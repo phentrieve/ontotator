@@ -144,6 +144,8 @@ A token can do only what both its scopes and its owner's roles allow. Many tools
 | `project_overview` | read | reads | Where a project stands: settings, totals per stage, people and open decisions. |
 | `get_progress` | read | reads | Assignment progress per text version and per person (open, in progress, submitted). |
 | `working_time_summary` | read | reads | Recorded working time per annotation mode: texts, total and median per text. |
+| `project_audit` | read | reads | The project's audit trail: who changed what and with which token, newest first (leads). |
+| `list_jobs` | read | reads | The project's import and export jobs, newest first, with state and error code (leads). |
 | `list_texts` | read | reads | The project's texts with IDs, stage, assigned people and final result. |
 | `agreement_summary` | read | reads | Agreement of the annotations behind the final results, project-wide. |
 | `start_consolidation` | read, project-admin | adds | Start a consolidation of a text's submissions by a consolidator. |
