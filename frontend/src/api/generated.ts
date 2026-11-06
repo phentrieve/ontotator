@@ -3325,6 +3325,20 @@ export interface components {
             /** Pairs */
             pairs: number;
         };
+        /**
+         * AgreementRelatedView
+         * @description Findings on overlapping text whose terms are ancestor and descendant
+         *     ("Seizure" / "Focal seizure", #303): a term difference all the same.
+         *     ``term_labels`` are the terms' names (else their ids), as ``term_ids``.
+         */
+        AgreementRelatedView: {
+            /** Layer Id */
+            layer_id: string;
+            /** Term Ids */
+            term_ids: string[];
+            /** Term Labels */
+            term_labels: string[];
+        };
         /** AgreementSummary */
         AgreementSummary: {
             macro_mean: components["schemas"]["AgreementMacroMean"];
@@ -3342,6 +3356,8 @@ export interface components {
             context_differences: number;
             /** Detail Differences */
             detail_differences?: components["schemas"]["AgreementDetailView"][];
+            /** Related Terms */
+            related_terms?: components["schemas"]["AgreementRelatedView"][];
         };
         /**
          * Annotation
