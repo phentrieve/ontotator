@@ -129,7 +129,9 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     ("POST", f"{P}/documents/{{doc:path}}/translation-correction-assignment"): (
         "project-admin"
     ),
-    ("POST", f"{P}/documents/{{doc:path}}/lead-correction"): SESSION,
+    # The lead takes a rejected translation over (issue 345): project work of
+    # the lead, as the correction assignment above.
+    ("POST", f"{P}/documents/{{doc:path}}/lead-correction"): "project-admin",
     ("POST", f"{P}/variants/{{document_id:path}}/discard"): "project-admin",
     ("GET", f"{P}/proposal-sets/{{set_id}}"): "read",
     ("GET", f"{P}/workflow-warnings"): "read",
@@ -179,6 +181,12 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     ("POST", f"{P}/annotation-mode-changes/{{change_id}}/restore"): "project-admin",
     ("POST", f"{P}/consolidations"): "project-admin",
     ("POST", f"{P}/submissions/{{submission_id:path}}/carry"): "project-admin",
+    # Text changes after annotation (issue 345): the lead moves open work to
+    # the new text version, or lets it finish or withdraws it.
+    ("POST", "/api/v1/assignments/{assignment_id}/move-to-version"): "project-admin",
+    ("POST", "/api/v1/assignments/{assignment_id}/text-change-resolution"): (
+        "project-admin"
+    ),
     ("PUT", f"{P}/final-selections"): "project-admin",
     # Agreement behind the final results (issue 353): leads, like the export.
     ("GET", f"{P}/agreement"): "read",
@@ -191,8 +199,6 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     ("POST", "/api/v1/assignments/{assignment_id}/problem-reports"): SESSION,
     # Annotation, review and translation review work: browser only
     ("POST", "/api/v1/assignments/{assignment_id}/open"): SESSION,
-    ("POST", "/api/v1/assignments/{assignment_id}/move-to-version"): SESSION,
-    ("POST", "/api/v1/assignments/{assignment_id}/text-change-resolution"): SESSION,
     ("POST", "/api/v1/rounds/{round_id}/open"): SESSION,
     ("GET", "/api/v1/rounds/{round_id}/inputs"): "read",
     ("GET", "/api/v1/rounds/{round_id}/consolidation"): "read",
@@ -228,6 +234,9 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
         "/api/v1/workspaces/{workspace_id}/consolidation-groups/undo-reopen-all",
     ): SESSION,
     ("GET", "/api/v1/translation-reviews/{assignment_id}"): "read",
+    # A translation review is personal work, like a workspace submit: its
+    # draft and its decision are made by the person it is assigned to, never
+    # by a machine acting as them (issue 345), so these stay with the session.
     ("PUT", "/api/v1/translation-reviews/{assignment_id}/draft"): SESSION,
     ("PUT", "/api/v1/translation-reviews/{assignment_id}/checked-sentences"): SESSION,
     ("POST", "/api/v1/translation-reviews/{assignment_id}/submit"): SESSION,
@@ -289,6 +298,10 @@ PROJECT_RESOLVED: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/api/v1/assignments/{assignment_id}/reopen"),
         ("POST", "/api/v1/assignments/{assignment_id}/remove"),
         ("POST", "/api/v1/assignments/{assignment_id}/revoke"),
+        # Text changes (issue 345): TextChangeService finds the assignment's
+        # project with AssignmentService._locate.
+        ("POST", "/api/v1/assignments/{assignment_id}/move-to-version"),
+        ("POST", "/api/v1/assignments/{assignment_id}/text-change-resolution"),
         # Issue 351: the task itself, its submissions and rounds. The task's
         # project is found by AssignmentService (readable, _locate) or the
         # owner check of the route (_owned_assignment).
