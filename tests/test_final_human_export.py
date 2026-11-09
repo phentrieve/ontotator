@@ -257,7 +257,7 @@ _VOLATILE = [
 # receipt.json and the "Taken out of the work plan" count and section to
 # README.txt.
 CARRY_FORWARD_DIGEST = (
-    "107bf1bdbe2c5289c3a0874696bf4f9873d3be77eca45b32d5ca140569bfc357"
+    "7bbe0e424f61d77e5b16787c64166af0d911df20d0c3189a56e9077ba7fc6543"
 )
 
 
