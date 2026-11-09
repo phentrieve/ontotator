@@ -270,7 +270,7 @@ test('corrected-text private carry preserves submitted history through a reporte
     const restarted = page.waitForResponse(r => r.request().method() === 'POST' && r.url().includes(`/problem-reports/${encodeURIComponent(report.report_id)}`));
     await restart.getByRole('button', { name: 'Restart in a new round', exact: true }).click();
     expect((await restarted).ok()).toBeTruthy();
-    await expect(page.getByText(/^The annotation of .+ restarted with /)).toBeVisible();
+    await expect(page.getByText(/^The annotation of .+ restarted in /)).toBeVisible();
     await author.page.reload();
     await expect(author.page.getByRole('button', { name: 'More actions', exact: true })).toBeVisible();
     await expect(author.page.locator('.sidebar .doc-item')).toHaveCount(0);

@@ -325,7 +325,7 @@ test("restart of a translation review keeps the old draft in the history; the re
   const restart = await openIntent(page, "Agree clean restart…", restartTitle(ref));
   await expect(restart).toContainText("The current translation draft is kept in the report history; the text and form start fresh.");
   await confirmRestart(restart, asLeadSees(s, "reporter"), "Agreed: review the translation again from scratch.");
-  await expect(outcome(page)).toContainText(`${upperFirst(ref)} restarted with`);
+  await expect(outcome(page)).toContainText(`${upperFirst(ref)} restarted in`);
   await expect(outcome(page)).toContainText("Report closed. The final result did not change.");
 
   // The history keeps the archived draft text and form values behind a disclosure.
