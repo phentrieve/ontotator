@@ -5550,6 +5550,11 @@ export interface components {
             state_digest: string;
             /** Not In Plan */
             not_in_plan?: components["schemas"]["RowRefView"][];
+            /**
+             * Planned Out Texts
+             * @default 0
+             */
+            planned_out_texts: number;
         };
         /** FinalSelectionRequest */
         FinalSelectionRequest: {

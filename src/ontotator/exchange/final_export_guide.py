@@ -213,8 +213,9 @@ def build_planned_out_csv(payload: Mapping[str, Any]) -> bytes:
     """One row per text taken out of the work plan, in case and language order.
 
     ``planned_out_at`` is the time of the plan change in UTC, ``reason`` the
-    reason entered with it (empty without one), ``final_result_kept`` "yes"
-    when the text had a final result, which stays in Ontotator unexported.
+    reason entered with it (empty without one), ``final_result_kept`` "true"
+    when the text had a final result, which stays in Ontotator unexported,
+    and "false" otherwise.
     """
     out = io.StringIO(newline="")
     writer = csv.DictWriter(out, fieldnames=PLANNED_OUT_COLUMNS)
@@ -227,7 +228,9 @@ def build_planned_out_csv(payload: Mapping[str, Any]) -> bytes:
                 "plan_revision": str(item["revision"]),
                 "planned_out_at": item["planned_out_at"],
                 "reason": item.get("reason") or "",
-                "final_result_kept": "yes" if item.get("final_result_kept") else "",
+                "final_result_kept": (
+                    "true" if item.get("final_result_kept") else "false"
+                ),
             }
         )
     return out.getvalue().encode("utf-8-sig")
@@ -247,22 +250,34 @@ def planned_out_section(payload: Mapping[str, Any]) -> list[str]:
         return [*out, "None."]
     out += _wrap(
         "These texts were planned for annotation until a lead turned Annotate "
-        "off in the work plan. They are not part of this export. The plan "
-        "revision is that of the text's case after the change; the time is in "
-        f"UTC. {PLANNED_OUT_FILE} lists the same."
+        "off in the work plan. They are not part of this export. Texts taken "
+        "out by the same plan change with the same reason are listed together "
+        "under one line giving the plan revision of the case after the change, "
+        'its time in UTC and the reason. A text marked "final result kept" '
+        "had a final result; it stays in Ontotator and is not exported. "
+        f"{PLANNED_OUT_FILE} lists the same, one row per text."
     )
-    out.append("")
+    groups: dict[tuple[int, str, str], list[Mapping[str, Any]]] = {}
     for item in items:
         moment = item["planned_out_at"][:19].replace("T", " ") + " UTC"
-        reason = item.get("reason")
-        text = (
-            f"{item['case_id']} ({item['language']}): taken out in plan revision "
-            f"{item['revision']} on {moment}. "
+        key = (item["revision"], moment, item.get("reason") or "")
+        groups.setdefault(key, []).append(item)
+    # Oldest change first; ties by revision and reason keep the order fixed.
+    for revision, moment, reason in sorted(groups, key=lambda k: (k[1], k[0], k[2])):
+        out.append("")
+        out += _wrap(
+            f"Plan revision {revision}, {moment}: "
             + (f"Reason: {reason}" if reason else "No reason was given.")
         )
-        if item.get("final_result_kept"):
-            text += " Its final result stays in Ontotator and is not exported."
-        out += _wrap(text, "", "  ")
+        texts = ", ".join(
+            f"{item['case_id']} ({item['language']}"
+            + (", final result kept)" if item.get("final_result_kept") else ")")
+            for item in sorted(
+                groups[(revision, moment, reason)],
+                key=lambda item: (item["case_id"], item["language"]),
+            )
+        )
+        out += _wrap(texts, "  ", "  ")
     return out
 
 

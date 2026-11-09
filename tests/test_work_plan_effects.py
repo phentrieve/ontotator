@@ -220,6 +220,8 @@ def test_export_names_texts_taken_out_of_the_plan_and_why(env):
 
     state = preflight(env)
     assert state["not_in_plan"] == [{"case_id": "c1", "language": "en"}]
+    # The export check counts them; the count is not part of the digest.
+    assert state["planned_out_texts"] == 2
     queued = env.lead.post(
         f"{BASE}/exports/final",
         json={
@@ -247,8 +249,8 @@ def test_export_names_texts_taken_out_of_the_plan_and_why(env):
         (r["case_id"], r["language"], r["reason"], r["final_result_kept"])
         for r in planned
     ] == [
-        ("c1", "en", "Adults only in this study.", "yes"),
-        ("c2", "de", "", ""),
+        ("c1", "en", "Adults only in this study.", "true"),
+        ("c2", "de", "", "false"),
     ]
     assert planned[0]["plan_revision"] == str(revision)
     assert planned[1]["plan_revision"] == "4"
@@ -259,13 +261,10 @@ def test_export_names_texts_taken_out_of_the_plan_and_why(env):
     ) == [("c1", "en"), ("c2", "de")]
     readme = " ".join(archive.read("README.txt").decode().split())
     assert "Taken out of the work plan: 2" in readme
-    assert (
-        f"c1 (en): taken out in plan revision {revision} on " in readme
-        and "Reason: Adults only in this study. Its final result stays in "
-        "Ontotator and is not exported."
-        in readme
-    )
-    assert "c2 (de): taken out in plan revision 4 on " in readme
+    assert f"Plan revision {revision}, " in readme
+    assert "Reason: Adults only in this study. c1 (en, final result kept)" in readme
+    assert "Plan revision 4, " in readme
+    assert "No reason was given. c2 (de)" in readme
     receipt = json.loads(archive.read("receipt.json"))
     assert [item["case_id"] for item in receipt["planned_out"]] == ["c1", "c2"]
     assert "planned-out.csv" in receipt["files"]

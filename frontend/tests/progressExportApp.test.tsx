@@ -30,7 +30,7 @@ beforeEach(() => {
   vi.spyOn(api, "listMembers").mockResolvedValue([]);
   vi.spyOn(api, "listAssignments").mockResolvedValue([]);
   vi.spyOn(api, "listMyTasks").mockResolvedValue([]);
-  vi.spyOn(api, "finalExportPreflight").mockResolvedValue({ project: "p/key", selections: [], warnings: [], omissions: [], state_digest: "0".repeat(64) });
+  vi.spyOn(api, "finalExportPreflight").mockResolvedValue({ project: "p/key", selections: [], warnings: [], omissions: [], state_digest: "0".repeat(64), planned_out_texts: 0 });
   vi.spyOn(api, "listProjectDocuments").mockResolvedValue([{ ...document, status: "not_started", text_length: 4 }] as never);
   vi.spyOn(api, "listProjectJobs").mockResolvedValue({ jobs: [], total: 0, limit: 20, offset: 0 });
 });

@@ -227,7 +227,13 @@ class FinalResultService:
     def preflight(self, key: str) -> dict[str, Any]:
         with self.db.transaction() as conn:
             pid = self._authorize(conn, key, exclusive=True)
-            return self._projection(conn, key, pid)
+            state = self._projection(conn, key, pid)
+            # For information (#338): the texts planned-out.csv would list.
+            # Outside the state and its digest, like the export snapshot.
+            planned_out = work_plan_store.planned_out(
+                conn, pid, work_plan_store.effective_plan(conn, pid)
+            )
+            return {**state, "planned_out_texts": len(planned_out)}
 
     def _compared(
         self,

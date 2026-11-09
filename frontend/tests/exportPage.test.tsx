@@ -8,7 +8,7 @@ const job = (id: number, kind = "t1_export", status: JobView["status"] = "succee
 const storageKey = (username = "lead", project = "p", kind = "t1") => `ontotator:export:${JSON.stringify([username, project, kind])}`;
 const card = (title = "Annotation results") => within(screen.getByRole("row", { name: title }));
 const finals = () => within(screen.getByRole("region", { name: "Final results" }));
-const emptyPreflight: FinalPreflight = { project: "p", selections: [], warnings: [], omissions: [], state_digest: "0".repeat(64) };
+const emptyPreflight: FinalPreflight = { project: "p", selections: [], warnings: [], omissions: [], state_digest: "0".repeat(64), planned_out_texts: 0 };
 const selection = { case_id: "case-1", language: "de", document_id: "d", submission_id: "s", revision: 1 };
 const warning = { id: "w", code: "OPEN_PROBLEM_REPORT", cause_revision: 2, case_id: "case-1", language: "de", reason: "Wording under review", destination: "#/tasks/1" };
 beforeEach(() => {
@@ -151,7 +151,7 @@ it("summarizes serializer errors and keeps raw diagnostics in a disclosure", asy
 it("links each preflight warning and omission to its Documents row", async () => {
   vi.mocked(api.finalExportPreflight).mockResolvedValue({ project: "p/a", selections: [{ case_id: "GSC17", language: "de", document_id: "d", submission_id: "s", revision: 1 }],
     warnings: [{ id: "held", code: "OPEN_PROBLEM_REPORT", cause_revision: 2, case_id: "GSC 17", language: "de", document_id: "old", reason: "Text wording needs review", destination: "#/tasks/7" }],
-    omissions: [{ case_id: "GSC18", language: "en" }], state_digest: "a".repeat(64) });
+    omissions: [{ case_id: "GSC18", language: "en" }], state_digest: "a".repeat(64), planned_out_texts: 0 });
   render(<ExportPage projectKey="p/a" currentUser={user} />);
   await screen.findByText("Text wording needs review");
   expect(screen.getByRole("link", { name: "Open in Documents, GSC 17 de" }).getAttribute("href")).toBe("#/projects/p%2Fa/documents?language=de&case=GSC+17");

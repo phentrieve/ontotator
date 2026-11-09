@@ -62,6 +62,9 @@ class FinalPreflight(BaseModel):
     state_digest: str
     # Rows with a final result and Annotate off: kept, not exported (information).
     not_in_plan: list[RowRefView] = Field(default_factory=list)
+    # Texts taken out of the work plan that a final export names in
+    # planned-out.csv (#338); not part of the state digest.
+    planned_out_texts: int = 0
 
 
 class WarningAcknowledgement(BaseModel):

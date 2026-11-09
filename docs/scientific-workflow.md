@@ -130,7 +130,8 @@ gets a layer of its own, `<layer id>@<digest prefix>`, with its release and dige
 A text a lead took out of the work plan, that is, whose annotation was on
 and was turned off and stays off at export, is not part of the final
 results. So that the exported subset stays documented, the export names it:
-`README.txt` lists it under *Taken out of the work plan*, `index.csv` has a
+`README.txt` lists it under *Taken out of the work plan*, grouped by plan
+revision, time and reason (one line per group, then the case IDs), `index.csv` has a
 row with `row_type` `planned_out` that fills only `case_id` and `language`,
 and `planned-out.csv` (UTF-8 with byte order mark, CRLF) has one row per text
 in case and language order:
@@ -141,8 +142,8 @@ in case and language order:
   `2026-11-05T10:44:01.000000Z`;
 - `reason`: the reason the lead entered in **Plan…**, or the discard reason
   when discarding a translation took it out; empty without one;
-- `final_result_kept`: `yes` when the text had a final result. It stays in
-  Ontotator and is not exported.
+- `final_result_kept`: `true` when the text had a final result, which stays
+  in Ontotator and is not exported; `false` otherwise.
 
 When a text was taken out more than once, the latest change counts. Texts
 that were never in the plan are not listed. The same entries are under

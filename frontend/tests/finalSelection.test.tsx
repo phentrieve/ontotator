@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { api } from "../src/api/client";
 import { FinalExportPanel } from "../src/admin/FinalExportPanel";
 import { ERROR_MESSAGES } from "../src/admin/errors";
-const preflight = { project: "p", selections: [{ case_id: "case", language: "en", document_id: "d", submission_id: "s", revision: 1 }], warnings: [{ id: "w", code: "OPEN_PROBLEM_REPORT", cause_revision: 2, case_id: "case", language: "en", reason: "Wording under review", destination: "#/tasks/1" }], omissions: [], state_digest: "a".repeat(64) };
+const preflight = { project: "p", selections: [{ case_id: "case", language: "en", document_id: "d", submission_id: "s", revision: 1 }], warnings: [{ id: "w", code: "OPEN_PROBLEM_REPORT", cause_revision: 2, case_id: "case", language: "en", reason: "Wording under review", destination: "#/tasks/1" }], omissions: [], state_digest: "a".repeat(64), planned_out_texts: 0 };
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 const ACK = /^Export the 1 result as it is/;
 it("requires conscious warning acceptance and sends exact preflight identities", async () => {
@@ -287,4 +287,19 @@ it("names why Phenopackets failed from the job's error code, or says which forma
   fireEvent.change(screen.getByLabelText("Format"), { target: { value: "phenopacket" } });
   fireEvent.click(screen.getByRole("button", { name: "Create final export" }));
   expect(await screen.findByText("The Phenopackets could not be created. Open diagnostics for the technical details.")).toBeDefined();
+});
+
+it("names the texts taken out of the work plan and the file that lists them", async () => {
+  vi.spyOn(api, "finalExportPreflight").mockResolvedValue({ ...preflight, warnings: [], planned_out_texts: 4 });
+  render(<FinalExportPanel projectKey="p" username="lead" />);
+  await screen.findByText("4 texts taken out of the work plan are listed in planned-out.csv.");
+  fireEvent.change(screen.getByLabelText("Format"), { target: { value: "phenopacket" } });
+  screen.getByText("4 texts taken out of the work plan are listed in README.txt.");
+});
+
+it("says nothing about the work plan when no text was taken out", async () => {
+  vi.spyOn(api, "finalExportPreflight").mockResolvedValue({ ...preflight, warnings: [], planned_out_texts: 0 });
+  render(<FinalExportPanel projectKey="p" username="lead" />);
+  await screen.findByText(/Nothing to check/);
+  expect(screen.queryByText(/taken out of the work plan (is|are) listed/)).toBeNull();
 });

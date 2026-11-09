@@ -278,6 +278,14 @@ PLANNED_OUT = [
         "final_result_kept": True,
     },
     {
+        "case_id": "case-three",
+        "language": "en",
+        "revision": 3,
+        "planned_out_at": "2026-10-18T09:15:02.123456Z",
+        "reason": "Out of scope: adult cases only.",
+        "final_result_kept": False,
+    },
+    {
         "case_id": "case-µ",
         "language": "fr",
         "revision": 2,
@@ -300,6 +308,7 @@ def test_planned_out_texts_have_index_rows_and_their_own_table():
     assert [(r["case_id"], r["language"], r["row_type"]) for r in table] == [
         ("case, two", "de", "planned_out"),
         ("case, two", "en", "omitted"),
+        ("case-three", "en", "planned_out"),
         ("case-µ", "de", "selected"),
         ("case-µ", "de", "provenance"),
         ("case-µ", "fr", "planned_out"),
@@ -318,7 +327,15 @@ def test_planned_out_texts_have_index_rows_and_their_own_table():
             "plan_revision": "3",
             "planned_out_at": "2026-10-18T09:15:02.123456Z",
             "reason": "Out of scope: adult cases only.",
-            "final_result_kept": "yes",
+            "final_result_kept": "true",
+        },
+        {
+            "case_id": "case-three",
+            "language": "en",
+            "plan_revision": "3",
+            "planned_out_at": "2026-10-18T09:15:02.123456Z",
+            "reason": "Out of scope: adult cases only.",
+            "final_result_kept": "false",
         },
         {
             "case_id": "case-µ",
@@ -326,23 +343,24 @@ def test_planned_out_texts_have_index_rows_and_their_own_table():
             "plan_revision": "2",
             "planned_out_at": "2026-10-17T07:00:00.000000Z",
             "reason": "",
-            "final_result_kept": "",
+            "final_result_kept": "false",
         },
     ]
     text = files["README.txt"].decode()
-    assert "Taken out of the work plan:        2\n" in text
+    assert "Taken out of the work plan:        3\n" in text
     assert "\nplanned-out.csv     The texts taken out of the work plan" in text
     assert "Taken out of the work plan\n--------------------------\n" in text
     flat = " ".join(text.split())
     for sentence in [
-        "case, two (de): taken out in plan revision 3 on 2026-10-18 09:15:02 UTC. "
-        "Reason: Out of scope: adult cases only. Its final result stays in "
-        "Ontotator and is not exported.",
-        "case-µ (fr): taken out in plan revision 2 on 2026-10-17 07:00:00 UTC. "
-        "No reason was given.",
+        "Plan revision 2, 2026-10-17 07:00:00 UTC: No reason was given. "
+        "case-µ (fr) Plan revision 3, 2026-10-18 09:15:02 UTC: Reason: Out of "
+        "scope: adult cases only. case, two (de, final result kept), "
+        "case-three (en)",
         '"planned_out" rows are texts a lead took out of the work plan',
     ]:
         assert sentence in flat, sentence
+    # The reason is written once per group, not once per text.
+    assert flat.count("Out of scope: adult cases only.") == 1
     again = guide_files(
         payload(planned_out=PLANNED_OUT),
         snapshot_id="s",

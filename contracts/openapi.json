@@ -17056,6 +17056,11 @@
             },
             "type": "array",
             "title": "Not In Plan"
+          },
+          "planned_out_texts": {
+            "type": "integer",
+            "title": "Planned Out Texts",
+            "default": 0
           }
         },
         "type": "object",
