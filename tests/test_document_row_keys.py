@@ -7,9 +7,10 @@ from typing import Any
 
 import pytest
 from auth_harness import logged_in
-from work_plan_support import BASE, plan_env
+from work_plan_support import BASE, CASES, LANGUAGES, plan_env, write
 
 from ontotator.application import document_row_keys
+from ontotator.domain.work_plans import PlanFlags, RowKey
 
 
 @pytest.fixture
@@ -74,6 +75,38 @@ def test_keys_with_exclude_return_the_other_matching_texts(env):
         f"{BASE}/document-rows/keys", json={"case_ids": too_many, "exclude": True}
     )
     assert response.status_code == 422, response.text
+
+
+def test_keys_with_exclude_and_active_only_leave_out_hidden_texts(env):
+    """The complement counts the rows the table shows (issue 339): with
+    "Show texts not in plan" off, sources out of the plan are hidden, so
+    "Select all except these" must neither count nor select them."""
+    write(
+        env,
+        {RowKey(case, "en"): PlanFlags(False, False) for case in CASES}
+        | {
+            RowKey(case, language): PlanFlags(False, True)
+            for case in CASES
+            for language in LANGUAGES
+        },
+    )
+    everything = keys(env, case_ids=["c2"], exclude=True)
+    assert pairs(everything) == [("c1", "en"), ("c1", "de"), ("c1", "fr")]
+    shown = keys(env, case_ids=["c2"], exclude=True, active_only=True)
+    assert pairs(shown) == [("c1", "de"), ("c1", "fr")]
+    assert shown["cases"] == 1 and shown["total"] == 2
+    sources = keys(
+        env,
+        case_ids=["c2"],
+        exclude=True,
+        active_only=True,
+        filters={"language": "en"},
+    )
+    assert pairs(sources) == [] and sources["cases"] == 0
+    # A source back in the plan is shown and counts again.
+    write(env, {RowKey("c1", "en"): PlanFlags(False, True)})
+    again = keys(env, case_ids=["c2"], exclude=True, active_only=True)
+    assert pairs(again) == [("c1", "en"), ("c1", "de"), ("c1", "fr")]
 
 
 def test_keys_truncate_at_2000_cases(env, monkeypatch):

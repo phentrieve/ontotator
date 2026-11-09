@@ -91,6 +91,11 @@ export function hiddenText({ not_shown: total = 0, not_shown_sources: sources = 
 
 export const MOVE_TO_FRONT = "Move to front";
 
+/** The confirm button of the inline confirmation, unlike the bar's trigger: "Move 2 texts to the front". */
+export function moveTextsText(texts: number): string {
+  return `Move ${plural(texts, "text")} to the front`;
+}
+
 /** "2 texts moved to the front of the queue." */
 export function movedText(moved: number): string {
   return `${plural(moved, "text")} moved to the front of the queue.`;
@@ -113,6 +118,7 @@ export function SelectionBar({
   const latest = useRef({ showToast, onAnnounce, onChanged, onRevisions, onSelectTexts });
   latest.current = { showToast, onAnnounce, onChanged, onRevisions, onSelectTexts };
   const alive = useRef(true);
+  const frontButton = useRef<HTMLButtonElement>(null);
   const section = useRef<HTMLElement>(null);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
@@ -224,16 +230,16 @@ export function SelectionBar({
         <div className="selection-bar-actions">
           <Button variant="primary" onClick={onAssign}>{assignButtonText(current)}</Button>
           <Button onClick={() => setPlan(caseIds)}>Plan…</Button>
-          <Button aria-expanded={front} onClick={() => setFront(value => !value)}>{MOVE_TO_FRONT}</Button>
+          <Button ref={frontButton} aria-expanded={front} onClick={() => setFront(value => !value)}>{MOVE_TO_FRONT}</Button>
           <Button aria-pressed={showSelected} onClick={onToggleShowSelected}>Show selected</Button>
           <Button onClick={onClear}>Clear selection</Button>
         </div>
       </div>}
       {limitNote && keys.size >= MIN_TEXTS && <p className="selection-bar-limit">{limitNote}</p>}
       {front && keys.size >= MIN_TEXTS && <div className="selection-bar-undo">
-        <InlineConfirm title="Move to the front of the queue" busy={frontBusy} confirmLabel={MOVE_TO_FRONT}
+        <InlineConfirm title="Move to the front of the queue" busy={frontBusy} confirmLabel={moveTextsText(keys.size)}
           message={<p>{`Open tasks on the ${plural(keys.size, "selected text")} come first in My tasks, before the tasks on texts imported earlier. The other texts keep their order.`}</p>}
-          onCancel={() => setFront(false)} onConfirm={moveToFront} />
+          onCancel={() => { setFront(false); frontButton.current?.focus(); }} onConfirm={moveToFront} />
       </div>}
       {error !== undefined && <div className="selection-bar-error"><ErrorNotice error={error} /></div>}
       {nothing?.key === idsKey && keys.size >= MIN_TEXTS && <InlineMessage tone="info">{nothing.text}</InlineMessage>}

@@ -6,7 +6,8 @@
  * Case IDs are case sensitive: an ID in another case matches only when one case ID fits; when several
  * do (and none exactly), the dialog lists them and the lead enters the exact one (issue 237).
  * "Select all except these" (issue 339) selects the other texts matching the current filters instead: the server
- * computes the complement (`document-rows/keys` with `exclude`) from at most `MAX_EXCLUDED` found case IDs.
+ * computes the complement (`document-rows/keys` with `exclude`) from at most `MAX_EXCLUDED` found case IDs, with
+ * `active_only` while the table hides texts not in plan, so the count and the selection are the rows the lead sees.
  */
 import { useEffect, useId, useRef, useState } from "react";
 import { api, type CaseIdLookupResult, type DocumentRowFilters, type DocumentRowKeys, type DocumentRowKeysRequest, type RowRefView } from "../api/client";
@@ -23,6 +24,8 @@ export interface SelectByIdsDialogProps {
   /** The current Documents filters and order: "Select all except these" selects the other matching texts. */
   filters?: DocumentRowFilters;
   sort?: DocumentRowKeysRequest["sort"];
+  /** The table hides texts not in plan ("Show texts not in plan" off): "Select all except these" leaves them out too. */
+  activeOnly?: boolean;
   onClose: () => void;
   /**
    * Text keys `"{case}:{language}"` of the found cases in pasted order (or, inverted, of the other matching cases in list
@@ -77,7 +80,7 @@ function shortList(items: readonly string[]): string {
   return `${items.slice(0, UNKNOWN_SHOWN).join(", ")}${items.length > UNKNOWN_SHOWN ? ` and ${items.length - UNKNOWN_SHOWN} more` : ""}`;
 }
 
-export function SelectByIdsDialog({ projectKey, current, filters = {}, sort, onClose, onSelect }: SelectByIdsDialogProps): JSX.Element {
+export function SelectByIdsDialog({ projectKey, current, filters = {}, sort, activeOnly = false, onClose, onSelect }: SelectByIdsDialogProps): JSX.Element {
   const id = useId().replace(/:/g, "");
   const [text, setText] = useState("");
   const [result, setResult] = useState<{ key: string; value: Lookup } | null>(null);
@@ -115,13 +118,13 @@ export function SelectByIdsDialog({ projectKey, current, filters = {}, sort, onC
   const ambiguous = fresh?.ambiguous ?? [];
   const add = adding && current.size > 0;
   // Inverted: the other texts matching the filters, computed by the server once the lookup is in.
-  const restKey = JSON.stringify([key, filters, sort ?? "case"]);
+  const restKey = JSON.stringify([key, filters, sort ?? "case", activeOnly]);
   const tooManyExcluded = found.length > MAX_EXCLUDED;
   const wantRest = invert && fresh !== null && found.length > 0 && !tooManyExcluded;
   useEffect(() => {
     if (!wantRest) return;
     let active = true;
-    api.documentRowKeys(projectKey, { case_ids: found, exclude: true, filters, sort: sort ?? "case" }).then(value => {
+    api.documentRowKeys(projectKey, { case_ids: found, exclude: true, active_only: activeOnly, filters, sort: sort ?? "case" }).then(value => {
       if (active) { setRest({ key: restKey, value }); setRestError(null); }
     }, (failure: unknown) => { if (active) setRestError({ key: restKey, error: failure }); });
     return () => { active = false; };

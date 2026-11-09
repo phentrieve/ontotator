@@ -15805,6 +15805,11 @@
             "title": "Exclude",
             "default": false
           },
+          "active_only": {
+            "type": "boolean",
+            "title": "Active Only",
+            "default": false
+          },
           "sort": {
             "type": "string",
             "enum": [

@@ -62,7 +62,7 @@ export function selectWithdrawnLabel(texts: number): string {
 export function undoneToast(withdrawn: readonly RowRefView[], onSelectTexts: ((keys: readonly string[]) => void) | undefined): Omit<ToastMessage, "id"> | null {
   const keys = withdrawnTextKeys(withdrawn);
   if (!keys.length || !onSelectTexts) return null;
-  return { message: "Plan change undone.", actionLabel: selectWithdrawnLabel(keys.length), onAction: () => onSelectTexts(keys), persist: true };
+  return { message: "Plan change undone.", actionLabel: selectWithdrawnLabel(keys.length), onAction: () => onSelectTexts(keys), plain: true, persist: true };
 }
 
 /** "1 open translation review (Ana Weber, ann-0004)" per task, joined with "; " (Undo conflict, D22). */

@@ -89,6 +89,8 @@ it("after an Undo the toast offers the texts of the withdrawn tasks (issue 339)"
   fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
   const offer = await screen.findByRole("button", { name: "Select the text with withdrawn tasks" });
   expect(screen.getByText("Plan change undone.", { selector: ".ui-toast *" })).toBeTruthy();
+  // A plain offer: no check icon (only Undo actions have an icon here).
+  expect(offer.querySelector(".btn-leading-icon")).toBeNull();
   fireEvent.click(offer);
   expect(onSelectTexts).toHaveBeenCalledWith(["case-0101:fr"]);
 });
@@ -104,7 +106,7 @@ it("withdrawn texts: each text once; no offer without withdrawn tasks", () => {
   expect(selectWithdrawnLabel(2)).toBe("Select the 2 texts with withdrawn tasks");
   expect(undoneToast([], vi.fn())).toBeNull();
   expect(undoneToast(withdrawn, undefined)).toBeNull();
-  expect(undoneToast(withdrawn, vi.fn())).toMatchObject({ message: "Plan change undone.", actionLabel: "Select the 2 texts with withdrawn tasks", persist: true });
+  expect(undoneToast(withdrawn, vi.fn())).toMatchObject({ message: "Plan change undone.", actionLabel: "Select the 2 texts with withdrawn tasks", plain: true, persist: true });
 });
 
 it("undo restores the previous flags with the returned revision", async () => {

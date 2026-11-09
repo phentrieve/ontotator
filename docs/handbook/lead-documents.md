@@ -252,7 +252,7 @@ What for: select texts from a list you have elsewhere, for example a spreadsheet
 2. Paste the IDs into **Paste case IDs**, one per line or separated by commas.
 3. Check how many were found. Click **Copy unknown IDs** to copy the ones that do not exist.
    Case IDs are case sensitive, and two cases can differ only in case. An exact ID always wins. An ID in another case, for example `fr100907`, finds `Fr100907` when that is the only case ID that fits; the dialog lists it under *Matched in another case*. When several case IDs fit and none exactly, the dialog selects none of them and says so, for example *fr100907 matches FR100907 and Fr100907; enter the exact ID.*
-4. Optional: to select every other text instead, tick **Select all except these**. The dialog then selects the texts that match the current tab, filters and search, except the texts of the pasted cases, and says how many, for example *120 other texts in 60 cases match the current filters.* This takes at most 5000 case IDs.
+4. Optional: to select every other text instead, tick **Select all except these**. The dialog then selects the texts that match the current tab, filters and search, except the texts of the pasted cases, and says how many, for example *120 other texts in 60 cases match the current filters.* These are the texts the table shows: texts not in plan count only while **Show texts not in plan** is ticked. This takes at most 5000 case IDs.
 5. Optional: to keep the current selection, tick **Add to the current selection instead**.
 6. Click the select button, for example *Select 20* or *Select 120 other texts*.
 
@@ -328,7 +328,7 @@ What for: have some texts done first, for example a batch uploaded later that is
 **My tasks** lists each person's open tasks by status, then in the project's order: first imported first. To change that order:
 
 1. Select the texts, then click **Move to front** in the selection bar.
-2. Read the confirmation **Move to the front of the queue** and click **Move to front**.
+2. Read the confirmation **Move to the front of the queue** and click the button that names the texts, for example *Move 2 texts to the front*. Or click **Cancel**, or press Escape, to keep the order.
 
 The selected texts now come first, in their earlier order among themselves; the other texts follow in theirs. The message says how many texts moved, for example *2 texts moved to the front of the queue.* The order applies to tasks already assigned and to tasks you assign later, and **Import order** under **Order** on **Documents** follows it. A later upload comes last again. Each move is recorded in the audit trail. There is no Undo: to change the order again, move other texts to the front.
 

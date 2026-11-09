@@ -526,13 +526,19 @@ class BatchAssignmentService:
         case_ids: Sequence[str] = (),
         *,
         exclude: bool = False,
+        active_only: bool = False,
     ) -> dict[str, Any]:
         """Text keys matching ``query`` in list order (``document_row_keys``)."""
         with self.db.transaction() as conn:
             pid = self._authorize(conn, key)
             facts = load_facts(conn, self.repo, key, pid, self.access.user_id)
         found, cases, total, truncated = document_row_keys.row_keys(
-            page.row_context(facts), query, case_ids, facts=facts, exclude=exclude
+            page.row_context(facts),
+            query,
+            case_ids,
+            facts=facts,
+            exclude=exclude,
+            active_only=active_only,
         )
         return {
             "keys": [{"case_id": k.case_id, "language": k.language} for k in found],

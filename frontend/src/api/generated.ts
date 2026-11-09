@@ -5129,6 +5129,11 @@ export interface components {
              */
             exclude: boolean;
             /**
+             * Active Only
+             * @default false
+             */
+            active_only: boolean;
+            /**
              * Sort
              * @default case
              * @enum {string}

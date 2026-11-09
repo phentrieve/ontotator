@@ -6,7 +6,9 @@ Documents filters (the one row predicate ``row_matches``, as the filtered
 case IDs) in list order: cases in the order of ``query.sort``, within a case
 the source first, then the translations by language. With ``exclude`` it
 returns the matching texts outside the given cases ("Select all except
-these", issue 339).
+these", issue 339). With ``active_only`` only texts in the plan or not yet
+decided count: the rows the Documents table shows while "Show texts not in
+plan" is off, so the complement is what the lead sees.
 """
 
 from __future__ import annotations
@@ -34,11 +36,13 @@ def row_keys(
     *,
     facts: RowFacts,
     exclude: bool = False,
+    active_only: bool = False,
 ) -> tuple[list[RowKey], int, int, bool]:
     """``(keys, cases, total, truncated)`` of the texts matching ``query``.
 
     With ``case_ids`` only texts of these cases count (unknown IDs are
-    ignored); with ``exclude`` only texts of the other cases count. ``keys``
+    ignored); with ``exclude`` only texts of the other cases count; with
+    ``active_only`` only texts in plan or undecided (``RowContext.active``). ``keys``
     hold the texts of the first ``MAX_CASES`` matching cases; ``cases`` and
     ``total`` count every matching case and text; ``truncated`` is True when
     cases were cut off.
@@ -47,6 +51,8 @@ def row_keys(
     by_case: dict[str, list[tuple[bool, str]]] = {}
     for (case_id, language), row in context.rows.items():
         if wanted is not None and (case_id in wanted) == exclude:
+            continue
+        if active_only and not context.active((case_id, language)):
             continue
         if row_matches(context, row, query):
             by_case.setdefault(case_id, []).append((not row["is_source"], language))

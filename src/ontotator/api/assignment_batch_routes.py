@@ -235,6 +235,9 @@ class DocumentRowKeysRequest(BaseModel):
     filters: DocumentRowFilters = Field(default_factory=DocumentRowFilters)
     case_ids: list[str] = Field(default_factory=list, max_length=MAX_CASE_IDS)
     exclude: bool = False
+    # Only texts in plan or not yet decided: the rows the Documents table
+    # shows while "Show texts not in plan" is off (issue 339).
+    active_only: bool = False
     sort: Sort = "case"
 
 
@@ -336,5 +339,9 @@ def document_row_keys(
     """Text keys matching the filters in list order, of at most 2000 cases."""
     _guard(request, key)
     return _service(request, principal).row_keys(
-        key, body.filters.query(body.sort), body.case_ids, exclude=body.exclude
+        key,
+        body.filters.query(body.sort),
+        body.case_ids,
+        exclude=body.exclude,
+        active_only=body.active_only,
     )

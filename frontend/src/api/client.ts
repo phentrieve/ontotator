@@ -125,7 +125,7 @@ export type SelectionSummary = components["schemas"]["SelectionSummary"];
 export type RowRefView = components["schemas"]["RowRefView"];
 /** A selection: whole cases (case IDs) or single texts (`rows`, VD21). */
 export type RowSelection = readonly string[] | { readonly rows: readonly RowRefView[] };
-export type DocumentRowKeysRequest = Defaulted<components["schemas"]["DocumentRowKeysRequest"], "sort" | "exclude">;
+export type DocumentRowKeysRequest = Defaulted<components["schemas"]["DocumentRowKeysRequest"], "sort" | "exclude" | "active_only">;
 export type MoveToFrontResult = components["schemas"]["MoveToFrontResult"];
 export type DocumentRowKeys = components["schemas"]["DocumentRowKeys"];
 export type DocumentsVisitView = components["schemas"]["DocumentsVisitView"];

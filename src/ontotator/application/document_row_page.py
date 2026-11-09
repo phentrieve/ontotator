@@ -1539,6 +1539,11 @@ class RowContext:
         self.flags: Mapping[RowKey, tuple[bool, bool]] = self._ctx.flags
         self.discarded: frozenset[str] = self._ctx.dropped
 
+    def active(self, key: RowKey) -> bool:
+        """In plan or undecided: a row the Documents table shows without
+        "Show texts not in plan" (``isActiveRow`` in the frontend)."""
+        return self._ctx.in_plan[key] or self._ctx.undecided(key)
+
     def cases_not_shown(self, case_ids: Sequence[str], query: RowQuery) -> int:
         """Selected cases without any row matching the filters of ``query``.
 

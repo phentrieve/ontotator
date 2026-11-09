@@ -128,7 +128,10 @@ it("Move to front confirms inline, moves the selected texts and keeps the select
   const confirm = within(bar()).getByRole("group", { name: "Move to the front of the queue" });
   expect(within(confirm).getByText("Open tasks on the 2 selected texts come first in My tasks, before the tasks on texts imported earlier. The other texts keep their order.")).toBeTruthy();
   expect(api.moveToFront).not.toHaveBeenCalled();
-  fireEvent.click(within(confirm).getByRole("button", { name: "Move to front" }));
+  // One "Move to front" on screen: the confirmation's button names what it does.
+  expect(within(bar()).getAllByRole("button", { name: "Move to front" })).toHaveLength(1);
+  expect(document.activeElement?.textContent).toBe("Move to the front of the queue");
+  fireEvent.click(within(confirm).getByRole("button", { name: "Move 2 texts to the front" }));
   await waitFor(() => expect(api.moveToFront).toHaveBeenCalledWith("p", [{ case_id: "case-0101", language: "en" }, { case_id: "case-0101", language: "de" }]));
   expect(await screen.findByText("2 texts moved to the front of the queue.", { selector: ".ui-toast *, .ui-toast" })).toBeTruthy();
   expect(onAnnounce).toHaveBeenCalledWith("2 texts moved to the front of the queue.");
@@ -143,9 +146,13 @@ it("Move to front: Cancel moves nothing, a failure stays in the bar", async () =
   fireEvent.click(within(bar()).getByRole("button", { name: "Move to front" }));
   fireEvent.click(within(bar()).getByRole("button", { name: "Cancel" }));
   expect(within(bar()).queryByRole("group", { name: "Move to the front of the queue" })).toBeNull();
+  expect(document.activeElement).toBe(within(bar()).getByRole("button", { name: "Move to front" }));
+  fireEvent.click(within(bar()).getByRole("button", { name: "Move to front" }));
+  fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+  expect(within(bar()).queryByRole("group", { name: "Move to the front of the queue" })).toBeNull();
   fireEvent.click(within(bar()).getByRole("button", { name: "Move to front" }));
   const confirm = within(bar()).getByRole("group", { name: "Move to the front of the queue" });
-  fireEvent.click(within(confirm).getByRole("button", { name: "Move to front" }));
+  fireEvent.click(within(confirm).getByRole("button", { name: "Move 1 text to the front" }));
   expect(await within(bar()).findByText(/offline/)).toBeTruthy();
 });
 

@@ -939,7 +939,7 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
       <TranslationCorrectionAction projectKey={projectKey} variant={correctionFor.variant} username={textVersionTools.username}
         requiredLanguages={textVersionTools.requiredLanguages(correctionFor.variant.document_id)} defaultOpen inDialog />
     </Dialog>}
-    {idsDialogOpen && <SelectByIdsDialog projectKey={projectKey} current={selection.cases} filters={filters} sort={request.sort ?? "case"} onClose={() => setIdsDialogOpen(false)} onSelect={selectByIds} />}
+    {idsDialogOpen && <SelectByIdsDialog projectKey={projectKey} current={selection.cases} filters={filters} sort={request.sort ?? "case"} activeOnly={!notInPlanShown} onClose={() => setIdsDialogOpen(false)} onSelect={selectByIds} />}
   </section>;
 }
 

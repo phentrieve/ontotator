@@ -18,7 +18,7 @@ beforeEach(() => {
 const keysOf = (ids: readonly string[]) => ids.flatMap(id => [`${id}:en`, `${id}:de`]);
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
-function renderDialog(current: readonly string[] = [], extra: Partial<Pick<SelectByIdsDialogProps, "filters" | "sort">> = {}) {
+function renderDialog(current: readonly string[] = [], extra: Partial<Pick<SelectByIdsDialogProps, "filters" | "sort" | "activeOnly">> = {}) {
   const onSelect = vi.fn();
   const onClose = vi.fn();
   render(<SelectByIdsDialog projectKey="p" current={new Set(current)} onClose={onClose} onSelect={onSelect} {...extra} />);
@@ -156,13 +156,14 @@ function mockComplement(cases = 2600) {
 it("selects all except these: the server's complement under the current filters (issue 339)", async () => {
   mockComplement(5);
   const filters = { language: "de" };
-  const { dialog, paste, onSelect } = renderDialog([], { filters, sort: "import" });
+  // The table hides texts not in plan: the complement leaves them out too (active_only).
+  const { dialog, paste, onSelect } = renderDialog([], { filters, sort: "import", activeOnly: true });
   paste("case-0001 case-0003 nope");
   await within(dialog).findByText("2 found, 1 unknown");
   fireEvent.click(within(dialog).getByLabelText("Select all except these"));
   expect(within(dialog).getByText("Selects the texts matching the current filters, except the texts of these cases.")).toBeTruthy();
   expect(await within(dialog).findByText("6 other texts in 3 cases match the current filters.")).toBeTruthy();
-  expect(api.documentRowKeys).toHaveBeenLastCalledWith("p", { case_ids: ["case-0001", "case-0003"], exclude: true, filters, sort: "import" });
+  expect(api.documentRowKeys).toHaveBeenLastCalledWith("p", { case_ids: ["case-0001", "case-0003"], exclude: true, active_only: true, filters, sort: "import" });
   fireEvent.click(within(dialog).getByRole("button", { name: "Select 6 other texts" }));
   await waitFor(() => expect(onSelect).toHaveBeenCalledWith(keysOf(["case-0000", "case-0002", "case-0004"]), "replace", false));
 });
@@ -174,6 +175,8 @@ it("select all except these: capped at 2000 cases and at most 5000 pasted case I
   await within(dialog).findByText("1 found, 0 unknown");
   fireEvent.click(within(dialog).getByLabelText("Select all except these"));
   expect(await within(dialog).findByText("5198 other texts in 2599 cases match the current filters.")).toBeTruthy();
+  // With texts not in plan shown, they count as well.
+  expect(api.documentRowKeys).toHaveBeenLastCalledWith("p", expect.objectContaining({ exclude: true, active_only: false }));
   expect(within(dialog).getByText("Selection is limited to 2000 cases.")).toBeTruthy();
   fireEvent.click(within(dialog).getByRole("button", { name: "Select the first 2000 others" }));
   await waitFor(() => expect(onSelect).toHaveBeenCalledWith(expect.any(Array), "replace", true));
