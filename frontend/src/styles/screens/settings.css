@@ -67,6 +67,16 @@
   background: var(--surface-raised);
 }
 
+/* "Delete this project" (issue 191): set apart below the General settings, in the colours of destructive actions. */
+.settings-card--danger {
+  margin-block-start: var(--space-6);
+  border-color: var(--danger-border);
+}
+
+.settings-card--danger .settings-card-title {
+  color: var(--danger);
+}
+
 .settings-card + .settings-card,
 .settings-card + .settings-section-actions,
 .settings-card + .guidelines-versions {
