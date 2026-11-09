@@ -163,7 +163,7 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   MODE_NOT_ALLOWED: "Your project roles do not allow this working mode.",
   NOT_AN_ACTIVE_ADMIN: "This operation needs an active system administrator.",
   NOT_A_MEMBER: "This user is not a member of the project.",
-  NOT_A_PRACTICE_PROJECT: "Only practice projects can be deleted here. A project without work is deleted from its row on the Projects page.",
+  NOT_A_PRACTICE_PROJECT: "Only practice projects can be deleted here. A project without work is deleted in its settings, under General.",
   IS_A_PRACTICE_PROJECT: "This is a practice project. Delete it under Show practice projects.",
   OBSOLETE_TERM: "Replace obsolete terms in your findings, or reject or replace affected proposals before submitting.",
   ORCID_INVALID: "The ORCID format or checksum is invalid.",

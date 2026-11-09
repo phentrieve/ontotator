@@ -206,10 +206,13 @@ What for: remove a project that was created by mistake, for example with a wrong
 Only a project nobody has worked in can be deleted. Work is anything beyond the project's settings and members: texts, tool proposals, tasks, drafts and submissions, a guideline, a work plan, problem reports, final results and working time, and an upload that was committed. An upload that was only checked or discarded is not work.
 
 1. Click **Projects** in the sidebar.
-2. In the project's row, click **Delete project…**. Only projects without texts show it.
-3. Read the dialog and click **Delete project**.
+2. In the project's row, click **Settings**.
+3. On the tab **General**, scroll to **Delete this project** at the bottom and click **Delete project…**. Only system administrators see it.
+4. Read the dialog and click **Delete project**.
 
-The project goes with its settings, members, ontology pins, project API tokens and uncommitted uploads, and the next project may use its key. Its audit entries stay and name it by key; the deletion itself is recorded as well. A project that has work is refused with *This project has work …* and stays as it was. A practice project is deleted under [Practice projects](#practice-projects).
+You are taken to **Projects**, and a message confirms the deletion. The project goes with its settings, members, ontology pins, project API tokens and uncommitted uploads, and the next project may use its key. Its audit entries stay and name it by key; the deletion itself is recorded as well.
+
+A project that has work is refused and stays as it was. The dialog then names the work it found, for example *This project has texts and a guideline, so it cannot be deleted.*, and offers only **Close**. A practice project is deleted under [Practice projects](#practice-projects).
 
 ## Move a project to another server
 

@@ -8,7 +8,7 @@ import { ScreenErrorBoundary } from "./app/ErrorBoundary";
 import { TaskEditor } from "./tasks/TaskEditor";
 import { MY_TASKS, parseRoute, routeHref, type NavigateOptions, type Route, type RouteLeaveGuard } from "./app/router";
 import { MyTasks } from "./tasks/MyTasks";
-import { landingProject, rememberProject } from "./app/lastProject";
+import { forgetProject, landingProject, rememberProject } from "./app/lastProject";
 import { useSessionRestored } from "./app/useSessionRestored";
 import { ProfilePage } from "./me/ProfilePage";
 import { PracticeFrame } from "./practice/PracticeFrame";
@@ -326,7 +326,15 @@ export function App({ user: givenUser, onLogout }: AppProps): JSX.Element {
     case "projectNew": content = user.is_system_admin ? <ProjectNewPage onNavigate={next => { setRetry(value => value + 1); go(next); }} />
       : notice("New project", "Only system administrators can create projects. Ask an administrator to create one and make you its lead."); break;
     case "projectSettings": content = projectGate(route.key, "Project settings") ?? <ProjectSettingsPage projectKey={route.key} currentUser={user} section={route.section}
-      onNavigate={go} routeLeaveRef={routeLeaveRef} onSaved={() => setRetry(value => value + 1)} />; break;
+      onNavigate={go} routeLeaveRef={routeLeaveRef} onSaved={() => setRetry(value => value + 1)}
+      onDeleted={() => {
+        const key = route.key;
+        const name = projects.find(project => project.project_key === key)?.name ?? key;
+        forgetProject(user.username, key);
+        reloadProjects();
+        go({ name: "projects" });
+        appToast.show({ message: `Project ${name} (${key}) deleted.` });
+      }} />; break;
     case "projectDocuments": {
       const currentProject = projects.find(project => project.project_key === route.key);
       // Display capability only; the import endpoint rechecks current authority.

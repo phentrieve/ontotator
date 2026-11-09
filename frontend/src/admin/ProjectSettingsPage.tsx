@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type MouseEvent, type Muta
 import { api, type CurrentUser, type OntologyInfo, type ProjectPin, type ProjectSettings, type RepinReport } from "../api/client";
 import { DEFAULT_SETTINGS_SECTION, routeHref, SETTINGS_SECTIONS, type Route, type RouteLeaveGuard, type SettingsSection } from "../app/router";
 import { Button, Checkbox, Dialog, InlineMessage, Select, Textarea, TextInput } from "../ui";
+import { DeleteProjectSection } from "./DeleteProjectSection";
 import { ErrorNotice } from "./ErrorNotice";
 import { GuidelinesSection } from "./GuidelinesSection";
 import { hiddenCount, HiddenAxisValuesField } from "./HiddenAxisValuesField";
@@ -21,6 +22,8 @@ export interface ProjectSettingsPageProps {
   section?: SettingsSection;
   onNavigate?: (route: Route) => void;
   routeLeaveRef?: MutableRefObject<RouteLeaveGuard | null>;
+  /** The project was deleted (system administrators, "Delete this project" under General, issue 191). */
+  onDeleted?: () => void;
 }
 
 /** "A", "A and B", "A, B and C". */
@@ -63,7 +66,7 @@ const generalOf = (settings: ProjectSettings) => ({ name: settings.name, descrip
 /** Settings › Annotation (M-8c): submit rules, prefilled values and the values annotators can choose; one Save. */
 const annotationOf = (settings: ProjectSettings) => ({ allow_spanless_findings: settings.allow_spanless_findings ?? true, require_spanless_note: settings.require_spanless_note ?? true, require_chosen_axes: settings.require_chosen_axes, contiguous_mentions_only: settings.contiguous_mentions_only, hidden_axis_values: settings.hidden_axis_values ?? {}, creation_defaults: settings.creation_defaults ?? {} });
 
-function SettingsEditor({ initial, ontologies, projectKey, onSaved, section = DEFAULT_SETTINGS_SECTION, onNavigate, routeLeaveRef }: ProjectSettingsPageProps & { initial: ProjectSettings; ontologies: OntologyInfo[] }): JSX.Element {
+function SettingsEditor({ initial, ontologies, projectKey, currentUser, onSaved, onDeleted, section = DEFAULT_SETTINGS_SECTION, onNavigate, routeLeaveRef }: ProjectSettingsPageProps & { initial: ProjectSettings; ontologies: OntologyInfo[] }): JSX.Element {
   const [model, setModel] = useState(initial);
   const [general, setGeneral] = useState(() => generalOf(initial));
   const [annotation, setAnnotation] = useState(() => annotationOf(initial));
@@ -289,7 +292,7 @@ function SettingsEditor({ initial, ontologies, projectKey, onSaved, section = DE
       </fieldset>
     </form>; break;
     case "guidelines": content = <section ref={bindSection} tabIndex={-1} className="settings-section" aria-label="Guidelines"><GuidelinesSection projectKey={projectKey} /></section>; break;
-    case "general": content = <form ref={bindSection} tabIndex={-1} className="settings-section" aria-label="General" onSubmit={event => submit(event, "General")}>
+    case "general": content = <><form ref={bindSection} tabIndex={-1} className="settings-section" aria-label="General" onSubmit={event => submit(event, "General")}>
       <fieldset disabled={busy !== null}><legend className="visually-hidden">General</legend>
         <SettingsCard title="Name and description">
           <TextInput id="project-name" label="Name" required value={general.name} onChange={event => { setGeneral({ ...general, name: event.target.value }); setSaved(null); }} />
@@ -300,7 +303,10 @@ function SettingsEditor({ initial, ontologies, projectKey, onSaved, section = DE
         </SettingsCard>
         {saveBar("General")}
       </fieldset>
-    </form>; break;
+    </form>
+      {/* Issue 191: system administrators only, set apart below the settings; the server decides whether the project has work. */}
+      {currentUser.is_system_admin && onDeleted && <DeleteProjectSection projectKey={projectKey} projectName={model.name} onDeleted={onDeleted} />}
+    </>; break;
     case "ontology": content = <section ref={bindSection} tabIndex={-1} className="settings-section" aria-label="Ontology">
       {model.locked ? <><SettingsCard title="Ontology" hint="Only the release can change once work has been submitted."
         why="Moving to another release rewrites draft terms the new release replaced or merged. Submitted work stays as it was submitted.">

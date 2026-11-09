@@ -1,7 +1,6 @@
 import { useEffect, useState, type MouseEvent } from "react";
 import { api, type ProjectSummary } from "../api/client";
-import { Button, ConfirmDialog, DataTable, EmptyState, IconCheck, TextInput, type Column } from "../ui";
-import { ErrorNotice } from "../admin/ErrorNotice";
+import { DataTable, EmptyState, IconCheck, TextInput, type Column } from "../ui";
 import { PROJECT_SEARCH_THRESHOLD, projectDestination, projectRoles } from "./ProjectPicker";
 import { routeHref, type Route } from "./router";
 import { AdminPracticeProjects } from "../practice/AdminPracticeProjects";
@@ -15,7 +14,7 @@ export interface ProjectsPageProps {
   onNavigate: (route: Route) => void;
   /** A system administrator also gets "Show practice projects (n)" (issue 266). */
   isAdmin?: boolean;
-  /** Reload the project list (a project archive was imported, a project was deleted). */
+  /** Reload the project list (a project archive was imported). */
   onProjectsChanged?: () => void;
 }
 
@@ -64,16 +63,6 @@ export function ProjectsPage({ projects, currentKey, onNavigate, isAdmin = false
   const [search, setSearch] = useState("");
   const decisions = useDecisionCounts(projects);
   const openTasks = useOpenTasks(projects.length > 0);
-  const [doomed, setDoomed] = useState<ProjectSummary | null>(null);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<unknown>(null);
-  const closeDelete = () => { setDoomed(null); setDeleteError(null); };
-  const remove = async () => {
-    if (!doomed) return;
-    setDeleting(true); setDeleteError(null);
-    try { await api.adminDeleteProject(doomed.project_key); closeDelete(); onProjectsChanged?.(); }
-    catch (failure) { setDeleteError(failure); } finally { setDeleting(false); }
-  };
   const needle = search.trim().toLocaleLowerCase();
   const shown = projects.filter(item => `${item.name} ${item.project_key}`.toLocaleLowerCase().includes(needle));
   // Quiet buttons: a filled primary "Open" in every row competes with itself (#47 A-19).
@@ -104,8 +93,6 @@ export function ProjectsPage({ projects, currentKey, onNavigate, isAdmin = false
     { id: "action", header: "Action", cell: item => <span className="projects-page__actions">
       {link(projectDestination(item), "Open")}
       {item.can_manage && link({ name: "projectSettings", key: item.project_key }, "Settings")}
-      {/* Issue 191: only a project without texts can be without work; the server decides. */}
-      {isAdmin && item.document_count === 0 && <Button size="sm" onClick={() => setDoomed(item)}>Delete project…</Button>}
     </span> },
   ];
   return <section className="projects-page" aria-labelledby="projects-heading">
@@ -117,13 +104,6 @@ export function ProjectsPage({ projects, currentKey, onNavigate, isAdmin = false
         rowProps={item => item.project_key === currentKey ? { "aria-current": "true", className: "projects-table__row--current" } : {}}
         empty="No matching projects." />
     </>}
-    <ConfirmDialog open={doomed !== null} title="Delete project?" tone="danger" busy={deleting} confirmLabel="Delete project"
-      message={doomed ? <>
-        <p>{`${doomed.name} (${doomed.project_key}) is deleted with its settings and members. Its key can be used again. Its audit entries stay.`}</p>
-        <p>Only a project nobody has worked in can be deleted: no texts, tasks, guideline or other work.</p>
-        {deleteError != null && <ErrorNotice error={deleteError} />}
-      </> : null}
-      onConfirm={() => { void remove(); }} onCancel={closeDelete} />
     {isAdmin && <AdminPracticeProjects />}
     {isAdmin && <ProjectArchives projects={projects} onImported={onProjectsChanged} />}
   </section>;

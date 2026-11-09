@@ -3,7 +3,7 @@
 An administrator may delete a project that was created by mistake, as long
 as nobody worked in it: no texts, proposals, tasks, guideline, results or
 any other work (the definition lives in the database function
-``delete_empty_project``, migration 0037, so there is one). The key is free
+``delete_empty_project``, migration 0038, so there is one). The key is free
 again afterwards. The audit entries stay, detached from the project and
 naming it by key; the deletion itself is recorded as ``project.delete``.
 """

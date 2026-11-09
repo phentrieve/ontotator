@@ -28,3 +28,10 @@ export function landingProject(username: string, projects: readonly ProjectSumma
   const remembered = rememberedProject(username);
   return projects.find(project => project.project_key === remembered)?.project_key;
 }
+
+/** Forget the remembered project when it is `key` (the project was deleted, issue 191). */
+export function forgetProject(username: string, key: string): void {
+  try {
+    if (window.localStorage.getItem(`${LAST_PROJECT_PREFIX}${username}`) === key) window.localStorage.removeItem(`${LAST_PROJECT_PREFIX}${username}`);
+  } catch { /* Storage may be unavailable; nothing was remembered then. */ }
+}
