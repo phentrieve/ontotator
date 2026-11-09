@@ -219,6 +219,14 @@ glob = "frontend/src/admin/FinalExportPanel.tsx"
 chapter = "lead-results.md"
 
 [[map]]
+glob = "frontend/src/admin/ExportFailure.tsx"
+chapter = "lead-results.md"
+
+[[map]]
+glob = "frontend/src/admin/DeleteProjectSection.tsx"
+chapter = "admin.md"
+
+[[map]]
 glob = "frontend/src/admin/ExportHistory.tsx"
 chapter = "lead-results.md"
 

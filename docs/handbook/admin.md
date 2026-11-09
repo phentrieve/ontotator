@@ -207,7 +207,7 @@ Only a project nobody has worked in can be deleted. Work is anything beyond the 
 
 1. Click **Projects** in the sidebar.
 2. In the project's row, click **Settings**.
-3. On the tab **General**, scroll to **Delete this project** at the bottom and click **Delete project…**. Only system administrators see it.
+3. On the tab **General**, scroll to **Delete this project** at the bottom and click **Delete project…**. Only system administrators see it, and they see it in every project: whether the project has work is checked when you confirm.
 4. Read the dialog and click **Delete project**.
 
 You are taken to **Projects**, and a message confirms the deletion. The project goes with its settings, members, ontology pins, project API tokens and uncommitted uploads, and the next project may use its key. Its audit entries stay and name it by key; the deletion itself is recorded as well.

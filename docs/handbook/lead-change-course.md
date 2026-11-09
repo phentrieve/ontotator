@@ -61,15 +61,16 @@ Before you start: [publish the new guideline version](lead-settings.md#publish-t
 
 Annotators can also do this themselves: **More** › **Work rounds** › **Continue from** starts a new round from their submission, where each carried finding must be checked again ([Start a new work round](annotator.md#start-a-new-work-round)).
 
-An empty start is possible only before the first submission (**Start empty round**). After a submission, an empty round needs your agreement: the annotator [reports a text problem](annotator.md#report-a-text-problem) and you choose **Agree empty restart…** ([Decide on a problem report](lead-results.md#decide-on-a-problem-report)). A task from proposals restarted this way has no proposals.
+An empty start is possible only before the first submission (**Start empty round**). After a submission, a fresh start needs your agreement: the annotator [reports a text problem](annotator.md#report-a-text-problem) and you choose **Agree clean restart…** ([Decide on a problem report](lead-results.md#decide-on-a-problem-report)). The new round has none of the earlier findings; a task from scratch starts empty, a task from proposals starts again on the newest tool proposals of the text, all open.
 
 ### Work from new tool proposals
 
-A proposal set you import later is used only by annotation rounds that start after the import, for example for a new assignment of a text planned **Annotate from proposals**. A task keeps the proposals its round started with, also after **Reopen…** or a new round from a submission.
+A proposal set you import later is used only by annotation rounds that start after the import, for example for a new assignment of a text planned **Annotate from proposals**. A task keeps the proposals its round started with, also after **Reopen…** or a new round from a submission. Only a restart agreed on a problem report (**Agree clean restart…**) starts it again on the newest proposals.
 
 1. Import the new proposals in an Ontospan bundle ([Upload texts](lead-documents.md#upload-texts)). Only sets of kind `tool_output`, made entirely by tools, can be imported.
 2. For a text without assignments, assign it: it starts from the newest proposals.
-3. For a text with work on it and no final result: open the text card, click **Annotation** and click **Change mode…**. Enter the **Reason** and click **Discard work and change mode** (or **Change mode**). The text is now from scratch, and the work on the whole text is discarded, submitted work included; the assignments are removed ([Change the annotation mode of one text](lead-documents.md#change-the-annotation-mode-of-one-text)). Then choose **From proposals** under **Annotation** and assign the text again.
+3. For one task already under way, its annotator can [report a text problem](annotator.md#report-a-text-problem) and you choose **Agree clean restart…** ([Decide on a problem report](lead-results.md#decide-on-a-problem-report)). The task starts a new round on the newest proposals; the earlier rounds stay in the history. Other people's tasks on the text keep their proposals.
+4. To restart the whole text instead: open the text card, click **Annotation** and click **Change mode…**. Enter the **Reason** and click **Discard work and change mode** (or **Change mode**). The text is now from scratch, and the work on the whole text is discarded, submitted work included; the assignments are removed ([Change the annotation mode of one text](lead-documents.md#change-the-annotation-mode-of-one-text)). Then choose **From proposals** under **Annotation** and assign the text again.
 
 For a text with a final result this is not possible: **Change mode…** is refused with *A final result was chosen for this text, so its annotation mode stays.*
 
@@ -84,21 +85,21 @@ For a text with a final result this is not possible: **Change mode…** is refus
 
 What for: finish fewer texts than planned, for example when the work goes slower than hoped.
 
-1. Select the texts to take out. Use **Select by case IDs…** with a list from a spreadsheet, or a filter and the checkbox in the table header ([Select texts](lead-documents.md#select-texts)). The dialog only selects the IDs you paste; to keep a list of texts and take out all others, build the list of the others outside Ontotator. One selection holds at most 2000 cases.
+1. Select the texts to take out. Use **Select by case IDs…** with a list from a spreadsheet, or a filter and the checkbox in the table header ([Select texts](lead-documents.md#select-texts)). To keep a list of texts and take out all others, paste the list and tick **Select all except these**. One selection holds at most 2000 cases.
 2. Click **Plan…** in the selection bar.
 3. Under **Annotation**, choose **Off (not annotated)** for each language. Under **Translation review**, choose **Off** if the reviews should stop too.
 4. Optional: enter a **Reason (optional)**, for example *Adults only in this study*. The final export names the texts you take out with this reason.
 5. Read what will change. Open tasks are withdrawn; annotation drafts are kept. Final results of these texts stay in the history but are no longer exported.
 6. Tick **I understand** (or **I understand — withdraw the open tasks**) and save again.
 
-Texts with neither a translation review nor an annotation planned leave the main list. To see them, tick **Show texts not in plan** on the tab **All**. On **Export**, they are listed under **Not planned, not exported**, and the export check counts the texts taken out of the work plan. The final export names those texts with the plan revision, the time and the reason, in README.txt and planned-out.csv ([Export final results](lead-results.md#export-final-results)).
+Texts with neither a translation review nor an annotation planned leave the main list. To see them, tick **Show texts not in plan** on the tab **All**. On **Export**, those that still have a final result are listed under **Not planned, not exported**; the others just leave the list. A line below the check counts the texts taken out of the work plan, for example *1 text taken out of the work plan is listed in planned-out.csv*. The final export names those texts with the plan revision, the time and the reason, in README.txt and planned-out.csv ([Export final results](lead-results.md#export-final-results)).
 
-To take the change back, click **Undo** in the message. It restores the plan and the final results as they were, without asking you to confirm them again, but not the withdrawn tasks: assign those again. Planning a text again later, instead of Undo, asks you to confirm its earlier final result.
+To take the change back, click **Undo** in the message. It restores the plan and the final results as they were, without asking you to confirm them again, but not the withdrawn tasks: the message then offers their texts, for example *Select the 2 texts with withdrawn tasks*; select them and assign them again. Planning a text again later, instead of Undo, asks you to confirm its earlier final result.
 
 Other ways to make the work smaller:
 
 - Fewer people per text: lower **Annotators per text**. Nobody is removed; texts that already have more annotators keep them. Lowered from the info button in the assign dialog, the limit says how many texts already have more, but there is no list of them. Remove the extra people one by one with **Remove…** in the text card ([Remove, reassign or reopen an assignment](lead-documents.md#remove-reassign-or-reopen-an-assignment)).
-- Order of work: there is no priority. **My tasks** lists open tasks by status, then in the order the texts were imported, so texts uploaded later come last. Assign the urgent texts first and the rest later.
+- Order of work: **My tasks** lists open tasks by status, then in the project's order, first imported first. To have urgent texts done first, select them and click **Move to front** ([Move texts to the front of the queue](lead-documents.md#move-texts-to-the-front-of-the-queue)).
 - Stop work for a while without withdrawing it: only through a problem report, with **Pause other tasks…**.
 
 ## On the command line

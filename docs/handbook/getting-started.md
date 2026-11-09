@@ -237,4 +237,6 @@ What for: let a script or another program read or export your projects without y
 
 The program sends the token in the header `Authorization: Bearer <token>`. It acts as you: it can do only what its scopes allow and what you may do yourself. Annotation, review and translation review work always needs the browser, and a token cannot create other tokens. Every change made with a token is in the audit trail with the token's name.
 
+An AI assistant that speaks MCP, such as Claude Desktop, can use a token too: the Ontotator MCP server lets it set up a project, follow progress and download exports for you. Installing and configuring it is described in the [MCP server guide](../../mcp/README.md). Prefer a project token with a short lifetime for it.
+
 To stop a token, click **Revoke…** in its row, then **Revoke token**. Every program that uses it stops working at once. All your tokens are also revoked when you change your password, when an administrator issues you a reset code and when your account is deactivated. Losing a project role does not revoke a personal token, but the token at once loses what the role allowed: it can only ever do what you may do yourself right now.
