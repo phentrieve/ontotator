@@ -87,12 +87,12 @@ export function DeleteProjectSection({ projectKey, projectName, onDeleted }: Del
       ? <Button ref={closeButton} onClick={close}>Close</Button>
       : <>
         <Button disabled={busy} onClick={close}>Cancel</Button>
-        <Button variant="danger" loading={busy} onClick={() => { void remove(); }}>Delete project</Button>
+        <Button variant="danger-solid" loading={busy} onClick={() => { void remove(); }}>Delete project</Button>
       </>}>
       {refused
         ? workText ? <InlineMessage tone="error">{workText}</InlineMessage> : <ErrorNotice error={error} />
         : <>
-          <p>{`${projectName} (${projectKey}) is deleted with its settings and members. Its key can be used again. Its audit entries stay.`}</p>
+          <p>{`“${projectName}” (key ${projectKey}) is deleted with its settings and members. Its key can be used again. Its audit entries stay.`}</p>
           <p>Only a project nobody has worked in can be deleted: no texts, tasks, guideline or other work.</p>
         </>}
     </Dialog>

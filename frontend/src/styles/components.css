@@ -433,6 +433,12 @@ textarea.form-control {
 .btn-danger[aria-disabled="true"]:hover { background: transparent; border-color: var(--border); }
 .btn-quiet[aria-disabled="true"]:hover { background: transparent; color: var(--text-muted); }
 
+/* The filled confirm button of a destructive dialog: it must not read like Cancel. */
+.btn-danger-solid { background: var(--danger); border-color: var(--danger); color: var(--on-accent); }
+.btn-danger-solid:hover { background: color-mix(in srgb, var(--danger) 85%, black); border-color: color-mix(in srgb, var(--danger) 85%, black); }
+.btn-danger-solid:disabled:hover,
+.btn-danger-solid[aria-disabled="true"]:hover { background: var(--danger); border-color: var(--danger); }
+
 .btn-icon {
   gap: 4px;
   padding-inline: 6px;

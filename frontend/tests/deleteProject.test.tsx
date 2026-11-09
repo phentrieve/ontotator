@@ -37,9 +37,10 @@ describe("Delete this project in the General settings (issue 191)", () => {
   it("deletes after the confirmation and hands over to the page", async () => {
     const remove = vi.spyOn(api, "adminDeleteProject").mockResolvedValue(undefined);
     const { dialog, onDeleted } = await openDialog();
-    expect(dialog.textContent).toContain("Research (p/key) is deleted with its settings and members.");
+    expect(dialog.textContent).toContain("“Research” (key p/key) is deleted with its settings and members.");
     expect(dialog.textContent).toContain("Its key can be used again.");
     expect(remove).not.toHaveBeenCalled();
+    expect(within(dialog).getByRole("button", { name: "Delete project" }).className).toContain("btn-danger-solid");
     fireEvent.click(within(dialog).getByRole("button", { name: "Delete project" }));
     await waitFor(() => expect(remove).toHaveBeenCalledWith("p/key"));
     await waitFor(() => expect(onDeleted).toHaveBeenCalledTimes(1));

@@ -333,7 +333,7 @@ export function App({ user: givenUser, onLogout }: AppProps): JSX.Element {
         forgetProject(user.username, key);
         reloadProjects();
         go({ name: "projects" });
-        appToast.show({ message: `Project ${name} (${key}) deleted.` });
+        appToast.show({ message: `Project “${name}” deleted (key ${key}).` });
       }} />; break;
     case "projectDocuments": {
       const currentProject = projects.find(project => project.project_key === route.key);

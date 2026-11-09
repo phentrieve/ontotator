@@ -1,6 +1,7 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 
-export type ButtonVariant = "primary" | "secondary" | "quiet" | "danger";
+/** "danger-solid" is the filled confirm button of a destructive dialog; "danger" is the outlined button that opens it. */
+export type ButtonVariant = "primary" | "secondary" | "quiet" | "danger" | "danger-solid";
 
 export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "type"> {
   variant?: ButtonVariant;
