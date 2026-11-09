@@ -586,6 +586,11 @@
   color: var(--text-muted);
 }
 
+/* The hint is not a row to decide (no choices), but it keeps the colour of the conflict row it explains. */
+.cons-row--conflict + .cons-row-hint td {
+  background: var(--warning-light);
+}
+
 /* A tag in the group heading as a small bordered chip (the app's .badge), apart from "2 fields to decide". */
 .cons-group-toggle .cons-chip {
   margin-inline-start: var(--space-1);

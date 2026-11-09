@@ -48,7 +48,7 @@ export function ComparisonTable({ name, group, people, rows, readOnly = false, b
   const names = peopleOf(people, members);
   const rowClass = (row: ComparisonRow) => row.conflict && !readOnly ? "cons-row--conflict" : row.agreed !== null && members.length > 1 ? "cons-row--agreed" : undefined;
   // A hint (related terms, issue 303) is its own full-width line right after its row, so it is read once, after the values it explains.
-  const line = (row: ComparisonRow) => row.hint ? [values(row), <tr key={`${row.id}-hint`} className={["cons-row-hint", rowClass(row)].filter(Boolean).join(" ")}>
+  const line = (row: ComparisonRow) => row.hint ? [values(row), <tr key={`${row.id}-hint`} className="cons-row-hint">
     <td colSpan={members.length + 1}>{row.hint}</td>
   </tr>] : values(row);
   const values = (row: ComparisonRow) => <tr key={row.id} className={rowClass(row)}>

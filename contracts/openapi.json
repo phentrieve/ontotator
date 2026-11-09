@@ -10550,6 +10550,10 @@
             "type": "integer",
             "title": "Modifiers Agreeing"
           },
+          "related_term_conflicts": {
+            "type": "integer",
+            "title": "Related Term Conflicts"
+          },
           "texts": {
             "type": "integer",
             "title": "Texts"
@@ -10584,6 +10588,7 @@
           "terms_equal",
           "modifiers_compared",
           "modifiers_agreeing",
+          "related_term_conflicts",
           "texts",
           "pairs"
         ],
@@ -19813,6 +19818,10 @@
             "type": "integer",
             "title": "Modifiers Agreeing"
           },
+          "related_term_conflicts": {
+            "type": "integer",
+            "title": "Related Term Conflicts"
+          },
           "case_id": {
             "type": "string",
             "title": "Case Id"
@@ -19871,6 +19880,7 @@
           "terms_equal",
           "modifiers_compared",
           "modifiers_agreeing",
+          "related_term_conflicts",
           "case_id",
           "language",
           "document_id",

@@ -3320,6 +3320,8 @@ export interface components {
             modifiers_compared: number;
             /** Modifiers Agreeing */
             modifiers_agreeing: number;
+            /** Related Term Conflicts */
+            related_term_conflicts: number;
             /** Texts */
             texts: number;
             /** Pairs */
@@ -6649,6 +6651,8 @@ export interface components {
             modifiers_compared: number;
             /** Modifiers Agreeing */
             modifiers_agreeing: number;
+            /** Related Term Conflicts */
+            related_term_conflicts: number;
             /** Case Id */
             case_id: string;
             /** Language */
