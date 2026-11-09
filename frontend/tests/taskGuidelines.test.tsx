@@ -299,8 +299,8 @@ describe("task guidelines in the task screens", () => {
     await act(async () => { window.dispatchEvent(new Event("focus")); });
     expect(await screen.findByRole("button", { name: "Guidelines v4, open the project guidelines, updated" })).toBeDefined();
     const notice = await screen.findByText("Guidelines updated to v4");
-    // Above the review bar.
-    expect(before(notice, document.querySelector<HTMLElement>(".translation-review-bar")!)).toBe(true);
+    // Under the review header, as in the annotation editor.
+    expect(before(document.querySelector<HTMLElement>(".translation-review-bar")!, notice)).toBe(true);
     expect(screen.getByText("v4: Units are checked.")).toBeDefined();
     await waitFor(() => expect(notified()).toEqual([["proj", 4, "notified"]]));
   });

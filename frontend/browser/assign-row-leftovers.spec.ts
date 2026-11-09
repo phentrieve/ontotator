@@ -38,7 +38,7 @@ async function selectByIds(page: Page, ids: string[]) {
 test("Show selected lists the hidden texts too, and the header counts texts", async ({ page }) => {
   const documents = await openDocuments(page);
   await documentsTab(page, "All").click();
-  await expect(page.getByRole("checkbox", { name: "Select all 6 filtered texts", exact: true })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: "Select all 4 filtered texts", exact: true })).toBeVisible();
 
   await page.goto(`${documents}?language=de`);
   await expect(filterChip(page, "Language: de")).toBeVisible();

@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { importPackage, openCase, selectText } from "./helpers";
+import { clampSidebarWidth, inspectorWidth, sidebarLimits } from "../src/editor/sidebarWidth";
 
 // The fixture's ontology (tests/fixtures/hp.json) is a single-parent tree:
 // All > { Clinical modifier > { Clinical course > Onset, Severity }, Frequency,
@@ -610,6 +611,9 @@ test.describe("ontology tree", () => {
       await test.step(`${size.width}x${size.height}`, async () => {
         await page.setViewportSize(size);
         await expect(treePanel(page)).toHaveCount(0);
+        // The findings width follows the window in a resize handler: measure only once it has (300 px at 1440, 340 at 1599).
+        const fallback = sidebarLimits({ viewport: size.width, inspector: inspectorWidth(size.width) });
+        await expect(page.locator(".app-layout")).toHaveCSS("--sidebar-width", `${clampSidebarWidth(fallback.fallback, fallback)}px`);
         const sidebarBefore = await box(page.locator(".app-layout > .sidebar"));
         const textBefore = await box(page.locator(".center-pane"));
         const inspectorBefore = await box(page.locator(".inspector-pane"));
