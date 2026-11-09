@@ -231,6 +231,7 @@ function AnnotationTaskEditor({ assignmentId, user, onNavigate, routeLeaveRef, l
       roundOrdinal={roundInfo?.round_ordinal} documentVersion={roundInfo?.document_version}
       held={assignment.held} holdReason={assignment.hold_reason} saveBeforeReportRef={saveBeforeReportRef}
       headerTimer={<WorkTimerControl timer={workTimer} />} onEdit={workTimer.edit}
+      guidelines={guidelines.panel}
       guidelineNotice={<><WorkTimeNotice timer={workTimer} />{/* Reloads when a lead acts on the task (revision) or a new answer arrives (My tasks list). */}
         <ReportAnswerNotice key={`${assignment.workflow_revision}:${current.answered_report_id ?? ""}`} projectKey={assignment.project_key}
           assignmentId={assignment.id} held={assignment.held} onNavigate={onNavigate} />{guidelines.notice}</>}
@@ -253,6 +254,6 @@ function AnnotationTaskEditor({ assignmentId, user, onNavigate, routeLeaveRef, l
       selectedWorkRound.current = created.round_id; setRoundDialogOpen(false);
       await load(undefined, created.round_id);
     }} />}
-  {guidelines.drawer}
+  {/* The guidelines open in the editor's inspector (CaseScreen), which renders their drawer where it cannot. */}
   </>}</TaskGuidelines>;
 }

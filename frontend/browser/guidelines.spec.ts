@@ -65,7 +65,8 @@ async function expectGuidelinesItem(page: Page, name: string | RegExp | null) {
   else await expect(page.getByRole("menuitem", typeof name === "string" ? { name, exact: true } : { name })).toBeVisible();
   await page.keyboard.press("Escape");
 }
-const drawer = (page: Page, version: number) => page.getByRole("complementary", { name: `Guidelines v${version}`, exact: true });
+/** In the editor (default 1280 px viewport) the guidelines open as the inspector's "Guidelines vN" tab. */
+const guidelinesTab = (page: Page, version: number) => page.locator(".inspector-pane").getByRole("tabpanel", { name: `Guidelines v${version}`, exact: true });
 const fileInput = (page: Page) => page.getByLabel("Guideline file (.md or .txt, up to 256 KB)", { exact: true });
 const notSeenLine = (page: Page) => page.locator(".guidelines-not-seen");
 const PUBLISH_HINT = "Everyone sees a notice in their next task. Published versions cannot be edited, only withdrawn.";
@@ -197,7 +198,7 @@ test("EMPTY: publish v1, read it in a task, publish v2, review under v2, export 
     await expectInForce(page, 1, "v1.md");
     await evidence(page, "lead-published-v1");
 
-    // 2. Ana: first-exposure notice, drawer (no script run, no image request), submit.
+    // 2. Ana: first-exposure notice, the guidelines in the inspector (no script run, no image request), submit.
     const external: string[] = [];
     const dialogs: string[] = [];
     ana.page.on("request", request => { if (request.url().includes("example.org")) external.push(request.url()); });
@@ -207,9 +208,10 @@ test("EMPTY: publish v1, read it in a task, publish v2, review under v2, export 
     await expect(ana.page.getByText("Read them before you start; they are available at any time under More › Guidelines in the toolbar.", { exact: true })).toBeVisible();
     await moreButton(ana.page).click();
     await ana.page.getByRole("menuitem", { name: "Guidelines v1 (new)", exact: true }).click();
-    const panel = drawer(ana.page, 1);
+    const panel = guidelinesTab(ana.page, 1);
     await expect(panel).toBeVisible();
-    await expect(panel.getByRole("heading", { name: "Guidelines v1", level: 2 })).toBeFocused();
+    await expect(panel).toBeFocused();
+    await expect(panel.getByRole("heading", { name: "Guidelines v1", level: 2 })).toBeVisible();
     await expect(panel.getByText(V1_TEXT)).toBeVisible();
     await expect(panel.getByRole("table")).toBeVisible();
     await expect(panel.getByRole("link", { name: /^Image: Example span/ })).toBeVisible();
@@ -221,7 +223,7 @@ test("EMPTY: publish v1, read it in a task, publish v2, review under v2, export 
     await panel.getByRole("button", { name: "Close", exact: true }).last().click();
     await expect(panel).toHaveCount(0);
     await expect(moreButton(ana.page)).toBeFocused();
-    // Opening the drawer marks v1 as seen: the "(new)" mark goes.
+    // Opening the guidelines marks v1 as seen: the "(new)" mark goes.
     await expectGuidelinesItem(ana.page, "Guidelines v1");
     expect(external, "no image request").toEqual([]);
     expect(dialogs, "no script executed").toEqual([]);

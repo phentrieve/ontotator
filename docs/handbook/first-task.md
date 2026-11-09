@@ -24,7 +24,7 @@ The editor opens. If you have no task, you see **No texts are assigned to you ye
 
 ## 3. Read the guidelines
 
-The first time you open a task in a project with guidelines, a notice asks you to read them. Click the read button in the notice, for example *Read guidelines v2*. Later you find them under **More** in the toolbar.
+The first time you open a task in a project with guidelines, a notice asks you to read them. Click the read button in the notice, for example *Read guidelines v2*. Later you find them under **More** in the toolbar. On a wide screen they open in the right column, as a tab next to **Details**, so the text stays in view; see [The guidelines in the editor](annotator.md#the-guidelines-in-the-editor).
 
 The guidelines tell you what to mark and how: which findings count, how much text to mark, how to handle negations or family history. When in doubt, follow the guidelines; if they do not answer your question, ask your lead.
 

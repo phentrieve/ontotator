@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { api, type AssignmentView, type GuidelineNotice } from "../api/client";
 import { routeHref } from "../app/router";
 import { GuidelineReader } from "../guidelines/GuidelineReader";
@@ -9,8 +9,12 @@ export interface TaskGuidelinesProps {
   assignment: AssignmentView;
   /** The task's real read-only state (submitted, held, read-only round): no notice and nothing recorded. */
   readOnly: boolean;
-  /** `item`: the same entry for a "More" menu (the editor header), null without guidelines. */
-  children: (parts: { button: ReactNode; item: MenuItem | null; notice: ReactNode; drawer: ReactNode }) => ReactNode;
+  /**
+   * `item`: the same entry for a "More" menu (the editor header), null without guidelines. `panel`: the same
+   * reading view for a screen that shows it itself (the editor's inspector tab); such a screen renders
+   * `panel.drawer` wherever it cannot, and the caller does not place `drawer` as well.
+   */
+  children: (parts: { button: ReactNode; item: MenuItem | null; notice: ReactNode; drawer: ReactNode; panel: GuidelinesPanel | null }) => ReactNode;
   /**
    * Only where no other part of the screen reloads the task metadata on window focus (the translation
    * review's lead-correction mode has no problem reporter): the focus reload then also re-reads the task
@@ -29,6 +33,27 @@ const entryPlaces: Record<TaskGuidelinesProps["place"], string> = {
   header: "Guidelines in the header",
 };
 
+/**
+ * The guidelines for a screen that can show them in a column of its own (the editor's inspector, from
+ * 1060 px). Every entry point (menu item, the notice's "Read guidelines vN") opens the same view.
+ */
+export interface GuidelinesPanel {
+  /** The guidelines are open: in the host's column or, where it has none, in `drawer`. */
+  open: boolean;
+  version: number;
+  /** Grows with every request to show the guidelines, so the host brings them forward and focuses them again. */
+  request: number;
+  /** The text of the shown version, with its "Guidelines vN" heading (h2). */
+  reader: ReactNode;
+  /** "All versions" and "Close", as in the drawer. */
+  footer: ReactNode;
+  close: () => void;
+  /** Where focus goes when the guidelines close (the control that opened them, else the toolbar or the h1). */
+  returnFocus: RefObject<HTMLElement>;
+  /** The page drawer (dialog, sheet) for where the host cannot show the guidelines itself. */
+  drawer: ReactNode;
+}
+
 const guidelineState = (value: AssignmentView) => JSON.stringify([value.guideline ?? null, value.guideline_notice ?? null]);
 
 /**
@@ -40,7 +65,7 @@ export function TaskGuidelines({ assignment, readOnly, children, onRefresh, plac
   const projectKey = assignment.project_key;
   const current = assignment.guideline?.version ?? null;
   const [latestSeen, setLatestSeen] = useState<{ key: string; version: number | null } | null>(null);
-  const [drawer, setDrawer] = useState<{ open: boolean; version: number | null }>({ open: false, version: null });
+  const [drawer, setDrawer] = useState<{ open: boolean; version: number | null; request: number }>({ open: false, version: null, request: 0 });
   const [notice, setNotice] = useState<{ key: string; value: GuidelineNotice } | null>(null);
   const recorded = useRef(new Set<string>());
   const button = useRef<HTMLButtonElement>(null);
@@ -101,7 +126,7 @@ export function TaskGuidelines({ assignment, readOnly, children, onRefresh, plac
   const openDrawer = (version: number) => {
     // Opened from a menu: focus returns to the menu's button (the focused element when the menu closed).
     toolbar.current = (button.current ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null))?.parentElement ?? toolbar.current;
-    setDrawer({ open: true, version });
+    setDrawer(value => ({ open: true, version, request: value.request + 1 }));
     setLatestSeen(seen => ({ key: projectKey, version: Math.max(version, seen?.key === projectKey ? seen.version ?? 0 : 0) }));
   };
   const closeDrawer = () => setDrawer(value => ({ ...value, open: false }));
@@ -121,18 +146,26 @@ export function TaskGuidelines({ assignment, readOnly, children, onRefresh, plac
   const noticePart = shown && <GuidelineNoticeMessage notice={shown} place={place} onRead={() => { setNotice(null); openDrawer(shown.to_version); }} onClose={() => setNotice(null)} />;
 
   const version = drawer.version;
-  const drawerPart = version !== null && <Drawer open={drawer.open} title={`Guidelines v${version}`} onClose={closeDrawer} returnFocusRef={returnFocus}
-    footer={<>
-      <a className="btn btn-secondary" href={routeHref({ name: "projectGuidelines", key: projectKey })} onKeyDown={onSpaceActivate} target="_blank" rel="noopener noreferrer">All versions</a>
-      <Button onClick={closeDrawer}>Close</Button>
-    </>}>
-    {/* Remounted when the version in force changes or a focus reload runs, so a withdrawal of the shown version replaces its text. */}
+  const footer = <>
+    <a className="btn btn-secondary" href={routeHref({ name: "projectGuidelines", key: projectKey })} onKeyDown={onSpaceActivate} target="_blank" rel="noopener noreferrer">All versions</a>
+    <Button onClick={closeDrawer}>Close</Button>
+  </>;
+  // Remounted when the version in force changes or a focus reload runs, so a withdrawal of the shown version replaces its text.
+  const readerKey = `${version}:${current ?? "none"}:${readerLoad}`;
+  const drawerPart = version !== null && <Drawer open={drawer.open} title={`Guidelines v${version}`} onClose={closeDrawer} returnFocusRef={returnFocus} footer={footer}>
     <div className="task-guidelines-reader">
-      <GuidelineReader key={`${version}:${current ?? "none"}:${readerLoad}`} projectKey={projectKey} version={version} currentVersion={current} headingLevel={2} showHeading={false} />
+      <GuidelineReader key={readerKey} projectKey={projectKey} version={version} currentVersion={current} headingLevel={2} showHeading={false} />
     </div>
   </Drawer>;
+  // The panel names the version in its own heading: the tab above it says only "Guidelines vN".
+  const panelPart: GuidelinesPanel | null = version === null ? null : {
+    open: drawer.open, version, request: drawer.request, footer, close: closeDrawer, returnFocus, drawer: drawerPart || null,
+    reader: <div className="task-guidelines-reader">
+      <GuidelineReader key={readerKey} projectKey={projectKey} version={version} currentVersion={current} headingLevel={2} />
+    </div>,
+  };
 
-  return <>{children({ button: buttonPart, item: itemPart, notice: noticePart || null, drawer: drawerPart || null })}</>;
+  return <>{children({ button: buttonPart, item: itemPart, notice: noticePart || null, drawer: drawerPart || null, panel: panelPart })}</>;
 }
 
 function GuidelineNoticeMessage({ notice, place, onRead, onClose }: { notice: GuidelineNotice; place: TaskGuidelinesProps["place"]; onRead: () => void; onClose: () => void }): JSX.Element {
