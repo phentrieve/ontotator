@@ -236,7 +236,10 @@ def build_planned_out_csv(payload: Mapping[str, Any]) -> bytes:
     return out.getvalue().encode("utf-8-sig")
 
 
-def planned_out_section(payload: Mapping[str, Any]) -> list[str]:
+def planned_out_section(
+    payload: Mapping[str, Any],
+    listing: str = f"{PLANNED_OUT_FILE} lists the same, one row per text.",
+) -> list[str]:
     """The README section on texts taken out of the work plan (#338).
 
     Empty for a snapshot frozen before the export recorded them, so its
@@ -254,8 +257,7 @@ def planned_out_section(payload: Mapping[str, Any]) -> list[str]:
         "out by the same plan change with the same reason are listed together "
         "under one line giving the plan revision of the case after the change, "
         'its time in UTC and the reason. A text marked "final result kept" '
-        "had a final result; it stays in Ontotator and is not exported. "
-        f"{PLANNED_OUT_FILE} lists the same, one row per text."
+        "had a final result; it stays in Ontotator and is not exported. " + listing
     )
     groups: dict[tuple[int, str, str], list[Mapping[str, Any]]] = {}
     for item in items:
