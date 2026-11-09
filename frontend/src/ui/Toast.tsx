@@ -11,6 +11,8 @@ export interface ToastMessage {
   onAction?: () => void;
   /** The action reverts the reported change: it shows the undo icon and runs on Ctrl+Z / Meta+Z. */
   undo?: boolean;
+  /** The action is an offer in plain text, without the check icon (e.g. "Select the 2 texts with withdrawn tasks"). */
+  plain?: boolean;
   note?: string;
   /** Stays until dismissed or replaced (an offer the user may need after the next action, e.g. skipped cases). */
   persist?: boolean;
@@ -113,7 +115,7 @@ export function Toast({ toast, onDismiss, durationMs = 10_000, undoDescription =
         >
           <span className="ui-toast-message" title={toast.message}>{toast.message}</span>
           {toast.note && <span className="ui-toast-note">{toast.note}</span>}
-          {toast.onAction && <Button size="sm" className="ui-toast-action" icon={toast.undo ? <IconUndo className="ui-toast-undo-icon" /> : <IconCheck />} onClick={runAction}>{toast.actionLabel ?? "Undo"}</Button>}
+          {toast.onAction && <Button size="sm" className="ui-toast-action" icon={toast.undo ? <IconUndo className="ui-toast-undo-icon" /> : toast.plain ? undefined : <IconCheck />} onClick={runAction}>{toast.actionLabel ?? "Undo"}</Button>}
           <IconButton size="sm" variant="quiet" className="ui-toast-close" label="Dismiss" icon={<IconClose />} onClick={onDismiss} />
         </div>
       )}
