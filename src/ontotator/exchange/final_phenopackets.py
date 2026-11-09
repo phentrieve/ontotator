@@ -250,7 +250,10 @@ def _readme(
             "No other submission was substituted."
         )
     ] or ["None."]
-    out += planned_out_section(payload)
+    # This ZIP has no planned-out.csv; the receipt carries the list.
+    out += planned_out_section(
+        payload, 'receipt.json lists the same under "planned_out", one entry per text.'
+    )
     out += [
         "",
         *_heading("Verify"),

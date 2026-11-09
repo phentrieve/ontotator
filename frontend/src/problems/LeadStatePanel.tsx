@@ -29,7 +29,7 @@ function ReleasedHold({ report, hold }: { report: ProblemReportView; hold: Repor
   const event = eventOf(report, hold.release_event_id);
   if (hold.release_action === "restart") {
     const ordinal = event?.round_ordinal;
-    return <><StatusBadge tone="neutral">Restarted</StatusBadge> {ordinal == null ? "An empty round started" : `Round ${ordinal} started empty`}{at}</>;
+    return <><StatusBadge tone="neutral">Restarted</StatusBadge> {ordinal == null ? "A new round started" : `Round ${ordinal} started`}{at}</>;
   }
   if ((hold.release_action === "resume" || hold.release_action === "withdraw") && by) {
     const name = personLabel(by, by === report.viewer_label, hold.released_by);

@@ -120,7 +120,7 @@ import { taskText } from "./identity";
 import { adjacentCase, nextOpenTask, orderTasks } from "./caseOrder";
 import type { RouteLeaveGuard } from "./router";
 import { isReviewLike, modeBadge } from "../editor/modes";
-import { LanguageTag } from "../ui/LanguageTag";
+import { LanguageTag, LanguageText } from "../ui/LanguageTag";
 import { onSpaceActivate } from "../ui/spaceActivates";
 import { actorName } from "../editor/actorName";
 
@@ -1849,9 +1849,9 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const redoTitle = redoStep ? `Redo: ${stepName(redoStep)}` : "Nothing to redo";
   // Inside a text field the browser's own text undo keeps working (shortcuts skip typing targets).
   useShortcut(["Ctrl+z", "Meta+z"], () => { void runHistory("undo_step"); },
-    { scope: "screen", description: "Undo the last change", group: "Editor", enabled: historyEnabled && !!undoStep && !historyBusy });
+    { scope: "screen", description: "Undo the last change", group: "Editor", enabled: historyEnabled && !!undoStep && !historyBusy, listWhenDisabled: historyEnabled });
   useShortcut(["Ctrl+Shift+z", "Meta+Shift+z", "Ctrl+y"], () => { void runHistory("redo_step"); },
-    { scope: "screen", description: "Redo", group: "Editor", enabled: historyEnabled && !!redoStep && !historyBusy });
+    { scope: "screen", description: "Redo the last undone change", group: "Editor", enabled: historyEnabled && !!redoStep && !historyBusy, listWhenDisabled: historyEnabled });
 
   useEffect(() => {
     if (!saveBeforeReportRef) return;
@@ -3756,8 +3756,10 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
               disabled={queueState === "saving"}
             />
           ) : null}
-          <h1 className="case-title" title={view.document.document_id}>{assignmentNavigation ? taskText(assignmentNavigation.current) : view.document.document_id}</h1>
-          <LanguageTag code={view.document.language} />
+          {/* A task title already ends with its language ("W03 en"): the flag goes into it, not a second "en" after it. */}
+          {assignmentNavigation
+            ? <h1 className="case-title" title={view.document.document_id}><LanguageText text={taskText(assignmentNavigation.current)} code={assignmentNavigation.current.language} /></h1>
+            : <><h1 className="case-title" title={view.document.document_id}>{view.document.document_id}</h1><LanguageTag code={view.document.language} /></>}
           <span
             title={roundTitle ?? (roundKind !== "consolidation" && !isCarryKind(roundKind) ? badge.title : undefined)}
             className="case-mode"

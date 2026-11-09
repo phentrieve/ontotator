@@ -8,7 +8,7 @@ describe("round labels", () => {
   it("identity_lines", () => {
     expect(roundIdentity(r({}), { now })).toBe("Round 1, started empty, de v1");
     expect(roundIdentity(r({ kind: "carry_forward", round_ordinal: 3, source_round_ordinal: 2, source_submission_recorded_at: "2026-10-19T00:57:00" }), { now })).toBe("Round 3, continued from Round 2 submission (19 Oct, 00:57), de v1");
-    expect(roundIdentity(r({ kind: "clean_restart", round_ordinal: 4 }), { now })).toBe("Round 4, restarted empty after agreement with the lead");
+    expect(roundIdentity(r({ kind: "clean_restart", round_ordinal: 4 }), { now })).toBe("Round 4, restarted after agreement with the lead");
     expect(roundIdentity(r({ kind: "consolidation", round_ordinal: 2, input_submission_ids: ["a", "b"] }), { now })).toBe("Round 2, consolidation of 2 submissions");
   });
   it("text_change_and_handover_rounds", () => {

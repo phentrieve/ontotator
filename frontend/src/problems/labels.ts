@@ -128,7 +128,7 @@ export function yourTaskFact(r: ProblemReportView): { kind: TaskFactKind; text: 
   switch (newest.release_action) {
     case "restart": {
       const ordinal = (r.events ?? []).find(e => e.event_id === newest.release_event_id)?.round_ordinal;
-      return { kind: "restarted", text: ordinal == null ? "Restarted with an empty round" : `Restarted with an empty Round ${ordinal}`, at };
+      return { kind: "restarted", text: ordinal == null ? "Restarted in a new round" : `Restarted in Round ${ordinal}`, at };
     }
     case "withdraw":
       return { kind: "withdrawn", text: "Resumed when you withdrew the report", at };
@@ -191,8 +191,8 @@ function eventSentence(r: ProblemReportView, e: ReportEventView, actor: string):
       const next = e.round_ordinal == null ? null : `Round ${e.round_ordinal}`;
       const prior = e.abandoned_round_ordinal == null ? null : `Round ${e.abandoned_round_ordinal}`;
       const sentence = lead
-        ? `${actor} agreed an empty restart of ${taskRef(reporterTask(r))}. ${prior ?? "The previous round"} abandoned and kept; ${next ?? "A new round"} started empty. Report closed.`
-        : `${actor} restarted your task with an empty ${next ?? "round"}. ${prior ?? "The previous round"} is kept. Report closed.`;
+        ? `${actor} agreed a clean restart of ${taskRef(reporterTask(r))}. ${prior ?? "The previous round"} abandoned and kept; ${next ?? "A new round"} started. Report closed.`
+        : `${actor} restarted your task in ${next ?? "a new round"}. ${prior ?? "The previous round"} is kept. Report closed.`;
       const item = withReason(sentence, "Outcome");
       const draft = draftOf(e);
       return draft ? { ...item, draft } : item;
@@ -282,8 +282,8 @@ export function intentState(r: ProblemReportView): Record<Intent, { label: strin
       unavailable: blockedByState,
     },
     restart: {
-      label: "Agree empty restart…",
-      consequence: `${upperFirst(taskRef(reporterTask(r)))} starts with an empty round; the report closes.`,
+      label: "Agree clean restart…",
+      consequence: `${upperFirst(taskRef(reporterTask(r)))} starts again in a new round; the report closes.`,
       unavailable: blockedByState ?? (otherReportPauses ? `${upperFirst(taskRef(reporterTask(r)))} is also paused by another report. Release that pause first.` : null),
     },
     reopen: {
@@ -327,9 +327,9 @@ export function leadOutcome(intent: Intent, before: ProblemReportView, after: Pr
       const restart = [...(after.events ?? [])].sort(byCreatedAt).filter(e => e.action === "restart").pop();
       const next = restart?.round_ordinal ?? after.current_round_ordinal;
       const prior = restart ? restart.abandoned_round_ordinal : before.current_round_ordinal;
-      const started = next == null ? "an empty round" : `an empty Round ${next}`;
+      const started = next == null ? "a new round" : `Round ${next}`;
       const kept = prior == null ? "The previous round" : `Round ${prior}`;
-      return `${upperFirst(taskRef(reporterTask(after)))} restarted with ${started}. ${kept} is kept in the history. Report closed. The final result did not change.`;
+      return `${upperFirst(taskRef(reporterTask(after)))} restarted in ${started}. ${kept} is kept in the history. Report closed. The final result did not change.`;
     }
     case "reopen":
       return "Report reopened. No task was paused again.";

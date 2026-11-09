@@ -330,7 +330,7 @@ What for: change your work after you submitted it, or start over. A submission i
 2. The table **Rounds** lists each round with its state and submission. **You are here** marks the current one; **Open** opens another.
 3. Under **Start a new round**, choose one:
    - To continue from your work: choose the submission under **Continue from**, read what the dialog says will happen, and click **Continue from this submission**. Your findings are carried into the new round, and each must be checked again ([Review carried findings](#review-carried-findings)). You can do this yourself; you do not need the lead.
-   - To start over: click **Start empty round**. The new round has no findings. This button is there only while the task has no round and no submission yet. After a submission, only your lead can restart it empty: [report a text problem](#report-a-text-problem) and ask for an empty restart.
+   - To start over: click **Start empty round**. The new round has no findings. This button is there only while the task has no round and no submission yet. After a submission, only your lead can restart it: [report a text problem](#report-a-text-problem) and ask for a restart. The new round has none of your findings; a task from proposals starts again on the newest tool proposals, all open.
 4. Click **Close**, make your changes and [submit the text](#submit-the-text) again.
 
 What happens to your earlier work:

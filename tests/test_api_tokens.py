@@ -246,6 +246,21 @@ def test_scopes_limit_the_routes(app: FastAPI, admin: TestClient) -> None:
         assert response.json()["code"] == "TOKEN_NOT_ALLOWED"
 
 
+def test_a_token_gets_404_for_a_path_no_route_has(
+    app: FastAPI, admin: TestClient
+) -> None:
+    reader = _bearer(app, _create(admin, ["read"])["secret"])
+    for path in ["/api/v1/doesnotexist", "/api/v1/admin/users"]:
+        response = reader.get(path)
+        assert response.status_code == 404, path
+        assert response.json()["code"] == "NOT_FOUND"
+    # A route that exists only for other methods, or only for a session, stays refused.
+    assert reader.delete("/api/v1/projects").json()["code"] == "TOKEN_NOT_ALLOWED"
+    assert reader.get("/api/v1/preferences").json()["code"] == "TOKEN_NOT_ALLOWED"
+    # Without a valid token the path is not revealed.
+    assert _bearer(app, "wrong").get("/api/v1/doesnotexist").status_code == 401
+
+
 def test_a_token_cannot_create_list_or_revoke_tokens(
     app: FastAPI, admin: TestClient
 ) -> None:
@@ -916,15 +931,16 @@ def test_an_unmapped_route_refuses_every_token(app: FastAPI, admin: TestClient) 
     app.router.routes.insert(
         0, APIRoute("/api/v1/unmapped-probe", probe, methods=["GET", "POST"])
     )
-    # A session reaches the new route; no token does, whatever its scopes.
+    # A session reaches the new route; no token does, whatever its scopes: the
+    # map does not know the path, so the middleware answers 404 itself.
     assert admin.get("/api/v1/unmapped-probe").status_code == 200
     for token in (secret, system):
         client = _bearer(app, token, **ORIGIN)
         for method in ("GET", "POST", "HEAD"):
             response = client.request(method, "/api/v1/unmapped-probe")
-            assert response.status_code == 403, (method, response.text)
+            assert response.status_code == 404, (method, response.text)
             if method != "HEAD":
-                assert response.json()["code"] == "TOKEN_NOT_ALLOWED"
+                assert response.json()["code"] == "NOT_FOUND"
 
 
 def test_encoded_slashes_never_move_a_project_token_elsewhere(

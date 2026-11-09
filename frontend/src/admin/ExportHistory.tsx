@@ -111,7 +111,7 @@ export function ExportHistory({ projectKey, revision = 0 }: { projectKey: string
       {loading && !loaded && <p className="cell-secondary" role="status">Loading export history…</p>}
       {error !== undefined && <ErrorNotice error={error} onRetry={loaded ? undefined : () => setReload(value => value + 1)} />}
       {loaded && jobs.length === 0 && <p className="cell-secondary">No exports yet.</p>}
-      {jobs.length > 0 && <table className="data-table export-research-table export-history-table">
+      {jobs.length > 0 && <div className="data-table-scroll"><table className="data-table export-research-table export-history-table">
         <thead><tr>
           <th scope="col">Export</th><th scope="col">State</th><th scope="col">Requested by</th>
           <th scope="col">Started</th><th scope="col">Duration</th><th scope="col"><span className="visually-hidden">Action</span></th>
@@ -127,7 +127,7 @@ export function ExportHistory({ projectKey, revision = 0 }: { projectKey: string
           <td>{duration(job)}</td>
           <td>{job.download_path && <Button size="sm" variant="secondary" loading={downloading === job.id} disabled={downloading !== null && downloading !== job.id} onClick={() => { void download(job); }}>Download</Button>}</td>
         </tr>)}</tbody>
-      </table>}
+      </table></div>}
       {jobs.length < total && <div><Button size="sm" variant="secondary" loading={loading} onClick={() => { void load(jobs.length); }}>Show older exports</Button></div>}
     </details>
   </section>;

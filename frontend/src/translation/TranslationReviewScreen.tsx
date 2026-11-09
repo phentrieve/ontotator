@@ -650,8 +650,6 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
 
   return <section className="translation-review" aria-label="Translation review" ref={screenRoot}>
     {held && <PausedNotice reason={props.holdReason ?? workspace.assignment.hold_reason} kept="Your local translation and review input are kept." />}
-    {/* Gone once the review is submitted here: the notice belongs to editable tasks. */}
-    {!readOnly && props.guidelineNotice}
     <Button className="translation-skip" onClick={focusDecision}>Skip to decision</Button>
     <div className="translation-review-bar density-compact">
       <h1>{label}</h1>
@@ -677,6 +675,8 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
           title="Load the latest saved state of this review. Unsaved edits are saved first; if that fails, you choose whether to discard them.">Reload from server</Button>
       </div>
     </div>
+    {/* Under the task header, as in the annotation editor; gone once the review is submitted here. */}
+    {!readOnly && props.guidelineNotice}
     <ChecksSummary failed={workspace.failed_checks} all={allChecks} />
     <div className="translation-workspace">
       <div className="translation-texts">

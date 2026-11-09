@@ -273,7 +273,7 @@ describe("exact filters from Progress links", () => {
     // Two of three selected: the header checkbox is mixed (#47 A-20).
     expect((screen.getByRole("checkbox", { name: "Select all 3 filtered texts" }) as HTMLInputElement).indeterminate).toBe(true);
     fireEvent.click(screen.getByRole("checkbox", { name: "Select all 3 filtered texts" }));
-    await waitFor(() => expect(api.documentRowKeys).toHaveBeenCalledWith("p", { filters: expected, sort: "import" }));
+    await waitFor(() => expect(api.documentRowKeys).toHaveBeenCalledWith("p", { filters: expected, active_only: false, sort: "import" }));
   });
 
   it("drops a final filter under a decision filter (the API takes one of them)", async () => {
@@ -327,7 +327,7 @@ describe("exact filters from Progress links", () => {
     // Two of three selected: the header checkbox is mixed (#47 A-20).
     expect((screen.getByRole("checkbox", { name: "Select all 3 filtered texts" }) as HTMLInputElement).indeterminate).toBe(true);
     fireEvent.click(screen.getByRole("checkbox", { name: "Select all 3 filtered texts" }));
-    await waitFor(() => expect(api.documentRowKeys).toHaveBeenCalledWith("p", { filters: expected, sort: "-activity" }));
+    await waitFor(() => expect(api.documentRowKeys).toHaveBeenCalledWith("p", { filters: expected, active_only: false, sort: "-activity" }));
   });
 });
 
@@ -556,7 +556,7 @@ describe("case selection", () => {
     expect(header.className).toContain("checkbox-target");
     fireEvent.click(header);
     await waitFor(() => expect(within(selectionRegion()).getByText(selectedText(50))).toBeTruthy());
-    expect(api.documentRowKeys).toHaveBeenCalledWith("p", { filters: { language: "de", segment: "assign" }, sort: "case" });
+    expect(api.documentRowKeys).toHaveBeenCalledWith("p", { filters: { language: "de", segment: "assign" }, active_only: false, sort: "case" });
     expect((header as HTMLInputElement).checked).toBe(true);
     await waitFor(() => expect(live().textContent).toBe(selectedText(50)));
     fireEvent.click(header);
@@ -903,7 +903,7 @@ it("the assignee filter shows its chip and goes to the rows and the header check
   expect(await screen.findByRole("button", { name: "Remove filter Assigned to: ann-0001" })).toBeTruthy();
   expect(api.listDocumentRows).toHaveBeenLastCalledWith("p", expect.objectContaining({ assignee: "ann-0001" }));
   fireEvent.click(screen.getByRole("checkbox", { name: "Select the only filtered text" }));
-  await waitFor(() => expect(api.documentRowKeys).toHaveBeenCalledWith("p", { filters: { assignee: "ann-0001" }, sort: "case" }));
+  await waitFor(() => expect(api.documentRowKeys).toHaveBeenCalledWith("p", { filters: { assignee: "ann-0001" }, active_only: false, sort: "case" }));
 });
 
 it("explains a preflight-only missing final result on a deep-linked row", async () => {
@@ -1536,7 +1536,10 @@ describe("lead review fixes", () => {
     expect(screen.queryByRole("button", { name: "Text case-1 fr" })).toBeNull();
     // The tab says 3, the table holds 1 (#198).
     expect(within(filterTools()).getByText("1 of 3")).toBeTruthy();
+    // The header selects what the table shows: the hidden texts are not counted (active_only).
+    expect(screen.getByRole("checkbox", { name: "Select the only filtered text" })).toBeTruthy();
     fireEvent.click(toggle);
+    expect(screen.getByRole("checkbox", { name: "Select all 3 filtered texts" })).toBeTruthy();
     expect(within(filterTools()).queryByText(/ of 3$/)).toBeNull();
     const fr = screen.getByRole("button", { name: "Text case-1 fr" }).closest("tr")!;
     expect(fr.className).toContain("documents-row--not-in-plan");

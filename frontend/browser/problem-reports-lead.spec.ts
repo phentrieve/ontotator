@@ -114,13 +114,13 @@ async function openIntent(page: Page, intent: string | RegExp, title: string): P
   return box;
 }
 
-const restartTitle = (ref: string) => `Agree empty restart of ${ref}`;
+const restartTitle = (ref: string) => `Agree clean restart of ${ref}`;
 
 /** Fill and send the restart confirmation (agreement + reason). */
 async function confirmRestart(box: Locator, reporter: string, reason: string) {
   await box.getByRole("checkbox", { name: new RegExp(`^I agreed this restart with ${esc(reporter)}( \\(required\\))?$`) }).check();
   await box.getByRole("textbox", { name: new RegExp(`^Reason \\(becomes the outcome ${esc(reporter)} sees\\)`) }).fill(reason);
-  await box.getByRole("button", { name: "Restart with empty round", exact: true }).click();
+  await box.getByRole("button", { name: "Restart in a new round", exact: true }).click();
 }
 
 /** Documents table helpers (documentsHelpers.ts; the same accessible names as the Documents specs). */
@@ -225,7 +225,7 @@ test("restart is refused while another report pauses the task, succeeds after th
   const other = await fileReport(s.users.reporter, task, OTHER_REPORT_TEXT);
 
   // This page still offers the restart; the server refuses it.
-  let restart = await openIntent(page, "Agree empty restart…", restartTitle(ref));
+  let restart = await openIntent(page, "Agree clean restart…", restartTitle(ref));
   const finalStays = restart.getByRole("listitem").filter({ hasText: /^Final result stays: / });
   for (const part of final.label_parts) await expect(finalStays).toContainText(part);
   await expect(finalStays).not.toContainText("None");
@@ -236,7 +236,7 @@ test("restart is refused while another report pauses the task, succeeds after th
   await expect(cardTitle(page, "Decide")).toBeVisible();
   await expect(fact(page, REPORTER_TASK)).toContainText("Also paused by another report");
   // The open confirmation stays and explains; no "Unavailable: …" line in the card.
-  await expect(decide(page).getByRole("button", { name: "Agree empty restart…" })).toHaveAttribute("aria-disabled", "true");
+  await expect(decide(page).getByRole("button", { name: "Agree clean restart…" })).toHaveAttribute("aria-disabled", "true");
   await expect(restart).toContainText(`${upperFirst(ref)} is also paused by another report. Release that pause first.`);
   await expect(decide(page)).not.toContainText("Unavailable:");
 
@@ -255,10 +255,10 @@ test("restart is refused while another report pauses the task, succeeds after th
   // Back on the first report: the restart now succeeds and the final result is unchanged.
   await openLeadPage(page, s, report);
   await expect(fact(page, REPORTER_TASK)).not.toContainText("Also paused by another report");
-  restart = await openIntent(page, "Agree empty restart…", restartTitle(ref));
+  restart = await openIntent(page, "Agree clean restart…", restartTitle(ref));
   for (const part of final.label_parts) await expect(restart.getByRole("listitem").filter({ hasText: /^Final result stays: / })).toContainText(part);
   await confirmRestart(restart, asLeadSees(s, "reporter"), "Agreed with the reporter: start over.");
-  await expect(outcome(page)).toContainText(/^The \w+ of .+ restarted with an empty Round \d+\. Round \d+ is kept in the history\. Report closed\. The final result did not change\./);
+  await expect(outcome(page)).toContainText(/^The \w+ of .+ restarted in Round \d+\. Round \d+ is kept in the history\. Report closed\. The final result did not change\./);
   await expect(outcome(page)).toContainText(`${upperFirst(ref)} restarted`);
   await expect(fact(page, "Report")).toContainText(`Closed by ${leadSelf(s)}`);
   for (const part of final.label_parts) await expect(fact(page, "Final result")).toContainText(part);
@@ -278,10 +278,10 @@ test("restart, reopen, restart again: the second confirmation and the history na
   await expect(page.locator(".lead-report-eyebrow")).toContainText(`Round ${n}`);
 
   // First restart: the reported round is the current one.
-  let restart = await openIntent(page, "Agree empty restart…", restartTitle(ref));
-  await expect(restart).toContainText(`Round ${n} is abandoned and kept; Round ${n + 1} starts empty.`);
+  let restart = await openIntent(page, "Agree clean restart…", restartTitle(ref));
+  await expect(restart).toContainText(`Round ${n} is abandoned and kept; Round ${n + 1} starts.`);
   await confirmRestart(restart, asLeadSees(s, "reporter"), "First restart agreed.");
-  await expect(outcome(page)).toContainText(`${upperFirst(ref)} restarted with an empty Round ${n + 1}. Round ${n} is kept in the history. Report closed. The final result did not change.`);
+  await expect(outcome(page)).toContainText(`${upperFirst(ref)} restarted in Round ${n + 1}. Round ${n} is kept in the history. Report closed. The final result did not change.`);
 
   // Reopen: nothing is paused again.
   const reopen = await openIntent(page, "Reopen report…", "Reopen report");
@@ -294,18 +294,18 @@ test("restart, reopen, restart again: the second confirmation and the history na
 
   // Second restart: names the round the first restart created, not the reported one.
   await expect(page.locator(".lead-report-eyebrow")).toContainText(`Round ${n}`);
-  restart = await openIntent(page, "Agree empty restart…", restartTitle(ref));
-  await expect(restart).toContainText(`Round ${n + 1} is abandoned and kept; Round ${n + 2} starts empty.`);
+  restart = await openIntent(page, "Agree clean restart…", restartTitle(ref));
+  await expect(restart).toContainText(`Round ${n + 1} is abandoned and kept; Round ${n + 2} starts.`);
   await expect(restart).not.toContainText(`Round ${n} is abandoned`);
   await confirmRestart(restart, asLeadSees(s, "reporter"), "Second restart agreed.");
-  await expect(outcome(page)).toContainText(`${upperFirst(ref)} restarted with an empty Round ${n + 2}. Round ${n + 1} is kept in the history. Report closed. The final result did not change.`);
+  await expect(outcome(page)).toContainText(`${upperFirst(ref)} restarted in Round ${n + 2}. Round ${n + 1} is kept in the history. Report closed. The final result did not change.`);
 
   // History: both restarts with their actual abandoned rounds, and the reopen in between.
   const items = history(page).locator(".report-timeline-sentence");
-  const restarts = items.filter({ hasText: `agreed an empty restart of ${ref}.` });
+  const restarts = items.filter({ hasText: `agreed a clean restart of ${ref}.` });
   await expect(restarts).toHaveCount(2);
-  await expect(restarts.nth(0)).toContainText(`Round ${n} abandoned and kept; Round ${n + 1} started empty. Report closed.`);
-  await expect(restarts.nth(1)).toContainText(`Round ${n + 1} abandoned and kept; Round ${n + 2} started empty. Report closed.`);
+  await expect(restarts.nth(0)).toContainText(`Round ${n} abandoned and kept; Round ${n + 1} started. Report closed.`);
+  await expect(restarts.nth(1)).toContainText(`Round ${n + 1} abandoned and kept; Round ${n + 2} started. Report closed.`);
   await expect(items.filter({ hasText: "reopened the report." })).toHaveCount(1);
   await expect(history(page)).toContainText("First restart agreed.");
   await expect(history(page)).toContainText("Second restart agreed.");
@@ -322,10 +322,10 @@ test("restart of a translation review keeps the old draft in the history; the re
   await openLeadPage(page, s, report);
   await expect(page.locator(".lead-report-eyebrow")).toContainText("Translation review");
 
-  const restart = await openIntent(page, "Agree empty restart…", restartTitle(ref));
+  const restart = await openIntent(page, "Agree clean restart…", restartTitle(ref));
   await expect(restart).toContainText("The current translation draft is kept in the report history; the text and form start fresh.");
   await confirmRestart(restart, asLeadSees(s, "reporter"), "Agreed: review the translation again from scratch.");
-  await expect(outcome(page)).toContainText(`${upperFirst(ref)} restarted with`);
+  await expect(outcome(page)).toContainText(`${upperFirst(ref)} restarted in`);
   await expect(outcome(page)).toContainText("Report closed. The final result did not change.");
 
   // The history keeps the archived draft text and form values behind a disclosure.

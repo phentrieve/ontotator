@@ -105,7 +105,7 @@ describe("current state panel", () => {
     const facts = [...stateSection().querySelectorAll(".lead-state > div")].map(item => item.textContent);
     expect(facts[0]).toMatch(/^Task of the reporterResumed by reporter \(ann-0004\), .*, "upsi"$/);
     expect(facts[1]).toMatch(/^Other taskResumed by lead-0002 \(you\), .* · ann-0005, accepted-translation en, annotation$/);
-    expect(facts[2]).toMatch(/^Other taskRestarted Round 3 started empty/);
+    expect(facts[2]).toMatch(/^Other taskRestarted Round 3 started/);
     expect(facts[3]).toContain("Released (no record of who released it)");
     expect(facts[4]).toMatch(/^Other taskPaused since .* · ann-0008, accepted-translation de, annotation/);
     expect(facts[4]).toContain("Also paused by another report");
@@ -134,8 +134,8 @@ describe("current state panel", () => {
 describe("intents", () => {
   // Only what is possible now: unavailable intents are not shown at all (no disabled button, no "Unavailable: …").
   const cases: [string, Partial<ProblemReportView>, string, string | null, string[]][] = [
-    ["open with pause", {}, "Decide", "Close and resume the annotation of accepted-translation de by ann-0004", ["Close, keep paused…", "Release pause…", "Pause other tasks…", "Agree empty restart…"]],
-    ["open without pause", { holds: [hold({ active: false })] }, "Decide", null, ["Close report…", "Pause other tasks…", "Agree empty restart…"]],
+    ["open with pause", {}, "Decide", "Close and resume the annotation of accepted-translation de by ann-0004", ["Close, keep paused…", "Release pause…", "Pause other tasks…", "Agree clean restart…"]],
+    ["open without pause", { holds: [hold({ active: false })] }, "Decide", null, ["Close report…", "Pause other tasks…", "Agree clean restart…"]],
     ["closed with pause", { state: "resolved" }, "One step left", "Release pause on the annotation of accepted-translation de by ann-0004…", ["Reopen report…"]],
     ["closed", { state: "resolved", holds: [hold({ active: false })] }, "Decided", null, ["Reopen report…"]],
     ["withdrawn", { state: "withdrawn", holds: [hold({ active: false })] }, "Decided", null, ["Reopen report…"]],
@@ -156,7 +156,7 @@ describe("intents", () => {
 
   it("hides restart while another report also pauses the reporter's task", async () => {
     await setup({ view: leadReport({ holds: [hold({ other_active_holds: [{ report_id: "r9" }] })] }) });
-    expect(within(screen.getByRole("group", { name: "Decide on this report" })).queryByRole("button", { name: "Agree empty restart…" })).toBeNull();
+    expect(within(screen.getByRole("group", { name: "Decide on this report" })).queryByRole("button", { name: "Agree clean restart…" })).toBeNull();
   });
 
   it("keeps one confirm open at a time and returns focus on Cancel and Escape", async () => {
@@ -335,11 +335,12 @@ describe("confirmations", () => {
     const { act, get } = await setup({ view: { ...view, holds: [hold()] } });
     act.mockRejectedValue(new ConflictError("held", "TASK_HELD", { assignment_id: 4 }));
     get.mockResolvedValue(view);
-    fireEvent.click(intent("Agree empty restart…"));
-    const box = within(confirmBox("Agree empty restart of the annotation of accepted-translation de by ann-0004"));
-    expect(box.getByText("Round 3 is abandoned and kept; Round 4 starts empty.")).toBeTruthy();
+    fireEvent.click(intent("Agree clean restart…"));
+    const box = within(confirmBox("Agree clean restart of the annotation of accepted-translation de by ann-0004"));
+    expect(box.getByText("Round 3 is abandoned and kept; Round 4 starts.")).toBeTruthy();
+    expect(box.getByText("The new round has none of the earlier findings; a task from tool proposals starts again from the newest proposals, all open.")).toBeTruthy();
     expect(box.getByText("Final result stays: None.")).toBeTruthy();
-    const confirm = box.getByRole("button", { name: "Restart with empty round" });
+    const confirm = box.getByRole("button", { name: "Restart in a new round" });
     expect(confirm.className).toContain("btn-danger");
     fireEvent.change(box.getByRole("textbox", { name: /Reason \(becomes the outcome ann-0004 sees\)/ }), { target: { value: "Start over" } });
     fireEvent.click(confirm);
@@ -410,7 +411,7 @@ describe("confirmations", () => {
       holds: [hold({ active: false, release_action: "restart", released_by_label: "lead-0002", released_at: T2, release_event_id: "e5" })],
       events: [event({ event_id: "e5", action: "restart", actor_label: "lead-0002", round_ordinal: 4, abandoned_round_ordinal: 3, created_at: T2 })] }) });
     const history = within(screen.getByRole("region", { name: "History" }));
-    expect(history.getByText(/Round 3 abandoned and kept; Round 4 started empty\./)).toBeTruthy();
+    expect(history.getByText(/Round 3 abandoned and kept; Round 4 started\. Report closed/)).toBeTruthy();
   });
 });
 
@@ -471,8 +472,8 @@ describe("display names for leads", () => {
     let box = within(confirmBox("Close report"));
     expect(box.getByRole("textbox", { name: /Outcome for Ana Weber \(ann-0004\)/ })).toBeTruthy();
     expect(box.getByText("Ana Weber (ann-0004) sees this in the report.")).toBeTruthy();
-    fireEvent.click(intent("Agree empty restart…"));
-    box = within(confirmBox("Agree empty restart of the annotation of accepted-translation de by Ana Weber (ann-0004)"));
+    fireEvent.click(intent("Agree clean restart…"));
+    box = within(confirmBox("Agree clean restart of the annotation of accepted-translation de by Ana Weber (ann-0004)"));
     expect(box.getByRole("checkbox", { name: /I agreed this restart with Ana Weber \(ann-0004\)/ })).toBeTruthy();
     expect(box.getByRole("textbox", { name: /Reason \(becomes the outcome Ana Weber \(ann-0004\) sees\)/ })).toBeTruthy();
     act.mockResolvedValue(leadReport({ reporter: ANA, revision: 2, holds: [hold({ owner: ANA, active: false, release_action: "resume", released_by_label: "lead-0002" })] }));

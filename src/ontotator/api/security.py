@@ -244,6 +244,9 @@ def install_security(
         principal: Principal = resolved
         path = request.scope["path"]
         needed = token_scopes.requirement(request.method, path)
+        # A path no route has: 404 here, without passing the request on.
+        if needed is None and not token_scopes.known_path(path):
+            return _error(404, "NOT_FOUND", "No API route has this path.")
         refusal = _token_refusal(principal, needed)
         if refusal is not None:
             return refusal

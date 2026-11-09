@@ -49,7 +49,7 @@ export interface LeadConfirmProps {
 }
 
 /**
- * The InlineConfirm of one lead intent (Close, Release pause, Pause other tasks, Agree empty restart, Reopen); for
+ * The InlineConfirm of one lead intent (Close, Release pause, Pause other tasks, Agree clean restart, Reopen); for
  * "Close and resume" the inline form of the decision card: an optional answer and the primary button, no second step.
  */
 export function LeadConfirm({ intent, report, finalText, preselect = [], lead, requests, unavailable, reportLink, onDone, onCancel, onStart }: LeadConfirmProps): JSX.Element {
@@ -249,15 +249,15 @@ export function LeadConfirm({ intent, report, finalText, preselect = [], lead, r
       break;
     }
     case "restart": {
-      title = `Agree empty restart of ${taskRef(reporterTask(report))}`;
+      title = `Agree clean restart of ${taskRef(reporterTask(report))}`;
       const current = report.current_round_ordinal;
       tone = "danger";
-      confirmLabel = "Restart with empty round";
+      confirmLabel = "Restart in a new round";
       message = <ul className="lead-restart-facts">
-        <li>{current == null ? "The current round is abandoned and kept; a new empty round starts." : `Round ${current} is abandoned and kept; Round ${current + 1} starts empty.`}</li>
+        <li>{current == null ? "The current round is abandoned and kept; a new round starts." : `Round ${current} is abandoned and kept; Round ${current + 1} starts.`}</li>
         <li>{report.task === "translation_review"
           ? "The current translation draft is kept in the report history; the text and form start fresh."
-          : "The new round has no earlier or machine findings."}</li>
+          : "The new round has none of the earlier findings; a task from tool proposals starts again from the newest proposals, all open."}</li>
         <li>This report closes; its pause on {taskRef(reporterTask(report))} is released.</li>
         <li>Final result stays: {finalText}.</li>
       </ul>;

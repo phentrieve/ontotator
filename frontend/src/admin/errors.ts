@@ -39,6 +39,7 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   PASSWORD_WRONG: "The current password is wrong.",
   NOT_AUTHENTICATED: "Your session has ended. Please log in again.",
   NOT_ALLOWED: "You do not have permission to do this.",
+  NOT_FOUND: "This API address does not exist.",
   PROJECT_BUSY: "The project is busy right now. Try again in a moment.",
   PROJECT_NOT_FOUND: "You do not have access to this project, or it no longer exists.",
   ASSIGNMENT_REQUIRED: "This task is no longer assigned to you.",

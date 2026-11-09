@@ -312,6 +312,8 @@ What for: let a script import, export or read this project, for example a nightl
 
 A project token works in this project only and acts as you, the lead who created it. It is revoked when you leave the project or lose the lead role (unless you are a system administrator), when you change your password and when your account is deactivated. Every lead of the project sees its tokens and can stop one with **Revoke…** and **Revoke token**. Changes made with a token are in the audit trail with the token's name.
 
+A project token is also the safest kind for the Ontotator MCP server, which lets an AI assistant set up and run the project for you ([MCP server guide](../../mcp/README.md)).
+
 ## Publish the first or a new guideline version
 
 What for: give annotators and reviewers the rules they work by. They find the guidelines in every task.

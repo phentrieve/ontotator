@@ -377,6 +377,15 @@ _COMPILED = [
 ]
 
 
+def known_path(path: str) -> bool:
+    """Whether any listed route, with any method, has this path.
+
+    The map lists every API route (tests enforce it), so a path no entry
+    matches has no route in the app at all.
+    """
+    return any(pattern.match(path) for pattern, _m, _t, _s in _COMPILED)
+
+
 def requirement(method: str, path: str) -> Requirement | None:
     """The scope a request for ``path`` needs, or None.
 

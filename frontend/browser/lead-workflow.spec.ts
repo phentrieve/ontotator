@@ -164,7 +164,7 @@ test("D15: import, plan de, assign de, plan fr, assign fr", async ({ page }) => 
   // decision (V10). The en sources are never undecided: not planned, no row (the "+1" of the case's rows), no decision.
   await expect(documentsTab(page, "All", 200)).toBeVisible();
   await expect(documentsTab(page, "Needs your decision", 150)).toBeVisible();
-  await expect(page.getByRole("checkbox", { name: "Select all 200 filtered texts", exact: true })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: "Select all 150 filtered texts", exact: true })).toBeVisible();
   for (const language of ["de", "es", "fr"]) {
     await expect(rowCell(row(page, "case-0101", language), "translation"), language).toContainText("not decided");
     await expect(rowAction(page, "Plan…", "case-0101", language)).toBeVisible();

@@ -221,7 +221,7 @@ test('source update review shows both immutable sources and deliberately submits
 });
 
 
-test('corrected-text private carry preserves submitted history through a reported hold and agreed empty restart', async ({ page, browser }) => {
+test('corrected-text private carry preserves submitted history through a reported hold and agreed clean restart', async ({ page, browser }) => {
   const response = await page.request.post('/__test_translation_review__?workflow=true&source_update=true', { timeout: 60_000 });
   expect(response.ok(), await response.text()).toBeTruthy(); const s = await response.json() as Scenario;
   await loginExisting(page, s.users.lead);
@@ -263,14 +263,14 @@ test('corrected-text private carry preserves submitted history through a reporte
     const reportRows = await value<components['schemas']['ProblemReportView'][]>(page, `${root(s)}/problem-reports`);
     const report = reportRows.find(item => item.assignment_id === task.id)!;
     await page.goto(`/#/projects/${encodeURIComponent(s.project)}/problem-reports/${encodeURIComponent(report.report_id)}`);
-    await page.getByRole('group', { name: 'Decide on this report', exact: true }).getByRole('button', { name: 'Agree empty restart…', exact: true }).click();
-    const restart = page.getByRole('group', { name: /^Agree empty restart of the annotation of / });
+    await page.getByRole('group', { name: 'Decide on this report', exact: true }).getByRole('button', { name: 'Agree clean restart…', exact: true }).click();
+    const restart = page.getByRole('group', { name: /^Agree clean restart of the annotation of / });
     await restart.getByLabel(/^I agreed this restart with /).check();
     await restart.getByLabel(/^Reason \(becomes the outcome/).fill('Agreed with the author: start a separate empty annotation round.');
     const restarted = page.waitForResponse(r => r.request().method() === 'POST' && r.url().includes(`/problem-reports/${encodeURIComponent(report.report_id)}`));
-    await restart.getByRole('button', { name: 'Restart with empty round', exact: true }).click();
+    await restart.getByRole('button', { name: 'Restart in a new round', exact: true }).click();
     expect((await restarted).ok()).toBeTruthy();
-    await expect(page.getByText(/^The annotation of .+ restarted with /)).toBeVisible();
+    await expect(page.getByText(/^The annotation of .+ restarted in /)).toBeVisible();
     await author.page.reload();
     await expect(author.page.getByRole('button', { name: 'More actions', exact: true })).toBeVisible();
     await expect(author.page.locator('.sidebar .doc-item')).toHaveCount(0);

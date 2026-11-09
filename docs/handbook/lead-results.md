@@ -173,7 +173,7 @@ What for: answer a report and let the work go on.
    - **Close report…** or **Close, keep paused…**: close it with an outcome for the reporter.
    - **Release pause…**: let paused tasks continue.
    - **Pause other tasks…**: pause other tasks on the same text or project.
-   - **Agree empty restart…**: restart the task with an empty round, after agreeing with the reporter. A task from proposals starts again on the newest proposal set of the text, so a newer tool set reaches the task this way.
+   - **Agree clean restart…**: restart the task with a new round, after agreeing with the reporter. The annotator's own findings are not carried over. A task from scratch starts empty; a task from proposals starts again on the newest proposal set of the text, all proposals open, so a newer tool set reaches the task this way.
    - **Reopen report…**: open a closed report again.
 5. Confirm in the form that opens.
 6. Click **Back to Documents**, or go to the next decision.
@@ -189,11 +189,11 @@ A final result is never changed here. If a task is still paused after the report
 What for: download the accepted final results.
 
 1. In the sidebar, click **Export**. Or click **Export final results…** on **Documents** or **Progress**.
-2. The card **Final results** checks every text. It lists texts that need your decision and texts left out because they have no final result. Texts with annotation off in the work plan are listed under **Not planned, not exported**, for information only; they are not exported. Of these, the README.txt names only the texts taken out of the work plan (see step 4). If you took texts out of the work plan, a line below the check counts them and names the file that lists them, for example *4 texts taken out of the work plan are listed in planned-out.csv*.
+2. The card **Final results** checks every text. It lists texts that need your decision and texts left out because they have no final result. Texts with annotation off in the work plan that still have a final result are listed under **Not planned, not exported**, for information only; they are not exported. Texts with annotation off and no final result are not listed. If you took texts out of the work plan, a line below the check counts them all and names the file that lists them, for example *4 texts taken out of the work plan are listed in planned-out.csv* (with Phenopackets: *… in README.txt*).
 3. Under **Format**, keep **Results with receipt (ontospan)**, or choose **Phenopackets (derived, lossy)**; see [Phenopackets](#phenopackets).
 4. If texts need your decision or are left out, a tick box names how many results are exported and how many texts are left out, for example *Export the 3 results as they are; leave out the other 243 texts*. Tick it to export now anyway. Without the tick, **Create final export** does not start. The export's README.txt lists the left-out texts and the warnings you acknowledged with this tick. Left out here means planned for annotation but without a final result.
 
-   Texts you took out of the work plan (annotation set to off after it was on) are named too: README.txt and index.csv list them, and planned-out.csv gives for each the plan revision, the time and the reason you entered in **Plan…** or when you discarded the translation. A final result such a text had stays in Ontotator and is not exported. Texts that were never in the plan are not listed.
+   Texts you took out of the work plan (annotation set to off after it was on) are named too: README.txt and index.csv list them, and planned-out.csv gives for each the plan revision, the time and the reason you entered in **Plan…** or when you discarded the translation. The Phenopackets ZIP names them in README.txt and lists them under `planned_out` in receipt.json. A final result such a text had stays in Ontotator and is not exported. Texts that were never in the plan are not listed.
 5. Click **Create final export**.
 6. When it is ready, click **Download (ZIP)**.
 

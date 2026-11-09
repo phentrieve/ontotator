@@ -116,7 +116,7 @@ test("keyboard only: Tab reaches the intents in order; Enter, Space, Escape and 
   const close = intent(page, "Close, keep paused…");
   const release = intent(page, "Release pause…");
   const pause = intent(page, "Pause other tasks…");
-  const restart = intent(page, "Agree empty restart…");
+  const restart = intent(page, "Agree clean restart…");
   const reopen = intent(page, "Reopen report…");
 
   // Only possible intents: Reopen is not offered on an open report (no disabled button).
@@ -158,8 +158,8 @@ test("keyboard only: Tab reaches the intents in order; Enter, Space, Escape and 
   await expect(releaseBox).toHaveCount(0);
   await expect(release).toBeFocused();
 
-  // Pause other tasks and Agree empty restart: Enter opens, Escape returns.
-  for (const [button, title] of [[pause, "Pause other tasks"], [restart, `Agree empty restart of ${ref}`]] as const) {
+  // Pause other tasks and Agree clean restart: Enter opens, Escape returns.
+  for (const [button, title] of [[pause, "Pause other tasks"], [restart, `Agree clean restart of ${ref}`]] as const) {
     await page.keyboard.press("Tab");
     await expect(button).toBeFocused();
     await page.keyboard.press("Enter");
@@ -215,7 +215,7 @@ test("lead page at 320 CSS px: no horizontal scroll; Decide buttons stacked full
       };
     });
   });
-  expect(layout.map(item => item.label)).toEqual(["Close, keep paused…", "Release pause…", "Pause other tasks…", "Agree empty restart…"]);
+  expect(layout.map(item => item.label)).toEqual(["Close, keep paused…", "Release pause…", "Pause other tasks…", "Agree clean restart…"]);
   const primary = (await decide(page).locator(".btn-primary").boundingBox())!;
   expect(primary.x + primary.width, "primary").toBeLessThanOrEqual(320);
   await expect(decide(page).locator(".btn-primary")).toHaveText(`Close and resume ${reporterTaskRef(s, report)}`);
@@ -365,7 +365,7 @@ test("axe: reporter dialog (list and new report views) and lead page (default an
     await expect(lead.getByRole("heading", { level: 1 })).toHaveCount(1);
     expect(await axeViolations(lead, "main"), "lead page").toEqual([]);
 
-    for (const [name, title] of [["Release pause…", "Release pause"], ["Pause other tasks…", "Pause other tasks"], ["Agree empty restart…", `Agree empty restart of ${reporterTaskRef(s, report)}`]] as const) {
+    for (const [name, title] of [["Release pause…", "Release pause"], ["Pause other tasks…", "Pause other tasks"], ["Agree clean restart…", `Agree clean restart of ${reporterTaskRef(s, report)}`]] as const) {
       await intent(lead, name).click();
       await expect(confirmBox(lead, title).getByRole("heading", { name: title })).toBeFocused();
       expect(await axeViolations(lead, "main"), `lead page, ${title} open`).toEqual([]);

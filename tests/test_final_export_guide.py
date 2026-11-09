@@ -10,6 +10,7 @@ from ontotator.exchange.final_export_guide import (
     build_index_csv,
     build_readme,
     guide_files,
+    planned_out_section,
 )
 
 
@@ -357,6 +358,7 @@ def test_planned_out_texts_have_index_rows_and_their_own_table():
         "scope: adult cases only. case, two (de, final result kept), "
         "case-three (en)",
         '"planned_out" rows are texts a lead took out of the work plan',
+        "planned-out.csv lists the same, one row per text.",
     ]:
         assert sentence in flat, sentence
     # The reason is written once per group, not once per text.
@@ -368,6 +370,15 @@ def test_planned_out_texts_have_index_rows_and_their_own_table():
         snapshot_created_at=AT,
     )
     assert again == files
+
+
+def test_planned_out_section_names_the_listing_of_its_format():
+    """The Phenopackets ZIP has no planned-out.csv; its README points elsewhere."""
+    flat = " ".join(
+        planned_out_section(payload(planned_out=PLANNED_OUT), "receipt.json lists it.")
+    )
+    assert "receipt.json lists it." in flat
+    assert "planned-out.csv" not in flat
 
 
 def test_no_planned_out_texts_say_none_and_add_no_file():

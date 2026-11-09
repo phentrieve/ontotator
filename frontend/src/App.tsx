@@ -331,6 +331,8 @@ export function App({ user: givenUser, onLogout }: AppProps): JSX.Element {
         const key = route.key;
         const name = projects.find(project => project.project_key === key)?.name ?? key;
         forgetProject(user.username, key);
+        // Out of the shown list at once: Projects must not ask for the deleted project's summary (404).
+        setProjectContext(context => context && { ...context, projects: context.projects.filter(project => project.project_key !== key) });
         reloadProjects();
         go({ name: "projects" });
         appToast.show({ message: `Project “${name}” deleted (key ${key}).` });

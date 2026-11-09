@@ -37,7 +37,7 @@ export function roundIdentity(round: RoundFacts, options: FormatTimeOptions = {}
   const withVersion = (start: string) => [title, start, version].filter(Boolean).join(", ");
   switch (round.kind) {
     case "clean_restart":
-      return `${title}, restarted empty after agreement with the lead`;
+      return `${title}, restarted after agreement with the lead`;
     case "consolidation":
       return `${title}, consolidation of ${plural(round.input_submission_ids?.length ?? 0, "submission", "submissions")}`;
     case "carry_forward": {
@@ -113,11 +113,11 @@ export function sourceOptionLabel(source: CarrySourceFacts, options: FormatTimeO
   ].filter(Boolean).join(", ");
 }
 
-/** Starting point in the Work rounds table: "from Round 2 submission", "restarted empty", … */
+/** Starting point in the Work rounds table: "from Round 2 submission", "restarted", … */
 export function roundStartingPoint(round: Pick<RoundFacts, "kind" | "round_ordinal" | "source_round_ordinal" | "input_submission_ids">): string {
   switch (round.kind) {
     case "carry_forward": return sourceRound(round) ? `from ${sourceRound(round)} submission` : "from an earlier submission";
-    case "clean_restart": return "restarted empty";
+    case "clean_restart": return "restarted";
     case "consolidation": return `consolidation of ${plural(round.input_submission_ids?.length ?? 0, "submission", "submissions")}`;
     case "text_change": return "carried after text change";
     case "handover": return "handed over";
