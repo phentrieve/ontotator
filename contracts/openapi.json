@@ -1577,7 +1577,10 @@
             }
           }
         },
-        "x-ontotator-scope": "import",
+        "x-ontotator-scope": [
+          "import",
+          "project-admin"
+        ],
         "x-ontotator-project-token": true
       }
     },
@@ -1631,7 +1634,8 @@
             }
           }
         },
-        "x-ontotator-scope": "session"
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
       }
     },
     "/api/v1/assignments/{assignment_id}/text-change-resolution": {
@@ -1684,7 +1688,8 @@
             }
           }
         },
-        "x-ontotator-scope": "session"
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
       }
     },
     "/api/v1/projects/{key}/submissions/{submission_id}/carry": {
@@ -6438,7 +6443,8 @@
             }
           }
         },
-        "x-ontotator-scope": "session"
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
       }
     },
     "/api/v1/translation-reviews/{assignment_id}/source-obligations": {
