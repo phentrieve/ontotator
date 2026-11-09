@@ -17,13 +17,35 @@ export type SidebarCommitSource = "drag" | "key" | "drag-start" | "drag-cancel";
 const MIN_WIDTH = 220;
 const MAX_WIDTH = 480;
 const TWO_COLUMN_MAX_VIEWPORT = 1024;
-/** Inspector width of the three-column layout (`grid-template-columns: … 380px`). */
-export const INSPECTOR_WIDTH = 380;
+/**
+ * Inspector width of the three-column layout, as `--inspector-width` in editor.css:
+ * clamp(380px, 380px + (100vw - 1440px) * 0.35, 520px), and at least 420 px while it holds the guidelines.
+ */
+export const INSPECTOR_WIDTH = { min: 380, max: 520, from: 1440, slope: 0.35, withGuidelines: 420 } as const;
 const TEXT_RESERVE = 420;
+/** Default findings width above 1024 px: clamp(260, 260 + (viewport - 1280) * 0.25, 340). */
+const DEFAULT_WIDTH = { twoColumns: 220, min: 260, max: 340, from: 1280, slope: 0.25 } as const;
 const KEY_COMMIT_DELAY_MS = 300;
 
 export function storageKey(username: string): string {
   return `ontotator.editor.sidebarWidth.v1:${username}`;
+}
+
+const clamp = (min: number, value: number, max: number) => Math.min(max, Math.max(min, value));
+
+/** Width of the inspector column at this viewport width (0 in the two-column layout). */
+export function inspectorWidth(viewport: number, withGuidelines = false): number {
+  if (viewport <= TWO_COLUMN_MAX_VIEWPORT) return 0;
+  const { min, max, from, slope } = INSPECTOR_WIDTH;
+  const width = clamp(min, min + (viewport - from) * slope, max);
+  return withGuidelines ? Math.max(INSPECTOR_WIDTH.withGuidelines, width) : width;
+}
+
+/** Default findings width: 220 px up to 1024 px, then 260 at 1280, 300 at 1440 and 340 from 1600 px. */
+export function defaultSidebarWidth(viewport: number): number {
+  if (viewport <= TWO_COLUMN_MAX_VIEWPORT) return DEFAULT_WIDTH.twoColumns;
+  const { min, max, from, slope } = DEFAULT_WIDTH;
+  return Math.round(clamp(min, min + (viewport - from) * slope, max));
 }
 
 export function sidebarLimits({ viewport, inspector }: { viewport: number; inspector: number }): SidebarLimits {
@@ -31,8 +53,8 @@ export function sidebarLimits({ viewport, inspector }: { viewport: number; inspe
   const share = Math.floor(viewport * 0.35);
   const max = twoColumns
     ? Math.min(MAX_WIDTH, share)
-    : Math.min(MAX_WIDTH, share, viewport - inspector - TEXT_RESERVE);
-  return { min: MIN_WIDTH, max: Math.max(MIN_WIDTH, max), fallback: twoColumns ? 220 : 260 };
+    : Math.min(MAX_WIDTH, share, Math.floor(viewport - inspector - TEXT_RESERVE));
+  return { min: MIN_WIDTH, max: Math.max(MIN_WIDTH, max), fallback: defaultSidebarWidth(viewport) };
 }
 
 export function clampSidebarWidth(value: number, limits: SidebarLimits): number {
@@ -70,10 +92,12 @@ export function clearStoredWidth(username: string): void {
   }
 }
 
-function currentLimits(): SidebarLimits {
+function currentLimits(withGuidelines = false): SidebarLimits {
   const viewport = typeof window === "undefined" ? 1280 : window.innerWidth;
-  return sidebarLimits({ viewport, inspector: viewport > TWO_COLUMN_MAX_VIEWPORT ? INSPECTOR_WIDTH : 0 });
+  return sidebarLimits({ viewport, inspector: inspectorWidth(viewport, withGuidelines) });
 }
+
+const sameLimits = (a: SidebarLimits, b: SidebarLimits) => a.min === b.min && a.max === b.max && a.fallback === b.fallback;
 
 export interface SidebarWidthState {
   width: number;
@@ -86,10 +110,13 @@ export interface SidebarWidthState {
 /**
  * Preferred findings-column width per user. The stored value is applied clamped to the
  * current limits; it is written after a drag end or 300 ms after the last key, never
- * during render. Reset removes the stored key.
+ * during render. Reset removes the stored key. `inspectorWithGuidelines`: the inspector
+ * holds the guidelines (at least 420 px), which lowers the maximum.
  */
-export function useSidebarWidth(username: string | undefined): SidebarWidthState {
-  const [limits, setLimits] = useState<SidebarLimits>(currentLimits);
+export function useSidebarWidth(username: string | undefined, { inspectorWithGuidelines = false } = {}): SidebarWidthState {
+  const [limits, setLimits] = useState<SidebarLimits>(() => currentLimits(inspectorWithGuidelines));
+  const guidelinesRef = useRef(inspectorWithGuidelines);
+  guidelinesRef.current = inspectorWithGuidelines;
   const [preferred, setPreferred] = useState<number | null>(() => (username ? readStoredWidth(username) : null));
   const preferredRef = useRef(preferred);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -109,13 +136,14 @@ export function useSidebarWidth(username: string | undefined): SidebarWidthState
   }, [username]);
 
   useEffect(() => {
-    const onResize = () => setLimits((previous) => {
-      const next = currentLimits();
-      return next.min === previous.min && next.max === previous.max && next.fallback === previous.fallback ? previous : next;
+    const update = () => setLimits((previous) => {
+      const next = currentLimits(guidelinesRef.current);
+      return sameLimits(next, previous) ? previous : next;
     });
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [inspectorWithGuidelines]);
 
   const clearTimer = useCallback(() => {
     if (timer.current != null) {
@@ -133,7 +161,7 @@ export function useSidebarWidth(username: string | undefined): SidebarWidthState
     timer.current = null;
     const user = userRef.current;
     const value = preferredRef.current;
-    if (user && value != null) writeStoredWidth(user, clampSidebarWidth(value, currentLimits()));
+    if (user && value != null) writeStoredWidth(user, clampSidebarWidth(value, currentLimits(guidelinesRef.current)));
   }, []);
   // Unmount: a pending keyboard write is flushed, not dropped (a drag in progress is not committed).
   useEffect(() => () => {
