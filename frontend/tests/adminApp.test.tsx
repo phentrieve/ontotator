@@ -212,3 +212,19 @@ it("starts at the main region after a navigation that left focus nowhere, and ke
   await waitFor(() => expect(window.location.hash).toBe("#/me"));
   expect(document.activeElement).toBe(profile);
 });
+
+it("after deleting a project, Projects never asks for its summary (no 404)", async () => {
+  window.history.replaceState(null, "", `#/projects/${encodeURIComponent(settings.project_key)}/settings/general`);
+  const reload = deferred<ProjectSummary[]>();
+  vi.mocked(api.listProjects).mockResolvedValueOnce([project]).mockReturnValue(reload.promise);
+  vi.spyOn(api, "adminDeleteProject").mockResolvedValue(undefined);
+  const summary = vi.spyOn(api, "documentsSummary").mockRejectedValue(new ApiError(404, "PROJECT_NOT_FOUND"));
+  render(<App user={user} onLogout={vi.fn()} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Delete project…" }));
+  const dialog = await screen.findByRole("dialog", { name: "Delete project?" });
+  summary.mockClear();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Delete project" }));
+  await waitFor(() => expect(window.location.hash).toBe("#/projects"));
+  await act(async () => reload.resolve([]));
+  expect(summary).not.toHaveBeenCalledWith(settings.project_key);
+});
