@@ -557,7 +557,7 @@ function AssignWorkEditor(props: AssignWorkDialogProps): JSX.Element {
           const addMe = person.unavailable === "role_missing" && person.username === props.me?.username;
           const submitted = submittedReview(person);
           if (holds(person)) return <tr key={person.username}>
-            <td><span className="assign-member">{personLabel(person.person)} {submitted
+            <td><span className="assign-member assign-member--held">{personLabel(person.person)} {submitted
               ? <><StatusBadge tone="neutral">Review submitted</StatusBadge><Button size="sm" disabled={busy} aria-expanded={reopening?.assignment_id === submitted.assignment_id}
                 onClick={() => { setReopenReason(""); setReopenError(undefined); setReopening(submitted); }}>Reopen their review…</Button></>
               : <StatusBadge tone="success">Already assigned</StatusBadge>}</span></td>

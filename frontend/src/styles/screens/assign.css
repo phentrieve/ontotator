@@ -20,6 +20,9 @@
 .assign-member { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 24px; }
 .assign-member input { width: 18px; height: 18px; margin: 0; flex: none; }
 .assign-member label { cursor: pointer; }
+/* A holder's pill and button move under the name as whole units instead of each wrapping inside. */
+.assign-member--held { flex-wrap: wrap; row-gap: var(--space-1); }
+.assign-member--held > .status-pill, .assign-member--held > .btn { white-space: nowrap; }
 .assign-members tr.is-chosen td { background: var(--accent-light); }
 .assign-members tr.is-unavailable td { color: var(--text-muted); }
 .assign-members tr.is-unavailable .assign-reason { font-style: italic; }
