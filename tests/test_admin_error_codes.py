@@ -24,6 +24,8 @@ PATHS = (
     "api/translation_review_routes.py",
     "api/translation_workflow_routes.py",
     "api/work_round_routes.py",
+    "api/single_term_routes.py",
+    "application/single_terms.py",
     "api/problem_report_routes.py",
     "api/technical_report_routes.py",
     "application/technical_reports.py",

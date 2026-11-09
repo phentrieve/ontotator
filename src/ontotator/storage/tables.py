@@ -64,6 +64,9 @@ APPEND_ONLY_TABLES = (
     "guideline_withdrawals",
     "work_time_events",
     "work_intervals",
+    "single_term_bases",
+    "single_term_batches",
+    "single_term_decisions",
 )
 
 NAMING_CONVENTION = {
@@ -150,6 +153,13 @@ class ProjectRow(Base):
     # Consolidators see "Annotator A, B, …" instead of names (issue 302).
     blind_consolidation: Mapped[bool] = mapped_column(
         Boolean, server_default=text("false")
+    )
+    # Issue 381: the single-term review and its negation cues per language.
+    single_term_review: Mapped[bool] = mapped_column(
+        Boolean, server_default=text("false")
+    )
+    single_term_negation_cues: Mapped[dict[str, Any]] = mapped_column(
+        server_default=text("'{}'::jsonb")
     )
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
@@ -1080,6 +1090,7 @@ from ontotator.storage import mode_change_tables as _mode_tables  # noqa: E402,F
 from ontotator.storage import overview_tables as _overview_tables  # noqa: E402,F401
 from ontotator.storage import plan_tables as _plan_tables  # noqa: E402,F401
 from ontotator.storage import report_tables as _report_tables  # noqa: E402,F401
+from ontotator.storage import single_term_tables as _single_terms  # noqa: E402,F401
 from ontotator.storage import work_time_tables as _work_time_tables  # noqa: E402,F401
 from ontotator.storage import workflow_tables as _workflow_tables  # noqa: E402, F401
 

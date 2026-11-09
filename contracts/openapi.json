@@ -2798,6 +2798,860 @@
         "x-ontotator-project-token": true
       }
     },
+    "/api/v1/projects/{key}/single-terms/basis": {
+      "post": {
+        "tags": [
+          "single-terms"
+        ],
+        "summary": "Start Basis",
+        "operationId": "start_basis_api_v1_projects__key__single_terms_basis_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SingleTermCommandRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SingleTermBasisView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/single-terms/summary": {
+      "get": {
+        "tags": [
+          "single-terms"
+        ],
+        "summary": "Summary",
+        "operationId": "summary_api_v1_projects__key__single_terms_summary_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SingleTermSummaryView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "read",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/single-terms/groups": {
+      "get": {
+        "tags": [
+          "single-terms"
+        ],
+        "summary": "Groups",
+        "operationId": "groups_api_v1_projects__key__single_terms_groups_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 8
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Language"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "open",
+                    "blocked",
+                    "decided",
+                    "stale"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "name": "batch",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Batch"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SingleTermGroupView"
+                  },
+                  "title": "Response Groups Api V1 Projects  Key  Single Terms Groups Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "session"
+      }
+    },
+    "/api/v1/projects/{key}/single-terms/groups/{group_id}/contexts": {
+      "get": {
+        "tags": [
+          "single-terms"
+        ],
+        "summary": "Contexts",
+        "operationId": "contexts_api_v1_projects__key__single_terms_groups__group_id__contexts_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "batch",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Batch"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 5,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SingleTermContextsView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "session"
+      }
+    },
+    "/api/v1/projects/{key}/single-terms/batches": {
+      "post": {
+        "tags": [
+          "single-terms"
+        ],
+        "summary": "Create Batch",
+        "operationId": "create_batch_api_v1_projects__key__single_terms_batches_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SingleTermBatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SingleTermBatchView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      },
+      "get": {
+        "tags": [
+          "single-terms"
+        ],
+        "summary": "Batches",
+        "operationId": "batches_api_v1_projects__key__single_terms_batches_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SingleTermBatchView"
+                  },
+                  "title": "Response Batches Api V1 Projects  Key  Single Terms Batches Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "read",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/single-terms/batches/{batch_id}": {
+      "get": {
+        "tags": [
+          "single-terms"
+        ],
+        "summary": "Batch",
+        "operationId": "batch_api_v1_projects__key__single_terms_batches__batch_id__get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Batch Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SingleTermBatchView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "read",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/single-terms/batches/{batch_id}/submit": {
+      "post": {
+        "tags": [
+          "single-terms"
+        ],
+        "summary": "Submit Batch",
+        "operationId": "submit_batch_api_v1_projects__key__single_terms_batches__batch_id__submit_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Batch Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SingleTermCommandRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SingleTermBatchView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "session"
+      }
+    },
+    "/api/v1/projects/{key}/single-terms/batches/{batch_id}/reopen": {
+      "post": {
+        "tags": [
+          "single-terms"
+        ],
+        "summary": "Reopen Batch",
+        "operationId": "reopen_batch_api_v1_projects__key__single_terms_batches__batch_id__reopen_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Batch Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SingleTermCommandRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SingleTermBatchView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/single-terms/batches/{batch_id}/abandon": {
+      "post": {
+        "tags": [
+          "single-terms"
+        ],
+        "summary": "Abandon Batch",
+        "operationId": "abandon_batch_api_v1_projects__key__single_terms_batches__batch_id__abandon_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Batch Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SingleTermCommandRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SingleTermBatchView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/single-terms/batches/{batch_id}/decisions": {
+      "post": {
+        "tags": [
+          "single-terms"
+        ],
+        "summary": "Decide",
+        "operationId": "decide_api_v1_projects__key__single_terms_batches__batch_id__decisions_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Batch Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SingleTermDecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SingleTermDecisionView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "session"
+      }
+    },
+    "/api/v1/projects/{key}/single-terms/reviewers": {
+      "get": {
+        "tags": [
+          "single-terms"
+        ],
+        "summary": "Reviewers",
+        "operationId": "reviewers_api_v1_projects__key__single_terms_reviewers_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SingleTermReviewerView"
+                  },
+                  "title": "Response Reviewers Api V1 Projects  Key  Single Terms Reviewers Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "read",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/single-terms/reviewers/{username}": {
+      "put": {
+        "tags": [
+          "single-terms"
+        ],
+        "summary": "Grant Reviewer",
+        "operationId": "grant_reviewer_api_v1_projects__key__single_terms_reviewers__username__put",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SingleTermReviewerView"
+                  },
+                  "title": "Response Grant Reviewer Api V1 Projects  Key  Single Terms Reviewers  Username  Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      },
+      "delete": {
+        "tags": [
+          "single-terms"
+        ],
+        "summary": "Revoke Reviewer",
+        "operationId": "revoke_reviewer_api_v1_projects__key__single_terms_reviewers__username__delete",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SingleTermReviewerView"
+                  },
+                  "title": "Response Revoke Reviewer Api V1 Projects  Key  Single Terms Reviewers  Username  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
     "/api/v1/projects/{key}/documents/{doc}/submissions/{submission_id}": {
       "get": {
         "tags": [
@@ -22970,6 +23824,20 @@
             "type": "boolean",
             "title": "Record Working Time"
           },
+          "single_term_review": {
+            "type": "boolean",
+            "title": "Single Term Review"
+          },
+          "single_term_negation_cues": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Single Term Negation Cues"
+          },
           "hidden_axis_values": {
             "additionalProperties": {
               "additionalProperties": {
@@ -23136,6 +24004,20 @@
           "record_working_time": {
             "type": "boolean",
             "title": "Record Working Time"
+          },
+          "single_term_review": {
+            "type": "boolean",
+            "title": "Single Term Review"
+          },
+          "single_term_negation_cues": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Single Term Negation Cues"
           },
           "hidden_axis_values": {
             "additionalProperties": {
@@ -26056,6 +26938,995 @@
         ],
         "title": "SessionState",
         "description": "Who this browser is logged in as, if anyone, for the login page."
+      },
+      "SingleTermAgreementView": {
+        "properties": {
+          "pairs": {
+            "type": "integer",
+            "title": "Pairs"
+          },
+          "agreeing": {
+            "type": "integer",
+            "title": "Agreeing"
+          },
+          "percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percent"
+          },
+          "kappa": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kappa"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pairs",
+          "agreeing",
+          "percent",
+          "kappa"
+        ],
+        "title": "SingleTermAgreementView",
+        "description": "Primary vs second review on accept (accept or adjust) vs reject."
+      },
+      "SingleTermBasisView": {
+        "properties": {
+          "basis_id": {
+            "type": "integer",
+            "title": "Basis Id"
+          },
+          "snapshot_id": {
+            "type": "string",
+            "title": "Snapshot Id"
+          },
+          "derivation_sha256": {
+            "type": "string",
+            "title": "Derivation Sha256"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "report": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Report"
+          }
+        },
+        "type": "object",
+        "required": [
+          "basis_id",
+          "snapshot_id",
+          "derivation_sha256",
+          "created_at",
+          "report"
+        ],
+        "title": "SingleTermBasisView"
+      },
+      "SingleTermBatchRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Request Id"
+          },
+          "reviewer": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Reviewer"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 8
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "layer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Layer Id"
+          },
+          "document_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Ids"
+          },
+          "stale_only": {
+            "type": "boolean",
+            "title": "Stale Only",
+            "default": false
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "second_review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SingleTermSecondReviewRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "reviewer"
+        ],
+        "title": "SingleTermBatchRequest",
+        "description": "A new batch: the open and stale groups of the newest basis that match\nevery given filter (and are in no other open primary batch)."
+      },
+      "SingleTermBatchView": {
+        "properties": {
+          "batch_id": {
+            "type": "integer",
+            "title": "Batch Id"
+          },
+          "basis_id": {
+            "type": "integer",
+            "title": "Basis Id"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "primary",
+              "second"
+            ],
+            "title": "Role"
+          },
+          "parent_batch_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Batch Id"
+          },
+          "second_batch_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Second Batch Ids"
+          },
+          "reviewer_username": {
+            "type": "string",
+            "title": "Reviewer Username"
+          },
+          "reviewer_pseudonym": {
+            "type": "string",
+            "title": "Reviewer Pseudonym"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "submitted",
+              "abandoned"
+            ],
+            "title": "State"
+          },
+          "filter": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Filter"
+          },
+          "groups": {
+            "type": "integer",
+            "title": "Groups"
+          },
+          "decided": {
+            "type": "integer",
+            "title": "Decided"
+          },
+          "current_basis": {
+            "type": "boolean",
+            "title": "Current Basis"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/SingleTermBatchWarning"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "batch_id",
+          "basis_id",
+          "role",
+          "parent_batch_id",
+          "second_batch_ids",
+          "reviewer_username",
+          "reviewer_pseudonym",
+          "state",
+          "filter",
+          "groups",
+          "decided",
+          "current_basis",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "SingleTermBatchView"
+      },
+      "SingleTermBatchWarning": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "groups": {
+            "type": "integer",
+            "title": "Groups"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "groups"
+        ],
+        "title": "SingleTermBatchWarning"
+      },
+      "SingleTermCommandRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id"
+        ],
+        "title": "SingleTermCommandRequest"
+      },
+      "SingleTermContextView": {
+        "properties": {
+          "occurrence_ref": {
+            "type": "string",
+            "title": "Occurrence Ref"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "start": {
+            "type": "integer",
+            "title": "Start"
+          },
+          "end": {
+            "type": "integer",
+            "title": "End"
+          },
+          "before": {
+            "type": "string",
+            "title": "Before"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "after": {
+            "type": "string",
+            "title": "After"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flags"
+          },
+          "blocked": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Blocked"
+          }
+        },
+        "type": "object",
+        "required": [
+          "occurrence_ref",
+          "document_id",
+          "start",
+          "end",
+          "before",
+          "text",
+          "after",
+          "flags",
+          "blocked"
+        ],
+        "title": "SingleTermContextView"
+      },
+      "SingleTermContextsView": {
+        "properties": {
+          "group_id": {
+            "type": "string",
+            "title": "Group Id"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "contexts": {
+            "items": {
+              "$ref": "#/components/schemas/SingleTermContextView"
+            },
+            "type": "array",
+            "title": "Contexts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "group_id",
+          "total",
+          "offset",
+          "contexts"
+        ],
+        "title": "SingleTermContextsView"
+      },
+      "SingleTermDecisionRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Request Id"
+          },
+          "group_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Group Id"
+          },
+          "phrase_only": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "would_accept",
+                  "would_reject"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phrase Only"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "accept",
+              "adjust_span",
+              "adjust_term",
+              "reject",
+              "withdrawn"
+            ],
+            "title": "Decision"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "needs_context",
+                  "ambiguous_abbreviation",
+                  "too_general",
+                  "term_wrong_out_of_context",
+                  "contains_other_finding",
+                  "negation_in_span",
+                  "conflict",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "adjusted_span": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SingleTermSpanRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "adjusted_term_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adjusted Term Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "group_id",
+          "decision"
+        ],
+        "title": "SingleTermDecisionRequest"
+      },
+      "SingleTermDecisionView": {
+        "properties": {
+          "decision_id": {
+            "type": "integer",
+            "title": "Decision Id"
+          },
+          "batch_id": {
+            "type": "integer",
+            "title": "Batch Id"
+          },
+          "basis_id": {
+            "type": "integer",
+            "title": "Basis Id"
+          },
+          "group_id": {
+            "type": "string",
+            "title": "Group Id"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "primary",
+              "second"
+            ],
+            "title": "Role"
+          },
+          "phrase_only": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "would_accept",
+                  "would_reject"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phrase Only"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "accept",
+              "adjust_span",
+              "adjust_term",
+              "reject",
+              "withdrawn"
+            ],
+            "title": "Decision"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "needs_context",
+                  "ambiguous_abbreviation",
+                  "too_general",
+                  "term_wrong_out_of_context",
+                  "contains_other_finding",
+                  "negation_in_span",
+                  "conflict",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "adjusted_span": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adjusted Span"
+          },
+          "adjusted_term_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adjusted Term Id"
+          },
+          "reviewer_independent": {
+            "type": "boolean",
+            "title": "Reviewer Independent"
+          },
+          "guideline_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guideline Version"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision_id",
+          "batch_id",
+          "basis_id",
+          "group_id",
+          "role",
+          "phrase_only",
+          "decision",
+          "reason",
+          "note",
+          "adjusted_span",
+          "adjusted_term_id",
+          "reviewer_independent",
+          "guideline_version",
+          "created_at"
+        ],
+        "title": "SingleTermDecisionView"
+      },
+      "SingleTermGroupView": {
+        "properties": {
+          "group_id": {
+            "type": "string",
+            "title": "Group Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "phrase": {
+            "type": "string",
+            "title": "Phrase"
+          },
+          "display_text": {
+            "type": "string",
+            "title": "Display Text"
+          },
+          "term_id": {
+            "type": "string",
+            "title": "Term Id"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "surface_variants": {
+            "items": {
+              "$ref": "#/components/schemas/SingleTermSurfaceVariantView"
+            },
+            "type": "array",
+            "title": "Surface Variants"
+          },
+          "occurrences": {
+            "type": "integer",
+            "title": "Occurrences"
+          },
+          "documents": {
+            "type": "integer",
+            "title": "Documents"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flags"
+          },
+          "blocked_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked Reason"
+          },
+          "conflict_with": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Conflict With"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "blocked",
+              "decided",
+              "stale"
+            ],
+            "title": "State"
+          },
+          "unseen_occurrences": {
+            "type": "integer",
+            "title": "Unseen Occurrences"
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SingleTermDecisionView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "second_decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SingleTermDecisionView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "group_id",
+          "language",
+          "phrase",
+          "display_text",
+          "term_id",
+          "label",
+          "surface_variants",
+          "occurrences",
+          "documents",
+          "flags",
+          "blocked_reason",
+          "conflict_with",
+          "state",
+          "unseen_occurrences",
+          "decision"
+        ],
+        "title": "SingleTermGroupView",
+        "description": "A phrase-term group as its viewer may see it.\n\nFor a lead ``decision`` is the newest primary decision that counts and\n``second_decision`` the second review's; for a reviewer ``decision`` is\ntheir own newest decision in the batch, ``second_decision`` is empty."
+      },
+      "SingleTermLanguageCounts": {
+        "properties": {
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "groups": {
+            "type": "integer",
+            "title": "Groups"
+          },
+          "occurrences": {
+            "type": "integer",
+            "title": "Occurrences"
+          },
+          "open": {
+            "type": "integer",
+            "title": "Open"
+          },
+          "blocked": {
+            "type": "integer",
+            "title": "Blocked"
+          },
+          "decided": {
+            "type": "integer",
+            "title": "Decided"
+          },
+          "stale": {
+            "type": "integer",
+            "title": "Stale"
+          },
+          "conflicts": {
+            "type": "integer",
+            "title": "Conflicts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "language",
+          "groups",
+          "occurrences",
+          "open",
+          "blocked",
+          "decided",
+          "stale",
+          "conflicts"
+        ],
+        "title": "SingleTermLanguageCounts"
+      },
+      "SingleTermReviewerView": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "pseudonym": {
+            "type": "string",
+            "title": "Pseudonym"
+          },
+          "added_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Added At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "pseudonym",
+          "added_at"
+        ],
+        "title": "SingleTermReviewerView"
+      },
+      "SingleTermSecondReviewRequest": {
+        "properties": {
+          "reviewer": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Reviewer"
+          },
+          "share": {
+            "type": "number",
+            "maximum": 1.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Share",
+            "default": 0.2
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reviewer"
+        ],
+        "title": "SingleTermSecondReviewRequest"
+      },
+      "SingleTermSpanRequest": {
+        "properties": {
+          "occurrence_ref": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Occurrence Ref"
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Start"
+          },
+          "end": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "End"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "occurrence_ref",
+          "start",
+          "end"
+        ],
+        "title": "SingleTermSpanRequest",
+        "description": "A re-cut of one occurrence, in code points of its text."
+      },
+      "SingleTermSummaryView": {
+        "properties": {
+          "basis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SingleTermBasisView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bases": {
+            "type": "integer",
+            "title": "Bases"
+          },
+          "languages": {
+            "items": {
+              "$ref": "#/components/schemas/SingleTermLanguageCounts"
+            },
+            "type": "array",
+            "title": "Languages"
+          },
+          "exclusions": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Exclusions"
+          },
+          "blocked": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Blocked"
+          },
+          "batches": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Batches"
+          },
+          "agreement": {
+            "$ref": "#/components/schemas/SingleTermAgreementView"
+          }
+        },
+        "type": "object",
+        "required": [
+          "basis",
+          "bases",
+          "languages",
+          "exclusions",
+          "blocked",
+          "batches",
+          "agreement"
+        ],
+        "title": "SingleTermSummaryView"
+      },
+      "SingleTermSurfaceVariantView": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "count"
+        ],
+        "title": "SingleTermSurfaceVariantView"
       },
       "SourceObligationView": {
         "properties": {

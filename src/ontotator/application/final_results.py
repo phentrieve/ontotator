@@ -429,6 +429,70 @@ class FinalResultService:
             **agreement_report(inputs or {}, units),
         }
 
+    def insert_snapshot(
+        self,
+        conn: Connection,
+        key: str,
+        pid: int,
+        state: dict[str, Any],
+        request: dict[str, Any],
+    ) -> tuple[str, str, dict[str, Any]]:
+        """Freeze ``state`` as an export selection snapshot; its id, digest
+        and payload. The final export and the single-term review basis
+        (#381) freeze through this one method."""
+        # Texts a plan change took out of annotation (#338); a final result
+        # they had stays in Ontotator (``not_in_plan``) and is not exported.
+        kept = {(row["case_id"], row["language"]) for row in state["not_in_plan"]}
+        planned_out = [
+            {
+                **item,
+                "final_result_kept": (item["case_id"], item["language"]) in kept,
+            }
+            for item in work_plan_store.planned_out(
+                conn, pid, work_plan_store.effective_plan(conn, pid)
+            )
+        ]
+        payload = {
+            "format": "ontotator-final-selection/v1",
+            "project": key,
+            "request": request,
+            **self._selection_inputs(conn, key, pid, state),
+            # Additive (#338): texts taken out of the work plan.
+            "planned_out": planned_out,
+        }
+        sid = str(uuid4())
+        digest = state_digest(payload)
+        conn.execute(
+            insert(ExportSelectionSnapshotRow).values(
+                snapshot_id=sid,
+                project_id=pid,
+                requester_id=self.actor.user_id,
+                request_id=request["request_id"],
+                sha256=digest,
+                payload=payload,
+            )
+        )
+        return sid, digest, payload
+
+    def freeze_current(
+        self, conn: Connection, key: str, pid: int, request: dict[str, Any]
+    ) -> tuple[str, str, dict[str, Any]]:
+        """A snapshot of the current final selections without an export job
+        or acknowledgements (the single-term review basis, #381). The caller
+        holds the project lock (``authorize``)."""
+        state = self._projection(conn, key, pid)
+        if not state["selections"]:
+            raise DomainError(
+                "SINGLE_TERM_NO_FINAL_RESULTS",
+                "Accept at least one final result before starting the"
+                " single-term review.",
+            )
+        return self.insert_snapshot(conn, key, pid, state, request)
+
+    def authorize(self, conn: Connection, key: str) -> int:
+        """The project id after the lead check, with the project lock held."""
+        return self._authorize(conn, key, exclusive=True)
+
     def freeze(self, key: str, request: dict[str, Any]) -> dict[str, int]:
         with self.db.transaction() as conn:
             pid = self._authorize(conn, key, exclusive=True)
@@ -485,38 +549,7 @@ class FinalResultService:
                     "EXPORT_EMPTY",
                     "Select at least one exact submitted result before final export.",
                 )
-            # Texts a plan change took out of annotation (#338); a final result
-            # they had stays in Ontotator (``not_in_plan``) and is not exported.
-            kept = {(row["case_id"], row["language"]) for row in state["not_in_plan"]}
-            planned_out = [
-                {
-                    **item,
-                    "final_result_kept": (item["case_id"], item["language"]) in kept,
-                }
-                for item in work_plan_store.planned_out(
-                    conn, pid, work_plan_store.effective_plan(conn, pid)
-                )
-            ]
-            payload = {
-                "format": "ontotator-final-selection/v1",
-                "project": key,
-                "request": request,
-                **self._selection_inputs(conn, key, pid, state),
-                # Additive (#338): texts taken out of the work plan.
-                "planned_out": planned_out,
-            }
-            sid = str(uuid4())
-            digest = state_digest(payload)
-            conn.execute(
-                insert(ExportSelectionSnapshotRow).values(
-                    snapshot_id=sid,
-                    project_id=pid,
-                    requester_id=self.actor.user_id,
-                    request_id=request["request_id"],
-                    sha256=digest,
-                    payload=payload,
-                )
-            )
+            sid, digest, _ = self.insert_snapshot(conn, key, pid, state, request)
             job_id = conn.execute(
                 insert(JobRow)
                 .values(

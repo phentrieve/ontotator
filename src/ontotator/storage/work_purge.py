@@ -4,7 +4,9 @@ Plain SQL on table names, no ORM models: migration 0020 imports this module
 and must stay valid when the models change. A unit is an assignment with its
 rounds, drafts, submissions, frozen drafts, reports, holds, text-change
 resolutions and the final selections, export snapshots and command receipts
-that point at its submissions or rounds. Work built on purged work (a round
+that point at its submissions or rounds, with the single-term review bases
+on those snapshots, their batches and the decisions on them or naming the
+submissions (decisions hold phrases of the texts). Work built on purged work (a round
 whose inputs, bindings or predecessor are purged) is purged with it, until no
 new ids appear. Audit and edit events stay as history: audit rows hold ids
 only, and migration 0020 drops the ``edit_events.draft_id`` foreign key, so
@@ -35,6 +37,10 @@ _TABLES = (
     "text_change_resolutions",
     "final_selection_events",
     "final_selections",
+    "single_term_decisions",
+    "single_term_batch_state",
+    "single_term_batches",
+    "single_term_bases",
     "export_selection_snapshots",
     "workflow_command_receipts",
     "review_obligation_resolutions",
@@ -189,6 +195,15 @@ def purge(
         "EXISTS (SELECT 1 FROM unnest(CAST(:refs AS text[])) AS ref"
         " WHERE {col}::text LIKE '%\"' || ref || '\"%')"
     )
+    # Single-term bases on a purged snapshot go with their batches and the
+    # decisions on them; a decision of another basis naming a purged
+    # submission goes too.
+    snapshots = (
+        f"SELECT snapshot_id FROM {S}.export_selection_snapshots"
+        f" WHERE {mentions.format(col='payload')}"
+    )
+    bases = f"SELECT id FROM {S}.single_term_bases WHERE snapshot_id IN ({snapshots})"
+    batches = f"SELECT id FROM {S}.single_term_batches WHERE basis_id IN ({bases})"
     deletes = {
         "discarded_submissions": _IN_SUBS.format(col="submission_id"),
         "task_hold_state": "hold_id = ANY(:h)",
@@ -201,6 +216,11 @@ def purge(
         "final_selection_events": "(project_id, payload->>'submission_id') IN"
         " (SELECT * FROM unnest(CAST(:sp AS bigint[]), CAST(:ss AS text[])))",
         "final_selections": _IN_SUBS.format(col="submission_id"),
+        "single_term_decisions": f"basis_id IN ({bases}) OR batch_id IN ({batches})"
+        f" OR {mentions.format(col='occurrence_refs')}",
+        "single_term_batch_state": f"batch_id IN ({batches})",
+        "single_term_batches": f"id IN ({batches})",
+        "single_term_bases": f"id IN ({bases})",
         "export_selection_snapshots": mentions.format(col="payload"),
         "workflow_command_receipts": mentions.format(col="response"),
         "review_obligation_resolutions": mentions.format(col="payload"),

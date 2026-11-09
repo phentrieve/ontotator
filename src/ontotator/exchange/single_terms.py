@@ -49,6 +49,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import unicodedata
 from collections import Counter, defaultdict
@@ -627,3 +628,82 @@ def _derivation(
         },
         occurrences=dict(sorted(Counter(o.language for o in passing).items())),
     )
+
+
+# --- review helpers ---------------------------------------------------------
+
+OCCURRENCE_REF_PREFIX = b"ontotator-single-term-occurrence/v1"
+SAMPLE_PREFIX = b"ontotator-single-term-sample/v1"
+
+
+def occurrence_ref(occurrence: Occurrence) -> str:
+    """A stable id of one occurrence: the same mention of the same result in
+    a later basis has the same ref (a decision's ``occurrence_refs``)."""
+    key = [
+        occurrence.document_id,
+        occurrence.submission_id,
+        occurrence.annotation_id,
+        occurrence.start,
+        occurrence.end,
+    ]
+    return hashlib.sha256(OCCURRENCE_REF_PREFIX + _canonical(key)).hexdigest()
+
+
+def other_finding_segments(
+    source: SourceUnit, annotation_id: str
+) -> list[tuple[int, int]]:
+    """The segments of the unit's other findings, as ``derive_candidates``
+    reads them for ``contains_other_finding``: the other own findings on an
+    HPO phenotype layer of the unit."""
+    layers = {layer.layer_id: layer for layer in source.unit.annotation_set.layers}
+    return [
+        (segment.start, segment.end)
+        for annotation in source.unit.annotation_set.annotations
+        if annotation.annotation_id != annotation_id
+        and annotation.annotation_id not in source.not_findings
+        and layers[annotation.layer_id].profile == hpo.NAME
+        for mention in annotation.mentions
+        for segment in mention.segments
+    ]
+
+
+def contains_negation(
+    text: str, language: str, patterns: Mapping[str, Sequence[re.Pattern[str]]]
+) -> bool:
+    """Whether ``text`` holds a negation cue of ``language`` (whole word,
+    ignoring case), as ``negation_in_span`` decides."""
+    normalized = surface_form(text)
+    return any(p.search(normalized) for p in patterns.get(language, ()))
+
+
+def overlaps(a: tuple[int, int], b: tuple[int, int]) -> bool:
+    """Whether two half-open code-point spans share a code point."""
+    return _overlaps(a, b)
+
+
+def second_review_sample(
+    groups: Sequence[CandidateGroup], share: float, minimum: int = 50
+) -> list[str]:
+    """The group ids of a blind second review: per language ``share`` of the
+    groups, at least ``minimum`` (all when fewer). No randomness: the groups
+    with the smallest sha256 of the sample prefix and their id are taken, so
+    the same groups always give the same sample."""
+    by_language: dict[str, list[str]] = defaultdict(list)
+    for item in groups:
+        by_language[item.language].append(item.group_id)
+    chosen: set[str] = set()
+    for ids in by_language.values():
+        wanted = (
+            len(ids) if len(ids) <= minimum else max(minimum, _ceil(share * len(ids)))
+        )
+        ranked = sorted(
+            ids,
+            key=lambda gid: hashlib.sha256(SAMPLE_PREFIX + gid.encode()).hexdigest(),
+        )
+        chosen.update(ranked[:wanted])
+    return [item.group_id for item in groups if item.group_id in chosen]
+
+
+def _ceil(value: float) -> int:
+    # Rounded first: 0.2 * 250 is 50.000000000000007 in floating point.
+    return math.ceil(round(value, 9))

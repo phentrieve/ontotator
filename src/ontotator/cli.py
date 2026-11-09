@@ -1326,7 +1326,13 @@ def _newest_final_snapshot(db: Database, project: str) -> dict[str, str]:
                 ExportSelectionSnapshotRow.sha256,
             )
             .join(ProjectRow, ProjectRow.id == ExportSelectionSnapshotRow.project_id)
-            .where(ProjectRow.project_key == project)
+            .where(
+                ProjectRow.project_key == project,
+                # A single-term review basis (#381) is no final export.
+                ExportSelectionSnapshotRow.payload["request"]["purpose"].astext.is_(
+                    None
+                ),
+            )
             .order_by(ExportSelectionSnapshotRow.created_at.desc())
             .limit(1)
         ).first()

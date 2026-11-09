@@ -110,6 +110,8 @@ NOT_FOUND_CODES = frozenset(
         "MODE_CHANGE_NOT_FOUND",
         "TECHNICAL_REPORT_NOT_FOUND",
         "TOKEN_NOT_FOUND",
+        "SINGLE_TERM_BATCH_NOT_FOUND",
+        "SINGLE_TERM_GROUP_NOT_FOUND",
     }
 )
 
@@ -555,6 +557,16 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
                     "PROJECT_HAS_WORK": 409,
                     "PRACTICE_IMPORT_FAILED": 503,
                     "TECHNICAL_REPORT_LIMIT": 429,
+                    "SINGLE_TERM_REVIEW_OFF": 409,
+                    "SINGLE_TERM_PRACTICE": 409,
+                    "SINGLE_TERM_NO_FINAL_RESULTS": 409,
+                    "SINGLE_TERM_NO_BASIS": 409,
+                    "SINGLE_TERM_BASIS_CHANGED": 409,
+                    "SINGLE_TERM_BATCH_EMPTY": 409,
+                    "SINGLE_TERM_BATCH_STATE": 409,
+                    "SINGLE_TERM_BATCH_NOT_OPEN": 409,
+                    "SINGLE_TERM_GROUP_BLOCKED": 409,
+                    "SINGLE_TERM_CONFLICT_ACCEPTED": 409,
                 }.get(exc.code, 422)
             ),
             content={"code": exc.code, "details": exc.details or str(exc)},
@@ -604,6 +616,9 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
     from ontotator.api.work_time_routes import router as work_time_router
 
     app.include_router(work_time_router)
+    from ontotator.api.single_term_routes import router as single_term_router
+
+    app.include_router(single_term_router)
     app.include_router(submission_history_router)
     app.include_router(variant_router)
     app.include_router(admin_router)

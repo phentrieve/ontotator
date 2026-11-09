@@ -127,6 +127,14 @@ ARCHIVED: tuple[ArchivedTable, ...] = (
     # Working time (#298): append-only, inserted with their recorded times.
     ArchivedTable("work_time_events"),
     ArchivedTable("work_intervals"),
+    # Single-term review (#381): reviewers, bases, batches and decisions.
+    ArchivedTable("single_term_reviewers"),
+    ArchivedTable("single_term_bases"),
+    ArchivedTable("single_term_batches"),
+    ArchivedTable(
+        "single_term_batch_state", parent=("batch_id", "single_term_batches", "id")
+    ),
+    ArchivedTable("single_term_decisions"),
 )
 
 # Project-scoped tables an archive leaves out, with the reason.
@@ -218,6 +226,7 @@ PSEUDONYM_COLUMNS: frozenset[tuple[str, str]] = frozenset(
         ("review_decisions", "reviewer_id"),
         ("work_rounds", "annotator_id"),
         ("translation_reviews", "reviewer_pseudonym"),
+        ("single_term_decisions", "reviewer_pseudonym"),
     }
 )
 # Display labels that show a pseudonym: renamed with the person, but not

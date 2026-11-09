@@ -194,6 +194,22 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
         "project-admin"
     ),
     ("PUT", f"{P}/final-selections"): "project-admin",
+    # Single-term review (#381): groups, contexts and decisions hold clinical
+    # phrases and are for browser sessions only.
+    ("POST", f"{P}/single-terms/basis"): "project-admin",
+    ("GET", f"{P}/single-terms/summary"): "read",
+    ("GET", f"{P}/single-terms/groups"): SESSION,
+    ("GET", f"{P}/single-terms/groups/{{group_id}}/contexts"): SESSION,
+    ("POST", f"{P}/single-terms/batches"): "project-admin",
+    ("GET", f"{P}/single-terms/batches"): "read",
+    ("GET", f"{P}/single-terms/batches/{{batch_id}}"): "read",
+    ("POST", f"{P}/single-terms/batches/{{batch_id}}/submit"): SESSION,
+    ("POST", f"{P}/single-terms/batches/{{batch_id}}/reopen"): "project-admin",
+    ("POST", f"{P}/single-terms/batches/{{batch_id}}/abandon"): "project-admin",
+    ("POST", f"{P}/single-terms/batches/{{batch_id}}/decisions"): SESSION,
+    ("GET", f"{P}/single-terms/reviewers"): "read",
+    ("PUT", f"{P}/single-terms/reviewers/{{username}}"): "project-admin",
+    ("DELETE", f"{P}/single-terms/reviewers/{{username}}"): "project-admin",
     # Agreement behind the final results (issue 353): leads, like the export.
     ("GET", f"{P}/agreement"): "read",
     # Problem reports
