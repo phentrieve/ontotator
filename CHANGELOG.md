@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-10
+
 ### Added
 
 - `scripts/restore-check.sh` runs the restore drill on the host as one command: it restores a recovery point of `scripts/backup.sh` into an isolated Compose project, verifies `SHA256SUMS`, compares the row count of every table with the dump and every `/data` file with the archive, waits for `/readyz` and removes the project again. docs/operations.md has a record template for the drill and recommends running it at least once a quarter (#71).
@@ -298,7 +300,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 First public release.
 
-[Unreleased]: https://github.com/phentrieve/ontotator/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/phentrieve/ontotator/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/phentrieve/ontotator/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/phentrieve/ontotator/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/phentrieve/ontotator/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/phentrieve/ontotator/compare/v0.7.0...v0.8.0
