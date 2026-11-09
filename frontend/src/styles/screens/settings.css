@@ -67,9 +67,9 @@
   background: var(--surface-raised);
 }
 
-/* "Delete this project" (issue 191): set apart below the General settings, in the colours of destructive actions. */
+/* "Delete this project" (issue 191): set apart below the General settings, in the colours of destructive actions.
+   The form's own bottom space (48 px) already sets it apart; no extra margin. */
 .settings-card--danger {
-  margin-block-start: var(--space-6);
   border-color: var(--danger-border);
 }
 
