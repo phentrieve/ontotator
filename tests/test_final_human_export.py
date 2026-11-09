@@ -253,9 +253,11 @@ _VOLATILE = [
 # "How to read it" then explained the columns of findings.csv, the counts
 # of agreement.csv and the empty cells of agreement-summary.csv and
 # proposals.csv. #303 added related_term_conflicts to agreement.csv and its
-# line to README.txt.
+# line to README.txt. #338 added the (here empty) "planned_out" record to
+# receipt.json and the "Taken out of the work plan" count and section to
+# README.txt.
 CARRY_FORWARD_DIGEST = (
-    "aee6dacd01adbe9afc70638e379f1a50f6f17e02c2cfb5dda961d900d72ebef7"
+    "7bbe0e424f61d77e5b16787c64166af0d911df20d0c3189a56e9077ba7fc6543"
 )
 
 

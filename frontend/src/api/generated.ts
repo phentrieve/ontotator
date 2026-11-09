@@ -4162,6 +4162,8 @@ export interface components {
              * @default false
              */
             confirm: boolean;
+            /** Reason */
+            reason?: string | null;
         };
         /** BulkPreview */
         BulkPreview: {
@@ -5548,6 +5550,11 @@ export interface components {
             state_digest: string;
             /** Not In Plan */
             not_in_plan?: components["schemas"]["RowRefView"][];
+            /**
+             * Planned Out Texts
+             * @default 0
+             */
+            planned_out_texts: number;
         };
         /** FinalSelectionRequest */
         FinalSelectionRequest: {

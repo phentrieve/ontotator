@@ -35,8 +35,24 @@ INDEX_COLUMNS = (
     "warning_codes",
     "guideline_version",
 )
-_ROW_ORDER = {"selected": 0, "omitted": 1, "compared": 2, "provenance": 3}
+_ROW_ORDER = {
+    "selected": 0,
+    "omitted": 1,
+    "compared": 2,
+    "provenance": 3,
+    "planned_out": 4,
+}
 _WIDTH = 76
+# The texts taken out of the work plan (#338): present only when there are any.
+PLANNED_OUT_FILE = "planned-out.csv"
+PLANNED_OUT_COLUMNS = (
+    "case_id",
+    "language",
+    "plan_revision",
+    "planned_out_at",
+    "reason",
+    "final_result_kept",
+)
 
 
 def bundle_file(row_type: str) -> str:
@@ -80,7 +96,8 @@ def build_index_csv(
     provenance_order: Sequence[str],
     compared_order: Sequence[str] = (),
 ) -> bytes:
-    """One row per selection, omission, compared and provenance-only submission."""
+    """One row per selection, omission, compared and provenance-only submission,
+    and per text taken out of the work plan (``planned_out``, #338)."""
     content = payload["content"]
     documents: Mapping[str, Any] = content["documents"]
     submissions = {sub["submission_id"]: sub for sub in content["submissions"]}
@@ -148,6 +165,14 @@ def build_index_csv(
             warning_codes=codes_for(omission["case_id"], omission["language"]),
         )
         table.append(row)
+    for item in payload.get("planned_out", []):
+        row = dict.fromkeys(INDEX_COLUMNS, "")
+        row.update(
+            row_type="planned_out",
+            case_id=item["case_id"],
+            language=item["language"],
+        )
+        table.append(row)
     for row_type, order in (
         ("provenance", provenance_order),
         ("compared", compared_order),
@@ -182,6 +207,78 @@ def build_index_csv(
     writer.writeheader()
     writer.writerows(table)
     return out.getvalue().encode("utf-8-sig")
+
+
+def build_planned_out_csv(payload: Mapping[str, Any]) -> bytes:
+    """One row per text taken out of the work plan, in case and language order.
+
+    ``planned_out_at`` is the time of the plan change in UTC, ``reason`` the
+    reason entered with it (empty without one), ``final_result_kept`` "true"
+    when the text had a final result, which stays in Ontotator unexported,
+    and "false" otherwise.
+    """
+    out = io.StringIO(newline="")
+    writer = csv.DictWriter(out, fieldnames=PLANNED_OUT_COLUMNS)
+    writer.writeheader()
+    for item in payload.get("planned_out", []):
+        writer.writerow(
+            {
+                "case_id": item["case_id"],
+                "language": item["language"],
+                "plan_revision": str(item["revision"]),
+                "planned_out_at": item["planned_out_at"],
+                "reason": item.get("reason") or "",
+                "final_result_kept": (
+                    "true" if item.get("final_result_kept") else "false"
+                ),
+            }
+        )
+    return out.getvalue().encode("utf-8-sig")
+
+
+def planned_out_section(payload: Mapping[str, Any]) -> list[str]:
+    """The README section on texts taken out of the work plan (#338).
+
+    Empty for a snapshot frozen before the export recorded them, so its
+    README stays as it was.
+    """
+    if "planned_out" not in payload:
+        return []
+    items = payload["planned_out"]
+    out = ["", *_heading("Taken out of the work plan")]
+    if not items:
+        return [*out, "None."]
+    out += _wrap(
+        "These texts were planned for annotation until a lead turned Annotate "
+        "off in the work plan. They are not part of this export. Texts taken "
+        "out by the same plan change with the same reason are listed together "
+        "under one line giving the plan revision of the case after the change, "
+        'its time in UTC and the reason. A text marked "final result kept" '
+        "had a final result; it stays in Ontotator and is not exported. "
+        f"{PLANNED_OUT_FILE} lists the same, one row per text."
+    )
+    groups: dict[tuple[int, str, str], list[Mapping[str, Any]]] = {}
+    for item in items:
+        moment = item["planned_out_at"][:19].replace("T", " ") + " UTC"
+        key = (item["revision"], moment, item.get("reason") or "")
+        groups.setdefault(key, []).append(item)
+    # Oldest change first; ties by revision and reason keep the order fixed.
+    for revision, moment, reason in sorted(groups, key=lambda k: (k[1], k[0], k[2])):
+        out.append("")
+        out += _wrap(
+            f"Plan revision {revision}, {moment}. "
+            + (f"Reason: {reason}" if reason else "No reason was given.")
+        )
+        texts = ", ".join(
+            f"{item['case_id']} ({item['language']}"
+            + (", final result kept)" if item.get("final_result_kept") else ")")
+            for item in sorted(
+                groups[(revision, moment, reason)],
+                key=lambda item: (item["case_id"], item["language"]),
+            )
+        )
+        out += _wrap(texts, "  ", "  ")
+    return out
 
 
 def _heading(title: str, rule: str = "-") -> list[str]:
@@ -229,6 +326,7 @@ def build_readme(
         submission_kind(sub, payload["round_kinds"]) == "consolidation"
         for sub in payload["content"]["submissions"]
     )
+    planned_out = payload.get("planned_out", [])
     out: list[str] = [*_heading("Ontotator final export", "="), ""]
     out += [
         f"Project:          {name if name == key else f'{name} ({key})'}",
@@ -246,12 +344,25 @@ def build_readme(
             if compared_ids
             else []
         ),
+        *(
+            [f"{'Taken out of the work plan:':<35}{len(planned_out)}"]
+            if "planned_out" in payload
+            else []
+        ),
         "",
         *_heading("What is in this archive"),
         "README.txt          This guide.",
         "index.csv           One row per selected result, omission and provenance",
         "                    or compared submission, with the file and entry that",
         "                    holds it.",
+        *(
+            [
+                "                    Texts taken out of the work plan have rows of",
+                '                    row_type "planned_out".',
+            ]
+            if planned_out
+            else []
+        ),
         bundle_file("selected"),
         "                    The selected final results as an Ontospan bundle.",
     ]
@@ -267,6 +378,11 @@ def build_readme(
             "                    NOT final results: the other annotators' work on",
             "                    texts whose result was accepted directly, kept only",
             "                    to compute agreement.csv.",
+        ]
+    if planned_out:
+        out += [
+            f"{PLANNED_OUT_FILE:<20}The texts taken out of the work plan: plan",
+            "                    revision, time and reason of the change.",
         ]
     out += [
         "source-texts.jsonl  The exact text versions the results refer to, one JSON",
@@ -438,6 +554,18 @@ def build_readme(
         ),
         *(
             _wrap(
+                '"planned_out" rows are texts a lead took out of the work plan '
+                "(Annotate off). They have no result in this archive; "
+                f"{PLANNED_OUT_FILE} gives the plan revision, the time and the "
+                "reason of the change.",
+                "- ",
+                "  ",
+            )
+            if planned_out
+            else []
+        ),
+        *(
+            _wrap(
                 '"compared" rows are not final results. They are the other '
                 "annotators' work on a text whose result was accepted directly, "
                 f"without consolidation, kept in {bundle_file('compared')} only to "
@@ -488,6 +616,7 @@ def build_readme(
             "No other submission was substituted."
         )
     ] or ["None."]
+    out += planned_out_section(payload)
     out += ["", *_heading("Warnings acknowledged at export")]
     groups: dict[tuple[str, str], list[Mapping[str, Any]]] = {}
     for warning in state["warnings"]:
@@ -525,7 +654,7 @@ def guide_files(
     provenance_order = [
         sid for sid in ordered if sid not in selected_ids | compared_ids
     ]
-    return {
+    files = {
         "README.txt": build_readme(
             payload,
             snapshot_id=snapshot_id,
@@ -538,3 +667,6 @@ def guide_files(
             payload, selected_order, provenance_order, compared_order
         ),
     }
+    if payload.get("planned_out"):
+        files[PLANNED_OUT_FILE] = build_planned_out_csv(payload)
+    return files

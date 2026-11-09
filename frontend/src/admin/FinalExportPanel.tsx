@@ -151,6 +151,7 @@ function FinalExportContent({ projectKey }: { projectKey: string }): JSX.Element
   const newExport = () => { focusCheck.current = true; checkAgain(); };
 
   const notInPlan = state?.not_in_plan ?? [];
+  const plannedOut = state?.planned_out_texts ?? 0;
   const warnings = state ? state.warnings.filter(warning => warning.code !== LEFT_OUT) : [];
   const decided = new Set(warnings.map(rowKey));
   // One row per text, whatever number of warnings it has.
@@ -197,6 +198,7 @@ function FinalExportContent({ projectKey }: { projectKey: string }): JSX.Element
               <Group projectKey={projectKey} title="Not planned, not exported" muted lines={notInPlan.map(row => ({ ...row, why: "Annotate is off in the work plan. For information only." }))} />
             </table>}
           </>}
+        {plannedOut > 0 && <p className="field-hint final-export-planned-out">{plannedOut === 1 ? "1 text taken out of the work plan is" : `${plannedOut} texts taken out of the work plan are`} listed in {format === "t1" ? "planned-out.csv" : "README.txt"}.</p>}
         {!state.selections.length && <InlineMessage tone="info"><span id="final-export-empty">No final results are selected yet. Accept submitted results in Documents to include them.</span>{" "}
           <a href={routeHref({ name: "projectDocuments", key: projectKey })}>Go to Documents</a></InlineMessage>}
       </section>}
@@ -234,6 +236,7 @@ function FinalExportContent({ projectKey }: { projectKey: string }): JSX.Element
           <li>every finding (findings.csv)</li>
           <li>the agreement between annotators (agreement.csv, agreement-summary.csv)</li>
           <li>what became of tool proposals (proposals.csv)</li>
+          <li>the texts taken out of the work plan, with the reason (planned-out.csv)</li>
         </ul>
       </>}
       {format === "phenopacket" && <p className="cell-secondary">One Phenopacket per text, made from the same results for tools that read phenotypic features. They leave out what a Phenopacket cannot hold, such as findings about family members, uncertain findings and findings left unresolved; a report per text and a summary (report.json) count what was left out. The ZIP also holds the selected results as an Ontospan bundle, which each finding in a Phenopacket points to. Texts of the same patient are not grouped yet.</p>}</details>}

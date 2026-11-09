@@ -227,7 +227,13 @@ class FinalResultService:
     def preflight(self, key: str) -> dict[str, Any]:
         with self.db.transaction() as conn:
             pid = self._authorize(conn, key, exclusive=True)
-            return self._projection(conn, key, pid)
+            state = self._projection(conn, key, pid)
+            # For information (#338): the texts planned-out.csv would list.
+            # Outside the state and its digest, like the export snapshot.
+            planned_out = work_plan_store.planned_out(
+                conn, pid, work_plan_store.effective_plan(conn, pid)
+            )
+            return {**state, "planned_out_texts": len(planned_out)}
 
     def _compared(
         self,
@@ -479,11 +485,25 @@ class FinalResultService:
                     "EXPORT_EMPTY",
                     "Select at least one exact submitted result before final export.",
                 )
+            # Texts a plan change took out of annotation (#338); a final result
+            # they had stays in Ontotator (``not_in_plan``) and is not exported.
+            kept = {(row["case_id"], row["language"]) for row in state["not_in_plan"]}
+            planned_out = [
+                {
+                    **item,
+                    "final_result_kept": (item["case_id"], item["language"]) in kept,
+                }
+                for item in work_plan_store.planned_out(
+                    conn, pid, work_plan_store.effective_plan(conn, pid)
+                )
+            ]
             payload = {
                 "format": "ontotator-final-selection/v1",
                 "project": key,
                 "request": request,
                 **self._selection_inputs(conn, key, pid, state),
+                # Additive (#338): texts taken out of the work plan.
+                "planned_out": planned_out,
             }
             sid = str(uuid4())
             digest = state_digest(payload)

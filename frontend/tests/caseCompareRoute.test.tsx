@@ -13,7 +13,7 @@ const linked = { ...ownRef, kind: 'submission' as const, id: 'sub-2', label: 'an
 beforeEach(() => {
   vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
   vi.spyOn(api, 'listProjects').mockResolvedValue([project]);
-  vi.spyOn(api, 'getWorkflowWarnings').mockResolvedValue({ project: 'pkg', selections: [], warnings: [], omissions: [], state_digest: 'a'.repeat(64) });
+  vi.spyOn(api, 'getWorkflowWarnings').mockResolvedValue({ project: 'pkg', selections: [], warnings: [], omissions: [], state_digest: 'a'.repeat(64), planned_out_texts: 0 });
   vi.spyOn(api, 'getCase').mockResolvedValue(caseDetail);
   vi.spyOn(api, 'getVariantText').mockImplementation(async (_project, doc) => ({ document_id: doc, text: `Immutable ${doc}`, text_sha256: 'text' }));
   vi.spyOn(api, 'listAnnotationVersions').mockResolvedValue([ownRef, linked]);
