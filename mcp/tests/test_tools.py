@@ -951,7 +951,11 @@ async def test_phenopackets_are_a_final_export_in_that_format(
         build("FinalPreflight", warnings=[], omissions=[], state_digest="e" * 64),
     )
     fake.on("POST", f"{P}/exports/final", {"job_id": 91})
-    for kind, export_format in (("phenopackets", "phenopacket"), ("final", "t1")):
+    for kind, export_format in (
+        ("phenopackets", "phenopacket"),
+        ("single_terms", "single-term"),
+        ("final", "t1"),
+    ):
         fake.calls.clear()
         result = await call(
             mcp_client, "start_export", {"project": "p", "kind": kind, "wait": False}
@@ -969,6 +973,16 @@ async def test_a_phenopacket_export_downloads_like_the_others(
         mcp_client, "download_export", {"job_id": 9, "path": str(tmp_path / "p.zip")}
     )
     assert result["kind"] == "phenopackets"
+
+
+async def test_a_single_term_export_downloads_like_the_others(
+    fake: FakeApi, mcp_client: Client, tmp_path: Path
+) -> None:
+    _export_job(fake, b"st", kind="final_single_term_export")
+    result = await call(
+        mcp_client, "download_export", {"job_id": 9, "path": str(tmp_path / "s.zip")}
+    )
+    assert result["kind"] == "single_terms"
 
 
 ARCHIVES = "/api/v1/admin/project-archives"

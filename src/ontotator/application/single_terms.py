@@ -785,22 +785,9 @@ class SingleTermService:
     @staticmethod
     def _decisions(conn: Connection, pid: int) -> list[RowMapping]:
         """Every decision that counts (not of an abandoned batch), oldest first."""
-        return list(
-            conn.execute(
-                select(SingleTermDecisionRow)
-                .join(
-                    SingleTermBatchStateRow,
-                    SingleTermBatchStateRow.batch_id == SingleTermDecisionRow.batch_id,
-                )
-                .where(
-                    SingleTermDecisionRow.project_id == pid,
-                    SingleTermBatchStateRow.state != "abandoned",
-                )
-                .order_by(SingleTermDecisionRow.id)
-            )
-            .mappings()
-            .all()
-        )
+        from ontotator.exchange.final_single_terms import counted_decisions
+
+        return counted_decisions(conn, pid)
 
     @staticmethod
     def _newest(decisions: Iterable[Record], role: str) -> dict[str, Record]:

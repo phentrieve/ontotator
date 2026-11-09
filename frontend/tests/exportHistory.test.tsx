@@ -134,3 +134,13 @@ it("offers to try again when the list fails to load", async () => {
 it("words durations so they never read as a clock", () => {
   expect([4, 59.6, 60, 72, 3599, 3600, 7500].map(formatJobDuration)).toEqual(["4 s", "1 min", "1 min", "1 min 12 s", "59 min 59 s", "1 h 00 min", "2 h 05 min"]);
 });
+
+it("lists and downloads the single-term cases of a final export", async () => {
+  vi.spyOn(api, "listProjectJobs").mockResolvedValue({ jobs: [job(12, { kind: "final_single_term_export" })], total: 1, limit: 20, offset: 0 });
+  render(<ExportHistory projectKey="p" />);
+  open();
+  await history().findByRole("row", { name: "Single-term cases 12" });
+  expect(vi.mocked(api.listProjectJobs).mock.calls[0][1]?.kind).toContain("final_single_term_export");
+  fireEvent.click(row("Single-term cases 12").getByRole("button", { name: "Download" }));
+  await waitFor(() => expect(downloads.saveDownload).toHaveBeenCalledWith(expect.anything(), "p-12.zip"));
+});

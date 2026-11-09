@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { api, ApiError, AuthError, type CurrentUser, type FinalPreflight, type JobView } from "../src/api/client";
+import { api, ApiError, AuthError, type CurrentUser, type FinalPreflight, type JobView, type ProjectSettings } from "../src/api/client";
 import * as downloads from "../src/api/download";
 import { ExportPage } from "../src/admin/ExportPage";
 const user: CurrentUser = { username: "lead", display_name: "Lead", pseudonym: "L", csrf_token: "csrf", is_system_admin: false };
@@ -19,7 +19,10 @@ beforeEach(() => {
   vi.spyOn(api, "downloadJob").mockResolvedValue({ blob: new Blob(["result"]), filename: "actual-server.zip" });
   vi.spyOn(downloads, "saveDownload").mockImplementation(() => {});
   vi.spyOn(api, "listProjectJobs").mockResolvedValue({ jobs: [], total: 0, limit: 20, offset: 0 });
+  vi.spyOn(api, "getProjectSettings").mockResolvedValue(settings(false));
 });
+/** Only the field the final export reads; the rest of the settings does not matter here. */
+const settings = (singleTermReview: boolean) => ({ single_term_review: singleTermReview }) as unknown as ProjectSettings;
 afterEach(() => { cleanup(); vi.restoreAllMocks(); sessionStorage.clear(); });
 it("starts actual export kinds, remembers namespaced IDs and downloads freshly authorized binary payloads", async () => {
   render(<ExportPage projectKey="p" currentUser={user} />);
@@ -280,4 +283,40 @@ it("leaves the export history out for people who may not list the jobs", () => {
   render(<ExportPage projectKey="p" currentUser={user} showHistory={false} />);
   expect(screen.queryByRole("region", { name: "Export history" })).toBeNull();
   expect(api.listProjectJobs).not.toHaveBeenCalled();
+});
+it("offers the single-term cases only while the project's single-term review is on", async () => {
+  vi.mocked(api.finalExportPreflight).mockResolvedValue({ ...emptyPreflight, selections: [selection] });
+  const { unmount } = render(<ExportPage projectKey="p" currentUser={user} />);
+  const off = await finals().findByLabelText("Format");
+  await waitFor(() => expect(api.getProjectSettings).toHaveBeenCalledWith("p"));
+  expect([...off.querySelectorAll("option")].map(o => o.getAttribute("value"))).toEqual(["t1", "phenopacket"]);
+  unmount();
+  vi.mocked(api.getProjectSettings).mockResolvedValue(settings(true));
+  const start = vi.spyOn(api, "startFinalExport").mockResolvedValue({ job_id: 9 });
+  vi.mocked(api.getJob).mockResolvedValue(job(9, "final_single_term_export"));
+  render(<ExportPage projectKey="p" currentUser={user} />);
+  const format = await finals().findByLabelText("Format");
+  await waitFor(() => expect(format.querySelector('option[value="single-term"]')).toBeTruthy());
+  expect(format.querySelector('option[value="single-term"]')?.textContent).toBe("Single-term cases (reviewed phrases)");
+  fireEvent.change(format, { target: { value: "single-term" } });
+  expect(finals().getByText(/^The phrases the single-term review accepted/)).toBeTruthy();
+  await finals().findByRole("region", { name: "Export check" });
+  fireEvent.click(finals().getByRole("button", { name: "Create final export" }));
+  await waitFor(() => expect(start).toHaveBeenCalledWith("p", expect.objectContaining({ format: "single-term" })));
+  expect(await finals().findByText("Single-term cases ready: 1 result")).toBeTruthy();
+  fireEvent.click(finals().getByRole("button", { name: "Download (ZIP)" }));
+  await waitFor(() => expect(downloads.saveDownload).toHaveBeenCalledWith(expect.anything(), "p-final-single-terms.zip"));
+});
+it("names the single-term cases when their export fails", async () => {
+  vi.mocked(api.getProjectSettings).mockResolvedValue(settings(true));
+  vi.mocked(api.finalExportPreflight).mockResolvedValue({ ...emptyPreflight, selections: [selection] });
+  vi.spyOn(api, "startFinalExport").mockResolvedValue({ job_id: 9 });
+  vi.mocked(api.getJob).mockResolvedValue({ ...job(9, "final_single_term_export", "failed"), error: "SINGLE_TERM_MIXED_RELEASE: {}" });
+  render(<ExportPage projectKey="p" currentUser={user} />);
+  const format = await finals().findByLabelText("Format");
+  await waitFor(() => expect(format.querySelector('option[value="single-term"]')).toBeTruthy());
+  fireEvent.change(format, { target: { value: "single-term" } });
+  await finals().findByRole("region", { name: "Export check" });
+  fireEvent.click(finals().getByRole("button", { name: "Create final export" }));
+  expect(await finals().findByText("The single-term cases could not be created. Open diagnostics for the technical details.")).toBeTruthy();
 });

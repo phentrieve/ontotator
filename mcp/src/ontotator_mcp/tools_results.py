@@ -17,6 +17,7 @@ Project = Annotated[str, Field(description="Project key, e.g. 'ward-7'.")]
 ExportKind = Literal[
     "final",
     "phenopackets",
+    "single_terms",
     "annotations",
     "edit_log",
     "work_time",
@@ -26,10 +27,17 @@ ExportKind = Literal[
 DOWNLOADABLE = {
     "final_t1_export": "final",
     "final_phenopacket_export": "phenopackets",
+    "final_single_term_export": "single_terms",
     "t1_export": "annotations",
     "edit_log_export": "edit_log",
     "work_time_export": "work_time",
     "translation_review_export": "translation_reviews",
+}
+# The final export formats: the tool's kind -> the request's format.
+FINAL_FORMATS = {
+    "final": "t1",
+    "phenopackets": "phenopacket",
+    "single_terms": "single-term",
 }
 MAX_LISTED = 50
 # Project archives (system tokens only); their import refuses every token.
@@ -238,6 +246,10 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
                     " proposals.csv and a README (ZIP). 'phenopackets': the same accepted results"
                     " as one GA4GH Phenopacket per text, derived and lossy,"
                     " with a report of what was left out (ZIP)."
+                    " 'single_terms': the phrase-term cases the single-term"
+                    " review accepted, from the same accepted results, with"
+                    " the decisions recorded until now (ZIP; the project's"
+                    " single-term review must be on)."
                     " 'annotations': every submission as an"
                     " Ontospan bundle (ZIP). 'edit_log': every edit (JSONL)."
                     " 'work_time': the recorded work intervals under"
@@ -259,7 +271,8 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
                 min_length=1,
                 max_length=128,
                 description=(
-                    "Final or Phenopackets export: a name for this request, e.g."
+                    "Final, Phenopackets or single-term export: a name for this"
+                    " request, e.g."
                     " 'nightly-2026-11-05'. Repeating the call with the same"
                     " request_id and an unchanged project returns the same job"
                     " instead of a second export. None: a new export each call."
@@ -273,16 +286,17 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
         """Start an export job of the project; download it with download_export.
 
         Stores a new export file on the server; changes no project data.
-        Each call starts a new job, except a final or Phenopackets export
-        repeated with the same request_id.
+        Each call starts a new job, except a final, Phenopackets or
+        single-term export repeated with the same request_id.
         A final export freezes the accepted results as they are now; the
         warnings and omissions final_export_check lists must be
         acknowledged.
         """
-        final = kind in ("final", "phenopackets")
+        final = kind in FINAL_FORMATS
         if request_id is not None and not final:
             raise OntotatorError(
-                "request_id applies to the final and Phenopackets exports only."
+                "request_id applies to the final, Phenopackets and single-term"
+                " exports only."
             )
         if final:
             state = await api.post(project_path(project, "exports/final/preflight"))
@@ -311,7 +325,7 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
                         {"case_id": o["case_id"], "language": o["language"]}
                         for o in omissions
                     ],
-                    "format": "phenopacket" if kind == "phenopackets" else "t1",
+                    "format": FINAL_FORMATS[kind],
                 },
             )
         elif kind == "translation_reviews":

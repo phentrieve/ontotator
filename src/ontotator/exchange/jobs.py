@@ -35,6 +35,7 @@ from ontotator.domain.work_rounds import CARRY_ROUND_KINDS
 from ontotator.exchange.archive import project_archive_export, project_archive_import
 from ontotator.exchange.final_export import final_t1_export
 from ontotator.exchange.final_phenopackets import final_phenopacket_export
+from ontotator.exchange.final_single_terms import final_single_term_export
 from ontotator.exchange.reanchor_job import reanchor
 from ontotator.exchange.review_export import translation_review_export
 from ontotator.exchange.t1 import (
@@ -717,6 +718,7 @@ HANDLERS: dict[str, Handler] = {
     "t1_export": t1_export,
     "final_t1_export": final_t1_export,
     "final_phenopacket_export": final_phenopacket_export,
+    "final_single_term_export": final_single_term_export,
     "edit_log_export": edit_log_export,
     "work_time_export": work_time_export,
     "translation_review_export": translation_review_export,

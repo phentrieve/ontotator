@@ -1312,18 +1312,38 @@ def import_command(
         typer.echo(f"warnings: {', '.join(result['warnings'])}")
 
 
-def _newest_final_snapshot(db: Database, project: str) -> dict[str, str]:
-    """The job payload naming the project's newest final-result snapshot."""
+def _newest_final_snapshot(
+    db: Database, project: str, *, single_terms: bool = False
+) -> dict[str, str]:
+    """The job payload naming the project's newest final-result snapshot.
+
+    ``single_terms``: for the single-term export (#381), whose setting is
+    checked here, at the request; the snapshot must hold the frozen
+    decisions (a final export made while the review was on).
+    """
     from sqlalchemy import select
 
+    from ontotator.exchange.final_single_terms import FROZEN_KEY
     from ontotator.storage.final_tables import ExportSelectionSnapshotRow
     from ontotator.storage.tables import ProjectRow
 
     with db.transaction() as conn:
+        if single_terms:
+            enabled = conn.execute(
+                select(ProjectRow.single_term_review).where(
+                    ProjectRow.project_key == project
+                )
+            ).scalar_one_or_none()
+            if not enabled:
+                _fail(
+                    "SINGLE_TERM_REVIEW_OFF",
+                    f"The single-term review is off in project '{project}'.",
+                )
         row = conn.execute(
             select(
                 ExportSelectionSnapshotRow.snapshot_id,
                 ExportSelectionSnapshotRow.sha256,
+                ExportSelectionSnapshotRow.payload.has_key(FROZEN_KEY),
             )
             .join(ProjectRow, ProjectRow.id == ExportSelectionSnapshotRow.project_id)
             .where(
@@ -1342,6 +1362,13 @@ def _newest_final_snapshot(db: Database, project: str) -> dict[str, str]:
             f"Project '{project}' has no final export yet; a lead creates one "
             "under Export > Final results.",
         )
+    if single_terms and not row[2]:
+        _fail(
+            "NO_SINGLE_TERM_DECISIONS",
+            f"The newest final export of project '{project}' was made while the "
+            "single-term review was off; a lead creates a new one under "
+            "Export > Final results.",
+        )
     return {"project": project, "snapshot_id": row[0], "snapshot_sha256": row[1]}
 
 
@@ -1353,8 +1380,10 @@ def _export(
         _fail("OUTPUT_EXISTS", f"{out} exists; choose another file.")
     with _open_database(ctx) as db:
         payload = (
-            _newest_final_snapshot(db, project)
-            if kind == "final_phenopacket_export"
+            _newest_final_snapshot(
+                db, project, single_terms=kind == "final_single_term_export"
+            )
+            if kind in ("final_phenopacket_export", "final_single_term_export")
             else {"project": project}
         )
         job = _run_job(db, kind, payload, wait=wait)
@@ -1388,6 +1417,12 @@ def _export(
             f"{_plural(totals['exported'], 'feature')}; see report.json for what "
             "was left out."
         )
+    elif kind == "final_single_term_export":
+        typer.echo(
+            f"Wrote {out}: {_plural(result['cases'], 'single-term case')} of "
+            f"final export {result['snapshot_id']}; see report.json for what "
+            "was left out."
+        )
     else:
         typer.echo(f"Wrote {out}: {_plural(result['events'], 'event')}.")
 
@@ -1409,17 +1444,24 @@ def export_command(
     out: OutOption,
     no_wait: NoWaitOption = False,
     export_format: Annotated[
-        Literal["t1", "phenopacket"],
+        Literal["t1", "phenopacket", "single-term"],
         typer.Option(
             "--format",
             help="t1: the latest submissions as an Ontospan bundle. phenopacket: "
             "Phenopackets (derived, lossy) of the results of the newest final "
-            "export, which a lead creates in the web app.",
+            "export, which a lead creates in the web app. single-term: the "
+            "phrase-term cases the single-term review accepted, with the "
+            "results and decisions of the newest final export.",
         ),
     ] = "t1",
 ) -> None:
-    """Export the latest submissions as an Ontospan bundle (ZIP), or Phenopackets."""
-    kind = "t1_export" if export_format == "t1" else "final_phenopacket_export"
+    """Export the latest submissions as an Ontospan bundle (ZIP), Phenopackets
+    or single-term cases."""
+    kind = {
+        "t1": "t1_export",
+        "phenopacket": "final_phenopacket_export",
+        "single-term": "final_single_term_export",
+    }[export_format]
     _export(ctx, kind, project, out, wait=not no_wait)
 
 

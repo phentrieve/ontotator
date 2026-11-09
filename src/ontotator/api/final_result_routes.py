@@ -80,8 +80,9 @@ class FinalExportRequest(BaseModel):
     acknowledged_warnings: list[WarningAcknowledgement]
     accepted_omissions: list[FinalOmission]
     # The file of the final export: the T1 bundle with receipt, or
-    # Phenopackets derived from the same frozen results (#308).
-    format: Literal["t1", "phenopacket"] = "t1"
+    # Phenopackets derived from the same frozen results (#308), or the
+    # single-term cases of the single-term review (#381).
+    format: Literal["t1", "phenopacket", "single-term"] = "t1"
 
 
 class AgreementValues(BaseModel):

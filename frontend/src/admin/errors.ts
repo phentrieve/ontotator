@@ -21,6 +21,7 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   SINGLE_TERM_DERIVATION_FAILED: "The single-term candidates could not be derived from the final results.",
   SINGLE_TERM_GROUP_BLOCKED: "This group is blocked: re-cut the span or reject it.",
   SINGLE_TERM_GROUP_NOT_FOUND: "This single-term group is not part of the batch or basis.",
+  SINGLE_TERM_MIXED_RELEASE: "A more general term is not an ancestor of the term in every ontology release of its texts. No file was created.",
   SINGLE_TERM_NOT_ANCESTOR: "Choose a more general term that is an active ancestor of the term in every release.",
   SINGLE_TERM_NOT_A_MEMBER: "Only a member of the project can review single terms.",
   SINGLE_TERM_NOT_A_REVIEWER: "This person is no single-term reviewer of the project.",

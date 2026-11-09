@@ -17674,7 +17674,8 @@
             "type": "string",
             "enum": [
               "t1",
-              "phenopacket"
+              "phenopacket",
+              "single-term"
             ],
             "title": "Format",
             "default": "t1"

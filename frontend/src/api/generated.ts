@@ -5704,7 +5704,7 @@ export interface components {
              * @default t1
              * @enum {string}
              */
-            format: "t1" | "phenopacket";
+            format: "t1" | "phenopacket" | "single-term";
         };
         /** FinalOmission */
         FinalOmission: {

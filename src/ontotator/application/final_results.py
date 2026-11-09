@@ -43,10 +43,11 @@ from ontotator.storage.tables import (
 )
 from ontotator.storage.workflow_tables import ReviewObligationResolutionRow
 
-# The job of each final export format; both read the same frozen snapshot.
+# The job of each final export format; all read the same frozen snapshot.
 FINAL_JOB_KINDS = {
     "t1": "final_t1_export",
     "phenopacket": "final_phenopacket_export",
+    "single-term": "final_single_term_export",
 }
 
 
@@ -436,10 +437,13 @@ class FinalResultService:
         pid: int,
         state: dict[str, Any],
         request: dict[str, Any],
+        *,
+        single_term_decisions: dict[str, Any] | None = None,
     ) -> tuple[str, str, dict[str, Any]]:
         """Freeze ``state`` as an export selection snapshot; its id, digest
         and payload. The final export and the single-term review basis
-        (#381) freeze through this one method."""
+        (#381) freeze through this one method. ``single_term_decisions``
+        (the decisions in force, #381) is added to the payload when given."""
         # Texts a plan change took out of annotation (#338); a final result
         # they had stays in Ontotator (``not_in_plan``) and is not exported.
         kept = {(row["case_id"], row["language"]) for row in state["not_in_plan"]}
@@ -459,6 +463,12 @@ class FinalResultService:
             **self._selection_inputs(conn, key, pid, state),
             # Additive (#338): texts taken out of the work plan.
             "planned_out": planned_out,
+            # Additive (#381): the single-term decisions in force.
+            **(
+                {"single_term_decisions": single_term_decisions}
+                if single_term_decisions is not None
+                else {}
+            ),
         }
         sid = str(uuid4())
         digest = state_digest(payload)
@@ -492,6 +502,34 @@ class FinalResultService:
     def authorize(self, conn: Connection, key: str) -> int:
         """The project id after the lead check, with the project lock held."""
         return self._authorize(conn, key, exclusive=True)
+
+    @staticmethod
+    def _single_term_decisions(
+        conn: Connection, pid: int, request: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        """The single-term decisions a final export freezes (#381): while the
+        project's single-term review is on, every export snapshot holds them,
+        so a later single-term export of it (``admin export``) reads the
+        decisions of its time. A single-term request needs the setting on;
+        it is checked here, at the request, and never in the job."""
+        from ontotator.exchange.final_single_terms import (
+            SINGLE_TERM_REQUEST_FORMAT,
+            freeze_decisions,
+        )
+
+        enabled, cues = conn.execute(
+            select(
+                ProjectRow.single_term_review, ProjectRow.single_term_negation_cues
+            ).where(ProjectRow.id == pid)
+        ).one()
+        if not enabled:
+            if request.get("format") == SINGLE_TERM_REQUEST_FORMAT:
+                raise DomainError(
+                    "SINGLE_TERM_REVIEW_OFF",
+                    "The single-term review is off in this project's settings.",
+                )
+            return None
+        return freeze_decisions(conn, pid, cues)
 
     def freeze(self, key: str, request: dict[str, Any]) -> dict[str, int]:
         with self.db.transaction() as conn:
@@ -527,6 +565,7 @@ class FinalResultService:
                     .limit(1)
                 ).scalar_one()
                 return {"job_id": job}
+            single_terms = self._single_term_decisions(conn, pid, request)
             state = self._projection(conn, key, pid)
             expected_warnings = [
                 {"id": warning["id"], "cause_revision": warning["cause_revision"]}
@@ -549,7 +588,9 @@ class FinalResultService:
                     "EXPORT_EMPTY",
                     "Select at least one exact submitted result before final export.",
                 )
-            sid, digest, _ = self.insert_snapshot(conn, key, pid, state, request)
+            sid, digest, _ = self.insert_snapshot(
+                conn, key, pid, state, request, single_term_decisions=single_terms
+            )
             job_id = conn.execute(
                 insert(JobRow)
                 .values(

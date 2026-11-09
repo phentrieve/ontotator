@@ -11,6 +11,7 @@ import { ErrorNotice } from "./ErrorNotice";
 const exportKinds: Record<string, { title: string; suffix: string }> = {
   final_t1_export: { title: "Final results", suffix: "zip" },
   final_phenopacket_export: { title: "Phenopackets", suffix: "zip" },
+  final_single_term_export: { title: "Single-term cases", suffix: "zip" },
   t1_export: { title: "Annotation results", suffix: "zip" },
   edit_log_export: { title: "Edit log", suffix: "jsonl" },
   work_time_export: { title: "Working time", suffix: "jsonl" },

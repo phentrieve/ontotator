@@ -49,6 +49,7 @@ const auditActions: Readonly<Record<string, string>> = {
   "project.final_export": "Final export created",
   "project.final_export_requested": "Final export requested",
   "project.final_phenopacket_export": "Phenopackets created",
+  "project.final_single_term_export": "Single-term cases created",
   "project.final_selection": "Final selection changed",
   "project.translation_review_export": "Translation reviews exported",
   "project.single_term_basis": "Single-term review basis frozen",

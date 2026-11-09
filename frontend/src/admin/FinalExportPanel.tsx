@@ -32,12 +32,17 @@ function Group({ projectKey, title, lines, muted = false }: { projectKey: string
   </tbody>;
 }
 
-/** The file of the final export (issue 308): both come from the same frozen results. */
-type Format = "t1" | "phenopacket";
-const FORMATS: Record<Format, { label: string; kind: string; file: string }> = {
-  t1: { label: "Results with receipt (ontospan)", kind: "final_t1_export", file: "final" },
-  phenopacket: { label: "Phenopackets (derived, lossy)", kind: "final_phenopacket_export", file: "final-phenopackets" },
+/**
+ * The file of the final export (issue 308): all come from the same frozen results. The single-term cases (issue 381)
+ * are offered only while the project's single-term review is on.
+ */
+type Format = "t1" | "phenopacket" | "single-term";
+const FORMATS: Record<Format, { label: string; kind: string; file: string; name: string }> = {
+  t1: { label: "Results with receipt (ontospan)", kind: "final_t1_export", file: "final", name: "Final export" },
+  phenopacket: { label: "Phenopackets (derived, lossy)", kind: "final_phenopacket_export", file: "final-phenopackets", name: "Phenopackets" },
+  "single-term": { label: "Single-term cases (reviewed phrases)", kind: "final_single_term_export", file: "final-single-terms", name: "Single-term cases" },
 };
+const failedName: Record<Format, string> = { t1: "The final export", phenopacket: "The Phenopackets", "single-term": "The single-term cases" };
 
 type Changed = "rerun" | "hidden" | "after_job";
 const CHANGED_TEXT: Record<Changed, string> = {
@@ -67,6 +72,7 @@ function FinalExportContent({ projectKey }: { projectKey: string }): JSX.Element
   const [exported, setExported] = useState(0);
   const [format, setFormat] = useState<Format>("t1");
   const [exportedFormat, setExportedFormat] = useState<Format>("t1");
+  const [singleTerms, setSingleTerms] = useState(false);
   const requestId = useRef("");
   const alive = useRef(false);
   const creatingRef = useRef(false);
@@ -83,6 +89,14 @@ function FinalExportContent({ projectKey }: { projectKey: string }): JSX.Element
   const phase = jobId !== null && !failed && jobError == null ? "job" : "check";
   inJob.current = phase === "job" || creating;
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  // The single-term format follows the project setting; without the settings (refused, offline) it stays hidden.
+  useEffect(() => {
+    let live = true;
+    api.getProjectSettings(projectKey).then(settings => { if (live) setSingleTerms(settings.single_term_review === true); }, () => { if (live) setSingleTerms(false); });
+    return () => { live = false; };
+  }, [projectKey]);
+  useEffect(() => { if (!singleTerms && format === "single-term") setFormat("t1"); }, [singleTerms, format]);
+  const formats = (Object.keys(FORMATS) as Format[]).filter(value => value !== "single-term" || singleTerms);
 
   const review = useCallback(async () => {
     if (creatingRef.current) return;
@@ -203,7 +217,7 @@ function FinalExportContent({ projectKey }: { projectKey: string }): JSX.Element
           <a href={routeHref({ name: "projectDocuments", key: projectKey })}>Go to Documents</a></InlineMessage>}
       </section>}
       <Select id="final-export-format" label="Format" value={format} disabled={creating} onChange={event => setFormat(event.target.value as Format)}>
-        {(Object.keys(FORMATS) as Format[]).map(value => <option key={value} value={value}>{FORMATS[value].label}</option>)}
+        {formats.map(value => <option key={value} value={value}>{FORMATS[value].label}</option>)}
       </Select>
       {state && needsAck(state) && <Checkbox ref={acknowledgement} id="final-export-ack"
         label={`Export ${state.selections.length === 1 ? "the 1 result as it is" : `the ${state.selections.length} results as they are`}${state.omissions.length ? `; leave out the other ${state.omissions.length === 1 ? "text" : `${state.omissions.length} texts`}` : ""}`}
@@ -217,10 +231,10 @@ function FinalExportContent({ projectKey }: { projectKey: string }): JSX.Element
     {jobError != null && <ErrorNotice error={jobError} />}
     {job && !succeeded && !failed && <p role="status">Creating the final export…</p>}
     {failed && <ExportFailure result={job.result} error={job.error}
-      fallback={`${job.kind === FORMATS.phenopacket.kind ? "The Phenopackets" : "The final export"} could not be created. Open diagnostics for the technical details.`} />}
+      fallback={`${failedName[(Object.keys(FORMATS) as Format[]).find(value => FORMATS[value].kind === job.kind) ?? "t1"]} could not be created. Open diagnostics for the technical details.`} />}
     {phase === "job" && <>
       {error != null && <ErrorNotice error={error} />}
-      {succeeded && <InlineMessage tone="success" title={`${exportedFormat === "phenopacket" ? "Phenopackets" : "Final export"} ready: ${exported} ${exported === 1 ? "result" : "results"}`}>
+      {succeeded && <InlineMessage tone="success" title={`${FORMATS[exportedFormat].name} ready: ${exported} ${exported === 1 ? "result" : "results"}`}>
         <p>Created <Time iso={job.finished_at ?? job.created_at} />.</p>
       </InlineMessage>}
       {!succeeded && <p id="final-export-download-hint" className="field-hint">The download is available when the export has finished.</p>}
@@ -239,7 +253,8 @@ function FinalExportContent({ projectKey }: { projectKey: string }): JSX.Element
           <li>the texts taken out of the work plan, with the reason (planned-out.csv)</li>
         </ul>
       </>}
-      {format === "phenopacket" && <p className="cell-secondary">One Phenopacket per text, made from the same results for tools that read phenotypic features. They leave out what a Phenopacket cannot hold, such as findings about family members, uncertain findings and findings left unresolved; a report per text and a summary (report.json) count what was left out. The ZIP also holds the selected results as an Ontospan bundle, which each finding in a Phenopacket points to. Texts of the same patient are not grouped yet.</p>}</details>}
+      {format === "phenopacket" && <p className="cell-secondary">One Phenopacket per text, made from the same results for tools that read phenotypic features. They leave out what a Phenopacket cannot hold, such as findings about family members, uncertain findings and findings left unresolved; a report per text and a summary (report.json) count what was left out. The ZIP also holds the selected results as an Ontospan bundle, which each finding in a Phenopacket points to. Texts of the same patient are not grouped yet.</p>}
+      {format === "single-term" && <p className="cell-secondary">The phrases the single-term review accepted, each with its HPO term and every place it occurs in the same results (cases.jsonl). Only the decisions recorded until you create the export are used; later ones go into a new export. A report (report.json) counts what was left out by rule, the groups still open or stale, the decisions and the agreement of the second review. The ZIP also holds the selected results as an Ontospan bundle and the texts.</p>}</details>}
   </section>;
 }
 
