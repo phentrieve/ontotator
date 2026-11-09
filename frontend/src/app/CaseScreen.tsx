@@ -1849,9 +1849,9 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const redoTitle = redoStep ? `Redo: ${stepName(redoStep)}` : "Nothing to redo";
   // Inside a text field the browser's own text undo keeps working (shortcuts skip typing targets).
   useShortcut(["Ctrl+z", "Meta+z"], () => { void runHistory("undo_step"); },
-    { scope: "screen", description: "Undo the last change", group: "Editor", enabled: historyEnabled && !!undoStep && !historyBusy });
+    { scope: "screen", description: "Undo the last change", group: "Editor", enabled: historyEnabled && !!undoStep && !historyBusy, listWhenDisabled: historyEnabled });
   useShortcut(["Ctrl+Shift+z", "Meta+Shift+z", "Ctrl+y"], () => { void runHistory("redo_step"); },
-    { scope: "screen", description: "Redo", group: "Editor", enabled: historyEnabled && !!redoStep && !historyBusy });
+    { scope: "screen", description: "Redo the last undone change", group: "Editor", enabled: historyEnabled && !!redoStep && !historyBusy, listWhenDisabled: historyEnabled });
 
   useEffect(() => {
     if (!saveBeforeReportRef) return;
