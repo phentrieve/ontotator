@@ -352,8 +352,8 @@ def test_planned_out_texts_have_index_rows_and_their_own_table():
     assert "Taken out of the work plan\n--------------------------\n" in text
     flat = " ".join(text.split())
     for sentence in [
-        "Plan revision 2, 2026-10-17 07:00:00 UTC: No reason was given. "
-        "case-µ (fr) Plan revision 3, 2026-10-18 09:15:02 UTC: Reason: Out of "
+        "Plan revision 2, 2026-10-17 07:00:00 UTC. No reason was given. "
+        "case-µ (fr) Plan revision 3, 2026-10-18 09:15:02 UTC. Reason: Out of "
         "scope: adult cases only. case, two (de, final result kept), "
         "case-three (en)",
         '"planned_out" rows are texts a lead took out of the work plan',

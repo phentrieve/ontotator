@@ -266,7 +266,7 @@ def planned_out_section(payload: Mapping[str, Any]) -> list[str]:
     for revision, moment, reason in sorted(groups, key=lambda k: (k[1], k[0], k[2])):
         out.append("")
         out += _wrap(
-            f"Plan revision {revision}, {moment}: "
+            f"Plan revision {revision}, {moment}. "
             + (f"Reason: {reason}" if reason else "No reason was given.")
         )
         texts = ", ".join(
