@@ -134,3 +134,9 @@ blockquote.lead-report-quote { margin-top: var(--space-2); border-left-color: va
 @media (max-width: 699px) {
   .lead-intent, .lead-primary { justify-items: stretch; }
 }
+
+/* Clean-restart facts inside the confirm box: keep the bullets inside its border. */
+.lead-restart-facts {
+  margin: 0;
+  padding-left: var(--space-5);
+}

@@ -35,7 +35,7 @@ describe("problem report labels", () => {
     expect(yourTaskFact(report()).text).toBe("Paused since");
     expect(yourTaskFact(report({ holds: [hold({ active: false, release_action: "resume", released_by_label: "ann-0004", released_at: "2026-10-19T01:13:00Z" })] })).text).toBe("Resumed by you");
     expect(yourTaskFact(report({ holds: [hold({ active: false, release_action: "resume", released_by_label: "lead-0002", released_at: "2026-10-19T01:13:00Z" })] })).text).toBe("Resumed by the project lead");
-    expect(yourTaskFact(report({ events: [event({ event_id: "e9", action: "restart", round_ordinal: 3 })], holds: [hold({ active: false, release_action: "restart", release_event_id: "e9", released_by_label: "lead-0002", released_at: "2026-10-19T02:00:00Z" })] })).text).toBe("Restarted with an empty Round 3");
+    expect(yourTaskFact(report({ events: [event({ event_id: "e9", action: "restart", round_ordinal: 3 })], holds: [hold({ active: false, release_action: "restart", release_event_id: "e9", released_by_label: "lead-0002", released_at: "2026-10-19T02:00:00Z" })] })).text).toBe("Restarted in Round 3");
     expect(yourTaskFact(report({ holds: [hold({ active: false }), hold({ hold_id: "h2", created_by_label: "lead-0002", created_at: "2026-10-19T03:00:00Z" })] })).text).toBe("Paused again by the project lead");
     expect(yourTaskFact(report({ holds: [hold({ active: false })] })).text).toBe("Released (no record of who released it)");
     expect(yourTaskFact(report({ holds: [hold({ active: false, release_action: "withdraw", released_at: "2026-10-19T01:20:00Z" })] }))).toEqual({ kind: "withdrawn", text: "Resumed when you withdrew the report", at: "2026-10-19T01:20:00Z" });
@@ -55,7 +55,7 @@ describe("problem report labels", () => {
     expect(historyItems(report({ events: [event({ action: "withdraw" })] })).at(-1)?.sentence).toBe("You withdrew the report. Your task resumed.");
     expect(historyItems(report({ events: [event({ action: "mystery", actor_label: "lead-0002" })] })).at(-1)?.sentence).toBe('The project lead recorded "mystery".');
     const restarted = report({ round_ordinal: 1, current_round_ordinal: 3, events: [event({ action: "restart", actor_label: "lead-0002", own_task: true, round_ordinal: 3, abandoned_round_ordinal: 2 })] });
-    expect(historyItems(restarted).at(-1)?.sentence).toBe("The project lead restarted your task with an empty Round 3. Round 2 is kept. Report closed.");
+    expect(historyItems(restarted).at(-1)?.sentence).toBe("The project lead restarted your task in Round 3. Round 2 is kept. Report closed.");
   });
   it("history_lead_sentences_for_release_restart_withdraw_and_reopen", () => {
     const other = { assignment_id: 7, owner_label: "ann-0005", case_id: "c", language: "de", task: "annotate" as const };
@@ -64,13 +64,13 @@ describe("problem report labels", () => {
     expect(lead([{ action: "extend_hold", actor_label: "lead-0002", own_task: false, affected: [other, { ...other, assignment_id: 9, owner_label: "ann-0006" }] }]))
       .toBe("lead-0002 paused the annotation of c de by ann-0005 and the annotation of c de by ann-0006. Reason shown to their owners:");
     expect(lead([{ action: "restart", actor_label: "lead-0002", round_ordinal: 3, abandoned_round_ordinal: 2 }]))
-      .toBe("lead-0002 agreed an empty restart of the annotation of accepted-translation de by ann-0004. Round 2 abandoned and kept; Round 3 started empty. Report closed.");
+      .toBe("lead-0002 agreed a clean restart of the annotation of accepted-translation de by ann-0004. Round 2 abandoned and kept; Round 3 started. Report closed.");
     expect(lead([{ action: "restart", actor_label: "lead-0002", round_ordinal: 3 }]))
-      .toBe("lead-0002 agreed an empty restart of the annotation of accepted-translation de by ann-0004. The previous round abandoned and kept; Round 3 started empty. Report closed.");
+      .toBe("lead-0002 agreed a clean restart of the annotation of accepted-translation de by ann-0004. The previous round abandoned and kept; Round 3 started. Report closed.");
     expect(lead([{ action: "withdraw", affected: [{ ...other, assignment_id: 4, owner_label: "ann-0004" }] }])).toBe("ann-0004 withdrew the report. The annotation of c de by ann-0004 resumed.");
     expect(lead([{ action: "reopen", actor_label: "lead-0002" }])).toBe("lead-0002 reopened the report.");
     const reporter = historyItems(report({ events: [event({ action: "restart", actor_label: "lead-0002", round_ordinal: 3, abandoned_translation_draft: { text: "Draft", form: { a: 1 } } })] })).at(-1);
-    expect(reporter).toMatchObject({ sentence: "The project lead restarted your task with an empty Round 3. The previous round is kept. Report closed.", draft: { text: "Draft", form: { a: 1 } } });
+    expect(reporter).toMatchObject({ sentence: "The project lead restarted your task in Round 3. The previous round is kept. Report closed.", draft: { text: "Draft", form: { a: 1 } } });
     expect(historyItems(report({ events: [event({ action: "extend_hold", actor_label: "lead-0002", own_task: true })] })).at(-1)?.sentence).toBe("The project lead paused your task again.");
     expect(historyItems(report({ events: [event({ actor_label: "lead-0002", own_task: true })] })).at(-1)?.sentence).toBe("The project lead released the pause on your task.");
     expect(historyItems(report({ events: [event({ action: "extend_hold", actor_label: "lead-0002", own_task: false })] }))).toHaveLength(1);
@@ -110,7 +110,7 @@ describe("problem report labels", () => {
     const stillHeld = report({ viewer_is_lead: true, holds: [hold({ active: false, release_action: "resume", other_active_holds: [{ report_id: "r2" }] })] });
     expect(leadOutcome("release", before, stillHeld)).toBe("Released the pause on the annotation of accepted-translation de by ann-0004. The report is still open. The annotation of accepted-translation de by ann-0004 is still paused by another report.");
     const restarted = report({ viewer_is_lead: true, state: "resolved", events: [event({ action: "restart", actor_label: "lead-0002", round_ordinal: 3, abandoned_round_ordinal: 2 })] });
-    expect(leadOutcome("restart", before, restarted)).toBe("The annotation of accepted-translation de by ann-0004 restarted with an empty Round 3. Round 2 is kept in the history. Report closed. The final result did not change.");
+    expect(leadOutcome("restart", before, restarted)).toBe("The annotation of accepted-translation de by ann-0004 restarted in Round 3. Round 2 is kept in the history. Report closed. The final result did not change.");
     const paused = report({ viewer_is_lead: true, holds: [hold(), hold({ hold_id: "h7", assignment_id: 7, owner_label: "ann-0005" })] });
     expect(leadOutcome("pause", before, paused)).toBe("Paused the annotation of accepted-translation de by ann-0005. Their owners see your reason. The report is still open.");
   });

@@ -208,7 +208,7 @@ test("withdraw an untouched report, lead reopens it: Open, no withdraw, task sta
       "Reopen report", "Report reopened. No task was paused again.");
     await expect(reportState(lead.page)).toHaveCount(0);
     await expect(cardTitle(lead.page, "Decide")).toBeVisible();
-    await expect(decide(lead.page).getByRole("button")).toHaveText(["Close report…", "Pause other tasks…", "Agree empty restart…"]);
+    await expect(decide(lead.page).getByRole("button")).toHaveText(["Close report…", "Pause other tasks…", "Agree clean restart…"]);
   } finally {
     await lead.close();
   }
