@@ -91,6 +91,9 @@ class ConsolidationGroupView(_View):
     # the text is a decision. ``span_differs`` alone (overlapping spans with
     # small shifts) is not.
     span_conflict: bool = False
+    # ``term_related`` groups (#303): the members' term ids from the broadest
+    # to the narrowest, each an ancestor of the next; empty otherwise.
+    term_lineage: list[str] = Field(default_factory=list)
     keep_input_id: str
     start: int | None
     members: list[ConsolidationMemberView]

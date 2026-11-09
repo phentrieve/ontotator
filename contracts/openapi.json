@@ -13291,6 +13291,13 @@
             "title": "Span Conflict",
             "default": false
           },
+          "term_lineage": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Term Lineage"
+          },
           "keep_input_id": {
             "type": "string",
             "title": "Keep Input Id"

@@ -68,6 +68,10 @@ def test_started_scenario_has_the_eight_designed_groups(client: TestClient) -> N
     assert [g["kinds"] for g in open_groups if len(g["kinds"]) > 1] == [
         ["term_related", "values_differ"]
     ]
+    # The view names the parent term first: Seizure above Status epilepticus.
+    assert [g["term_lineage"] for g in open_groups if "term_related" in g["kinds"]] == [
+        ["HP:0001250", "HP:0002133"]
+    ]
     # Overlapping reflex spans and one shared span in the term group: no text decision.
     assert [g["span_conflict"] for g in open_groups] == [False] * 4
     labels = [person["label"] for person in view["people"]]

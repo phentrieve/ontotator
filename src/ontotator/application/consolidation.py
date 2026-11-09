@@ -795,6 +795,7 @@ def _group_view(
         "differing_axes": list(group.differing_axes),
         "majority": dict(group.majority),
         "span_conflict": group.span_conflict,
+        "term_lineage": list(group.lineage),
         "keep_input_id": group.members[group.keep],
         "start": group.start,
         "members": member_views,

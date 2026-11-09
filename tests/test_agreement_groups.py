@@ -522,6 +522,9 @@ def test_parent_and_child_terms_are_related_not_different() -> None:
     assert plain.kinds == frozenset({"term_differs"})
     # Only the kind changes: the same members, terms and default.
     assert related.members == plain.members and related.terms == plain.terms
+    # The view names the parent: the broadest term first; none without a relation.
+    assert related.lineage == ("HP:1", "HP:2")
+    assert plain.lineage == ()
 
 
 def test_unrelated_terms_still_differ_with_the_lookup() -> None:
@@ -563,6 +566,23 @@ def test_three_terms_are_related_only_on_one_line() -> None:
         )
     )
     assert mixed.kinds == frozenset({"term_differs"})
+    assert mixed.lineage == ()
+
+
+def test_lineage_runs_from_the_broadest_term_whoever_marked_it() -> None:
+    g = one(
+        groups(
+            {
+                "s1": [f("a", 0, "HP:3", ((0, 7),))],
+                "s2": [f("b", 0, "HP:1", ((0, 7),))],
+                "s3": [f("c", 0, "HP:2", ((0, 7),))],
+            },
+            ABC,
+            ancestors=ancestors,
+        )
+    )
+    assert g.terms == ("HP:3", "HP:1", "HP:2")
+    assert g.lineage == ("HP:1", "HP:2", "HP:3")
 
 
 def test_related_terms_keep_their_other_differences() -> None:

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { duplicatesText, fieldsToDecide, finalizationState, groupStatus, headerTitle, partialText, readOnlyText, submittedText, summaryText } from "../../src/consolidation/consolidationText";
 import type { ConsolidationGroupView } from "../../src/api/client";
-import { attachCandidates, choicesComplete, choose, comparisonRows, duplicateTerms, groupName, resolvePayload, resultLine, sameTermGroups, standaloneText, storedResult, type Choices } from "../../src/consolidation/groupModel";
+import { attachCandidates, choicesComplete, choose, comparisonRows, duplicateTerms, groupName, relatedTermHint, resolvePayload, resultLine, sameTermGroups, standaloneText, storedResult, type Choices } from "../../src/consolidation/groupModel";
 import { NO_MODIFIERS } from "../../src/consolidation/modifierSets";
 import { textOrder } from "../../src/consolidation/GroupList";
 import { ANA, BEN, CEM, decidedView, exampleGroups, exampleView, group, hypotoniaThree, LUC, member, mild, MOD_PEOPLE, MOD_TEXT, modSpan, recurrent, seizure, severe, span, TEXT, THREE, TOM } from "./fixtures";
@@ -77,6 +77,19 @@ describe("comparison model", () => {
     const related = hypotoniaThree();
     const rows = comparisonRows({ ...related, kinds: related.kinds.map(kind => kind === "term_differs" ? "term_related" : kind) }, THREE, TEXT, {});
     expect(rowOf(rows, "term").conflict).toBe(true);
+    expect(rowOf(rows, "term").hint).toBeUndefined();
+  });
+
+  it("related terms (#303) name the parent in the Term row, broadest first", () => {
+    const related = hypotoniaThree({ kinds: ["term_related", "values_differ"], term_lineage: ["HP:0001252", "HP:0008936"] });
+    expect(relatedTermHint(related)).toBe("Hypotonia is a parent term of Axial hypotonia.");
+    expect(rowOf(comparisonRows(related, THREE, TEXT, {}), "term").hint).toBe("Hypotonia is a parent term of Axial hypotonia.");
+    // A line of three terms: each with the next; an unlabelled term by its code.
+    expect(relatedTermHint({ ...related, term_lineage: ["HP:0000001", "HP:0001252", "HP:0008936"] }))
+      .toBe("HP:0000001 is a parent term of Hypotonia. Hypotonia is a parent term of Axial hypotonia.");
+    // No lineage (an older server) or no relation: no hint.
+    expect(relatedTermHint({ ...related, term_lineage: [] })).toBeNull();
+    expect(relatedTermHint(hypotoniaThree({ term_lineage: ["HP:0001252", "HP:0008936"] }))).toBeNull();
   });
 
   it("text is information unless spans conflict", () => {

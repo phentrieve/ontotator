@@ -576,5 +576,21 @@
   font-weight: var(--weight-regular);
 }
 
+/* Related terms (#303): which term is the parent, one line under the Term row, read as part of it. */
+.cons-compare tr:has(+ .cons-row-hint) > * {
+  border-bottom-color: transparent;
+}
+
+.cons-row-hint td {
+  padding-top: 0;
+  color: var(--text-muted);
+}
+
+/* A tag in the group heading as a small bordered chip (the app's .badge), apart from "2 fields to decide". */
+.cons-group-toggle .cons-chip {
+  margin-inline-start: var(--space-1);
+  vertical-align: 0.1em;
+}
+
 /* Submit summary: the server's warnings as a list inside the warning box. */
 .cons-warning-list { margin: var(--space-1) 0 0; padding-inline-start: var(--space-5); }

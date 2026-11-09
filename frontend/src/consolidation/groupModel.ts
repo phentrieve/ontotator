@@ -55,6 +55,18 @@ export const needsTerm = (group: ConsolidationGroupView) => hasKind(group, "term
 /** #303: the members' terms are parent and child ("Seizure" / "Focal seizure"), a smaller difference. */
 export const relatedTerms = (group: ConsolidationGroupView) => hasKind(group, "term_related");
 
+/**
+ * #303: which related term is the parent, for the Term row: "Seizure is a parent term of Status epilepticus." From
+ * `term_lineage` (broadest first; "a" parent, since it may sit further up or be one of several parents). Null for other
+ * groups.
+ */
+export function relatedTermHint(group: ConsolidationGroupView): string | null {
+  const lineage = relatedTerms(group) ? group.term_lineage ?? [] : [];
+  if (lineage.length < 2) return null;
+  const name = (termId: string) => group.members.find(member => member.term_id === termId)?.term_label || termId;
+  return lineage.slice(1).map((termId, index) => `${name(lineage[index])} is a parent term of ${name(termId)}.`).join(" ");
+}
+
 /** "Hypotonia (HP:0001252)"; the code alone when the label is the code. */
 export function termLabel(member: Pick<ConsolidationMemberView, "term_id" | "term_label">): string {
   return member.term_label && member.term_label !== member.term_id ? `${member.term_label} (${member.term_id})` : member.term_id;
@@ -176,6 +188,8 @@ export interface ComparisonRow {
   cells: ComparisonCell[];
   /** "Two severities" / "Two onsets" for the chosen (or agreed) modifiers. */
   warnings?: string[];
+  /** A line shown below the row: which related term is the parent (#303). */
+  hint?: string;
 }
 
 /** " (all agree)" only when there is someone to agree with. */
@@ -209,8 +223,10 @@ export function comparisonRows(group: ConsolidationGroupView, people: readonly C
     return { kind, id, label, conflict, info, cells,
       agreed: !conflict && same && info === null ? `${cells[0].display}${allAgree(members)}` : null };
   };
+  const termRow = row("term", "term", "Term", needsTerm(group), member => member.term_id, member => member.term_label || member.term_id);
+  const hint = relatedTermHint(group);
   const rows = [
-    row("term", "term", "Term", needsTerm(group), member => member.term_id, member => member.term_label || member.term_id),
+    hint ? { ...termRow, hint } : termRow,
     ...axesOf(group).map(axis => row("axis", axis, axisLabel(axis), group.differing_axes.includes(axis),
       member => member.axes[axis] ?? "", member => axisOptionLabel(member.axes[axis]))),
     // Keyed by member: identical spans may differ in their note, which comes with the span. "Overlapping" needs two

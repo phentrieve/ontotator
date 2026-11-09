@@ -141,6 +141,9 @@ class Group:
     majority: Mapping[str, str]  # axis -> value of > half of >= 3 same-term members
     # ``spans_conflict`` among all members: the text is a decision ("Text" row).
     span_conflict: bool = False
+    # ``term_related`` (#303): ``terms`` from the broadest to the narrowest
+    # (each an ancestor of the next), so a view can say which is the parent.
+    lineage: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -390,13 +393,24 @@ def _group(
                     winners.setdefault(axis, set()).add(value)
 
     kinds: set[GroupKind] = set()
+    lineage: tuple[str, ...] = ()
     if len(members) < submissions:
         kinds.add("partial")
     if len(terms) > 1:
-        related = ancestors is not None and related_terms(
-            members[0][1].layer_id, terms, ancestors
-        )
+        layer_id = members[0][1].layer_id
+        related = ancestors is not None and related_terms(layer_id, terms, ancestors)
         kinds.add("term_related" if related else "term_differs")
+        if related and ancestors is not None:
+            # On one line of the hierarchy, the broadest term has the fewest
+            # of the others above it.
+            lineage = tuple(
+                sorted(
+                    terms,
+                    key=lambda term: sum(
+                        other in ancestors(layer_id, term) for other in terms
+                    ),
+                )
+            )
     if differing:
         kinds.add("values_differ")
     if span_differs:
@@ -429,6 +443,7 @@ def _group(
         start=min(starts) if starts else None,
         majority=majority,
         span_conflict=spans_conflict(findings),
+        lineage=lineage,
     )
 
 

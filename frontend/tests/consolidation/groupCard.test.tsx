@@ -26,15 +26,32 @@ describe("GroupCard", () => {
     const related = (extra: Partial<ConsolidationGroupView> = {}) => group("g-rel", ["term_related"], [
       member("in-luc", LUC, "HP:0001250", "Seizure", [span("two seizures")]),
       member("in-tom", TOM, "HP:0002133", "Status epilepticus", [span("two seizures")]),
-    ], extra);
+    ], { term_lineage: ["HP:0001250", "HP:0002133"], ...extra });
 
     it("names the related terms and still asks for the term", () => {
       renderCard(related());
       const toggle = screen.getByRole("button", { expanded: true });
-      expect(within(toggle).getByText("Related terms")).toBeTruthy();
+      // A small bordered chip apart from "N fields to decide", without a title-only explanation.
+      const chip = within(toggle).getByText("Related terms");
+      expect(chip.className).toContain("badge");
+      expect(chip.getAttribute("title")).toBeNull();
+      expect(chip.closest(".cons-group-state")).toBeNull();
       expect(toggle.textContent).toContain("to decide");
       // The term is a decision as for any other term: the card shows a conflict.
       expect(within(toggle).getByText("Conflict")).toBeTruthy();
+    });
+
+    it("says in the table which term is the parent, right after the Term row", () => {
+      renderCard(related());
+      const table = screen.getByRole("table");
+      const hint = within(table).getByText("Seizure is a parent term of Status epilepticus.");
+      const rows = within(table).getAllByRole("row");
+      const term = rows.findIndex(item => within(item).queryByRole("rowheader", { name: /Term/ }) !== null);
+      expect(rows[term + 1].contains(hint)).toBe(true);
+      // The parent comes first whoever marked it.
+      cleanup();
+      renderCard(related({ term_lineage: ["HP:0001250", "HP:0002133"], members: [...related().members].reverse() }));
+      expect(within(screen.getByRole("table")).getByText("Seizure is a parent term of Status epilepticus.")).toBeTruthy();
     });
 
     it("keeps the tag on a decided group and shows none for other term differences", () => {
@@ -43,6 +60,7 @@ describe("GroupCard", () => {
       cleanup();
       renderCard(byId("g-gait"));
       expect(within(screen.getByRole("button", { expanded: true })).queryByText("Related terms")).toBeNull();
+      expect(screen.queryByText(/is a parent term of/)).toBeNull();
     });
   });
 

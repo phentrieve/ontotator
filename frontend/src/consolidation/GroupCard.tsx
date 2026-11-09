@@ -223,7 +223,7 @@ export function GroupCard(props: GroupCardProps): JSX.Element {
       {group.edited && <>{" "}<span className="cons-tag">edited in editor</span></>}
       {group.guidelines_unclear && <>{" "}<span className="cons-tag">flagged</span></>}
       {showsUnresolved(group) && <>{" "}<span className="cons-tag">Unresolved</span></>}
-      {relatedTerms(group) && <>{" "}<span className="cons-tag" title="One term is a parent of the other. Choose the term that fits the text.">Related terms</span></>}
+      {relatedTerms(group) && <>{" "}<span className="badge badge-review cons-chip">Related terms</span></>}
     </button>
   </h2>;
 

@@ -4370,6 +4370,8 @@ export interface components {
              * @default false
              */
             span_conflict: boolean;
+            /** Term Lineage */
+            term_lineage?: string[];
             /** Keep Input Id */
             keep_input_id: string;
             /** Start */
