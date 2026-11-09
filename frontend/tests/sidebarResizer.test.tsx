@@ -2,7 +2,7 @@ import { act, fireEvent, render, renderHook, screen } from "@testing-library/rea
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { clampSidebarWidth, readStoredWidth, sidebarLimits, storageKey, useSidebarWidth } from "../src/editor/sidebarWidth";
+import { clampSidebarWidth, defaultSidebarWidth, inspectorWidth, readStoredWidth, sidebarLimits, storageKey, useSidebarWidth } from "../src/editor/sidebarWidth";
 import { SidebarResizer } from "../src/editor/SidebarResizer";
 
 const editorCss = readFileSync(resolve(__dirname, "../src/styles/screens/editor.css"), "utf8");
@@ -23,9 +23,22 @@ beforeEach(() => localStorage.clear());
 afterEach(() => vi.useRealTimers());
 
 it("limits_three_and_two_columns", () => {
-  expect(sidebarLimits({ viewport: 1600, inspector: 380 })).toEqual({ min: 220, max: 480, fallback: 260 });
+  expect(sidebarLimits({ viewport: 1600, inspector: 436 })).toEqual({ min: 220, max: 480, fallback: 340 });
+  expect(sidebarLimits({ viewport: 1280, inspector: 380 })).toEqual({ min: 220, max: 448, fallback: 260 });
   expect(sidebarLimits({ viewport: 1100, inspector: 380 })).toEqual({ min: 220, max: 300, fallback: 260 });
   expect(sidebarLimits({ viewport: 900, inspector: 0 })).toEqual({ min: 220, max: 315, fallback: 220 });
+});
+
+it("default_width_grows_from_1280_to_1600_px", () => {
+  expect([1024, 1025, 1280, 1360, 1440, 1600, 1920].map(defaultSidebarWidth)).toEqual([220, 260, 260, 280, 300, 340, 340]);
+});
+
+it("inspector_width_follows_the_css_clamp", () => {
+  expect([1024, 1060, 1280, 1440, 1600, 1840, 1920].map(viewport => inspectorWidth(viewport))).toEqual([0, 380, 380, 380, 436, 520, 520]);
+  // While it holds the guidelines the inspector is at least 420 px.
+  expect([1060, 1440, 1600, 1920].map(viewport => inspectorWidth(viewport, true))).toEqual([420, 420, 436, 520]);
+  // The keyboard limits use it: 1100 px with the guidelines leaves 1100 − 420 − 420 = 260 px.
+  expect(sidebarLimits({ viewport: 1100, inspector: inspectorWidth(1100, true) }).max).toBe(260);
 });
 
 it("clamps_and_ignores_invalid_stored_values", () => {
@@ -147,12 +160,12 @@ describe("useSidebarWidth", () => {
     fireEvent.pointerMove(sep, { clientX: 360, pointerId: 1 });
     fireEvent.keyDown(sep, { key: "Enter" });
     act(() => { vi.advanceTimersByTime(50); });
-    expect(sep.getAttribute("aria-valuenow")).toBe("260");
+    expect(sep.getAttribute("aria-valuenow")).toBe("340");
     expect(localStorage.getItem(storageKey("anna"))).toBeNull();
     fireEvent.pointerMove(sep, { clientX: 400, pointerId: 1 });
     fireEvent.pointerUp(sep, { clientX: 400, pointerId: 1 });
     act(() => { vi.advanceTimersByTime(50); });
-    expect(sep.getAttribute("aria-valuenow")).toBe("260");
+    expect(sep.getAttribute("aria-valuenow")).toBe("340");
     expect(localStorage.getItem(storageKey("anna"))).toBeNull();
   });
 
@@ -161,8 +174,17 @@ describe("useSidebarWidth", () => {
     const { result } = renderHook(() => useSidebarWidth("anna"));
     expect(result.current.width).toBe(320);
     act(() => result.current.reset());
-    expect(result.current.width).toBe(260);
+    // 1600 px: the default is 340 px.
+    expect(result.current.width).toBe(340);
     expect(localStorage.getItem(storageKey("anna"))).toBeNull();
+  });
+
+  it("lowers_the_maximum_while_the_inspector_holds_the_guidelines", () => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1100 });
+    const { result, rerender } = renderHook(({ guidelines }) => useSidebarWidth("anna", { inspectorWithGuidelines: guidelines }), { initialProps: { guidelines: false } });
+    expect(result.current.limits).toEqual({ min: 220, max: 300, fallback: 260 });
+    rerender({ guidelines: true });
+    expect(result.current.limits).toEqual({ min: 220, max: 260, fallback: 260 });
   });
 
   it("reclamps_on_viewport_resize", () => {

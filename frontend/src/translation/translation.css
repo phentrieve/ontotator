@@ -180,7 +180,7 @@
 }
 @media (min-width: 1100px) {
   .translation-review { overflow: hidden; }
-  .translation-review .translation-workspace { flex: 1 1 0; min-height: 0; grid-template-columns: minmax(0, 1fr) 360px; }
+  .translation-review .translation-workspace { flex: 1 1 0; min-height: 0; grid-template-columns: minmax(0, 1fr) clamp(360px, 22vw, 440px); }
   .translation-review .translation-texts { min-height: 0; }
   .translation-texts .translation-columns { flex: 1; min-height: 0; }
   .translation-texts .translation-column > .translation-text,

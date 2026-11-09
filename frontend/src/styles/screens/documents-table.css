@@ -108,6 +108,9 @@ button.documents-text-name { min-height: 24px; padding: 0; border: 0; background
   .stage-state-wide { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
 @media (min-width: 1600px) { .documents-waiting-on .waiting-narrow, .stage-state-narrow { display: none; } }
+/* Below 1440 px the navigation beside the page has grown (clamp(11rem, 9rem + 4vw, 14rem), about 195 px at 1280):
+   tighter cell insets, as in the Users table, keep the one-line table within the page at 1280 px. */
+@media (max-width: 1439px) { .documents-table { --cell-pad-x: var(--space-2); } }
 /* The checkbox and Text cells stay at the left edge while the table scrolls sideways, so actions keep their row
    label (#10); opaque backgrounds (the row tints below repeat on them), above the scrolled cells. */
 .documents-table .documents-row > :where(.data-table-select-cell, th[scope="row"]),

@@ -435,7 +435,6 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [reloadSubmissionRules, setReloadSubmissionRules] = useState(false);
   const [mobilePane, setMobilePane] = useState<"list" | "text" | "details">("text");
-  const sidebarWidth = useSidebarWidth(versionContext?.username);
   // The ontology tree, docked under the annotation panel while a walk is open. One entry
   // is one walk; a new nonce starts a new one.
   const [treeWalk, setTreeWalk] = useState<{
@@ -3412,6 +3411,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     },
   });
   const guidelinesTab = tabs.hosted && tabs.tab === "guidelines";
+  // The findings column's limits follow the inspector, which is at least 420 px while it holds the guidelines.
+  const sidebarWidth = useSidebarWidth(versionContext?.username, { inspectorWithGuidelines: tabs.hosted });
   useLayoutEffect(() => {
     tabs.resetDetailsScroll();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new inspector subject resets its scroll

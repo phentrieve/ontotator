@@ -608,8 +608,10 @@ a.shell-product { color: inherit; text-decoration: none; }
 .shell-breadcrumb li + li::before { content: "/"; margin-right: var(--space-2); }
 .shell-breadcrumb a { color: var(--accent); }
 .shell-body { display: flex; flex: 1; min-height: 0; }
-/* Narrow sidebar: about its longest item ("Documents (34)", the project switcher); small gutter to the main column. */
-.app-nav { flex: 0 0 11rem; padding: var(--space-4) var(--space-3); border-right: 1px solid var(--border); overflow: auto; }
+/* Narrow sidebar: about its longest item ("Documents (34)", the project switcher) at 1024 px, a little wider on
+   larger screens so project names wrap less (176 px at 1024, about 195 at 1280, 224 from 1920); small gutter to the
+   main column. Below 900 px it is a band over the content (see there). */
+.app-nav { flex: 0 0 clamp(11rem, 9rem + 4vw, 14rem); padding: var(--space-4) var(--space-3); border-right: 1px solid var(--border); overflow: auto; }
 .shell-nav-list { list-style: none; margin: 0; padding: 0; }
 .shell-nav-list li + li { margin-top: var(--space-1); }
 .shell-nav-group { margin-top: var(--space-5); }

@@ -126,12 +126,13 @@ test("sidebar resize: pointer and keyboard, persistence across reload, reset, te
   const handle = separator(page);
   await expect(handle).toHaveAttribute("aria-orientation", "vertical");
   await expect(handle).toHaveAttribute("aria-controls", "findings-column");
-  await expect(handle).toHaveAttribute("aria-valuenow", "260");
+  // 1440 px: default 260 + (1440 − 1280) · 0.25 = 300.
+  await expect(handle).toHaveAttribute("aria-valuenow", "300");
   await expect(handle).toHaveAttribute("aria-valuemin", "220");
   // 1440 px: min(480, 35 vw = 504, 1440 − 380 − 420 = 640).
   await expect(handle).toHaveAttribute("aria-valuemax", "480");
-  await expect(handle).toHaveAttribute("aria-valuetext", "260 pixels (default 260)");
-  expect(await widthOf(sidebar(page))).toBe(260);
+  await expect(handle).toHaveAttribute("aria-valuetext", "300 pixels (default 300)");
+  expect(await widthOf(sidebar(page))).toBe(300);
 
   // At the default width the separator does not move the text pane.
   const textLeft = () => page.locator(".center-pane").evaluate(element => element.getBoundingClientRect().left);
@@ -152,15 +153,15 @@ test("sidebar resize: pointer and keyboard, persistence across reload, reset, te
     await page.keyboard.press(press);
     await expect(handle).toHaveAttribute("aria-valuenow", String(value));
   };
-  await key("ArrowRight", 276);
-  await key("Shift+ArrowRight", 340);
-  await key("ArrowLeft", 324);
-  await key("Shift+ArrowLeft", 260);
+  await key("ArrowRight", 316);
+  await key("Shift+ArrowRight", 380);
+  await key("ArrowLeft", 364);
+  await key("Shift+ArrowLeft", 300);
   await key("Home", 220);
   await key("End", 480);
   expect(await widthOf(sidebar(page))).toBe(480);
   await expect.poll(() => stored(page, s.username)).toBe("480");
-  await key("Enter", 260);
+  await key("Enter", 300);
   await expect.poll(() => stored(page, s.username)).toBeNull();
 
   // Pointer: drag by 100 px; the width is stored at drag end.
@@ -174,24 +175,24 @@ test("sidebar resize: pointer and keyboard, persistence across reload, reset, te
     await finish(start);
   };
   await drag(100);
-  await expect(handle).toHaveAttribute("aria-valuenow", "360");
-  expect(await widthOf(sidebar(page))).toBe(360);
-  expect(await stored(page, s.username)).toBe("360");
-  await evidence(page, "sidebar-360");
+  await expect(handle).toHaveAttribute("aria-valuenow", "400");
+  expect(await widthOf(sidebar(page))).toBe(400);
+  expect(await stored(page, s.username)).toBe("400");
+  await evidence(page, "sidebar-400");
 
   // Escape during a drag restores the width from the drag start.
   await drag(60, async () => { await page.keyboard.press("Escape"); await page.mouse.up(); });
-  await expect(handle).toHaveAttribute("aria-valuenow", "360");
+  await expect(handle).toHaveAttribute("aria-valuenow", "400");
 
   // Persistence across reload.
   await page.reload();
   await expect(page.locator(".text-container")).toBeVisible();
-  await expect(separator(page)).toHaveAttribute("aria-valuenow", "360");
-  expect(await widthOf(sidebar(page))).toBe(360);
+  await expect(separator(page)).toHaveAttribute("aria-valuenow", "400");
+  expect(await widthOf(sidebar(page))).toBe(400);
 
-  // Double-click resets and removes the stored width.
+  // Double-click resets to the default of this viewport and removes the stored width.
   await separator(page).dblclick();
-  await expect(separator(page)).toHaveAttribute("aria-valuenow", "260");
+  await expect(separator(page)).toHaveAttribute("aria-valuenow", "300");
   expect(await stored(page, s.username)).toBeNull();
 });
 
@@ -223,7 +224,51 @@ test("sidebar transitions at 1024 and 700 px; findings tab label", async ({ page
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(handle).toBeVisible();
-  await expect(handle).toHaveAttribute("aria-valuenow", "260");
+  await expect(handle).toHaveAttribute("aria-valuenow", "300");
+});
+
+test("default widths grow with the viewport: findings 260–340 px, inspector 380–520 px; a stored width wins", async ({ page }) => {
+  const s = await openT5(page);
+  const handle = separator(page);
+  const inspector = page.locator(".app-layout > .inspector-pane");
+  // [viewport, findings default, inspector]
+  for (const [viewport, findings, inspectorWidth] of [[1060, 260, 380], [1280, 260, 380], [1440, 300, 380], [1600, 340, 436], [1920, 340, 520]]) {
+    await page.setViewportSize({ width: viewport, height: 900 });
+    await expect(handle).toHaveAttribute("aria-valuenow", String(findings));
+    await expect(handle).toHaveAttribute("aria-valuetext", `${findings} pixels (default ${findings})`);
+    expect(await widthOf(sidebar(page)), `${viewport}: findings`).toBe(findings);
+    expect(await widthOf(inspector), `${viewport}: inspector`).toBe(inspectorWidth);
+    // Three columns: the inspector beside the text, which keeps at least 420 px.
+    const geometry = await page.evaluate(() => {
+      const center = document.querySelector(".app-layout > .center-pane")!.getBoundingClientRect();
+      const side = document.querySelector(".app-layout > .inspector-pane")!.getBoundingClientRect();
+      return { beside: side.left >= center.right - 1, text: center.width };
+    });
+    expect(geometry.beside, `${viewport}: three columns`).toBe(true);
+    expect(geometry.text, `${viewport}: text column`).toBeGreaterThanOrEqual(420);
+  }
+  // 1024 px and below: unchanged (220 px findings, the inspector under the text).
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await expect(handle).toHaveAttribute("aria-valuenow", "220");
+  expect(await widthOf(inspector)).toBe(await widthOf(page.locator(".app-layout > .center-pane")));
+
+  // A stored width wins over the default at every width; reset returns to the new default.
+  await page.setViewportSize({ width: 1920, height: 900 });
+  await handle.focus();
+  await page.keyboard.press("Home");
+  await expect(handle).toHaveAttribute("aria-valuenow", "220");
+  await expect.poll(() => stored(page, s.username)).toBe("220");
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await expect(handle).toHaveAttribute("aria-valuetext", "220 pixels (default 340)");
+  await handle.focus();
+  await page.keyboard.press("Enter");
+  await expect(handle).toHaveAttribute("aria-valuenow", "340");
+  await expect.poll(() => stored(page, s.username)).toBeNull();
+
+  // Term labels hyphenate in their language instead of breaking mid-word.
+  const label = sidebar(page).locator(".term-name > span[lang]").first();
+  await expect(label).toHaveAttribute("lang", "en");
+  expect(await label.evaluate(element => getComputedStyle(element).hyphens)).toBe("auto");
 });
 
 test("390 px: the shell header is one compact row (Sections, breadcrumb, Log out)", async ({ page }) => {
@@ -439,7 +484,7 @@ test.describe("half-width editor", () => {
     await expectTextReadable(page, "960 tree after the drawer");
   });
 
-  for (const width of [1280, 1440]) {
+  for (const width of [1060, 1280, 1440, 1600, 1920]) {
     test(`${width} px: the guidelines open in the inspector and three columns stay, with and without the tree`, async ({ page }) => {
       await page.setViewportSize({ width, height: 1000 });
       await openGuidedTask(page);
@@ -449,6 +494,9 @@ test.describe("half-width editor", () => {
       await expect(page.getByRole("complementary", { name: "Guidelines v1" })).toHaveCount(0);
       await expectTextReadable(page, `${width} guidelines`);
       expect(await inspectorBeside(page), `${width} guidelines: three columns`).toBe(true);
+      // At least 420 px while it holds the guidelines, wider from 1600 px: max(420, clamp(380, 380 + (vw − 1440) · 0.35, 520)).
+      const expected = Math.max(420, Math.min(520, Math.max(380, 380 + (width - 1440) * 0.35)));
+      expect(await page.locator(".app-layout > .inspector-pane").evaluate(element => element.getBoundingClientRect().width)).toBeCloseTo(expected, 0);
       await shot(page, `${width}-guidelines-inspector`);
       // "Show in tree" is in Details: the tree docks under the inspector, still beside the text.
       await page.getByRole("tab", { name: "Details", exact: true }).click();
