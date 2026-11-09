@@ -10,6 +10,8 @@ import { PlaceholderRow } from "../editor/carried/PlaceholderRow";
 import { CarriedProgress } from "../editor/carried/CarriedProgress";
 import { SidebarResizer } from "../editor/SidebarResizer";
 import { useSidebarWidth } from "../editor/sidebarWidth";
+import { InspectorTabList, inspectorTabIds, useInspectorTabs } from "../editor/InspectorTabs";
+import type { GuidelinesPanel } from "../tasks/TaskGuidelines";
 import { RoundInputEvidenceDialog } from "../tasks/RoundInputEvidenceDialog";
 import { ComparePane } from "../variants/ComparePane";
 import { Toolbar } from "../ui/Toolbar";
@@ -224,6 +226,11 @@ export interface CaseScreenProps {
   userPseudonym?: string;
   /** The guidelines update notice (tasks/TaskGuidelines), shown below the toolbar. */
   guidelineNotice?: React.ReactNode;
+  /**
+   * The task's guidelines (tasks/TaskGuidelines). From 1060 px, while the draft is shown, they open as the
+   * inspector's "Guidelines" tab, so the text keeps its column; otherwise the screen renders their drawer.
+   */
+  guidelines?: GuidelinesPanel | null;
   held?: boolean;
   holdReason?: string | null;
   saveBeforeReportRef?: React.MutableRefObject<(() => Promise<void>) | null>;
@@ -261,7 +268,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   onSubmitted,
   annotatorName,
   leaveGuardRef,
-  readOnly: serverReadOnly = false, routeLeaveRef, assignmentNavigation, onReadonlyRequired, versionContext, menuItems = [], userPseudonym, guidelineNotice, held = false, holdReason, saveBeforeReportRef, roundInputs = NO_ROUND_INPUTS, roundKind, roundActive = true, roundBadge, roundTitle, documentVersion, roundOrdinal, headerTimer, onEdit,
+  readOnly: serverReadOnly = false, routeLeaveRef, assignmentNavigation, onReadonlyRequired, versionContext, menuItems = [], userPseudonym, guidelineNotice, guidelines = null, held = false, holdReason, saveBeforeReportRef, roundInputs = NO_ROUND_INPUTS, roundKind, roundActive = true, roundBadge, roundTitle, documentVersion, roundOrdinal, headerTimer, onEdit,
 }) => {
   const versionIdentity = JSON.stringify([versionContext?.username, versionContext?.assignmentId, versionContext?.canBrowseVersions, workspaceId, view.key]);
   const [acceptedSubmission, setAcceptedSubmission] = useState<{ identity: string; value: Submission } | null>(null);
@@ -749,9 +756,6 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     else if (requiredNoteKey !== null) inspectorRef.current?.querySelector<HTMLTextAreaElement>('[aria-label="Reviewer note"]')?.focus();
   }, [selectedTargetId, requiredNoteKey]);
   const inspectorKey = pendingAnnotation ? `pending:${pendingAnnotation.annotationId}` : selectedListKey;
-  useLayoutEffect(() => {
-    if (inspectorRef.current) inspectorRef.current.scrollTop = 0;
-  }, [inspectorKey]);
   const sourceMentions: MentionDisplay[] = useMemo(() => visibleSources.flatMap(s => s.evidence.map(ev => ({
     evidence_id: `source:${sourceKey(s)}:${ev.mention.evidence_id}:${ev.version}`,
     sourceId: sourceKey(s),
@@ -2238,6 +2242,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const handleCloseTree = () => {
     const active = document.activeElement;
     if (active instanceof HTMLElement && active.closest(".tree-host")) {
+      tabs.showDetailsNow();
       inspectorRef.current?.querySelector<HTMLElement>(".annotation-tree-button")?.focus();
     }
     setTreeWalk(null);
@@ -2352,6 +2357,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     setRequiredNoteKey(key); setSelectedTargetId(key);
     setSelectedAnnotationId(null); setSelectedSourceId(null); setSelectedEvidenceId(null);
     cancelPending(); setMobilePane("details");
+    if (selectedTargetId === key) tabs.showDetailsNow();
     if (selectedTargetId === key) inspectorRef.current?.querySelector<HTMLTextAreaElement>('[aria-label="Reviewer note"]')?.focus();
   };
 
@@ -2945,6 +2951,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     modifierCommands.setLinkSpan(null);
     if (!mode) return;
     if (panesLayout) flushSync(() => setMobilePane("details"));
+    tabs.showDetailsNow();
     if (inspectorRef.current) chipIn(inspectorRef.current, mode.termId)?.focus({ preventScroll: true });
   };
   // Another selection ends "Link a text span".
@@ -3387,6 +3394,29 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const [valuesError, setValuesError] = useState<{ annotationId: string; message: string } | null>(null);
   const [changeTermRequest, setChangeTermRequest] = useState(0);
   const [searchFocusRequest, setSearchFocusRequest] = useState(0);
+
+  // --- Guidelines in the inspector (from 1060 px, three columns; editor/InspectorTabs) -----------
+  // Below, or while an older version is shown (no inspector), the guidelines keep their drawer.
+  const threeColumns = useMediaQuery("(min-width: 1060px)");
+  const guidelinesHosted = !!guidelines?.open && threeColumns && !display;
+  const inspectorIdBase = `inspector${React.useId()}`;
+  const inspectorIds = inspectorTabIds(inspectorIdBase);
+  const guidelinesPanelRef = useRef<HTMLElement>(null);
+  const tabs = useInspectorTabs({
+    hosted: guidelinesHosted, open: !!guidelines?.open, request: guidelines?.request ?? 0, returnFocus: guidelines?.returnFocus,
+    scroller: inspectorRef, panel: guidelinesPanelRef,
+    // Work that needs a field of the inspector brings Details to the front; selecting a finding does not.
+    demand: {
+      key: JSON.stringify([pendingAnnotation?.annotationId ?? null, attachModifier?.mode ?? null, requiredNoteKey, loopFocus?.annotationId ?? null, focusRequest?.key ?? null]),
+      active: !!(pendingAnnotation || attachModifier || requiredNoteKey !== null || loopFocus || focusRequest),
+    },
+  });
+  const guidelinesTab = tabs.hosted && tabs.tab === "guidelines";
+  useLayoutEffect(() => {
+    tabs.resetDetailsScroll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new inspector subject resets its scroll
+  }, [inspectorKey]);
+
   /** End of the mark: largest segment end of the selected mention, else of the finding's first mention. */
   const markEndOf = (snapshot: AnnotationSnapshot, evidenceId: string | null): number | null => {
     const refs = snapshot.annotation.evidence_refs ?? [];
@@ -3564,6 +3594,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     && !selectedInputState && !(isReviewLike(view.key.mode) && selectedTarget);
   const pendingSearchable = !readOnly && !display && !!pendingAnnotation && !pendingAnnotation.carriedInput && !savedPendingReanchor;
   useShortcut("/", () => {
+    if (pendingSearchable || ownFindingActive) tabs.showDetailsNow();
     if (pendingSearchable) {
       if (panesLayout) chooseTerm();
       else setSearchFocusRequest(count => count + 1);
@@ -3578,6 +3609,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   useShortcut("v", event => {
     // Plain "v" only: Shift+V is not this shortcut.
     if (event.shiftKey) return false;
+    // The values are in Details: with Guidelines in front, Details comes back first.
+    if (ownFindingActive) tabs.showDetailsNow();
     const fields = Array.from(inspectorRef.current?.querySelectorAll<HTMLElement>("[data-values-section] [data-axis-field]") ?? []);
     const defaulted = new Set(selectedAnnotation?.annotation.axes_defaulted ?? []);
     const field = fields.find(element => defaulted.has(element.dataset.axisField ?? "")) ?? fields[0];
@@ -3864,7 +3897,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
         ))}
       </nav>
       {/* Main Workspace Layout */}
-      <div className={`app-layout mobile-pane-${mobilePane}${treeWalk && !treeCollapsed ? " tree-open" : ""}`}
+      <div className={`app-layout mobile-pane-${mobilePane}${treeWalk && !treeCollapsed ? " tree-open" : ""}${tabs.hosted ? " inspector-with-guidelines" : ""}`}
         style={{ "--sidebar-width": `${sidebarWidth.width}px` } as CSSProperties}>
         {/* Left: Sidebar (Annotations & Review Targets) */}
         <aside className="sidebar density-compact" id="findings-column">
@@ -4133,6 +4166,11 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
 
         {/* Right: Annotation & Search Panel + Review Actions */}
         <div className="inspector-pane density-compact" ref={inspectorRef}>
+          {/* With the guidelines open (from 1060 px): "Details | Guidelines vN" at the top; Details stays mounted while hidden. */}
+          {tabs.hosted && guidelines && <InspectorTabList idBase={inspectorIdBase} tab={tabs.tab}
+            version={guidelines.version} onSelect={tabs.select} onClose={guidelines.close} />}
+          <div className="inspector-details" {...(tabs.hosted ? { role: "tabpanel", id: inspectorIds.detailsPanel,
+            "aria-labelledby": inspectorIds.detailsTab, hidden: guidelinesTab } : {})}>
           {/* Always mounted so the text change is announced; aria-live, not role="status", which the save state owns.
               M2 M-2: a framed success strip with a check icon, spacing below, so it reads as a status. */}
           <div aria-live="polite" data-advance-status>
@@ -4446,6 +4484,19 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
               }}
             />
           </>)}
+          </div>
+          {tabs.hosted && guidelines && <section ref={guidelinesPanelRef} role="tabpanel" id={inspectorIds.guidelinesPanel}
+            aria-labelledby={inspectorIds.guidelinesTab} tabIndex={0} hidden={!guidelinesTab} className="inspector-guidelines"
+            onKeyDown={event => {
+              // Escape closes the guidelines, as in the drawer; other keys reach the editor's shortcuts (1–4 decide).
+              if (event.key !== "Escape" || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+              event.preventDefault();
+              event.stopPropagation();
+              guidelines.close();
+            }}>
+            <div className="inspector-guidelines-body">{guidelines.reader}</div>
+            <div className="inspector-guidelines-footer">{guidelines.footer}</div>
+          </section>}
         </div>
 
         {/* Ontology tree: docked into the layout, after the annotation panel. */}
@@ -4511,6 +4562,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
       {confirmRequest && <ConfirmDialog open title={confirmRequest.title} message={<p>{confirmRequest.message}</p>}
         confirmLabel={confirmRequest.confirmLabel} cancelLabel={confirmRequest.cancelLabel} onConfirm={() => closeConfirm(true)} onCancel={() => closeConfirm(false)} />}
     </div>
+    {/* Where the inspector cannot hold them (up to 1059 px, an older version shown): the page drawer, dialog or sheet. */}
+    {guidelines && !guidelinesHosted && guidelines.drawer}
     </ProposalMetadataProvider>
   );
 };

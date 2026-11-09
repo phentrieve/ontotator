@@ -4,8 +4,8 @@
  *
  * Every test builds its own ``PUBLISHED`` project through ``POST /__test_guidelines__``: v1 published
  * by the lead ("First version"), not yet seen by Ana, who owns the en annotate task ``annotate-1``.
- * The drawer is a non-modal ``<aside>`` from 1280 px, a modal ``lg`` Dialog from 700 px and a
- * full-height sheet below.
+ * In the editor the guidelines open as the inspector's "Guidelines v1" tab from 1060 px (three
+ * columns); below, the drawer is a modal ``lg`` Dialog from 700 px and a full-height sheet below that.
  */
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
@@ -30,6 +30,28 @@ async function evidence(page: Page, name: string) {
 const entry = (page: Page) => page.getByRole("button", { name: "More actions", exact: true });
 const openGuidelines = (page: Page) => moreAction(page, /^Guidelines v1/);
 const aside = (page: Page) => page.getByRole("complementary", { name: "Guidelines v1", exact: true });
+/** The inspector's Guidelines tab panel (editor from 1060 px). */
+const tabPanel = (page: Page) => page.locator(".inspector-pane").getByRole("tabpanel", { name: "Guidelines v1", exact: true });
+const tab = (page: Page, name: "Details" | "Guidelines v1") => page.getByRole("tablist", { name: "Inspector", exact: true }).getByRole("tab", { name, exact: true });
+
+/** Boxes of the three columns and the first characters of the text (on top, inside the text column). */
+async function columns(page: Page) {
+  return page.evaluate(() => {
+    const box = (selector: string) => {
+      const { left, right, top, bottom, width } = document.querySelector(selector)!.getBoundingClientRect();
+      return { left, right, top, bottom, width };
+    };
+    const container = document.querySelector(".text-container")!;
+    const node = document.createTreeWalker(container, NodeFilter.SHOW_TEXT).nextNode()!;
+    const range = document.createRange();
+    range.setStart(node, 0);
+    range.setEnd(node, Math.min(12, node.textContent!.length));
+    const first = range.getBoundingClientRect();
+    const hit = document.elementFromPoint(first.left + 2, (first.top + first.bottom) / 2);
+    return { sidebar: box(".sidebar"), center: box(".center-pane"), inspector: box(".inspector-pane"),
+      textOnTop: !!hit && container.contains(hit), viewport: innerWidth };
+  });
+}
 const modal = (page: Page) => page.getByRole("dialog", { name: "Guidelines v1", exact: true });
 const scrollWidth = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth);
 
@@ -63,42 +85,82 @@ async function axeViolations(page: Page, include: string): Promise<string[]> {
   return results.violations.flatMap(v => v.nodes.map(n => `${v.id} ${n.target.join(" ")}: ${n.failureSummary ?? ""}`));
 }
 
-test("drawer at 1280 px is non-modal and the editor stays operable", async ({ page }) => {
+for (const width of [1280, 1440]) {
+  test(`at ${width} px the guidelines open in the inspector and the editor keeps three columns`, async ({ page }) => {
+    await anaOnTask(page, { width, height: 800 });
+    const before = await columns(page);
+    await openGuidelines(page);
+    const panel = tabPanel(page);
+    await expect(panel).toBeVisible();
+    await expect(panel).toBeFocused();
+    await expect(panel.getByRole("heading", { name: "Guidelines v1", level: 2 })).toBeVisible();
+    await expect(panel.getByText(V1_TEXT)).toBeVisible();
+    await expect(panel.getByRole("link", { name: "All versions", exact: true })).toBeVisible();
+    await expect(tab(page, "Guidelines v1")).toHaveAttribute("aria-selected", "true");
+    await expect(tab(page, "Details")).toHaveAttribute("aria-selected", "false");
+    // No page drawer, nothing modal.
+    await expect(aside(page)).toHaveCount(0);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.locator('[aria-modal="true"]')).toHaveCount(0);
+
+    // Three columns: the inspector (420 px) beside the text, at the right edge; the text keeps at least 420 px and is not covered.
+    const open = await columns(page);
+    expect(open.inspector.left, "inspector beside the text").toBeGreaterThanOrEqual(open.center.right - 1);
+    expect(Math.abs(open.inspector.top - open.center.top), "inspector not stacked").toBeLessThanOrEqual(1);
+    expect(Math.round(open.inspector.right)).toBe(width);
+    expect(Math.round(open.inspector.width)).toBe(420);
+    expect(open.center.width).toBeGreaterThanOrEqual(420);
+    expect(open.center.width, "the text loses at most the 40 px the inspector gains").toBeGreaterThanOrEqual(before.center.width - 41);
+    expect(open.textOnTop).toBe(true);
+    expect(await scrollWidth(page)).toBeLessThanOrEqual(width);
+    await evidence(page, `${width}-inspector-guidelines`);
+
+    // The editor stays operable: marking text brings Details (the New finding panel) to the front.
+    await selectText(page, 0, 11);
+    await expect(tab(page, "Details")).toHaveAttribute("aria-selected", "true");
+    await page.getByLabel("Search term", { exact: true }).fill("Hypotonia");
+    await expect(page.locator(".candidate-card").filter({ hasText: "HP:0001252" })).toHaveAttribute("aria-selected", "true");
+    await page.getByLabel("Search term", { exact: true }).press("Enter");
+    await expect(page.locator(".sidebar .doc-item")).toHaveCount(1);
+    // The Guidelines tab stays; selecting the finding in the list does not take it away.
+    await tab(page, "Guidelines v1").click();
+    await expect(panel).toBeVisible();
+    await page.locator(".sidebar .doc-item").first().click();
+    await expect(tab(page, "Guidelines v1")).toHaveAttribute("aria-selected", "true");
+    await expect(panel.getByText(V1_TEXT)).toBeVisible();
+    await evidence(page, `${width}-inspector-guidelines-editor-used`);
+
+    await panel.getByRole("button", { name: "Close", exact: true }).click();
+    await expect(panel).toHaveCount(0);
+    await expect(page.getByRole("tablist", { name: "Inspector" })).toHaveCount(0);
+    await expect(entry(page)).toBeFocused();
+    expect(Math.round((await columns(page)).inspector.width)).toBe(380);
+  });
+}
+
+test("inspector tabs: arrow keys switch, Escape and ✕ close and return focus", async ({ page }) => {
   await anaOnTask(page, { width: 1280, height: 800 });
   await openGuidelines(page);
-  const panel = aside(page);
-  await expect(panel).toBeVisible();
-  await expect(panel.getByRole("heading", { name: "Guidelines v1", level: 2 })).toBeFocused();
-  await expect(panel.getByText(V1_TEXT)).toBeVisible();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(page.locator('[aria-modal="true"]')).toHaveCount(0);
-  // min(24rem, 30vw) on the right, below the AppShell header.
-  const box = (await panel.boundingBox())!;
-  expect(box.width).toBeLessThanOrEqual(Math.min(384, 1280 * 0.3) + 1);
-  expect(Math.round(box.x + box.width)).toBe(1280);
-  const header = (await page.locator(".shell-header").boundingBox())!;
-  expect(box.y).toBeGreaterThanOrEqual(header.y + header.height - 1);
-  // The page narrows beside the drawer: the clinical text is not covered.
-  const text = (await page.locator(".text-container").first().boundingBox())!;
-  expect(text.x + text.width).toBeLessThanOrEqual(box.x + 1);
-  expect(text.width).toBeGreaterThan(180);
-  await evidence(page, "1280-drawer");
-
-  // Keys typed inside the drawer do not reach the editor's shortcuts; outside they do.
-  await page.keyboard.press("d");
-  await expect(panel).toBeVisible();
-
-  // The editor behind stays operable: select text, search a term, add a finding.
-  await selectText(page, 0, 11);
-  await page.getByLabel("Search term", { exact: true }).fill("Hypotonia");
-  await expect(page.locator(".candidate-card").filter({ hasText: "HP:0001252" })).toHaveAttribute("aria-selected", "true");
-  await page.getByLabel("Search term", { exact: true }).press("Enter");
-  await expect(page.locator(".sidebar .doc-item")).toHaveCount(1);
-  await expect(panel).toBeVisible();
-  await evidence(page, "1280-drawer-editor-used");
-
-  await panel.getByRole("button", { name: "Close", exact: true }).first().click();
-  await expect(panel).toHaveCount(0);
+  await expect(tabPanel(page)).toBeFocused();
+  await tab(page, "Guidelines v1").focus();
+  await page.keyboard.press("ArrowLeft");
+  await expect(tab(page, "Details")).toBeFocused();
+  await expect(tab(page, "Details")).toHaveAttribute("aria-selected", "true");
+  await expect(tabPanel(page)).toBeHidden();
+  await page.keyboard.press("ArrowRight");
+  await expect(tab(page, "Guidelines v1")).toBeFocused();
+  await expect(tabPanel(page)).toBeVisible();
+  // Tab moves from the selected tab to ✕, then into the panel.
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Close guidelines", exact: true })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(tabPanel(page)).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(tabPanel(page)).toHaveCount(0);
+  await expect(entry(page)).toBeFocused();
+  await openGuidelines(page);
+  await page.getByRole("button", { name: "Close guidelines", exact: true }).click();
+  await expect(tabPanel(page)).toHaveCount(0);
   await expect(entry(page)).toBeFocused();
 });
 
@@ -179,29 +241,29 @@ test("keyboard-only path: Tab to More, the Guidelines item, Enter, Escape return
     await expect(page.getByRole("menuitem", { name, exact: typeof name === "string" })).toBeFocused();
   }
   await page.keyboard.press("Enter");
-  const panel = aside(page);
+  const panel = tabPanel(page);
   await expect(panel).toBeVisible();
-  await expect(panel.getByRole("heading", { name: "Guidelines v1", level: 2 })).toBeFocused();
-  // Tab moves on into the drawer's content and footer.
+  await expect(panel).toBeFocused();
+  // Tab moves on into the guidelines text and their footer.
   await tabTo(page, panel.getByRole("link", { name: "All versions", exact: true }), 20);
   await page.keyboard.press("Escape");
   await expect(panel).toHaveCount(0);
   await expect(entry(page)).toBeFocused();
-  // The notice's "Read guidelines v1" opens the same drawer with Enter.
+  // The notice's "Read guidelines v1" opens the same tab with Enter.
   await tabTo(page, page.getByRole("button", { name: "Read guidelines v1", exact: true }), 80);
   await page.keyboard.press("Enter");
-  await expect(panel.getByRole("heading", { name: "Guidelines v1", level: 2 })).toBeFocused();
+  await expect(panel).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(panel).toHaveCount(0);
 });
 
-test("axe has no violations on the drawer, Settings › Guidelines and the withdraw dialog", async ({ page }) => {
+test("axe has no violations on the inspector with the guidelines, Settings › Guidelines and the withdraw dialog", async ({ page }) => {
   const s = await anaOnTask(page, { width: 1280, height: 800 });
   await openGuidelines(page);
-  await expect(aside(page).getByText(V1_TEXT)).toBeVisible();
-  await evidence(page, "axe-drawer");
-  // Soft, so Settings and the withdraw dialog are still checked when the drawer fails.
-  expect.soft(await axeViolations(page, ".ui-drawer"), "drawer").toEqual([]);
+  await expect(tabPanel(page).getByText(V1_TEXT)).toBeVisible();
+  await evidence(page, "axe-inspector-guidelines");
+  // Soft, so Settings and the withdraw dialog are still checked when the inspector fails.
+  expect.soft(await axeViolations(page, ".inspector-pane"), "inspector with the guidelines").toEqual([]);
 
   const lead = await page.context().browser()!.newContext({ baseURL: test.info().project.use.baseURL, viewport: { width: 1280, height: 800 } });
   try {

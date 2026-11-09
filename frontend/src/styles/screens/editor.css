@@ -65,9 +65,15 @@
 .app-layout {
   /* Findings column width; the editor sets the user's preferred width inline. */
   --sidebar-width: 260px;
+  /* Inspector column of the three-column layout; wider while it holds the guidelines (InspectorTabs). */
+  --inspector-width: 380px;
   display: flex;
   flex: 1;
   overflow: hidden;
+}
+
+.app-layout.inspector-with-guidelines {
+  --inspector-width: 420px;
 }
 
 .mobile-pane-tabs {
@@ -378,7 +384,7 @@
 }
 
 .inspector-pane {
-  width: 380px;
+  width: var(--inspector-width, 380px);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -386,6 +392,107 @@
   border-left: 1px solid var(--border);
   background: var(--surface-raised);
   overflow-wrap: anywhere;
+}
+
+/* The inspector's content (the Details tab while the guidelines are open): lays its parts out as the pane did. */
+.inspector-details {
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 auto;
+  min-width: 0;
+}
+
+.inspector-details[hidden],
+.inspector-guidelines[hidden] {
+  display: none;
+}
+
+/* "Details | Guidelines vN" and ✕ (editor/InspectorTabs.tsx): stays at the top while the pane scrolls. */
+.inspector-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) 0 var(--space-3);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+
+.inspector-tablist {
+  display: flex;
+  flex: 1 1 auto;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.inspector-tab {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  font: inherit;
+  font-size: var(--size-md);
+  cursor: pointer;
+}
+
+.inspector-tab[aria-selected="true"] {
+  border-bottom-color: var(--accent);
+}
+
+.inspector-tab-badge {
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  font-size: var(--size-sm);
+  font-weight: var(--weight-strong);
+}
+
+.inspector-tabs-close {
+  align-self: center;
+  margin-bottom: var(--space-1);
+}
+
+/* The guidelines panel: the reader scrolls with the pane, "All versions" and "Close" stay at its foot. */
+.inspector-guidelines {
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 auto;
+  min-width: 0;
+  font-size: var(--size-md);
+  line-height: var(--leading-md);
+}
+
+.inspector-guidelines:focus {
+  outline: none;
+}
+
+.inspector-guidelines:focus-visible {
+  outline: var(--focus-width) solid var(--focus-ring);
+  outline-offset: calc(-1 * var(--focus-width));
+}
+
+.inspector-guidelines-body {
+  flex: 1 0 auto;
+  padding: var(--space-4) var(--space-5);
+}
+
+.inspector-guidelines-footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+
+@media (forced-colors: active) {
+  .inspector-tab[aria-selected="true"] { border-bottom-color: Highlight; }
 }
 
 .technical-details {
@@ -927,7 +1034,7 @@
 @media (min-width: 1025px) {
   .app-layout.tree-open {
     display: grid;
-    grid-template-columns: var(--sidebar-width) minmax(0, 1fr) 380px;
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr) var(--inspector-width);
     grid-template-rows: minmax(40%, auto) minmax(max(50%, min(400px, 60%)), 1fr);
   }
   .app-layout.tree-open > .sidebar {
@@ -992,21 +1099,23 @@
 @media (max-width: 700px) { .sidebar-resizer { display: none; } }
 @media (forced-colors: active) { .sidebar-resizer-grip { background: CanvasText; } .sidebar-resizer:focus-visible { outline-color: Highlight; } }
 
-/* The columns follow the room the editor really has, not only the viewport: the non-modal
-   guidelines drawer (from 1280 px) narrows the page beside it. Three columns need the text's
-   420 px beside the findings column and the 380 px inspector (1060 px with the default findings
-   width); with less room the inspector stacks under the text as in the 701–1024 px grid. The
-   findings column never takes the text's 420 px. */
+/* The columns follow the room the editor really has, not only the viewport (a page drawer would
+   narrow it; in the editor the guidelines open in the inspector instead, from 1060 px). Three
+   columns need the text's 420 px beside the findings column and the 380 px inspector (1060 px with
+   the default findings width); with less room the inspector stacks under the text as in the
+   701–1024 px grid. The findings column never takes the text's 420 px: with the guidelines the
+   inspector is 420 px and the findings column gives way (down to 220 px), so 1060 px still hold
+   three columns. */
 .case-screen:not(.case-comparing) {
   container: case-screen / inline-size;
 }
 
 @media (min-width: 1025px) {
   .case-screen:not(.case-comparing) .app-layout > .sidebar {
-    width: min(var(--sidebar-width), max(220px, 100cqi - 800px));
+    width: min(var(--sidebar-width), max(220px, 100cqi - 420px - var(--inspector-width)));
   }
   .case-screen:not(.case-comparing) .app-layout.tree-open {
-    grid-template-columns: min(var(--sidebar-width), max(220px, 100cqi - 800px)) minmax(0, 1fr) 380px;
+    grid-template-columns: min(var(--sidebar-width), max(220px, 100cqi - 420px - var(--inspector-width))) minmax(0, 1fr) var(--inspector-width);
   }
 
   @container case-screen (max-width: 1059px) {
