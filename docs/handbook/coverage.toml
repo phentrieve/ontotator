@@ -403,3 +403,8 @@ chapter = "lead-change-course.md"
 [[map]]
 glob = "frontend/src/tasks/WorkRoundActions.tsx"
 chapter = "lead-change-course.md"
+
+# Single-term review (#381): the Single terms page, batches, the review screen and its settings cards.
+[[map]]
+glob = "frontend/src/singleterms/**"
+chapter = "lead-single-terms.md"

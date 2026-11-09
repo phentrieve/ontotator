@@ -192,6 +192,14 @@ Some texts still need your decision or have no final result. Either decide them 
 
 A final result holds something a Phenopacket cannot, for example findings of one text made under two HPO releases. **Technical diagnostics** names the text. The results with receipt are not affected: choose that format to export them. See [Phenopackets](lead-results.md#phenopackets).
 
+### I do not see "Single terms", or it says the single-term review is off
+
+The single-term review is off in this project. A lead turns it on under **Settings**, tab **Workflow**, card **Single-term review**; practice projects cannot use it. A member who is not a lead also needs to be ticked under **Single-term reviewers** on **People**. See [Turn on the single-term review](lead-single-terms.md#turn-on-the-single-term-review).
+
+### I cannot accept a single-term group: "This group is blocked"
+
+The phrase overlaps another finding or holds a negation cue of its language. Use **Adjust…** to re-cut the passage so that it no longer does, or reject the group. Choosing a more general term does not lift the block. See [Blocked groups](lead-single-terms.md#blocked-groups).
+
 ### I cannot remove a lead
 
 A project needs at least one lead. Add another lead first, then remove the role. See [Change a member's roles](lead-settings.md#change-a-members-roles).

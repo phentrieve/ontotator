@@ -8,9 +8,9 @@ General, Annotation, Workflow and Ontology have a **Save changes** button at the
 | --- | --- |
 | **General** | [Name and description](#change-the-project-name-and-description), [languages of the texts](#set-the-languages-of-the-texts); for system administrators also [Delete this project](admin.md#delete-a-project-without-work) |
 | **Annotation** | [Submission rules](#set-the-submission-rules), [prefilled values](#set-prefilled-values-for-new-findings), [values annotators can choose](#limit-the-values-annotators-can-choose) |
-| **Workflow** | [Plan for new imports](#choose-the-plan-for-new-imports), [texts with tool proposals](#choose-how-texts-with-tool-proposals-are-annotated), [annotators per text and consolidation rules](#set-annotators-per-text-and-the-consolidation-rules), [working time](#record-working-time) |
+| **Workflow** | [Plan for new imports](#choose-the-plan-for-new-imports), [texts with tool proposals](#choose-how-texts-with-tool-proposals-are-annotated), [annotators per text and consolidation rules](#set-annotators-per-text-and-the-consolidation-rules), [working time](#record-working-time), [single-term review](#turn-on-the-single-term-review) |
 | **Guidelines** | [Publish](#publish-the-first-or-a-new-guideline-version), [see who read them](#see-who-has-read-the-guidelines), [republish](#republish-an-earlier-guideline-version), [withdraw](#withdraw-a-guideline-version) |
-| **People** | [Add](#add-a-member), [change roles](#change-a-members-roles), [remove](#remove-a-member) |
+| **People** | [Add](#add-a-member), [change roles](#change-a-members-roles), [remove](#remove-a-member), [single-term reviewers](lead-single-terms.md#choose-the-single-term-reviewers) |
 | **Ontology** | [Ontology version and annotation scheme](#choose-the-ontology-version-branches-and-annotation-scheme), [task profile](#task-profiles) and [replacing it](#replace-the-task-profile), [move to a newer release](#move-a-started-project-to-a-newer-release), [translations](#see-which-translations-the-project-uses) and [the newest translations](#use-the-newest-translations) |
 
 ## Open project settings
@@ -265,6 +265,17 @@ What for: measure how long annotation and translation review take, for example f
 From the next opened task, annotation and translation review tasks show the person working a timer of their own active time. It pauses after 3 minutes without input (those 3 minutes still count, as reading time), while the tab is in the background and when the person pauses it ([Working time](annotator.md#working-time)). Everyone is told on their first task in the project. Consolidations are not timed.
 
 You see sums only: **Progress** › **Working time** ([Watch progress](lead-documents.md#watch-progress)). The single work periods, under pseudonyms, are in the **Working time** research export ([Export research data](lead-results.md#export-research-data)). Switching the setting off stops recording; times already recorded stay. Like every settings change, the change is kept in the project's history.
+
+## Turn on the single-term review
+
+What for: check after the final results whether each annotated phrase maps to its term on its own, and export the accepted phrases.
+
+1. Open **Settings**, tab **Workflow**, card **Single-term review**.
+2. Tick **Review single terms of the final results**. It is off by default and not offered in practice projects.
+3. Enter the negation cues of each language, one per line.
+4. Click **Save changes** of this card; it saves separately from the rest of the tab.
+
+The sidebar then shows **Single terms**. Choose the reviewers under **People**, card **Single-term reviewers**. The whole review is described in [Lead: single-term review](lead-single-terms.md).
 
 ## Add a member
 

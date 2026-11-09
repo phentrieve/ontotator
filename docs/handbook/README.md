@@ -9,7 +9,7 @@ This handbook explains how to work with Ontotator in the browser. It is for ever
 | New to Ontotator, any role | [Getting started](getting-started.md) | the chapter for your role |
 | Annotator or translation reviewer | [Your first task, start to finish](first-task.md) | [Annotator reference](annotator.md) |
 | Consolidator | [Typical consolidation, start to finish](consolidator.md#typical-consolidation-start-to-finish) | [Consolidator chapter](consolidator.md) |
-| Project lead | [Lead overview and typical project](lead.md) | [Settings](lead-settings.md), [Documents](lead-documents.md), [Results and export](lead-results.md), [Change course](lead-change-course.md) |
+| Project lead | [Lead overview and typical project](lead.md) | [Settings](lead-settings.md), [Documents](lead-documents.md), [Results and export](lead-results.md), [Change course](lead-change-course.md), [Single-term review](lead-single-terms.md) |
 | System administrator | [Administration](admin.md) | |
 
 Stuck? See the [frequently asked questions](faq.md).
@@ -37,6 +37,7 @@ You can have more than one role. Roles other than system administrator apply to 
 | **Annotator** | Mark findings in the texts assigned to you, check tool proposals, submit your work. Annotators also do translation reviews. | [Annotator reference](annotator.md) |
 | **Translation reviewer** | Not a separate role you can be given: any annotator can get a translation review task. The header shows this name while you work on one. | [Review a translation](annotator.md#review-a-translation) |
 | **Consolidator** | Merge the differing submissions on one text into one result. | [Consolidator chapter](consolidator.md) |
+| **Single-term reviewer** | Not a role: a lead lets a member review single terms in projects that use the single-term review. Judge annotated phrases alone, then in context. | [Review a batch](lead-single-terms.md#review-a-batch) |
 | **Lead** | Set up the project, upload texts, plan and assign work, publish guidelines, accept results, export. | [Lead overview](lead.md) |
 | **System administrator** | Create user accounts, upload ontology releases, create projects, handle technical reports. | [Administration](admin.md) |
 
@@ -87,6 +88,7 @@ Words you meet in the app, in alphabetical order. The handbook uses one word per
 | Pseudonym | Your stable ID, for example `ann-0004`. Exports show it instead of your name. |
 | Reopened | A submission the lead opened again for changes. Your task shows **Reopened** with the lead's reason. |
 | Round | One pass of work on a task. A task can have several rounds, for example after you continue from your submission or after the text changed. |
+| Single-term review | An optional check after the final results: does each annotated phrase, read alone, map to its term? Its reviewers decide *groups*, the places where the same phrase has the same term. See [Single-term review](lead-single-terms.md). |
 | Spanless finding | A finding that points to no text passage. The project decides whether this is allowed and whether it needs a reason. |
 | Submission | The fixed result of a task or round. To change it, a new round starts. |
 | Task | Your piece of work on one text: Annotation, Translation review or Consolidation. |
@@ -106,7 +108,7 @@ Words you meet in the app, in alphabetical order. The handbook uses one word per
 2. [Your first task, start to finish](first-task.md): one annotation task from login to submission.
 3. [Annotator reference](annotator.md): the editor, findings, values, tool proposals, carried findings, submitting, problem reports, translation review.
 4. [Consolidator chapter](consolidator.md): how to decide, the groups, finishing a consolidation.
-5. [Lead overview](lead.md): the typical project, with [Settings](lead-settings.md), [Documents](lead-documents.md), [Results and export](lead-results.md) and [Change course in a running project](lead-change-course.md): another translation, annotating again, fewer texts.
+5. [Lead overview](lead.md): the typical project, with [Settings](lead-settings.md), [Documents](lead-documents.md), [Results and export](lead-results.md) and [Change course in a running project](lead-change-course.md): another translation, annotating again, fewer texts. The optional [single-term review](lead-single-terms.md) checks annotated phrases alone.
 6. [Administration](admin.md): user accounts, ontology releases, projects.
 7. [FAQ](faq.md): typical problems and what to do.
 

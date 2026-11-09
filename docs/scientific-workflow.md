@@ -95,6 +95,10 @@ available as `ontotator admin export`, `export-edit-log` and
   command and the submission it went into. No user or session ids.
 - **Translation reviews**: see the
   [translation review export guide](translation-review-export.md).
+- **Single-term cases** (ZIP, format `ontotator-final-single-terms/v1`):
+  the phrases a single-term review accepted, each with its HPO term and its
+  occurrences in the final results; see
+  [Single-term review](#single-term-review).
 
 People appear as pseudonyms in every export.
 
@@ -436,3 +440,169 @@ temporality of each finding stays in `selected-results.ontospan.zip`.
 
 On the command line, `ontotator admin export PROJECT OUT.zip --format phenopacket` exports the
 Phenopackets of the project's newest final-result snapshot.
+
+## Single-term review
+
+A single-term review asks, after the final results are accepted, whether
+each annotated phrase maps to its HPO term on its own, without its sentence.
+Its output is a set of phrase-term cases, for example for testing how a
+tool maps short phrases. It is optional (Settings › Workflow, off by
+default, not available in practice projects) and runs outside annotation
+and consolidation: it never changes a submission or a final result. The
+handbook chapter [Lead: single-term review](handbook/lead-single-terms.md)
+describes the screens.
+
+### Candidates and groups
+
+A lead freezes the current final results as a *review basis* (a final-result
+snapshot, made with the same code as the final export). The candidates are
+derived from the selected results of that snapshot with the conversion of
+the final export, so they are exactly the findings of
+`selected-results.ontospan.zip`. Each mention of a finding is one
+*occurrence*. The rules, in the order they apply:
+
+| Rule | Result |
+|---|---|
+| Not an HPO phenotype layer | excluded `other_layer` |
+| Assertion other than present | excluded `not_present` |
+| Experiencer other than the patient | excluded `not_patient` |
+| Left unresolved in consolidation | excluded `unresolved` |
+| Finding without a mention (document level) | excluded `no_span` |
+| Mention of more than one segment | excluded `discontinuous` |
+| Another finding of the same result has a mention with exactly this span | excluded `shared_span` |
+| Term obsolete or unknown in the result's release | excluded `obsolete_term` |
+| Span overlaps or contains a segment of another finding (any assertion) | blocked `contains_other_finding` |
+| Span contains a negation cue of its language (whole word, any case) | blocked `negation_in_span` |
+| A modifier segment overlaps the span | flag `modifier_in_span` |
+| Term not under *Phenotypic abnormality* (HP:0000118) | flag `outside_phenotypic_abnormality` |
+
+"Another finding" is another finding of an HPO phenotype layer of the same
+result; uncertain proposal-check targets are not findings. Temporality is
+not a rule. A rule for non-verbalised measurements is not applied: neither
+the task profile nor a finding marks a measurement. Negation cues are set
+per language by the lead; an empty list blocks nothing.
+
+Occurrences form a group by `(language, phrase, term)`. The phrase is the
+covered text without soft hyphens, with runs of whitespace collapsed to one
+space, in Unicode NFC and lower case (Python `str.lower`, so "ß" stays "ß").
+The group ID is the SHA-256 of `ontotator-single-term-group/v1` and the
+canonical JSON of the key, so the same phrase and term keep the same ID
+across bases. A group shows its most frequent surface form (ties:
+lexicographic) and keeps every surface form with its count. Groups of the
+same language and phrase with different terms are in a *phrase conflict*.
+
+### Review and decisions
+
+A lead gives groups to reviewers in batches. Reviewers are members the lead
+grants the single-term reviewer capability, or leads. A batch freezes the
+group IDs it holds when it is created. The optional blind second review
+draws, per language, a share of the batch (20 % by default, at least 50
+groups or all if fewer), chosen by the group IDs' hash, so the sample is
+repeatable; it goes to a different reviewer, who does not see the first
+decision. If a reviewer annotated or consolidated any text of a group, their
+decision on it records `reviewer_independent=false`.
+
+For each group, the reviewer records a phrase-only judgment (`would_accept`
+or `would_reject`) to the question "Would a clinician map this phrase alone,
+without its sentence, to this term?" before any context is shown. Then they
+read up to five occurrences (more on request) with 200 code points of text
+on either side, and decide:
+
+- `accept`: the phrase as annotated with the annotated term;
+- `adjust_span`: a verbatim re-cut of one occurrence. The new span must
+  overlap the annotated one, overlap no other finding and contain no
+  negation cue;
+- `adjust_term`: a more general term, which must be an active ancestor of
+  the annotated term in the release of every occurrence;
+- `reject` with a reason: `needs_context`, `ambiguous_abbreviation`,
+  `too_general`, `term_wrong_out_of_context`, `contains_other_finding`,
+  `negation_in_span`, `conflict` (only for groups in a phrase conflict) or
+  `other`;
+- `withdrawn`: takes back the decision and opens the group again.
+
+One adjustment per decision; no free-text rewrite. A blocked group accepts
+only `adjust_span` or `reject`. In a phrase conflict at most one group can be
+accepted; the others are rejected with `conflict`, or all are rejected. The
+newest decision per group and role counts. Decisions count as soon as they
+are recorded; those of an abandoned batch no longer count. Reviewers never see
+annotator or consolidator pseudonyms, tool proposals or working time, and
+decisions record no working time. A term that is wrong in its context is a
+final-result error, corrected through a problem report on the text, not a
+single-term decision.
+
+Second-review agreement compares the newest primary and second decision of
+each group reviewed twice, with `accept`, `adjust_span` and `adjust_term`
+counted as acceptance and `reject` as rejection: the percentage of agreeing
+pairs and Cohen's kappa (`null` when chance agreement is certain).
+
+### Repeatability
+
+When the lead refreshes the basis, decisions carry over by group ID. A
+decision stays valid while its group exists and its term, and an adjusted
+term, is present and not obsolete in the release of every occurrence.
+Otherwise the group is *stale* and opens again. It is stale too when an
+accepted group has become blocked, when the re-cut occurrence of an
+`adjust_span` is gone, or when an adjusted term is no longer an ancestor.
+An occurrence that is new in a decided group inherits the decision and is
+marked `seen_by_reviewer=false`. A group is `open`, `blocked` (open, but not
+acceptable as it is), `decided` or `stale`. A new basis opens only new and
+stale groups.
+
+Bases, batches and decisions are append-only (the database refuses updates
+and deletions); only the batch state (open, submitted, abandoned) changes.
+Each basis stores the SHA-256 of its derivation, and a recomputation with a
+different digest is refused. Every step is in the project audit.
+
+### Files of the single-term export
+
+The single-term export (Export › Final results › Format › *Single-term cases
+(reviewed phrases)*, or `ontotator admin export PROJECT OUT.zip --format
+single-term` for the newest final export made while the review was on;
+format `ontotator-final-single-terms/v1`) freezes a final-result snapshot like
+the final export and adds to it the decisions in force at the request (their
+IDs, SHA-256 and the negation cues). A decision recorded later is not in the
+file; the same snapshot always gives the same bytes. The candidates are
+derived from the snapshot again and the newest frozen primary decision of
+each group applies.
+
+| File | Content |
+|---|---|
+| `README.txt` | Plain-language guide to the archive, with the snapshot, the number of decisions and their SHA-256. |
+| `cases.jsonl` | One case per line: a phrase that alone maps to an HPO term, with its occurrences and the review. |
+| `report.json` | Counts: exclusions per rule and language, blocked and conflict groups, groups per state, decisions per kind and reject reason, second-review agreement and the yield per language. |
+| `selected-results.ontospan.zip` | The selected final results as an Ontospan bundle, byte for byte the same file as in the final export of the same snapshot; every `annotation_ref` points into it. |
+| `source-texts.jsonl` | The exact text versions, one per line, as in the final export. |
+| `receipt.json` | Format, snapshot ID and SHA-256, the frozen decision IDs and their SHA-256, the negation cues, selections, omissions, texts taken out of the work plan and the SHA-256 of every other file. |
+
+Only groups whose decision is `accept`, `adjust_span` or `adjust_term` become
+cases; open, blocked, stale and rejected groups are only counted. `accept`
+and `adjust_term` write every occurrence of the group; `adjust_span` writes
+only the re-cut occurrence, with its new span, since the others were not
+judged in that cut. Cases with the same language, normalised text and final
+term merge into one. A case of `cases.jsonl` holds:
+
+- `case_id`: SHA-256 of `ontotator-single-term-case/v1` and the canonical
+  JSON of `(language, normalised text, HPO ID)`;
+- `language`, `text` (the most frequent surface form), `surface_variants`
+  (each form with its count);
+- `text_origin`: `verbatim`, or `span_adjusted` when every occurrence comes
+  from a re-cut; `hpo_id`, `term_label` and `hpo_origin`: `annotated`, or
+  `generalised` when every occurrence carries a more general term;
+- `flags`: `modifier_in_span`, `outside_phenotypic_abnormality`;
+- `occurrences`: per occurrence `document_id`, `source_text_sha256`,
+  `text_version`, `source_text_line`, `start` and `end` (Unicode code points
+  into the text of that line of `source-texts.jsonl`), the written `text`
+  and the annotated span and term, `annotation_ref`
+  (`urn:ontospan:selected-<snapshot ID>:<set ID>:<annotation ID>`, as in the
+  Phenopackets), `axes`, `modifiers`, `ontology_release`, `ontology_digest`,
+  the `decision_id` it came from and `seen_by_reviewer`;
+- `review`: `decision_id`, `group_id`, `phrase_only`, `decision`, `reason`,
+  `original_text`, `original_term`, `reviewer` (`ontotator:<pseudonym>`),
+  `reviewer_independent`, `guideline_version`, `guideline_sha256` and
+  `decided_at` (UTC, to the second), with `second_review` (the second
+  decision and whether it agrees) for a sampled group; `merged_reviews`
+  lists the reviews of further groups merged into the case.
+
+A generalised term that is active but no ancestor of the annotated term in
+the release of one occurrence fails the job with `SINGLE_TERM_MIXED_RELEASE`;
+one absent or obsolete in a release makes the group stale.

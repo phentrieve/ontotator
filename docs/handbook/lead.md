@@ -4,7 +4,7 @@ This chapter is for project leads. A lead sets up the project, uploads texts, pl
 
 As a lead you see an extra group in the sidebar with the name of the current project: **Documents**, **Progress**, **Settings** and **Export**. System administrators see the same pages for every project ([Open and manage any project](admin.md#open-and-manage-any-project)). How annotators and consolidators do their tasks is in the [annotator reference](annotator.md) and the [consolidator chapter](consolidator.md).
 
-The lead's tasks are in four chapters:
+The lead's tasks are in five chapters:
 
 | Chapter | Screen | What is in it |
 | --- | --- | --- |
@@ -12,6 +12,7 @@ The lead's tasks are in four chapters:
 | [Lead: texts, work plans and progress](lead-documents.md) | **Documents**, **Progress** | Upload, the Documents table, the text card, work plans, assigning, progress |
 | [Lead: results, decisions and export](lead-results.md) | **Documents** (Finalization), **Export** | Accept results, consolidations, translation and text-change decisions, problem reports, export |
 | [Lead: change course in a running project](lead-change-course.md) | **Documents**, **Settings** | Use another translation, annotate texts again, narrow the scope, the command line |
+| [Lead: single-term review](lead-single-terms.md) | **Single terms**, **Export** | Optional: review annotated phrases alone, batches for reviewers, export the accepted phrases |
 
 ## Typical project, start to finish
 
@@ -25,5 +26,6 @@ The lead's tasks are in four chapters:
 8. Accept one result per text, or start a consolidation when annotators disagree: [Accept a result or compare results](lead-results.md#accept-a-result-or-compare-results), [Start a consolidation](lead-results.md#start-a-consolidation).
 9. Read the consolidators' notes and flags, and improve the guidelines where they were unclear: [Accept a consolidation](lead-results.md#accept-a-consolidation).
 10. Export the final results: [Export final results](lead-results.md#export-final-results).
+11. Optional: review the annotated phrases alone and export them as single-term cases: [Lead: single-term review](lead-single-terms.md).
 
 Try it with the demo project: the [demo project guide](../../examples/demo-project/README.md) walks through every step with invented clinical letters, tool proposals, translations and guidelines.
