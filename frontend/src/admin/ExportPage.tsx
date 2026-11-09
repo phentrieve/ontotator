@@ -16,6 +16,8 @@ export interface ExportPageProps {
   /** Texts in the project; 0 shows "Nothing to export yet" instead of the exports (#46). */
   documentCount?: number;
   onNavigate?: (route: Route) => void;
+  /** Leads and system admins see the export history; others would only be refused by the server. */
+  showHistory?: boolean;
 }
 const jsonl = "JSONL, one record per line";
 const definitions = [
@@ -38,16 +40,16 @@ function readRemembered(key: string): { id: number | null; storageError: boolean
 }
 
 const record = (value: unknown): Record<string, unknown> | undefined => typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
-export function ExportPage({ projectKey, currentUser, documentCount, onNavigate }: ExportPageProps): JSX.Element {
+export function ExportPage({ projectKey, currentUser, documentCount, onNavigate, showHistory = true }: ExportPageProps): JSX.Element {
   // shortcut: the count comes from the project list loaded with the session, so texts uploaded since then show only after a reload.
   if (documentCount === 0) return <section><h1>Export</h1><EmptyState title="Nothing to export yet" action={
     <RouteLink route={{ name: "projectDocuments", key: projectKey }} className="btn btn-secondary" onNavigate={onNavigate}>Go to Documents</RouteLink>
   }>Exports become available once the project has texts and submitted results.</EmptyState></section>;
-  return <ExportSections projectKey={projectKey} currentUser={currentUser} />;
+  return <ExportSections projectKey={projectKey} currentUser={currentUser} showHistory={showHistory} />;
 }
 
-function ExportSections({ projectKey, currentUser }: { projectKey: string; currentUser: CurrentUser }): JSX.Element {
-  // A research export that starts or ends reloads the history; a final export shows there after Refresh history.
+function ExportSections({ projectKey, currentUser, showHistory }: { projectKey: string; currentUser: CurrentUser; showHistory: boolean }): JSX.Element {
+  // A research export that starts or ends reloads an open history; a final export shows there after Refresh history.
   const [historyRevision, setHistoryRevision] = useState(0);
   const changed = useCallback(() => setHistoryRevision(value => value + 1), []);
   return <section className="export-page"><h1>Export</h1><FinalExportPanel projectKey={projectKey} username={currentUser.username} />
@@ -65,7 +67,7 @@ function ExportSections({ projectKey, currentUser }: { projectKey: string; curre
         <p className="cell-secondary">Unresolved proposals are included with a reviewer flag and note; clinical values are unchanged. Files with reviewer flags cannot be imported back as proposals.</p>
       </details>
     </section>
-    <ExportHistory projectKey={projectKey} revision={historyRevision} />
+    {showHistory && <ExportHistory projectKey={projectKey} revision={historyRevision} />}
   </section>;
 }
 

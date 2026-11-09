@@ -743,7 +743,11 @@ a.shell-product { color: inherit; text-decoration: none; }
 .final-export-table td[colspan] { text-align: left; }
 .export-row-status { margin: var(--space-1) 0 0; color: var(--text-muted); font-size: var(--size-sm); line-height: var(--leading-sm); }
 .export-row-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: flex-end; }
+/* A disclosure like "Details and limits": the summary reads the same; the open list keeps the table's size. */
+.export-history-details > summary { font-size: var(--size-sm); }
+.export-history-details[open] { display: grid; gap: var(--space-3); }
 .export-history-head { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); align-items: baseline; justify-content: space-between; }
+.export-history-head > p { margin: 0; }
 .export-history-table td { vertical-align: top; }
 .export-history-table td:last-child { vertical-align: middle; }
 

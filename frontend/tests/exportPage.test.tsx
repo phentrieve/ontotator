@@ -264,12 +264,20 @@ it("asks for the format before the tick box and describes only the chosen format
   expect(finals().getByText(/^One Phenopacket per text/)).toBeTruthy();
   expect(finals().queryByText(/^A ZIP with one result file per text/)).toBeNull();
 });
-it("lists the export history below and reloads it when a research export starts and ends", async () => {
+it("lists the export history below once opened and reloads it when a research export starts and ends", async () => {
   render(<ExportPage projectKey="p" currentUser={user} />);
-  await screen.findByRole("region", { name: "Export history" });
+  const history = within(await screen.findByRole("region", { name: "Export history" }));
+  expect(api.listProjectJobs).not.toHaveBeenCalled();
+  fireEvent.click(history.getByText("Export history", { selector: "summary" }));
+  await history.findByText("No exports yet.");
   expect(api.listProjectJobs).toHaveBeenCalledTimes(1);
   fireEvent.click(card().getByRole("button", { name: "Create" }));
   await card().findByRole("button", { name: "Download" });
   await waitFor(() => expect(vi.mocked(api.listProjectJobs).mock.calls.length).toBeGreaterThanOrEqual(2));
   expect(vi.mocked(api.listProjectJobs).mock.calls.every(([key, filters]) => key === "p" && filters?.offset === 0)).toBe(true);
+});
+it("leaves the export history out for people who may not list the jobs", () => {
+  render(<ExportPage projectKey="p" currentUser={user} showHistory={false} />);
+  expect(screen.queryByRole("region", { name: "Export history" })).toBeNull();
+  expect(api.listProjectJobs).not.toHaveBeenCalled();
 });

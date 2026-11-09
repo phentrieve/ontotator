@@ -372,6 +372,8 @@ test.describe("Administration through real accounts and jobs", () => {
     for (const line of lines) expect(typeof JSON.parse(line)).toBe("object");
     // Both exports are in the history, newest first, made by the lead (#355).
     const history = page.getByRole("region", { name: "Export history", exact: true });
+    // A disclosure, closed at first: the list loads when it opens.
+    await history.locator("summary").click();
     const rows = history.getByRole("row", { name: /^(Edit log|Annotation results) \d+$/ });
     await expect(rows).toHaveCount(2);
     await expect(rows.first()).toHaveAccessibleName(/^Edit log \d+$/);
