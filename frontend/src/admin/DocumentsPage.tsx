@@ -482,10 +482,26 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
     void api.documentRowKeys(projectKey, { case_ids: [...caseIds] }).then(result => selectTexts(result.keys.map(textKeyOf)),
       (failure: unknown) => setSelectionError(failure));
   };
+  // "Show texts not in plan" (All tab only; off by default, remembered per user in this browser).
+  const notInPlanKey = `ontotator.documents.showNotInPlan.v1:${currentUser?.username ?? ""}`;
+  const [showNotInPlan, setShowNotInPlan] = useState(() => { try { return window.localStorage.getItem(notInPlanKey) === "1"; } catch { return false; } });
+  const changeShowNotInPlan = (value: boolean) => {
+    setShowNotInPlan(value);
+    try { window.localStorage.setItem(notInPlanKey, value ? "1" : "0"); } catch { /* Blocked storage: not remembered. */ }
+  };
+  const notInPlanShown = showSelected || (showNotInPlan && activeTab(query) === "all");
+  // Texts outside the plan in the current filters: the plan facet's "not in plan" minus the undecided rows it also counts.
+  const planFacet = page?.bar.facets?.plan;
+  const notInPlanCount = Math.max(0, (planFacet?.not_in_plan ?? 0) - (planFacet?.not_decided ?? 0));
+  // The wide table of All leaves them out while the switch is off: the count says "246 of 307" (issue 198).
+  const hiddenNotInPlanCount = !narrow && activeTab(query) === "all" && !notInPlanShown ? Math.min(notInPlanCount, page?.bar.shown ?? 0) : 0;
   // Header checkbox: every text matching the current filters, across pages (server list, at most 2000 cases).
   const filteredCases = page?.group_count ?? 0;
-  const filteredTexts = page?.text_count ?? 0;
-  const allSelected = allFiltered !== null && allFiltered.identity === filterIdentity && allFiltered.keys.length > 0 && allFiltered.keys.every(key => selection.keys.has(key));
+  // Texts the table hides (not in plan) are not selected either: the label counts what the lead sees ("118 of 120").
+  const filteredTexts = (page?.text_count ?? 0) - hiddenNotInPlanCount;
+  const activeOnly = hiddenNotInPlanCount > 0;
+  const selectIdentity = `${filterIdentity}${activeOnly ? ":active" : ""}`;
+  const allSelected = allFiltered !== null && allFiltered.identity === selectIdentity && allFiltered.keys.length > 0 && allFiltered.keys.every(key => selection.keys.has(key));
   const selectAllLabel = filteredCases > MAX_SELECTION
     ? `Select the texts of the first ${MAX_SELECTION} of ${filteredCases} filtered cases`
     : filteredTexts === 1 ? "Select the only filtered text" : `Select all ${filteredTexts} filtered texts`;
@@ -495,12 +511,12 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
     if (showSelected || allSelected || !filteredTexts || selection.keys.size < filteredTexts) return;
     let active = true;
     const { page: _page, sort, retain: _retain, ...rowFilters } = request;
-    api.documentRowKeys(projectKey, { filters: rowFilters, sort: sort ?? "case" }).then(result => {
-      if (active) setAllFiltered({ identity: filterIdentity, keys: result.keys.map(textKeyOf) });
+    api.documentRowKeys(projectKey, { filters: rowFilters, active_only: activeOnly, sort: sort ?? "case" }).then(result => {
+      if (active) setAllFiltered({ identity: selectIdentity, keys: result.keys.map(textKeyOf) });
     }, () => { /* The header stays mixed; a click on it reports the failure. */ });
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- filterIdentity stands for request and projectKey
-  }, [selection.keys, filterIdentity, filteredTexts, showSelected]);
+  }, [selection.keys, selectIdentity, filteredTexts, showSelected]);
   const toggleAll = async () => {
     if (selectingAll) return;
     setSelectionError(undefined);
@@ -509,11 +525,11 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
       selection.remove(allFiltered.keys); setAllFiltered(null); setLimitNote(null);
       return;
     }
-    const identity = filterIdentity;
+    const identity = selectIdentity;
     const { page: _page, sort, retain: _retain, ...rowFilters } = request;
     setSelectingAll(true);
     try {
-      const result = await api.documentRowKeys(projectKey, { filters: rowFilters, sort: sort ?? "case" });
+      const result = await api.documentRowKeys(projectKey, { filters: rowFilters, active_only: activeOnly, sort: sort ?? "case" });
       const keys = result.keys.map(textKeyOf);
       announceSelection.current = true;
       const added = selection.add(keys);
@@ -734,19 +750,6 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
   const closeCorrection = () => { setCorrectionFor(null); reloadAfterAction(); };
 
   const [planFor, setPlanFor] = useState<DocumentRowView | null>(null);
-  // "Show texts not in plan" (All tab only; off by default, remembered per user in this browser).
-  const notInPlanKey = `ontotator.documents.showNotInPlan.v1:${currentUser?.username ?? ""}`;
-  const [showNotInPlan, setShowNotInPlan] = useState(() => { try { return window.localStorage.getItem(notInPlanKey) === "1"; } catch { return false; } });
-  const changeShowNotInPlan = (value: boolean) => {
-    setShowNotInPlan(value);
-    try { window.localStorage.setItem(notInPlanKey, value ? "1" : "0"); } catch { /* Blocked storage: not remembered. */ }
-  };
-  const notInPlanShown = showSelected || (showNotInPlan && activeTab(query) === "all");
-  // Texts outside the plan in the current filters: the plan facet's "not in plan" minus the undecided rows it also counts.
-  const planFacet = page?.bar.facets?.plan;
-  const notInPlanCount = Math.max(0, (planFacet?.not_in_plan ?? 0) - (planFacet?.not_decided ?? 0));
-  // The wide table of All leaves them out while the switch is off: the count says "246 of 307" (issue 198).
-  const hiddenNotInPlanCount = !narrow && activeTab(query) === "all" && !notInPlanShown ? Math.min(notInPlanCount, page?.bar.shown ?? 0) : 0;
   // A status-column sort of the loaded page (the server sorts by Text and Last activity only).
   const [columnSort, setColumnSort] = useState<ColumnSort | null>(null);
   const shownRows = useMemo(() => page ? tableRows(page, notInPlanShown, columnSort) : [], [page, notInPlanShown, columnSort]);
