@@ -32,7 +32,7 @@ export function taskCrumbLabel(task: TaskTextFields): string {
 const ROUTE_PAGES: Readonly<Record<Exclude<Route["name"], "task" | "projectCase">, string>> = {
   tasks: "My tasks", me: "Profile", adminUsers: "Users", adminOntologies: "Ontologies", adminReports: "Technical reports", adminSettings: "Server settings", projectNew: "New project",
   projects: "Projects", projectSettings: "Settings", projectDocuments: "Documents", projectProgress: "Progress",
-  projectExport: "Export", projectGuidelines: "Guidelines", projectProblemReport: "Problem report",
+  projectExport: "Export", projectSingleTerms: "Single terms", projectSingleTermBatch: "Single-term review", projectGuidelines: "Guidelines", projectProblemReport: "Problem report",
   projectConsolidation: "Consolidation", help: "Handbook", notFound: "Page not found",
 };
 

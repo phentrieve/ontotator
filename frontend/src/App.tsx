@@ -22,6 +22,8 @@ import { ProjectSettingsPage } from "./admin/ProjectSettingsPage";
 import { DocumentsPage } from "./admin/DocumentsPage";
 import { ProgressPage } from "./admin/ProgressPage";
 import { ExportPage } from "./admin/ExportPage";
+import { SingleTermsPage } from "./singleterms/SingleTermsPage";
+import { ReviewScreen } from "./singleterms/ReviewScreen";
 import { ProjectsPage } from "./app/ProjectsPage";
 import { projectDestination } from "./app/ProjectPicker";
 import { ProblemReportDetail } from './tasks/ProblemReportDetail';
@@ -351,6 +353,15 @@ export function App({ user: givenUser, onLogout }: AppProps): JSX.Element {
       const exported = projects.find(project => project.project_key === route.key);
       content = <ExportPage projectKey={route.key} currentUser={user} documentCount={exported?.document_count} onNavigate={go}
         showHistory={user.is_system_admin || !!exported?.roles.includes("lead")} />; break;
+    }
+    // Single-term review (issue 381): leads and granted reviewers; the server decides who sees what.
+    case "projectSingleTerms": case "projectSingleTermBatch": {
+      const reviewed = projects.find(project => project.project_key === route.key);
+      content = projectContext?.identity !== projectIdentity ? accessLoading
+        : !reviewed ? <NotFound title="Project not found or no access" reason="It does not exist or you are not a member." onNavigate={go} />
+        : route.name === "projectSingleTerms" ? <SingleTermsPage projectKey={route.key} canManage={reviewed.can_manage} onNavigate={go} />
+        : <ReviewScreen projectKey={route.key} batchId={route.batchId} group={route.group} username={user.username} canManage={reviewed.can_manage} onNavigate={go} />;
+      break;
     }
     case "projectGuidelines": content = <GuidelinesPage projectKey={route.key} version={route.version}
       canManage={!!projects.find(project => project.project_key === route.key)?.can_manage} onNavigate={go} />; break;

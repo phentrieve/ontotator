@@ -136,6 +136,10 @@ export type Route =
   | { name: "projectCase"; key: string; caseId: string; variant?: string; annotations?: string; compare?: string; show?: string; compare_show?: string; documents?: ProjectDocumentsQuery }
   | { name: "projectProgress"; key: string }
   | { name: "projectExport"; key: string }
+  /** Single-term review (issue 381): the lead's overview, or a reviewer's list of their batches. */
+  | { name: "projectSingleTerms"; key: string }
+  /** One single-term batch: its review screen; `group` opens that group. */
+  | { name: "projectSingleTermBatch"; key: string; batchId: number; group?: string }
   /** Read-only guidelines page; without `version` the version in force. */
   | { name: "projectGuidelines"; key: string; version?: number }
   | { name: "projectProblemReport"; key: string; reportId: string; action?: "resume"; section?: "decide"; documents?: ProjectDocumentsQuery }
@@ -235,6 +239,15 @@ export function parseRoute(hash: string): Route {
       const version = Number(guidelines[2]);
       return Number.isSafeInteger(version) ? { name: "projectGuidelines", key, version } : notFound;
     }
+    const singleTerms = /^#\/projects\/([^/]+)\/single-terms(?:\/batches\/([1-9]\d*))?$/.exec(path);
+    if (singleTerms) {
+      const key = decodeURIComponent(singleTerms[1]);
+      if (singleTerms[2] === undefined) return { name: "projectSingleTerms", key };
+      const batchId = Number(singleTerms[2]);
+      if (!Number.isSafeInteger(batchId)) return notFound;
+      const group = params.get("group");
+      return { name: "projectSingleTermBatch", key, batchId, ...(group ? { group } : {}) };
+    }
     const project = /^#\/projects\/([^/]+)\/(documents|progress|export)$/.exec(path);
     if (!project) return notFound;
     const key = decodeURIComponent(project[1]);
@@ -283,6 +296,8 @@ export function routeHref(route: Route): string {
     ])}`;
     case "projectProgress": return `#/projects/${encodeURIComponent(route.key)}/progress`;
     case "projectExport": return `#/projects/${encodeURIComponent(route.key)}/export`;
+    case "projectSingleTerms": return `#/projects/${encodeURIComponent(route.key)}/single-terms`;
+    case "projectSingleTermBatch": return `#/projects/${encodeURIComponent(route.key)}/single-terms/batches/${route.batchId}${querySuffix([["group", route.group]])}`;
     case "projectGuidelines": return `#/projects/${encodeURIComponent(route.key)}/guidelines${route.version === undefined ? "" : `/v${route.version}`}`;
     case "projectProblemReport": return `#/projects/${encodeURIComponent(route.key)}/problem-reports/${encodeURIComponent(route.reportId)}${querySuffix([
       ["action", route.action], ["section", route.section], ...documentsEntries(route.documents, "documents_"),

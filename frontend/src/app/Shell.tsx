@@ -10,6 +10,7 @@ import { TASKS_CHANGED } from "../tasks/tasksEvents";
 import { TechnicalReportHost } from "../reports/TechnicalReportDialog";
 import { TECHNICAL_REPORTS_CHANGED } from "../reports/TechnicalReportsPage";
 import { openTechnicalReport, REPORT_ENTRY_LABEL, REPORT_NAV_LABEL } from "../reports/technicalReport";
+import { useSingleTermAccess } from "../singleterms/useSingleTermAccess";
 
 export interface ShellProps {
   user: CurrentUser;
@@ -128,6 +129,8 @@ export function Shell({ user, projects, route, onNavigate, onLogout, breadcrumb,
   const openReports = useOpenReportCount(user.is_system_admin, navigation);
   // "Documents (n)": rows needing the lead's decision (V3); the summary is lead only.
   const needsDecision = useDocumentsSummary(current?.project_key, !!current?.can_manage && current.roles.includes("lead"));
+  // "Single terms" (issue 381): while the project's setting is on, for leads and granted reviewers.
+  const singleTerms = useSingleTermAccess(current?.project_key);
   const switcher = projects.length > 0 && <ProjectSwitcher projects={projects} current={current} route={route}
     onNavigate={onNavigate} onChoose={key => setChoice({ username: user.username, key })} />;
   const link = (destination: Route, text: string, label?: string) => <li key={destination.name}>
@@ -143,6 +146,7 @@ export function Shell({ user, projects, route, onNavigate, onLogout, breadcrumb,
       {/* "All" explicitly, so a reload of My tasks never triggers the last-used landing. */}
       {link(MY_TASKS, openTasks === null ? "My tasks" : `My tasks (${openTasks})`)}
       {projects.length > 0 && link({ name: "projects" }, "Projects")}
+      {current && !current.can_manage && singleTerms && link({ name: "projectSingleTerms", key: current.project_key }, "Single terms")}
       {link({ name: "me" }, "Profile")}
       <li><button type="button" className="shell-nav-link" aria-label={REPORT_ENTRY_LABEL} onClick={openTechnicalReport}>{REPORT_NAV_LABEL}</button></li>
     </ul>
@@ -163,6 +167,7 @@ export function Shell({ user, projects, route, onNavigate, onLogout, breadcrumb,
         <ul className="shell-nav-list">
           {documentsLink(current.project_key)}
           {link({ name: "projectProgress", key: current.project_key }, "Progress")}
+          {singleTerms && link({ name: "projectSingleTerms", key: current.project_key }, "Single terms")}
           {link({ name: "projectSettings", key: current.project_key }, "Settings")}
           {link({ name: "projectExport", key: current.project_key }, "Export")}
         </ul>

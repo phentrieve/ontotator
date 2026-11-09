@@ -315,6 +315,18 @@ export type CreateProjectRequest = components["schemas"]["CreateProjectRequest"]
 export type ProjectPin = components["schemas"]["ProjectPin"];
 export type RepinReport = components["schemas"]["RepinReport"];
 export type Member = components["schemas"]["Member"];
+// Single-term review (issue 381)
+export type SingleTermSummary = components["schemas"]["SingleTermSummaryView"];
+export type SingleTermBasis = components["schemas"]["SingleTermBasisView"];
+export type SingleTermGroup = components["schemas"]["SingleTermGroupView"];
+export type SingleTermContext = components["schemas"]["SingleTermContextView"];
+export type SingleTermContexts = components["schemas"]["SingleTermContextsView"];
+export type SingleTermBatch = components["schemas"]["SingleTermBatchView"];
+export type SingleTermBatchRequest = components["schemas"]["SingleTermBatchRequest"];
+export type SingleTermDecision = components["schemas"]["SingleTermDecisionView"];
+export type SingleTermDecisionRequest = components["schemas"]["SingleTermDecisionRequest"];
+export type SingleTermReviewer = components["schemas"]["SingleTermReviewerView"];
+export type SingleTermLanguageCounts = components["schemas"]["SingleTermLanguageCounts"];
 export type MemberCandidate = components["schemas"]["MemberCandidate"];
 export type OpenTasksView = components["schemas"]["OpenTasksView"];
 export type AssignmentView = components["schemas"]["AssignmentView"];
@@ -1413,6 +1425,45 @@ export class ApiClient {
     return this.request<OntologyInfo[]>(`/api/v1/projects/${encodeURIComponent(projectKey)}/ontologies`, {
       method: "GET",
     });
+  }
+
+  // Single-term review (issue 381). Groups, contexts and decisions hold clinical phrases: session only.
+  private singleTerms(key: string, path: string): string { return `/api/v1/projects/${encodeURIComponent(key)}/single-terms${path}`; }
+  async startSingleTermBasis(key: string, requestId: string): Promise<SingleTermBasis> {
+    return this.request(this.singleTerms(key, "/basis"), { method: "POST", body: JSON.stringify({ request_id: requestId }) });
+  }
+  async singleTermSummary(key: string): Promise<SingleTermSummary> { return this.request(this.singleTerms(key, "/summary"), { method: "GET" }); }
+  async listSingleTermGroups(key: string, filters: { batch?: number; language?: string; state?: SingleTermGroup["state"] } = {}): Promise<SingleTermGroup[]> {
+    const query = new URLSearchParams();
+    if (filters.language) query.set("language", filters.language);
+    if (filters.state) query.set("state", filters.state);
+    if (filters.batch !== undefined) query.set("batch", String(filters.batch));
+    return this.request(this.singleTerms(key, `/groups${query.size ? `?${query}` : ""}`), { method: "GET" });
+  }
+  async singleTermContexts(key: string, groupId: string, options: { batch?: number; limit?: number; offset?: number } = {}): Promise<SingleTermContexts> {
+    const query = new URLSearchParams();
+    if (options.batch !== undefined) query.set("batch", String(options.batch));
+    if (options.limit !== undefined) query.set("limit", String(options.limit));
+    if (options.offset) query.set("offset", String(options.offset));
+    return this.request(this.singleTerms(key, `/groups/${encodeURIComponent(groupId)}/contexts${query.size ? `?${query}` : ""}`), { method: "GET" });
+  }
+  async listSingleTermBatches(key: string): Promise<SingleTermBatch[]> { return this.request(this.singleTerms(key, "/batches"), { method: "GET" }); }
+  async getSingleTermBatch(key: string, batchId: number): Promise<SingleTermBatch> { return this.request(this.singleTerms(key, `/batches/${batchId}`), { method: "GET" }); }
+  async createSingleTermBatch(key: string, body: SingleTermBatchRequest): Promise<SingleTermBatch> {
+    return this.request(this.singleTerms(key, "/batches"), { method: "POST", body: JSON.stringify(body) });
+  }
+  async singleTermBatchAction(key: string, batchId: number, action: "submit" | "reopen" | "abandon", requestId: string): Promise<SingleTermBatch> {
+    return this.request(this.singleTerms(key, `/batches/${batchId}/${action}`), { method: "POST", body: JSON.stringify({ request_id: requestId }) });
+  }
+  async decideSingleTerm(key: string, batchId: number, body: SingleTermDecisionRequest): Promise<SingleTermDecision> {
+    return this.request(this.singleTerms(key, `/batches/${batchId}/decisions`), { method: "POST", body: JSON.stringify(body) });
+  }
+  async listSingleTermReviewers(key: string): Promise<SingleTermReviewer[]> { return this.request(this.singleTerms(key, "/reviewers"), { method: "GET" }); }
+  async grantSingleTermReviewer(key: string, username: string): Promise<SingleTermReviewer[]> {
+    return this.request(this.singleTerms(key, `/reviewers/${encodeURIComponent(username)}`), { method: "PUT" });
+  }
+  async revokeSingleTermReviewer(key: string, username: string): Promise<SingleTermReviewer[]> {
+    return this.request(this.singleTerms(key, `/reviewers/${encodeURIComponent(username)}`), { method: "DELETE" });
   }
 
 }

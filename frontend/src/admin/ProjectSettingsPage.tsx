@@ -14,6 +14,9 @@ import { draftPins, PinFields, ProfileUpload, ReleaseFields, serializePins, ANNO
 import { RepinReportPanel } from "./RepinReport";
 import { FrozenTranslationsCard } from "./FrozenTranslationsCard";
 import { axisOptionLabel } from "../editor/axisLabels";
+import { cueLanguages, SingleTermSettingsCard, singleTermDirty, singleTermOf, singleTermPatch } from "../singleterms/SingleTermSettings";
+import { notifySingleTermsChanged } from "../singleterms/useSingleTermAccess";
+import { SingleTermReviewersCard } from "../singleterms/SingleTermReviewersCard";
 export interface ProjectSettingsPageProps {
   projectKey: string;
   currentUser: CurrentUser;
@@ -49,15 +52,15 @@ export function ProjectSettingsPage(props: ProjectSettingsPageProps): JSX.Elemen
 }
 
 /** The saveable parts; Members and Guidelines save on their own. */
-type Section = "General" | "Workflow" | "Annotation" | "Pins" | "Profile";
+type Section = "General" | "Workflow" | "SingleTerm" | "Annotation" | "Pins" | "Profile";
 /** Six tabs by job and frequency (M2 M-8a, audit D1 B); People first and the default (D2 B). */
 const SECTION_LABELS: Record<SettingsSection, string> = {
   people: "People", workflow: "Workflow", annotation: "Annotation", guidelines: "Guidelines", general: "General", ontology: "Ontology",
 };
 const SECTION_PARTS: Record<SettingsSection, readonly Section[]> = {
-  people: [], workflow: ["Workflow"], annotation: ["Annotation"], guidelines: [], general: ["General"], ontology: ["Pins", "Profile"],
+  people: [], workflow: ["Workflow", "SingleTerm"], annotation: ["Annotation"], guidelines: [], general: ["General"], ontology: ["Pins", "Profile"],
 };
-const PART_LABELS: Record<Section, string> = { General: "General", Workflow: "Workflow", Annotation: "Annotation", Pins: "Ontology version", Profile: "Task profile" };
+const PART_LABELS: Record<Section, string> = { General: "General", Workflow: "Workflow", SingleTerm: "Single-term review", Annotation: "Annotation", Pins: "Ontology version", Profile: "Task profile" };
 /** A pin change waits for the lead to look at its check; not an error to show. */
 class RepinPending extends Error {}
 const settingsRoute = (key: string, section: SettingsSection): Route =>
@@ -71,6 +74,7 @@ function SettingsEditor({ initial, ontologies, projectKey, currentUser, onSaved,
   const [general, setGeneral] = useState(() => generalOf(initial));
   const [annotation, setAnnotation] = useState(() => annotationOf(initial));
   const [workflow, setWorkflow] = useState(() => workflowOf(initial));
+  const [singleTerm, setSingleTerm] = useState(() => singleTermOf(initial));
   const [pins, setPins] = useState(() => draftPins(initial.pins));
   const [repin, setRepin] = useState<{ pins: ProjectPin[]; report: RepinReport } | null>(null);
   const [uploaded, setUploaded] = useState<UploadedProfile | null>(null);
@@ -105,6 +109,7 @@ function SettingsEditor({ initial, ontologies, projectKey, currentUser, onSaved,
       if (part === "General") setGeneral(generalOf(response));
       if (part === "Annotation") setAnnotation(annotationOf(response));
       if (part === "Workflow") setWorkflow(workflowOf(response));
+      if (part === "SingleTerm") { setSingleTerm(singleTermOf(response)); notifySingleTermsChanged(); }
       if (part === "Pins") setPins(current => current === pins ? draftPins(response.pins) : current);
       if (part === "Profile") { setUploaded(null); setProfileGeneration(value => value + 1); }
       setSaved(part); onSaved?.(response);
@@ -123,6 +128,7 @@ function SettingsEditor({ initial, ontologies, projectKey, currentUser, onSaved,
     General: () => api.updateProjectSettings(projectKey, { name: general.name, description: general.description.trim() ? general.description : null, languages: general.languages }),
     Annotation: () => api.updateProjectSettings(projectKey, annotation),
     Workflow: () => api.updateProjectSettings(projectKey, { import_plan: workflow.import_plan, annotations_per_text: workflow.annotations_per_text, tool_proposal_mode: workflow.tool_proposal_mode, annotate_accepted_translations_only: workflow.annotate_accepted_translations_only, adjudicator_not_annotator: workflow.adjudicator_not_annotator, blind_consolidation: workflow.blind_consolidation, record_working_time: workflow.record_working_time }),
+    SingleTerm: () => api.updateProjectSettings(projectKey, singleTermPatch(singleTerm)),
     // The check first: a move that touches drafts, or any move once work was submitted, waits for the lead's look.
     Pins: async () => {
       const chosen = serializePins(ids, pins);
@@ -141,6 +147,7 @@ function SettingsEditor({ initial, ontologies, projectKey, currentUser, onSaved,
     General: JSON.stringify(general) !== JSON.stringify(generalOf(model)),
     Annotation: JSON.stringify(annotation) !== JSON.stringify(annotationOf(model)),
     Workflow: JSON.stringify(workflow) !== JSON.stringify(workflowOf(model)),
+    SingleTerm: singleTermDirty(singleTerm, singleTermOf(model)),
     Pins: JSON.stringify(pins) !== JSON.stringify(draftPins(model.pins)),
     Profile: !model.locked && uploaded !== null,
   };
@@ -181,6 +188,7 @@ function SettingsEditor({ initial, ontologies, projectKey, currentUser, onSaved,
       if (part === "General") setGeneral(generalOf(model));
       if (part === "Annotation") setAnnotation(annotationOf(model));
       if (part === "Workflow") setWorkflow(workflowOf(model));
+      if (part === "SingleTerm") setSingleTerm(singleTermOf(model));
       if (part === "Pins") { setPins(draftPins(model.pins)); setRepin(null); }
       if (part === "Profile") { setUploaded(null); setProfileGeneration(value => value + 1); }
     }
@@ -204,7 +212,8 @@ function SettingsEditor({ initial, ontologies, projectKey, currentUser, onSaved,
    * and a status line ("Unsaved changes." / "{part} saved.").
    */
   const saveBar = (part: Section) => <div className="settings-section-actions" role="group" aria-label={`${PART_LABELS[part]} save state`}>
-    <Button type="submit" variant="primary" disabled={!dirty[part]} loading={busy === part}>Save changes</Button>
+    {/* A second form in one section names its own Save (the single-term card under Workflow). */}
+    <Button type="submit" variant="primary" disabled={!dirty[part]} loading={busy === part} aria-label={part === "SingleTerm" ? "Save single-term review" : undefined}>Save changes</Button>
     {dirty[part] && <Button onClick={() => discard([part])}>Discard changes</Button>}
     {error?.section === part && <ErrorNotice error={error.error} />}
     {saved === part && <InlineMessage tone="success">{PART_LABELS[part]} saved.{dirty[part] ? " Newer changes remain unsaved." : ""}</InlineMessage>}
@@ -235,13 +244,20 @@ function SettingsEditor({ initial, ontologies, projectKey, currentUser, onSaved,
 
   let content: JSX.Element;
   switch (section) {
-    case "people": content = <div ref={bindSection} tabIndex={-1} className="settings-section"><MembersSection projectKey={projectKey} /><TokensSection mode={{ kind: "project", projectKey }} /></div>; break;
-    case "workflow": content = <form ref={bindSection} tabIndex={-1} className="settings-section" aria-label="Workflow" onSubmit={event => submit(event, "Workflow")}>
+    case "people": content = <div ref={bindSection} tabIndex={-1} className="settings-section"><MembersSection projectKey={projectKey} /><SingleTermReviewersCard projectKey={projectKey} /><TokensSection mode={{ kind: "project", projectKey }} /></div>; break;
+    case "workflow": content = <><form ref={bindSection} tabIndex={-1} className="settings-section" aria-label="Workflow" onSubmit={event => submit(event, "Workflow")}>
       <fieldset disabled={busy !== null}><legend className="visually-hidden">Workflow</legend>
         <WorkflowFields projectKey={projectKey} value={workflow} saved={workflowOf(model)} disabled={busy !== null} onChange={value => { setWorkflow(value); setSaved(null); }} />
         {saveBar("Workflow")}
       </fieldset>
-    </form>; break;
+    </form>
+    {/* Issue 381: its own form and Save, so the workflow fields above keep their change. */}
+    <form className="settings-section" aria-label="Single-term review" onSubmit={event => submit(event, "SingleTerm")}>
+      <fieldset disabled={busy !== null}><legend className="visually-hidden">Single-term review</legend>
+        <SingleTermSettingsCard value={singleTerm} languages={cueLanguages(model)} disabled={busy !== null} onChange={value => { setSingleTerm(value); setSaved(null); }} />
+        {saveBar("SingleTerm")}
+      </fieldset>
+    </form></>; break;
     case "annotation": content = <form ref={bindSection} tabIndex={-1} className="settings-section" aria-label="Annotation" onSubmit={event => submit(event, "Annotation")}>
       <fieldset disabled={busy !== null}><legend className="visually-hidden">Annotation</legend>
         <SettingsCard title="When submitting" hint="Applies to every submission from now on."
