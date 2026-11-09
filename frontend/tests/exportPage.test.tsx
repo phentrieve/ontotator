@@ -293,7 +293,7 @@ it("offers the single-term cases only while the project's single-term review is 
   unmount();
   vi.mocked(api.getProjectSettings).mockResolvedValue(settings(true));
   const start = vi.spyOn(api, "startFinalExport").mockResolvedValue({ job_id: 9 });
-  vi.mocked(api.getJob).mockResolvedValue(job(9, "final_single_term_export"));
+  vi.mocked(api.getJob).mockResolvedValue({ ...job(9, "final_single_term_export"), result: { cases: 3 } });
   render(<ExportPage projectKey="p" currentUser={user} />);
   const format = await finals().findByLabelText("Format");
   await waitFor(() => expect(format.querySelector('option[value="single-term"]')).toBeTruthy());
@@ -303,7 +303,8 @@ it("offers the single-term cases only while the project's single-term review is 
   await finals().findByRole("region", { name: "Export check" });
   fireEvent.click(finals().getByRole("button", { name: "Create final export" }));
   await waitFor(() => expect(start).toHaveBeenCalledWith("p", expect.objectContaining({ format: "single-term" })));
-  expect(await finals().findByText("Single-term cases ready: 1 result")).toBeTruthy();
+  // The number of cases the job wrote, not of the selected results.
+  expect(await finals().findByText("Single-term cases ready: 3 cases")).toBeTruthy();
   fireEvent.click(finals().getByRole("button", { name: "Download (ZIP)" }));
   await waitFor(() => expect(downloads.saveDownload).toHaveBeenCalledWith(expect.anything(), "p-final-single-terms.zip"));
 });

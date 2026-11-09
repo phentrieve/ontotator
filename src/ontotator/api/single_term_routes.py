@@ -17,6 +17,7 @@ from ontotator.application.single_terms import (
     DEFAULT_CONTEXTS,
     MAX_CONTEXTS,
     GroupState,
+    SingleTermAncestorsView,
     SingleTermBasisView,
     SingleTermBatchRequest,
     SingleTermBatchView,
@@ -87,6 +88,18 @@ def contexts(
     return _service(request, principal).contexts(
         key, group_id, batch_id=batch, limit=limit, offset=offset
     )
+
+
+@router.get("/groups/{group_id}/ancestors")
+def ancestors(
+    key: str,
+    group_id: str,
+    request: Request,
+    principal: PrincipalDep,
+    batch: int | None = None,
+) -> SingleTermAncestorsView:
+    """The terms the group's term can be generalised to."""
+    return _service(request, principal).ancestors(key, group_id, batch_id=batch)
 
 
 @router.post("/batches")

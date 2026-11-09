@@ -557,6 +557,92 @@ def test_a_changed_frozen_decision_fails_the_job(env):
     assert refused.value.code == "INVALID_EXPORT_SNAPSHOT"
 
 
+def test_an_imported_snapshot_finds_its_frozen_decisions(env, tmp_path):
+    from auth_harness import add_ontology
+    from pg_harness import owner_engine
+    from sqlalchemy import text
+    from t1_fixtures import HP_PATH
+
+    from ontotator.auth.audit import Actor
+    from ontotator.cli import _newest_final_snapshot, _run_job
+    from ontotator.exchange import archive as project_archive
+
+    _review(env)
+    job_id = _export(env)
+    before = _cases(_zip(_download(env, _run(env, job_id).id)))
+    built = project_archive.build_archive(env.db, "proj", tmp_path / "proj.zip")
+    target = _app(tmp_path / "target")
+    add_ontology(target, HP_PATH)
+    db = target.state.repo.db
+    # The target server numbers its rows from elsewhere, as any server with
+    # other projects does.
+    with owner_engine(db).begin() as conn:
+        for table in ("single_term_decisions", "single_term_batches"):
+            conn.execute(
+                text(
+                    f"SELECT setval(pg_get_serial_sequence('ontotator.{table}',"
+                    " 'id'), 500)"
+                )
+            )
+    result = project_archive.import_archive(
+        db, Actor(None, "test:operator"), built.path.read_bytes()
+    )
+    assert result["verification"]["ok"], result
+    payload = _newest_final_snapshot(db, result["project"], single_terms=True)
+    job = _run_job(db, "final_single_term_export", payload, wait=True)
+    assert job.status == "succeeded", job.error
+    assert job.result["cases"] == 3
+    imported = _cases(_zip(db.blobs.get(job.result["sha256"])))
+    assert imported.keys() == before.keys()
+    for key, case in imported.items():
+        assert case["review"]["decision_id"] > 500
+        assert case["review"]["phrase_only"] == before[key]["review"]["phrase_only"]
+
+
+def test_two_accepted_groups_of_a_conflict_are_not_exported():
+    import dataclasses
+
+    from ontotator.exchange.final_single_terms import build_cases
+    from ontotator.exchange.single_terms import Derivation
+
+    view = _View({"HP:0000002": {"HP:0000001"}, "HP:0000003": {"HP:0000001"}})
+    one = dataclasses.replace(
+        _group(_occurrence("d1", "2026-01-01")),
+        group_id="a" * 64,
+        conflict_with=("b" * 64,),
+    )
+    other = dataclasses.replace(
+        one, group_id="b" * 64, term_id="HP:0000003", conflict_with=("a" * 64,)
+    )
+    derivation = Derivation(groups=(one, other), exclusions={}, occurrences={"en": 2})
+
+    def accept(decision_id: int, group: str) -> dict[str, Any]:
+        return {
+            "id": decision_id,
+            "group_id": group,
+            "role": "primary",
+            "decision": "accept",
+            "reason": None,
+            "phrase_only": "would_accept",
+            "occurrence_refs": [],
+            "reviewer_pseudonym": "ann-0009",
+            "reviewer_independent": True,
+            "guideline_version": None,
+            "created_at": "2026-11-01T10:00:00+00:00",
+        }
+
+    # Accepted in batches of different bases: neither is written.
+    result = build_cases(
+        derivation,
+        {},
+        {"d1": view},
+        [accept(1, "a" * 64), accept(2, "b" * 64)],
+        {},
+    )
+    assert result.cases == []
+    assert result.report["groups"]["en"]["stale"] == 2
+
+
 # --- a term adjustment across releases --------------------------------------
 
 

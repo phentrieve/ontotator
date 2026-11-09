@@ -3089,6 +3089,75 @@
         "x-ontotator-scope": "session"
       }
     },
+    "/api/v1/projects/{key}/single-terms/groups/{group_id}/ancestors": {
+      "get": {
+        "tags": [
+          "single-terms"
+        ],
+        "summary": "Ancestors",
+        "description": "The terms the group's term can be generalised to.",
+        "operationId": "ancestors_api_v1_projects__key__single_terms_groups__group_id__ancestors_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "batch",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Batch"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SingleTermAncestorsView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "session"
+      }
+    },
     "/api/v1/projects/{key}/single-terms/batches": {
       "post": {
         "tags": [
@@ -26982,6 +27051,62 @@
         ],
         "title": "SingleTermAgreementView",
         "description": "Primary vs second review on accept (accept or adjust) vs reject."
+      },
+      "SingleTermAncestorView": {
+        "properties": {
+          "term_id": {
+            "type": "string",
+            "title": "Term Id"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "nearest": {
+            "type": "boolean",
+            "title": "Nearest"
+          }
+        },
+        "type": "object",
+        "required": [
+          "term_id",
+          "label",
+          "nearest"
+        ],
+        "title": "SingleTermAncestorView"
+      },
+      "SingleTermAncestorsView": {
+        "properties": {
+          "group_id": {
+            "type": "string",
+            "title": "Group Id"
+          },
+          "term_id": {
+            "type": "string",
+            "title": "Term Id"
+          },
+          "ancestors": {
+            "items": {
+              "$ref": "#/components/schemas/SingleTermAncestorView"
+            },
+            "type": "array",
+            "title": "Ancestors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "group_id",
+          "term_id",
+          "ancestors"
+        ],
+        "title": "SingleTermAncestorsView"
       },
       "SingleTermBasisView": {
         "properties": {

@@ -254,6 +254,21 @@ class SingleTermContextsView(BaseModel):
     contexts: list[SingleTermContextView]
 
 
+class SingleTermAncestorView(BaseModel):
+    term_id: str
+    label: str | None
+    # Not an ancestor of another offered term: a parent of the term.
+    nearest: bool
+
+
+class SingleTermAncestorsView(BaseModel):
+    group_id: str
+    term_id: str
+    # Active strict ancestors of the term in the release of every
+    # occurrence, nearest first.
+    ancestors: list[SingleTermAncestorView]
+
+
 class SingleTermBatchWarning(BaseModel):
     code: str
     groups: int
@@ -406,7 +421,9 @@ def _ancestor_everywhere(
 def carries(decision: Record, group: CandidateGroup, data: BasisData) -> bool:
     """Whether a decision still holds for the group as this basis has it."""
     kind = decision["decision"]
-    if kind == "accept" and group.blocked:
+    # Neither an acceptance nor a term adjustment lifts a block the group
+    # has come to have (as the export's ``export_state`` has it).
+    if kind in ("accept", "adjust_term") and group.blocked:
         return False
     if kind == "adjust_term":
         return _ancestor_everywhere(
@@ -916,10 +933,17 @@ class SingleTermService:
     def _visible_batch(
         self, conn: Connection, viewer: _Viewer, batch_id: int
     ) -> RowMapping:
-        """A batch the viewer leads or reviews; another's looks missing."""
+        """A batch the viewer leads or reviews; another's looks missing. Their
+        own is refused once their reviewer capability is revoked."""
         batch = self._batch(conn, viewer.project_id, batch_id)
-        if not viewer.lead and batch["reviewer_user_id"] != viewer.user_id:
+        if viewer.lead:
+            return batch
+        if batch["reviewer_user_id"] != viewer.user_id:
             raise DomainError("SINGLE_TERM_BATCH_NOT_FOUND")
+        if not viewer.reviewer:
+            raise AccessDenied(
+                "NOT_ALLOWED", "Only a single-term reviewer works on a batch."
+            )
         return batch
 
     def groups(
@@ -1012,25 +1036,7 @@ class SingleTermService:
     ) -> SingleTermContextsView:
         """The occurrences of a group in their text, ``CONTEXT_WINDOW`` code
         points either side. A reviewer reads only the groups of their batches."""
-        with self.db.transaction() as conn:
-            viewer = self._viewer(conn, key)
-            pid = viewer.project_id
-            if batch_id is None:
-                self._require_lead(viewer)
-                basis = self._latest_basis(conn, pid)
-                if basis is None:
-                    raise DomainError("SINGLE_TERM_NO_BASIS")
-            else:
-                batch = self._visible_batch(conn, viewer, batch_id)
-                if not viewer.reviewer:
-                    raise AccessDenied("NOT_ALLOWED")
-                if group_id not in batch["group_ids"]:
-                    raise DomainError("SINGLE_TERM_GROUP_NOT_FOUND")
-                basis = self._basis(conn, pid, batch["basis_id"])
-            data = self._data(conn, key, basis)
-        group = data.groups.get(group_id)
-        if group is None:
-            raise DomainError("SINGLE_TERM_GROUP_NOT_FOUND")
+        data, group = self._readable_group(key, group_id, batch_id)
         items = group.occurrences[offset : offset + limit]
         contexts = []
         for occurrence in items:
@@ -1055,6 +1061,61 @@ class SingleTermService:
             total=len(group.occurrences),
             offset=offset,
             contexts=contexts,
+        )
+
+    def _readable_group(
+        self, key: str, group_id: str, batch_id: int | None
+    ) -> tuple[BasisData, CandidateGroup]:
+        """A group of the newest basis (leads) or of one batch in its basis
+        (its reviewer and leads), with the basis's data."""
+        with self.db.transaction() as conn:
+            viewer = self._viewer(conn, key)
+            pid = viewer.project_id
+            if batch_id is None:
+                self._require_lead(viewer)
+                basis = self._latest_basis(conn, pid)
+                if basis is None:
+                    raise DomainError("SINGLE_TERM_NO_BASIS")
+            else:
+                batch = self._visible_batch(conn, viewer, batch_id)
+                if not viewer.reviewer:
+                    raise AccessDenied("NOT_ALLOWED")
+                if group_id not in batch["group_ids"]:
+                    raise DomainError("SINGLE_TERM_GROUP_NOT_FOUND")
+                basis = self._basis(conn, pid, batch["basis_id"])
+            data = self._data(conn, key, basis)
+        group = data.groups.get(group_id)
+        if group is None:
+            raise DomainError("SINGLE_TERM_GROUP_NOT_FOUND")
+        return data, group
+
+    def ancestors(
+        self, key: str, group_id: str, *, batch_id: int | None = None
+    ) -> SingleTermAncestorsView:
+        """The terms a group's term can be generalised to (``adjust_term``):
+        its active strict ancestors in the release of every occurrence."""
+        data, group = self._readable_group(key, group_id, batch_id)
+        offered: list[SingleTermAncestorView] = []
+        first = (
+            data.views.get(group.occurrences[0].ontology_digest or "")
+            if group.occurrences
+            else None
+        )
+        if first is not None:
+            terms = {
+                term
+                for term in first.ancestors(group.term_id)
+                if _ancestor_everywhere(term, group.occurrences, data.views)
+            }
+            above = {a for term in terms for a in first.ancestors(term)}
+            offered = [
+                SingleTermAncestorView(
+                    term_id=term, label=first.label(term), nearest=term not in above
+                )
+                for term in sorted(terms, key=lambda t: (-len(first.ancestors(t)), t))
+            ]
+        return SingleTermAncestorsView(
+            group_id=group.group_id, term_id=group.term_id, ancestors=offered
         )
 
     # -- reviewers --------------------------------------------------------------
@@ -1374,6 +1435,7 @@ class SingleTermService:
                 now,
             )
             second_id = None
+            sample: list[str] = []
             if body.second_review is not None and second_reviewer is not None:
                 sample = second_review_sample(
                     chosen, body.second_review.share, SECOND_MINIMUM
@@ -1403,6 +1465,23 @@ class SingleTermService:
                 if dependent
                 else []
             )
+            second_dependent = None
+            if second_id is not None:
+                assert second_reviewer is not None
+                second_worked = self._worked_on(conn, pid, second_reviewer["pseudonym"])
+                sampled = set(sample)
+                second_dependent = sum(
+                    any(o.document_id in second_worked for o in g.occurrences)
+                    for g in chosen
+                    if g.group_id in sampled
+                )
+                if second_dependent:
+                    warnings.append(
+                        SingleTermBatchWarning(
+                            code="SINGLE_TERM_SECOND_REVIEWER_NOT_INDEPENDENT",
+                            groups=second_dependent,
+                        )
+                    )
             record_audit(
                 conn,
                 self.actor,
@@ -1413,10 +1492,12 @@ class SingleTermService:
                 details={
                     "batch_id": batch_id,
                     "basis_id": basis["id"],
-                    "reviewer": reviewer["username"],
+                    # Under ``username``, which account erasure rewrites.
+                    "username": reviewer["username"],
                     "groups": len(chosen),
                     "second_batch_id": second_id,
                     "not_independent_groups": dependent,
+                    "second_not_independent_groups": second_dependent,
                 },
                 at=now,
             )
@@ -1542,6 +1623,24 @@ class SingleTermService:
 
     # -- decisions --------------------------------------------------------------
 
+    def _partners(
+        self,
+        conn: Connection,
+        key: str,
+        pid: int,
+        basis: Record,
+        group: CandidateGroup,
+    ) -> set[str]:
+        """The group's phrase-conflict partners in its batch's basis and in
+        the latest basis."""
+        partners = set(group.conflict_with)
+        latest = self._latest_basis(conn, pid)
+        if latest is not None and latest["id"] != basis["id"]:
+            current = self._data(conn, key, latest).groups.get(group.group_id)
+            if current is not None:
+                partners.update(current.conflict_with)
+        return partners
+
     def decide(
         self, key: str, batch_id: int, body: SingleTermDecisionRequest
     ) -> SingleTermDecisionView:
@@ -1616,11 +1715,19 @@ class SingleTermService:
                     "Only a group in a phrase conflict is rejected for it.",
                 )
             role = batch["role"]
-            if body.decision in ACCEPTING and role == "primary" and group.conflict:
+            # Conflict partners of the batch's basis and of the latest one: a
+            # batch still open on an older basis must not accept a group
+            # whose partner, new in a later basis, is already accepted.
+            partners = (
+                self._partners(conn, key, pid, basis, group)
+                if body.decision in ACCEPTING and role == "primary"
+                else set()
+            )
+            if partners:
                 primary = self._newest(self._decisions(conn, pid), "primary")
                 accepted = [
                     other
-                    for other in group.conflict_with
+                    for other in sorted(partners)
                     if other in primary and primary[other]["decision"] in ACCEPTING
                 ]
                 if accepted:

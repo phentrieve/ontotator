@@ -993,6 +993,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{key}/single-terms/groups/{group_id}/ancestors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ancestors
+         * @description The terms the group's term can be generalised to.
+         */
+        get: operations["ancestors_api_v1_projects__key__single_terms_groups__group_id__ancestors_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{key}/single-terms/batches": {
         parameters: {
             query?: never;
@@ -9103,6 +9123,24 @@ export interface components {
             /** Kappa */
             kappa: number | null;
         };
+        /** SingleTermAncestorView */
+        SingleTermAncestorView: {
+            /** Term Id */
+            term_id: string;
+            /** Label */
+            label: string | null;
+            /** Nearest */
+            nearest: boolean;
+        };
+        /** SingleTermAncestorsView */
+        SingleTermAncestorsView: {
+            /** Group Id */
+            group_id: string;
+            /** Term Id */
+            term_id: string;
+            /** Ancestors */
+            ancestors: components["schemas"]["SingleTermAncestorView"][];
+        };
         /** SingleTermBasisView */
         SingleTermBasisView: {
             /** Basis Id */
@@ -13002,6 +13040,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SingleTermContextsView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ancestors_api_v1_projects__key__single_terms_groups__group_id__ancestors_get: {
+        parameters: {
+            query?: {
+                batch?: number | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SingleTermAncestorsView"];
                 };
             };
             /** @description Validation Error */

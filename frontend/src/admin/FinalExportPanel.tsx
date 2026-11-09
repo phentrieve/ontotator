@@ -59,6 +59,13 @@ export function FinalExportPanel({ projectKey, username }: { projectKey: string;
  * changes (while the page is visible) rerun it. "Create final export" is primary; open decisions and
  * left-out texts ask for the acknowledgement, which names the counts; the download stays an explicit click.
  */
+/** "… ready: N results", or for the single-term cases the number of cases the job wrote (none when it gives none). */
+function readyTitle(name: string, count: unknown, cases: boolean): string {
+  if (typeof count !== "number") return `${name} ready`;
+  const noun = cases ? (count === 1 ? "case" : "cases") : count === 1 ? "result" : "results";
+  return `${name} ready: ${count} ${noun}`;
+}
+
 function FinalExportContent({ projectKey }: { projectKey: string }): JSX.Element {
   const [state, setState] = useState<FinalPreflight>();
   const [checking, setChecking] = useState(true);
@@ -234,7 +241,7 @@ function FinalExportContent({ projectKey }: { projectKey: string }): JSX.Element
       fallback={`${failedName[(Object.keys(FORMATS) as Format[]).find(value => FORMATS[value].kind === job.kind) ?? "t1"]} could not be created. Open diagnostics for the technical details.`} />}
     {phase === "job" && <>
       {error != null && <ErrorNotice error={error} />}
-      {succeeded && <InlineMessage tone="success" title={`${FORMATS[exportedFormat].name} ready: ${exported} ${exported === 1 ? "result" : "results"}`}>
+      {succeeded && <InlineMessage tone="success" title={readyTitle(FORMATS[exportedFormat].name, exportedFormat === "single-term" ? job.result?.cases : exported, exportedFormat === "single-term")}>
         <p>Created <Time iso={job.finished_at ?? job.created_at} />.</p>
       </InlineMessage>}
       {!succeeded && <p id="final-export-download-hint" className="field-hint">The download is available when the export has finished.</p>}

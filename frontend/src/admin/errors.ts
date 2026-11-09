@@ -32,6 +32,7 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   SINGLE_TERM_REVIEWER_NOT_INDEPENDENT: "The reviewer annotated or consolidated some of these texts.",
   SINGLE_TERM_REVIEW_OFF: "The single-term review is off in this project's settings.",
   SINGLE_TERM_SAME_REVIEWER: "The second review needs another reviewer.",
+  SINGLE_TERM_SECOND_REVIEWER_NOT_INDEPENDENT: "The second reviewer annotated or consolidated some of the sampled texts.",
   SINGLE_TERM_SPAN_INVALID: "The re-cut must overlap its occurrence, differ from it and stay inside the text.",
   SINGLE_TERM_SPAN_NEGATED: "The re-cut holds a negation cue.",
   SINGLE_TERM_SPAN_OVERLAPS_FINDING: "The re-cut overlaps another finding of the text.",

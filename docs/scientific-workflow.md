@@ -557,10 +557,13 @@ different digest is refused. Every step is in the project audit.
 
 The single-term export (Export › Final results › Format › *Single-term cases
 (reviewed phrases)*, or `ontotator admin export PROJECT OUT.zip --format
-single-term` for the newest final export made while the review was on;
-format `ontotator-final-single-terms/v1`) freezes a final-result snapshot like
-the final export and adds to it the decisions in force at the request (their
-IDs, SHA-256 and the negation cues). A decision recorded later is not in the
+single-term` for the newest final export, refused if it was made while the
+review was off; format `ontotator-final-single-terms/v1`) freezes a
+final-result snapshot like the final export and adds to it the decisions in
+force at the request (their IDs, a SHA-256 of each decision's content, the
+SHA-256 of all of them and the negation cues). The content digests leave out
+the row IDs and reviewer pseudonyms a project archive import renumbers or
+renames, so the export of an imported snapshot finds the same decisions. A decision recorded later is not in the
 file; the same snapshot always gives the same bytes. The candidates are
 derived from the snapshot again and the newest frozen primary decision of
 each group applies.

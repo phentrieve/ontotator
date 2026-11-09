@@ -200,6 +200,7 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     ("GET", f"{P}/single-terms/summary"): "read",
     ("GET", f"{P}/single-terms/groups"): SESSION,
     ("GET", f"{P}/single-terms/groups/{{group_id}}/contexts"): SESSION,
+    ("GET", f"{P}/single-terms/groups/{{group_id}}/ancestors"): SESSION,
     ("POST", f"{P}/single-terms/batches"): "project-admin",
     ("GET", f"{P}/single-terms/batches"): "read",
     ("GET", f"{P}/single-terms/batches/{{batch_id}}"): "read",

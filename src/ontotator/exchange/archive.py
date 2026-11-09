@@ -1514,9 +1514,14 @@ def _insert(
             conn.execute(_statement(t), params[start : start + _CHUNK])
         return
     ids = mapper.rows.setdefault(name, {})
-    # Rows naming other rows of their table outside a foreign key (a job and
-    # the job it came from) go one by one, each after the rows it names.
-    chunk_size = 1 if extra_self_references(name) else _CHUNK
+    # Rows naming other rows of their table (a job and the job it came from,
+    # a second-review batch and its batch) go one by one, each after the rows
+    # it names: the new id of a row is known only once it is inserted.
+    chunk_size = (
+        1
+        if extra_self_references(name) or any(True for _ in self_references(name))
+        else _CHUNK
+    )
     for start in range(0, len(ordered), chunk_size):
         chunk = ordered[start : start + chunk_size]
         params = []

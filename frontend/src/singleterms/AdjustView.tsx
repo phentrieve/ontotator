@@ -1,5 +1,5 @@
 import { useId, useMemo, useRef, useState, type ReactNode } from "react";
-import type { SingleTermContext, SingleTermGroup } from "../api/client";
+import type { SingleTermAncestor, SingleTermContext, SingleTermGroup } from "../api/client";
 import { ErrorNotice } from "../admin/ErrorNotice";
 import { Button, Select, TextInput } from "../ui";
 import { blockedLabels, label } from "./labels";
@@ -12,6 +12,9 @@ export type Adjustment =
 export interface AdjustViewProps {
   group: SingleTermGroup;
   contexts: readonly SingleTermContext[];
+  /** The terms the group's term can be generalised to, nearest first; undefined while loading. */
+  ancestors?: readonly SingleTermAncestor[];
+  ancestorError?: unknown;
   busy?: boolean;
   error?: unknown;
   /** Where "term wrong in context" goes (a problem report on the text); null hides the link. */
@@ -27,7 +30,7 @@ const sameRange = (a: readonly [number, number] | null, b: readonly [number, num
  * (or dragging over them), or generalise the term to an ancestor. One kind of adjustment per decision; the
  * re-cut stays verbatim. A blocked group can only be re-cut.
  */
-export function AdjustView({ group, contexts, busy = false, error, problemLink, onCancel, onSubmit }: AdjustViewProps): JSX.Element {
+export function AdjustView({ group, contexts, ancestors, ancestorError, busy = false, error, problemLink, onCancel, onSubmit }: AdjustViewProps): JSX.Element {
   const id = useId().replace(/:/g, "");
   const [occurrence, setOccurrence] = useState(0);
   const context = contexts[Math.min(occurrence, contexts.length - 1)];
@@ -58,7 +61,8 @@ export function AdjustView({ group, contexts, busy = false, error, problemLink, 
   const span = win && selection ? selectionSpan(win, tokens, selection[0], selection[1]) : null;
   const recut = !sameRange(selection, initial) && span !== null;
   const general = termMode === "general";
-  const ancestorId = ancestor.trim();
+  const ancestorId = ancestor;
+  const ancestorLabel = ancestors?.find(item => item.term_id === ancestorId)?.label ?? null;
   let problem: string | null = null;
   if (recut && general) problem = "One adjustment per decision: re-cut the span or generalise the term, not both.";
   else if (general && group.blocked_reason) problem = "A generalised term does not lift the block: re-cut the span instead, or reject.";
@@ -118,9 +122,11 @@ export function AdjustView({ group, contexts, busy = false, error, problemLink, 
         <div className="st-spread"><h2 id={`${id}-term`}>Or generalise the term</h2><span className="st-small st-muted">ancestors only</span></div>
         <fieldset className="st-options"><legend>Term</legend>
           <label className="st-option"><input type="radio" name={`${id}-term`} checked={!general} onChange={() => setTermMode("keep")} /> <span>{group.label ?? group.term_id} · {group.term_id} <span className="st-muted">(annotated)</span></span></label>
-          <label className="st-option"><input type="radio" name={`${id}-term`} checked={general} disabled={!!group.blocked_reason}
-            onChange={() => { setTermMode("general"); setSelection(initial); setPickStart(true); }} /> <span>A more general term</span></label>
-          {general && <TextInput id={`${id}-ancestor`} label="Ancestor term ID" hint="It must be an active ancestor of the annotated term in the release of every occurrence." value={ancestor} onChange={event => setAncestor(event.target.value)} />}
+          {ancestors?.map(item => <label key={item.term_id} className="st-option"><input type="radio" name={`${id}-term`} checked={general && ancestor === item.term_id} disabled={!!group.blocked_reason}
+            onChange={() => { setAncestor(item.term_id); setTermMode("general"); setSelection(initial); setPickStart(true); }} /> <span>{item.label ?? item.term_id} · {item.term_id}{item.nearest && <span className="st-muted"> (parent)</span>}</span></label>)}
+          {ancestorError !== undefined ? <ErrorNotice error={ancestorError} />
+            : ancestors === undefined ? <p className="st-muted st-small" role="status" style={{ margin: 0 }}>Loading the more general terms…</p>
+            : ancestors.length === 0 && <p className="st-muted st-small" style={{ margin: 0 }}>No more general term is active in the release of every occurrence.</p>}
         </fieldset>
         <p className="st-small st-muted" style={{ margin: 0 }}>Is the term wrong in its context? Then the final result has an error{context && problemLink ? <>: {problemLink(context.document_id)}</> : ": ask a lead to correct it (problem report)"}. The case returns after the correction.</p>
       </section>
@@ -133,7 +139,7 @@ export function AdjustView({ group, contexts, busy = false, error, problemLink, 
       <section className="st-card" aria-labelledby={`${id}-result`}>
         <h2 id={`${id}-result`}>Resulting case</h2>
         <p style={{ margin: 0 }}><span className="st-muted">Text</span> <strong>{recut && span ? span.text : group.display_text}</strong></p>
-        <p style={{ margin: 0 }}><span className="st-muted">Term</span> <strong>{general && ancestorId ? ancestorId : group.label ?? group.term_id}</strong>{!(general && ancestorId) && <> {group.term_id}</>}</p>
+        <p style={{ margin: 0 }}><span className="st-muted">Term</span> <strong>{general && ancestorId ? ancestorLabel ?? ancestorId : group.label ?? group.term_id}</strong>{general && ancestorId ? <> {ancestorId}</> : <> {group.term_id}</>}</p>
         <p style={{ margin: 0 }}><span className="st-muted">Origin</span> {recut ? "span re-cut · term as annotated" : general ? "term generalised · span as annotated" : "unchanged"}</p>
         <TextInput id={`${id}-note`} label="Note (optional)" value={note} maxLength={2000} onChange={event => setNote(event.target.value)} />
       </section>

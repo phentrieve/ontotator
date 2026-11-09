@@ -111,7 +111,7 @@ The phrase stays as it is in the text: there is no way to rewrite it. Your judgm
 One adjustment per decision: re-cut the passage or generalise the term, not both.
 
 - **Re-cut the span**: choose the place under **Occurrence** if there are several, then click the first and the last word of the new passage, or drag over them. The new passage must overlap the annotated one, stay within the text, overlap no other finding and hold no negation cue; the server checks this. Only this one place goes into the export, with the new passage.
-- **Or generalise the term**: choose **A more general term** and enter its **Ancestor term ID**. It must be an active ancestor of the annotated term in the release of every place of the group. A more general term does not lift a block.
+- **Or generalise the term**: choose one of the more general terms listed under the annotated term, nearest first; the nearest are marked *(parent)*. Only terms that are active ancestors of the annotated term in the release of every place of the group are listed. A more general term does not lift a block.
 
 **Resulting case** shows what will be exported. Click **Accept adjusted case**, or **Cancel**.
 
@@ -136,4 +136,4 @@ What for: download the phrases the review accepted, as cases for analysis.
 
 The export freezes the current final results and the decisions recorded until you click; later decisions go into a new export. Each case is a phrase with its HPO term and every place it occurs in the selected results. Only accepted and adjusted groups are cases; open, blocked, stale and rejected groups are only counted in report.json, as are the findings not offered and the second-review agreement. The ZIP also holds the selected results as an Ontospan bundle, the same file as in the results with receipt of the same check, and the texts. The files are described in the [scientific workflow guide](../scientific-workflow.md#single-term-review).
 
-An operator can create the same file on the command line with `ontotator admin export PROJECT OUT.zip --format single-term`, from the newest final export that was made while the review was on.
+An operator can create the same file on the command line with `ontotator admin export PROJECT OUT.zip --format single-term`, from the newest final export. It is refused if that export was made while the review was off: then a lead creates a new final export first.

@@ -321,6 +321,8 @@ export type SingleTermBasis = components["schemas"]["SingleTermBasisView"];
 export type SingleTermGroup = components["schemas"]["SingleTermGroupView"];
 export type SingleTermContext = components["schemas"]["SingleTermContextView"];
 export type SingleTermContexts = components["schemas"]["SingleTermContextsView"];
+export type SingleTermAncestors = components["schemas"]["SingleTermAncestorsView"];
+export type SingleTermAncestor = components["schemas"]["SingleTermAncestorView"];
 export type SingleTermBatch = components["schemas"]["SingleTermBatchView"];
 export type SingleTermBatchRequest = components["schemas"]["SingleTermBatchRequest"];
 export type SingleTermDecision = components["schemas"]["SingleTermDecisionView"];
@@ -1446,6 +1448,11 @@ export class ApiClient {
     if (options.limit !== undefined) query.set("limit", String(options.limit));
     if (options.offset) query.set("offset", String(options.offset));
     return this.request(this.singleTerms(key, `/groups/${encodeURIComponent(groupId)}/contexts${query.size ? `?${query}` : ""}`), { method: "GET" });
+  }
+  async singleTermAncestors(key: string, groupId: string, options: { batch?: number } = {}): Promise<SingleTermAncestors> {
+    const query = new URLSearchParams();
+    if (options.batch !== undefined) query.set("batch", String(options.batch));
+    return this.request(this.singleTerms(key, `/groups/${encodeURIComponent(groupId)}/ancestors${query.size ? `?${query}` : ""}`), { method: "GET" });
   }
   async listSingleTermBatches(key: string): Promise<SingleTermBatch[]> { return this.request(this.singleTerms(key, "/batches"), { method: "GET" }); }
   async getSingleTermBatch(key: string, batchId: number): Promise<SingleTermBatch> { return this.request(this.singleTerms(key, `/batches/${batchId}`), { method: "GET" }); }

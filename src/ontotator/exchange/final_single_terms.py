@@ -94,9 +94,16 @@ ACCEPTING = ("accept", "adjust_span", "adjust_term")
 DECISION_KINDS = ("accept", "adjust_span", "adjust_term", "reject")
 GROUP_STATES = ("open", "blocked", "decided", "stale")
 
-# Every column of a decision, in the frozen digest.
+# Every column of a decision (its JSON record).
 _DECISION_COLUMNS = tuple(
     column.key for column in SingleTermDecisionRow.__table__.columns
+)
+# The columns a project archive import renumbers or renames
+# (``--rename-pseudonyms``): left out of the frozen digests, so a snapshot's
+# decisions still resolve on the imported project.
+_RENUMBERED = frozenset(
+    {"id", "project_id", "batch_id", "basis_id", "reviewer_user_id"}
+    | {"reviewer_pseudonym"}
 )
 
 
@@ -134,15 +141,24 @@ def decision_record(row: Mapping[str, Any] | RowMapping) -> dict[str, Any]:
     return record
 
 
+def _stable(record: Mapping[str, Any]) -> dict[str, Any]:
+    """A decision record without the columns an archive import changes."""
+    return {k: v for k, v in record.items() if k not in _RENUMBERED}
+
+
 def freeze_decisions(
     conn: Connection, pid: int, cues: Mapping[str, Sequence[str]]
 ) -> dict[str, Any]:
-    """The snapshot payload entry: the ids of the decisions that count now,
-    the digest of their records and the negation cues in force."""
+    """The snapshot payload entry: the decisions that count now (their ids
+    at the time, and per decision the digest of its content, which survives
+    a project archive import), the digest of their content and the negation
+    cues in force."""
     records = [decision_record(row) for row in counted_decisions(conn, pid)]
+    stable = [_stable(record) for record in records]
     return {
         "ids": [record["id"] for record in records],
-        "sha256": state_digest(records),
+        "records": [state_digest(record) for record in stable],
+        "sha256": state_digest(stable),
         "negation_cues": {lang: list(items) for lang, items in sorted(cues.items())},
     }
 
@@ -150,24 +166,35 @@ def freeze_decisions(
 def load_decisions(
     conn: Connection, pid: int, frozen: Mapping[str, Any]
 ) -> list[dict[str, Any]]:
-    """The frozen decisions, checked against their digest."""
-    ids = list(frozen["ids"])
+    """The frozen decisions in their frozen order, found by their content
+    (ids and reviewer pseudonyms change in an archive import), checked
+    against their digest."""
+    wanted = list(frozen["records"])
     rows = (
         conn.execute(
             select(SingleTermDecisionRow)
-            .where(
-                SingleTermDecisionRow.project_id == pid,
-                SingleTermDecisionRow.id.in_(ids),
-            )
+            .where(SingleTermDecisionRow.project_id == pid)
             .order_by(SingleTermDecisionRow.id)
         )
         .mappings()
         .all()
-        if ids
+        if wanted
         else []
     )
-    records = [decision_record(row) for row in rows]
-    if [r["id"] for r in records] != ids or state_digest(records) != frozen["sha256"]:
+    by_digest: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        record = decision_record(row)
+        by_digest[state_digest(_stable(record))].append(record)
+    records = []
+    for digest in wanted:
+        found = by_digest.get(digest)
+        if not found:
+            raise DomainError(
+                "INVALID_EXPORT_SNAPSHOT",
+                "A frozen single-term decision is unavailable or changed.",
+            )
+        records.append(found.pop(0))
+    if state_digest([_stable(r) for r in records]) != frozen["sha256"]:
         raise DomainError(
             "INVALID_EXPORT_SNAPSHOT",
             "A frozen single-term decision is unavailable or changed.",
@@ -422,9 +449,22 @@ def build_cases(
     pairs: list[tuple[str, str]] = []
     accepted: Counter[str] = Counter()
     merged: dict[tuple[str, str, str], list[_Part]] = defaultdict(list)
+    group_states = {
+        group.group_id: export_state(group, primary.get(group.group_id), views)
+        for group in derivation.groups
+    }
+    accepting = {
+        group_id
+        for group_id, state in group_states.items()
+        if state == "decided" and primary[group_id]["decision"] in ACCEPTING
+    }
     for group in derivation.groups:
         decision = primary.get(group.group_id)
-        state = export_state(group, decision, views)
+        state = group_states[group.group_id]
+        # A phrase conflict is resolved by accepting at most one group: when
+        # several were accepted (across bases), none of them is exported.
+        if group.group_id in accepting and accepting.intersection(group.conflict_with):
+            state = "stale"
         per = states.setdefault(group.language, dict.fromkeys(GROUP_STATES, 0))
         per[state] += 1
         if state != "decided":
@@ -768,7 +808,7 @@ def final_single_term_export(job: Job, ctx: JobContext) -> dict[str, Any]:
         "snapshot_sha256": row["sha256"],
         "selected_results": {"file": SELECTED_RESULTS_FILE, "bundle_id": bundle_id},
         "single_term_decisions": {
-            "ids": frozen_decisions["ids"],
+            "ids": [decision["id"] for decision in decisions],
             "sha256": frozen_decisions["sha256"],
         },
         "negation_cues": frozen_decisions["negation_cues"],

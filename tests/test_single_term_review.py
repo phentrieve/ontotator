@@ -410,6 +410,48 @@ def test_a_reviewer_who_annotated_the_texts_is_flagged(env):
     assert decided.json()["reviewer_independent"] is False
 
 
+def test_a_second_reviewer_who_annotated_the_texts_is_flagged(env):
+    _basis(env)
+    assert env.lead.put(f"{ST}/reviewers/alice").status_code == 200
+    batch = env.lead.post(
+        f"{ST}/batches",
+        json={
+            "request_id": "b-second-alice",
+            "reviewer": "rita",
+            "second_review": {"reviewer": "alice"},
+        },
+    ).json()
+    # All five groups are sampled (fewer than 50); alice annotated each text.
+    assert batch["warnings"] == [
+        {"code": "SINGLE_TERM_SECOND_REVIEWER_NOT_INDEPENDENT", "groups": 5}
+    ]
+    with env.db.transaction() as conn:
+        details = conn.execute(
+            select(AuditEventRow.details).where(
+                AuditEventRow.action == "project.single_term_batch_create"
+            )
+        ).scalar_one()
+    assert details["not_independent_groups"] == 0
+    assert details["second_not_independent_groups"] == 5
+
+
+def test_erasing_a_reviewer_removes_their_username_from_the_batch_audit(env):
+    from ontotator.auth.audit import Actor as AuditActor
+
+    _basis(env)
+    _batch(env)
+    env.app.state.accounts.set_active(AuditActor.cli(), "rita", False)
+    env.app.state.accounts.anonymise(AuditActor.cli(), "rita")
+    with env.db.transaction() as conn:
+        details = conn.execute(
+            select(AuditEventRow.details).where(
+                AuditEventRow.action == "project.single_term_batch_create"
+            )
+        ).scalar_one()
+    assert "rita" not in str(details)
+    assert "reviewer" not in details and details["username"] != "rita"
+
+
 def test_batch_states_submit_reopen_abandon(env):
     _basis(env)
     batch_id = _batch(env)["batch_id"]
@@ -692,6 +734,63 @@ def test_a_refresh_opens_only_new_and_stale_groups(env):
     assert german["conflicts"] == 2
 
 
+def test_a_term_adjustment_does_not_carry_onto_a_newly_blocked_group(env):
+    _basis(env)
+    batch_id = _batch(env)["batch_id"]
+    adjusted = _decide(
+        env.rita, batch_id, "nb1", G_HEARING, "adjust_term", adjusted_term_id=HEARING
+    )
+    assert adjusted.status_code == 200, adjusted.text
+    env.rita.post(f"{ST}/batches/{batch_id}/submit", json={"request_id": "nb-s"})
+    # The lead adds a cue the phrase holds: the group becomes blocked.
+    settings = env.lead.patch(
+        f"{BASE}/settings",
+        json={"single_term_negation_cues": {"de": ["keine", "hörminderung"]}},
+    )
+    assert settings.status_code == 200, settings.text
+    _basis(env, "basis-2")
+    group = _groups(env.lead)[G_HEARING]
+    # Stale, as the export counts it, so a new batch offers it again.
+    assert group["blocked_reason"] == "negation_in_span"
+    assert group["state"] == "stale"
+    again = _batch(env, "batch-nb", stale_only=True)
+    assert again["groups"] == 1
+    assert list(_groups(env.lead, batch=again["batch_id"])) == [G_HEARING]
+
+
+def test_a_conflict_partner_new_in_a_later_basis_refuses_acceptance(env, monkeypatch):
+    _basis(env)
+    old_batch = _batch(env)["batch_id"]
+    # A new text maps the same phrase to another term: a conflict that only
+    # the newer basis knows.
+    monkeypatch.setitem(FINDINGS, DOC3, [("c1", "Krampfanfälle", STATUS)])
+    _submit(env, DOC3, "final-3")
+    _select(env, DOC3, "final-3")
+    _basis(env, "basis-2")
+    g_status = group_id("de", "krampfanfälle", STATUS)
+    assert set(_groups(env.lead)[G_SEIZURE]["conflict_with"]) == {g_status}
+    new_batch = env.lead.post(
+        f"{ST}/batches", json={"request_id": "batch-new", "reviewer": "sam"}
+    ).json()
+    assert list(_groups(env.sam, batch=new_batch["batch_id"])) == [g_status]
+    accepted = _decide(env.sam, new_batch["batch_id"], "cf1", g_status, "accept")
+    assert accepted.status_code == 200, accepted.text
+    # The batch on the older basis does not know the partner, but is refused.
+    refused = _decide(env.rita, old_batch, "cf2", G_SEIZURE, "accept")
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["details"] == {"accepted_group_ids": [g_status]}
+    rejected = _decide(
+        env.rita,
+        old_batch,
+        "cf3",
+        G_SEIZURE,
+        "reject",
+        reason="too_general",
+        phrase_only="would_reject",
+    )
+    assert rejected.status_code == 200, rejected.text
+
+
 # --- summary and agreement -------------------------------------------------------
 
 
@@ -782,9 +881,13 @@ def test_permissions_of_lead_reviewer_and_other_member(env):
     # Another member sees nothing.
     assert otto.get(f"{ST}/batches").status_code == 403
     assert otto.get(f"{ST}/groups", params={"batch": batch_id}).status_code == 404
-    # A revoked reviewer can no longer decide in their batch.
+    # A revoked reviewer can no longer decide in, read or submit their batch.
     assert env.lead.delete(f"{ST}/reviewers/rita").status_code == 200
     assert _decide(rita, batch_id, "p4", G_SEIZURE, "accept").status_code == 403
+    assert rita.get(f"{ST}/batches/{batch_id}").status_code == 403
+    submitted = rita.post(f"{ST}/batches/{batch_id}/submit", json={"request_id": "p5"})
+    assert submitted.status_code == 403
+    assert env.lead.get(f"{ST}/batches/{batch_id}").json()["state"] == "open"
     # A lead may review without the capability.
     own = env.lead.post(
         f"{ST}/batches",
@@ -804,6 +907,66 @@ def test_permissions_of_lead_reviewer_and_other_member(env):
         "project.single_term_reviewer_add",
         "project.single_term_reviewer_remove",
     ]
+
+
+def test_removing_a_member_ends_their_reviewer_capability(env):
+    from ontotator.auth.audit import Actor as AuditActor
+
+    memberships = env.app.state.memberships
+    # Losing one role of several keeps the capability.
+    memberships.set_roles(
+        AuditActor.cli(), "proj", "rita", ["annotator", "adjudicator"]
+    )
+    memberships.remove(AuditActor.cli(), "proj", "rita", ["adjudicator"])
+    names = [r["username"] for r in env.lead.get(f"{ST}/reviewers").json()]
+    assert "rita" in names
+    memberships.remove(AuditActor.cli(), "proj", "rita")
+    names = [r["username"] for r in env.lead.get(f"{ST}/reviewers").json()]
+    assert names == ["sam"]
+    # Added again, the person needs a new grant.
+    memberships.set_roles(AuditActor.cli(), "proj", "rita", ["annotator"])
+    assert "rita" not in [r["username"] for r in env.lead.get(f"{ST}/reviewers").json()]
+    with env.db.transaction() as conn:
+        removed = conn.execute(
+            select(AuditEventRow.details).where(
+                AuditEventRow.action == "project.single_term_reviewer_remove"
+            )
+        ).scalar_one()
+    assert removed == {"username": "rita"}
+
+
+def test_ancestors_list_the_terms_a_group_can_be_generalised_to(env):
+    _basis(env)
+    batch_id = _batch(env)["batch_id"]
+    listed = env.rita.get(
+        f"{ST}/groups/{G_HEARING}/ancestors", params={"batch": batch_id}
+    )
+    assert listed.status_code == 200, listed.text
+    body = listed.json()
+    assert body["group_id"] == G_HEARING and body["term_id"] == SENSORINEURAL
+    terms = [item["term_id"] for item in body["ancestors"]]
+    assert HEARING in terms and SENSORINEURAL not in terms
+    # Nearest first; every offered term is accepted as an adjustment.
+    assert body["ancestors"][0]["nearest"] is True
+    assert terms.index(HEARING) < terms.index("HP:0000118")
+    assert all(item["label"] for item in body["ancestors"])
+    # Only the batch's reviewer (and leads) read them.
+    assert env.lead.get(f"{ST}/groups/{G_HEARING}/ancestors").status_code == 200
+    assert (
+        env.otto.get(
+            f"{ST}/groups/{G_HEARING}/ancestors", params={"batch": batch_id}
+        ).status_code
+        == 404
+    )
+    adjusted = _decide(
+        env.rita,
+        batch_id,
+        "an1",
+        G_HEARING,
+        "adjust_term",
+        adjusted_term_id=terms[-1],
+    )
+    assert adjusted.status_code == 200, adjusted.text
 
 
 def test_tokens_reach_the_summary_but_never_phrases_or_decisions(env):

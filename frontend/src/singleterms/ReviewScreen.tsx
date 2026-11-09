@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from "react";
-import { api, ApiError, type SingleTermBatch, type SingleTermContexts, type SingleTermDecision, type SingleTermDecisionRequest, type SingleTermGroup } from "../api/client";
+import { api, ApiError, type SingleTermAncestor, type SingleTermBatch, type SingleTermContexts, type SingleTermDecision, type SingleTermDecisionRequest, type SingleTermGroup } from "../api/client";
 import { ErrorNotice } from "../admin/ErrorNotice";
 import { routeHref, type Route } from "../app/router";
 import { Button, InlineMessage, Kbd, TextInput } from "../ui";
@@ -105,6 +105,8 @@ function ReviewContent({ projectKey, batchId, username, canManage, group: initia
   const [note, setNote] = useState("");
   const [contexts, setContexts] = useState<Record<string, SingleTermContexts | undefined>>({});
   const [contextError, setContextError] = useState<unknown>();
+  const [ancestors, setAncestors] = useState<Record<string, readonly SingleTermAncestor[] | undefined>>({});
+  const [ancestorError, setAncestorError] = useState<unknown>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
   const [last, setLast] = useState<{ groupId: string; text: string } | null>(null);
@@ -156,6 +158,18 @@ function ReviewContent({ projectKey, batchId, username, canManage, group: initia
   useEffect(() => {
     if (currentGroup && (judged || readOnly || decided(currentGroup))) loadContexts(currentGroup.group_id);
   }, [currentGroup, judged, readOnly, loadContexts]);
+
+  const adjustGroup = mode === "adjust" ? currentGroup?.group_id : undefined;
+  const haveAncestors = adjustGroup !== undefined && ancestors[adjustGroup] !== undefined;
+  useEffect(() => {
+    if (adjustGroup === undefined || haveAncestors) return;
+    let active = true;
+    setAncestorError(undefined);
+    void api.singleTermAncestors(projectKey, adjustGroup, { batch: batchId }).then(view => {
+      if (active) setAncestors(now => ({ ...now, [adjustGroup]: view.ancestors }));
+    }, failure => { if (active) setAncestorError(failure); });
+    return () => { active = false; };
+  }, [projectKey, batchId, adjustGroup, haveAncestors]);
 
   const select = (item: Item) => {
     setCurrent(itemGroups(item)[0].group_id);
@@ -268,6 +282,7 @@ function ReviewContent({ projectKey, batchId, username, canManage, group: initia
       readOnly={readOnly} busy={busy} error={error} onDecide={list => void decide(list)} />;
   } else if (mode === "adjust" && currentGroup) {
     work = <AdjustView key={currentGroup.group_id} group={currentGroup} contexts={contexts[currentGroup.group_id]?.contexts ?? []} busy={busy} error={error}
+      ancestors={ancestors[currentGroup.group_id]} ancestorError={ancestorError}
       problemLink={problemLink} onCancel={() => { setMode("review"); setError(undefined); }} onSubmit={submitAdjustment} />;
   } else if (currentGroup) {
     work = <GroupWork id={id} group={currentGroup} judged={judged} readOnly={readOnly} contexts={contexts[currentGroup.group_id]} contextError={contextError}

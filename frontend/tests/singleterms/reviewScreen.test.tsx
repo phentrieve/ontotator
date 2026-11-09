@@ -20,6 +20,13 @@ beforeEach(() => {
     adjusted_term_id: body.adjusted_term_id ?? null, adjusted_span: body.adjusted_span ? { ...body.adjusted_span } : null,
   }));
   vi.spyOn(api, "singleTermBatchAction").mockResolvedValue(batch({ state: "submitted" }));
+  vi.spyOn(api, "singleTermAncestors").mockImplementation(async (_key, groupId) => ({
+    group_id: groupId, term_id: "HP:0001250",
+    ancestors: [
+      { term_id: "HP:0012638", label: "Abnormal nervous system physiology", nearest: true },
+      { term_id: "HP:0000001", label: "All", nearest: false },
+    ],
+  }));
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
@@ -138,7 +145,8 @@ describe("single-term review screen", () => {
     const accept = screen.getByRole("button", { name: "Accept adjusted case" }) as HTMLButtonElement;
     expect(accept.disabled).toBe(true);
     // A generalised term does not lift the block.
-    expect((screen.getByRole("radio", { name: "A more general term" }) as HTMLInputElement).disabled).toBe(true);
+    const parent = await screen.findByRole("radio", { name: /Abnormal nervous system physiology · HP:0012638 \(parent\)/ });
+    expect((parent as HTMLInputElement).disabled).toBe(true);
 
     fireEvent.click(word("𝑥"));
     fireEvent.click(word("geschwollen"));
@@ -159,12 +167,13 @@ describe("single-term review screen", () => {
     renderScreen();
     fireEvent.click(await screen.findByRole("button", { name: /Yes, as a phrase/ }));
     fireEvent.click(await screen.findByRole("button", { name: /^Adjust/ }));
-    fireEvent.click(screen.getByRole("radio", { name: "A more general term" }));
-    fireEvent.change(screen.getByLabelText("Ancestor term ID"), { target: { value: " HP:0000001 " } });
+    const all = await screen.findByRole("radio", { name: "All · HP:0000001" });
+    expect(api.singleTermAncestors).toHaveBeenCalledWith("p", gid(1), { batch: 3 });
+    fireEvent.click(all);
     const words = screen.getByRole("group", { name: "Words of the context" });
     fireEvent.click(within(words).getByRole("button", { name: "beim" }));
-    expect(screen.getByRole("radio", { name: "A more general term" })).toHaveProperty("checked", false);
-    fireEvent.click(screen.getByRole("radio", { name: "A more general term" }));
+    expect(screen.getByRole("radio", { name: "All · HP:0000001" })).toHaveProperty("checked", false);
+    fireEvent.click(screen.getByRole("radio", { name: "All · HP:0000001" }));
     fireEvent.click(screen.getByRole("button", { name: "Accept adjusted case" }));
     await waitFor(() => expect(decided()).toHaveLength(1));
     expect(decided()[0]).toMatchObject({ decision: "adjust_term", adjusted_term_id: "HP:0000001", phrase_only: "would_accept" });

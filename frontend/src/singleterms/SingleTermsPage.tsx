@@ -189,7 +189,8 @@ function SingleTermsContent({ projectKey, canManage, onNavigate }: SingleTermsPa
       onCreated={batch => {
         setDialog(false);
         const warning = batch.warnings?.find(item => item.code === "SINGLE_TERM_REVIEWER_NOT_INDEPENDENT");
-        setNotice(`Batch #${batch.batch_id} created with ${batch.groups} ${batch.groups === 1 ? "group" : "groups"} for ${batch.reviewer_username}.${batch.second_batch_ids.length ? ` Second review: batch #${batch.second_batch_ids.join(", #")}.` : ""}${warning ? ` ${batch.reviewer_username} annotated or consolidated texts of ${warning.groups} of these groups; their decisions are marked “reviewer not independent”.` : ""}`);
+        const secondWarning = batch.warnings?.find(item => item.code === "SINGLE_TERM_SECOND_REVIEWER_NOT_INDEPENDENT");
+        setNotice(`Batch #${batch.batch_id} created with ${batch.groups} ${batch.groups === 1 ? "group" : "groups"} for ${batch.reviewer_username}.${batch.second_batch_ids.length ? ` Second review: batch #${batch.second_batch_ids.join(", #")}.` : ""}${warning ? ` ${batch.reviewer_username} annotated or consolidated texts of ${warning.groups} of these groups; their decisions are marked “reviewer not independent”.` : ""}${secondWarning ? ` The second reviewer annotated or consolidated texts of ${secondWarning.groups} of the sampled groups; their decisions are marked “reviewer not independent”.` : ""}`);
         setRevision(value => value + 1);
       }} />}
     <ConfirmDialog open={abandon !== null} tone="danger" title={abandon ? `Abandon batch #${abandon.batch_id}?` : ""} confirmLabel="Abandon batch"
