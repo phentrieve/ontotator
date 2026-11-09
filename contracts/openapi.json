@@ -10550,6 +10550,10 @@
             "type": "integer",
             "title": "Modifiers Agreeing"
           },
+          "related_term_conflicts": {
+            "type": "integer",
+            "title": "Related Term Conflicts"
+          },
           "texts": {
             "type": "integer",
             "title": "Texts"
@@ -10584,11 +10588,43 @@
           "terms_equal",
           "modifiers_compared",
           "modifiers_agreeing",
+          "related_term_conflicts",
           "texts",
           "pairs"
         ],
         "title": "AgreementPooled",
         "description": "F1 of the counts summed over every pair (micro average)."
+      },
+      "AgreementRelatedView": {
+        "properties": {
+          "layer_id": {
+            "type": "string",
+            "title": "Layer Id"
+          },
+          "term_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Term Ids"
+          },
+          "term_labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Term Labels"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "layer_id",
+          "term_ids",
+          "term_labels"
+        ],
+        "title": "AgreementRelatedView",
+        "description": "Findings on overlapping text whose terms are ancestor and descendant\n(\"Seizure\" / \"Focal seizure\", #303): a term difference all the same.\n``term_labels`` are the terms' names (else their ids), as ``term_ids``."
       },
       "AgreementSummary": {
         "properties": {
@@ -10630,6 +10666,13 @@
             },
             "type": "array",
             "title": "Detail Differences"
+          },
+          "related_terms": {
+            "items": {
+              "$ref": "#/components/schemas/AgreementRelatedView"
+            },
+            "type": "array",
+            "title": "Related Terms"
           }
         },
         "additionalProperties": false,
@@ -13252,6 +13295,13 @@
             "type": "boolean",
             "title": "Span Conflict",
             "default": false
+          },
+          "term_lineage": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Term Lineage"
           },
           "keep_input_id": {
             "type": "string",
@@ -19768,6 +19818,10 @@
             "type": "integer",
             "title": "Modifiers Agreeing"
           },
+          "related_term_conflicts": {
+            "type": "integer",
+            "title": "Related Term Conflicts"
+          },
           "case_id": {
             "type": "string",
             "title": "Case Id"
@@ -19826,6 +19880,7 @@
           "terms_equal",
           "modifiers_compared",
           "modifiers_agreeing",
+          "related_term_conflicts",
           "case_id",
           "language",
           "document_id",

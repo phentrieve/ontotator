@@ -110,6 +110,8 @@ class AgreementCounts(BaseModel):
     terms_equal: int
     modifiers_compared: int
     modifiers_agreeing: int
+    # Of term_conflicts: the terms are ancestor and descendant (#303).
+    related_term_conflicts: int
 
 
 class AgreementMacroMean(AgreementValues):

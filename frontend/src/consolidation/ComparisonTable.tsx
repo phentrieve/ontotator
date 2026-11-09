@@ -46,8 +46,12 @@ export function orderRows(rows: readonly ComparisonRow[]): ComparisonRow[] {
 export function ComparisonTable({ name, group, people, rows, readOnly = false, busy = false, onChoose }: ComparisonTableProps): JSX.Element {
   const members = group.members;
   const names = peopleOf(people, members);
-  const line = (row: ComparisonRow) => <tr key={row.id}
-    className={row.conflict && !readOnly ? "cons-row--conflict" : row.agreed !== null && members.length > 1 ? "cons-row--agreed" : undefined}>
+  const rowClass = (row: ComparisonRow) => row.conflict && !readOnly ? "cons-row--conflict" : row.agreed !== null && members.length > 1 ? "cons-row--agreed" : undefined;
+  // A hint (related terms, issue 303) is its own full-width line right after its row, so it is read once, after the values it explains.
+  const line = (row: ComparisonRow) => row.hint ? [values(row), <tr key={`${row.id}-hint`} className="cons-row-hint">
+    <td colSpan={members.length + 1}>{row.hint}</td>
+  </tr>] : values(row);
+  const values = (row: ComparisonRow) => <tr key={row.id} className={rowClass(row)}>
       <th scope="row">
         {row.conflict && !readOnly && <><IconWarning className="cons-conflict-mark" /><span className="visually-hidden">Conflict: </span></>}
         {row.label}
