@@ -226,28 +226,12 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
         )
         return {"applied": True, "preview": preview, "result": result}
 
-    @register(server, scopes="read", effect="read")
-    async def list_annotation_mode_changes(
-        project: Project, case_id: str, language: str
-    ) -> dict[str, Any]:
-        """Annotation mode changes of one text, with what each discarded.
-
-        Gives the change_id restore_annotation_mode needs, and whether the
-        change can still be restored (``restorable``, ``restore_blocked``).
-        """
-        listed: dict[str, Any] = await api.get(
-            project_path(project, "annotation-mode-changes"),
-            case_id=case_id,
-            language=language,
-        )
-        return listed
-
     @register(server, scopes=("read", "project-admin"), effect="changes")
     async def restore_annotation_mode(
         project: Project,
         case_id: str,
         language: str,
-        change_id: Annotated[int, Field(description="list_annotation_mode_changes")],
+        change_id: Annotated[int, Field(description="From list_mode_changes.")],
         confirm: Confirm = False,
     ) -> dict[str, Any]:
         """Undo an annotation mode change, after a preview.

@@ -159,11 +159,6 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "reason": "Proposals were wrong",
             "confirm": True,
         },
-        "list_annotation_mode_changes": {
-            "project": "p",
-            "case_id": "c",
-            "language": "en",
-        },
         "restore_annotation_mode": {
             "project": "p",
             "case_id": "c",
