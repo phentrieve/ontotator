@@ -120,7 +120,7 @@ import { taskText } from "./identity";
 import { adjacentCase, nextOpenTask, orderTasks } from "./caseOrder";
 import type { RouteLeaveGuard } from "./router";
 import { isReviewLike, modeBadge } from "../editor/modes";
-import { LanguageTag } from "../ui/LanguageTag";
+import { LanguageTag, LanguageText } from "../ui/LanguageTag";
 import { onSpaceActivate } from "../ui/spaceActivates";
 import { actorName } from "../editor/actorName";
 
@@ -3756,8 +3756,10 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
               disabled={queueState === "saving"}
             />
           ) : null}
-          <h1 className="case-title" title={view.document.document_id}>{assignmentNavigation ? taskText(assignmentNavigation.current) : view.document.document_id}</h1>
-          <LanguageTag code={view.document.language} />
+          {/* A task title already ends with its language ("W03 en"): the flag goes into it, not a second "en" after it. */}
+          {assignmentNavigation
+            ? <h1 className="case-title" title={view.document.document_id}><LanguageText text={taskText(assignmentNavigation.current)} code={assignmentNavigation.current.language} /></h1>
+            : <><h1 className="case-title" title={view.document.document_id}>{view.document.document_id}</h1><LanguageTag code={view.document.language} /></>}
           <span
             title={roundTitle ?? (roundKind !== "consolidation" && !isCarryKind(roundKind) ? badge.title : undefined)}
             className="case-mode"

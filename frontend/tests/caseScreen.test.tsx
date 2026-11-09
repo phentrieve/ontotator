@@ -2458,6 +2458,9 @@ describe("CaseScreen integration", () => {
       const rendered = render(<CaseScreen view={sampleView} workspaceId="ws" onClose={vi.fn()} assignmentNavigation={assignmentNavigation} />);
       const title = screen.getByRole("heading", { level: 1 });
       expect(title.textContent).toBe("accepted-translation de");
+      // The language shows once: the flag sits in the title, no second "de" tag follows it.
+      expect(title.querySelector("svg.language-flag")).not.toBeNull();
+      expect(document.querySelector(".case-title + .language-tag")).toBeNull();
       expect(title.classList.contains("case-title")).toBe(true);
       expect(screen.getByText("1 of 1")).toBeDefined();
       // Below 700 px the CSS hides a one-case navigation through this class.
