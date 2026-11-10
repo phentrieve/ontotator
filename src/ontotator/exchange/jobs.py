@@ -29,8 +29,8 @@ from ontotator.application.work_time import work_time_export as work_time_lines
 from ontotator.auth.audit import Actor, record_audit
 from ontotator.authz.memberships import MembershipService
 from ontotator.authz.policy import Access, Action, can
-from ontotator.authz.scoped import ScopedRepository, project_not_found
-from ontotator.domain.errors import AccessDenied, DomainError
+from ontotator.authz.scoped import ScopedRepository
+from ontotator.domain.errors import AccessDenied, DomainError, project_not_found
 from ontotator.domain.work_rounds import CARRY_ROUND_KINDS
 from ontotator.exchange.archive import project_archive_export, project_archive_import
 from ontotator.exchange.final_export import final_t1_export

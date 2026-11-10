@@ -91,7 +91,7 @@ def test_projects_do_not_see_each_others_content(tmp_path: Path) -> None:
 
     assert repo.list_annotations_for_document("pkg-b", "doc-1") == []
     assert repo.get_document("pkg-c", "doc-1") is None
-    with pytest.raises(DomainError, match="PACKAGE_NOT_FOUND"):
+    with pytest.raises(DomainError, match="PROJECT_NOT_FOUND"):
         repo.get_task_profile("pkg-c")
 
 
