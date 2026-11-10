@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import Connection, delete, func, select
 
 from ontotator.storage.database import advisory_lock_id
-from ontotator.storage.tables import LoginAttemptRow
+from ontotator.storage.tables import LoginAttemptRow, UserRow
 
 
 @dataclass(frozen=True)
@@ -16,7 +16,10 @@ class SessionPolicy:
 
     A name is locked per client address, so a stranger cannot lock a known
     account (``admin``) for everybody else. The per-address limit is high
-    enough for many people behind one NAT address mistyping their passwords.
+    enough for many people behind one NAT address mistyping their passwords,
+    and it counts only the failures of existing usernames (#392): mistyped or
+    made-up names behind a shared address cannot lock out everyone behind it,
+    while the per-name limit still slows guesses at an unknown name.
     """
 
     idle: timedelta = timedelta(hours=12)
@@ -24,7 +27,7 @@ class SessionPolicy:
     window: timedelta = timedelta(minutes=15)
     # Failures of one name from one address.
     failures_per_account: int = 5
-    # Failures of any names from one address.
+    # Failures of any existing usernames from one address.
     failures_per_address: int = 100
     # Attempts are kept this long: the window, plus a day to look into attacks.
     retention: timedelta = timedelta(days=1)
@@ -81,8 +84,17 @@ def login_locked(
     ).scalar_one()
     if account >= policy.failures_per_account:
         return True
+    # Only names that exist count here. The query is the same whether the
+    # name of this attempt exists or not, and the answer is LoginFailed either
+    # way, so it tells nothing about this name. What an attacker can learn is
+    # whether an earlier failure of a name counted, from whether its address
+    # locked: with failures of 20 known names to bring the address to one
+    # below the limit, every probe costs about 100 attempts in one window.
     address = conn.execute(
-        recent_failures.where(LoginAttemptRow.client_ip == client_ip)
+        recent_failures.where(
+            LoginAttemptRow.client_ip == client_ip,
+            LoginAttemptRow.username.in_(select(UserRow.username)),
+        )
     ).scalar_one()
     return bool(address >= policy.failures_per_address)
 
