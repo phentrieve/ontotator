@@ -132,17 +132,28 @@ class SessionService:
         client address, then one on the name, then the user row (``FOR NO
         KEY UPDATE``), always in this order. The logins from one address and
         those of one name, known or not, run one after another, so neither
-        limit can be passed by concurrent attempts and an unknown name queues
-        like a real one. A password change waits for a login that read the
-        old hash; the session it created is then revoked with the others.
+        limit can be passed by concurrent attempts and an unknown name is
+        treated like a real one. A password change waits for a login that read
+        the old hash; the session it created is then revoked with the others.
+
+        The name lock is only tried (#391): a login for a name that another
+        login holds fails at once instead of waiting with a pooled connection,
+        so parallel logins for one name, sent from many addresses, cannot fill
+        the pool. Such a busy attempt reads nothing about the user, skips
+        Argon2 like a locked one, is recorded as ``throttled`` and does not
+        count, so a double-clicked login costs nobody an attempt. The address
+        lock still waits: the logins from one address are bounded by the
+        proxy's per-address rate limit, and refusing them would fail people
+        behind one NAT address who log in at the same moment.
 
         Raises:
-            LoginFailed: for a wrong password, an unknown or inactive user, or
-                a locked account or address. The attempt is committed first,
-                so the failure counts towards the lockout. An attempt refused
-                because of a lock is recorded as ``throttled`` and does not
-                count, so the lock ends with the window of the failures that
-                caused it.
+            LoginFailed: for a wrong password, an unknown or inactive user, a
+                locked account or address, or a name another login holds at
+                this moment. The attempt is committed first, so the failure
+                counts towards the lockout. An attempt refused because of a
+                lock, or because the name was busy, is recorded as
+                ``throttled`` and does not count, so the lock ends with the
+                window of the failures that caused it.
             RuntimeError: inside an open transaction of this context.
         """
         if self.db.in_transaction():
@@ -154,78 +165,109 @@ class SessionService:
         started: tuple[str, Principal] | None = None
         with self.db.transaction() as conn:
             conn.execute(select(func.pg_advisory_xact_lock(_address_lock(client_ip))))
-            conn.execute(select(func.pg_advisory_xact_lock(_username_lock(name))))
-            # Read after waiting for the locks, so the attempts that committed
-            # meanwhile are inside the window this one is checked against.
+            busy = not conn.execute(
+                select(func.pg_try_advisory_xact_lock(_username_lock(name)))
+            ).scalar_one()
+            # Read after waiting for the address lock, so the attempts that
+            # committed meanwhile are inside the window this one is checked
+            # against.
             now = self._now()
-            user = conn.execute(
-                select(UserRow)
-                .where(UserRow.username == name)
-                .with_for_update(key_share=True)
-            ).one_or_none()
-            stored_hash = None
-            if user is not None and user.active:
-                stored_hash = conn.execute(
-                    select(PasswordCredentialRow.password_hash).where(
-                        PasswordCredentialRow.user_id == user.id
-                    )
-                ).scalar_one_or_none()
-            locked = self._locked(conn, name, client_ip, now)
-            # Argon2 runs once for every name, known or not (index D-j). A
-            # locked attempt skips it: the lock is per name and address and
-            # treats unknown names alike, so skipping tells nothing new.
-            matches = not locked and verify_password(stored_hash, password)
-            succeeded = matches and not locked and user is not None
-            conn.execute(
-                insert(LoginAttemptRow).values(
-                    username=name,
-                    client_ip=client_ip,
-                    succeeded=succeeded,
-                    throttled=locked,
-                    at=now,
-                )
-            )
-            prune_login_attempts(conn, now, self.policy)
-            if succeeded and user is not None and stored_hash is not None:
-                if needs_rehash(stored_hash):
-                    conn.execute(
-                        update(PasswordCredentialRow)
-                        .where(PasswordCredentialRow.user_id == user.id)
-                        .values(password_hash=hash_password(password), changed_at=now)
-                    )
-                token = secrets.token_urlsafe(32)
-                csrf_token = secrets.token_urlsafe(32)
-                session_id = conn.execute(
-                    insert(SessionRow)
-                    .values(
-                        user_id=user.id,
-                        token_sha256=token_digest(token),
-                        csrf_token=csrf_token,
-                        created_at=now,
-                        last_seen_at=now,
-                        expires_at=now + self.policy.absolute,
+            if busy:
+                conn.execute(
+                    insert(LoginAttemptRow).values(
+                        username=name,
                         client_ip=client_ip,
-                        user_agent=_printable(user_agent[:MAX_RECORDED_USER_AGENT])
-                        if user_agent
-                        else None,
+                        succeeded=False,
+                        throttled=True,
+                        at=now,
                     )
-                    .returning(SessionRow.id)
-                ).scalar_one()
-                started = (
-                    token,
-                    Principal(
-                        user_id=user.id,
-                        username=user.username,
-                        display_name=user.display_name,
-                        pseudonym=user.pseudonym,
-                        is_system_admin=user.is_system_admin,
-                        session_id=session_id,
-                        csrf_token=csrf_token,
-                    ),
+                )
+                prune_login_attempts(conn, now, self.policy)
+            else:
+                started = self._attempt(
+                    conn, name, password, now, client_ip, user_agent
                 )
         # Raised only now: inside the transaction it would roll back the attempt.
         if started is None:
             raise LoginFailed()
+        return started
+
+    def _attempt(
+        self,
+        conn: Connection,
+        name: str,
+        password: str,
+        now: datetime,
+        client_ip: str,
+        user_agent: str | None,
+    ) -> tuple[str, Principal] | None:
+        """Check and record one login under both locks; its session, if any."""
+        started: tuple[str, Principal] | None = None
+        user = conn.execute(
+            select(UserRow)
+            .where(UserRow.username == name)
+            .with_for_update(key_share=True)
+        ).one_or_none()
+        stored_hash = None
+        if user is not None and user.active:
+            stored_hash = conn.execute(
+                select(PasswordCredentialRow.password_hash).where(
+                    PasswordCredentialRow.user_id == user.id
+                )
+            ).scalar_one_or_none()
+        locked = self._locked(conn, name, client_ip, now)
+        # Argon2 runs once for every name, known or not (index D-j). A
+        # locked attempt skips it: the lock is per name and address and
+        # treats unknown names alike, so skipping tells nothing new.
+        matches = not locked and verify_password(stored_hash, password)
+        succeeded = matches and not locked and user is not None
+        conn.execute(
+            insert(LoginAttemptRow).values(
+                username=name,
+                client_ip=client_ip,
+                succeeded=succeeded,
+                throttled=locked,
+                at=now,
+            )
+        )
+        prune_login_attempts(conn, now, self.policy)
+        if succeeded and user is not None and stored_hash is not None:
+            if needs_rehash(stored_hash):
+                conn.execute(
+                    update(PasswordCredentialRow)
+                    .where(PasswordCredentialRow.user_id == user.id)
+                    .values(password_hash=hash_password(password), changed_at=now)
+                )
+            token = secrets.token_urlsafe(32)
+            csrf_token = secrets.token_urlsafe(32)
+            session_id = conn.execute(
+                insert(SessionRow)
+                .values(
+                    user_id=user.id,
+                    token_sha256=token_digest(token),
+                    csrf_token=csrf_token,
+                    created_at=now,
+                    last_seen_at=now,
+                    expires_at=now + self.policy.absolute,
+                    client_ip=client_ip,
+                    user_agent=_printable(user_agent[:MAX_RECORDED_USER_AGENT])
+                    if user_agent
+                    else None,
+                )
+                .returning(SessionRow.id)
+            ).scalar_one()
+            started = (
+                token,
+                Principal(
+                    user_id=user.id,
+                    username=user.username,
+                    display_name=user.display_name,
+                    pseudonym=user.pseudonym,
+                    is_system_admin=user.is_system_admin,
+                    session_id=session_id,
+                    csrf_token=csrf_token,
+                ),
+            )
         return started
 
     def _locked(
