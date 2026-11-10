@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import re
+import tomllib
+from pathlib import Path
 
 import httpx
 import pytest
@@ -207,3 +209,20 @@ async def test_a_transport_error_does_not_show_the_token(settings: Settings) -> 
     assert "Cannot reach Ontotator" in str(raised.value)
     assert "Bearer ***" in str(raised.value)
     assert TOKEN not in str(raised.value)
+
+
+def test_the_readme_installs_the_current_release() -> None:
+    """Install URLs name the release tag, not main (#387).
+
+    A release bumps the version in the root pyproject.toml, so this fails
+    until the README's pin is bumped with it.
+    """
+    root = Path(__file__).resolve().parents[2]
+    version = tomllib.loads((root / "pyproject.toml").read_text())["project"]["version"]
+    readme = (root / "mcp" / "README.md").read_text()
+    urls = re.findall(r"git\+https://github\.com/phentrieve/ontotator[^\s\"`]*", readme)
+    assert len(urls) == 3
+    expected = (
+        f"git+https://github.com/phentrieve/ontotator@v{version}#subdirectory=mcp"
+    )
+    assert set(urls) == {expected}
