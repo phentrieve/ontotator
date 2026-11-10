@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from ontotator.api.identity import PrincipalDep, session_id_of
-from ontotator.api.security import SESSION_COOKIE
+from ontotator.api.security import session_cookie
 from ontotator.auth.accounts import AccountService
 from ontotator.auth.login_attempts import client_address
 from ontotator.auth.sessions import Principal, SessionService
@@ -89,12 +89,13 @@ def _start_session(
         client_ip=client_address(request.client.host if request.client else None),
         user_agent=request.headers.get("user-agent"),
     )
-    previous = request.cookies.get(SESSION_COOKIE)
+    previous = request.cookies.get(session_cookie(request.app))
     replaced = sessions.resolve(previous) if previous else None
     if replaced is not None and replaced.session_id is not None:
         sessions.logout(replaced.session_id)
+    # Secure, Path=/ and no Domain, as the __Host- prefix requires.
     response.set_cookie(
-        SESSION_COOKIE,
+        session_cookie(request.app),
         token,
         httponly=True,
         secure=bool(request.app.state.secure_cookies),
@@ -134,7 +135,7 @@ def logout(principal: PrincipalDep, request: Request) -> Response:
     _sessions(request).logout(session_id_of(principal))
     response = Response(status_code=204)
     response.delete_cookie(
-        SESSION_COOKIE,
+        session_cookie(request.app),
         path="/",
         httponly=True,
         secure=bool(request.app.state.secure_cookies),
@@ -156,7 +157,7 @@ def session(request: Request) -> SessionState:
     The login page asks this instead of ``/me``, so an anonymous visit logs
     no failed request, and learns whether to ask for demo logins.
     """
-    token = request.cookies.get(SESSION_COOKIE)
+    token = request.cookies.get(session_cookie(request.app))
     principal = _sessions(request).resolve(token) if token else None
     return SessionState(
         user=CurrentUser.of(principal) if principal is not None else None,

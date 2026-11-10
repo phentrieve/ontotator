@@ -25,7 +25,7 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from ontotator.api.routes import decode_workspace_id
-from ontotator.api.security import SESSION_COOKIE
+from ontotator.api.security import session_cookie
 from ontotator.application.preferences import normalize_annotator_id
 from ontotator.auth.audit import Actor
 from ontotator.authz.policy import ROLES
@@ -362,7 +362,7 @@ class AutoLoginClient(TestClient):
         """Log in as the harness user of ``annotator`` (created once)."""
         username = username_for(annotator)
         ensure_user(self.app, username, system_admin=True, pseudonym=annotator)
-        self.cookies.delete(SESSION_COOKIE)
+        self.cookies.delete(session_cookie(self.app))
         log_in(self, username)
         self.annotator = annotator
 

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Behind an `https://` public origin the session cookie is now `__Host-ontotator_session` instead of `ontotator_session`, so the browser keeps it to the exact host over HTTPS (Secure, `Path=/`, no `Domain`) and a sibling subdomain or a plain-HTTP page cannot set or replace it. **Everyone is logged out once** after the upgrade and logs in again; the old cookie is ignored and expires by itself. Without an https origin (plain-HTTP development) the cookie keeps its old name, since browsers refuse a `__Host-` cookie without Secure (#393).
+
 ### Fixed
 
 - Login: parallel logins for one username, sent from many addresses, no longer fill the database pool and answer 503 to everyone. A login no longer waits while another login for the same name is being checked; it fails at once with the usual `LOGIN_FAILED`, skips the password check and does not count towards the lockout, so a double-clicked login costs no attempt (#391).

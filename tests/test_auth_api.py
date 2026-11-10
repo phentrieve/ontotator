@@ -86,16 +86,40 @@ def test_login_sets_a_strict_cookie_and_me_names_the_user(app: FastAPI) -> None:
     assert user["csrf_token"]
 
 
-def test_the_cookie_is_secure_behind_an_https_origin(tmp_path: Path) -> None:
+def test_the_cookie_is_a_secure_host_cookie_behind_an_https_origin(
+    tmp_path: Path,
+) -> None:
+    # Issue 393: the __Host- prefix needs Secure, Path=/ and no Domain.
     app = _app(tmp_path, public_origin="https://editor.example")
     ensure_user(app, "alice")
+    origin = {"Origin": "https://editor.example"}
+    client = TestClient(app, base_url="https://editor.example")
 
-    response = _login(
-        TestClient(app), "alice", headers={"Origin": "https://editor.example"}
-    )
+    response = _login(client, "alice", headers=origin)
 
     assert response.status_code == 200, response.text
-    assert "secure" in _set_cookie(response).lower()
+    cookie = _set_cookie(response)
+    assert cookie.startswith("__Host-ontotator_session=")
+    lowered = cookie.lower()
+    assert "secure" in lowered
+    assert "path=/;" in lowered or lowered.endswith("path=/")
+    assert "domain=" not in lowered
+    assert client.get("/api/v1/auth/me").status_code == 200
+    token = client.cookies.get("__Host-ontotator_session")
+    # The cookie of the earlier name no longer opens a session.
+    renamed = TestClient(
+        app, base_url="https://editor.example", cookies={"ontotator_session": token}
+    )
+    assert renamed.get("/api/v1/auth/me").status_code == 401
+
+    logout = client.post(
+        "/api/v1/auth/logout",
+        headers={**origin, "X-CSRF-Token": response.json()["csrf_token"]},
+    )
+
+    assert logout.status_code == 204, logout.text
+    assert '__Host-ontotator_session=""' in _set_cookie(logout)
+    assert "secure" in _set_cookie(logout).lower()
 
 
 @pytest.mark.parametrize(
