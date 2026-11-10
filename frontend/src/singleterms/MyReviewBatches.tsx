@@ -45,7 +45,7 @@ export function MyReviewBatches({ projects, project, username, onNavigate }: {
       }}>{batch.decided ? "Continue" : "Start"}</a>;
     } },
   ];
-  return <section aria-labelledby="my-review-batches">
+  return <section aria-labelledby="my-review-batches" style={{ marginBottom: "var(--space-5)" }}>
     <h2 id="my-review-batches">Single-term review</h2>
     <DataTable label="My single-term review batches" className="data-table--pin-end" rows={shown} columns={columns}
       rowKey={({ project: item, batch }) => `${item.project_key}:${batch.batch_id}`} />
