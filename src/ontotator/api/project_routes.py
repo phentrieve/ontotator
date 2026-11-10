@@ -23,6 +23,7 @@ from ontotator.domain.next_steps import Stage, StepCode
 from ontotator.domain.profile_templates import PROFILE_TEMPLATES
 from ontotator.domain.profiles import TaskProfile
 from ontotator.domain.variants import TranslationStatus
+from ontotator.exchange.archive import expire_archive_files
 from ontotator.exchange.t1 import Pin
 from ontotator.projects.repin import RepinReport
 from ontotator.projects.service import (
@@ -316,6 +317,8 @@ def request_export(
     key: str, body: ExportRequest, principal: PrincipalDep, request: Request
 ) -> ExportCreated:
     actor = Actor.user(principal.user_id, principal.username)
+    # Exports past their retention go first (#396).
+    expire_archive_files(request.app.state.repo.db)
     with request.app.state.repo.db.transaction() as conn:
         project_id = authorized_project(conn, key, actor, EXPORT_ACTIONS[body.kind])
         job_id = request.app.state.jobs.enqueue(
@@ -329,6 +332,7 @@ def request_translation_review_export(
     key: str, principal: PrincipalDep, request: Request
 ) -> ExportCreated:
     actor = Actor.user(principal.user_id, principal.username)
+    expire_archive_files(request.app.state.repo.db)
     with request.app.state.repo.db.transaction() as conn:
         project_id = authorized_project(conn, key, actor, Action.EXPORT_ALL_WORK)
         job_id = request.app.state.jobs.enqueue(

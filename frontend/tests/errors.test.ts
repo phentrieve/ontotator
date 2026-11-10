@@ -47,3 +47,8 @@ it("names the version and the refused field in guideline refusals", () => {
   expect(errorMessage(new ApiError(409, "raw", "GUIDELINE_UNCHANGED", { version: "x" }))).toBe(ERROR_MESSAGES.GUIDELINE_UNCHANGED);
   expect(Object.hasOwn(ERROR_MESSAGES, "GUIDELINE_INCOMPLETE")).toBe(false);
 });
+
+it("names the queue limit of a refused job (issue 396)", () => {
+  expect(errorMessage(new ApiError(429, "raw", "JOB_QUEUE_LIMIT", { max: 3 }))).toBe("You already have 3 jobs waiting. Try again when one of them has started.");
+  expect(errorMessage(new ApiError(429, "raw", "JOB_QUEUE_LIMIT"))).toBe(ERROR_MESSAGES.JOB_QUEUE_LIMIT);
+});

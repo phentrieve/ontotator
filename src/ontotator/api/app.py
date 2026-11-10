@@ -77,7 +77,13 @@ from ontotator.domain.errors import (
     RevisionConflict,
 )
 from ontotator.exchange.archive import expire_archive_files
-from ontotator.jobs.queue import Handler, JobContext, JobQueue, Worker
+from ontotator.jobs.queue import (
+    QUEUE_RETRY_AFTER_SECONDS,
+    Handler,
+    JobContext,
+    JobQueue,
+    Worker,
+)
 from ontotator.ontology.modifiers import install_service_source
 from ontotator.ontology.translations import parse_translation_name
 from ontotator.storage.database import (
@@ -485,7 +491,7 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
 
     @app.exception_handler(DomainError)
     async def domain_error_handler(_req: Request, exc: DomainError) -> JSONResponse:
-        return JSONResponse(
+        response = JSONResponse(
             # A foreign project looks like a missing one (E3).
             status_code=(
                 404
@@ -555,10 +561,14 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
                     "PROJECT_HAS_WORK": 409,
                     "PRACTICE_IMPORT_FAILED": 503,
                     "TECHNICAL_REPORT_LIMIT": 429,
+                    "JOB_QUEUE_LIMIT": 429,
                 }.get(exc.code, 422)
             ),
             content={"code": exc.code, "details": exc.details or str(exc)},
         )
+        if exc.code == "JOB_QUEUE_LIMIT":
+            response.headers["Retry-After"] = str(QUEUE_RETRY_AFTER_SECONDS)
+        return response
 
     from ontotator.api.assignment_routes import router as assignment_router
     from ontotator.api.variant_routes import router as variant_router

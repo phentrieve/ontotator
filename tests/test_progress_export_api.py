@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import ontospan
 import pytest
@@ -34,6 +34,8 @@ from ontotator.storage.tables import (
 )
 
 BASE = "/api/v1/projects/proj"
+# Within the export retention (issue 396), so the file is still there.
+FINISHED_AT = datetime.now(UTC).replace(microsecond=0) - timedelta(minutes=5)
 
 
 @pytest.fixture
@@ -131,9 +133,7 @@ def _job(
                 requested_label=f"user:{requester}",
                 payload=payload or {"project": "proj"},
                 result=result,
-                finished_at=datetime(2026, 10, 15, 12, 34, 56, tzinfo=UTC)
-                if status in {"succeeded", "failed"}
-                else None,
+                finished_at=FINISHED_AT if status in {"succeeded", "failed"} else None,
             )
             .returning(JobRow.id)
         ).scalar_one()
@@ -449,7 +449,7 @@ def test_current_other_exporter_can_download(project):
     assert response.content == b"{}\n"
     assert (
         response.headers["content-disposition"]
-        == 'attachment; filename="proj-edit_log-20261015T123456Z.jsonl"'
+        == f'attachment; filename="proj-edit_log-{FINISHED_AT:%Y%m%dT%H%M%SZ}.jsonl"'
     )
 
 

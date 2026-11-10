@@ -14,6 +14,7 @@ from ontotator.authz.policy import Action
 from ontotator.authz.project_authority import require_project_management
 from ontotator.authz.scoped import project_not_found
 from ontotator.domain.errors import DomainError
+from ontotator.exchange.archive import expire_archive_files
 from ontotator.storage.repository import Repository, _lock_id
 from ontotator.storage.tables import JobRow, ProjectRow
 
@@ -138,8 +139,14 @@ def get_job(job_id: int, request: Request, principal: PrincipalDep) -> JobView:
 def download_job(
     job_id: int, request: Request, principal: PrincipalDep
 ) -> FileResponse:
+    """The file of a finished export; audited as ``project.export_download``.
+
+    410 once the file was deleted (``EXPORT_RETENTION`` after the export, or
+    when the command line wrote it out).
+    """
     actor = Actor.user(principal.user_id, principal.username)
     db = request.app.state.repo.db
+    expire_archive_files(db)
     with db.transaction() as conn:
         project_id, key, _ = _association(conn, job_id)
         # First conceal foreign projects, before inspecting job kind/result.
@@ -174,6 +181,12 @@ def download_job(
         sha = row.result.get("sha256")
         if not isinstance(sha, str):
             raise _not_found()
+        if row.result.get("file_deleted_at"):
+            raise HTTPException(
+                status_code=410,
+                detail="The export file was deleted 24 hours after the export."
+                " Export again.",
+            )
         try:
             path = db.blobs.path(sha)
             stat = path.stat()
