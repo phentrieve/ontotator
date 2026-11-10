@@ -34,6 +34,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Jobs: one person may have at most 3 queued jobs at a time (uploads, upload commits, exports, final exports and project archive jobs), because the worker runs the oldest queued job of the whole server and a loop of requests made every other project wait. One more is refused with `JOB_QUEUE_LIMIT` (HTTP 429, `Retry-After: 30`) before any file is stored; running jobs do not count, a per-person database lock lets parallel requests not both take the last place, and jobs from the command line and the annotation carry-over jobs of an accepted upload or translation review are never refused (#396).
 - Exports: the file of an export (annotation results, final results, Phenopackets, edit log, working time, translation reviews) is deleted 24 hours after its job finished, as a project archive is, instead of never; the job stays in the job list and **Export history** without a download, `GET /api/v1/jobs/{id}/download` answers 410 and the job result records `file_deleted_at`. A file a newer export, an upload or an import also uses stays. `ontotator admin export`, `export-edit-log` and `export-translation-reviews` now delete the server's copy once they have written the file, as their comment always said (#396).
 
+- A web T1 bundle upload is held to the same expanded-size limit as a web text upload (128 MiB) instead of ontospan's 512 MiB, so its preview cannot exhaust the app's memory. The command-line import keeps the larger limit.
+- The MCP tool `issue_setup_codes` refuses `include_active_accounts` without `codes_path`: a reset code of an active account is written to a local file and never enters the conversation with the model.
+
 ## [0.10.0] - 2026-11-10
 
 ### Added
