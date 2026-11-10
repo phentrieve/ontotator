@@ -34,7 +34,6 @@ stored data stays.
 
 from __future__ import annotations
 
-import json
 import threading
 from collections import OrderedDict
 from collections.abc import Iterable, Mapping, Sequence
@@ -771,7 +770,7 @@ class SingleTermService:
                 return self._basis_view(self._basis(conn, pid, replayed["basis_id"]))
             previous = self._latest_basis(conn, pid)
             cues = dict(viewer.cues)
-            sid, _digest, payload = finals.freeze_current(
+            sid, _digest, _payload = finals.freeze_current(
                 conn,
                 key,
                 pid,
@@ -780,8 +779,13 @@ class SingleTermService:
                     "purpose": BASIS_PURPOSE,
                 },
             )
-            # As stored: the recomputation reads the payload back from JSON.
-            payload = json.loads(json.dumps(payload))
+            # As stored (JSONB orders the keys anew), so that a recomputation
+            # and the final export see the same order of texts.
+            payload = conn.execute(
+                select(ExportSelectionSnapshotRow.payload).where(
+                    ExportSelectionSnapshotRow.snapshot_id == sid
+                )
+            ).scalar_one()
             data = derive_basis(self.db, key, sid, payload, cues)
             derivation_sha256 = data.derivation.sha256()
             report = data.derivation.report()

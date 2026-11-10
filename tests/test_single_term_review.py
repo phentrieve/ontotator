@@ -344,6 +344,27 @@ def test_the_derivation_is_recomputed_from_the_basis_after_a_cache_loss(env):
     assert stored == basis["derivation_sha256"]
 
 
+def test_the_basis_derives_from_the_snapshot_as_stored(env, monkeypatch):
+    """The stored snapshot's keys come back in another order (JSONB): the
+    basis must derive as a recomputation after a restart does."""
+    from ontotator.application import final_results, single_terms
+
+    freeze = final_results.FinalResultService.freeze_current
+
+    def reordered(self, *args, **kwargs):
+        sid, digest, payload = freeze(self, *args, **kwargs)
+        documents = payload["content"]["documents"]
+        assert len(documents) > 1
+        payload["content"]["documents"] = dict(reversed(list(documents.items())))
+        return sid, digest, payload
+
+    monkeypatch.setattr(final_results.FinalResultService, "freeze_current", reordered)
+    _basis(env)
+    single_terms._derivations.clear()
+    summary = env.lead.get(f"{ST}/summary")
+    assert summary.status_code == 200, summary.text
+
+
 def test_contexts_show_the_text_around_each_occurrence(env):
     _basis(env)
     contexts = env.lead.get(f"{ST}/groups/{G_SEIZURE}/contexts", params={"limit": 1})
