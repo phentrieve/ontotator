@@ -2189,21 +2189,26 @@ def discard_archive_files(
 
 
 def expire_archive_files(db: Database, now: datetime | None = None) -> None:
-    """``discard_archive_files`` of the archives past their retention (server
-    start, each archive request and export)."""
-    from ontotator.exchange.jobs import unlink_after_commit
+    """``discard_archive_files`` of the archives and ``discard_export_files``
+    of the exports past their retention (server start, each archive or export
+    request and download, each archive export)."""
+    from ontotator.exchange.jobs import discard_export_files, unlink_after_commit
 
+    now = now or datetime.now(UTC)
     with db.transaction() as conn:
-        deleted = discard_archive_files(conn, now or datetime.now(UTC))
+        deleted = discard_archive_files(conn, now)
+        deleted += discard_export_files(conn, now)
         unlink_after_commit(db, deleted)
 
 
 def release_archive_file(db: Database, job_id: int) -> None:
-    """Delete the stored archive of one finished archive job now."""
-    from ontotator.exchange.jobs import unlink_after_commit
+    """Delete the stored file of one finished archive or export job now."""
+    from ontotator.exchange.jobs import discard_export_files, unlink_after_commit
 
+    now = datetime.now(UTC)
     with db.transaction() as conn:
-        deleted = discard_archive_files(conn, datetime.now(UTC), job_ids=[job_id])
+        deleted = discard_archive_files(conn, now, job_ids=[job_id])
+        deleted += discard_export_files(conn, now, job_ids=[job_id])
         unlink_after_commit(db, deleted)
 
 

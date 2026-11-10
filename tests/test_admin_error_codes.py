@@ -18,6 +18,7 @@ PATHS = (
     "api/ontology_routes.py",
     "api/upload_routes.py",
     "api/job_routes.py",
+    "jobs/queue.py",
     "api/assignment_routes.py",
     "api/document_projection.py",
     "api/variant_routes.py",

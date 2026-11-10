@@ -3,7 +3,7 @@
 import hashlib
 import json
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from threading import Event, get_ident
 
 import pytest
@@ -115,10 +115,10 @@ def test_real_record_contract_blob_audit_and_download(exported_env, decision):
                 StoredFileRow.sha256 == result.result["sha256"]
             )
         ).scalar_one() == len(data)
+        # Within the export retention (issue 396), so the file is still there.
+        finished = datetime.now(UTC).replace(microsecond=0) - timedelta(minutes=5)
         conn.execute(
-            update(JobRow)
-            .where(JobRow.id == result.id)
-            .values(finished_at=datetime(2026, 10, 16, 12, 34, 56, tzinfo=UTC))
+            update(JobRow).where(JobRow.id == result.id).values(finished_at=finished)
         )
     assert audits(env, "project.translation_review_export") == [
         {**result.result, "job_id": result.id}
@@ -127,7 +127,7 @@ def test_real_record_contract_blob_audit_and_download(exported_env, decision):
     assert download.status_code == 200 and download.content == data
     assert download.headers["content-type"] == "application/x-ndjson"
     assert (
-        "proj-translation-reviews-20261016T123456Z.jsonl"
+        f"proj-translation-reviews-{finished:%Y%m%dT%H%M%SZ}.jsonl"
         in download.headers["content-disposition"]
     )
     assert audits(env, "project.export_download")[-1]["kind"] == "translation-reviews"

@@ -225,6 +225,8 @@ What for: download raw material for analysis. People appear as pseudonyms.
 2. Choose a row: **Annotation results**, **Edit log**, **Working time** or **Translation reviews**. **Working time** holds data only if the project records working time ([Record working time](lead-settings.md#record-working-time)).
 3. Click **Create**, then **Download** when it is ready.
 
+Download an export within 24 hours: the server then deletes its file, and you create the export again. You can have at most 3 exports and uploads waiting at a time; one more is refused until one of them has started.
+
 How to analyse these files is described in the [scientific workflow guide](../scientific-workflow.md).
 
 ### Export history
@@ -233,7 +235,7 @@ What for: find an earlier export again, see who made it and why one failed.
 
 **Export history** at the bottom of **Export** is closed at first; click it to open the list. It lists every export of the project, newest first: final results, Phenopackets and the research data, also those that other leads or an API token started. Each row shows the export, its state (*Waiting*, *Running*, *Ready* or *Failed*), who requested it (*Command line* for one started on the server), when it started (to the minute) and how long it ran, for example *4 s* or *1 min 12 s*; *–* while it is still waiting or running. Point at the duration for the exact start and finish times. A failed export shows its error code under *Failed*; point at it for the full message.
 
-- Click **Download** to save the file of a finished export again. The server checks your rights again on every download.
+- Click **Download** to save the file of a finished export again, within 24 hours of the export. Then the server deletes the file and the row has no **Download** any more: create the export again. The server checks your rights again on every download.
 - Click **Show older exports** for the next 20.
 - While the list is open, it updates when you create a research export here. Click **Refresh history** to see a final export or exports others started meanwhile.
 

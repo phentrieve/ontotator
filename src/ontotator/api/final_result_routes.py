@@ -11,6 +11,7 @@ from ontotator.api.routes import get_access
 from ontotator.api.work_plan_routes import RowRefView
 from ontotator.application.final_results import FinalResultService
 from ontotator.auth.audit import Actor
+from ontotator.exchange.archive import expire_archive_files
 
 router = APIRouter(prefix="/api/v1/projects/{key}", tags=["final-results"])
 
@@ -223,6 +224,8 @@ def final_export(
     # A T1 request is stored without ``format``, as before #308, so that a
     # replayed older request matches its stored one.
     exclude = {"format"} if body.format == "t1" else None
+    # Exports past their retention go first (#396).
+    expire_archive_files(request.app.state.repo.db)
     return _service(request, principal).freeze(
         key, body.model_dump(mode="json", exclude=exclude)
     )

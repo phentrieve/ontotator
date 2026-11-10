@@ -315,11 +315,13 @@ def enqueue_import_pairs(
                 **pair.model_dump(),
                 producer=ImportProducer(job_id=parent_job_id),
             )
+            # Part of the accepted import: never refused for the queue limit.
             queue.enqueue(
                 "reanchor",
                 payload.model_dump(mode="json"),
                 project_id=project_id,
                 actor=actor,
+                queue_limit=False,
             )
 
 
@@ -343,8 +345,13 @@ def enqueue_review_pair(
         new_document_id=new,
         producer=ReviewProducer(review_id=review_id),
     )
+    # Part of the accepted review: never refused for the queue limit.
     return jobs.enqueue(
-        "reanchor", payload.model_dump(mode="json"), project_id=project_id, actor=actor
+        "reanchor",
+        payload.model_dump(mode="json"),
+        project_id=project_id,
+        actor=actor,
+        queue_limit=False,
     )
 
 

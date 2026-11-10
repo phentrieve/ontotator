@@ -8,6 +8,10 @@ While a job runs, its claimer holds a session advisory lock on the job id
 (taken in the claim transaction). A job still ``running`` whose lock is free
 lost its process (deploy, SIGKILL, OOM); :meth:`JobQueue.reclaim` marks it
 failed, with its upload, at worker start and then every ``RECLAIM_INTERVAL``.
+
+The worker takes the oldest queued job of the whole installation, so one
+person may hold at most ``MAX_QUEUED_JOBS_PER_USER`` queued jobs (issue 396):
+a request for one more is refused with ``JOB_QUEUE_LIMIT`` (HTTP 429).
 """
 
 from __future__ import annotations
@@ -35,7 +39,7 @@ from sqlalchemy import (
 from ontotator.auth.audit import Actor
 from ontotator.auth.context import api_token_ref, current_job_api_token
 from ontotator.domain.errors import DomainError
-from ontotator.storage.database import Database
+from ontotator.storage.database import Database, advisory_lock_id
 from ontotator.storage.lease import _discard
 from ontotator.storage.tables import JobRow, UploadRow
 
@@ -47,6 +51,58 @@ logger = logging.getLogger(__name__)
 
 RECLAIM_INTERVAL = 60.0
 """Seconds between a worker's checks for jobs whose process died."""
+
+MAX_QUEUED_JOBS_PER_USER = 3
+"""Queued (not yet running) jobs one person may have at a time (issue 396).
+
+Running jobs do not count: each worker runs one job at a time, so they are
+bounded already, and a long export must not block the next request."""
+
+QUEUE_RETRY_AFTER_SECONDS = 30
+"""The ``Retry-After`` of a ``JOB_QUEUE_LIMIT`` refusal."""
+
+
+def _queue_lock(user_id: int) -> int:
+    return advisory_lock_id("job-queue-user", str(user_id))
+
+
+def _queued_by(conn: Connection, user_id: int) -> int:
+    return int(
+        conn.execute(
+            select(func.count()).where(
+                JobRow.requested_by == user_id, JobRow.status == "queued"
+            )
+        ).scalar_one()
+    )
+
+
+def queue_full_error() -> DomainError:
+    return DomainError(
+        "JOB_QUEUE_LIMIT",
+        {
+            "message": f"You already have {MAX_QUEUED_JOBS_PER_USER} jobs waiting."
+            " Try again when one of them has started.",
+            "max": MAX_QUEUED_JOBS_PER_USER,
+        },
+    )
+
+
+def check_queue_room(conn: Connection, actor: Actor) -> None:
+    """Refuse a person's next job when ``MAX_QUEUED_JOBS_PER_USER`` are queued.
+
+    Takes a transaction lock per person first, so two parallel requests see
+    each other's job: the lock is held until the caller's transaction, which
+    inserts the job, commits. Processes (``actor.user_id`` None: the admin
+    command line, practice setup) are never refused.
+
+    Raises:
+        DomainError: ``JOB_QUEUE_LIMIT`` (HTTP 429).
+    """
+    if actor.user_id is None:
+        return
+    conn.execute(select(func.pg_advisory_xact_lock(_queue_lock(actor.user_id))))
+    if _queued_by(conn, actor.user_id) >= MAX_QUEUED_JOBS_PER_USER:
+        raise queue_full_error()
 
 
 @dataclass(frozen=True)
@@ -156,7 +212,14 @@ class JobQueue:
         *,
         project_id: int | None = None,
         actor: Actor,
+        queue_limit: bool = True,
     ) -> int:
+        """Queue a job; its id.
+
+        ``queue_limit=False`` for a job the system queues as a consequence of
+        work already accepted (a carry-over of annotations), which must not
+        fail for the queue limit (``check_queue_room``).
+        """
         if kind not in self.handlers:
             raise DomainError("JOB_KIND_UNKNOWN", f"No job handler for '{kind}'.")
         token = api_token_ref()
@@ -164,6 +227,8 @@ class JobQueue:
             # The job's audit entries name the token; _run takes it out again.
             payload = {**payload, "api_token": token}
         with self.db.transaction() as conn:
+            if queue_limit:
+                check_queue_room(conn, actor)
             return int(
                 conn.execute(
                     insert(JobRow)
@@ -178,6 +243,17 @@ class JobQueue:
                     .returning(JobRow.id)
                 ).scalar_one()
             )
+
+    def precheck_queue_room(self, actor: Actor) -> None:
+        """``check_queue_room`` without its lock, before a request stores files.
+
+        Only a shortcut: ``enqueue`` checks again under the lock.
+        """
+        if actor.user_id is None:
+            return
+        with self.db.transaction() as conn:
+            if _queued_by(conn, actor.user_id) >= MAX_QUEUED_JOBS_PER_USER:
+                raise queue_full_error()
 
     def claim_next(self, worker: str) -> Job | None:
         """The oldest queued job nobody else is claiming, now running."""

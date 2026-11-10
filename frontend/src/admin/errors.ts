@@ -166,6 +166,8 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   NOT_A_MEMBER: "This user is not a member of the project.",
   NOT_A_PRACTICE_PROJECT: "Only practice projects can be deleted here. A project without work is deleted in its settings, under General.",
   IS_A_PRACTICE_PROJECT: "This is a practice project. Delete it under Show practice projects.",
+  JOB_KIND_UNKNOWN: "This server cannot run this kind of job.",
+  JOB_QUEUE_LIMIT: "You already have several jobs waiting. Try again when one of them has started.",
   OBSOLETE_TERM: "Replace obsolete terms in your findings, or reject or replace affected proposals before submitting.",
   ORCID_INVALID: "The ORCID format or checksum is invalid.",
   ONTOLOGY_NOT_FOUND: "The required ontology is unavailable. Ask an administrator to check the project pins.",
@@ -286,6 +288,10 @@ export function errorMessage(error: unknown): string {
   if (error instanceof ApiError && error.code === "ANNOTATIONS_PER_TEXT_REACHED" && typeof error.details === "object" && error.details !== null) {
     const limit = error.details.limit;
     if (typeof limit === "number" && Number.isSafeInteger(limit) && limit > 0) return `This text already has ${limit} annotation assignments, the project's limit (Settings, Workflow).`;
+  }
+  if (error instanceof ApiError && error.code === "JOB_QUEUE_LIMIT" && typeof error.details === "object" && error.details !== null) {
+    const max = error.details.max;
+    if (typeof max === "number" && Number.isSafeInteger(max) && max > 0) return `You already have ${max} jobs waiting. Try again when one of them has started.`;
   }
   if (error instanceof ApiError && error.code === "TEXT_CHANGE_NOT_APPLICABLE" && typeof error.details === "object" && error.details !== null && error.details.reason === "from_proposals") {
     return error.details.step === "carry"

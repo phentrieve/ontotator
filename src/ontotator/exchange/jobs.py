@@ -14,7 +14,7 @@ import json
 import tempfile
 import zipfile
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -22,7 +22,7 @@ from typing import Any
 
 import ontospan
 from ontospan.bundle import MANIFEST as BUNDLE_MANIFEST
-from sqlalchemy import Connection, Text, cast, delete, exists, or_, select
+from sqlalchemy import Connection, Text, cast, delete, exists, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ontotator.application.work_time import work_time_export as work_time_lines
@@ -32,7 +32,11 @@ from ontotator.authz.policy import Access, Action, can
 from ontotator.authz.scoped import ScopedRepository
 from ontotator.domain.errors import AccessDenied, DomainError, project_not_found
 from ontotator.domain.work_rounds import CARRY_ROUND_KINDS
-from ontotator.exchange.archive import project_archive_export, project_archive_import
+from ontotator.exchange.archive import (
+    ARCHIVE_RETENTION,
+    project_archive_export,
+    project_archive_import,
+)
 from ontotator.exchange.final_export import final_t1_export
 from ontotator.exchange.final_phenopackets import final_phenopacket_export
 from ontotator.exchange.reanchor_job import reanchor
@@ -163,6 +167,86 @@ def unlink_after_commit(db: Database, digests: Sequence[str]) -> None:
     if digests:
         found = list(digests)
         db.after_commit(lambda: unlink_deleted_files(db, found))
+
+
+EXPORT_JOB_KINDS = frozenset(
+    {
+        "t1_export",
+        "final_t1_export",
+        "final_phenopacket_export",
+        "edit_log_export",
+        "work_time_export",
+        "translation_review_export",
+    }
+)
+"""The jobs whose result is a downloadable file (``/api/v1/jobs/{id}/download``)."""
+
+EXPORT_RETENTION = ARCHIVE_RETENTION
+"""An export's file is kept this long after its job finished, as an archive
+is (issue 396); the job stays, with ``file_deleted_at`` in its result."""
+
+
+def export_file_due(now: datetime) -> datetime:
+    """Exports that finished before this time are past their retention."""
+    return now - EXPORT_RETENTION
+
+
+def discard_export_files(
+    conn: Connection, now: datetime, *, job_ids: Iterable[int] | None = None
+) -> list[str]:
+    """Delete the files of exports ``EXPORT_RETENTION`` after their job finished.
+
+    ``job_ids``: only these jobs' files, at once (the command line wrote the
+    file out). The job's result records ``file_deleted_at``, and its download
+    answers 410. A file another export within its retention, an upload or an
+    import also refers to stays. Returns the files whose rows went; remove them
+    after the commit (``unlink_after_commit``).
+    """
+    due = (
+        JobRow.id.in_(sorted(job_ids))
+        if job_ids is not None
+        else JobRow.finished_at < export_file_due(now)
+    )
+    rows = conn.execute(
+        select(JobRow.id, JobRow.result)
+        .where(
+            JobRow.kind.in_(EXPORT_JOB_KINDS),
+            JobRow.status == "succeeded",
+            JobRow.result["sha256"].astext.is_not(None),
+            JobRow.result["file_deleted_at"].astext.is_(None),
+            due,
+        )
+        .order_by(JobRow.id)
+        .with_for_update()
+    ).all()
+    deleted: list[str] = []
+    for job_id, result in rows:
+        digest = str(result["sha256"])
+        Database.lock_blob(conn, digest)
+        # Identical bytes (a final export of the same snapshot) are one file.
+        shared = conn.execute(
+            select(JobRow.id).where(
+                JobRow.id != job_id,
+                JobRow.kind.in_(EXPORT_JOB_KINDS),
+                JobRow.status == "succeeded",
+                JobRow.result["sha256"].astext == digest,
+                JobRow.result["file_deleted_at"].astext.is_(None),
+            )
+        ).first()
+        if shared is None and delete_unreferenced_file(
+            conn, digest, ignore_job_kinds=EXPORT_JOB_KINDS
+        ):
+            deleted.append(digest)
+        conn.execute(
+            update(JobRow)
+            .where(JobRow.id == job_id)
+            .values(
+                result=JobRow.result.op("||")(
+                    func.jsonb_build_object("file_deleted_at", now.isoformat())
+                )
+            )
+        )
+    return deleted
 
 
 def operator_access(actor: Actor) -> Access:

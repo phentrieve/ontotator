@@ -25,6 +25,7 @@ from ontotator.exchange.final_export import agreement_units
 from ontotator.exchange.final_export_guide import submission_kind
 from ontotator.exchange.final_tables import ANNOTATION_KINDS, agreement_report
 from ontotator.exchange.human_inputs import human_input_closure
+from ontotator.jobs.queue import check_queue_room
 from ontotator.storage import work_plan_store
 from ontotator.storage.database import Database
 from ontotator.storage.final_tables import (
@@ -463,6 +464,8 @@ class FinalResultService:
                     .limit(1)
                 ).scalar_one()
                 return {"job_id": job}
+            # The job is inserted below, not through ``JobQueue.enqueue`` (#396).
+            check_queue_room(conn, self.actor)
             state = self._projection(conn, key, pid)
             expected_warnings = [
                 {"id": warning["id"], "cause_revision": warning["cause_revision"]}
