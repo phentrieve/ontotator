@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Security
+
+- A web T1 bundle upload is held to the same expanded-size limit as a web text upload (128 MiB) instead of ontospan's 512 MiB, so its preview cannot exhaust the app's memory. The command-line import keeps the larger limit.
+- The MCP tool `issue_setup_codes` refuses `include_active_accounts` without `codes_path`: a reset code of an active account is written to a local file and never enters the conversation with the model.
+
 ## [0.10.0] - 2026-11-10
 
 ### Added

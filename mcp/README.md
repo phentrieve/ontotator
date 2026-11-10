@@ -175,7 +175,7 @@ Writes with a token are audited with the token (`details.api_token`), as in the 
 
 ### Setup codes
 
-`create_users` and `issue_setup_codes` return one-time codes with which a person sets a password on the login page. The codes are credentials. With `codes_path` they are written to a CSV file (`username`, `display_name`, `email`, `code`, `expires_at`) inside `ONTOTATOR_MCP_FILES_DIR`, readable by you only, and the result names only who got one; without it the codes are part of the tool result, and so of the conversation with the model. `create_users` skips usernames the server already has, so a repeated call adds only the missing people. `issue_setup_codes` renews only codes of people who never set a password, unless `include_active_accounts` (which ends the person's sessions and revokes their API tokens).
+`create_users` and `issue_setup_codes` return one-time codes with which a person sets a password on the login page. The codes are credentials. With `codes_path` they are written to a CSV file (`username`, `display_name`, `email`, `code`, `expires_at`) inside `ONTOTATOR_MCP_FILES_DIR`, readable by you only, and the result names only who got one; without it the codes are part of the tool result, and so of the conversation with the model. `create_users` skips usernames the server already has, so a repeated call adds only the missing people. `issue_setup_codes` renews only codes of people who never set a password, unless `include_active_accounts` (which ends the person's sessions and revokes their API tokens, and needs `codes_path`: a reset code of an active account is never returned to the model).
 
 ### Project archives
 

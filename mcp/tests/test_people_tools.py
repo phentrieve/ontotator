@@ -157,7 +157,7 @@ async def test_an_existing_codes_file_is_refused_before_any_code_is_issued(
 
 
 async def test_issue_setup_codes_renews_only_pending_invitations(
-    fake: FakeApi, mcp_client: Client
+    fake: FakeApi, mcp_client: Client, tmp_path: Path
 ) -> None:
     fake.on(
         "GET",
@@ -183,12 +183,34 @@ async def test_issue_setup_codes_renews_only_pending_invitations(
     [post] = fake.calls_to("POST", RESET)
     assert post.request.url.path == "/api/v1/admin/users/pending/reset-code"
     fake.calls.clear()
+    codes = tmp_path / "codes.csv"
     forced = await call(
         mcp_client,
         "issue_setup_codes",
-        {"usernames": ["working"], "include_active_accounts": True},
+        {
+            "usernames": ["working"],
+            "include_active_accounts": True,
+            "codes_path": str(codes),
+        },
     )
-    assert [item["username"] for item in forced["codes"]] == ["working"]
+    assert "NEW" not in str(forced)
+    with codes.open(encoding="utf-8") as handle:
+        assert [row["username"] for row in csv.DictReader(handle)] == ["working"]
+
+
+async def test_resetting_an_active_account_needs_a_codes_file(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    fake.on("GET", USERS, [_account("working", setup_pending=False)])
+    fake.on("POST", RESET, {"code": "NEW", "expires_at": "2026-11-06T10:00:00Z"})
+    with pytest.raises(ToolFailed) as refused:
+        await call(
+            mcp_client,
+            "issue_setup_codes",
+            {"usernames": ["working"], "include_active_accounts": True},
+        )
+    assert "needs codes_path" in str(refused.value)
+    assert not fake.calls_to("POST", RESET)
 
 
 async def test_update_user_sends_only_the_named_fields(

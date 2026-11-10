@@ -126,7 +126,11 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "project": "p",
             "codes_path": str(folder / "codes.csv"),
         },
-        "issue_setup_codes": {"usernames": ["old"], "include_active_accounts": True},
+        "issue_setup_codes": {
+            "usernames": ["old"],
+            "include_active_accounts": True,
+            "codes_path": str(folder / "reset.csv"),
+        },
         "update_user": {"username": "old", "active": False},
         "find_people": {"project": "p", "query": "ann"},
         "list_assignments": {"project": "p"},
