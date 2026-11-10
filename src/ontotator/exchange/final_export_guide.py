@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from ontotator.domain.work_rounds import CARRY_ROUND_KINDS
+from ontotator.exchange.spreadsheet import spreadsheet_row
 
 INDEX_COLUMNS = (
     "row_type",
@@ -205,7 +206,7 @@ def build_index_csv(
     out = io.StringIO(newline="")
     writer = csv.DictWriter(out, fieldnames=INDEX_COLUMNS)
     writer.writeheader()
-    writer.writerows(table)
+    writer.writerows(spreadsheet_row(row) for row in table)
     return out.getvalue().encode("utf-8-sig")
 
 
@@ -222,16 +223,18 @@ def build_planned_out_csv(payload: Mapping[str, Any]) -> bytes:
     writer.writeheader()
     for item in payload.get("planned_out", []):
         writer.writerow(
-            {
-                "case_id": item["case_id"],
-                "language": item["language"],
-                "plan_revision": str(item["revision"]),
-                "planned_out_at": item["planned_out_at"],
-                "reason": item.get("reason") or "",
-                "final_result_kept": (
-                    "true" if item.get("final_result_kept") else "false"
-                ),
-            }
+            spreadsheet_row(
+                {
+                    "case_id": item["case_id"],
+                    "language": item["language"],
+                    "plan_revision": str(item["revision"]),
+                    "planned_out_at": item["planned_out_at"],
+                    "reason": item.get("reason") or "",
+                    "final_result_kept": (
+                        "true" if item.get("final_result_kept") else "false"
+                    ),
+                }
+            )
         )
     return out.getvalue().encode("utf-8-sig")
 
@@ -442,6 +445,17 @@ def build_readme(
         *_wrap(
             "Text positions are Unicode code points into the text of the matching line "
             'of source-texts.jsonl (column "source_text_line").',
+            "- ",
+            "  ",
+        ),
+        *_wrap(
+            "In the CSV files a cell that starts with =, +, -, @, a tab or a "
+            "carriage return, unless it is a plain number such as -1, gets an "
+            "extra apostrophe in front, so that a spreadsheet shows it as text "
+            "instead of running it as a formula; so does a cell that starts with "
+            "an apostrophe. To get the exact value, for example of covered_text, "
+            "remove one leading apostrophe from every cell that starts with one. "
+            "The bundles and source-texts.jsonl hold every value unchanged.",
             "- ",
             "  ",
         ),

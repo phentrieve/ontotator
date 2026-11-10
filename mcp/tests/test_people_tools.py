@@ -191,6 +191,60 @@ async def test_issue_setup_codes_renews_only_pending_invitations(
     assert [item["username"] for item in forced["codes"]] == ["working"]
 
 
+async def test_issued_codes_file_escapes_cells_a_spreadsheet_would_run(
+    fake: FakeApi, mcp_client: Client, tmp_path: Path
+) -> None:
+    """#386: a person sets their own display name and e-mail address; in the
+    codes file a formula such as =1+1 is text, not a formula."""
+    link = '=HYPERLINK("http://x","y")'
+    fake.on(
+        "GET",
+        USERS,
+        [
+            _account(
+                "pending", display_name="=1+1", email="+x@y.org", setup_pending=True
+            ),
+            _account("other", display_name=link, email=None, setup_pending=True),
+        ],
+    )
+    fake.on(
+        "POST", RESET, {"code": "AB3DE-FGH4K", "expires_at": "2026-11-06T10:00:00Z"}
+    )
+    codes = tmp_path / "codes.csv"
+    await call(
+        mcp_client,
+        "issue_setup_codes",
+        {"usernames": ["pending", "other"], "codes_path": str(codes)},
+    )
+    with codes.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    assert [(r["display_name"], r["email"], r["code"]) for r in rows] == [
+        ("'=1+1", "'+x@y.org", "AB3DE-FGH4K"),
+        ("'" + link, "", "AB3DE-FGH4K"),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("value", "cell"),
+    [
+        ("=1+1", "'=1+1"),
+        ("-x", "'-x"),
+        ("@x", "'@x"),
+        ("\tx", "'\tx"),
+        ("\rx", "'\rx"),
+        ("'x", "''x"),
+        ("-1", "-1"),
+        ("+0.5e3", "+0.5e3"),
+        ("Ann", "Ann"),
+        (None, None),
+    ],
+)
+def test_spreadsheet_cell_matches_the_server(value: Any, cell: Any) -> None:
+    from ontotator_mcp.tools_people import spreadsheet_cell
+
+    assert spreadsheet_cell(value) == cell
+
+
 async def test_update_user_sends_only_the_named_fields(
     fake: FakeApi, mcp_client: Client
 ) -> None:

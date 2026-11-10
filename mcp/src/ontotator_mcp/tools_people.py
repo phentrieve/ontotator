@@ -13,6 +13,7 @@ import contextlib
 import csv
 import io
 import os
+import re
 import tempfile
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -40,6 +41,28 @@ CodesPath = Annotated[
 CODE_COLUMNS = ("username", "display_name", "email", "code", "expires_at")
 # Tasks a lead can hand to someone else (a consolidation opens through its round).
 HANDOVER_TASKS = ("annotate", "translation_review")
+# A copy of ontotator.exchange.spreadsheet (#386): this package is installed on
+# its own and does not depend on the server. Keep the two in step.
+ESCAPED_START = ("=", "+", "-", "@", "\t", "\r", "'")
+_NUMBER = re.compile(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?", re.ASCII)
+
+
+def spreadsheet_cell(value: Any) -> Any:
+    """``value`` as a CSV cell no spreadsheet runs as a formula.
+
+    A text that starts with ``=``, ``+``, ``-``, ``@``, a tab or a carriage
+    return (a display name such as ``=HYPERLINK(...)``) gets a leading
+    apostrophe, so Excel and LibreOffice show it as text; so does one that
+    starts with an apostrophe, so removing one leading apostrophe gives back
+    the value. Plain numbers such as ``-1`` stay unchanged.
+    """
+    if (
+        isinstance(value, str)
+        and value.startswith(ESCAPED_START)
+        and _NUMBER.fullmatch(value) is None
+    ):
+        return "'" + value
+    return value
 
 
 def codes_target(api: OntotatorClient, path: str, overwrite: bool) -> Path:
@@ -64,7 +87,9 @@ def write_codes(
     buffer = io.StringIO()
     writer = csv.DictWriter(buffer, fieldnames=CODE_COLUMNS, extrasaction="ignore")
     writer.writeheader()
-    writer.writerows(rows)
+    writer.writerows(
+        {key: spreadsheet_cell(value) for key, value in row.items()} for row in rows
+    )
     handle, partial = tempfile.mkstemp(
         prefix=f".{target.name}.", suffix=".part", dir=target.parent
     )

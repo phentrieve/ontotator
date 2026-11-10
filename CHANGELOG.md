@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Security
+
+- CSV files no longer carry formulas into spreadsheets (#386). A cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage return, such as a display name `=HYPERLINK(...)` a person set in their profile, a passage of an uploaded text in `covered_text`, a case ID or a reason, now gets a leading apostrophe (`'=1+1`), so Excel or LibreOffice shows it as text instead of running it. This covers every table of the final export (`index.csv`, `planned-out.csv`, `findings.csv`, `agreement.csv`, `agreement-summary.csv`, `proposals.csv`) and the setup codes file of the MCP tools `create_users` and `issue_setup_codes`. Plain numbers such as `-1` stay unchanged, and a cell that starts with an apostrophe gets a second one, so removing one leading apostrophe from every cell that starts with one gives back the exact value; README.txt of the export and the [scientific workflow guide](docs/scientific-workflow.md#files-of-the-final-export) say so. The bundles, `source-texts.jsonl`, `receipt.json` and the JSON and JSONL exports are unchanged; the format stays `ontotator-final-export/v2`. README.txt has one more paragraph, so a new export of an earlier check differs from the earlier export in README.txt and in every escaped cell.
+
 ## [0.10.0] - 2026-11-10
 
 ### Added

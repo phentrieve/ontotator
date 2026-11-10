@@ -33,6 +33,7 @@ from ontotator.exchange.final_export_guide import (
     bundle_file,
     submission_kind,
 )
+from ontotator.exchange.spreadsheet import spreadsheet_row
 
 FINDINGS_COLUMNS = (
     "row_type",
@@ -190,7 +191,7 @@ def _csv(columns: Sequence[str], rows: Iterable[Mapping[str, str]]) -> bytes:
     out = io.StringIO(newline="")
     writer = csv.DictWriter(out, fieldnames=columns)
     writer.writeheader()
-    writer.writerows(rows)
+    writer.writerows(spreadsheet_row(row) for row in rows)
     return out.getvalue().encode("utf-8-sig")
 
 
