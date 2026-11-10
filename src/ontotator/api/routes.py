@@ -46,8 +46,8 @@ from ontotator.authz.policy import (
     allowed_modes,
     can,
 )
-from ontotator.authz.scoped import ScopedRepository, project_not_found
-from ontotator.domain.errors import AccessDenied, DomainError
+from ontotator.authz.scoped import ScopedRepository
+from ontotator.domain.errors import AccessDenied, DomainError, project_not_found
 from ontotator.domain.profiles import resolve_layer
 from ontotator.domain.review import ReviewTargetSet
 from ontotator.domain.scopes import build_scope, is_review_like

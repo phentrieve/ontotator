@@ -44,7 +44,7 @@ from ontotator.domain.annotation_modes import workspace_mode
 from ontotator.domain.annotations import AnnotationSnapshot
 from ontotator.domain.axes import AxesConfig
 from ontotator.domain.documents import Document, EvidenceSnapshot
-from ontotator.domain.errors import AccessDenied, DomainError
+from ontotator.domain.errors import AccessDenied, DomainError, project_not_found
 from ontotator.domain.profiles import TaskProfile
 from ontotator.domain.project_rules import ProjectRules
 from ontotator.domain.reanchor_resolution import PendingReanchorRef, ReanchorItem
@@ -112,10 +112,6 @@ def _count_rollbacks(*args: Any) -> None:
 
 def _write_stamp() -> tuple[int, int]:
     return threading.get_ident(), getattr(_writes, "count", 0)
-
-
-def project_not_found(project_key: str) -> DomainError:
-    return DomainError("PROJECT_NOT_FOUND", f"There is no project '{project_key}'.")
 
 
 def _project_required() -> DomainError:

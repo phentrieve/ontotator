@@ -43,7 +43,12 @@ from ontotator.domain.axes import AxesConfig
 from ontotator.domain.axis_visibility import editor_profile, legacy_axes_config
 from ontotator.domain.canonical import canonical_hash
 from ontotator.domain.documents import Document, EvidenceSnapshot
-from ontotator.domain.errors import DomainError, InvalidPackage, RevisionConflict
+from ontotator.domain.errors import (
+    DomainError,
+    InvalidPackage,
+    RevisionConflict,
+    project_not_found,
+)
 from ontotator.domain.guidelines import guideline_ref
 from ontotator.domain.profiles import OntologyDefinition, TaskProfile, profile_hash
 from ontotator.domain.project_rules import ProjectRules
@@ -775,9 +780,7 @@ class Repository:
     def _require_project(self, conn: Connection, project_key: str) -> int:
         project_id = self._project_id(conn, project_key)
         if project_id is None:
-            raise DomainError(
-                "PACKAGE_NOT_FOUND", f"No package found for package '{project_key}'"
-            )
+            raise project_not_found(project_key)
         return project_id
 
     @staticmethod
@@ -1730,9 +1733,7 @@ class Repository:
                 )
             ).one_or_none()
             if project is None:
-                raise DomainError(
-                    "PACKAGE_NOT_FOUND", f"No package found for package '{project_key}'"
-                )
+                raise project_not_found(project_key)
             variants = {v.document_id: v for v in self._variants(project_key)}
             documents = {
                 row.document_id: ImportedDocument(
@@ -1928,9 +1929,7 @@ class Repository:
                 select(ProjectRow.manifest).where(ProjectRow.project_key == project_key)
             ).scalar_one_or_none()
         if stored is None:
-            raise DomainError(
-                "PACKAGE_NOT_FOUND", f"No package found for package '{project_key}'"
-            )
+            raise project_not_found(project_key)
         return PackageManifest.model_validate(stored)
 
     def manifest_hash(self, project_key: str) -> str | None:
@@ -1987,10 +1986,7 @@ class Repository:
                 )
             ).scalar_one_or_none()
         if stored is None:
-            raise DomainError(
-                "PACKAGE_NOT_FOUND",
-                f"No package or task profile found for package '{project_key}'",
-            )
+            raise project_not_found(project_key)
         return TaskProfile.model_validate(stored)
 
     def get_project_rules(self, project_key: str) -> ProjectRules:
@@ -2008,7 +2004,7 @@ class Repository:
                 ).where(ProjectRow.project_key == project_key)
             ).one_or_none()
         if row is None:
-            raise DomainError("PACKAGE_NOT_FOUND", f"Project '{project_key}' not found")
+            raise project_not_found(project_key)
         return ProjectRules.of(row)
 
     def get_axes_config(self, project_key: str) -> AxesConfig:
@@ -3722,7 +3718,7 @@ class Repository:
         """The edit log of one draft, oldest first; empty for an unknown draft.
 
         Raises:
-            DomainError: ``PACKAGE_NOT_FOUND``.
+            DomainError: ``PROJECT_NOT_FOUND``.
         """
         with self.db.transaction() as conn:
             self._require_project(conn, key.project_key)
@@ -3733,7 +3729,7 @@ class Repository:
         """The content of a draft after ``revision``; empty for revision 0.
 
         Raises:
-            DomainError: ``PACKAGE_NOT_FOUND``, or ``REVISION_NOT_FOUND`` when
+            DomainError: ``PROJECT_NOT_FOUND``, or ``REVISION_NOT_FOUND`` when
                 no logged command of the draft produced ``revision`` (e.g. the
                 revision a draft resumed from a submission started at).
         """
