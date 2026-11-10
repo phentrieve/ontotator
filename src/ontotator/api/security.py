@@ -29,7 +29,7 @@ from collections.abc import Collection
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.applications import Starlette
 from starlette.concurrency import run_in_threadpool
@@ -88,36 +88,64 @@ HSTS = "max-age=31536000"
 _CSP_EXEMPT = ("/docs", "/redoc")
 
 
+def security_headers(path: str, *, https: bool) -> dict[str, str]:
+    """The security headers of a response to ``path``.
+
+    HSTS is sent only when ``https`` is true (an https public origin).
+    """
+    headers = dict(SECURITY_HEADERS)
+    if https:
+        headers["strict-transport-security"] = HSTS
+    if not path.startswith(_CSP_EXEMPT):
+        headers["content-security-policy"] = CONTENT_SECURITY_POLICY
+    return headers
+
+
 class SecurityHeadersMiddleware:
     """Adds the security headers to every HTTP response, not relying on a proxy.
 
-    HSTS is sent only when ``https`` is true (an https public origin).
+    An unhandled exception's 500 bypasses it (Starlette's outermost error
+    layer sends it); ``install_security_headers`` covers that one as well.
     """
 
     def __init__(self, app: ASGIApp, *, https: bool) -> None:
         self.app = app
-        self.headers = dict(SECURITY_HEADERS)
-        if https:
-            self.headers["strict-transport-security"] = HSTS
+        self.https = https
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-        csp = not scope["path"].startswith(_CSP_EXEMPT)
+        wanted = security_headers(scope["path"], https=self.https)
 
         async def with_headers(message: Message) -> None:
             if message["type"] == "http.response.start":
                 headers = MutableHeaders(scope=message)
-                for name, value in self.headers.items():
+                for name, value in wanted.items():
                     headers.setdefault(name, value)
-                if csp:
-                    headers.setdefault(
-                        "content-security-policy", CONTENT_SECURITY_POLICY
-                    )
             await send(message)
 
         await self.app(scope, receive, with_headers)
+
+
+def install_security_headers(app: FastAPI, *, https: bool) -> None:
+    """Send the security headers on every response, an unhandled 500 included.
+
+    Starlette answers an unhandled exception in ``ServerErrorMiddleware``,
+    outside every user middleware, with the handler registered for
+    ``Exception``. That handler gives the same plain 500 as Starlette's own
+    one plus the headers; the exception is still re-raised and logged.
+    """
+    app.add_middleware(SecurityHeadersMiddleware, https=https)
+
+    async def server_error(request: Request, _exc: Exception) -> Response:
+        return PlainTextResponse(
+            "Internal Server Error",
+            status_code=500,
+            headers=security_headers(request.url.path, https=https),
+        )
+
+    app.add_exception_handler(Exception, server_error)
 
 
 def expected_origin(request: Request, public_origin: str | None) -> str:
