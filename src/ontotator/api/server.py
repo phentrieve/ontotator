@@ -13,7 +13,7 @@ from sqlalchemy.exc import OperationalError
 from ontotator.api.app import _runtime_lease, create_app
 from ontotator.api.health import ReadinessProbe, router
 from ontotator.api.proxy_guard import TrustedPeerGuard
-from ontotator.api.security import install_security
+from ontotator.api.security import install_security, install_security_headers
 from ontotator.config import AppConfig
 from ontotator.domain.errors import DomainError
 from ontotator.settings import ServerSettings, demo_logins, server_settings
@@ -79,6 +79,12 @@ def app_from_env() -> FastAPI:
     app.state.readiness_probe = ReadinessProbe()
     app.state.health_database_url = runtime.database_url
     install_security(app, None, runtime.public_origin, tuple(hosts))
+    install_security_headers(
+        app,
+        https=bool(
+            runtime.public_origin and runtime.public_origin.startswith("https://")
+        ),
+    )
     app.include_router(router)
     return _guarded(app, runtime)
 

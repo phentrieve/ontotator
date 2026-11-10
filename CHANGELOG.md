@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- The security headers (Content-Security-Policy, `X-Content-Type-Options: nosniff`, `X-Frame-Options`, `Referrer-Policy` and, behind an https origin, HSTS) are now also sent by the health-only app a server shows while a database migration is pending, and on the 500 answer to an unhandled error, which Starlette sends outside every middleware (#394).
+
 ## [0.10.0] - 2026-11-10
 
 ### Added

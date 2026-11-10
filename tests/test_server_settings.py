@@ -321,9 +321,16 @@ def test_production_pending_schema_exposes_only_unready_health(
     with TestClient(
         api, client=("127.0.0.1", 1234), base_url="https://editor.example.org"
     ) as client:
-        assert client.get("/livez").status_code == 200
+        live = client.get("/livez")
+        assert live.status_code == 200
         response = client.get("/readyz")
         assert response.status_code == 503
+        # Issue 394: the fallback app sends the security headers too.
+        for answer in (live, response, client.get("/missing")):
+            assert answer.headers["x-content-type-options"] == "nosniff"
+            assert answer.headers["x-frame-options"] == "DENY"
+            assert "frame-ancestors" in answer.headers["content-security-policy"]
+            assert answer.headers["strict-transport-security"].startswith("max-age=")
         assert response.json()["checks"] == {
             "database": True,
             "schema": False,
