@@ -567,6 +567,32 @@ def test_hsts_is_sent_behind_an_https_origin(tmp_path: Path) -> None:
     assert response.headers["strict-transport-security"].startswith("max-age=")
 
 
+def test_an_unhandled_error_answers_500_with_the_security_headers(
+    tmp_path: Path,
+) -> None:
+    app = _app(tmp_path, public_origin="https://editor.example")
+
+    @app.get("/probe-crash")
+    def crash() -> None:
+        raise RuntimeError("boom")
+
+    # Ahead of the static files mounted at "/".
+    app.router.routes.insert(0, app.router.routes.pop())
+    client = TestClient(
+        app, base_url="https://editor.example", raise_server_exceptions=False
+    )
+    response = client.get("/probe-crash")
+
+    assert response.status_code == 500
+    assert response.text == "Internal Server Error"
+    assert "boom" not in response.text
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "same-origin"
+    assert "frame-ancestors 'none'" in response.headers["content-security-policy"]
+    assert response.headers["strict-transport-security"].startswith("max-age=")
+
+
 @pytest.mark.parametrize("path", ["/api/v1/auth/login", "/api/v1/auth/redeem-code"])
 def test_an_oversized_unauthenticated_body_is_refused(
     tmp_path: Path, path: str

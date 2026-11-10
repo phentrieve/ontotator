@@ -43,8 +43,8 @@ from ontotator.api.practice_routes import sweep as practice_sweep
 from ontotator.api.project_routes import router as project_router
 from ontotator.api.routes import router
 from ontotator.api.security import (
-    SecurityHeadersMiddleware,
     install_security,
+    install_security_headers,
     project_busy,
 )
 from ontotator.api.submission_history_routes import (
@@ -370,8 +370,8 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
     # An oversized body is refused before anything reads it.
     app.add_middleware(BodyLimitMiddleware)
     # Outside the body limit, so its 413 carries the headers as well.
-    app.add_middleware(
-        SecurityHeadersMiddleware,
+    install_security_headers(
+        app,
         https=bool(
             config
             and config.public_origin
