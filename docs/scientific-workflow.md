@@ -120,6 +120,22 @@ positions are Unicode code points into the canonical text of the line of
 `source-texts.jsonl` named in `source_text_line`. The tables are computed
 from the two bundles, so each row describes what the bundles hold.
 
+So that a spreadsheet does not run a cell as a formula (#386), a CSV cell
+that starts with `=`, `+`, `-`, `@`, a tab or a carriage return gets a
+leading apostrophe (`=1+1` is written as `'=1+1`), as OWASP recommends for
+CSV files; a cell that is a plain number such as `-1` or `0.2500` stays as it
+is. A cell that itself starts with an apostrophe gets a second one, so the
+rule can be undone: to get the exact value, for example a `covered_text` to
+compare with the text at its offsets, remove one leading apostrophe from
+every cell that starts with one, after reading the file with a CSV parser.
+Every cell that can start this way is one that came from people or texts
+(case IDs, covered text, reasons, term labels and the like); the numbers,
+offsets and fixed values never do. Only the CSV files change: the bundles,
+`source-texts.jsonl`, `receipt.json` and the other exports (JSON, JSONL)
+hold every value unchanged, and `receipt.json` hashes the CSV files as
+written. A spreadsheet shows such a cell as text, some with the apostrophe
+visible.
+
 An Ontospan bundle of the final export names, per text, the ontology release recorded with its submission,
 which can be older than the project's current release. If its texts were made
 under different releases, the newest keeps the layer ID and each older release
