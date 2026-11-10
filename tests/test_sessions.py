@@ -131,16 +131,62 @@ def test_failures_from_one_ipv6_64_share_one_lockout(services: Services) -> None
     )
 
 
-def test_many_failures_from_one_address_lock_that_address(services: Services) -> None:
+def _record_failures(services: Services, client_ip: str, names: list[str]) -> None:
+    """Failed attempts at the current time, as earlier logins recorded them."""
+    with services.sessions.db.transaction() as conn:
+        conn.execute(
+            insert(LoginAttemptRow),
+            [
+                {
+                    "username": name,
+                    "client_ip": client_ip,
+                    "succeeded": False,
+                    "throttled": False,
+                    "at": services.clock(),
+                }
+                for name in names
+            ],
+        )
+
+
+def test_many_failures_of_existing_names_from_one_address_lock_that_address(
+    services: Services,
+) -> None:
+    limit = services.sessions.policy.failures_per_address
+    for name in ("bob", "carol"):
+        services.accounts.create_user(ADMIN, name, name.title())
+    _record_failures(
+        services, "10.0.0.9", ["bob"] * (limit - 1) + [f"nobody{n}" for n in range(50)]
+    )
+    services.sessions.login("alice", PASSWORD, client_ip="10.0.0.9")
+
+    with pytest.raises(LoginFailed):
+        services.sessions.login("carol", "wrong password!", client_ip="10.0.0.9")
+
+    with pytest.raises(LoginFailed):
+        services.sessions.login("alice", PASSWORD, client_ip="10.0.0.9")
+    services.sessions.login("alice", PASSWORD, client_ip="10.0.0.10")
+
+
+def test_failures_of_unknown_names_do_not_lock_the_address(
+    services: Services,
+) -> None:
+    # Issue 392: one NAT address mistyping names must not lock out everyone.
     for number in range(services.sessions.policy.failures_per_address):
         with pytest.raises(LoginFailed):
             services.sessions.login(
                 f"nobody{number}", "wrong password!", client_ip="10.0.0.9"
             )
 
+    services.sessions.login("alice", PASSWORD, client_ip="10.0.0.9")
+    # The per-name limit still holds for an unknown name.
+    for _ in range(services.sessions.policy.failures_per_account):
+        with pytest.raises(LoginFailed):
+            services.sessions.login("nobody", "wrong password!", client_ip="10.0.0.9")
     with pytest.raises(LoginFailed):
-        services.sessions.login("alice", PASSWORD, client_ip="10.0.0.9")
-    services.sessions.login("alice", PASSWORD, client_ip="10.0.0.10")
+        services.sessions.login("nobody", "wrong password!", client_ip="10.0.0.9")
+    throttled = column_values(services.sessions, "login_attempts", "throttled")
+    assert throttled.count(True) == 1
 
 
 def test_a_failed_attempt_is_recorded_even_though_the_login_fails(
@@ -274,20 +320,10 @@ def test_concurrent_failures_from_one_address_stop_at_the_threshold(
     services: Services, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     limit = services.sessions.policy.failures_per_address
-    with services.sessions.db.transaction() as conn:
-        conn.execute(
-            insert(LoginAttemptRow),
-            [
-                {
-                    "username": f"nobody{number}",
-                    "client_ip": "10.0.0.9",
-                    "succeeded": False,
-                    "throttled": False,
-                    "at": services.clock(),
-                }
-                for number in range(limit - 1)
-            ],
-        )
+    # Only failures of existing names count towards the address limit.
+    for name in ["bob"] + [f"other{number}" for number in range(4)]:
+        services.accounts.create_user(ADMIN, name, name.title())
+    _record_failures(services, "10.0.0.9", ["bob"] * (limit - 1))
     together = threading.Barrier(4)
     real_verify = sessions_module.verify_password
 
