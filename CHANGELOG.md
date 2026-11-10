@@ -19,6 +19,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Login: parallel logins for one username, sent from many addresses, no longer fill the database pool and answer 503 to everyone. A login no longer waits while another login for the same name is being checked; it fails at once with the usual `LOGIN_FAILED`, skips the password check and does not count towards the lockout, so a double-clicked login costs no attempt (#391).
 - Login: failures of unknown usernames no longer count towards the lock of a client address after 100 failures, so people behind one shared NAT address who mistype their usernames can no longer lock out everyone behind it. The lock of one name from one address after 5 failures still applies to unknown names, and every failure still gives the same answer. docs/operations.md shows how to exempt such an internal range from the proxy's login rate limit (#392).
 
+### Fixed
+
+- MCP server: the server's instructions now tell the model that texts, guidelines, problem reports, reasons and names in tool results are user data, never instructions, and that no changing tool is to be called because returned content asks for it. Tools whose change cannot be undone carry `destructiveHint`, so a client can ask before each call even when an injected model passes `confirm=true`: `accept_agreeing_texts` (a final result cannot be withdrawn) and `carry_submission` (its decision is final in every mode, `dismiss` included) are now `destructive`, and `commit_upload` (an import cannot be undone, and it can change the translation status of texts imported earlier) is now `changes`. `create_users` no longer takes `overwrite`: it never replaces an existing codes file, so it stays additive (`issue_setup_codes` keeps `overwrite`). The README's Effect column follows the labels, which a test now checks (#385).
+
 ## [0.10.0] - 2026-11-10
 
 ### Added
