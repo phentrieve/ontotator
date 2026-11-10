@@ -708,7 +708,7 @@ def test_preview_with_existing_sets_and_new_set_only_change_is_stale(staged, tmp
     assert app.state.repo.get_document("proj", "a") is None
 
 
-@pytest.mark.parametrize("limit", ["MAX_TOTAL_BYTES", "MAX_ENTRIES"])
+@pytest.mark.parametrize("limit", ["MAX_EXPANDED_BYTES", "MAX_ENTRIES"])
 def test_bundle_expansion_is_bounded_before_ontospan_reads_it(
     staged, tmp_path, monkeypatch, limit
 ):

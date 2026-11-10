@@ -294,8 +294,14 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         replaces unused earlier ones. With codes_path the codes are WRITTEN
         TO A LOCAL CSV FILE (readable by the user only) inside the folders
         of ONTOTATOR_MCP_FILES_DIR instead of being returned. Needs a system
-        token.
+        token. Resetting active accounts needs codes_path, so a reset code
+        for a working account never enters the conversation with the model.
         """
+        if include_active_accounts and codes_path is None:
+            raise OntotatorError(
+                "include_active_accounts needs codes_path: a reset code of an"
+                " active account is written to a local file, never returned."
+            )
         accounts = {
             str(item.get("username", "")).lower(): item
             for item in await api.get("/api/v1/admin/users/")

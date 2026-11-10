@@ -55,7 +55,7 @@ from ontotator.exchange.t1 import (
     ImportedDocument,
     ImportedSet,
 )
-from ontotator.exchange.text import expanded_size, read_text_upload
+from ontotator.exchange.text import MAX_EXPANDED_BYTES, expanded_size, read_text_upload
 from ontotator.exchange.variant_overrides import (
     StatusOverride,
     normalize_overrides,
@@ -174,8 +174,8 @@ def read_sources(
 ) -> tuple[list[tuple[str, list[IncomingUnit]]], list[Issue]]:
     """Read source bytes once, retaining original file and producer identities.
 
-    Text expands to at most ``text_limit`` bytes (default: the web upload cap);
-    T1 bundles to ontospan's bound.
+    Text and T1 bundles expand to at most ``text_limit`` bytes (default: the
+    web upload cap, since the web preview runs in the API process).
     """
     repo = Repository(db)
     row = conn.execute(select(ProjectRow).where(ProjectRow.id == project_id)).one()
@@ -215,7 +215,8 @@ def read_sources(
         # Bound the expansion from the ZIP directories before ontospan reads anything.
         sizes = [expanded_size(db.blobs.path(f["sha256"])) for f in files]
         if (
-            sum(size for size, _ in sizes) > MAX_TOTAL_BYTES
+            sum(size for size, _ in sizes)
+            > (MAX_EXPANDED_BYTES if text_limit is None else text_limit)
             or sum(count for _, count in sizes) > MAX_ENTRIES
         ):
             message = "Upload exceeds the expanded size or entry limit"
