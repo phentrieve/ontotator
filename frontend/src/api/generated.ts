@@ -2218,7 +2218,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Download Job */
+        /**
+         * Download Job
+         * @description The file of a finished export; audited as ``project.export_download``.
+         *
+         *     410 once the file was deleted (``EXPORT_RETENTION`` after the export, or
+         *     when the command line wrote it out).
+         */
         get: operations["download_job_api_v1_jobs__job_id__download_get"];
         put?: never;
         post?: never;

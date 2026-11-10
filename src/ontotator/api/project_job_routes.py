@@ -8,7 +8,7 @@ project audit. Project archive jobs belong to the administration and are
 not listed.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Query, Request
@@ -31,6 +31,7 @@ from ontotator.api.person_views import PersonRefView
 from ontotator.application.people import person_refs
 from ontotator.auth.audit import Actor
 from ontotator.authz.policy import Action
+from ontotator.exchange.jobs import export_file_due
 from ontotator.storage.tables import JobRow, UserRow
 
 router = APIRouter(prefix="/api/v1/projects", tags=["jobs"])
@@ -193,6 +194,7 @@ def project_jobs(
             viewer_is_lead=True,
         )
     downloads = _may_download(principal)
+    due = export_file_due(datetime.now(UTC))
 
     def download_path(row: Row[Any]) -> str | None:
         # The same conditions as the download route, but for the right: a
@@ -206,6 +208,9 @@ def project_jobs(
             or row.payload_project != key
             or not isinstance(result, dict)
             or not isinstance(result.get("sha256"), str)
+            # Past its retention (#396), also before the sweep deleted it.
+            or result.get("file_deleted_at")
+            or row.finished_at < due
         ):
             return None
         try:

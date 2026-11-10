@@ -63,6 +63,10 @@ async def create_upload(
     language: Annotated[str | None, Form()] = None,
 ) -> UploadCreated:
     _guard(request, Action.IMPORT_DOCUMENTS, key)
+    # Before any file is stored; the upload's job is checked again (#396).
+    request.app.state.jobs.precheck_queue_room(
+        Actor.user(principal.user_id, principal.username)
+    )
     limit = request.app.state.config.max_upload_bytes
     total = 0
     received = []

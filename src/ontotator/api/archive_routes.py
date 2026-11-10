@@ -104,6 +104,8 @@ async def import_archive(
     one, and a person matched by e-mail keeps the account's pseudonym.
     """
     require_system_admin(principal)
+    # Before the archive is stored; the import job is checked again (#396).
+    request.app.state.jobs.precheck_queue_room(_actor(principal))
     limit: int = request.app.state.config.max_ontology_bytes
     total = 0
     db = request.app.state.repo.db

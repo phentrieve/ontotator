@@ -8036,6 +8036,7 @@
           "jobs"
         ],
         "summary": "Download Job",
+        "description": "The file of a finished export; audited as ``project.export_download``.\n\n410 once the file was deleted (``EXPORT_RETENTION`` after the export, or\nwhen the command line wrote it out).",
         "operationId": "download_job_api_v1_jobs__job_id__download_get",
         "parameters": [
           {
