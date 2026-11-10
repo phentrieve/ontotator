@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Login: parallel logins for one username, sent from many addresses, no longer fill the database pool and answer 503 to everyone. A login no longer waits while another login for the same name is being checked; it fails at once with the usual `LOGIN_FAILED`, skips the password check and does not count towards the lockout, so a double-clicked login costs no attempt (#391).
+
 ## [0.10.0] - 2026-11-10
 
 ### Added
