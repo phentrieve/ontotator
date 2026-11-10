@@ -24,7 +24,7 @@ from ontotator.authz.visibility import (
     require_document,
     visible_documents,
 )
-from ontotator.domain.errors import DomainError, RevisionConflict
+from ontotator.domain.errors import DomainError, RevisionConflict, project_not_found
 from ontotator.domain.translation_review import (
     LEAD_CORRECTION_DECISION,
     REVIEW_POLICY,
@@ -357,6 +357,9 @@ class TranslationReviewService:
         document_id: str,
     ) -> list[TranslationReviewRecord]:
         fresh = current_access(conn, access, project_id, key)
+        if not can(fresh, Action.VIEW_PROJECT, key):
+            # A foreign project looks like a missing one (E3, issue 398).
+            raise project_not_found(key)
         require_document(conn, fresh, project_id, key, document_id)
         baseline_hash = conn.execute(
             select(DocumentRow.text_sha256).where(

@@ -12,8 +12,7 @@ from ontotator.api.identity import PrincipalDep
 from ontotator.auth.audit import Actor, record_audit
 from ontotator.authz.policy import Action
 from ontotator.authz.project_authority import require_project_management
-from ontotator.authz.scoped import project_not_found
-from ontotator.domain.errors import DomainError
+from ontotator.domain.errors import DomainError, project_not_found
 from ontotator.storage.repository import Repository, _lock_id
 from ontotator.storage.tables import JobRow, ProjectRow
 

@@ -10,6 +10,14 @@ class DomainError(Exception):
         self.details = details
 
 
+def project_not_found(project_key: str) -> DomainError:
+    """A project that does not exist, or that the caller may not see (E3).
+
+    The one answer for both, so a response cannot tell them apart.
+    """
+    return DomainError("PROJECT_NOT_FOUND", f"There is no project '{project_key}'.")
+
+
 class RevisionConflict(DomainError):
     """Raised when expected draft revision does not match current database revision."""
 

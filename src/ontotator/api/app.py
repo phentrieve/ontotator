@@ -91,6 +91,19 @@ from ontotator.storage.schema import current_revision, head_revision
 
 logger = logging.getLogger(__name__)
 
+
+def _project_not_found_details(request: Request) -> str:
+    """One text for every unknown or foreign project (E3, issue 398).
+
+    Services word the refusal differently, so the details alone would tell
+    a project the caller may not see from one that does not exist.
+    """
+    key = request.path_params.get("key", request.path_params.get("project_key"))
+    if isinstance(key, str):
+        return f"There is no project '{key}'."
+    return "There is no such project."
+
+
 # Answered with 404, so a non-member cannot tell "missing" from "not yours".
 NOT_FOUND_CODES = frozenset(
     {
@@ -484,7 +497,7 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
         return project_busy(request, cause)
 
     @app.exception_handler(DomainError)
-    async def domain_error_handler(_req: Request, exc: DomainError) -> JSONResponse:
+    async def domain_error_handler(request: Request, exc: DomainError) -> JSONResponse:
         return JSONResponse(
             # A foreign project looks like a missing one (E3).
             status_code=(
@@ -557,7 +570,12 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
                     "TECHNICAL_REPORT_LIMIT": 429,
                 }.get(exc.code, 422)
             ),
-            content={"code": exc.code, "details": exc.details or str(exc)},
+            content={
+                "code": exc.code,
+                "details": _project_not_found_details(request)
+                if exc.code == "PROJECT_NOT_FOUND"
+                else exc.details or str(exc),
+            },
         )
 
     from ontotator.api.assignment_routes import router as assignment_router

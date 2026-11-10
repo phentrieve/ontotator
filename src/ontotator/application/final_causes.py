@@ -14,8 +14,7 @@ from ontotator.application.workflow_warnings import project_warnings
 from ontotator.auth.audit import Actor
 from ontotator.authz.policy import Action
 from ontotator.authz.project_authority import require_project_management
-from ontotator.authz.scoped import project_not_found
-from ontotator.domain.errors import DomainError
+from ontotator.domain.errors import DomainError, project_not_found
 from ontotator.domain.work_plans import PlanFlags, RowKey
 from ontotator.domain.work_rounds import CARRY_ROUND_KINDS
 from ontotator.domain.workspace import WorkspaceKey

@@ -27,6 +27,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Fixed
 
 - The security headers (Content-Security-Policy, `X-Content-Type-Options: nosniff`, `X-Frame-Options`, `Referrer-Policy` and, behind an https origin, HSTS) are now also sent by the health-only app a server shows while a database migration is pending, and on the 500 answer to an unhandled error, which Starlette sends outside every middleware (#394).
+- A user who is not a member of a project can no longer tell whether its key exists. `GET /api/v1/projects/{key}/documents/{doc}/translation-reviews` checks the project before the text and answered such a user `DOCUMENT_NOT_FOUND` for an existing key; `cases`, `cases/{case_id}`, `problem-reports` and the text routes under `documents/{doc}` (`text`, `variant`, `layers`, `submissions`, `submissions/{submission_id}`, `annotation-versions`, `annotation-versions/{kind}/{version_id}`, `reanchor-items`) answered a missing key `PACKAGE_NOT_FOUND` and an existing one `PROJECT_NOT_FOUND`. A missing project is now `PROJECT_NOT_FOUND` everywhere (no route answers `PACKAGE_NOT_FOUND` any more), and its `details` read the same for a missing and a foreign project. Members, system administrators and API tokens see no other change (#398).
 
 ## [0.10.0] - 2026-11-10
 

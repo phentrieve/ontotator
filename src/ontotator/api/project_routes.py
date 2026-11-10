@@ -17,8 +17,7 @@ from ontotator.application.progress import progress_view
 from ontotator.assignments.batch import open_task_counts
 from ontotator.auth.audit import Actor
 from ontotator.authz.policy import Action, can
-from ontotator.authz.scoped import project_not_found
-from ontotator.domain.errors import AccessDenied, DomainError
+from ontotator.domain.errors import AccessDenied, DomainError, project_not_found
 from ontotator.domain.next_steps import Stage, StepCode
 from ontotator.domain.profile_templates import PROFILE_TEMPLATES
 from ontotator.domain.profiles import TaskProfile
