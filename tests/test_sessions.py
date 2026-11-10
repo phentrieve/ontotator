@@ -402,6 +402,55 @@ def test_a_failed_login_locks_and_verifies_alike_for_any_username(
     assert costs[0] == costs[1]
 
 
+@pytest.mark.parametrize("name", ["alice", "nobody"])
+def test_a_login_for_a_busy_name_fails_at_once_and_does_not_count(
+    services: Services, monkeypatch: pytest.MonkeyPatch, name: str
+) -> None:
+    # Issue 391: waiting for the name lock would hold a pooled connection.
+    calls: list[str] = []
+    real_verify = sessions_module.verify_password
+
+    def counting_verify(stored_hash: str | None, password: str) -> bool:
+        calls.append(password)
+        return real_verify(stored_hash, password)
+
+    monkeypatch.setattr(sessions_module, "verify_password", counting_verify)
+    key = sessions_module._username_lock(name)
+    failures: list[LoginFailed] = []
+
+    def attempts() -> None:
+        for _ in range(services.sessions.policy.failures_per_account + 1):
+            try:
+                services.sessions.login(name, PASSWORD, client_ip="10.0.0.1")
+            except LoginFailed as error:
+                failures.append(error)
+
+    with services.sessions.db.engine.connect() as holder:
+        # Held the way a login holds it: in an open transaction.
+        holder.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": key})
+        thread = threading.Thread(target=attempts)
+        thread.start()
+        thread.join(timeout=10)
+        finished = not thread.is_alive()
+        holder.rollback()
+    thread.join()
+
+    assert finished
+    assert len(failures) == services.sessions.policy.failures_per_account + 1
+    for error in failures:
+        assert (error.code, error.details) == (
+            LoginFailed().code,
+            LoginFailed().details,
+        )
+    assert calls == []
+    assert column_values(services.sessions, "login_attempts", "throttled") == [
+        True
+    ] * len(failures)
+    if name == "alice":
+        # The busy attempts did not count: the account is not locked.
+        services.sessions.login(name, PASSWORD, client_ip="10.0.0.1")
+
+
 def test_a_login_during_a_password_change_leaves_no_old_session(
     services: Services, monkeypatch: pytest.MonkeyPatch
 ) -> None:
