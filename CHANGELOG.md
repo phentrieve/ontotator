@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-11-10
+
 ### Changed
 
 - Behind an `https://` public origin the session cookie is now `__Host-ontotator_session` instead of `ontotator_session`, so the browser keeps it to the exact host over HTTPS (Secure, `Path=/`, no `Domain`) and a sibling subdomain or a plain-HTTP page cannot set or replace it. **Everyone is logged out once** after the upgrade and logs in again; the old cookie is ignored and expires by itself. Without an https origin (plain-HTTP development) the cookie keeps its old name, since browsers refuse a `__Host-` cookie without Secure (#393).
@@ -321,7 +323,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 First public release.
 
-[Unreleased]: https://github.com/phentrieve/ontotator/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/phentrieve/ontotator/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/phentrieve/ontotator/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/phentrieve/ontotator/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/phentrieve/ontotator/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/phentrieve/ontotator/compare/v0.8.0...v0.8.1
