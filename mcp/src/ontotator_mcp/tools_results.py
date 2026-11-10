@@ -149,7 +149,8 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
         )
         return started
 
-    @register(server, scopes=("read", "project-admin"), effect="additive")
+    # A final result cannot be withdrawn (#343): the same PUT as set_final_result.
+    @register(server, scopes=("read", "project-admin"), effect="destructive")
     async def accept_agreeing_texts(
         project: Project,
         case_ids: Annotated[
@@ -166,7 +167,8 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
         (also notes and modifier text spans; unresolved findings never
         count as agreed). The dry run lists what would be accepted and why
         the others are not; with confirm the agreeing submission becomes
-        the final result of each.
+        the final result of each. A final result can be changed later with
+        set_final_result, but not withdrawn.
         """
         found, _ = await rows(api, project, stage=["final"])
         if case_ids is not None:

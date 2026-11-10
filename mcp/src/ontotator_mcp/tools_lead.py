@@ -627,7 +627,8 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
             "assignment": assignment_summary(decided),
         }
 
-    @register(server, scopes="project-admin", effect="additive")
+    # The decision is final in every mode, 'dismiss' included.
+    @register(server, scopes="project-admin", effect="destructive")
     async def carry_submission(
         project: Project,
         submission_id: Annotated[
@@ -657,7 +658,9 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
 
         The dry run counts the findings that can be placed and lists the
         people who could check them. With confirm a new task carries the
-        placed findings; the submission itself stays.
+        placed findings; the submission itself stays. The decision, 'dismiss'
+        included, is final: the submission cannot be carried to this version
+        again.
         """
         preview = await _text_change_preview(
             api, project, {"submission_id": submission_id}, target_document_id

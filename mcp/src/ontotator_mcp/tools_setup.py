@@ -512,7 +512,9 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
             for item in listed
         ]
 
-    @register(server, scopes="import", effect="additive")
+    # An import cannot be undone, and accept_external_review or a re-delivered
+    # translation changes the status of texts imported earlier.
+    @register(server, scopes="import", effect="changes")
     async def commit_upload(
         project: Project,
         upload_id: int,
