@@ -42,7 +42,7 @@ What for: freeze the final results the groups are derived from.
 1. In the sidebar, click **Single terms**.
 2. Click **Start single-term review**. Once a basis exists, the button reads **Refresh review basis**.
 
-You need at least one accepted final result. The page then shows, per language, the groups, how many are decided, open, stale and blocked, and how many are in a phrase conflict. Below it are the review batches and, per language, the findings that were not offered.
+You need at least one accepted final result. The page then shows, per language, the groups, how many are decided, open, stale and blocked, and how many are in a phrase conflict. A warning line names the conflicts and the blocked groups still to re-cut or reject; it disappears once they are decided. Below it are the review batches, across the full width, and, per language, the findings that were not offered.
 
 Refresh the basis after you accepted or changed final results. A decision carries over to the new basis while its group still exists and its term (and the more general term, if the reviewer chose one) is still active in the ontology release of every place. Otherwise the group is **stale** and opens again. A place that is new in a decided group takes the decision over; the export marks it as not seen by the reviewer.
 
@@ -69,14 +69,14 @@ What for: give a part of the open groups to one reviewer.
 
 1. On **Single terms**, click **New review batch…**.
 2. Choose the **Language** (or **All languages**) and the **Layer** (or **All HPO layers**).
-3. Under **Groups**, choose **All open and stale groups** or **Groups with occurrences in chosen texts** and enter the **Text IDs**. **At most this many groups (optional)** limits the batch. Groups already in another open batch are left out.
+3. Under **Groups**, choose **All open and stale groups** or **Groups with occurrences in chosen texts** and enter the **Text IDs**. **At most this many groups (optional)** limits the batch. Groups already in another open batch are left out; the number in brackets counts only the groups a new batch can still take.
 4. Choose the **Reviewer (single-term reviewers)**.
 5. For a check of the reviewers' agreement, tick **Draw a sample for a second reviewer**, keep or change the **Share (%)** (20 % by default) and choose a **Second reviewer**, who must be another person. The sample has at least 50 groups per language, or all if there are fewer. It follows from the group IDs, so the same groups give the same sample.
 6. Click **Create batch**.
 
 The groups of the batch are fixed when you create it. If the reviewer annotated or consolidated one of the texts of its groups, a message says so; the batch is still created, and their decisions on those groups are marked as not independent in the export.
 
-Tell the reviewer that the batch is waiting: they find it under **Single terms**. The second reviewer gets a batch of their own and does not see the first reviewer's decisions.
+Tell the reviewer that the batch is waiting: they find it under **My tasks**, in the table **Single-term review**, and under **Single terms**. The second reviewer gets a batch of their own and does not see the first reviewer's decisions.
 
 ## Follow and close batches
 
@@ -92,16 +92,16 @@ A decision counts as soon as the reviewer records it, before the batch is submit
 
 What for: decide each group of your batch. This part is for every single-term reviewer, leads included.
 
-1. In the sidebar, click **Single terms**, then **Continue** at your batch. The groups are listed on the left; the buttons above the list show the open, conflicting, blocked and decided groups.
+1. On **My tasks**, click **Start** or **Continue** at your batch under **Single-term review**, or in the sidebar click **Single terms**, then **Continue** at your batch. The groups are listed on the left; the buttons above the list show the open, conflicting, blocked and decided groups.
 2. **Step 1 · Phrase only**: read the phrase and its term and answer the question *Would a clinician map this phrase alone, without its sentence, to this term?* Click **Yes, as a phrase** (`Y`) or **No** (`N`). The answer is recorded before you see any context.
 3. **Step 2 · Contexts**: read the phrase in up to five of its places, with some text before and after. **Show more contexts** loads further places.
 4. **Step 3 · Decision**:
    - **Accept** (`A`): the phrase alone means this term.
    - **Adjust…** (`E`): re-cut the passage or choose a more general term; see [Adjust a group](#adjust-a-group).
-   - **Reject** (`R`): choose a reason first: *needs context*, *ambiguous abbreviation*, *too general*, *term wrong out of context*, *contains other finding*, *negation in span* or *other*.
+   - **Reject** (`R`): choose a reason first: *needs context*, *ambiguous abbreviation*, *too general*, *term wrong out of context*, *contains other finding*, *negation in span*, *only usable rewritten (words inside removed)* (the phrase would map alone only without some words inside it; a re-cut keeps those words) or *other*.
 
    **Note (optional)** adds a comment to the decision.
-5. **Undo** after a decision opens the group again. The newest decision of a group counts.
+5. A decided group shows its decision: for a re-cut the new phrase, for a more general term its name. **Undo** after a decision opens the group again. The newest decision of a group counts.
 6. When every group is decided, click **Submit batch**. A lead can reopen it.
 
 The phrase stays as it is in the text: there is no way to rewrite it. Your judgment is about the phrase alone; whether the finding was right in its sentence was decided in annotation and consolidation.
@@ -111,7 +111,7 @@ The phrase stays as it is in the text: there is no way to rewrite it. Your judgm
 One adjustment per decision: re-cut the passage or generalise the term, not both.
 
 - **Re-cut the span**: choose the place under **Occurrence** if there are several, then click the first and the last word of the new passage, or drag over them. The new passage must overlap the annotated one, stay within the text, overlap no other finding and hold no negation cue; the server checks this. Only this one place goes into the export, with the new passage.
-- **Or generalise the term**: choose one of the more general terms listed under the annotated term, nearest first; the nearest are marked *(parent)*. Only terms that are active ancestors of the annotated term in the release of every place of the group are listed. A more general term does not lift a block.
+- **Or generalise the term**: choose one of the more general terms listed under the annotated term, nearest first; the nearest are marked *(parent)*. Only terms that are active ancestors of the annotated term in the release of every place of the group are listed, never *All*, the branches directly under it such as *Phenotypic abnormality*, or the organ-system terms directly under *Phenotypic abnormality* such as *Abnormality of the nervous system*. A more general term does not lift a block.
 
 **Resulting case** shows what will be exported. Click **Accept adjusted case**, or **Cancel**.
 

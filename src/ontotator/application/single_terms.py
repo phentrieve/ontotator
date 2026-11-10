@@ -120,6 +120,7 @@ RejectReason = Literal[
     "term_wrong_out_of_context",
     "contains_other_finding",
     "negation_in_span",
+    "needs_rewrite",
     "conflict",
     "other",
 ]
@@ -243,6 +244,8 @@ class SingleTermContextView(BaseModel):
     before: str
     text: str
     after: str
+    # Code points of the whole text: whether before and after reach its ends.
+    text_length: int
     flags: list[str]
     blocked: list[str]
 
@@ -301,6 +304,9 @@ class SingleTermLanguageCounts(BaseModel):
     decided: int
     stale: int
     conflicts: int
+    # Open, blocked or stale groups in no open batch: what a new batch can take.
+    available: int
+    available_stale: int
 
 
 class SingleTermAgreementView(BaseModel):
@@ -399,6 +405,24 @@ def derive_basis(
 
 
 # --- decisions in force -----------------------------------------------------
+
+
+HPO_ROOT = "HP:0000001"
+PHENOTYPIC_ABNORMALITY = "HP:0000118"
+
+
+def _too_general(term: str, occurrences: Iterable[Occurrence], views: Record) -> bool:
+    """The HPO root, the branch roots directly under it or an organ-system
+    term directly under Phenotypic abnormality (guideline R1) in some
+    occurrence's release: never offered or accepted as a generalised term.
+    Checked when deciding only, so a decision carries over as the export
+    has it."""
+    for occurrence in occurrences:
+        view = views.get(occurrence.ontology_digest or "")
+        above = set(view.ancestors(term)) if view is not None else set()
+        if above <= {HPO_ROOT} or above == {HPO_ROOT, PHENOTYPIC_ABNORMALITY}:
+            return True
+    return False
 
 
 def _ancestor_everywhere(
@@ -864,6 +888,7 @@ class SingleTermService:
             data = self._data(conn, key, basis)
             states, primary, decisions = self._states(conn, pid, data)
             second = self._newest(decisions, "second")
+            taken = self._in_open_batches(conn, pid)
         counts: dict[str, dict[str, int]] = {}
         for group in data.derivation.groups:
             per = counts.setdefault(
@@ -877,14 +902,20 @@ class SingleTermService:
                         "decided",
                         "stale",
                         "conflicts",
+                        "available",
+                        "available_stale",
                     ),
                     0,
                 ),
             )
+            state = states[group.group_id]
             per["groups"] += 1
             per["occurrences"] += len(group.occurrences)
-            per[states[group.group_id]] += 1
+            per[state] += 1
             per["conflicts"] += group.conflict
+            if state != "decided" and group.group_id not in taken:
+                per["available"] += 1
+                per["available_stale"] += state == "stale"
         pairs = [
             (_binary(primary[gid]["decision"]), _binary(row["decision"]))
             for gid, row in sorted(second.items())
@@ -1052,6 +1083,7 @@ class SingleTermService:
                     ],
                     text=text[occurrence.start : occurrence.end],
                     after=text[occurrence.end : occurrence.end + CONTEXT_WINDOW],
+                    text_length=len(text),
                     flags=list(occurrence.flags),
                     blocked=list(occurrence.blocked),
                 )
@@ -1106,6 +1138,7 @@ class SingleTermService:
                 term
                 for term in first.ancestors(group.term_id)
                 if _ancestor_everywhere(term, group.occurrences, data.views)
+                and not _too_general(term, group.occurrences, data.views)
             }
             above = {a for term in terms for a in first.ancestors(term)}
             offered = [
@@ -1694,11 +1727,12 @@ class SingleTermService:
                 assert body.adjusted_term_id is not None
                 if not _ancestor_everywhere(
                     body.adjusted_term_id, group.occurrences, data.views
-                ):
+                ) or _too_general(body.adjusted_term_id, group.occurrences, data.views):
                     raise DomainError(
                         "SINGLE_TERM_NOT_ANCESTOR",
                         "The adjusted term must be an active ancestor of the term"
-                        " in the release of every occurrence.",
+                        " in the release of every occurrence, below the HPO root,"
+                        " its branch roots and the organ-system terms.",
                     )
             if body.decision == "adjust_span":
                 assert body.adjusted_span is not None

@@ -20,7 +20,7 @@ export function batch(extra: Partial<SingleTermBatch> = {}): SingleTermBatch {
 }
 
 export function context(n: number, extra: Partial<SingleTermContext> = {}): SingleTermContext {
-  return { occurrence_ref: `occ-${n}`, document_id: `DOC-${n}`, start: 28, end: 37, before: "Seit gestern klagt sie über ", text: "Schwindel", after: " beim Aufstehen.", flags: [], blocked: [], ...extra };
+  return { occurrence_ref: `occ-${n}`, document_id: `DOC-${n}`, start: 28, end: 37, before: "Seit gestern klagt sie über ", text: "Schwindel", after: " beim Aufstehen.", text_length: 53, flags: [], blocked: [], ...extra };
 }
 
 export function contexts(groupId: string, items: SingleTermContext[], total = items.length): SingleTermContexts {
@@ -39,8 +39,8 @@ export function summary(extra: Partial<SingleTermSummary> = {}): SingleTermSumma
     basis: { basis_id: 2, snapshot_id: "snap-2", derivation_sha256: "a".repeat(64), created_at: "2026-11-02T16:40:00Z", report: {} },
     bases: 2,
     languages: [
-      { language: "de", groups: 40, occurrences: 95, open: 20, blocked: 4, decided: 12, stale: 4, conflicts: 2 },
-      { language: "en", groups: 30, occurrences: 61, open: 30, blocked: 0, decided: 0, stale: 0, conflicts: 0 },
+      { language: "de", groups: 40, occurrences: 95, open: 20, blocked: 4, decided: 12, stale: 4, conflicts: 2, available: 13, available_stale: 1 },
+      { language: "en", groups: 30, occurrences: 61, open: 30, blocked: 0, decided: 0, stale: 0, conflicts: 0, available: 30, available_stale: 0 },
     ],
     exclusions: { not_present: { de: 14, en: 3 }, not_patient: { de: 2 }, obsolete_term: {} },
     blocked: { contains_other_finding: { de: 3 }, negation_in_span: { de: 1 } },

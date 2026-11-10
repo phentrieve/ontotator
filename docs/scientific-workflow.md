@@ -513,11 +513,15 @@ on either side, and decide:
   overlap the annotated one, overlap no other finding and contain no
   negation cue;
 - `adjust_term`: a more general term, which must be an active ancestor of
-  the annotated term in the release of every occurrence;
+  the annotated term in the release of every occurrence and neither the
+  HPO root `HP:0000001`, a term directly under it (such as `HP:0000118`
+  Phenotypic abnormality) nor an organ-system term directly under
+  `HP:0000118` (such as `HP:0000707` Abnormality of the nervous system);
 - `reject` with a reason: `needs_context`, `ambiguous_abbreviation`,
   `too_general`, `term_wrong_out_of_context`, `contains_other_finding`,
-  `negation_in_span`, `conflict` (only for groups in a phrase conflict) or
-  `other`;
+  `negation_in_span`, `needs_rewrite` (the phrase would stand alone only
+  with words inside it removed, which a verbatim re-cut cannot do),
+  `conflict` (only for groups in a phrase conflict) or `other`;
 - `withdrawn`: takes back the decision and opens the group again.
 
 One adjustment per decision; no free-text rewrite. A blocked group accepts

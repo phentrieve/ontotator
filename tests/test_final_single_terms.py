@@ -53,7 +53,10 @@ TEXTS = {
     DOC2: "Erneut Krampfanfälle. Areflexie beidseits. Hypotonie.",
 }
 SEIZURE, HYPOTONIA, AREFLEXIA = "HP:0001250", "HP:0001252", "HP:0001284"
-HEARING, SENSORINEURAL = "HP:0000365", "HP:0000407"
+# The fixture's Hearing impairment sits directly under Phenotypic abnormality,
+# a level never offered as a generalised term: the hearing finding is
+# annotated as Dialeptic seizure, which generalises to Seizure.
+HEARING, SENSORINEURAL = "HP:0001250", "HP:0011146"
 FINDINGS: dict[str, list[tuple[str, str, str]]] = {
     DOC1: [
         ("a1", "Krampfanfälle", SEIZURE),
@@ -284,7 +287,15 @@ def _cli(env, out, *extra):
 
 
 def test_cases_reviews_merge_and_report(env):
-    _review(env)
+    batches = _review(env)
+    _decide(
+        env.rita,
+        batches["primary"],
+        "d5",
+        G_HYPOTONIA,
+        "reject",
+        reason="needs_rewrite",
+    )
     job_id = _export(env)
     job = env.lead.get(f"/api/v1/jobs/{job_id}").json()
     assert job["kind"] == "final_single_term_export"
@@ -354,14 +365,15 @@ def test_cases_reviews_merge_and_report(env):
     report = json.loads(archive.read("report.json"))
     assert report["format"] == FINAL_SINGLE_TERM_FORMAT
     assert report["groups"] == {
-        "de": {"open": 1, "blocked": 0, "decided": 4, "stale": 0}
+        "de": {"open": 0, "blocked": 0, "decided": 5, "stale": 0}
     }
     assert report["decisions"] == {
         "accept": 2,
         "adjust_span": 1,
         "adjust_term": 1,
-        "reject": 0,
+        "reject": 1,
     }
+    assert report["reject_reasons"] == {"needs_rewrite": 1}
     assert report["blocked"]["negation_in_span"] == {"de": 1}
     assert report["second_review"]["pairs"] == 2
     assert report["second_review"]["percent"] == 50.0

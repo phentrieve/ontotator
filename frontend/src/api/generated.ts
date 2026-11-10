@@ -9259,6 +9259,8 @@ export interface components {
             text: string;
             /** After */
             after: string;
+            /** Text Length */
+            text_length: number;
             /** Flags */
             flags: string[];
             /** Blocked */
@@ -9289,7 +9291,7 @@ export interface components {
              */
             decision: "accept" | "adjust_span" | "adjust_term" | "reject" | "withdrawn";
             /** Reason */
-            reason?: ("needs_context" | "ambiguous_abbreviation" | "too_general" | "term_wrong_out_of_context" | "contains_other_finding" | "negation_in_span" | "conflict" | "other") | null;
+            reason?: ("needs_context" | "ambiguous_abbreviation" | "too_general" | "term_wrong_out_of_context" | "contains_other_finding" | "negation_in_span" | "needs_rewrite" | "conflict" | "other") | null;
             /** Note */
             note?: string | null;
             adjusted_span?: components["schemas"]["SingleTermSpanRequest"] | null;
@@ -9319,7 +9321,7 @@ export interface components {
              */
             decision: "accept" | "adjust_span" | "adjust_term" | "reject" | "withdrawn";
             /** Reason */
-            reason: ("needs_context" | "ambiguous_abbreviation" | "too_general" | "term_wrong_out_of_context" | "contains_other_finding" | "negation_in_span" | "conflict" | "other") | null;
+            reason: ("needs_context" | "ambiguous_abbreviation" | "too_general" | "term_wrong_out_of_context" | "contains_other_finding" | "negation_in_span" | "needs_rewrite" | "conflict" | "other") | null;
             /** Note */
             note: string | null;
             /** Adjusted Span */
@@ -9399,6 +9401,10 @@ export interface components {
             stale: number;
             /** Conflicts */
             conflicts: number;
+            /** Available */
+            available: number;
+            /** Available Stale */
+            available_stale: number;
         };
         /** SingleTermReviewerView */
         SingleTermReviewerView: {

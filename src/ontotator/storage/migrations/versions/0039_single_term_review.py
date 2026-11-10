@@ -45,7 +45,7 @@ DECISIONS = "('accept', 'adjust_span', 'adjust_term', 'reject', 'withdrawn')"
 REASONS = (
     "('needs_context', 'ambiguous_abbreviation', 'too_general',"
     " 'term_wrong_out_of_context', 'contains_other_finding', 'negation_in_span',"
-    " 'conflict', 'other')"
+    " 'needs_rewrite', 'conflict', 'other')"
 )
 
 

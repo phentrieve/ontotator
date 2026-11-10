@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, ApiError, notifySessionRestored, type ProjectSummary, type TaskSummary } from "../src/api/client";
+import { api, ApiError, notifySessionRestored, type ProjectSummary, type SingleTermBatch, type TaskSummary } from "../src/api/client";
 import { memberHint, MyTasks } from "../src/tasks/MyTasks";
 import { guidelineListing, guidelineSummary, withdrawnGuideline } from "./projectFixtures";
 
@@ -21,11 +21,36 @@ const deferred = <T,>() => {
 };
 
 // No project has guidelines unless a test says so.
-beforeEach(() => { vi.spyOn(api, "listGuidelines").mockResolvedValue(guidelineListing([])); });
+beforeEach(() => {
+  vi.spyOn(api, "listGuidelines").mockResolvedValue(guidelineListing([]));
+  vi.spyOn(api, "listSingleTermBatches").mockResolvedValue([]);
+});
 
 describe("My tasks component", () => {
   beforeEach(() => { vi.spyOn(api, "listMyTasks").mockResolvedValue(tasks); });
   afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+
+  it("lists the user's open single-term review batches with a link into each (#381)", async () => {
+    const onNavigate = vi.fn();
+    const batch = (batch_id: number, reviewer_username: string, state: SingleTermBatch["state"] = "open"): SingleTermBatch => ({
+      batch_id, basis_id: 1, role: "primary", parent_batch_id: null, second_batch_ids: [], reviewer_username, reviewer_pseudonym: "r",
+      state, filter: { language: "de" }, groups: 13, decided: 2, current_basis: true, created_at: "2026-11-02T16:40:00Z", updated_at: "2026-11-02T16:40:00Z", warnings: [],
+    });
+    vi.mocked(api.listSingleTermBatches).mockImplementation(async key => {
+      if (key === "q") throw new ApiError(409, "off", "SINGLE_TERM_REVIEW_OFF");
+      return [batch(1, "ana"), batch(2, "ben"), batch(3, "ana", "submitted")];
+    });
+    render(<MyTasks projects={[project("p", "Project P"), project("q", "Project Q")]} onNavigate={onNavigate} username="ana" />);
+    const table = await screen.findByRole("table", { name: "My single-term review batches" });
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].textContent).toContain("#1");
+    expect(rows[0].textContent).toContain("2 of 13 decided");
+    const link = within(rows[0]).getByRole("link", { name: "Continue" });
+    expect(link.getAttribute("href")).toBe("#/projects/p/single-terms/batches/1");
+    fireEvent.click(link);
+    expect(onNavigate).toHaveBeenCalledWith({ name: "projectSingleTermBatch", key: "p", batchId: 1 });
+  });
 
   it("shows a waiting task as not startable (issue 213)", async () => {
     vi.mocked(api.listMyTasks).mockResolvedValue([{ ...task(3, "open"), waiting_for_translation_review: true }]);

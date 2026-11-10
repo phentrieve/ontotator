@@ -68,6 +68,28 @@ describe("single-term review screen", () => {
     await waitFor(() => expect(screen.getByText("0 of 3 decided")).toBeDefined());
   });
 
+  it("shows the resulting phrase or term of a decided group, without the block notice", async () => {
+    groups = [
+      group(1, { blocked_reason: "negation_in_span", state: "decided", decision: decision(gid(1), {
+        decision: "adjust_span", adjusted_span: { occurrence_ref: "occ-1", start: 30, end: 37, text: "hwindel" } }) }),
+      group(2, { state: "decided", decision: decision(gid(2), { decision: "adjust_term", adjusted_term_id: "HP:0012638" }) }),
+    ];
+    vi.mocked(api.singleTermContexts).mockImplementation(async (_key, groupId) => contexts(groupId, [
+      context(1), context(2, { start: 300, end: 309, text_length: 900 }),
+    ]));
+    renderScreen({ group: gid(1) });
+    expect(await screen.findByText(/Adjusted and accepted: re-cut to “hwindel”/)).toBeDefined();
+    expect(screen.queryByText(/Blocked: the span/)).toBeNull();
+    // "…" only where a context stops short of the text's start or end.
+    const items = await screen.findAllByRole("listitem");
+    const shown = items.filter(item => item.classList.contains("st-context")).map(item => item.textContent ?? "");
+    expect(shown[0].startsWith("Seit") && shown[0].includes("Aufstehen. ")).toBe(true);
+    expect(shown[1].startsWith("…Seit") && shown[1].includes("Aufstehen.… ")).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: /Decided/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Phrase 2/ }));
+    expect(await screen.findByText(/generalised to Abnormal nervous system physiology \(HP:0012638\)/)).toBeDefined();
+  });
+
   it("does not offer Accept for a blocked group", async () => {
     renderScreen({ group: gid(2) });
     expect(await screen.findByRole("heading", { name: "Phrase 2" })).toBeDefined();
@@ -87,7 +109,7 @@ describe("single-term review screen", () => {
     expect((reject as HTMLButtonElement).disabled).toBe(true);
     const reasons = screen.getByRole("group", { name: "Reject reason" });
     expect(within(reasons).getAllByRole("button").map(button => button.textContent)).toEqual([
-      "needs context", "ambiguous abbreviation", "too general", "term wrong out of context", "contains other finding", "negation in span", "other",
+      "needs context", "ambiguous abbreviation", "too general", "term wrong out of context", "contains other finding", "negation in span", "only usable rewritten (words inside removed)", "other",
     ]);
     fireEvent.click(within(reasons).getByRole("button", { name: "too general" }));
     expect(within(reasons).getByRole("button", { name: "too general" }).getAttribute("aria-pressed")).toBe("true");

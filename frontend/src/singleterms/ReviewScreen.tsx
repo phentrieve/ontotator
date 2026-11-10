@@ -8,7 +8,7 @@ import { AdjustView, type Adjustment } from "./AdjustView";
 import { HelpLink } from "../help/HelpLink";
 import { ConflictView } from "./ConflictView";
 import {
-  accepting, batchScope, blockedLabels, decisionBadge, flagLabels, GUIDING_QUESTION, label, languageLabel, newRequestId,
+  accepting, batchScope, blockedLabels, contextParts, decisionBadge, flagLabels, GUIDING_QUESTION, label, languageLabel, newRequestId,
   REJECT_REASONS, reasonLabels, type RejectReason,
 } from "./labels";
 import "./singleterms.css";
@@ -72,11 +72,19 @@ function RouteLink({ route, onNavigate, children }: { route: Route; onNavigate: 
   }}>{children}</a>;
 }
 
-function decisionText(decision: SingleTermDecision): string {
+/** `ancestors`: the group's offered terms, for the name of a generalised term. */
+function decisionText(decision: SingleTermDecision, ancestors?: readonly SingleTermAncestor[]): string {
   switch (decision.decision) {
     case "accept": return "Accepted";
-    case "adjust_span": return "Adjusted (span re-cut) and accepted";
-    case "adjust_term": return `Adjusted (term ${decision.adjusted_term_id ?? ""}) and accepted`;
+    case "adjust_span": {
+      const text = (decision.adjusted_span as { text?: string } | null)?.text;
+      return text ? `Adjusted and accepted: re-cut to “${text}”` : "Adjusted (span re-cut) and accepted";
+    }
+    case "adjust_term": {
+      const term = decision.adjusted_term_id ?? "";
+      const name = ancestors?.find(item => item.term_id === term)?.label;
+      return `Adjusted and accepted: generalised to ${name ? `${name} (${term})` : term}`;
+    }
     case "reject": return `Rejected: ${decision.reason ? reasonLabels[decision.reason] : ""}`;
     case "withdrawn": return "Withdrawn";
   }
@@ -159,7 +167,8 @@ function ReviewContent({ projectKey, batchId, username, canManage, group: initia
     if (currentGroup && (judged || readOnly || decided(currentGroup))) loadContexts(currentGroup.group_id);
   }, [currentGroup, judged, readOnly, loadContexts]);
 
-  const adjustGroup = mode === "adjust" ? currentGroup?.group_id : undefined;
+  // Also for a decided term adjustment, to name the generalised term.
+  const adjustGroup = mode === "adjust" || currentGroup?.decision?.decision === "adjust_term" ? currentGroup?.group_id : undefined;
   const haveAncestors = adjustGroup !== undefined && ancestors[adjustGroup] !== undefined;
   useEffect(() => {
     if (adjustGroup === undefined || haveAncestors) return;
@@ -207,7 +216,7 @@ function ReviewContent({ projectKey, batchId, username, canManage, group: initia
       }
       if (lastView) {
         const decidedGroup = rows.find(row => row.group_id === lastView!.group_id);
-        setLast(lastView.decision === "withdrawn" ? null : { groupId: lastView.group_id, text: `${decidedGroup?.display_text ?? ""}: ${decisionText(lastView)}.` });
+        setLast(lastView.decision === "withdrawn" ? null : { groupId: lastView.group_id, text: `${decidedGroup?.display_text ?? ""}: ${decisionText(lastView, ancestors[lastView.group_id])}.` });
         setMode("review"); setReason(null); setNote("");
         if (options.advance && lastView.decision !== "withdrawn") {
           const next = nextOpen(lastView.group_id, rows);
@@ -285,7 +294,7 @@ function ReviewContent({ projectKey, batchId, username, canManage, group: initia
       ancestors={ancestors[currentGroup.group_id]} ancestorError={ancestorError}
       problemLink={problemLink} onCancel={() => { setMode("review"); setError(undefined); }} onSubmit={submitAdjustment} />;
   } else if (currentGroup) {
-    work = <GroupWork id={id} group={currentGroup} judged={judged} readOnly={readOnly} contexts={contexts[currentGroup.group_id]} contextError={contextError}
+    work = <GroupWork id={id} group={currentGroup} ancestors={ancestors[currentGroup.group_id]} judged={judged} readOnly={readOnly} contexts={contexts[currentGroup.group_id]} contextError={contextError}
       onJudge={judge} onMore={() => loadContexts(currentGroup.group_id, true)} busy={busy} error={error} reason={reason} onReason={setReason}
       note={note} onNote={setNote} reasonsRef={reasonsRef} problemLink={problemLink}
       onAccept={() => decideCurrent("accept")} onAdjust={() => setMode("adjust")} onReject={() => { if (reason) decideCurrent("reject", { reason }); }}
@@ -337,6 +346,7 @@ function ReviewContent({ projectKey, batchId, username, canManage, group: initia
 interface GroupWorkProps {
   id: string;
   group: SingleTermGroup;
+  ancestors: readonly SingleTermAncestor[] | undefined;
   judged: PhraseOnly | undefined;
   readOnly: boolean;
   contexts: SingleTermContexts | undefined;
@@ -357,7 +367,7 @@ interface GroupWorkProps {
   onUndo: () => void;
 }
 
-function GroupWork({ id, group, judged, readOnly, contexts, contextError, busy, error, reason, note, reasonsRef, problemLink, onJudge, onMore, onReason, onNote, onAccept, onAdjust, onReject, onUndo }: GroupWorkProps): JSX.Element {
+function GroupWork({ id, group, ancestors, judged, readOnly, contexts, contextError, busy, error, reason, note, reasonsRef, problemLink, onJudge, onMore, onReason, onNote, onAccept, onAdjust, onReject, onUndo }: GroupWorkProps): JSX.Element {
   const isDecided = decided(group);
   const showContexts = readOnly || isDecided || !!judged;
   const blocked = group.blocked_reason;
@@ -368,7 +378,7 @@ function GroupWork({ id, group, judged, readOnly, contexts, contextError, busy, 
       <p className="st-row" style={{ margin: 0 }}><strong>{group.label ?? group.term_id}</strong><span className="st-muted">{group.term_id}</span>
         {group.flags.map(flag => <span key={flag} className="st-pill st-pill--neutral">{label(flagLabels, flag)}</span>)}</p>
       {group.surface_variants.length > 1 && <p className="st-small st-muted" style={{ margin: 0 }}>Written as: {group.surface_variants.map(item => `${item.text} (${item.count})`).join(", ")}</p>}
-      {blocked && <p className="st-warn st-small">Blocked: the span {blocked === "negation_in_span" ? "holds a negation cue" : "contains another finding"}. It cannot be accepted as it is; re-cut it or reject it.</p>}
+      {blocked && !isDecided && <p className="st-warn st-small">Blocked: the span {blocked === "negation_in_span" ? "holds a negation cue" : "contains another finding"}. It cannot be accepted as it is; re-cut it or reject it.</p>}
       <p className="st-question">{GUIDING_QUESTION}</p>
       {!readOnly && !isDecided && !judged && <div className="st-row" role="group" aria-label="Phrase-only judgment">
         <Button onClick={() => onJudge("would_accept")}>Yes, as a phrase <Kbd>Y</Kbd></Button>
@@ -383,12 +393,12 @@ function GroupWork({ id, group, judged, readOnly, contexts, contextError, busy, 
       {contextError !== undefined && !contexts && <ErrorNotice error={contextError} />}
       {!contexts && contextError === undefined && <p className="st-muted st-small">Loading contexts…</p>}
       {contexts && <ul className="st-contexts">{contexts.contexts.map(item => <li key={item.occurrence_ref} className="st-context">
-        …{item.before}<mark>{item.text}</mark>{item.after}… <span className="st-muted st-small">{item.document_id}</span>
+        {contextParts(item).before}<mark>{item.text}</mark>{contextParts(item).after} <span className="st-muted st-small">{item.document_id}</span>
       </li>)}</ul>}
       {contexts && contexts.contexts.length < contexts.total && <Button size="sm" onClick={onMore}>Show more contexts</Button>}
       {group.unseen_occurrences > 0 && <p className="st-small st-muted" style={{ margin: 0 }}>{group.unseen_occurrences} {group.unseen_occurrences === 1 ? "occurrence is" : "occurrences are"} new since the decision and were not seen by its reviewer.</p>}
     </section>}
-    {showContexts && isDecided && group.decision && <p className="st-recorded" role="status">{decisionText(group.decision)}.{group.decision.note ? ` Note: ${group.decision.note}` : ""} {!readOnly && <Button size="sm" variant="quiet" disabled={busy} onClick={onUndo}>Undo</Button>}</p>}
+    {showContexts && isDecided && group.decision && <p className="st-recorded" role="status">{decisionText(group.decision, ancestors)}.{group.decision.note ? ` Note: ${group.decision.note}` : ""} {!readOnly && <Button size="sm" variant="quiet" disabled={busy} onClick={onUndo}>Undo</Button>}</p>}
     {!readOnly && !isDecided && judged && <section className="st-card" aria-labelledby={`${id}-decision`}>
       <h2 id={`${id}-decision`} className="st-step">Step 3 · Decision</h2>
       <div className="st-row">

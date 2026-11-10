@@ -60,7 +60,10 @@ SEIZURE, STATUS, HYPOTONIA, AREFLEXIA = (
     "HP:0001252",
     "HP:0001284",
 )
-HEARING, SENSORINEURAL = "HP:0000365", "HP:0000407"
+# The fixture's Hearing impairment sits directly under Phenotypic abnormality,
+# a level never offered as a generalised term: the hearing finding is
+# annotated as Dialeptic seizure, which generalises to Seizure.
+HEARING, SENSORINEURAL = "HP:0001250", "HP:0011146"
 FINDINGS: dict[str, list[tuple[str, str, str]]] = {
     DOC1: [
         ("a1", "Krampfanfälle", SEIZURE),
@@ -351,6 +354,7 @@ def test_contexts_show_the_text_around_each_occurrence(env):
     assert first["text"] == "Krampfanfälle"
     assert first["before"] == "Seit dem Sommer "
     assert first["after"].startswith(" und Hypotonie.")
+    assert first["text_length"] == len(TEXTS[DOC1])
     assert "annotator" not in str(body) and "ann-" not in str(body)
 
 
@@ -583,7 +587,12 @@ def test_decision_rules_for_blocked_groups_terms_spans_and_reasons(env):
     assert (
         code(
             _decide(
-                rita, batch_id, "x8", G_HEARING, "adjust_term", adjusted_term_id=SEIZURE
+                rita,
+                batch_id,
+                "x8",
+                G_HEARING,
+                "adjust_term",
+                adjusted_term_id=HYPOTONIA,
             )
         )
         == "SINGLE_TERM_NOT_ANCESTOR"
@@ -732,6 +741,9 @@ def test_a_refresh_opens_only_new_and_stale_groups(env):
     [german] = summary["languages"]
     assert german["decided"] == 2 and german["stale"] == 1
     assert german["conflicts"] == 2
+    # The stale group is in the open stale batch: no new batch can take it.
+    assert german["available_stale"] == 0
+    assert german["available"] == german["open"] == 2
 
 
 def test_a_term_adjustment_does_not_carry_onto_a_newly_blocked_group(env):
@@ -948,8 +960,11 @@ def test_ancestors_list_the_terms_a_group_can_be_generalised_to(env):
     assert HEARING in terms and SENSORINEURAL not in terms
     # Nearest first; every offered term is accepted as an adjustment.
     assert body["ancestors"][0]["nearest"] is True
-    assert terms.index(HEARING) < terms.index("HP:0000118")
     assert all(item["label"] for item in body["ancestors"])
+    # The root, the branch roots under it and the organ-system terms under
+    # Phenotypic abnormality are never offered, nor accepted.
+    too_general = ("HP:0000001", "HP:0000118", "HP:0000707")
+    assert not set(too_general) & set(terms)
     # Only the batch's reviewer (and leads) read them.
     assert env.lead.get(f"{ST}/groups/{G_HEARING}/ancestors").status_code == 200
     assert (
@@ -967,6 +982,16 @@ def test_ancestors_list_the_terms_a_group_can_be_generalised_to(env):
         adjusted_term_id=terms[-1],
     )
     assert adjusted.status_code == 200, adjusted.text
+    for i, term in enumerate(too_general):
+        refused = _decide(
+            env.rita,
+            batch_id,
+            f"an-{i}",
+            G_HEARING,
+            "adjust_term",
+            adjusted_term_id=term,
+        )
+        assert refused.json()["code"] == "SINGLE_TERM_NOT_ANCESTOR", term
 
 
 def test_tokens_reach_the_summary_but_never_phrases_or_decisions(env):

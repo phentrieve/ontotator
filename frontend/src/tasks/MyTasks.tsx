@@ -13,6 +13,7 @@ import { onSpaceActivate } from "../ui/spaceActivates";
 import { annotationTaskName } from "../editor/modes";
 import { PracticeCard, PracticeGroup } from "../practice/PracticeOnMyTasks";
 import { usePractice } from "../practice/usePractice";
+import { MyReviewBatches } from "../singleterms/MyReviewBatches";
 import { notifyTasksChanged } from "./tasksEvents";
 
 export interface MyTasksProps {
@@ -248,6 +249,7 @@ export function MyTasks({ project, status, projects, onNavigate, username }: MyT
       {guidelineLinks.length > 0 && <ul className="task-counts" aria-label="Project guidelines">
         {guidelineLinks.map(key => <li key={key}>{guidelineLink(key)}</li>)}
       </ul>}
+      {username !== undefined && <MyReviewBatches projects={projects} project={project} username={username} onNavigate={onNavigate} />}
       {tasks.length === 0 ? empty : <>
         <Tabs label="Task status" tabs={tabs} active={active} panelId={STATUS_PANEL} onSelect={id => onNavigate(tabRoute(id as TaskStatusTab))} />
         <div role="tabpanel" id={STATUS_PANEL} aria-labelledby={tabId(STATUS_PANEL, active)}>

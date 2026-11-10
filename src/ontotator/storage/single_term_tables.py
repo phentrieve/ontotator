@@ -39,6 +39,7 @@ REJECT_REASONS = (
     "term_wrong_out_of_context",
     "contains_other_finding",
     "negation_in_span",
+    "needs_rewrite",
     "conflict",
     "other",
 )

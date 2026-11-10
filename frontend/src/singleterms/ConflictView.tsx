@@ -2,7 +2,7 @@ import { useEffect, useId, useState } from "react";
 import type { SingleTermContexts, SingleTermDecisionRequest, SingleTermGroup } from "../api/client";
 import { ErrorNotice } from "../admin/ErrorNotice";
 import { Button } from "../ui";
-import { accepting, blockedLabels, decisionBadge, label } from "./labels";
+import { accepting, blockedLabels, contextParts, decisionBadge, label } from "./labels";
 
 type Request = Omit<SingleTermDecisionRequest, "request_id">;
 
@@ -71,7 +71,7 @@ export function ConflictView({ groups, outside, contexts, loadContexts, readOnly
             {badge && <p style={{ margin: 0 }}><span className={`st-pill st-pill--${badge.tone}`}>{badge.text}{group.decision?.reason ? `: ${group.decision.reason.replace(/_/g, " ")}` : ""}</span></p>}
             {group.blocked_reason && <p className="st-warn st-small">Blocked: {label(blockedLabels, group.blocked_reason)}. Re-cut it in the group's own review, or reject.</p>}
             {view ? <ul className="st-contexts">{view.contexts.slice(0, 2).map(item => <li key={item.occurrence_ref} className="st-context">
-              …{[...item.before].slice(-60).join("")}<mark>{item.text}</mark>{[...item.after].slice(0, 60).join("")}… <span className="st-muted st-small">{item.document_id}</span>
+              {contextParts(item, 60).before}<mark>{item.text}</mark>{contextParts(item, 60).after} <span className="st-muted st-small">{item.document_id}</span>
             </li>)}</ul> : <p className="st-muted st-small">Loading contexts…</p>}
             {!readOnly && <Button variant="primary" disabled={!!group.blocked_reason || acceptedGroup === group} loading={busy} onClick={() => choose(group)}>Use this term</Button>}
           </section>;

@@ -43,7 +43,10 @@ export function BatchDialog({ open, projectKey, languages, reviewers, layers = [
   const first = useRef<HTMLSelectElement>(null);
 
   const counts = languages.find(item => item.language === language);
-  const openCount = counts ? counts.open + counts.blocked + counts.stale : null;
+  // Without a language: the sum over all languages, as the batch takes them.
+  const pool = counts ? [counts] : languages;
+  const openCount = pool.reduce((sum, item) => sum + item.available, 0);
+  const staleCount = pool.reduce((sum, item) => sum + item.available_stale, 0);
   const secondChoices = reviewers.filter(name => name !== reviewer);
   const chosenSecond = secondChoices.includes(secondReviewer) ? secondReviewer : secondChoices[0] ?? "";
 
@@ -96,10 +99,10 @@ export function BatchDialog({ open, projectKey, languages, reviewers, layers = [
         </Select>
       </div>
       <fieldset className="st-options"><legend>Groups</legend>
-        <label className="st-option"><input type="radio" name={`${id}-groups`} checked={choice === "all"} onChange={() => setChoice("all")} /> <span>All open and stale groups{openCount !== null && <span className="st-muted"> (up to {openCount})</span>}</span></label>
+        <label className="st-option"><input type="radio" name={`${id}-groups`} checked={choice === "all"} onChange={() => setChoice("all")} /> <span>All open and stale groups<span className="st-muted"> ({openCount === 0 ? "none left: all are decided or in an open batch" : `up to ${openCount}`})</span></span></label>
         <label className="st-option"><input type="radio" name={`${id}-groups`} checked={choice === "texts"} onChange={() => setChoice("texts")} /> <span>Groups with occurrences in chosen texts</span></label>
         {choice === "texts" && <Textarea id={`${id}-texts`} label="Text IDs" hint="One per line or separated by commas." rows={3} value={texts} onChange={event => setTexts(event.target.value)} />}
-        <label className="st-option"><input type="radio" name={`${id}-groups`} checked={choice === "stale"} onChange={() => setChoice("stale")} /> <span>Stale decisions only{counts && <span className="st-muted"> ({counts.stale})</span>}</span></label>
+        <label className="st-option"><input type="radio" name={`${id}-groups`} checked={choice === "stale"} onChange={() => setChoice("stale")} /> <span>Stale decisions only<span className="st-muted"> ({staleCount})</span></span></label>
         <TextInput id={`${id}-limit`} label="At most this many groups (optional)" type="number" min={1} step={1} value={limit} onChange={event => setLimit(event.target.value)} />
         <p className="st-small st-muted">Groups already in another open batch are left out.</p>
       </fieldset>

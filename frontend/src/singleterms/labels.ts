@@ -1,4 +1,4 @@
-import type { SingleTermBatch, SingleTermDecision, SingleTermGroup } from "../api/client";
+import type { SingleTermBatch, SingleTermContext, SingleTermDecision, SingleTermGroup } from "../api/client";
 import { languageName } from "../translation/labels";
 
 export type RejectReason = NonNullable<SingleTermDecision["reason"]>;
@@ -11,7 +11,7 @@ export const GUIDING_QUESTION = "Would a clinician map this phrase alone, withou
 /** Reasons a reviewer can pick in step 3; `conflict` belongs to the conflict view. */
 export const REJECT_REASONS: readonly RejectReason[] = [
   "needs_context", "ambiguous_abbreviation", "too_general", "term_wrong_out_of_context",
-  "contains_other_finding", "negation_in_span", "other",
+  "contains_other_finding", "negation_in_span", "needs_rewrite", "other",
 ];
 
 export const reasonLabels: Readonly<Record<RejectReason, string>> = {
@@ -21,6 +21,7 @@ export const reasonLabels: Readonly<Record<RejectReason, string>> = {
   term_wrong_out_of_context: "term wrong out of context",
   contains_other_finding: "contains other finding",
   negation_in_span: "negation in span",
+  needs_rewrite: "only usable rewritten (words inside removed)",
   conflict: "conflict",
   other: "other",
 };
@@ -86,6 +87,16 @@ export function decisionBadge(decision: SingleTermDecision | null): { text: stri
   if (decision.decision === "accept") return { text: "accepted", tone: "success" };
   if (decision.decision === "reject") return { text: "rejected", tone: "danger" };
   return { text: "adjusted", tone: "info" };
+}
+
+/** A context's text before and after the phrase, with "…" only where it stops short of the text's start or end. */
+export function contextParts(item: SingleTermContext, width?: number): { before: string; after: string } {
+  const before = width === undefined ? [...item.before] : [...item.before].slice(-width);
+  const after = width === undefined ? [...item.after] : [...item.after].slice(0, width);
+  return {
+    before: (item.start > before.length ? "…" : "") + before.join(""),
+    after: after.join("") + (item.end + after.length < item.text_length ? "…" : ""),
+  };
 }
 
 export const percent = (value: number | null | undefined): string => value == null ? "–" : `${Math.round(value)} %`;

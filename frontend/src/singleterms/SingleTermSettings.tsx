@@ -38,7 +38,7 @@ export function SingleTermSettingsCard({ value, languages, onChange, disabled }:
     <Checkbox id={`${prefix}-single-term`} label="Review single terms of the final results" hint="Adds “Single terms” to the project navigation."
       checked={value.single_term_review} disabled={disabled} onChange={event => onChange({ ...value, single_term_review: event.target.checked })} />
     {languages.length ? <div className="settings-card-row">
-      {languages.map(language => <Textarea key={language} id={`${prefix}-cues-${language}`} label={`Negation cues, ${languageLabel(language)}`} hint="One cue per line." rows={3}
+      {languages.map(language => <Textarea key={language} id={`${prefix}-cues-${language}`} label={`Negation cues, ${languageLabel(language)}`} hint="One cue per line." rows={Math.max(3, (value.cues[language] ?? "").split("\n").length + 1)}
         value={value.cues[language] ?? ""} disabled={disabled} onChange={event => onChange({ ...value, cues: { ...value.cues, [language]: event.target.value } })} />)}
     </div> : <p className="field-hint">Add the project's languages under General to list negation cues.</p>}
   </SettingsCard>;

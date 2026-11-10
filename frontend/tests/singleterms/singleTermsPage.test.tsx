@@ -40,7 +40,9 @@ describe("single-term overview", () => {
     const german = screen.getByRole("region", { name: "German" });
     expect(within(german).getByText("95 occurrences")).toBeDefined();
     expect(within(german).getByText("open · 4 stale")).toBeDefined();
-    expect(within(german).getByText(/2 groups in phrase conflicts · 4 blocked groups/)).toBeDefined();
+    expect(within(german).getByText("2 groups in phrase conflicts · 4 blocked groups to re-cut or reject")).toBeDefined();
+    // English has nothing left to re-cut or reject.
+    expect(within(screen.getByRole("region", { name: "English" })).queryByText(/blocked groups/)).toBeNull();
     expect(screen.getByText(/agreement 90 % · κ 0.78/)).toBeDefined();
     const table = within(screen.getByRole("region", { name: "Review batches" })).getByRole("table");
     const rows = within(table).getAllByRole("row").slice(1).map(row => row.textContent);
@@ -85,7 +87,9 @@ describe("single-term overview", () => {
     render(<SingleTermsPage projectKey="p" canManage onNavigate={vi.fn()} />);
     fireEvent.click(await screen.findByRole("button", { name: "New review batch…" }));
     const dialog = await screen.findByRole("dialog", { name: "New review batch" });
-    expect(within(dialog).getByText("(up to 28)")).toBeDefined();
+    // Groups already in an open batch are not counted.
+    expect(within(dialog).getByText("(up to 13)")).toBeDefined();
+    expect(within(dialog).getByText("(1)")).toBeDefined();
     expect(within(dialog).getAllByRole("option").map(option => option.textContent)).toContain("HPO phenotype");
     const reviewer = within(dialog).getByLabelText(/^Reviewer/) as HTMLSelectElement;
     expect([...reviewer.options].map(option => option.value)).toEqual(["rev-04", "rev-07", "lead-1"]);

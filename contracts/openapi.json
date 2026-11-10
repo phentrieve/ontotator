@@ -27405,6 +27405,10 @@
             "type": "string",
             "title": "After"
           },
+          "text_length": {
+            "type": "integer",
+            "title": "Text Length"
+          },
           "flags": {
             "items": {
               "type": "string"
@@ -27429,6 +27433,7 @@
           "before",
           "text",
           "after",
+          "text_length",
           "flags",
           "blocked"
         ],
@@ -27516,6 +27521,7 @@
                   "term_wrong_out_of_context",
                   "contains_other_finding",
                   "negation_in_span",
+                  "needs_rewrite",
                   "conflict",
                   "other"
                 ]
@@ -27633,6 +27639,7 @@
                   "term_wrong_out_of_context",
                   "contains_other_finding",
                   "negation_in_span",
+                  "needs_rewrite",
                   "conflict",
                   "other"
                 ]
@@ -27879,6 +27886,14 @@
           "conflicts": {
             "type": "integer",
             "title": "Conflicts"
+          },
+          "available": {
+            "type": "integer",
+            "title": "Available"
+          },
+          "available_stale": {
+            "type": "integer",
+            "title": "Available Stale"
           }
         },
         "type": "object",
@@ -27890,7 +27905,9 @@
           "blocked",
           "decided",
           "stale",
-          "conflicts"
+          "conflicts",
+          "available",
+          "available_stale"
         ],
         "title": "SingleTermLanguageCounts"
       },

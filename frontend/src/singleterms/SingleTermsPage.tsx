@@ -150,7 +150,11 @@ function SingleTermsContent({ projectKey, canManage, onNavigate }: SingleTermsPa
       <div className="st-grid">
         {summary.languages.map(counts => {
           const share = counts.groups ? Math.round((counts.decided / counts.groups) * 100) : 0;
-          const blockedTotal = Object.values(summary.blocked).reduce((sum, per) => sum + (per[counts.language] ?? 0), 0);
+          // Still to do only: blocked groups that are decided need nothing more.
+          const pending = [
+            counts.conflicts > 0 && `${counts.conflicts} ${counts.conflicts === 1 ? "group" : "groups"} in phrase conflicts`,
+            counts.blocked > 0 && `${counts.blocked} blocked ${counts.blocked === 1 ? "group" : "groups"} to re-cut or reject`,
+          ].filter(Boolean);
           return <section key={counts.language} className="st-card" aria-labelledby={`st-lang-${counts.language}`}>
             <div className="st-spread"><h2 id={`st-lang-${counts.language}`}>{languageLabel(counts.language)}</h2><span className="st-muted st-small">{counts.occurrences} occurrences</span></div>
             <dl className="st-stats">
@@ -160,9 +164,7 @@ function SingleTermsContent({ projectKey, canManage, onNavigate }: SingleTermsPa
               <div><dt>blocked</dt><dd>{counts.blocked}</dd></div>
             </dl>
             <div className="st-bar" aria-hidden="true"><span style={{ width: `${share}%` }} /></div>
-            {(counts.conflicts > 0 || blockedTotal > 0) && <p className="st-small" style={{ margin: 0, color: "var(--warning)" }}>
-              {counts.conflicts} {counts.conflicts === 1 ? "group" : "groups"} in phrase conflicts · {blockedTotal} blocked {blockedTotal === 1 ? "group" : "groups"} (re-cut or reject)
-            </p>}
+            {pending.length > 0 && <p className="st-small" style={{ margin: 0, color: "var(--warning)" }}>{pending.join(" · ")}</p>}
           </section>;
         })}
         {!summary.languages.length && <EmptyState title="No single-term candidates.">The final results of this basis hold no finding that can stand alone as a phrase.</EmptyState>}
@@ -172,10 +174,10 @@ function SingleTermsContent({ projectKey, canManage, onNavigate }: SingleTermsPa
           : "Second blind review: no group reviewed twice yet."}
       </p>
     </>}
+    <section className="st-card" aria-labelledby="st-batches"><h2 id="st-batches">Review batches</h2>
+      {batches.length ? batchTable : <p className="st-muted" style={{ margin: 0 }}>No review batch yet.</p>}
+    </section>
     <div className="st-grid">
-      <section className="st-card" aria-labelledby="st-batches"><h2 id="st-batches">Review batches</h2>
-        {batches.length ? batchTable : <p className="st-muted" style={{ margin: 0 }}>No review batch yet.</p>}
-      </section>
       {summary && exclusionLanguages.map(language => <section key={language} className="st-card" aria-labelledby={`st-excluded-${language}`}>
         <h2 id={`st-excluded-${language}`}>{languageLabel(language)} findings not offered</h2>
         <div>
