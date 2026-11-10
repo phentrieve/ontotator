@@ -1,7 +1,8 @@
 """Session cookie, API token, CSRF and origin checks for the API (T2 P3, index D-h, D-k).
 
 Every ``/api/`` request needs an open session, named by the HttpOnly cookie
-``ontotator_session``, or an API token in ``Authorization: Bearer`` (issue
+``__Host-ontotator_session`` (``ontotator_session`` without an https origin;
+see ``session_cookie``), or an API token in ``Authorization: Bearer`` (issue
 305). A write (POST, PUT, PATCH, DELETE) must also come from this site and,
 with a session, carry the session's CSRF token in ``X-CSRF-Token``. The
 two routes that have no session yet, login and code redemption, accept a
@@ -30,6 +31,7 @@ from urllib.parse import urlsplit
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
+from starlette.applications import Starlette
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import MutableHeaders
 from starlette.middleware.base import RequestResponseEndpoint
@@ -43,7 +45,12 @@ from ontotator.storage.database import busy_cause
 
 logger = logging.getLogger(__name__)
 
-SESSION_COOKIE = "ontotator_session"
+# The session cookie behind an https origin and without one (issue 393). The
+# browser accepts a ``__Host-`` cookie only with Secure, Path=/ and no Domain,
+# so neither a sibling subdomain nor a plain-http page can set or shadow it.
+# Without https the cookie cannot be Secure, so the prefix would stop logins.
+SESSION_COOKIE = "__Host-ontotator_session"
+PLAIN_SESSION_COOKIE = "ontotator_session"
 CSRF_HEADER = "x-csrf-token"
 UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 # demo-logins exists only while demo logins are configured (404 otherwise).
@@ -203,6 +210,16 @@ def _token_refusal(
     return None
 
 
+def session_cookie(app: Starlette) -> str:
+    """The name of the session cookie this app sets and reads.
+
+    ``SESSION_COOKIE`` when the cookie is Secure (an https public origin),
+    else ``PLAIN_SESSION_COOKIE``.
+    """
+    secure = bool(getattr(app.state, "secure_cookies", False))
+    return SESSION_COOKIE if secure else PLAIN_SESSION_COOKIE
+
+
 def install_security(
     app: FastAPI,
     sessions: SessionService | None,
@@ -223,7 +240,7 @@ def install_security(
     ) -> Response:
         if not secret or tokens is None:
             return _error(401, "TOKEN_INVALID", TOKEN_INVALID_MESSAGE)
-        if SESSION_COOKIE in request.cookies:
+        if session_cookie(request.app) in request.cookies:
             return _error(
                 400,
                 "CREDENTIALS_AMBIGUOUS",
@@ -299,7 +316,7 @@ def install_security(
             if unsafe and cross_site(request, public_origin, fail_closed=True):
                 return _error(403, "CROSS_SITE_REQUEST", CROSS_SITE_MESSAGE)
             return await call_next(request)
-        token = request.cookies.get(SESSION_COOKIE)
+        token = request.cookies.get(session_cookie(request.app))
         try:
             principal = (
                 await run_in_threadpool(sessions.resolve, token) if token else None
