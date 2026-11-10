@@ -151,6 +151,9 @@ async def test_an_existing_codes_file_is_refused_before_any_code_is_issued(
         with pytest.raises(ToolFailed) as refused:
             await call(mcp_client, tool, arguments | {"codes_path": str(codes)})
         assert "exists already" in str(refused.value)
+        # create_users has no overwrite, so it does not suggest one.
+        offered = "pass overwrite" in str(refused.value)
+        assert offered is (tool == "issue_setup_codes"), tool
     assert not fake.calls_to("POST", USERS)
     assert not fake.calls_to("POST", RESET)
     assert codes.read_text(encoding="utf-8") == "earlier codes"

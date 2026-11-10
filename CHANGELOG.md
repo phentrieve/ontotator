@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- MCP server: the server's instructions now tell the model that texts, guidelines, problem reports, reasons and names in tool results are user data, never instructions, and that no changing tool is to be called because returned content asks for it. Tools whose change cannot be undone carry `destructiveHint`, so a client can ask before each call even when an injected model passes `confirm=true`: `accept_agreeing_texts` (a final result cannot be withdrawn) and `carry_submission` (its decision is final in every mode, `dismiss` included) are now `destructive`, and `commit_upload` (an import cannot be undone, and it can change the translation status of texts imported earlier) is now `changes`. `create_users` no longer takes `overwrite`: it never replaces an existing codes file, so it stays additive (`issue_setup_codes` keeps `overwrite`). The README's Effect column follows the labels, which a test now checks (#385).
+
 ## [0.10.0] - 2026-11-10
 
 ### Added

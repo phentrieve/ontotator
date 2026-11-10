@@ -42,22 +42,27 @@ CODE_COLUMNS = ("username", "display_name", "email", "code", "expires_at")
 HANDOVER_TASKS = ("annotate", "translation_review")
 
 
-def codes_target(api: OntotatorClient, path: str, overwrite: bool) -> Path:
-    """The checked codes file; called before any code is issued, so none is lost."""
+def codes_target(api: OntotatorClient, path: str, overwrite: bool | None) -> Path:
+    """The checked codes file; called before any code is issued, so none is lost.
+
+    ``overwrite`` None: the tool never replaces a file (create_users).
+    """
     target = api.local_path(path)
     if target.is_dir():
         raise OntotatorError(f"{target} is a directory; name a file.")
     if target.exists() and not overwrite:
-        raise OntotatorError(
-            f"{target} exists already. Choose another path or pass overwrite."
-        )
+        hint = "" if overwrite is None else " or pass overwrite"
+        raise OntotatorError(f"{target} exists already. Choose another path{hint}.")
     if not target.parent.is_dir():
         raise OntotatorError(f"The folder {target.parent} does not exist.")
     return target
 
 
 def write_codes(
-    api: OntotatorClient, path: str, rows: list[dict[str, Any]], overwrite: bool
+    api: OntotatorClient,
+    path: str,
+    rows: list[dict[str, Any]],
+    overwrite: bool | None,
 ) -> str:
     """Write ``rows`` as CSV readable by the user only; the absolute path."""
     target = codes_target(api, path, overwrite)
@@ -84,7 +89,7 @@ def _codes(
     api: OntotatorClient,
     issued: list[dict[str, Any]],
     codes_path: str | None,
-    overwrite: bool,
+    overwrite: bool | None,
 ) -> dict[str, Any]:
     """Where the codes went: a local file, or the result itself."""
     if not issued:
@@ -157,6 +162,8 @@ def handover_plan(
 
 
 def register_people(server: MCPServer, api: OntotatorClient) -> None:
+    # No overwrite: the tool stays additive (#385), and an earlier codes file
+    # may hold the only copy of other people's codes.
     @register(server, scopes="admin", effect="additive", idempotent=True)
     async def create_users(
         users: Annotated[list[NewUser], Field(min_length=1, max_length=200)],
@@ -170,7 +177,6 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
             ),
         ] = None,
         codes_path: CodesPath = None,
-        overwrite: bool = False,
     ) -> dict[str, Any]:
         """Create accounts for a cohort, each with a one-time setup code.
 
@@ -181,7 +187,7 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         page; issue_setup_codes renews lapsed ones. With codes_path the
         codes are WRITTEN TO A LOCAL CSV FILE (readable by the user only)
         inside the folders of ONTOTATOR_MCP_FILES_DIR instead of being
-        returned. Needs a system token.
+        returned; an existing file is never replaced. Needs a system token.
         """
         known = {
             str(item.get("username", "")).lower()
@@ -189,7 +195,7 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         }
         if codes_path is not None:
             # Refuse a bad path before creating anyone.
-            codes_target(api, codes_path, overwrite)
+            codes_target(api, codes_path, None)
         existing: list[str] = []
         created: list[dict[str, Any]] = []
         refused: list[dict[str, Any]] = []
@@ -238,7 +244,7 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
             "created": created,
             "existing": existing,
             "refused": refused,
-        } | _codes(api, issued, codes_path, overwrite)
+        } | _codes(api, issued, codes_path, None)
 
     @register(server, scopes="admin", effect="changes")
     async def issue_setup_codes(
