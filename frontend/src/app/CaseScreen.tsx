@@ -2242,8 +2242,9 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const handleCloseTree = () => {
     const active = document.activeElement;
     if (active instanceof HTMLElement && active.closest(".tree-host")) {
-      tabs.showDetailsNow();
-      inspectorRef.current?.querySelector<HTMLElement>(".annotation-tree-button")?.focus();
+      const button = inspectorRef.current?.querySelector<HTMLElement>(".annotation-tree-button");
+      // Closed because the selection was cleared (Escape on a tree button), the button is gone: the text takes the focus.
+      if (button) { tabs.showDetailsNow(); button.focus(); } else leftTextElement?.focus();
     }
     setTreeWalk(null);
   };

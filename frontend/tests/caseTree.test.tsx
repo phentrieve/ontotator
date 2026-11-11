@@ -402,10 +402,14 @@ describe("the tree in the case screen", () => {
     const { container } = render(<CaseScreen view={view} workspaceId="ws" onClose={vi.fn()} />);
     const panel = await openPanel(container, "a1");
 
-    fireEvent.keyDown(within(panel).getByRole("button", { name: "Close tree" }), { key: "Escape" });
+    const close = within(panel).getByRole("button", { name: "Close tree" });
+    close.focus();
+    fireEvent.keyDown(close, { key: "Escape" });
 
     expect(entry(container, "a1").classList.contains("selected")).toBe(false);
     noTree();
+    // "Show in tree" went with the selection: the focus is on the text, not lost to the page.
+    expect(document.activeElement?.classList.contains("text-container")).toBe(true);
   });
 
   it("closes with its close button or with Escape inside the tree, and does not come back by itself", async () => {
