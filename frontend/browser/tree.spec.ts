@@ -375,14 +375,14 @@ test.describe("ontology tree", () => {
     await expect(page.locator(".sidebar .doc-item.selected")).toHaveCount(1);
 
     // On one of the tree's buttons Escape is the case screen's, as everywhere
-    // outside the tree widget: it clears the selection, and the tree stays.
+    // outside the tree widget: it clears the selection, and with nothing to
+    // assign to the tree closes.
     await page.keyboard.press("Enter");
     await expect(treeItem(page, SEIZURE)).toBeFocused();
     await panel.getByRole("button", { name: "Close tree" }).focus();
     await page.keyboard.press("Escape");
     await expect(page.locator(".sidebar .doc-item.selected")).toHaveCount(0);
-    await expect(panel).toBeVisible();
-    await expect(treeItem(page, SEIZURE)).toHaveAttribute("aria-selected", "true");
+    await expect(panel).toHaveCount(0);
   });
 
   test("'Show in tree' docks the tree under the annotation panel at 1280x720, and it follows the selection", async ({ page }) => {
@@ -483,13 +483,6 @@ test.describe("ontology tree", () => {
     await expect(page.locator(".inspector-pane :focus")).toHaveCount(1);
     await expect(panel).toBeVisible();
 
-    // Escape belongs to the tree only while the focus is in the tree widget.
-    await treeItem(page, SEIZURE).click();
-    await expect(treeItem(page, SEIZURE)).toBeFocused();
-    await panel.getByRole("button", { name: "Use this term" }).focus();
-    await page.keyboard.press("Escape");
-    await expect(panel).toBeVisible();
-
     // The text is still usable. A new annotation has no term yet, so there is
     // nothing for the tree to show: it makes room, and the search has the
     // whole column.
@@ -580,6 +573,16 @@ test.describe("ontology tree", () => {
     await page.waitForTimeout(200);
     await expect(panel).toHaveCount(0);
     expect(opens).toEqual([HYPOTONIA, STATUS_EPILEPTICUS]);
+    // Escape belongs to the tree only while the focus is in the tree widget. On
+    // one of its buttons it clears the selection, so the tree closes.
+    await showInTree(page).click();
+    await expect(treeItem(page, HYPOTONIA)).toHaveAttribute("aria-current", "true");
+    await treeItem(page, NERVOUS_SYSTEM).click();
+    await expect(panel.getByRole("button", { name: "Use this term" })).toBeEnabled();
+    await panel.getByRole("button", { name: "Use this term" }).focus();
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".sidebar .doc-item.selected")).toHaveCount(0);
+    await expect(panel).toHaveCount(0);
     // All along, nothing was stored about the tree.
     expect(stored).toEqual([]);
   });

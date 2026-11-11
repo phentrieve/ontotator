@@ -354,6 +354,7 @@ def spanless_decisions_package() -> ValidatedPackage:
 # copy (``browser-fixture-<spec>``), so parallel Playwright workers never share
 # its settings, members, assignments or progress counts.
 FIXTURE_SPECS = (
+    "copy-tree-follow",
     "decision-semantics",
     "design",
     "practice",
@@ -374,6 +375,13 @@ def decision_scenario_package() -> ValidatedPackage:
     """decision-semantics.spec.ts's own copy of layers.spec.ts's multi-layer project."""
     pkg = scenario_package("multi_editable")
     pkg.manifest.package_id = "pkg-scenario-c-decisions"
+    return pkg
+
+
+def copy_tree_follow_package() -> ValidatedPackage:
+    """copy-tree-follow.spec.ts's own copy of scenario B: references and two texts."""
+    pkg = scenario_package("assisted")
+    pkg.manifest.package_id = "pkg-scenario-b-copy-tree"
     return pkg
 
 
@@ -400,6 +408,7 @@ def seed_packages() -> list[ValidatedPackage]:
             )
         ),
         decision_scenario_package(),
+        copy_tree_follow_package(),
     ]
 
 
