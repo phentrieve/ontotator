@@ -497,6 +497,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const rootRef = useRef<HTMLDivElement>(null);
   // At ≤700 px the editor shows one pane at a time; marking text does not switch panes on its own.
   const panesLayout = useMediaQuery("(max-width: 700px)");
+  // At phone widths the "New finding" bar's quote needs the room: its "Copy text" is an icon.
+  const narrowBar = useMediaQuery("(max-width: 420px)");
   // Below 1024 px the header keeps one bar: "Next open item" moves into "More", the mode text hides.
   const narrowHeader = useMediaQuery("(max-width: 1023px)");
   // Back to the text after a cancelled new finding: runs after the text pane re-rendered its runs,
@@ -4188,7 +4190,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
             <span className="pending-bar__text">New finding “{quoteSegments(view.document.text, pendingAnnotation!.segments, 40)}”</span>
             <Button type="button" variant="primary" size="sm" onClick={chooseTerm}>Choose term</Button>
             <Button type="button" variant="secondary" size="sm" onClick={discardPending}>Discard</Button>
-            <CopyTextButton text={passageRef.current} onAnnounce={announceCarried} />
+            <CopyTextButton text={passageRef.current} onAnnounce={announceCarried} compact={narrowBar} />
           </div>
         )}
 

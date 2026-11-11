@@ -56,10 +56,10 @@ async function expectCopyButton(page: Page, scope: ReturnType<Page["locator"]>, 
   await resetClipboard(page);
   const button = scope.getByRole("button", { name: /^(Copy text|Copied)$/ });
   await button.click();
-  await expect(button).toHaveText("Copied");
+  await expect(button).toHaveAccessibleName("Copied");
   await expect.poll(() => clipboard(page)).toBe(text);
   // The label is back after about two seconds.
-  await expect(button).toHaveText("Copy text", { timeout: 4000 });
+  await expect(button).toHaveAccessibleName("Copy text", { timeout: 4000 });
 }
 
 /** Mark text, search a term and pick it; the new annotation stays selected. */
@@ -139,6 +139,15 @@ test.describe("copy the marked text", () => {
     await expect(bar).toBeVisible();
     await expectCopyButton(page, bar, "Hypotonia");
     // Nothing overflows the page because of the extra button.
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
+
+    // At phone width it is an icon, so the quote keeps its room; it copies the same.
+    await page.setViewportSize({ width: 375, height: 800 });
+    const icon = bar.getByRole("button", { name: "Copy text" });
+    await expect(icon).toHaveText("");
+    await resetClipboard(page);
+    await icon.click();
+    await expect.poll(() => clipboard(page)).toBe("Hypotonia");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
   });
 });
