@@ -38,7 +38,7 @@ describe("My tasks component", () => {
     });
     vi.mocked(api.listSingleTermBatches).mockImplementation(async key => {
       if (key === "q") throw new ApiError(409, "off", "SINGLE_TERM_REVIEW_OFF");
-      return [batch(1, "ana"), batch(2, "ben"), batch(3, "ana", "submitted")];
+      return [batch(1, "ana"), batch(2, "ben"), batch(3, "ana", "abandoned"), { ...batch(4, "ana"), decided: 13 }];
     });
     render(<MyTasks projects={[project("p", "Project P"), project("q", "Project Q")]} onNavigate={onNavigate} username="ana" />);
     const table = await screen.findByRole("table", { name: "My single-term review batches" });

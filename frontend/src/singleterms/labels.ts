@@ -8,19 +8,13 @@ export type GroupState = SingleTermGroup["state"];
 /** The guiding question of step 1 (spec section 3). */
 export const GUIDING_QUESTION = "Would a clinician map this phrase alone, without its sentence, to this term?";
 
-/** Reasons a reviewer can pick in step 3; `conflict` belongs to the conflict view. */
-export const REJECT_REASONS: readonly RejectReason[] = [
-  "needs_context", "ambiguous_abbreviation", "too_general", "term_wrong_out_of_context",
-  "contains_other_finding", "negation_in_span", "needs_rewrite", "other",
-];
+/** Reasons a reviewer can pick in step 3; `conflict` is set by the conflict view when another term wins. */
+export const REJECT_REASONS: readonly RejectReason[] = ["needs_context", "ambiguous_abbreviation", "too_general", "needs_rewrite", "other"];
 
 export const reasonLabels: Readonly<Record<RejectReason, string>> = {
   needs_context: "needs context",
   ambiguous_abbreviation: "ambiguous abbreviation",
   too_general: "too general",
-  term_wrong_out_of_context: "term wrong out of context",
-  contains_other_finding: "contains other finding",
-  negation_in_span: "negation in span",
   needs_rewrite: "only usable rewritten (words inside removed)",
   conflict: "conflict",
   other: "other",
@@ -53,7 +47,6 @@ export const exclusionLabels: Readonly<Record<string, string>> = {
 
 export const blockedLabels: Readonly<Record<string, string>> = {
   contains_other_finding: "contains other finding",
-  negation_in_span: "negation in span",
 };
 
 export const flagLabels: Readonly<Record<string, string>> = {
@@ -65,17 +58,18 @@ export const label = (labels: Readonly<Record<string, string>>, key: string): st
 
 export const languageLabel = (code: string): string => languageName(code);
 
-/** "German · texts", "German · stale only", "German · 20 % sample": the batch's frozen filter in words. */
+/** "German", "German · first 50", "All languages · 20 % sample": the batch's frozen filter in words. */
 export function batchScope(batch: Pick<SingleTermBatch, "filter" | "role">): string {
-  const filter = batch.filter as { language?: string | null; layer_id?: string | null; document_ids?: string[] | null; stale_only?: boolean; limit?: number | null; share?: number };
+  const filter = batch.filter as { language?: string | null; limit?: number | null; share?: number };
   const parts = [filter.language ? languageLabel(filter.language) : "All languages"];
   if (batch.role === "second" && typeof filter.share === "number") parts.push(`${Math.round(filter.share * 100)} % sample`);
-  if (filter.stale_only) parts.push("stale only");
-  if (filter.document_ids?.length) parts.push(`${filter.document_ids.length} ${filter.document_ids.length === 1 ? "text" : "texts"}`);
-  if (filter.layer_id) parts.push(filter.layer_id);
   if (filter.limit) parts.push(`first ${filter.limit}`);
   return parts.join(" · ");
 }
+
+/** "open", "done" (every group decided) or "abandoned". */
+export const batchStatus = (batch: Pick<SingleTermBatch, "state" | "decided" | "groups">): "open" | "done" | "abandoned" =>
+  batch.state === "abandoned" ? "abandoned" : batch.groups > 0 && batch.decided >= batch.groups ? "done" : "open";
 
 /** True when the decision lets the group into the export (accept or an adjustment). */
 export const accepting = (decision: DecisionKind | undefined | null): boolean =>
@@ -101,6 +95,17 @@ export function contextParts(item: SingleTermContext, width?: number): { before:
 
 export const percent = (value: number | null | undefined): string => value == null ? "–" : `${Math.round(value)} %`;
 export const kappa = (value: number | null | undefined): string => value == null ? "–" : value.toFixed(2);
+
+/** Cohen's kappa in plain words (Landis & Koch 1977). */
+export function kappaReading(value: number | null | undefined): string | null {
+  if (value == null) return null;
+  if (value < 0) return "less than chance";
+  if (value <= 0.2) return "slight";
+  if (value <= 0.4) return "fair";
+  if (value <= 0.6) return "moderate";
+  if (value <= 0.8) return "substantial";
+  return "almost perfect";
+}
 
 /** A fresh idempotency key for one user action. */
 export function newRequestId(): string {

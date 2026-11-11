@@ -15,7 +15,7 @@ export const HELP_SECTIONS = {
   consolidationReadOnly: { chapter: "lead-results", section: "read-a-submitted-consolidation" },
   documents: { chapter: "lead-documents", section: "the-documents-page" },
   taskProfiles: { chapter: "lead-settings", section: "task-profiles" },
-  singleTerms: { chapter: "lead-single-terms", section: "start-or-refresh-the-review-basis" },
+  singleTerms: { chapter: "lead-single-terms", section: "the-single-terms-page" },
   singleTermReview: { chapter: "lead-single-terms", section: "review-a-batch" },
 } as const satisfies Record<string, { chapter: string; section: string }>;
 

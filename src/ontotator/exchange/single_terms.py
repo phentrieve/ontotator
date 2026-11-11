@@ -5,8 +5,8 @@ its term. Its candidates come from the selected units of a final-result
 snapshot, built with the same conversion as the final export
 (``t1_export_content_exact`` + ``submission_to_unit``), so a candidate is
 always a finding the final export holds. The derivation here is pure and
-deterministic: given the units, the ontology view of each unit's layers and
-the negation cues, it returns the same groups and the same report.
+deterministic: given the units and the ontology view of each unit's layers,
+it returns the same groups and the same report.
 
 What counts as a finding is the export's definition: findings on an HPO
 phenotype layer (``layer.profile == hpo.NAME``), the person's own findings
@@ -24,9 +24,9 @@ that applies deciding:
   in the unit's release; an unknown term counts too).
 * blocked (a candidate, but it cannot be accepted as it is):
   ``contains_other_finding`` (the span overlaps or contains a segment of
-  another finding of the unit, whatever its assertion) and
-  ``negation_in_span`` (the span contains a negation cue of its language as
-  a whole word, ignoring case).
+  another finding of the unit, whatever its assertion). A negation the term
+  itself names belongs in the span (guideline R2), so a span is never
+  blocked for holding one; negated findings are ``absent`` and excluded.
 * flags: ``modifier_in_span`` (a modifier segment of a finding of the unit
   overlaps the span) and ``outside_phenotypic_abnormality`` (the term is not
   under HP:0000118 in the unit's release).
@@ -50,7 +50,6 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-import re
 import unicodedata
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping, Sequence
@@ -83,7 +82,7 @@ ExclusionReason = Literal[
     "shared_span",
     "obsolete_term",
 ]
-BlockedReason = Literal["contains_other_finding", "negation_in_span"]
+BlockedReason = Literal["contains_other_finding"]
 Flag = Literal["modifier_in_span", "outside_phenotypic_abnormality"]
 # In the order the rules apply; the report lists every reason.
 EXCLUSION_REASONS: tuple[ExclusionReason, ...] = (
@@ -96,10 +95,7 @@ EXCLUSION_REASONS: tuple[ExclusionReason, ...] = (
     "shared_span",
     "obsolete_term",
 )
-BLOCKED_REASONS: tuple[BlockedReason, ...] = (
-    "contains_other_finding",
-    "negation_in_span",
-)
+BLOCKED_REASONS: tuple[BlockedReason, ...] = ("contains_other_finding",)
 FLAGS: tuple[Flag, ...] = ("modifier_in_span", "outside_phenotypic_abnormality")
 
 
@@ -206,25 +202,6 @@ def group_id(language: str, phrase: str, term_id: str) -> str:
     return hashlib.sha256(
         GROUP_ID_PREFIX + _canonical([language, phrase, term_id])
     ).hexdigest()
-
-
-def _cue_pattern(cue: str) -> re.Pattern[str] | None:
-    words = surface_form(cue).split(" ")
-    if not words or words == [""]:
-        return None
-    body = r"\s+".join(re.escape(word) for word in words)
-    return re.compile(rf"(?<!\w){body}(?!\w)", re.IGNORECASE)
-
-
-def negation_patterns(
-    cues: Mapping[str, Sequence[str]],
-) -> dict[str, list[re.Pattern[str]]]:
-    """Per language the compiled whole-word, case-insensitive cue patterns."""
-    patterns: dict[str, list[re.Pattern[str]]] = {}
-    for language, items in cues.items():
-        compiled = [p for cue in sorted(set(items)) if (p := _cue_pattern(cue))]
-        patterns[language] = compiled
-    return patterns
 
 
 # --- output -----------------------------------------------------------------
@@ -428,7 +405,6 @@ def _finding_exclusion(finding: _Finding) -> ExclusionReason | None:
 def derive_candidates(
     units: Iterable[SourceUnit],
     *,
-    negation_cues: Mapping[str, Sequence[str]],
     bundle_id: str,
 ) -> Derivation:
     """The candidate groups of the units and the exclusion report.
@@ -437,7 +413,6 @@ def derive_candidates(
     references point into (``selected-<snapshot id>``, as the Phenopacket
     export forms them).
     """
-    patterns = negation_patterns(negation_cues)
     exclusions: dict[str, dict[str, int]] = defaultdict(dict)
     passing: list[Occurrence] = []
 
@@ -509,9 +484,6 @@ def derive_candidates(
                 blocked: list[BlockedReason] = []
                 if any(_overlaps(span, other) for other in other_segments):
                     blocked.append("contains_other_finding")
-                normalized = surface_form(segment.text)
-                if any(p.search(normalized) for p in patterns.get(language, ())):
-                    blocked.append("negation_in_span")
                 flags: list[Flag] = []
                 if any(_overlaps(span, m) for m in modifier_segments):
                     flags.append("modifier_in_span")
@@ -665,15 +637,6 @@ def other_finding_segments(
         for mention in annotation.mentions
         for segment in mention.segments
     ]
-
-
-def contains_negation(
-    text: str, language: str, patterns: Mapping[str, Sequence[re.Pattern[str]]]
-) -> bool:
-    """Whether ``text`` holds a negation cue of ``language`` (whole word,
-    ignoring case), as ``negation_in_span`` decides."""
-    normalized = surface_form(text)
-    return any(p.search(normalized) for p in patterns.get(language, ()))
 
 
 def overlaps(a: tuple[int, int], b: tuple[int, int]) -> bool:

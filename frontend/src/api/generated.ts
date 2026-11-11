@@ -934,8 +934,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Start Basis */
-        post: operations["start_basis_api_v1_projects__key__single_terms_basis_post"];
+        /**
+         * Refresh Basis
+         * @description The newest basis, refreshed when the accepted final results changed;
+         *     null while there is no final result.
+         */
+        post: operations["refresh_basis_api_v1_projects__key__single_terms_basis_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1048,40 +1052,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/projects/{key}/single-terms/batches/{batch_id}/submit": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Submit Batch */
-        post: operations["submit_batch_api_v1_projects__key__single_terms_batches__batch_id__submit_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/{key}/single-terms/batches/{batch_id}/reopen": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Reopen Batch */
-        post: operations["reopen_batch_api_v1_projects__key__single_terms_batches__batch_id__reopen_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/projects/{key}/single-terms/batches/{batch_id}/abandon": {
         parameters: {
             query?: never;
@@ -1111,41 +1081,6 @@ export interface paths {
         /** Decide */
         post: operations["decide_api_v1_projects__key__single_terms_batches__batch_id__decisions_post"];
         delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/{key}/single-terms/reviewers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Reviewers */
-        get: operations["reviewers_api_v1_projects__key__single_terms_reviewers_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/{key}/single-terms/reviewers/{username}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Grant Reviewer */
-        put: operations["grant_reviewer_api_v1_projects__key__single_terms_reviewers__username__put"];
-        post?: never;
-        /** Revoke Reviewer */
-        delete: operations["revoke_reviewer_api_v1_projects__key__single_terms_reviewers__username__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -8016,10 +7951,6 @@ export interface components {
             record_working_time?: boolean;
             /** Single Term Review */
             single_term_review?: boolean;
-            /** Single Term Negation Cues */
-            single_term_negation_cues?: {
-                [key: string]: string[];
-            };
             /** Hidden Axis Values */
             hidden_axis_values?: {
                 [key: string]: {
@@ -8120,10 +8051,6 @@ export interface components {
             record_working_time?: boolean;
             /** Single Term Review */
             single_term_review?: boolean;
-            /** Single Term Negation Cues */
-            single_term_negation_cues?: {
-                [key: string]: string[];
-            };
             /** Hidden Axis Values */
             hidden_axis_values?: {
                 [key: string]: {
@@ -9161,8 +9088,8 @@ export interface components {
         };
         /**
          * SingleTermBatchRequest
-         * @description A new batch: the open and stale groups of the newest basis that match
-         *     every given filter (and are in no other open primary batch).
+         * @description A new batch: the open and stale groups of the newest basis (of one
+         *     language, when given; at most ``limit``) in no other open primary batch.
          */
         SingleTermBatchRequest: {
             /** Request Id */
@@ -9171,15 +9098,6 @@ export interface components {
             reviewer: string;
             /** Language */
             language?: string | null;
-            /** Layer Id */
-            layer_id?: string | null;
-            /** Document Ids */
-            document_ids?: string[] | null;
-            /**
-             * Stale Only
-             * @default false
-             */
-            stale_only: boolean;
             /** Limit */
             limit?: number | null;
             second_review?: components["schemas"]["SingleTermSecondReviewRequest"] | null;
@@ -9207,7 +9125,7 @@ export interface components {
              * State
              * @enum {string}
              */
-            state: "open" | "submitted" | "abandoned";
+            state: "open" | "abandoned";
             /** Filter */
             filter: {
                 [key: string]: unknown;
@@ -9291,7 +9209,7 @@ export interface components {
              */
             decision: "accept" | "adjust_span" | "adjust_term" | "reject" | "withdrawn";
             /** Reason */
-            reason?: ("needs_context" | "ambiguous_abbreviation" | "too_general" | "term_wrong_out_of_context" | "contains_other_finding" | "negation_in_span" | "needs_rewrite" | "conflict" | "other") | null;
+            reason?: ("needs_context" | "ambiguous_abbreviation" | "too_general" | "needs_rewrite" | "conflict" | "other") | null;
             /** Note */
             note?: string | null;
             adjusted_span?: components["schemas"]["SingleTermSpanRequest"] | null;
@@ -9321,7 +9239,7 @@ export interface components {
              */
             decision: "accept" | "adjust_span" | "adjust_term" | "reject" | "withdrawn";
             /** Reason */
-            reason: ("needs_context" | "ambiguous_abbreviation" | "too_general" | "term_wrong_out_of_context" | "contains_other_finding" | "negation_in_span" | "needs_rewrite" | "conflict" | "other") | null;
+            reason: ("needs_context" | "ambiguous_abbreviation" | "too_general" | "needs_rewrite" | "conflict" | "other") | null;
             /** Note */
             note: string | null;
             /** Adjusted Span */
@@ -9403,30 +9321,11 @@ export interface components {
             conflicts: number;
             /** Available */
             available: number;
-            /** Available Stale */
-            available_stale: number;
-        };
-        /** SingleTermReviewerView */
-        SingleTermReviewerView: {
-            /** Username */
-            username: string;
-            /** Pseudonym */
-            pseudonym: string;
-            /**
-             * Added At
-             * Format: date-time
-             */
-            added_at: string;
         };
         /** SingleTermSecondReviewRequest */
         SingleTermSecondReviewRequest: {
             /** Reviewer */
             reviewer: string;
-            /**
-             * Share
-             * @default 0.2
-             */
-            share: number;
         };
         /**
          * SingleTermSpanRequest
@@ -12922,7 +12821,7 @@ export interface operations {
             };
         };
     };
-    start_basis_api_v1_projects__key__single_terms_basis_post: {
+    refresh_basis_api_v1_projects__key__single_terms_basis_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -12931,11 +12830,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SingleTermCommandRequest"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -12943,7 +12838,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SingleTermBasisView"];
+                    "application/json": components["schemas"]["SingleTermBasisView"] | null;
                 };
             };
             /** @description Validation Error */
@@ -13191,78 +13086,6 @@ export interface operations {
             };
         };
     };
-    submit_batch_api_v1_projects__key__single_terms_batches__batch_id__submit_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key: string;
-                batch_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SingleTermCommandRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SingleTermBatchView"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    reopen_batch_api_v1_projects__key__single_terms_batches__batch_id__reopen_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key: string;
-                batch_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SingleTermCommandRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SingleTermBatchView"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     abandon_batch_api_v1_projects__key__single_terms_batches__batch_id__abandon_post: {
         parameters: {
             query?: never;
@@ -13322,101 +13145,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SingleTermDecisionView"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    reviewers_api_v1_projects__key__single_terms_reviewers_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SingleTermReviewerView"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    grant_reviewer_api_v1_projects__key__single_terms_reviewers__username__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key: string;
-                username: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SingleTermReviewerView"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    revoke_reviewer_api_v1_projects__key__single_terms_reviewers__username__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key: string;
-                username: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SingleTermReviewerView"][];
                 };
             };
             /** @description Validation Error */

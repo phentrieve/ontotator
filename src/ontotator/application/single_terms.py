@@ -1,17 +1,20 @@
 """Single-term review (issue 381): bases, batches, decisions and their state.
 
-A lead *starts* (later *refreshes*) the review basis: a frozen final-result
-snapshot, taken through the final export's own freeze
-(``FinalResultService.insert_snapshot``) without an export job. The
+The review basis is a frozen final-result snapshot, taken through the final
+export's own freeze (``FinalResultService.insert_snapshot``) without an
+export job. It refreshes by itself: when a lead opens the review or creates
+a batch and the accepted final results differ from those of the newest
+basis, a new basis is frozen (the first once there is a final result). The
 candidate groups of a basis are derived from the snapshot with the export's
 conversion (``exchange.single_terms``); a basis stores the digest of its
-derivation and the negation cues it used, so the derivation is recomputed
-deterministically and checked against the digest (and cached per basis in
-this process).
+derivation, so the derivation is recomputed deterministically and checked
+against the digest (and cached per basis in this process).
 
 The lead creates *batches*: a subset of the open and stale groups of the
-newest basis, frozen at creation, for one reviewer, with an optional blind
-second review of a deterministic sample. A reviewer records one decision per
+newest basis, frozen at creation, for one project member, with an optional
+blind second review of a deterministic sample (``SECOND_SHARE`` of the
+groups per language, at least ``SECOND_MINIMUM``). A batch is done when
+every group in it is decided; a lead may abandon it. A reviewer records one decision per
 group: ``accept``, ``adjust_span`` (a re-cut of one occurrence),
 ``adjust_term`` (an ancestor of the term), ``reject`` with a reason, or
 ``withdrawn`` (the group is open again). The newest decision per (project,
@@ -26,7 +29,8 @@ group has not become blocked. Otherwise the group is ``stale`` and opens
 again. Occurrences the decision did not list are inherited unseen
 (``seen_by_reviewer`` false).
 
-Reviewers see the groups and contexts of their own batches only, never
+Every project member may review. Reviewers see the groups and contexts of
+their own batches only, never
 annotator or consolidator pseudonyms, and a second reviewer never sees the
 first decision. Everything refuses while the project setting is off; the
 stored data stays.
@@ -40,20 +44,19 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any, Literal, cast, get_args
+from uuid import uuid4
 
 import ontospan
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import (
     Connection,
     RowMapping,
-    delete,
     func,
     insert,
     null,
     select,
     update,
 )
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ontotator.application.final_results import FinalResultService
 from ontotator.application.workflow_warnings import state_digest
@@ -71,9 +74,7 @@ from ontotator.exchange.single_terms import (
     Derivation,
     Occurrence,
     SourceUnit,
-    contains_negation,
     derive_candidates,
-    negation_patterns,
     occurrence_ref,
     other_finding_segments,
     overlaps,
@@ -90,7 +91,6 @@ from ontotator.storage.single_term_tables import (
     SingleTermBatchRow,
     SingleTermBatchStateRow,
     SingleTermDecisionRow,
-    SingleTermReviewerRow,
 )
 from ontotator.storage.tables import (
     DraftRow,
@@ -116,16 +116,13 @@ RejectReason = Literal[
     "needs_context",
     "ambiguous_abbreviation",
     "too_general",
-    "term_wrong_out_of_context",
-    "contains_other_finding",
-    "negation_in_span",
     "needs_rewrite",
+    # Set by the conflict view when another term of the phrase is chosen.
     "conflict",
     "other",
 ]
 BatchRole = Literal["primary", "second"]
-BatchState = Literal["open", "submitted", "abandoned"]
-BatchAction = Literal["submit", "reopen", "abandon"]
+BatchState = Literal["open", "abandoned"]
 # A stored row as read (``RowMapping``) or as a plain mapping.
 Record = Mapping[str, Any] | RowMapping
 ACCEPTING = frozenset({"accept", "adjust_span", "adjust_term"})
@@ -138,20 +135,16 @@ assert set(REJECT_REASONS) == set(get_args(RejectReason))
 class SingleTermSecondReviewRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     reviewer: str = Field(min_length=1, max_length=200)
-    share: float = Field(SECOND_SHARE, gt=0, le=1)
 
 
 class SingleTermBatchRequest(BaseModel):
-    """A new batch: the open and stale groups of the newest basis that match
-    every given filter (and are in no other open primary batch)."""
+    """A new batch: the open and stale groups of the newest basis (of one
+    language, when given; at most ``limit``) in no other open primary batch."""
 
     model_config = ConfigDict(extra="forbid")
     request_id: str = Field(min_length=1, max_length=128)
     reviewer: str = Field(min_length=1, max_length=200)
     language: str | None = Field(None, max_length=8)
-    layer_id: str | None = Field(None, max_length=200)
-    document_ids: list[str] | None = Field(None, max_length=10000)
-    stale_only: bool = False
     limit: int | None = Field(None, ge=1, le=100000)
     second_review: SingleTermSecondReviewRequest | None = None
 
@@ -305,7 +298,6 @@ class SingleTermLanguageCounts(BaseModel):
     conflicts: int
     # Open, blocked or stale groups in no open batch: what a new batch can take.
     available: int
-    available_stale: int
 
 
 class SingleTermAgreementView(BaseModel):
@@ -325,12 +317,6 @@ class SingleTermSummaryView(BaseModel):
     blocked: dict[str, dict[str, int]]
     batches: dict[str, int]
     agreement: SingleTermAgreementView
-
-
-class SingleTermReviewerView(BaseModel):
-    username: str
-    pseudonym: str
-    added_at: datetime
 
 
 # --- derivation of a basis --------------------------------------------------
@@ -359,13 +345,12 @@ def derive_basis(
     project: str,
     snapshot_id: str,
     payload: Mapping[str, Any],
-    cues: Mapping[str, Sequence[str]],
 ) -> BasisData:
     """The derivation of a frozen snapshot, as the final export converts it.
 
     The selected results, thawed from the snapshot, are built into T1 units
     with ``build_t1_units`` (the same conversion, bundle id and references
-    as the final export of that snapshot) and derived with the cues.
+    as the final export of that snapshot) and derived.
     """
     from ontotator.exchange.jobs import build_t1_units
 
@@ -392,9 +377,7 @@ def derive_basis(
     with _lock:
         _views.update(views)
     units = source_units(payload, selected, built.units, built.views)
-    derivation = derive_candidates(
-        units, negation_cues=cues, bundle_id=f"selected-{snapshot_id}"
-    )
+    derivation = derive_candidates(units, bundle_id=f"selected-{snapshot_id}")
     return BasisData(
         derivation=derivation,
         sources={unit.submission_id: unit for unit in units},
@@ -508,8 +491,8 @@ class _Viewer:
     user_id: int
     pseudonym: str
     lead: bool
+    # A member of the project or a lead: every member may review.
     reviewer: bool
-    cues: Mapping[str, list[str]]
 
 
 def _not_found(key: str) -> DomainError:
@@ -575,7 +558,6 @@ class SingleTermService:
                 ProjectRow.id,
                 ProjectRow.practice,
                 ProjectRow.single_term_review,
-                ProjectRow.single_term_negation_cues,
             ).where(ProjectRow.project_key == key)
         ).one_or_none()
         if project is None or self.actor.user_id is None:
@@ -607,22 +589,12 @@ class SingleTermService:
                 "The single-term review is off in this project's settings.",
             )
         lead = can(access, Action.MANAGE_ASSIGNMENTS, key)
-        granted = bool(roles) and (
-            conn.execute(
-                select(SingleTermReviewerRow.user_id).where(
-                    SingleTermReviewerRow.project_id == project.id,
-                    SingleTermReviewerRow.user_id == self.actor.user_id,
-                )
-            ).first()
-            is not None
-        )
         return _Viewer(
             project_id=project.id,
             user_id=self.actor.user_id,
             pseudonym=user["pseudonym"],
             lead=lead,
-            reviewer=lead or granted,
-            cues=project.single_term_negation_cues,
+            reviewer=lead or bool(roles),
         )
 
     @staticmethod
@@ -722,9 +694,7 @@ class SingleTermService:
                 ExportSelectionSnapshotRow.snapshot_id == basis["snapshot_id"]
             )
         ).scalar_one()
-        data = derive_basis(
-            self.db, key, basis["snapshot_id"], payload, basis["negation_cues"]
-        )
+        data = derive_basis(self.db, key, basis["snapshot_id"], payload)
         if data.derivation.sha256() != basis["derivation_sha256"]:
             raise DomainError(
                 "SINGLE_TERM_BASIS_CHANGED",
@@ -751,79 +721,93 @@ class SingleTermService:
             report=row["report"],
         )
 
-    def start_basis(self, key: str, request_id: str) -> SingleTermBasisView:
-        """Start or refresh the review basis: freeze the current final results.
+    def refresh_basis(self, key: str) -> SingleTermBasisView | None:
+        """The newest basis, refreshed first when the accepted final results
+        differ from its own; None while there is no final result.
 
         Raises:
-            DomainError: ``SINGLE_TERM_REVIEW_OFF``,
-                ``SINGLE_TERM_NO_FINAL_RESULTS``, ``WORKFLOW_REQUEST_CONFLICT``.
+            DomainError: ``SINGLE_TERM_REVIEW_OFF``.
         """
-        request_hash = state_digest({"command": "single_term_basis"})
-        now = self._now()
         finals = FinalResultService(self.db, self.actor, self.access)
         with self.db.transaction() as conn:
             pid = finals.authorize(conn, key)
             viewer = self._viewer(conn, key, write=True)
             self._require_lead(viewer)
-            replayed = self._replayed(conn, viewer, request_id, request_hash)
-            if replayed is not None:
-                return self._basis_view(self._basis(conn, pid, replayed["basis_id"]))
-            previous = self._latest_basis(conn, pid)
-            cues = dict(viewer.cues)
-            sid, _digest, _payload = finals.freeze_current(
-                conn,
-                key,
-                pid,
-                {
-                    "request_id": f"single-term-basis:{request_id}",
-                    "purpose": BASIS_PURPOSE,
-                },
+            basis = self._refreshed(conn, key, pid, viewer, finals)
+            return None if basis is None else self._basis_view(basis)
+
+    def _refreshed(
+        self,
+        conn: Connection,
+        key: str,
+        pid: int,
+        viewer: _Viewer,
+        finals: FinalResultService,
+    ) -> RowMapping | None:
+        """The newest basis after freezing a new one if the final results
+        changed. The caller holds the project lock (``finals.authorize``)."""
+        previous = self._latest_basis(conn, pid)
+        state = finals.current_state(conn, key, pid)
+        if not state["selections"]:
+            return previous
+        if previous is not None:
+            frozen = conn.execute(
+                select(
+                    ExportSelectionSnapshotRow.payload["state"]["state_digest"].astext
+                ).where(
+                    ExportSelectionSnapshotRow.snapshot_id == previous["snapshot_id"]
+                )
+            ).scalar_one()
+            if frozen == state["state_digest"]:
+                return previous
+        now = self._now()
+        sid, _digest, _payload = finals.insert_snapshot(
+            conn,
+            key,
+            pid,
+            state,
+            {"request_id": f"single-term-basis:{uuid4()}", "purpose": BASIS_PURPOSE},
+        )
+        # As stored (JSONB orders the keys anew), so that a recomputation and
+        # the final export see the same order of texts.
+        payload = conn.execute(
+            select(ExportSelectionSnapshotRow.payload).where(
+                ExportSelectionSnapshotRow.snapshot_id == sid
             )
-            # As stored (JSONB orders the keys anew), so that a recomputation
-            # and the final export see the same order of texts.
-            payload = conn.execute(
-                select(ExportSelectionSnapshotRow.payload).where(
-                    ExportSelectionSnapshotRow.snapshot_id == sid
-                )
-            ).scalar_one()
-            data = derive_basis(self.db, key, sid, payload, cues)
-            derivation_sha256 = data.derivation.sha256()
-            report = data.derivation.report()
-            basis_id = conn.execute(
-                insert(SingleTermBasisRow)
-                .values(
-                    project_id=pid,
-                    snapshot_id=sid,
-                    derivation_sha256=derivation_sha256,
-                    negation_cues=cues,
-                    report=report,
-                    created_by=viewer.user_id,
-                    created_at=now,
-                )
-                .returning(SingleTermBasisRow.id)
-            ).scalar_one()
-            record_audit(
-                conn,
-                self.actor,
-                "project.single_term_basis",
-                target_type="project",
-                target_id=key,
+        ).scalar_one()
+        data = derive_basis(self.db, key, sid, payload)
+        derivation_sha256 = data.derivation.sha256()
+        report = data.derivation.report()
+        basis_id = conn.execute(
+            insert(SingleTermBasisRow)
+            .values(
                 project_id=pid,
-                details={
-                    "basis_id": basis_id,
-                    "snapshot_id": sid,
-                    "derivation_sha256": derivation_sha256,
-                    "refresh": previous is not None,
-                    "groups": sum(report["groups"].values()),
-                },
-                at=now,
+                snapshot_id=sid,
+                derivation_sha256=derivation_sha256,
+                report=report,
+                created_by=viewer.user_id,
+                created_at=now,
             )
-            self._remember(
-                conn, viewer, request_id, request_hash, {"basis_id": basis_id}, now
-            )
-            row = self._basis(conn, pid, basis_id)
-            self._cache((str(self.db.engine.url), basis_id, derivation_sha256), data)
-            return self._basis_view(row)
+            .returning(SingleTermBasisRow.id)
+        ).scalar_one()
+        record_audit(
+            conn,
+            self.actor,
+            "project.single_term_basis",
+            target_type="project",
+            target_id=key,
+            project_id=pid,
+            details={
+                "basis_id": basis_id,
+                "snapshot_id": sid,
+                "derivation_sha256": derivation_sha256,
+                "refresh": previous is not None,
+                "groups": sum(report["groups"].values()),
+            },
+            at=now,
+        )
+        self._cache((str(self.db.engine.url), basis_id, derivation_sha256), data)
+        return self._basis(conn, pid, basis_id)
 
     # -- decisions in force ----------------------------------------------------
 
@@ -866,9 +850,7 @@ class SingleTermService:
                 .select_from(SingleTermBasisRow)
                 .where(SingleTermBasisRow.project_id == pid)
             ).scalar_one()
-            batch_states: dict[str, int] = dict.fromkeys(
-                ("open", "submitted", "abandoned"), 0
-            )
+            batch_states: dict[str, int] = dict.fromkeys(("open", "abandoned"), 0)
             for state, count in conn.execute(
                 select(SingleTermBatchStateRow.state, func.count())
                 .join(
@@ -907,7 +889,6 @@ class SingleTermService:
                         "stale",
                         "conflicts",
                         "available",
-                        "available_stale",
                     ),
                     0,
                 ),
@@ -919,7 +900,6 @@ class SingleTermService:
             per["conflicts"] += group.conflict
             if state != "decided" and group.group_id not in taken:
                 per["available"] += 1
-                per["available_stale"] += state == "stale"
         pairs = [
             (_binary(primary[gid]["decision"]), _binary(row["decision"]))
             for gid, row in sorted(second.items())
@@ -969,16 +949,14 @@ class SingleTermService:
         self, conn: Connection, viewer: _Viewer, batch_id: int
     ) -> RowMapping:
         """A batch the viewer leads or reviews; another's looks missing. Their
-        own is refused once their reviewer capability is revoked."""
+        own is refused once they are no member of the project."""
         batch = self._batch(conn, viewer.project_id, batch_id)
         if viewer.lead:
             return batch
         if batch["reviewer_user_id"] != viewer.user_id:
             raise DomainError("SINGLE_TERM_BATCH_NOT_FOUND")
         if not viewer.reviewer:
-            raise AccessDenied(
-                "NOT_ALLOWED", "Only a single-term reviewer works on a batch."
-            )
+            raise AccessDenied("NOT_ALLOWED", "Only a project member works on a batch.")
         return batch
 
     def groups(
@@ -1155,26 +1133,7 @@ class SingleTermService:
             group_id=group.group_id, term_id=group.term_id, ancestors=offered
         )
 
-    # -- reviewers --------------------------------------------------------------
-
-    def reviewers(self, key: str) -> list[SingleTermReviewerView]:
-        with self.db.transaction() as conn:
-            viewer = self._viewer(conn, key)
-            self._require_lead(viewer)
-            rows = conn.execute(
-                select(
-                    UserRow.username, UserRow.pseudonym, SingleTermReviewerRow.added_at
-                )
-                .join(UserRow, UserRow.id == SingleTermReviewerRow.user_id)
-                .where(SingleTermReviewerRow.project_id == viewer.project_id)
-                .order_by(UserRow.username)
-            ).all()
-        return [
-            SingleTermReviewerView(
-                username=r.username, pseudonym=r.pseudonym, added_at=r.added_at
-            )
-            for r in rows
-        ]
+    # -- reviewers ---------------------------------------------------------------
 
     def _member(self, conn: Connection, pid: int, username: str) -> RowMapping:
         name = normalize_username(username)
@@ -1202,96 +1161,13 @@ class SingleTermService:
             )
         return user
 
-    def grant_reviewer(self, key: str, username: str) -> list[SingleTermReviewerView]:
-        now = self._now()
-        with self.db.transaction() as conn:
-            viewer = self._viewer(conn, key, write=True)
-            self._require_lead(viewer)
-            user = self._member(conn, viewer.project_id, username)
-            added = conn.execute(
-                pg_insert(SingleTermReviewerRow)
-                .values(
-                    project_id=viewer.project_id,
-                    user_id=user["id"],
-                    added_by=viewer.user_id,
-                    added_at=now,
-                )
-                .on_conflict_do_nothing()
-                .returning(SingleTermReviewerRow.user_id)
-            ).first()
-            if added is not None:
-                record_audit(
-                    conn,
-                    self.actor,
-                    "project.single_term_reviewer_add",
-                    target_type="user",
-                    target_id=user["username"],
-                    project_id=viewer.project_id,
-                    details={"username": user["username"]},
-                    at=now,
-                )
-        return self.reviewers(key)
-
-    def revoke_reviewer(self, key: str, username: str) -> list[SingleTermReviewerView]:
-        now = self._now()
-        with self.db.transaction() as conn:
-            viewer = self._viewer(conn, key, write=True)
-            self._require_lead(viewer)
-            name = normalize_username(username)
-            user_id = conn.execute(
-                select(UserRow.id).where(UserRow.username == name)
-            ).scalar_one_or_none()
-            if user_id is None:
-                raise DomainError("USER_NOT_FOUND", f"There is no user '{name}'.")
-            removed = conn.execute(
-                delete(SingleTermReviewerRow)
-                .where(
-                    SingleTermReviewerRow.project_id == viewer.project_id,
-                    SingleTermReviewerRow.user_id == user_id,
-                )
-                .returning(SingleTermReviewerRow.user_id)
-            ).first()
-            if removed is not None:
-                record_audit(
-                    conn,
-                    self.actor,
-                    "project.single_term_reviewer_remove",
-                    target_type="user",
-                    target_id=name,
-                    project_id=viewer.project_id,
-                    details={"username": name},
-                    at=now,
-                )
-        return self.reviewers(key)
-
-    def _may_review(self, conn: Connection, pid: int, user: Record) -> bool:
-        """A lead of the project, or a member granted the capability."""
-        roles = set(
-            conn.execute(
-                select(ProjectMembershipRow.role).where(
-                    ProjectMembershipRow.project_id == pid,
-                    ProjectMembershipRow.user_id == user["id"],
-                )
-            ).scalars()
-        )
-        if "lead" in roles:
-            return True
-        return bool(roles) and (
-            conn.execute(
-                select(SingleTermReviewerRow.user_id).where(
-                    SingleTermReviewerRow.project_id == pid,
-                    SingleTermReviewerRow.user_id == user["id"],
-                )
-            ).first()
-            is not None
-        )
-
     def _reviewer(self, conn: Connection, pid: int, username: str) -> RowMapping:
+        """An active member of the project: every member may review."""
         user = self._member(conn, pid, username)
-        if not user["active"] or not self._may_review(conn, pid, user):
+        if not user["active"]:
             raise DomainError(
-                "SINGLE_TERM_NOT_A_REVIEWER",
-                f"'{user['username']}' is no single-term reviewer of the project.",
+                "SINGLE_TERM_NOT_A_MEMBER",
+                f"'{user['username']}' is no active member of the project.",
             )
         return user
 
@@ -1396,25 +1272,28 @@ class SingleTermService:
     ) -> SingleTermBatchView:
         """Freeze a subset of the open and stale groups for one reviewer.
 
+        The basis is refreshed first when the final results changed.
+
         Raises:
-            DomainError: ``SINGLE_TERM_NO_BASIS``, ``SINGLE_TERM_NOT_A_REVIEWER``,
+            DomainError: ``SINGLE_TERM_NO_BASIS``, ``SINGLE_TERM_NOT_A_MEMBER``,
                 ``SINGLE_TERM_SAME_REVIEWER``, ``SINGLE_TERM_BATCH_EMPTY``.
         """
         request_hash = state_digest(
             {"command": "single_term_batch", **body.model_dump(mode="json")}
         )
         now = self._now()
+        finals = FinalResultService(self.db, self.actor, self.access)
         with self.db.transaction() as conn:
+            pid = finals.authorize(conn, key)
             viewer = self._viewer(conn, key, write=True)
             self._require_lead(viewer)
-            pid = viewer.project_id
             replayed = self._replayed(conn, viewer, body.request_id, request_hash)
             if replayed is not None:
                 return SingleTermBatchView.model_validate(replayed)
-            basis = self._latest_basis(conn, pid)
+            basis = self._refreshed(conn, key, pid, viewer, finals)
             if basis is None:
                 raise DomainError(
-                    "SINGLE_TERM_NO_BASIS", "Start the single-term review first."
+                    "SINGLE_TERM_NO_BASIS", "Accept a final result first."
                 )
             reviewer = self._reviewer(conn, pid, body.reviewer)
             second_reviewer = None
@@ -1428,26 +1307,12 @@ class SingleTermService:
             data = self._data(conn, key, basis)
             states, _primary, _ = self._states(conn, pid, data)
             taken = self._in_open_batches(conn, pid)
-            wanted_states = (
-                {"stale"} if body.stale_only else {"open", "blocked", "stale"}
-            )
-            documents = (
-                set(body.document_ids) if body.document_ids is not None else None
-            )
             chosen = [
                 group
                 for group in data.derivation.groups
-                if states[group.group_id] in wanted_states
+                if states[group.group_id] != "decided"
                 and group.group_id not in taken
                 and (body.language is None or group.language == body.language)
-                and (
-                    body.layer_id is None
-                    or any(o.layer_id == body.layer_id for o in group.occurrences)
-                )
-                and (
-                    documents is None
-                    or any(o.document_id in documents for o in group.occurrences)
-                )
             ]
             if body.limit is not None:
                 chosen = chosen[: body.limit]
@@ -1474,9 +1339,7 @@ class SingleTermService:
             second_id = None
             sample: list[str] = []
             if body.second_review is not None and second_reviewer is not None:
-                sample = second_review_sample(
-                    chosen, body.second_review.share, SECOND_MINIMUM
-                )
+                sample = second_review_sample(chosen, SECOND_SHARE, SECOND_MINIMUM)
                 second_id = self._insert_batch(
                     conn,
                     pid,
@@ -1485,7 +1348,7 @@ class SingleTermService:
                     second_reviewer["id"],
                     "second",
                     batch_id,
-                    {**filter_, "share": body.second_review.share},
+                    {**filter_, "share": SECOND_SHARE},
                     sample,
                     now,
                 )
@@ -1553,9 +1416,11 @@ class SingleTermService:
 
     @staticmethod
     def _in_open_batches(conn: Connection, pid: int) -> set[str]:
-        ids: set[str] = set()
-        for group_ids in conn.execute(
-            select(SingleTermBatchRow.group_ids)
+        """The groups an open primary batch has still to decide. A group its
+        batch decided is free again (a stale one goes into a new batch); a
+        batch with every group decided is done and holds none."""
+        batches = conn.execute(
+            select(SingleTermBatchRow.id, SingleTermBatchRow.group_ids)
             .join(
                 SingleTermBatchStateRow,
                 SingleTermBatchStateRow.batch_id == SingleTermBatchRow.id,
@@ -1565,9 +1430,26 @@ class SingleTermService:
                 SingleTermBatchRow.role == "primary",
                 SingleTermBatchStateRow.state == "open",
             )
-        ).scalars():
-            ids.update(group_ids)
-        return ids
+        ).all()
+        if not batches:
+            return set()
+        newest: dict[tuple[int, str], str] = {}
+        for batch_id, gid, kind in conn.execute(
+            select(
+                SingleTermDecisionRow.batch_id,
+                SingleTermDecisionRow.group_id,
+                SingleTermDecisionRow.decision,
+            )
+            .where(SingleTermDecisionRow.batch_id.in_([b.id for b in batches]))
+            .order_by(SingleTermDecisionRow.id)
+        ):
+            newest[(batch_id, gid)] = kind
+        return {
+            gid
+            for batch in batches
+            for gid in batch.group_ids
+            if newest.get((batch.id, gid), "withdrawn") == "withdrawn"
+        }
 
     @staticmethod
     def _insert_batch(
@@ -1604,23 +1486,14 @@ class SingleTermService:
         )
         return int(batch_id)
 
-    def act(
-        self, key: str, batch_id: int, action: BatchAction, request_id: str
-    ) -> SingleTermBatchView:
-        """``submit`` (its reviewer or a lead: open to submitted), ``reopen``
-        (a lead: submitted to open), ``abandon`` (a lead: its decisions stop
-        counting; final).
+    def abandon(self, key: str, batch_id: int, request_id: str) -> SingleTermBatchView:
+        """A lead abandons a batch: its decisions stop counting; final.
 
         Raises:
-            DomainError: ``SINGLE_TERM_BATCH_STATE``.
+            DomainError: ``SINGLE_TERM_BATCH_NOT_OPEN``.
         """
-        transitions: dict[str, tuple[set[str], str]] = {
-            "submit": ({"open"}, "submitted"),
-            "reopen": ({"submitted"}, "open"),
-            "abandon": ({"open", "submitted"}, "abandoned"),
-        }
         request_hash = state_digest(
-            {"command": f"single_term_batch_{action}", "batch_id": batch_id}
+            {"command": "single_term_batch_abandon", "batch_id": batch_id}
         )
         now = self._now()
         with self.db.transaction() as conn:
@@ -1629,28 +1502,25 @@ class SingleTermService:
             replayed = self._replayed(conn, viewer, request_id, request_hash)
             if replayed is not None:
                 return self._batch_view(conn, pid, self._batch(conn, pid, batch_id))
+            self._require_lead(viewer)
             batch = self._visible_batch(conn, viewer, batch_id)
-            if action != "submit" or batch["reviewer_user_id"] != viewer.user_id:
-                self._require_lead(viewer)
-            allowed, target = transitions[action]
-            if batch["state"] not in allowed:
+            if batch["state"] != "open":
                 raise DomainError(
-                    "SINGLE_TERM_BATCH_STATE",
-                    {"state": batch["state"], "action": action},
+                    "SINGLE_TERM_BATCH_NOT_OPEN", {"state": batch["state"]}
                 )
             conn.execute(
                 update(SingleTermBatchStateRow)
                 .where(SingleTermBatchStateRow.batch_id == batch_id)
-                .values(state=target, updated_at=now, updated_by=viewer.user_id)
+                .values(state="abandoned", updated_at=now, updated_by=viewer.user_id)
             )
             record_audit(
                 conn,
                 self.actor,
-                f"project.single_term_batch_{action}",
+                "project.single_term_batch_abandon",
                 target_type="project",
                 target_id=key,
                 project_id=pid,
-                details={"batch_id": batch_id, "state": target},
+                details={"batch_id": batch_id, "state": "abandoned"},
                 at=now,
             )
             self._remember(
@@ -1689,7 +1559,7 @@ class SingleTermService:
                 ``SINGLE_TERM_GROUP_BLOCKED``, ``SINGLE_TERM_NOT_ANCESTOR``,
                 ``SINGLE_TERM_SPAN_INVALID``,
                 ``SINGLE_TERM_SPAN_OVERLAPS_FINDING``,
-                ``SINGLE_TERM_SPAN_NEGATED``, ``SINGLE_TERM_NOT_IN_CONFLICT``,
+                ``SINGLE_TERM_NOT_IN_CONFLICT``,
                 ``SINGLE_TERM_CONFLICT_ACCEPTED``, ``WORKFLOW_REQUEST_CONFLICT``.
         """
         request_hash = state_digest(
@@ -1740,9 +1610,7 @@ class SingleTermService:
                     )
             if body.decision == "adjust_span":
                 assert body.adjusted_span is not None
-                adjusted_span = self._check_span(
-                    body.adjusted_span, group, data, basis["negation_cues"]
-                )
+                adjusted_span = self._check_span(body.adjusted_span, group, data)
             if (
                 body.decision == "reject"
                 and body.reason == "conflict"
@@ -1877,11 +1745,10 @@ class SingleTermService:
         span: SingleTermSpanRequest,
         group: CandidateGroup,
         data: BasisData,
-        cues: Mapping[str, list[str]],
     ) -> dict[str, Any]:
         """A re-cut of one of the group's occurrences: in bounds, overlapping
-        the occurrence and different from it, overlapping no other finding,
-        without a negation cue. The stored text is the verbatim cut."""
+        the occurrence and different from it, overlapping no other finding.
+        The stored text is the verbatim cut."""
         occurrence = next(
             (o for o in group.occurrences if occurrence_ref(o) == span.occurrence_ref),
             None,
@@ -1913,10 +1780,6 @@ class SingleTermService:
             raise DomainError(
                 "SINGLE_TERM_SPAN_OVERLAPS_FINDING",
                 "The re-cut overlaps another finding of the text.",
-            )
-        if contains_negation(verbatim, group.language, negation_patterns(cues)):
-            raise DomainError(
-                "SINGLE_TERM_SPAN_NEGATED", "The re-cut holds a negation cue."
             )
         return {
             "occurrence_ref": span.occurrence_ref,

@@ -5,18 +5,18 @@ import { routeHref, type Route } from "../app/router";
 import { Button, ConfirmDialog, EmptyState, InlineMessage, StatusBadge, type StatusTone } from "../ui";
 import { HelpLink } from "../help/HelpLink";
 import { BatchDialog } from "./BatchDialog";
-import { batchScope, blockedLabels, exclusionLabels, kappa, label, languageLabel, newRequestId, percent } from "./labels";
+import { batchScope, batchStatus, blockedLabels, exclusionLabels, kappa, kappaReading, label, languageLabel, newRequestId, percent } from "./labels";
 import "./singleterms.css";
 
 export interface SingleTermsPageProps {
   projectKey: string;
-  /** A lead (or administrator) of the project: summary, basis and batch management. */
+  /** A lead (or administrator) of the project: summary and batch management. */
   canManage: boolean;
   onNavigate: (route: Route) => void;
 }
 
 const basisDate = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
-const stateTones: Record<SingleTermBatch["state"], StatusTone> = { open: "warning", submitted: "success", abandoned: "neutral" };
+const statusTones: Record<ReturnType<typeof batchStatus>, StatusTone> = { open: "warning", done: "success", abandoned: "neutral" };
 
 function RouteLink({ route, onNavigate, children, label: ariaLabel }: { route: Route; onNavigate: (route: Route) => void; children: ReactNode; label?: string }): JSX.Element {
   return <a href={routeHref(route)} aria-label={ariaLabel} onClick={(event: MouseEvent<HTMLAnchorElement>) => {
@@ -25,11 +25,12 @@ function RouteLink({ route, onNavigate, children, label: ariaLabel }: { route: R
   }}>{children}</a>;
 }
 
-type Loaded = { summary: SingleTermSummary | null; batches: SingleTermBatch[]; reviewers: string[]; layers: { id: string; label: string }[] };
+type Loaded = { summary: SingleTermSummary | null; batches: SingleTermBatch[]; reviewers: string[] };
 
 /**
- * "Single terms" (mockup Overview): the review basis and its refresh, counts per language, the batches and
- * the findings the derivation left out. A reviewer who is no lead sees only their own batches.
+ * "Single terms" (mockup Overview): counts per language, the batches and the findings the derivation left
+ * out. Opening it as a lead refreshes the review basis when the accepted final results changed. A reviewer
+ * who is no lead sees only their own batches.
  */
 export function SingleTermsPage(props: SingleTermsPageProps): JSX.Element {
   return <SingleTermsContent key={props.projectKey} {...props} />;
@@ -57,18 +58,11 @@ function SingleTermsContent({ projectKey, canManage, onNavigate }: SingleTermsPa
     let active = true;
     setError(undefined);
     const load = async (): Promise<Loaded> => {
+      if (canManage) await api.refreshSingleTermBasis(projectKey);
       const batches = await api.listSingleTermBatches(projectKey);
-      if (!canManage) return { summary: null, batches, reviewers: [], layers: [] };
-      const [summary, granted, members, settings] = await Promise.all([
-        api.singleTermSummary(projectKey),
-        api.listSingleTermReviewers(projectKey),
-        api.listMembers(projectKey).catch(() => []),
-        api.getProjectSettings(projectKey).catch(() => null),
-      ]);
-      const leads = members.filter(member => member.roles.includes("lead")).map(member => member.username);
-      const reviewers = [...new Set([...granted.map(item => item.username), ...leads])];
-      const layers = settings?.profile.layers.map(layer => ({ id: layer.layer_id, label: layer.label })) ?? [];
-      return { summary, batches, reviewers, layers };
+      if (!canManage) return { summary: null, batches, reviewers: [] };
+      const [summary, members] = await Promise.all([api.singleTermSummary(projectKey), api.listMembers(projectKey).catch(() => [])]);
+      return { summary, batches, reviewers: members.map(member => member.username) };
     };
     void load().then(value => { if (active) setLoaded(value); }, failure => { if (active) { setLoaded(null); setError(failure); } });
     return () => { active = false; };
@@ -85,14 +79,10 @@ function SingleTermsContent({ projectKey, canManage, onNavigate }: SingleTermsPa
     } catch (failure: unknown) { setActionError(failure); }
     finally { setBusy(null); }
   };
-  const startBasis = () => void run("basis", async requestId => {
-    const basis = await api.startSingleTermBasis(projectKey, requestId);
-    return `Review basis ${basis.basis_id} frozen. Only new and stale groups open again.`;
-  });
-  const act = (batch: SingleTermBatch, action: "reopen" | "abandon") => void run(`${action}:${batch.batch_id}`, async requestId => {
-    await api.singleTermBatchAction(projectKey, batch.batch_id, action, requestId);
+  const abandonBatch = (batch: SingleTermBatch) => void run(`abandon:${batch.batch_id}`, async requestId => {
+    await api.abandonSingleTermBatch(projectKey, batch.batch_id, requestId);
     setAbandon(null);
-    return action === "reopen" ? `Batch #${batch.batch_id} reopened.` : `Batch #${batch.batch_id} abandoned. Its decisions no longer count.`;
+    return `Batch #${batch.batch_id} abandoned. Its decisions no longer count.`;
   });
 
   const off = error instanceof ApiError && error.code === "SINGLE_TERM_REVIEW_OFF";
@@ -108,18 +98,17 @@ function SingleTermsContent({ projectKey, canManage, onNavigate }: SingleTermsPa
   const batchTable = <div className="st-table-box"><table className="st-table">
     <caption className="visually-hidden">Review batches</caption>
     <thead><tr><th scope="col">Batch</th><th scope="col">Groups</th><th scope="col">Reviewer</th><th scope="col">Progress</th><th scope="col">State</th><th scope="col"><span className="visually-hidden">Actions</span></th></tr></thead>
-    <tbody>{[...batches].reverse().map(batch => <tr key={batch.batch_id}>
+    <tbody>{[...batches].reverse().map(batch => { const status = batchStatus(batch); return <tr key={batch.batch_id}>
       <td>#{batch.batch_id}{!batch.current_basis && <span className="st-muted st-small"> · earlier basis</span>}</td>
       <td>{batchScope(batch)}</td>
       <td>{batch.reviewer_username}{batch.role === "second" && <span className="st-muted"> · second{batch.parent_batch_id ? ` of #${batch.parent_batch_id}` : ""}</span>}</td>
       <td>{batch.decided} / {batch.groups}</td>
-      <td><StatusBadge tone={stateTones[batch.state]}>{batch.state}</StatusBadge></td>
+      <td><StatusBadge tone={statusTones[status]}>{status}</StatusBadge></td>
       <td><div className="st-row">
-        {batch.state !== "abandoned" && <RouteLink route={batchRoute(batch)} onNavigate={onNavigate} label={`${batch.state === "open" ? "Continue" : "Open"} batch #${batch.batch_id}`}>{batch.state === "open" ? "Continue" : "Open"}</RouteLink>}
-        {canManage && batch.state === "submitted" && <Button size="sm" loading={busy === `reopen:${batch.batch_id}`} onClick={() => act(batch, "reopen")} aria-label={`Reopen batch #${batch.batch_id}`}>Reopen</Button>}
-        {canManage && batch.state !== "abandoned" && <Button size="sm" variant="danger" onClick={() => { setActionError(undefined); setAbandon(batch); }} aria-label={`Abandon batch #${batch.batch_id}`}>Abandon…</Button>}
+        {status !== "abandoned" && <RouteLink route={batchRoute(batch)} onNavigate={onNavigate} label={`${status === "open" ? "Continue" : "Open"} batch #${batch.batch_id}`}>{status === "open" ? "Continue" : "Open"}</RouteLink>}
+        {canManage && status !== "abandoned" && <Button size="sm" variant="danger" onClick={() => { setActionError(undefined); setAbandon(batch); }} aria-label={`Abandon batch #${batch.batch_id}`}>Abandon…</Button>}
       </div></td>
-    </tr>)}</tbody>
+    </tr>; })}</tbody>
   </table></div>;
 
   if (!canManage) return <section className="st-page">
@@ -134,13 +123,12 @@ function SingleTermsContent({ projectKey, canManage, onNavigate }: SingleTermsPa
       <div>
         <h1>Single terms</h1>
         <p className="st-muted" style={{ margin: "var(--space-1) 0 0" }}>
-          {basis ? `Review basis: final results of ${basisDate.format(new Date(basis.created_at))} UTC. Only accepted or adjusted cases are exported.`
-            : "No review basis yet. Starting the review freezes the current final results; the phrase-term groups are derived from them."}
+          {basis ? `Review basis: final results of ${basisDate.format(new Date(basis.created_at))} UTC, refreshed when they change. Only accepted or adjusted cases are exported.`
+            : "No final result is accepted yet. The review starts from the accepted final results; their phrase-term groups show here once there is one."}
         </p>
       </div>
       <div className="st-row">
         <HelpLink screen="singleTerms" />
-        <Button loading={busy === "basis"} onClick={startBasis} variant={basis ? "secondary" : "primary"}>{basis ? "Refresh review basis" : "Start single-term review"}</Button>
         {basis && <Button variant="primary" onClick={() => { setNotice(null); setDialog(true); }}>New review batch…</Button>}
       </div>
     </div>
@@ -170,7 +158,7 @@ function SingleTermsContent({ projectKey, canManage, onNavigate }: SingleTermsPa
         {!summary.languages.length && <EmptyState title="No single-term candidates.">The final results of this basis hold no finding that can stand alone as a phrase.</EmptyState>}
       </div>
       <p className="st-small st-muted" style={{ margin: 0 }}>
-        {summary.agreement.pairs ? `Second blind review: ${summary.agreement.pairs} groups reviewed twice · agreement ${percent(summary.agreement.percent)} · κ ${kappa(summary.agreement.kappa)}`
+        {summary.agreement.pairs ? `Second blind review: ${summary.agreement.pairs} groups reviewed twice · agreement ${percent(summary.agreement.percent)} · κ ${kappa(summary.agreement.kappa)}${kappaReading(summary.agreement.kappa) ? ` (${kappaReading(summary.agreement.kappa)} agreement beyond chance)` : ""}`
           : "Second blind review: no group reviewed twice yet."}
       </p>
     </>}
@@ -186,7 +174,7 @@ function SingleTermsContent({ projectKey, canManage, onNavigate }: SingleTermsPa
         </div>
       </section>)}
     </div>
-    {dialog && summary && <BatchDialog open projectKey={projectKey} languages={summary.languages} reviewers={loaded.reviewers} layers={loaded.layers}
+    {dialog && summary && <BatchDialog open projectKey={projectKey} languages={summary.languages} reviewers={loaded.reviewers}
       onClose={() => setDialog(false)}
       onCreated={batch => {
         setDialog(false);
@@ -199,6 +187,6 @@ function SingleTermsContent({ projectKey, canManage, onNavigate }: SingleTermsPa
       busy={busy !== null}
       message={<><p>Its decisions stop counting and its groups open again for a new batch. This cannot be undone.</p>{actionError !== undefined && <ErrorNotice error={actionError} />}</>}
       onCancel={() => { if (!busy) { setAbandon(null); setActionError(undefined); } }}
-      onConfirm={() => { if (abandon) act(abandon, "abandon"); }} />
+      onConfirm={() => { if (abandon) abandonBatch(abandon); }} />
   </section>;
 }

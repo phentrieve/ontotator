@@ -14,7 +14,7 @@ export function group(n: number, extra: Partial<SingleTermGroup> = {}): SingleTe
 export function batch(extra: Partial<SingleTermBatch> = {}): SingleTermBatch {
   return {
     batch_id: 3, basis_id: 1, role: "primary", parent_batch_id: null, second_batch_ids: [], reviewer_username: "rev-04", reviewer_pseudonym: "r4",
-    state: "open", filter: { language: "de", stale_only: false }, groups: 3, decided: 0, current_basis: true,
+    state: "open", filter: { language: "de" }, groups: 3, decided: 0, current_basis: true,
     created_at: "2026-11-02T16:40:00Z", updated_at: "2026-11-02T16:40:00Z", warnings: [], ...extra,
   };
 }
@@ -39,12 +39,12 @@ export function summary(extra: Partial<SingleTermSummary> = {}): SingleTermSumma
     basis: { basis_id: 2, snapshot_id: "snap-2", derivation_sha256: "a".repeat(64), created_at: "2026-11-02T16:40:00Z", report: {} },
     bases: 2,
     languages: [
-      { language: "de", groups: 40, occurrences: 95, open: 20, blocked: 4, decided: 12, stale: 4, conflicts: 2, available: 13, available_stale: 1 },
-      { language: "en", groups: 30, occurrences: 61, open: 30, blocked: 0, decided: 0, stale: 0, conflicts: 0, available: 30, available_stale: 0 },
+      { language: "de", groups: 40, occurrences: 95, open: 20, blocked: 4, decided: 12, stale: 4, conflicts: 2, available: 13 },
+      { language: "en", groups: 30, occurrences: 61, open: 30, blocked: 0, decided: 0, stale: 0, conflicts: 0, available: 30 },
     ],
     exclusions: { not_present: { de: 14, en: 3 }, not_patient: { de: 2 }, obsolete_term: {} },
-    blocked: { contains_other_finding: { de: 3 }, negation_in_span: { de: 1 } },
-    batches: { open: 1, submitted: 1, abandoned: 0 },
+    blocked: { contains_other_finding: { de: 3 } },
+    batches: { open: 2, abandoned: 0 },
     agreement: { pairs: 10, agreeing: 9, percent: 90, kappa: 0.78 },
     ...extra,
   };

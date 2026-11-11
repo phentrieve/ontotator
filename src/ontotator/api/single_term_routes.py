@@ -1,12 +1,10 @@
 """Single-term review routes (issue 381).
 
-Leads start the review basis, create batches and read the summary; the
-reviewer of a batch reads its groups and contexts and records decisions.
+Leads refresh the review basis (the page does so when it opens), create
+batches and read the summary; the reviewer of a batch reads its groups and contexts and records decisions.
 Groups, contexts and decisions hold clinical phrases: browser sessions only
 (``token_scopes``). Every route refuses while the project setting is off.
 """
-
-from typing import Literal
 
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
@@ -25,7 +23,6 @@ from ontotator.application.single_terms import (
     SingleTermDecisionRequest,
     SingleTermDecisionView,
     SingleTermGroupView,
-    SingleTermReviewerView,
     SingleTermService,
     SingleTermSummaryView,
 )
@@ -48,10 +45,12 @@ def _service(request: Request, principal: PrincipalDep) -> SingleTermService:
 
 
 @router.post("/basis")
-def start_basis(
-    key: str, body: SingleTermCommandRequest, request: Request, principal: PrincipalDep
-) -> SingleTermBasisView:
-    return _service(request, principal).start_basis(key, body.request_id)
+def refresh_basis(
+    key: str, request: Request, principal: PrincipalDep
+) -> SingleTermBasisView | None:
+    """The newest basis, refreshed when the accepted final results changed;
+    null while there is no final result."""
+    return _service(request, principal).refresh_basis(key)
 
 
 @router.get("/summary")
@@ -123,39 +122,6 @@ def batch(
     return _service(request, principal).batch(key, batch_id)
 
 
-def _act(
-    action: Literal["submit", "reopen", "abandon"],
-    key: str,
-    batch_id: int,
-    body: SingleTermCommandRequest,
-    request: Request,
-    principal: PrincipalDep,
-) -> SingleTermBatchView:
-    return _service(request, principal).act(key, batch_id, action, body.request_id)
-
-
-@router.post("/batches/{batch_id}/submit")
-def submit_batch(
-    key: str,
-    batch_id: int,
-    body: SingleTermCommandRequest,
-    request: Request,
-    principal: PrincipalDep,
-) -> SingleTermBatchView:
-    return _act("submit", key, batch_id, body, request, principal)
-
-
-@router.post("/batches/{batch_id}/reopen")
-def reopen_batch(
-    key: str,
-    batch_id: int,
-    body: SingleTermCommandRequest,
-    request: Request,
-    principal: PrincipalDep,
-) -> SingleTermBatchView:
-    return _act("reopen", key, batch_id, body, request, principal)
-
-
 @router.post("/batches/{batch_id}/abandon")
 def abandon_batch(
     key: str,
@@ -164,7 +130,7 @@ def abandon_batch(
     request: Request,
     principal: PrincipalDep,
 ) -> SingleTermBatchView:
-    return _act("abandon", key, batch_id, body, request, principal)
+    return _service(request, principal).abandon(key, batch_id, body.request_id)
 
 
 @router.post("/batches/{batch_id}/decisions")
@@ -176,24 +142,3 @@ def decide(
     principal: PrincipalDep,
 ) -> SingleTermDecisionView:
     return _service(request, principal).decide(key, batch_id, body)
-
-
-@router.get("/reviewers")
-def reviewers(
-    key: str, request: Request, principal: PrincipalDep
-) -> list[SingleTermReviewerView]:
-    return _service(request, principal).reviewers(key)
-
-
-@router.put("/reviewers/{username}")
-def grant_reviewer(
-    key: str, username: str, request: Request, principal: PrincipalDep
-) -> list[SingleTermReviewerView]:
-    return _service(request, principal).grant_reviewer(key, username)
-
-
-@router.delete("/reviewers/{username}")
-def revoke_reviewer(
-    key: str, username: str, request: Request, principal: PrincipalDep
-) -> list[SingleTermReviewerView]:
-    return _service(request, principal).revoke_reviewer(key, username)

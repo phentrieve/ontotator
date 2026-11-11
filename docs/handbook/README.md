@@ -37,7 +37,7 @@ You can have more than one role. Roles other than system administrator apply to 
 | **Annotator** | Mark findings in the texts assigned to you, check tool proposals, submit your work. Annotators also do translation reviews. | [Annotator reference](annotator.md) |
 | **Translation reviewer** | Not a separate role you can be given: any annotator can get a translation review task. The header shows this name while you work on one. | [Review a translation](annotator.md#review-a-translation) |
 | **Consolidator** | Merge the differing submissions on one text into one result. | [Consolidator chapter](consolidator.md) |
-| **Single-term reviewer** | Not a role: a lead lets a member review single terms in projects that use the single-term review. Judge annotated phrases alone, then in context. | [Review a batch](lead-single-terms.md#review-a-batch) |
+| Single-term reviewer | Not a role: any project member a lead gives a review batch, in projects that use the single-term review. Judge annotated phrases alone, then in context. | [Review a batch](lead-single-terms.md#review-a-batch) |
 | **Lead** | Set up the project, upload texts, plan and assign work, publish guidelines, accept results, export. | [Lead overview](lead.md) |
 | **System administrator** | Create user accounts, upload ontology releases, create projects, handle technical reports. | [Administration](admin.md) |
 

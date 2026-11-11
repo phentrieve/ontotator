@@ -3,12 +3,12 @@ import { api, type ProjectSummary, type SingleTermBatch } from "../api/client";
 import { routeHref, type Route } from "../app/router";
 import { DataTable, type Column } from "../ui";
 import { onSpaceActivate } from "../ui/spaceActivates";
-import { batchScope } from "./labels";
+import { batchScope, batchStatus } from "./labels";
 
 type Row = { project: ProjectSummary; batch: SingleTermBatch };
 
 /**
- * My tasks: the user's open single-term review batches, one row per batch with a link into it. Projects
+ * My tasks: the user's open single-term review batches (not abandoned, not every group decided), one row per batch with a link into it. Projects
  * without the review (or without access) answer with an error and simply list nothing.
  */
 export function MyReviewBatches({ projects, project, username, onNavigate }: {
@@ -23,7 +23,7 @@ export function MyReviewBatches({ projects, project, username, onNavigate }: {
   useEffect(() => {
     let active = true;
     void Promise.all(projects.map(item => new Promise<unknown>(resolve => resolve(api.listSingleTermBatches(item.project_key))).then(
-      batches => Array.isArray(batches) ? (batches as SingleTermBatch[]).filter(batch => batch.state === "open" && batch.reviewer_username === username).map(batch => ({ project: item, batch })) : [],
+      batches => Array.isArray(batches) ? (batches as SingleTermBatch[]).filter(batch => batchStatus(batch) === "open" && batch.reviewer_username === username).map(batch => ({ project: item, batch })) : [],
       () => [] as Row[],
     ))).then(lists => { if (active) setRows(lists.flat()); });
     return () => { active = false; };

@@ -161,18 +161,10 @@ def env(tmp_path, monkeypatch):
             json={"document_id": doc, "submission_id": sid, "expected_revision": 0},
         )
         assert selected.status_code == 200, selected.text
-    settings = lead.patch(
-        f"{BASE}/settings",
-        json={
-            "single_term_review": True,
-            "single_term_negation_cues": {"de": ["keine"]},
-        },
-    )
+    settings = lead.patch(f"{BASE}/settings", json={"single_term_review": True})
     assert settings.status_code == 200, settings.text
     rita = logged_in(app, "rita", projects={"proj": ["annotator"]}, assignments=[])
     sam = logged_in(app, "sam", projects={"proj": ["annotator"]}, assignments=[])
-    for name in ("rita", "sam"):
-        assert lead.put(f"{ST}/reviewers/{name}").status_code == 200
     return SimpleNamespace(
         app=app, db=db, lead=lead, rita=rita, sam=sam, tmp_path=tmp_path
     )
@@ -193,7 +185,7 @@ def _decide(client, batch_id, request_id, group, decision, **extra):
 
 def _review(env) -> dict[str, int]:
     """Basis, a batch with a blind second review and the primary decisions."""
-    _post(env.lead, f"{ST}/basis", {"request_id": "basis-1"})
+    _post(env.lead, f"{ST}/basis", None)
     batch = _post(
         env.lead,
         f"{ST}/batches",
@@ -374,7 +366,7 @@ def test_cases_reviews_merge_and_report(env):
         "reject": 1,
     }
     assert report["reject_reasons"] == {"needs_rewrite": 1}
-    assert report["blocked"]["negation_in_span"] == {"de": 1}
+    assert report["blocked"] == {"contains_other_finding": {}}
     assert report["second_review"]["pairs"] == 2
     assert report["second_review"]["percent"] == 50.0
     assert report["yield"]["de"]["accepted_groups"] == 4
@@ -418,7 +410,7 @@ def test_receipt_names_the_snapshot_decisions_and_every_file(env):
         "sha256": frozen["sha256"],
     }
     assert len(frozen["ids"]) == 6
-    assert receipt["negation_cues"] == {"de": ["keine"]}
+    assert "negation_cues" not in receipt
     assert receipt["selected_results"]["bundle_id"] == (
         f"selected-{receipt['snapshot_id']}"
     )

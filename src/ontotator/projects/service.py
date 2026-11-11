@@ -65,10 +65,6 @@ from ontotator.storage.tables import (
 
 HiddenValues = dict[str, dict[str, list[str]]]
 CreationDefaults = dict[str, dict[str, dict[str, str]]]
-# Issue 381: per language the negation cues of the single-term review.
-NegationCues = dict[str, list[str]]
-MAX_NEGATION_CUES = 200
-MAX_NEGATION_CUE_LENGTH = 100
 
 
 class ProjectPin(BaseModel):
@@ -165,10 +161,8 @@ class ProjectSettingsChange(BaseModel):
     # A factory default keeps the field optional in the generated types.
     record_working_time: bool = Field(default_factory=lambda: False)
     # Issue 381: review the phrase-term pairs of the final results alone;
-    # never in a practice project. The cues block a candidate whose phrase
-    # holds one of them (whole word, any case), per language.
+    # never in a practice project.
     single_term_review: bool = Field(default_factory=lambda: False)
-    single_term_negation_cues: NegationCues = Field(default_factory=dict)
     hidden_axis_values: HiddenValues = Field(default_factory=dict)
     creation_defaults: CreationDefaults = Field(default_factory=dict)
     # ``None`` keeps the stored value (the settings page sends full replaces).
@@ -191,31 +185,6 @@ class ProjectSettings(ProjectSettingsChange):
     annotation_policy_revision: int = 1
     # ``None``: not frozen yet, the first use takes the server's translations.
     frozen_translations: FrozenTranslations | None = None
-
-
-def normalize_negation_cues(cues: Mapping[str, list[str]]) -> NegationCues:
-    """The cues trimmed, without repeats, sorted; languages as codes.
-
-    A language without cues is left out, so an emptied list stores nothing.
-
-    Raises:
-        DomainError: ``LANGUAGE_INVALID`` or ``NEGATION_CUES_INVALID``.
-    """
-    normalized: NegationCues = {}
-    for language, items in cues.items():
-        [code] = normalize_languages([language])
-        cleaned = sorted({" ".join(item.split()) for item in items} - {""})
-        if len(cleaned) > MAX_NEGATION_CUES or any(
-            len(item) > MAX_NEGATION_CUE_LENGTH for item in cleaned
-        ):
-            raise DomainError(
-                "NEGATION_CUES_INVALID",
-                f"Give at most {MAX_NEGATION_CUES} cues per language, each at"
-                f" most {MAX_NEGATION_CUE_LENGTH} characters long.",
-            )
-        if cleaned:
-            normalized[code] = sorted(set(normalized.get(code, [])) | set(cleaned))
-    return dict(sorted(normalized.items()))
 
 
 def validate_creation_defaults(
@@ -800,10 +769,6 @@ class ProjectService:
                 del fields[name]
         if "languages" in fields:
             fields["languages"] = sorted(normalize_languages(change.languages))
-        if "single_term_negation_cues" in fields:
-            fields["single_term_negation_cues"] = normalize_negation_cues(
-                change.single_term_negation_cues
-            )
         with self.db.transaction() as conn:
             conn.execute(
                 select(func.pg_advisory_xact_lock_shared(_lock_id("members", key)))

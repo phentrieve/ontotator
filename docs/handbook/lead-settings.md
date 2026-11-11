@@ -10,7 +10,7 @@ General, Annotation, Workflow and Ontology have a **Save changes** button at the
 | **Annotation** | [Submission rules](#set-the-submission-rules), [prefilled values](#set-prefilled-values-for-new-findings), [values annotators can choose](#limit-the-values-annotators-can-choose) |
 | **Workflow** | [Plan for new imports](#choose-the-plan-for-new-imports), [texts with tool proposals](#choose-how-texts-with-tool-proposals-are-annotated), [annotators per text and consolidation rules](#set-annotators-per-text-and-the-consolidation-rules), [working time](#record-working-time), [single-term review](#turn-on-the-single-term-review) |
 | **Guidelines** | [Publish](#publish-the-first-or-a-new-guideline-version), [see who read them](#see-who-has-read-the-guidelines), [republish](#republish-an-earlier-guideline-version), [withdraw](#withdraw-a-guideline-version) |
-| **People** | [Add](#add-a-member), [change roles](#change-a-members-roles), [remove](#remove-a-member), [single-term reviewers](lead-single-terms.md#choose-the-single-term-reviewers) |
+| **People** | [Add](#add-a-member), [change roles](#change-a-members-roles), [remove](#remove-a-member) |
 | **Ontology** | [Ontology version and annotation scheme](#choose-the-ontology-version-branches-and-annotation-scheme), [task profile](#task-profiles) and [replacing it](#replace-the-task-profile), [move to a newer release](#move-a-started-project-to-a-newer-release), [translations](#see-which-translations-the-project-uses) and [the newest translations](#use-the-newest-translations) |
 
 ## Open project settings
@@ -272,10 +272,9 @@ What for: check after the final results whether each annotated phrase maps to it
 
 1. Open **Settings**, tab **Workflow**, card **Single-term review**.
 2. Tick **Review single terms of the final results**. It is off by default and not offered in practice projects.
-3. Enter the negation cues of each language, one per line.
-4. Click **Save changes** of this card; it saves separately from the rest of the tab.
+3. Click **Save changes** of this card; it saves separately from the rest of the tab.
 
-The sidebar then shows **Single terms**. Choose the reviewers under **People**, card **Single-term reviewers**. The whole review is described in [Lead: single-term review](lead-single-terms.md).
+The sidebar then shows **Single terms**. Every project member may review; you hand out batches there. The whole review is described in [Lead: single-term review](lead-single-terms.md).
 
 ## Add a member
 

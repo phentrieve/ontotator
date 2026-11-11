@@ -42,7 +42,6 @@ from ontotator.exchange.single_terms import (
 
 CREATED = datetime(2026, 11, 1, 9, 0, tzinfo=UTC)
 BUNDLE = "selected-snap-1"
-CUES = {"de": ["kein", "ohne"], "en": ["no", "denies", "free of"]}
 
 # An invented miniature of HPO: root, phenotypic abnormality and a few terms.
 PARENTS = {
@@ -223,8 +222,8 @@ def source(
     )
 
 
-def derive(*units: SourceUnit, cues=CUES):
-    return derive_candidates(units, negation_cues=cues, bundle_id=BUNDLE)
+def derive(*units: SourceUnit):
+    return derive_candidates(units, bundle_id=BUNDLE)
 
 
 def only_group(derivation):
@@ -439,44 +438,18 @@ def test_another_layer_neither_blocks_nor_shares():
 
 
 @pytest.mark.parametrize(
-    ("text", "phrase", "blocked"),
+    ("text", "phrase", "language"),
     [
-        ("He denies seizure activity.", "denies seizure", True),
-        ("NO seizure today.", "NO seizure", True),
-        ("Free  of seizure since May.", "Free  of seizure", True),
-        ("Nocturnal seizure noted.", "Nocturnal seizure", False),  # not a word
-        ("Seizure, now none.", "Seizure", False),  # cue outside the span
+        # Guideline R2: a negation the term names belongs in the span.
+        ("Gehen nicht möglich.", "Gehen nicht möglich", "de"),
+        ("keine Spontanatmung", "keine Spontanatmung", "de"),
+        ("Pulse not palpable.", "Pulse not palpable", "en"),
+        ("Nicht-Hodgkin-Lymphom", "Nicht-Hodgkin-Lymphom", "de"),
     ],
 )
-def test_negation_cue_in_span_is_blocked_whole_word_ignoring_case(
-    text, phrase, blocked
-):
-    group = only_group(derive(source(text, [finding(text, "a1", _find(text, phrase))])))
-    assert group.blocked_reason == ("negation_in_span" if blocked else None)
-
-
-def test_negation_cues_are_per_language():
-    text = "kein Krampfanfall"
-    unit = source(text, [finding(text, "a1", (0, len(text)))], language="de")
-    assert only_group(derive(unit)).blocked_reason == "negation_in_span"
-    assert not only_group(derive(unit, cues={"en": ["kein"]})).blocked
-    assert not only_group(derive(unit, cues={})).blocked
-
-
-def test_both_block_reasons_are_kept_in_rule_order():
-    text = "no seizure with ataxia"
-    derivation = derive(
-        source(
-            text,
-            [
-                finding(text, "a1", (0, len(text))),
-                finding(text, "a2", _find(text, "ataxia"), term="HP:0001251"),
-            ],
-        )
-    )
-    group = next(g for g in derivation.groups if g.term_id == "HP:0001250")
-    assert group.blocked_reasons == ("contains_other_finding", "negation_in_span")
-    assert group.blocked_reason == "contains_other_finding"
+def test_a_negation_in_the_span_does_not_block(text, phrase, language):
+    unit = source(text, [finding(text, "a1", _find(text, phrase))], language=language)
+    assert not only_group(derive(unit)).blocked
 
 
 # --- flags --------------------------------------------------------------------
@@ -763,12 +736,13 @@ def test_derivation_is_deterministic_whatever_the_unit_order():
 
 
 def test_report_holds_counts_only_and_every_reason():
-    text = "He denies seizure. Ataxia in the father."
+    text = "Seizure with ataxia. Ataxia in the father."
     derivation = derive(
         source(
             text,
             [
-                finding(text, "a1", _find(text, "denies seizure")),
+                finding(text, "a1", _find(text, "Seizure with ataxia")),
+                finding(text, "a3", _find(text, "ataxia"), term="HP:0001251"),
                 finding(
                     text,
                     "a2",
@@ -782,9 +756,9 @@ def test_report_holds_counts_only_and_every_reason():
     report = derivation.report()
     assert report["exclusions"]["not_patient"] == {"en": 1}
     assert report["exclusions"]["no_span"] == {}
-    assert report["blocked_groups"]["negation_in_span"] == {"en": 1}
-    assert report["groups"] == {"en": 1}
-    assert report["occurrences"] == {"en": 1}
+    assert report["blocked_groups"] == {"contains_other_finding": {"en": 2}}
+    assert report["groups"] == {"en": 2}
+    assert report["occurrences"] == {"en": 2}
     assert "seizure" not in json.dumps(report)
 
 

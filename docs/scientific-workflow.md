@@ -454,8 +454,10 @@ describes the screens.
 
 ### Candidates and groups
 
-A lead freezes the current final results as a *review basis* (a final-result
-snapshot, made with the same code as the final export). The candidates are
+The accepted final results are frozen as a *review basis* (a final-result
+snapshot, made with the same code as the final export) when a lead opens the
+review or creates a batch and the final results differ from those of the
+newest basis; the first basis is frozen once there is a final result. The candidates are
 derived from the selected results of that snapshot with the conversion of
 the final export, so they are exactly the findings of
 `selected-results.ontospan.zip`. Each mention of a finding is one
@@ -472,15 +474,17 @@ the final export, so they are exactly the findings of
 | Another finding of the same result has a mention with exactly this span | excluded `shared_span` |
 | Term obsolete or unknown in the result's release | excluded `obsolete_term` |
 | Span overlaps or contains a segment of another finding (any assertion) | blocked `contains_other_finding` |
-| Span contains a negation cue of its language (whole word, any case) | blocked `negation_in_span` |
 | A modifier segment overlaps the span | flag `modifier_in_span` |
 | Term not under *Phenotypic abnormality* (HP:0000118) | flag `outside_phenotypic_abnormality` |
 
 "Another finding" is another finding of an HPO phenotype layer of the same
 result; uncertain proposal-check targets are not findings. Temporality is
 not a rule. A rule for non-verbalised measurements is not applied: neither
-the task profile nor a finding marks a measurement. Negation cues are set
-per language by the lead; an empty list blocks nothing.
+the task profile nor a finding marks a measurement. A negation inside the
+span blocks nothing: a negation the term itself names belongs in the span
+(guideline R2, for example "Gehen nicht möglich" for Inability to walk or
+"Nicht-Hodgkin-Lymphom"), and a negated finding is annotated `absent` and so
+excluded as `not_present`.
 
 Occurrences form a group by `(language, phrase, term)`. The phrase is the
 covered text without soft hyphens, with runs of whitespace collapsed to one
@@ -493,12 +497,13 @@ same language and phrase with different terms are in a *phrase conflict*.
 
 ### Review and decisions
 
-A lead gives groups to reviewers in batches. Reviewers are members the lead
-grants the single-term reviewer capability, or leads. A batch freezes the
-group IDs it holds when it is created. The optional blind second review
-draws, per language, a share of the batch (20 % by default, at least 50
-groups or all if fewer), chosen by the group IDs' hash, so the sample is
-repeatable; it goes to a different reviewer, who does not see the first
+A lead gives groups to reviewers in batches: the open and stale groups of
+one language or of all, optionally at most a given number, that no other
+open batch still has to decide. Every project member may review. A batch
+freezes the group IDs it holds when it is created; it is done when every
+group in it is decided. The optional blind second review draws, per
+language, 20 % of the batch's groups (at least 50, or all if fewer), chosen
+by the group IDs' hash, so the sample is repeatable; it goes to a different reviewer, who does not see the first
 decision. If a reviewer annotated or consolidated any text of a group, their
 decision on it records `reviewer_independent=false`.
 
@@ -510,25 +515,26 @@ on either side, and decide:
 
 - `accept`: the phrase as annotated with the annotated term;
 - `adjust_span`: a verbatim re-cut of one occurrence. The new span must
-  overlap the annotated one, overlap no other finding and contain no
-  negation cue;
+  overlap the annotated one and overlap no other finding;
 - `adjust_term`: a more general term, which must be an active ancestor of
   the annotated term in the release of every occurrence and neither the
   HPO root `HP:0000001`, a term directly under it (such as `HP:0000118`
   Phenotypic abnormality) nor an organ-system term directly under
   `HP:0000118` (such as `HP:0000707` Abnormality of the nervous system);
 - `reject` with a reason: `needs_context`, `ambiguous_abbreviation`,
-  `too_general`, `term_wrong_out_of_context`, `contains_other_finding`,
-  `negation_in_span`, `needs_rewrite` (the phrase would stand alone only
-  with words inside it removed, which a verbatim re-cut cannot do),
-  `conflict` (only for groups in a phrase conflict) or `other`;
+  `too_general`, `needs_rewrite` (the phrase would stand alone only with
+  words inside it removed, which a verbatim re-cut cannot do) or `other`;
+  `conflict` is set only when another term of the phrase is chosen in a
+  phrase conflict;
 - `withdrawn`: takes back the decision and opens the group again.
 
 One adjustment per decision; no free-text rewrite. A blocked group accepts
 only `adjust_span` or `reject`. In a phrase conflict at most one group can be
 accepted; the others are rejected with `conflict`, or all are rejected. The
-newest decision per group and role counts. Decisions count as soon as they
-are recorded; those of an abandoned batch no longer count. Reviewers never see
+newest decision per group and role counts, so a decision is changed by
+withdrawing it and deciding again. Decisions count as soon as they are
+recorded; there is no submit step. Those of an abandoned batch no longer
+count. Reviewers never see
 annotator or consolidator pseudonyms, tool proposals or working time, and
 decisions record no working time. A term that is wrong in its context is a
 final-result error, corrected through a problem report on the text, not a
@@ -537,11 +543,14 @@ single-term decision.
 Second-review agreement compares the newest primary and second decision of
 each group reviewed twice, with `accept`, `adjust_span` and `adjust_term`
 counted as acceptance and `reject` as rejection: the percentage of agreeing
-pairs and Cohen's kappa (`null` when chance agreement is certain).
+pairs and Cohen's kappa (`null` when chance agreement is certain). The
+review page reads kappa after Landis and Koch (1977): slight up to 0.20,
+fair up to 0.40, moderate up to 0.60, substantial up to 0.80, almost perfect
+above.
 
 ### Repeatability
 
-When the lead refreshes the basis, decisions carry over by group ID. A
+When a new basis is frozen, decisions carry over by group ID. A
 decision stays valid while its group exists and its term, and an adjusted
 term, is present and not obsolete in the release of every occurrence.
 Otherwise the group is *stale* and opens again. It is stale too when an
@@ -550,10 +559,10 @@ accepted group has become blocked, when the re-cut occurrence of an
 An occurrence that is new in a decided group inherits the decision and is
 marked `seen_by_reviewer=false`. A group is `open`, `blocked` (open, but not
 acceptable as it is), `decided` or `stale`. A new basis opens only new and
-stale groups.
+stale groups; a stale group goes into the next batch.
 
 Bases, batches and decisions are append-only (the database refuses updates
-and deletions); only the batch state (open, submitted, abandoned) changes.
+and deletions); only the batch state (open or abandoned) changes.
 Each basis stores the SHA-256 of its derivation, and a recomputation with a
 different digest is refused. Every step is in the project audit.
 
@@ -565,7 +574,7 @@ single-term` for the newest final export, refused if it was made while the
 review was off; format `ontotator-final-single-terms/v1`) freezes a
 final-result snapshot like the final export and adds to it the decisions in
 force at the request (their IDs, a SHA-256 of each decision's content, the
-SHA-256 of all of them and the negation cues). The content digests leave out
+SHA-256 of all of them). The content digests leave out
 the row IDs and reviewer pseudonyms a project archive import renumbers or
 renames, so the export of an imported snapshot finds the same decisions. A decision recorded later is not in the
 file; the same snapshot always gives the same bytes. The candidates are
@@ -579,7 +588,7 @@ each group applies.
 | `report.json` | Counts: exclusions per rule and language, blocked and conflict groups, groups per state, decisions per kind and reject reason, second-review agreement and the yield per language. |
 | `selected-results.ontospan.zip` | The selected final results as an Ontospan bundle, byte for byte the same file as in the final export of the same snapshot; every `annotation_ref` points into it. |
 | `source-texts.jsonl` | The exact text versions, one per line, as in the final export. |
-| `receipt.json` | Format, snapshot ID and SHA-256, the frozen decision IDs and their SHA-256, the negation cues, selections, omissions, texts taken out of the work plan and the SHA-256 of every other file. |
+| `receipt.json` | Format, snapshot ID and SHA-256, the frozen decision IDs and their SHA-256, selections, omissions, texts taken out of the work plan and the SHA-256 of every other file. |
 
 Only groups whose decision is `accept`, `adjust_span` or `adjust_term` become
 cases; open, blocked, stale and rejected groups are only counted. `accept`

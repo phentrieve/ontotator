@@ -354,7 +354,7 @@ export function App({ user: givenUser, onLogout }: AppProps): JSX.Element {
       content = <ExportPage projectKey={route.key} currentUser={user} documentCount={exported?.document_count} onNavigate={go}
         showHistory={user.is_system_admin || !!exported?.roles.includes("lead")} />; break;
     }
-    // Single-term review (issue 381): leads and granted reviewers; the server decides who sees what.
+    // Single-term review (issue 381): leads and project members; the server decides who sees what.
     case "projectSingleTerms": case "projectSingleTermBatch": {
       const reviewed = projects.find(project => project.project_key === route.key);
       content = projectContext?.identity !== projectIdentity ? accessLoading

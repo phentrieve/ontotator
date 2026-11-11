@@ -110,7 +110,7 @@ export function AdjustView({ group, contexts, ancestors, ancestorError, busy = f
       </section>
       <section className="st-card st-card--focus" aria-labelledby={`${id}-recut`}>
         <div className="st-spread"><h2 id={`${id}-recut`}>Re-cut the span</h2><span className="st-small" style={{ color: "var(--success)" }}>stays verbatim</span></div>
-        <p className="st-muted st-small" style={{ margin: 0 }}>Click the first word, then the last word, or drag over them. The new span must stay clear of other findings and negations; the server checks both.</p>
+        <p className="st-muted st-small" style={{ margin: 0 }}>Click the first word, then the last word, or drag over them. The new span must stay clear of other findings; the server checks it.</p>
         {contexts.length > 1 && <Select id={`${id}-occurrence`} label="Occurrence" value={String(occurrence)} onChange={event => chooseOccurrence(Number(event.target.value))}>
           {contexts.map((item, index) => <option key={item.occurrence_ref} value={index}>{`${index + 1}: text ${item.document_id}`}</option>)}
         </Select>}
@@ -132,10 +132,6 @@ export function AdjustView({ group, contexts, ancestors, ancestorError, busy = f
       </section>
     </div>
     <div className="st-work" style={{ flex: "1 1 300px" }}>
-      <section className="st-card st-card--quiet" aria-labelledby={`${id}-rewrite`}>
-        <div className="st-spread"><h2 id={`${id}-rewrite`} className="st-muted">Rewrite the text</h2><span className="st-pill st-pill--neutral">not offered</span></div>
-        <p className="st-small st-muted" style={{ margin: 0 }}>Free text would leave the annotated data, so cases stay verbatim.</p>
-      </section>
       <section className="st-card" aria-labelledby={`${id}-result`}>
         <h2 id={`${id}-result`}>Resulting case</h2>
         <p style={{ margin: 0 }}><span className="st-muted">Text</span> <strong>{recut && span ? span.text : group.display_text}</strong></p>

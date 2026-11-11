@@ -19,7 +19,6 @@ beforeEach(() => {
     decision_id: next++, decision: body.decision, phrase_only: body.phrase_only ?? null, reason: body.reason ?? null, note: body.note ?? null,
     adjusted_term_id: body.adjusted_term_id ?? null, adjusted_span: body.adjusted_span ? { ...body.adjusted_span } : null,
   }));
-  vi.spyOn(api, "singleTermBatchAction").mockResolvedValue(batch({ state: "submitted" }));
   vi.spyOn(api, "singleTermAncestors").mockImplementation(async (_key, groupId) => ({
     group_id: groupId, term_id: "HP:0001250",
     ancestors: [
@@ -70,7 +69,7 @@ describe("single-term review screen", () => {
 
   it("shows the resulting phrase or term of a decided group, without the block notice", async () => {
     groups = [
-      group(1, { blocked_reason: "negation_in_span", state: "decided", decision: decision(gid(1), {
+      group(1, { blocked_reason: "contains_other_finding", state: "decided", decision: decision(gid(1), {
         decision: "adjust_span", adjusted_span: { occurrence_ref: "occ-1", start: 30, end: 37, text: "hwindel" } }) }),
       group(2, { state: "decided", decision: decision(gid(2), { decision: "adjust_term", adjusted_term_id: "HP:0012638" }) }),
     ];
@@ -109,7 +108,7 @@ describe("single-term review screen", () => {
     expect((reject as HTMLButtonElement).disabled).toBe(true);
     const reasons = screen.getByRole("group", { name: "Reject reason" });
     expect(within(reasons).getAllByRole("button").map(button => button.textContent)).toEqual([
-      "needs context", "ambiguous abbreviation", "too general", "term wrong out of context", "contains other finding", "negation in span", "only usable rewritten (words inside removed)", "other",
+      "needs context", "ambiguous abbreviation", "too general", "only usable rewritten (words inside removed)", "other",
     ]);
     fireEvent.click(within(reasons).getByRole("button", { name: "too general" }));
     expect(within(reasons).getByRole("button", { name: "too general" }).getAttribute("aria-pressed")).toBe("true");
@@ -222,20 +221,19 @@ describe("single-term review screen", () => {
     expect(decided()[1]).toMatchObject({ group_id: gid(4), decision: "accept", phrase_only: "would_reject" });
   });
 
-  it("submits the batch once every group is decided and shows another's batch read-only", async () => {
+  it("calls a batch done once every group is decided and shows another's batch read-only", async () => {
     groups = [group(1, { state: "decided", decision: decision(gid(1)) })];
     const { unmount } = renderScreen();
-    const submit = await screen.findByRole("button", { name: "Submit batch" });
-    fireEvent.click(submit);
-    await waitFor(() => expect(api.singleTermBatchAction).toHaveBeenCalledWith("p", 3, "submit", expect.any(String)));
-    expect(await screen.findByText(/This batch is submitted/)).toBeDefined();
+    expect(await screen.findByText(/Every group is decided: the batch is done/)).toBeDefined();
+    expect(screen.getByText("1 of 1 decided · done")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Submit batch" })).toBeNull();
     unmount();
 
     groups = [group(1)];
     renderScreen({ username: "lead-1", canManage: true });
     expect(await screen.findByText(/belongs to rev-04/)).toBeDefined();
     expect(screen.queryByRole("button", { name: /Yes, as a phrase/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Submit batch" })).toBeNull();
+    expect(screen.queryByText(/the batch is done/)).toBeNull();
     await waitFor(() => expect(api.singleTermContexts).toHaveBeenCalled());
   });
 });

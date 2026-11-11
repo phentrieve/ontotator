@@ -3,21 +3,16 @@
 Purely additive:
 
 * ``projects.single_term_review`` (``NOT NULL DEFAULT false``) switches the
-  review on per project, ``projects.single_term_negation_cues`` (``NOT NULL
-  DEFAULT '{}'``) holds the negation cues per language. Constant defaults:
-  PostgreSQL adds both without rewriting the table.
-* ``single_term_reviewers``: the members a lead made single-term reviewers
-  (mutable, like memberships).
+  review on per project. A constant default: PostgreSQL adds it without
+  rewriting the table.
 * ``single_term_bases``, ``single_term_batches`` and
   ``single_term_decisions``: append-only history with the shared
   ``forbid_history_change()`` trigger; ``single_term_batch_state`` holds the
   one mutable fact of a batch (pattern ``work_rounds``/``work_round_state``).
 
-Two functions are replaced with versions that know the new tables, their
-text otherwise unchanged: ``delete_practice_project`` empties
+``delete_practice_project`` is replaced with a version that empties
 ``single_term_batch_state`` (it has no ``project_id``) before the generic
-pass, and ``delete_empty_project`` counts ``single_term_reviewers`` as setup,
-not work. The downgrade restores both.
+pass, its text otherwise unchanged. The downgrade restores it.
 
 Follows 0038 (delete a project without work).
 """
@@ -39,12 +34,11 @@ SCHEMA = "ontotator"
 APP_ROLE = "ontotator_app"
 HISTORY = ("single_term_bases", "single_term_batches", "single_term_decisions")
 ROLES = "('primary', 'second')"
-STATES = "('open', 'submitted', 'abandoned')"
+STATES = "('open', 'abandoned')"
 PHRASE_ONLY = "('would_accept', 'would_reject')"
 DECISIONS = "('accept', 'adjust_span', 'adjust_term', 'reject', 'withdrawn')"
 REASONS = (
     "('needs_context', 'ambiguous_abbreviation', 'too_general',"
-    " 'term_wrong_out_of_context', 'contains_other_finding', 'negation_in_span',"
     " 'needs_rewrite', 'conflict', 'other')"
 )
 
@@ -76,19 +70,6 @@ def _practice_functions() -> tuple[str, str]:
         f"  DELETE FROM {SCHEMA}.single_term_batch_state WHERE batch_id IN\n"
         f"    (SELECT id FROM {SCHEMA}.single_term_batches"
         " WHERE project_id = p_project);\n" + anchor,
-    )
-    return original, extended
-
-
-def _empty_functions() -> tuple[str, str]:
-    """(original, with reviewers as setup) of ``delete_empty_project``."""
-    module = _migration("0038_delete_empty_project")
-    original = module._DELETE_EMPTY.replace(
-        "CREATE FUNCTION", "CREATE OR REPLACE FUNCTION", 1
-    )
-    old = f"ARRAY[{module._SETUP}]"
-    extended = _replaced(
-        original, old, f"ARRAY['single_term_reviewers', {module._SETUP}]"
     )
     return original, extended
 
@@ -129,34 +110,6 @@ def upgrade() -> None:
         ),
         schema=SCHEMA,
     )
-    op.add_column(
-        "projects",
-        sa.Column(
-            "single_term_negation_cues",
-            postgresql.JSONB(),
-            nullable=False,
-            server_default=sa.text("'{}'::jsonb"),
-        ),
-        schema=SCHEMA,
-    )
-    op.create_table(
-        "single_term_reviewers",
-        sa.Column(
-            "project_id",
-            sa.BigInteger(),
-            sa.ForeignKey(f"{SCHEMA}.projects.id"),
-            primary_key=True,
-        ),
-        sa.Column(
-            "user_id",
-            sa.BigInteger(),
-            sa.ForeignKey(f"{SCHEMA}.users.id"),
-            primary_key=True,
-        ),
-        _user("added_by", nullable=True),
-        _created("added_at"),
-        schema=SCHEMA,
-    )
     op.create_table(
         "single_term_bases",
         _id(),
@@ -168,7 +121,6 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("derivation_sha256", sa.Text(), nullable=False),
-        sa.Column("negation_cues", postgresql.JSONB(), nullable=False),
         sa.Column("report", postgresql.JSONB(), nullable=False),
         _user("created_by"),
         _created(),
@@ -324,23 +276,16 @@ def upgrade() -> None:
         f"GRANT SELECT, INSERT, UPDATE ON {SCHEMA}.single_term_batch_state"
         f" TO {APP_ROLE}"
     )
-    op.execute(
-        f"GRANT SELECT, INSERT, DELETE ON {SCHEMA}.single_term_reviewers TO {APP_ROLE}"
-    )
     op.execute(_practice_functions()[1])
-    op.execute(_empty_functions()[1])
 
 
 def downgrade() -> None:
     op.execute(_practice_functions()[0])
-    op.execute(_empty_functions()[0])
     for table in (
         "single_term_decisions",
         "single_term_batch_state",
         "single_term_batches",
         "single_term_bases",
-        "single_term_reviewers",
     ):
         op.drop_table(table, schema=SCHEMA)
-    op.drop_column("projects", "single_term_negation_cues", schema=SCHEMA)
     op.drop_column("projects", "single_term_review", schema=SCHEMA)

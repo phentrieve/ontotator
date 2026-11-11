@@ -347,10 +347,6 @@ class MembershipService:
                     details=details,
                     at=now,
                 )
-                if not wanted:
-                    _end_single_term_reviewer(
-                        conn, actor, project_id, user.id, user.username, now
-                    )
             grant_roles(
                 conn, actor, project_id, user.id, user.username, wanted - current, now
             )
@@ -407,36 +403,3 @@ class MembershipService:
             )
         ).scalars()
         return frozenset(cast(Role, role) for role in roles)
-
-
-def _end_single_term_reviewer(
-    conn: Connection,
-    actor: Actor,
-    project_id: int,
-    user_id: int,
-    username: str,
-    now: datetime,
-) -> None:
-    """The single-term reviewer capability ends with the membership: a person
-    added again later needs a new grant (#381)."""
-    from ontotator.storage.single_term_tables import SingleTermReviewerRow
-
-    removed = conn.execute(
-        delete(SingleTermReviewerRow)
-        .where(
-            SingleTermReviewerRow.project_id == project_id,
-            SingleTermReviewerRow.user_id == user_id,
-        )
-        .returning(SingleTermReviewerRow.user_id)
-    ).first()
-    if removed is not None:
-        record_audit(
-            conn,
-            actor,
-            "project.single_term_reviewer_remove",
-            target_type="user",
-            target_id=username,
-            project_id=project_id,
-            details={"username": username},
-            at=now,
-        )

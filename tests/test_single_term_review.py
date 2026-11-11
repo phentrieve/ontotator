@@ -50,7 +50,10 @@ ST = f"{BASE}/single-terms"
 S = "ontotator"
 DOC1, DOC2, DOC3 = "ST-1", "ST-2", "ST-3"
 TEXTS = {
-    DOC1: "Seit dem Sommer Krampfanfälle und Hypotonie. Keine Areflexie. Hörminderung links.",
+    DOC1: (
+        "Seit dem Sommer Krampfanfälle und Hypotonie. Keine Areflexie."
+        " Hörminderung links. Status epilepticus im Mai."
+    ),
     DOC2: "Erneut Krampfanfälle in der Nacht. Hypotonie der Rumpfmuskulatur.",
     DOC3: "Bekannte Krampfanfälle seit Jahren.",
 }
@@ -64,12 +67,17 @@ SEIZURE, STATUS, HYPOTONIA, AREFLEXIA = (
 # a level never offered as a generalised term: the hearing finding is
 # annotated as Dialeptic seizure, which generalises to Seizure.
 HEARING, SENSORINEURAL = "HP:0001250", "HP:0011146"
-FINDINGS: dict[str, list[tuple[str, str, str]]] = {
+# (annotation id, covered text, term[, assertion])
+FINDINGS: dict[str, list[tuple[str, ...]]] = {
     DOC1: [
         ("a1", "Krampfanfälle", SEIZURE),
         ("a2", "Hypotonie", HYPOTONIA),
+        # Guideline R2: a negation the term names belongs in the span.
         ("a3", "Keine Areflexie", AREFLEXIA),
         ("a4", "Hörminderung", SENSORINEURAL),
+        # An absent finding inside the span blocks it (contains_other_finding).
+        ("a5", "Status epilepticus im Mai", STATUS),
+        ("a6", "Mai", HYPOTONIA, "absent"),
     ],
     # Hypotonia mapped to another term: a phrase conflict.
     DOC2: [("b1", "Krampfanfälle", SEIZURE), ("b2", "Hypotonie", AREFLEXIA)],
@@ -80,9 +88,10 @@ G_HYPOTONIA = group_id("de", "hypotonie", HYPOTONIA)
 G_HYPO_WRONG = group_id("de", "hypotonie", AREFLEXIA)
 G_NEGATED = group_id("de", "keine areflexie", AREFLEXIA)
 G_HEARING = group_id("de", "hörminderung", SENSORINEURAL)
+G_BLOCKED = group_id("de", "status epilepticus im mai", STATUS)
 
 
-def _finding(document, annotation_id, word, term):
+def _finding(document, annotation_id, word, term, assertion="present"):
     start = document.text.index(word)
     evidence = snapshot_evidence(
         EvidenceMention(
@@ -98,7 +107,7 @@ def _finding(document, annotation_id, word, term):
             layer_id="hpo",
             term_id=term,
             axes_values={
-                "assertion": "present",
+                "assertion": assertion,
                 "experiencer": "patient",
                 "temporality": "current",
             },
@@ -140,10 +149,7 @@ def _submit(env, document_id: str, submission_id: str, revision: int = 1) -> Non
         origin_key=key,
         targets=ReviewTargetSet.create([]),
         draft_revision=revision,
-        snapshots=[
-            _finding(document, aid, word, term)
-            for aid, word, term in FINDINGS[document_id]
-        ],
+        snapshots=[_finding(document, *item) for item in FINDINGS[document_id]],
         decisions=[],
         created_at="2026-11-01T10:00:00Z",
     )
@@ -181,27 +187,20 @@ def env(tmp_path):
     for doc, sid in ((DOC1, "final-1"), (DOC2, "final-2")):
         _submit(env, doc, sid)
         _select(env, doc, sid)
-    settings = lead.patch(
-        f"{BASE}/settings",
-        json={
-            "single_term_review": True,
-            "single_term_negation_cues": {"de": ["keine", " kein "]},
-        },
-    )
+    settings = lead.patch(f"{BASE}/settings", json={"single_term_review": True})
     assert settings.status_code == 200, settings.text
+    # Every project member may review.
     env.rita = logged_in(app, "rita", projects={"proj": ["annotator"]}, assignments=[])
     env.sam = logged_in(app, "sam", projects={"proj": ["annotator"]}, assignments=[])
     env.otto = logged_in(app, "otto", projects={"proj": ["annotator"]}, assignments=[])
-    for name in ("rita", "sam"):
-        granted = lead.put(f"{ST}/reviewers/{name}")
-        assert granted.status_code == 200, granted.text
     return env
 
 
-def _basis(env, request_id: str = "basis-1") -> dict[str, Any]:
-    started = env.lead.post(f"{ST}/basis", json={"request_id": request_id})
-    assert started.status_code == 200, started.text
-    return started.json()
+def _basis(env) -> dict[str, Any]:
+    """Opening the review as a lead: the basis, refreshed if needed."""
+    refreshed = env.lead.post(f"{ST}/basis")
+    assert refreshed.status_code == 200, refreshed.text
+    return refreshed.json()
 
 
 def _batch(env, request_id: str = "batch-1", **extra) -> dict[str, Any]:
@@ -243,10 +242,10 @@ def _ref(client, batch_id: int, group: str, document_id: str) -> dict[str, Any]:
 # --- setting -----------------------------------------------------------------
 
 
-def test_setting_and_cues_are_stored_normalised_and_audited(env):
+def test_the_setting_is_stored_and_audited_without_cues(env):
     settings = env.lead.get(f"{BASE}/settings").json()
     assert settings["single_term_review"] is True
-    assert settings["single_term_negation_cues"] == {"de": ["kein", "keine"]}
+    assert "single_term_negation_cues" not in settings
     with env.db.transaction() as conn:
         details = conn.execute(
             select(AuditEventRow.details)
@@ -254,12 +253,11 @@ def test_setting_and_cues_are_stored_normalised_and_audited(env):
             .order_by(AuditEventRow.id.desc())
             .limit(1)
         ).scalar_one()
-    assert details["fields"] == ["single_term_negation_cues", "single_term_review"]
+    assert details["fields"] == ["single_term_review"]
     refused = env.lead.patch(
-        f"{BASE}/settings", json={"single_term_negation_cues": {"de": ["x" * 101]}}
+        f"{BASE}/settings", json={"single_term_negation_cues": {"de": ["kein"]}}
     )
     assert refused.status_code == 422
-    assert refused.json()["code"] == "NEGATION_CUES_INVALID"
 
 
 def test_with_the_setting_off_every_route_refuses_and_data_stays(env):
@@ -269,8 +267,8 @@ def test_with_the_setting_off_every_route_refuses_and_data_stays(env):
     for response in (
         env.lead.get(f"{ST}/summary"),
         env.lead.get(f"{ST}/groups"),
-        env.lead.post(f"{ST}/basis", json={"request_id": "b-off"}),
-        env.lead.get(f"{ST}/reviewers"),
+        env.lead.post(f"{ST}/basis"),
+        env.lead.get(f"{ST}/batches"),
     ):
         assert response.status_code == 409, response.text
         assert response.json()["code"] == "SINGLE_TERM_REVIEW_OFF"
@@ -302,14 +300,24 @@ def test_a_practice_project_cannot_enable_the_review(env):
 
 def test_the_basis_freezes_a_snapshot_and_derives_the_groups(env):
     basis = _basis(env)
-    assert basis["report"]["groups"] == {"de": 5}
-    assert basis["report"]["blocked_groups"]["negation_in_span"] == {"de": 1}
-    # The same request returns the same basis.
+    assert basis["report"]["groups"] == {"de": 6}
+    assert basis["report"]["blocked_groups"] == {"contains_other_finding": {"de": 1}}
+    # Unchanged final results: opening the review again keeps the basis.
     assert _basis(env)["basis_id"] == basis["basis_id"]
     groups = _groups(env.lead)
-    assert set(groups) == {G_SEIZURE, G_HYPOTONIA, G_HYPO_WRONG, G_NEGATED, G_HEARING}
+    assert set(groups) == {
+        G_SEIZURE,
+        G_HYPOTONIA,
+        G_HYPO_WRONG,
+        G_NEGATED,
+        G_HEARING,
+        G_BLOCKED,
+    }
     assert groups[G_SEIZURE]["occurrences"] == 2
-    assert groups[G_NEGATED]["state"] == "blocked"
+    # A negation in the span blocks nothing (guideline R2).
+    assert groups[G_NEGATED]["state"] == "open"
+    assert groups[G_NEGATED]["blocked_reason"] is None
+    assert groups[G_BLOCKED]["state"] == "blocked"
     assert groups[G_HYPOTONIA]["conflict_with"] == [G_HYPO_WRONG]
     assert {g["state"] for g in groups.values()} == {"open", "blocked"}
     with env.db.transaction() as conn:
@@ -327,8 +335,19 @@ def test_the_basis_freezes_a_snapshot_and_derives_the_groups(env):
             .where(AuditEventRow.action == "project.single_term_basis")
         ).scalar_one()
     assert purpose == "single_term_basis"
-    assert row["negation_cues"] == {"de": ["kein", "keine"]}
     assert audit == 1
+
+
+def test_no_basis_without_a_final_result(env):
+    with owner_engine(env.db).begin() as conn:
+        conn.execute(text(f"DELETE FROM {S}.final_selections"))
+    refreshed = env.lead.post(f"{ST}/basis")
+    assert refreshed.status_code == 200 and refreshed.json() is None
+    refused = env.lead.post(
+        f"{ST}/batches", json={"request_id": "b0", "reviewer": "rita"}
+    )
+    assert refused.status_code == 409
+    assert refused.json()["code"] == "SINGLE_TERM_NO_BASIS"
 
 
 def test_the_derivation_is_recomputed_from_the_basis_after_a_cache_loss(env):
@@ -349,7 +368,7 @@ def test_the_basis_derives_from_the_snapshot_as_stored(env, monkeypatch):
     basis must derive as a recomputation after a restart does."""
     from ontotator.application import final_results, single_terms
 
-    freeze = final_results.FinalResultService.freeze_current
+    freeze = final_results.FinalResultService.insert_snapshot
 
     def reordered(self, *args, **kwargs):
         sid, digest, payload = freeze(self, *args, **kwargs)
@@ -358,7 +377,7 @@ def test_the_basis_derives_from_the_snapshot_as_stored(env, monkeypatch):
         payload["content"]["documents"] = dict(reversed(list(documents.items())))
         return sid, digest, payload
 
-    monkeypatch.setattr(final_results.FinalResultService, "freeze_current", reordered)
+    monkeypatch.setattr(final_results.FinalResultService, "insert_snapshot", reordered)
     _basis(env)
     single_terms._derivations.clear()
     summary = env.lead.get(f"{ST}/summary")
@@ -384,13 +403,24 @@ def test_contexts_show_the_text_around_each_occurrence(env):
 
 def test_a_batch_freezes_open_groups_and_samples_a_second_review(env):
     _basis(env)
-    batch = _batch(env, second_review={"reviewer": "sam", "share": 0.2})
-    assert batch["groups"] == 5 and batch["role"] == "primary"
+    # The share is fixed (20 %, at least 50 per language).
+    with_share = env.lead.post(
+        f"{ST}/batches",
+        json={
+            "request_id": "b-share",
+            "reviewer": "rita",
+            "second_review": {"reviewer": "sam", "share": 0.5},
+        },
+    )
+    assert with_share.status_code == 422
+    batch = _batch(env, second_review={"reviewer": "sam"})
+    assert batch["groups"] == 6 and batch["role"] == "primary"
     assert batch["warnings"] == []
     [second_id] = batch["second_batch_ids"]
     second = env.lead.get(f"{ST}/batches/{second_id}").json()
     # Fewer than 50 groups per language: all of them.
-    assert second["groups"] == 5 and second["role"] == "second"
+    assert second["groups"] == 6 and second["role"] == "second"
+    assert second["filter"] == {"language": None, "limit": None, "share": 0.2}
     assert second["parent_batch_id"] == batch["batch_id"]
     # The groups are taken: another batch finds none.
     refused = env.lead.post(
@@ -402,11 +432,22 @@ def test_a_batch_freezes_open_groups_and_samples_a_second_review(env):
 
 def test_batch_filters_and_reviewer_rules(env):
     _basis(env)
-    only = _batch(env, document_ids=[DOC2], limit=1)
+    only = _batch(env, language="de", limit=1)
     assert only["groups"] == 1
-    assert only["filter"]["document_ids"] == [DOC2]
+    assert only["filter"] == {"language": "de", "limit": 1}
+    for removed in (
+        {"layer_id": "hpo"},
+        {"document_ids": [DOC2]},
+        {"stale_only": True},
+    ):
+        refused = env.lead.post(
+            f"{ST}/batches",
+            json={"request_id": f"r-{removed}", "reviewer": "rita", **removed},
+        )
+        assert refused.status_code == 422, removed
+    logged_in(env.app, "nina", projects={}, assignments=[])
     for body, code in (
-        ({"reviewer": "otto"}, "SINGLE_TERM_NOT_A_REVIEWER"),
+        ({"reviewer": "nina"}, "SINGLE_TERM_NOT_A_MEMBER"),
         (
             {"reviewer": "rita", "second_review": {"reviewer": "rita"}},
             "SINGLE_TERM_SAME_REVIEWER",
@@ -418,16 +459,17 @@ def test_batch_filters_and_reviewer_rules(env):
         )
         assert refused.status_code == 422, refused.text
         assert refused.json()["code"] == code
+    # Any member, without a grant.
+    assert _batch(env, "b-otto", reviewer="otto")["groups"] == 5
 
 
 def test_a_reviewer_who_annotated_the_texts_is_flagged(env):
     _basis(env)
-    assert env.lead.put(f"{ST}/reviewers/alice").status_code == 200
     batch = env.lead.post(
         f"{ST}/batches", json={"request_id": "b-alice", "reviewer": "alice"}
     ).json()
     assert batch["warnings"] == [
-        {"code": "SINGLE_TERM_REVIEWER_NOT_INDEPENDENT", "groups": 5}
+        {"code": "SINGLE_TERM_REVIEWER_NOT_INDEPENDENT", "groups": 6}
     ]
     alice = logged_in(env.app, "alice")
     decided = _decide(alice, batch["batch_id"], "d-a", G_SEIZURE, "accept")
@@ -437,7 +479,6 @@ def test_a_reviewer_who_annotated_the_texts_is_flagged(env):
 
 def test_a_second_reviewer_who_annotated_the_texts_is_flagged(env):
     _basis(env)
-    assert env.lead.put(f"{ST}/reviewers/alice").status_code == 200
     batch = env.lead.post(
         f"{ST}/batches",
         json={
@@ -446,9 +487,9 @@ def test_a_second_reviewer_who_annotated_the_texts_is_flagged(env):
             "second_review": {"reviewer": "alice"},
         },
     ).json()
-    # All five groups are sampled (fewer than 50); alice annotated each text.
+    # All six groups are sampled (fewer than 50); alice annotated each text.
     assert batch["warnings"] == [
-        {"code": "SINGLE_TERM_SECOND_REVIEWER_NOT_INDEPENDENT", "groups": 5}
+        {"code": "SINGLE_TERM_SECOND_REVIEWER_NOT_INDEPENDENT", "groups": 6}
     ]
     with env.db.transaction() as conn:
         details = conn.execute(
@@ -457,7 +498,7 @@ def test_a_second_reviewer_who_annotated_the_texts_is_flagged(env):
             )
         ).scalar_one()
     assert details["not_independent_groups"] == 0
-    assert details["second_not_independent_groups"] == 5
+    assert details["second_not_independent_groups"] == 6
 
 
 def test_erasing_a_reviewer_removes_their_username_from_the_batch_audit(env):
@@ -477,34 +518,39 @@ def test_erasing_a_reviewer_removes_their_username_from_the_batch_audit(env):
     assert "reviewer" not in details and details["username"] != "rita"
 
 
-def test_batch_states_submit_reopen_abandon(env):
+def test_a_batch_is_done_when_decided_and_a_lead_may_abandon_it(env):
     _basis(env)
-    batch_id = _batch(env)["batch_id"]
-    submitted = env.rita.post(
-        f"{ST}/batches/{batch_id}/submit", json={"request_id": "s-1"}
-    )
-    assert submitted.status_code == 200 and submitted.json()["state"] == "submitted"
-    refused = _decide(env.rita, batch_id, "d-late", G_SEIZURE, "accept")
-    assert refused.json()["code"] == "SINGLE_TERM_BATCH_NOT_OPEN"
-    # Only a lead reopens or abandons.
+    batch_id = _batch(env, limit=1)["batch_id"]
+    [only] = _groups(env.rita, batch=batch_id)
+    assert _decide(env.rita, batch_id, "d-1", only, "accept").status_code == 200
+    done = env.lead.get(f"{ST}/batches/{batch_id}").json()
+    assert done["state"] == "open" and done["decided"] == done["groups"] == 1
+    # No submit or reopen; Undo (a newer decision) still changes it.
+    for action in ("submit", "reopen"):
+        gone = env.lead.post(
+            f"{ST}/batches/{batch_id}/{action}", json={"request_id": action}
+        )
+        assert gone.status_code in {404, 405}, action
+    assert _decide(env.rita, batch_id, "d-2", only, "withdrawn").status_code == 200
+    assert _decide(env.rita, batch_id, "d-3", only, "accept").status_code == 200
+    assert _groups(env.lead)[only]["state"] == "decided"
+    # Only a lead abandons.
     assert (
-        env.rita.post(f"{ST}/batches/{batch_id}/reopen", json={"request_id": "r-1"})
+        env.rita.post(f"{ST}/batches/{batch_id}/abandon", json={"request_id": "a-0"})
     ).status_code == 403
-    reopened = env.lead.post(
-        f"{ST}/batches/{batch_id}/reopen", json={"request_id": "r-2"}
-    )
-    assert reopened.json()["state"] == "open"
-    assert _decide(env.rita, batch_id, "d-1", G_SEIZURE, "accept").status_code == 200
-    assert _groups(env.lead)[G_SEIZURE]["state"] == "decided"
     abandoned = env.lead.post(
         f"{ST}/batches/{batch_id}/abandon", json={"request_id": "a-1"}
     )
     assert abandoned.json()["state"] == "abandoned"
     # The decisions of an abandoned batch stop counting.
-    assert _groups(env.lead)[G_SEIZURE]["state"] == "open"
-    again = env.lead.post(f"{ST}/batches/{batch_id}/reopen", json={"request_id": "r-3"})
+    assert _groups(env.lead)[only]["state"] in {"open", "blocked"}
+    again = env.lead.post(
+        f"{ST}/batches/{batch_id}/abandon", json={"request_id": "a-2"}
+    )
     assert again.status_code == 409
-    assert again.json()["code"] == "SINGLE_TERM_BATCH_STATE"
+    assert again.json()["code"] == "SINGLE_TERM_BATCH_NOT_OPEN"
+    late = _decide(env.rita, batch_id, "d-late", only, "accept")
+    assert late.json()["code"] == "SINGLE_TERM_BATCH_NOT_OPEN"
     with env.db.transaction() as conn:
         actions = set(
             conn.execute(
@@ -515,8 +561,6 @@ def test_batch_states_submit_reopen_abandon(env):
         )
     assert actions == {
         "project.single_term_batch_create",
-        "project.single_term_batch_submit",
-        "project.single_term_batch_reopen",
         "project.single_term_batch_abandon",
     }
 
@@ -533,7 +577,7 @@ def test_decision_rules_for_blocked_groups_terms_spans_and_reasons(env):
         return response.json()["code"]
 
     # A blocked group: no accept, no term adjustment; a re-cut or a rejection.
-    assert code(_decide(rita, batch_id, "x1", G_NEGATED, "accept")) == (
+    assert code(_decide(rita, batch_id, "x1", G_BLOCKED, "accept")) == (
         "SINGLE_TERM_GROUP_BLOCKED"
     )
     assert (
@@ -542,29 +586,29 @@ def test_decision_rules_for_blocked_groups_terms_spans_and_reasons(env):
                 rita,
                 batch_id,
                 "x2",
-                G_NEGATED,
+                G_BLOCKED,
                 "adjust_term",
-                adjusted_term_id="HP:0000707",
+                adjusted_term_id=SEIZURE,
             )
         )
         == "SINGLE_TERM_GROUP_BLOCKED"
     )
-    negated = _ref(rita, batch_id, G_NEGATED, DOC1)
-    span = {"occurrence_ref": negated["occurrence_ref"]}
-    still_negated = _decide(
+    blocked = _ref(rita, batch_id, G_BLOCKED, DOC1)
+    span = {"occurrence_ref": blocked["occurrence_ref"]}
+    still_blocked = _decide(
         rita,
         batch_id,
         "x3",
-        G_NEGATED,
+        G_BLOCKED,
         "adjust_span",
-        adjusted_span={**span, "start": negated["start"], "end": negated["end"] + 1},
+        adjusted_span={**span, "start": blocked["start"], "end": blocked["end"] + 1},
     )
-    assert code(still_negated) == "SINGLE_TERM_SPAN_NEGATED"
+    assert code(still_blocked) == "SINGLE_TERM_SPAN_OVERLAPS_FINDING"
     outside = _decide(
         rita,
         batch_id,
         "x4",
-        G_NEGATED,
+        G_BLOCKED,
         "adjust_span",
         adjusted_span={**span, "start": 0, "end": 4},
     )
@@ -573,21 +617,38 @@ def test_decision_rules_for_blocked_groups_terms_spans_and_reasons(env):
         rita,
         batch_id,
         "x5",
-        G_NEGATED,
+        G_BLOCKED,
         "adjust_span",
-        adjusted_span={**span, "start": negated["start"], "end": 10_000},
+        adjusted_span={**span, "start": blocked["start"], "end": 10_000},
     )
     assert code(beyond) == "SINGLE_TERM_SPAN_INVALID"
     recut = _decide(
         rita,
         batch_id,
         "x6",
-        G_NEGATED,
+        G_BLOCKED,
         "adjust_span",
-        adjusted_span={**span, "start": negated["start"] + 6, "end": negated["end"]},
+        adjusted_span={
+            **span,
+            "start": blocked["start"],
+            "end": blocked["start"] + len("Status epilepticus"),
+        },
     )
     assert recut.status_code == 200, recut.text
-    assert recut.json()["adjusted_span"]["text"] == "Areflexie"
+    assert recut.json()["adjusted_span"]["text"] == "Status epilepticus"
+    # A span with the negation the term names is accepted as it is (R2).
+    negated = _decide(rita, batch_id, "x6n", G_NEGATED, "accept")
+    assert negated.status_code == 200, negated.text
+    # The removed reject reasons are refused.
+    for reason in (
+        "contains_other_finding",
+        "negation_in_span",
+        "term_wrong_out_of_context",
+    ):
+        refused = _decide(
+            rita, batch_id, f"x-{reason}", G_SEIZURE, "reject", reason=reason
+        )
+        assert refused.status_code == 422, reason
 
     seizure = _ref(rita, batch_id, G_SEIZURE, DOC1)
     overlapping = _decide(
@@ -703,22 +764,22 @@ def test_a_decision_request_is_idempotent(env):
 
 
 def test_a_refresh_opens_only_new_and_stale_groups(env):
-    _basis(env)
+    first = _basis(env)
     batch_id = _batch(env)["batch_id"]
     rita = env.rita
     assert _decide(rita, batch_id, "k1", G_SEIZURE, "accept").status_code == 200
-    negated = _ref(rita, batch_id, G_NEGATED, DOC1)
+    blocked = _ref(rita, batch_id, G_BLOCKED, DOC1)
     assert (
         _decide(
             rita,
             batch_id,
             "k2",
-            G_NEGATED,
+            G_BLOCKED,
             "adjust_span",
             adjusted_span={
-                "occurrence_ref": negated["occurrence_ref"],
-                "start": negated["start"] + 6,
-                "end": negated["end"],
+                "occurrence_ref": blocked["occurrence_ref"],
+                "start": blocked["start"],
+                "end": blocked["start"] + len("Status epilepticus"),
             },
         ).status_code
         == 200
@@ -729,66 +790,63 @@ def test_a_refresh_opens_only_new_and_stale_groups(env):
         ).status_code
         == 200
     )
-    rita.post(f"{ST}/batches/{batch_id}/submit", json={"request_id": "k-s"})
 
-    # Unchanged results: every decision carries over.
-    _basis(env, "basis-2")
+    # Unchanged results: no new basis, every decision holds.
+    assert _basis(env)["basis_id"] == first["basis_id"]
     states = {g: v["state"] for g, v in _groups(env.lead).items()}
-    assert states[G_SEIZURE] == states[G_NEGATED] == states[G_HEARING] == "decided"
+    assert states[G_SEIZURE] == states[G_BLOCKED] == states[G_HEARING] == "decided"
     assert _groups(env.lead)[G_SEIZURE]["unseen_occurrences"] == 0
 
-    # A new text with the phrase and a new final result of the first text: the
-    # accepted group keeps its decision with unseen occurrences; the re-cut
-    # occurrence is gone, so that group is stale.
+    # A new text with the phrase and a new final result of the first text: a
+    # new batch refreshes the basis first. The accepted group keeps its
+    # decision with unseen occurrences; the re-cut occurrence is gone, so
+    # that group is stale and goes into the batch. The groups the open first
+    # batch has not decided stay with it.
     _submit(env, DOC3, "final-3")
     _select(env, DOC3, "final-3")
     _submit(env, DOC1, "final-1b", revision=2)
     _select(env, DOC1, "final-1b", revision=1)
-    _basis(env, "basis-3")
+    stale = _batch(env, "batch-stale")
+    assert stale["basis_id"] != first["basis_id"] and stale["current_basis"] is True
+    assert list(_groups(env.lead, batch=stale["batch_id"])) == [G_BLOCKED]
     groups = _groups(env.lead)
     assert groups[G_SEIZURE]["state"] == "decided"
     assert groups[G_SEIZURE]["occurrences"] == 3
     assert groups[G_SEIZURE]["unseen_occurrences"] == 2
-    assert groups[G_NEGATED]["state"] == "stale"
+    assert groups[G_BLOCKED]["state"] == "stale"
     assert groups[G_HEARING]["state"] == "decided"
     assert groups[G_HYPOTONIA]["state"] == "open"
-    # A new batch takes the open and stale groups only, or the stale ones.
-    stale = _batch(env, "batch-stale", stale_only=True)
-    assert stale["groups"] == 1
-    rest = env.lead.get(f"{ST}/batches/{stale['batch_id']}").json()
-    assert rest["current_basis"] is True
     summary = env.lead.get(f"{ST}/summary").json()
-    assert summary["bases"] == 3
+    assert summary["bases"] == 2
     [german] = summary["languages"]
     assert german["decided"] == 2 and german["stale"] == 1
     assert german["conflicts"] == 2
-    # The stale group is in the open stale batch: no new batch can take it.
-    assert german["available_stale"] == 0
-    assert german["available"] == german["open"] == 2
+    # The stale group is in the new batch, the open ones in the first.
+    assert german["open"] == 3 and german["available"] == 0
 
 
-def test_a_term_adjustment_does_not_carry_onto_a_newly_blocked_group(env):
+def test_a_term_adjustment_does_not_carry_onto_a_newly_blocked_group(env, monkeypatch):
     _basis(env)
     batch_id = _batch(env)["batch_id"]
     adjusted = _decide(
         env.rita, batch_id, "nb1", G_HEARING, "adjust_term", adjusted_term_id=HEARING
     )
     assert adjusted.status_code == 200, adjusted.text
-    env.rita.post(f"{ST}/batches/{batch_id}/submit", json={"request_id": "nb-s"})
-    # The lead adds a cue the phrase holds: the group becomes blocked.
-    settings = env.lead.patch(
-        f"{BASE}/settings",
-        json={"single_term_negation_cues": {"de": ["keine", "hörminderung"]}},
+    # A new final result adds a finding inside the span: the group is blocked.
+    monkeypatch.setitem(
+        FINDINGS,
+        DOC1,
+        [*FINDINGS[DOC1], ("a7", "Hörminderung links", HYPOTONIA, "absent")],
     )
-    assert settings.status_code == 200, settings.text
-    _basis(env, "basis-2")
+    _submit(env, DOC1, "final-1b", revision=2)
+    _select(env, DOC1, "final-1b", revision=1)
+    # Creating a batch refreshes the basis; the group is in it again.
+    again = _batch(env, "batch-nb")
+    assert list(_groups(env.lead, batch=again["batch_id"])) == [G_HEARING]
     group = _groups(env.lead)[G_HEARING]
     # Stale, as the export counts it, so a new batch offers it again.
-    assert group["blocked_reason"] == "negation_in_span"
+    assert group["blocked_reason"] == "contains_other_finding"
     assert group["state"] == "stale"
-    again = _batch(env, "batch-nb", stale_only=True)
-    assert again["groups"] == 1
-    assert list(_groups(env.lead, batch=again["batch_id"])) == [G_HEARING]
 
 
 def test_a_conflict_partner_new_in_a_later_basis_refuses_acceptance(env, monkeypatch):
@@ -799,12 +857,12 @@ def test_a_conflict_partner_new_in_a_later_basis_refuses_acceptance(env, monkeyp
     monkeypatch.setitem(FINDINGS, DOC3, [("c1", "Krampfanfälle", STATUS)])
     _submit(env, DOC3, "final-3")
     _select(env, DOC3, "final-3")
-    _basis(env, "basis-2")
     g_status = group_id("de", "krampfanfälle", STATUS)
-    assert set(_groups(env.lead)[G_SEIZURE]["conflict_with"]) == {g_status}
+    # Creating the batch refreshes the basis.
     new_batch = env.lead.post(
         f"{ST}/batches", json={"request_id": "batch-new", "reviewer": "sam"}
     ).json()
+    assert set(_groups(env.lead)[G_SEIZURE]["conflict_with"]) == {g_status}
     assert list(_groups(env.sam, batch=new_batch["batch_id"])) == [g_status]
     accepted = _decide(env.sam, new_batch["batch_id"], "cf1", g_status, "accept")
     assert accepted.status_code == 200, accepted.text
@@ -862,7 +920,7 @@ def test_summary_reports_second_review_agreement(env):
     assert summary["agreement"]["kappa"] == pytest.approx(
         (2 / 3 - 4 / 9) / (5 / 9), abs=1e-4
     )
-    assert summary["batches"] == {"open": 2, "submitted": 0, "abandoned": 0}
+    assert summary["batches"] == {"open": 2, "abandoned": 0}
 
 
 def test_agreement_without_pairs_or_with_certain_chance():
@@ -886,17 +944,17 @@ def test_permissions_of_lead_reviewer_and_other_member(env):
     for client in (rita, otto):
         assert client.get(f"{ST}/summary").status_code == 403
         assert client.get(f"{ST}/groups").status_code == 403
-        assert client.post(f"{ST}/basis", json={"request_id": "z"}).status_code == 403
-        assert client.get(f"{ST}/reviewers").status_code == 403
-        assert client.put(f"{ST}/reviewers/otto").status_code == 403
+        assert client.post(f"{ST}/basis").status_code == 403
         assert (
             client.post(
                 f"{ST}/batches", json={"request_id": "z", "reviewer": "rita"}
             ).status_code
             == 403
         )
+    # There is no reviewer capability to grant.
+    assert env.lead.get(f"{ST}/reviewers").status_code == 404
     # A reviewer sees their own batch only.
-    assert len(_groups(rita, batch=batch_id)) == 5
+    assert len(_groups(rita, batch=batch_id)) == 6
     assert rita.get(f"{ST}/groups", params={"batch": second}).status_code == 404
     assert (
         rita.get(
@@ -909,63 +967,25 @@ def test_permissions_of_lead_reviewer_and_other_member(env):
     assert _decide(sam, batch_id, "p2", G_SEIZURE, "accept").status_code == 404
     # The lead reads every batch but decides only in their own.
     assert len(env.lead.get(f"{ST}/batches").json()) == 2
-    assert len(_groups(env.lead, batch=second)) == 5
+    assert len(_groups(env.lead, batch=second)) == 6
     assert _decide(env.lead, batch_id, "p3", G_SEIZURE, "accept").status_code == 403
-    # Another member sees nothing.
-    assert otto.get(f"{ST}/batches").status_code == 403
+    # Another member has no batch and sees none of the others.
+    assert otto.get(f"{ST}/batches").json() == []
     assert otto.get(f"{ST}/groups", params={"batch": batch_id}).status_code == 404
-    # A revoked reviewer can no longer decide in, read or submit their batch.
-    assert env.lead.delete(f"{ST}/reviewers/rita").status_code == 200
-    assert _decide(rita, batch_id, "p4", G_SEIZURE, "accept").status_code == 403
-    assert rita.get(f"{ST}/batches/{batch_id}").status_code == 403
-    submitted = rita.post(f"{ST}/batches/{batch_id}/submit", json={"request_id": "p5"})
-    assert submitted.status_code == 403
-    assert env.lead.get(f"{ST}/batches/{batch_id}").json()["state"] == "open"
-    # A lead may review without the capability.
-    own = env.lead.post(
-        f"{ST}/batches",
-        json={"request_id": "lead-own", "reviewer": "leader", "stale_only": False},
-    )
-    assert own.status_code == 409  # every group is in an open batch
-    with env.db.transaction() as conn:
-        actions = list(
-            conn.execute(
-                select(AuditEventRow.action)
-                .where(AuditEventRow.action.like("project.single_term_reviewer%"))
-                .order_by(AuditEventRow.id)
-            ).scalars()
-        )
-    assert actions == [
-        "project.single_term_reviewer_add",
-        "project.single_term_reviewer_add",
-        "project.single_term_reviewer_remove",
-    ]
-
-
-def test_removing_a_member_ends_their_reviewer_capability(env):
+    # Removed from the project, a reviewer can no longer decide in or read
+    # their batch.
     from ontotator.auth.audit import Actor as AuditActor
 
-    memberships = env.app.state.memberships
-    # Losing one role of several keeps the capability.
-    memberships.set_roles(
-        AuditActor.cli(), "proj", "rita", ["annotator", "adjudicator"]
+    env.app.state.memberships.remove(AuditActor.cli(), "proj", "rita")
+    # (Leaving the last project ends the session.)
+    assert _decide(rita, batch_id, "p4", G_SEIZURE, "accept").status_code in {401, 404}
+    assert rita.get(f"{ST}/batches/{batch_id}").status_code in {401, 404}
+    assert env.lead.get(f"{ST}/batches/{batch_id}").json()["state"] == "open"
+    # A lead may review too.
+    own = env.lead.post(
+        f"{ST}/batches", json={"request_id": "lead-own", "reviewer": "leader"}
     )
-    memberships.remove(AuditActor.cli(), "proj", "rita", ["adjudicator"])
-    names = [r["username"] for r in env.lead.get(f"{ST}/reviewers").json()]
-    assert "rita" in names
-    memberships.remove(AuditActor.cli(), "proj", "rita")
-    names = [r["username"] for r in env.lead.get(f"{ST}/reviewers").json()]
-    assert names == ["sam"]
-    # Added again, the person needs a new grant.
-    memberships.set_roles(AuditActor.cli(), "proj", "rita", ["annotator"])
-    assert "rita" not in [r["username"] for r in env.lead.get(f"{ST}/reviewers").json()]
-    with env.db.transaction() as conn:
-        removed = conn.execute(
-            select(AuditEventRow.details).where(
-                AuditEventRow.action == "project.single_term_reviewer_remove"
-            )
-        ).scalar_one()
-    assert removed == {"username": "rita"}
+    assert own.status_code == 409  # every group is in an open batch
 
 
 def test_ancestors_list_the_terms_a_group_can_be_generalised_to(env):
@@ -1028,7 +1048,6 @@ def test_tokens_reach_the_summary_but_never_phrases_or_decisions(env):
     )
     assert token.get(f"{ST}/summary").status_code == 200
     assert token.get(f"{ST}/batches").status_code == 200
-    assert token.get(f"{ST}/reviewers").status_code == 200
     for response in (
         token.get(f"{ST}/groups"),
         token.get(f"{ST}/groups/{G_SEIZURE}/contexts"),
@@ -1041,7 +1060,6 @@ def test_tokens_reach_the_summary_but_never_phrases_or_decisions(env):
                 "phrase_only": "would_accept",
             },
         ),
-        token.post(f"{ST}/batches/{batch_id}/submit", json={"request_id": "t"}),
     ):
         assert response.status_code == 403, response.text
     abandoned = token.post(

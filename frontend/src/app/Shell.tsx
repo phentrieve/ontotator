@@ -129,8 +129,8 @@ export function Shell({ user, projects, route, onNavigate, onLogout, breadcrumb,
   const openReports = useOpenReportCount(user.is_system_admin, navigation);
   // "Documents (n)": rows needing the lead's decision (V3); the summary is lead only.
   const needsDecision = useDocumentsSummary(current?.project_key, !!current?.can_manage && current.roles.includes("lead"));
-  // "Single terms" (issue 381): while the project's setting is on, for leads and granted reviewers.
-  const singleTerms = useSingleTermAccess(current?.project_key);
+  // "Single terms" (issue 381): while the project's setting is on, for leads and members with a batch.
+  const singleTerms = useSingleTermAccess(current?.project_key, !!current?.can_manage);
   const switcher = projects.length > 0 && <ProjectSwitcher projects={projects} current={current} route={route}
     onNavigate={onNavigate} onChoose={key => setChoice({ username: user.username, key })} />;
   const link = (destination: Route, text: string, label?: string) => <li key={destination.name}>

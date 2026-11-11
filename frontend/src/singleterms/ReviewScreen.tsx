@@ -242,18 +242,6 @@ function ReviewContent({ projectKey, batchId, username, canManage, group: initia
     const { note: adjustNote, ...rest } = adjustment;
     void decide([{ group_id: currentGroup.group_id, phrase_only: judged, note: adjustNote.trim() || null, ...rest }], { advance: true });
   };
-  const submitBatch = async () => {
-    if (!batch || busy) return;
-    setBusy(true); setError(undefined);
-    const signature = "submit";
-    const requestId = requests.current.get(signature) ?? newRequestId();
-    requests.current.set(signature, requestId);
-    try {
-      setBatch(await api.singleTermBatchAction(projectKey, batchId, "submit", requestId));
-      requests.current.delete(signature);
-    } catch (failure: unknown) { setError(failure); } finally { setBusy(false); }
-  };
-
   // Step 1 and step 3 keys, only while the review column shows them.
   const reviewing = mode === "review" && !readOnly && !!currentGroup && !decided(currentGroup);
   const step1 = reviewing && !judged;
@@ -306,16 +294,15 @@ function ReviewContent({ projectKey, batchId, username, canManage, group: initia
       <div className="st-row">
         <RouteLink route={{ name: "projectSingleTerms", key: projectKey }} onNavigate={onNavigate}>← Single terms</RouteLink>
         <h1 id={`${id}-title`} style={{ fontSize: "var(--size-md)" }}>Batch #{batch.batch_id} · {language ? languageLabel(language) : batchScope(batch)}{batch.role === "second" ? " · second review" : ""}</h1>
-        <span className="st-muted" role="status">{decidedCount} of {total} decided</span>
+        <span className="st-muted" role="status">{decidedCount} of {total} decided{total > 0 && decidedCount === total ? " · done" : ""}</span>
       </div>
       <div className="st-row">
         <RouteLink route={{ name: "projectGuidelines", key: projectKey }} onNavigate={onNavigate}>Guidelines</RouteLink>
         <HelpLink screen="singleTermReview" />
-        {!readOnly && <Button variant="primary" disabled={decidedCount < total} loading={busy && decidedCount === total} onClick={() => void submitBatch()}
-          title={decidedCount < total ? "Decide every group first." : undefined}>Submit batch</Button>}
       </div>
     </div>
-    {batch.state !== "open" && <InlineMessage tone="info">{batch.state === "submitted" ? "This batch is submitted. A lead can reopen it." : "This batch was abandoned; its decisions no longer count."}</InlineMessage>}
+    {batch.state === "abandoned" && <InlineMessage tone="info">This batch was abandoned; its decisions no longer count.</InlineMessage>}
+    {!readOnly && total > 0 && decidedCount === total && <InlineMessage tone="success">Every group is decided: the batch is done. To change a decision, open the group and undo it.</InlineMessage>}
     {batch.state === "open" && batch.reviewer_username !== username && <InlineMessage tone="info">{`This batch belongs to ${batch.reviewer_username}. You see it read-only.`}</InlineMessage>}
     {last && <p className="st-recorded" role="status">{last.text} {!readOnly && <Button size="sm" variant="quiet" disabled={busy} onClick={() => undo(last.groupId)}>Undo</Button>}</p>}
     <div className="st-review">
@@ -378,7 +365,7 @@ function GroupWork({ id, group, ancestors, judged, readOnly, contexts, contextEr
       <p className="st-row" style={{ margin: 0 }}><strong>{group.label ?? group.term_id}</strong><span className="st-muted">{group.term_id}</span>
         {group.flags.map(flag => <span key={flag} className="st-pill st-pill--neutral">{label(flagLabels, flag)}</span>)}</p>
       {group.surface_variants.length > 1 && <p className="st-small st-muted" style={{ margin: 0 }}>Written as: {group.surface_variants.map(item => `${item.text} (${item.count})`).join(", ")}</p>}
-      {blocked && !isDecided && <p className="st-warn st-small">Blocked: the span {blocked === "negation_in_span" ? "holds a negation cue" : "contains another finding"}. It cannot be accepted as it is; re-cut it or reject it.</p>}
+      {blocked && !isDecided && <p className="st-warn st-small">Blocked: the span contains another finding. It cannot be accepted as it is; re-cut it or reject it.</p>}
       <p className="st-question">{GUIDING_QUESTION}</p>
       {!readOnly && !isDecided && !judged && <div className="st-row" role="group" aria-label="Phrase-only judgment">
         <Button onClick={() => onJudge("would_accept")}>Yes, as a phrase <Kbd>Y</Kbd></Button>

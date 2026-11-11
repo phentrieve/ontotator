@@ -154,12 +154,9 @@ class ProjectRow(Base):
     blind_consolidation: Mapped[bool] = mapped_column(
         Boolean, server_default=text("false")
     )
-    # Issue 381: the single-term review and its negation cues per language.
+    # Issue 381: the single-term review.
     single_term_review: Mapped[bool] = mapped_column(
         Boolean, server_default=text("false")
-    )
-    single_term_negation_cues: Mapped[dict[str, Any]] = mapped_column(
-        server_default=text("'{}'::jsonb")
     )
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())

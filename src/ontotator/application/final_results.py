@@ -484,20 +484,11 @@ class FinalResultService:
         )
         return sid, digest, payload
 
-    def freeze_current(
-        self, conn: Connection, key: str, pid: int, request: dict[str, Any]
-    ) -> tuple[str, str, dict[str, Any]]:
-        """A snapshot of the current final selections without an export job
-        or acknowledgements (the single-term review basis, #381). The caller
-        holds the project lock (``authorize``)."""
-        state = self._projection(conn, key, pid)
-        if not state["selections"]:
-            raise DomainError(
-                "SINGLE_TERM_NO_FINAL_RESULTS",
-                "Accept at least one final result before starting the"
-                " single-term review.",
-            )
-        return self.insert_snapshot(conn, key, pid, state, request)
+    def current_state(self, conn: Connection, key: str, pid: int) -> dict[str, Any]:
+        """The current final selections, as a snapshot would freeze them (the
+        single-term review basis, #381). The caller holds the project lock
+        (``authorize``)."""
+        return self._projection(conn, key, pid)
 
     def authorize(self, conn: Connection, key: str) -> int:
         """The project id after the lead check, with the project lock held."""
@@ -517,11 +508,9 @@ class FinalResultService:
             freeze_decisions,
         )
 
-        enabled, cues = conn.execute(
-            select(
-                ProjectRow.single_term_review, ProjectRow.single_term_negation_cues
-            ).where(ProjectRow.id == pid)
-        ).one()
+        enabled = conn.execute(
+            select(ProjectRow.single_term_review).where(ProjectRow.id == pid)
+        ).scalar_one()
         if not enabled:
             if request.get("format") == SINGLE_TERM_REQUEST_FORMAT:
                 raise DomainError(
@@ -529,7 +518,7 @@ class FinalResultService:
                     "The single-term review is off in this project's settings.",
                 )
             return None
-        return freeze_decisions(conn, pid, cues)
+        return freeze_decisions(conn, pid)
 
     def freeze(self, key: str, request: dict[str, Any]) -> dict[str, int]:
         with self.db.transaction() as conn:

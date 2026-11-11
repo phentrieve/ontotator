@@ -194,11 +194,11 @@ A final result holds something a Phenopacket cannot, for example findings of one
 
 ### I do not see "Single terms", or it says the single-term review is off
 
-The single-term review is off in this project. A lead turns it on under **Settings**, tab **Workflow**, card **Single-term review**; practice projects cannot use it. A member who is not a lead also needs to be ticked under **Single-term reviewers** on **People**. See [Turn on the single-term review](lead-single-terms.md#turn-on-the-single-term-review).
+The single-term review is off in this project. A lead turns it on under **Settings**, tab **Workflow**, card **Single-term review**; practice projects cannot use it. A member who is not a lead sees it once a lead has given them a review batch. See [Turn on the single-term review](lead-single-terms.md#turn-on-the-single-term-review).
 
 ### I cannot accept a single-term group: "This group is blocked"
 
-The phrase overlaps another finding or holds a negation cue of its language. Use **Adjust…** to re-cut the passage so that it no longer does, or reject the group. Choosing a more general term does not lift the block. See [Blocked groups](lead-single-terms.md#blocked-groups).
+The phrase overlaps another finding of its text. Use **Adjust…** to re-cut the passage so that it no longer does, or reject the group. A negation inside the phrase never blocks it. Choosing a more general term does not lift the block. See [Blocked groups](lead-single-terms.md#blocked-groups).
 
 ### I cannot remove a lead
 

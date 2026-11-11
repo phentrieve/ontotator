@@ -8,8 +8,8 @@ It reads the same frozen snapshot as the final export. The candidates are
 derived from the snapshot's selected results with the review's own
 derivation (``exchange.single_terms``, the final export's conversion), and
 the single-term decisions frozen into the snapshot when the export was
-requested (``single_term_decisions``: their ids, digest and the negation
-cues in force) are applied to them. A decision recorded after the request
+requested (``single_term_decisions``: their ids and digest) are applied to
+them. A decision recorded after the request
 is not in the snapshot and so not in the file; the same snapshot always
 gives the same file.
 
@@ -146,20 +146,16 @@ def _stable(record: Mapping[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in record.items() if k not in _RENUMBERED}
 
 
-def freeze_decisions(
-    conn: Connection, pid: int, cues: Mapping[str, Sequence[str]]
-) -> dict[str, Any]:
+def freeze_decisions(conn: Connection, pid: int) -> dict[str, Any]:
     """The snapshot payload entry: the decisions that count now (their ids
     at the time, and per decision the digest of its content, which survives
-    a project archive import), the digest of their content and the negation
-    cues in force."""
+    a project archive import) and the digest of their content."""
     records = [decision_record(row) for row in counted_decisions(conn, pid)]
     stable = [_stable(record) for record in records]
     return {
         "ids": [record["id"] for record in records],
         "records": [state_digest(record) for record in stable],
         "sha256": state_digest(stable),
-        "negation_cues": {lang: list(items) for lang, items in sorted(cues.items())},
     }
 
 
@@ -679,7 +675,9 @@ def _readme(
             "layers in the selected final results whose assertion is present "
             "and whose experiencer is the patient, with one continuous span "
             "that no other finding shares; report.json counts what each rule "
-            "left out. Occurrences of the same phrase (ignoring case, soft "
+            "left out. A span that overlaps another finding is blocked until "
+            "it is re-cut; a negation the term itself names stays in the "
+            "phrase. Occurrences of the same phrase (ignoring case, soft "
             "hyphens and runs of whitespace) with the same term form a group.",
             "- ",
             "  ",
@@ -779,11 +777,7 @@ def final_single_term_export(job: Job, ctx: JobContext) -> dict[str, Any]:
     units = source_units(
         payload, frozen.selected_content.submissions, built.units, built.views
     )
-    derivation = derive_candidates(
-        units,
-        negation_cues=frozen_decisions["negation_cues"],
-        bundle_id=bundle_id,
-    )
+    derivation = derive_candidates(units, bundle_id=bundle_id)
     result = build_cases(
         derivation,
         {unit.submission_id: unit for unit in units},
@@ -814,7 +808,6 @@ def final_single_term_export(job: Job, ctx: JobContext) -> dict[str, Any]:
             "ids": [decision["id"] for decision in decisions],
             "sha256": frozen_decisions["sha256"],
         },
-        "negation_cues": frozen_decisions["negation_cues"],
         "selections": payload["state"]["selections"],
         "omissions": payload["state"]["omissions"],
         **({"planned_out": payload["planned_out"]} if "planned_out" in payload else {}),

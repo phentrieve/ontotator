@@ -2,10 +2,9 @@
 
 A single-term review judges phrase-term groups derived from a frozen
 final-result snapshot (a *basis*). The basis, the batches and the decisions
-are append-only history; the state of a batch (open, submitted, abandoned)
-is the one mutable row, in ``single_term_batch_state`` (pattern
-``work_rounds``/``work_round_state``). ``single_term_reviewers`` holds the
-project capability "single-term reviewer" a lead grants to members.
+are append-only history; the state of a batch (open or abandoned) is the
+one mutable row, in ``single_term_batch_state`` (pattern
+``work_rounds``/``work_round_state``). Every project member may review.
 
 A decision belongs to a phrase-term group across texts, not to a text: the
 newest decision per (project, group, role) wins.
@@ -29,16 +28,13 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ontotator.storage.tables import SCHEMA, Base
 
 BATCH_ROLES = ("primary", "second")
-BATCH_STATES = ("open", "submitted", "abandoned")
+BATCH_STATES = ("open", "abandoned")
 PHRASE_ONLY = ("would_accept", "would_reject")
 DECISIONS = ("accept", "adjust_span", "adjust_term", "reject", "withdrawn")
 REJECT_REASONS = (
     "needs_context",
     "ambiguous_abbreviation",
     "too_general",
-    "term_wrong_out_of_context",
-    "contains_other_finding",
-    "negation_in_span",
     "needs_rewrite",
     "conflict",
     "other",
@@ -49,28 +45,11 @@ def _in(values: tuple[str, ...]) -> str:
     return "(" + ", ".join(f"'{value}'" for value in values) + ")"
 
 
-class SingleTermReviewerRow(Base):
-    """A member a lead made single-term reviewer of the project."""
-
-    __tablename__ = "single_term_reviewers"
-    project_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey(f"{SCHEMA}.projects.id"), primary_key=True
-    )
-    user_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey(f"{SCHEMA}.users.id"), primary_key=True
-    )
-    added_by: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey(f"{SCHEMA}.users.id")
-    )
-    added_at: Mapped[datetime] = mapped_column(server_default=func.now())
-
-
 class SingleTermBasisRow(Base):
     """A frozen final-result snapshot the candidates are derived from.
 
     ``derivation_sha256`` is the digest of the derivation (groups and
-    report); a recomputation from the snapshot and ``negation_cues`` must
-    give the same digest. ``report`` holds counts only.
+    report); a recomputation from the snapshot must give the same digest. ``report`` holds counts only.
     """
 
     __tablename__ = "single_term_bases"
@@ -83,7 +62,6 @@ class SingleTermBasisRow(Base):
         ForeignKey(f"{SCHEMA}.export_selection_snapshots.snapshot_id")
     )
     derivation_sha256: Mapped[str]
-    negation_cues: Mapped[dict[str, Any]]
     report: Mapped[dict[str, Any]]
     created_by: Mapped[int] = mapped_column(
         BigInteger, ForeignKey(f"{SCHEMA}.users.id")
@@ -129,7 +107,7 @@ class SingleTermBatchRow(Base):
 
 
 class SingleTermBatchStateRow(Base):
-    """The one mutable fact of a batch: open, submitted or abandoned."""
+    """The one mutable fact of a batch: open or abandoned."""
 
     __tablename__ = "single_term_batch_state"
     __table_args__ = (CheckConstraint(f"state IN {_in(BATCH_STATES)}", name="state"),)

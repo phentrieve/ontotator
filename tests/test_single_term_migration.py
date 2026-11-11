@@ -25,7 +25,6 @@ REVISION = "0039"
 PREVIOUS = "0038"
 S = "ontotator"
 TABLES = (
-    "single_term_reviewers",
     "single_term_bases",
     "single_term_batches",
     "single_term_batch_state",
@@ -81,13 +80,12 @@ def test_upgrade_adds_columns_and_tables_and_downgrade_restores(tmp_path: Path):
             assert _tables(conn) == set(TABLES)
             row = _exec(
                 conn,
-                f"SELECT single_term_review, single_term_negation_cues FROM {S}.projects",
+                f"SELECT single_term_review FROM {S}.projects",
             ).one()
-            assert tuple(row) == (False, {})
+            assert tuple(row) == (False,)
             assert "single_term_batch_state" in _function(
                 conn, "delete_practice_project"
             )
-            assert "'single_term_reviewers'" in _function(conn, "delete_empty_project")
             command.downgrade(alembic_config(conn), PREVIOUS)
         with engine.begin() as conn:
             assert _tables(conn) == set()
@@ -133,8 +131,8 @@ def _review_rows(conn: Connection, pid: int, user_id: int) -> None:
     basis = _exec(
         conn,
         f"INSERT INTO {S}.single_term_bases (project_id, snapshot_id,"
-        " derivation_sha256, negation_cues, report, created_by)"
-        " VALUES (:p, :sid, 'd', '{}', '{}', :u) RETURNING id",
+        " derivation_sha256, report, created_by)"
+        " VALUES (:p, :sid, 'd', '{}', :u) RETURNING id",
         p=pid,
         sid=f"snap-{pid}",
         u=user_id,
@@ -191,23 +189,3 @@ def test_deleting_a_practice_project_clears_its_review_rows(app: FastAPI) -> Non
         for table in TABLES:
             left = _exec(conn, f"SELECT count(*) FROM {S}.{table}").scalar_one()
             assert left == 0, table
-
-
-def test_single_term_reviewers_are_setup_of_an_empty_project(app: FastAPI) -> None:
-    ensure_user(app, "lea")
-    assert grant(app, "lea", "real", ["lead"])
-    pid = _pid(app, "real")
-    user_id = app.state.accounts.get_by_username("lea").id
-    db = app.state.repo.db
-    with db.transaction() as conn:
-        _exec(
-            conn,
-            f"INSERT INTO {S}.single_term_reviewers (project_id, user_id)"
-            " VALUES (:p, :u)",
-            p=pid,
-            u=user_id,
-        )
-    with db.transaction() as conn:
-        result = _exec(conn, f"SELECT {S}.delete_empty_project(:p)", p=pid).scalar_one()
-    assert result["deleted"] is True, result
-    assert result["rows"]["single_term_reviewers"] == 1

@@ -2803,8 +2803,9 @@
         "tags": [
           "single-terms"
         ],
-        "summary": "Start Basis",
-        "operationId": "start_basis_api_v1_projects__key__single_terms_basis_post",
+        "summary": "Refresh Basis",
+        "description": "The newest basis, refreshed when the accepted final results changed;\nnull while there is no final result.",
+        "operationId": "refresh_basis_api_v1_projects__key__single_terms_basis_post",
         "parameters": [
           {
             "name": "key",
@@ -2816,23 +2817,21 @@
             }
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SingleTermCommandRequest"
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SingleTermBasisView"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/SingleTermBasisView"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Refresh Basis Api V1 Projects  Key  Single Terms Basis Post"
                 }
               }
             }
@@ -3311,131 +3310,6 @@
         "x-ontotator-project-token": true
       }
     },
-    "/api/v1/projects/{key}/single-terms/batches/{batch_id}/submit": {
-      "post": {
-        "tags": [
-          "single-terms"
-        ],
-        "summary": "Submit Batch",
-        "operationId": "submit_batch_api_v1_projects__key__single_terms_batches__batch_id__submit_post",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Key"
-            }
-          },
-          {
-            "name": "batch_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Batch Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SingleTermCommandRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SingleTermBatchView"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-ontotator-scope": "session"
-      }
-    },
-    "/api/v1/projects/{key}/single-terms/batches/{batch_id}/reopen": {
-      "post": {
-        "tags": [
-          "single-terms"
-        ],
-        "summary": "Reopen Batch",
-        "operationId": "reopen_batch_api_v1_projects__key__single_terms_batches__batch_id__reopen_post",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Key"
-            }
-          },
-          {
-            "name": "batch_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Batch Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SingleTermCommandRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SingleTermBatchView"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-ontotator-scope": "project-admin",
-        "x-ontotator-project-token": true
-      }
-    },
     "/api/v1/projects/{key}/single-terms/batches/{batch_id}/abandon": {
       "post": {
         "tags": [
@@ -3559,166 +3433,6 @@
           }
         },
         "x-ontotator-scope": "session"
-      }
-    },
-    "/api/v1/projects/{key}/single-terms/reviewers": {
-      "get": {
-        "tags": [
-          "single-terms"
-        ],
-        "summary": "Reviewers",
-        "operationId": "reviewers_api_v1_projects__key__single_terms_reviewers_get",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Key"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/SingleTermReviewerView"
-                  },
-                  "title": "Response Reviewers Api V1 Projects  Key  Single Terms Reviewers Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-ontotator-scope": "read",
-        "x-ontotator-project-token": true
-      }
-    },
-    "/api/v1/projects/{key}/single-terms/reviewers/{username}": {
-      "put": {
-        "tags": [
-          "single-terms"
-        ],
-        "summary": "Grant Reviewer",
-        "operationId": "grant_reviewer_api_v1_projects__key__single_terms_reviewers__username__put",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Key"
-            }
-          },
-          {
-            "name": "username",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Username"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/SingleTermReviewerView"
-                  },
-                  "title": "Response Grant Reviewer Api V1 Projects  Key  Single Terms Reviewers  Username  Put"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-ontotator-scope": "project-admin",
-        "x-ontotator-project-token": true
-      },
-      "delete": {
-        "tags": [
-          "single-terms"
-        ],
-        "summary": "Revoke Reviewer",
-        "operationId": "revoke_reviewer_api_v1_projects__key__single_terms_reviewers__username__delete",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Key"
-            }
-          },
-          {
-            "name": "username",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Username"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/SingleTermReviewerView"
-                  },
-                  "title": "Response Revoke Reviewer Api V1 Projects  Key  Single Terms Reviewers  Username  Delete"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-ontotator-scope": "project-admin",
-        "x-ontotator-project-token": true
       }
     },
     "/api/v1/projects/{key}/documents/{doc}/submissions/{submission_id}": {
@@ -23898,16 +23612,6 @@
             "type": "boolean",
             "title": "Single Term Review"
           },
-          "single_term_negation_cues": {
-            "additionalProperties": {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            "type": "object",
-            "title": "Single Term Negation Cues"
-          },
           "hidden_axis_values": {
             "additionalProperties": {
               "additionalProperties": {
@@ -24078,16 +23782,6 @@
           "single_term_review": {
             "type": "boolean",
             "title": "Single Term Review"
-          },
-          "single_term_negation_cues": {
-            "additionalProperties": {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            "type": "object",
-            "title": "Single Term Negation Cues"
           },
           "hidden_axis_values": {
             "additionalProperties": {
@@ -27169,38 +26863,6 @@
             ],
             "title": "Language"
           },
-          "layer_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 200
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Layer Id"
-          },
-          "document_ids": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array",
-                "maxItems": 10000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Document Ids"
-          },
-          "stale_only": {
-            "type": "boolean",
-            "title": "Stale Only",
-            "default": false
-          },
           "limit": {
             "anyOf": [
               {
@@ -27232,7 +26894,7 @@
           "reviewer"
         ],
         "title": "SingleTermBatchRequest",
-        "description": "A new batch: the open and stale groups of the newest basis that match\nevery given filter (and are in no other open primary batch)."
+        "description": "A new batch: the open and stale groups of the newest basis (of one\nlanguage, when given; at most ``limit``) in no other open primary batch."
       },
       "SingleTermBatchView": {
         "properties": {
@@ -27282,7 +26944,6 @@
             "type": "string",
             "enum": [
               "open",
-              "submitted",
               "abandoned"
             ],
             "title": "State"
@@ -27518,9 +27179,6 @@
                   "needs_context",
                   "ambiguous_abbreviation",
                   "too_general",
-                  "term_wrong_out_of_context",
-                  "contains_other_finding",
-                  "negation_in_span",
                   "needs_rewrite",
                   "conflict",
                   "other"
@@ -27636,9 +27294,6 @@
                   "needs_context",
                   "ambiguous_abbreviation",
                   "too_general",
-                  "term_wrong_out_of_context",
-                  "contains_other_finding",
-                  "negation_in_span",
                   "needs_rewrite",
                   "conflict",
                   "other"
@@ -27890,10 +27545,6 @@
           "available": {
             "type": "integer",
             "title": "Available"
-          },
-          "available_stale": {
-            "type": "integer",
-            "title": "Available Stale"
           }
         },
         "type": "object",
@@ -27906,34 +27557,9 @@
           "decided",
           "stale",
           "conflicts",
-          "available",
-          "available_stale"
+          "available"
         ],
         "title": "SingleTermLanguageCounts"
-      },
-      "SingleTermReviewerView": {
-        "properties": {
-          "username": {
-            "type": "string",
-            "title": "Username"
-          },
-          "pseudonym": {
-            "type": "string",
-            "title": "Pseudonym"
-          },
-          "added_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Added At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "username",
-          "pseudonym",
-          "added_at"
-        ],
-        "title": "SingleTermReviewerView"
       },
       "SingleTermSecondReviewRequest": {
         "properties": {
@@ -27942,13 +27568,6 @@
             "maxLength": 200,
             "minLength": 1,
             "title": "Reviewer"
-          },
-          "share": {
-            "type": "number",
-            "maximum": 1.0,
-            "exclusiveMinimum": 0.0,
-            "title": "Share",
-            "default": 0.2
           }
         },
         "additionalProperties": false,

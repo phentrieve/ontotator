@@ -127,8 +127,7 @@ ARCHIVED: tuple[ArchivedTable, ...] = (
     # Working time (#298): append-only, inserted with their recorded times.
     ArchivedTable("work_time_events"),
     ArchivedTable("work_intervals"),
-    # Single-term review (#381): reviewers, bases, batches and decisions.
-    ArchivedTable("single_term_reviewers"),
+    # Single-term review (#381): bases, batches and decisions.
     ArchivedTable("single_term_bases"),
     ArchivedTable("single_term_batches"),
     ArchivedTable(

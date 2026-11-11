@@ -14,9 +14,8 @@ import { draftPins, PinFields, ProfileUpload, ReleaseFields, serializePins, ANNO
 import { RepinReportPanel } from "./RepinReport";
 import { FrozenTranslationsCard } from "./FrozenTranslationsCard";
 import { axisOptionLabel } from "../editor/axisLabels";
-import { cueLanguages, SingleTermSettingsCard, singleTermDirty, singleTermOf, singleTermPatch } from "../singleterms/SingleTermSettings";
+import { SingleTermSettingsCard, singleTermOf } from "../singleterms/SingleTermSettings";
 import { notifySingleTermsChanged } from "../singleterms/useSingleTermAccess";
-import { SingleTermReviewersCard } from "../singleterms/SingleTermReviewersCard";
 export interface ProjectSettingsPageProps {
   projectKey: string;
   currentUser: CurrentUser;
@@ -128,7 +127,7 @@ function SettingsEditor({ initial, ontologies, projectKey, currentUser, onSaved,
     General: () => api.updateProjectSettings(projectKey, { name: general.name, description: general.description.trim() ? general.description : null, languages: general.languages }),
     Annotation: () => api.updateProjectSettings(projectKey, annotation),
     Workflow: () => api.updateProjectSettings(projectKey, { import_plan: workflow.import_plan, annotations_per_text: workflow.annotations_per_text, tool_proposal_mode: workflow.tool_proposal_mode, annotate_accepted_translations_only: workflow.annotate_accepted_translations_only, adjudicator_not_annotator: workflow.adjudicator_not_annotator, blind_consolidation: workflow.blind_consolidation, record_working_time: workflow.record_working_time }),
-    SingleTerm: () => api.updateProjectSettings(projectKey, singleTermPatch(singleTerm)),
+    SingleTerm: () => api.updateProjectSettings(projectKey, singleTerm),
     // The check first: a move that touches drafts, or any move once work was submitted, waits for the lead's look.
     Pins: async () => {
       const chosen = serializePins(ids, pins);
@@ -147,7 +146,7 @@ function SettingsEditor({ initial, ontologies, projectKey, currentUser, onSaved,
     General: JSON.stringify(general) !== JSON.stringify(generalOf(model)),
     Annotation: JSON.stringify(annotation) !== JSON.stringify(annotationOf(model)),
     Workflow: JSON.stringify(workflow) !== JSON.stringify(workflowOf(model)),
-    SingleTerm: singleTermDirty(singleTerm, singleTermOf(model)),
+    SingleTerm: singleTerm.single_term_review !== singleTermOf(model).single_term_review,
     Pins: JSON.stringify(pins) !== JSON.stringify(draftPins(model.pins)),
     Profile: !model.locked && uploaded !== null,
   };
@@ -244,7 +243,7 @@ function SettingsEditor({ initial, ontologies, projectKey, currentUser, onSaved,
 
   let content: JSX.Element;
   switch (section) {
-    case "people": content = <div ref={bindSection} tabIndex={-1} className="settings-section"><MembersSection projectKey={projectKey} /><SingleTermReviewersCard projectKey={projectKey} /><TokensSection mode={{ kind: "project", projectKey }} /></div>; break;
+    case "people": content = <div ref={bindSection} tabIndex={-1} className="settings-section"><MembersSection projectKey={projectKey} /><TokensSection mode={{ kind: "project", projectKey }} /></div>; break;
     case "workflow": content = <><form ref={bindSection} tabIndex={-1} className="settings-section" aria-label="Workflow" onSubmit={event => submit(event, "Workflow")}>
       <fieldset disabled={busy !== null}><legend className="visually-hidden">Workflow</legend>
         <WorkflowFields projectKey={projectKey} value={workflow} saved={workflowOf(model)} disabled={busy !== null} onChange={value => { setWorkflow(value); setSaved(null); }} />
@@ -254,7 +253,7 @@ function SettingsEditor({ initial, ontologies, projectKey, currentUser, onSaved,
     {/* Issue 381: its own form and Save, so the workflow fields above keep their change. */}
     <form className="settings-section" aria-label="Single-term review" onSubmit={event => submit(event, "SingleTerm")}>
       <fieldset disabled={busy !== null}><legend className="visually-hidden">Single-term review</legend>
-        <SingleTermSettingsCard value={singleTerm} languages={cueLanguages(model)} disabled={busy !== null} onChange={value => { setSingleTerm(value); setSaved(null); }} />
+        <SingleTermSettingsCard value={singleTerm} disabled={busy !== null} onChange={value => { setSingleTerm(value); setSaved(null); }} />
         {saveBar("SingleTerm")}
       </fieldset>
     </form></>; break;
