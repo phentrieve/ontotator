@@ -98,6 +98,7 @@ import { TermName } from "../editor/TermName";
 import { TextPane } from "../editor/TextPane";
 import { Kbd } from "../ui/Kbd";
 import { TreeBrowser } from "../editor/TreeBrowser";
+import { CopyTextButton } from "../editor/CopyTextButton";
 import { useTermLabels } from "../editor/useTermLabels";
 import { ModifiersSection } from "../editor/ModifiersSection";
 import { AttachModePanel, attachCopy } from "../editor/AttachModePanel";
@@ -2248,15 +2249,37 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   };
 
   // An open tree follows the selection: another own annotation with a term starts a new
-  // walk there. Anything else (a proposal, a reference, nothing) leaves the tree as it is.
+  // walk there. Anything else (a proposal, a reference, nothing) closes it: there it could
+  // assign nothing. While a new finding's term is searched it only steps aside (see above).
   const followAnnotationId = treeAnnotation?.annotation.term_id ? treeAnnotation.annotation.annotation_id : null;
   useEffect(() => {
-    if (!treeWalk || !treeAnnotation || !followAnnotationId) return;
+    if (!treeWalk || pendingAnnotation) return;
+    if (!treeAnnotation || !followAnnotationId) { handleCloseTree(); return; }
     if (followAnnotationId === treeWalk.annotationId) return;
     startTreeWalk(treeAnnotation, false);
     // Only a change of the selected annotation moves the tree, not an edit of it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [followAnnotationId]);
+
+  // Ctrl+C (Cmd+C) with nothing else selected copies the active passage, to look it up elsewhere: the marked
+  // text of a new finding, else the selected (or first) mention of the selected finding. Several segments are
+  // joined by a space, as a web search reads them. A selection of its own (a field, the page) copies as usual.
+  const passageRef = useRef("");
+  const passageRefs = selectedAnnotation?.annotation.evidence_refs ?? [];
+  const passageSegments = pendingAnnotation?.segments?.length ? pendingAnnotation.segments
+    : allEvidenceMap[(passageRefs.find(ref => ref.evidence_id === selectedEvidenceId) ?? passageRefs[0])?.evidence_id ?? ""]?.mention.segments;
+  passageRef.current = passageSegments?.length ? quoteOf(view.document.text, passageSegments, " ") : "";
+  useEffect(() => {
+    const copyPassage = (event: ClipboardEvent) => {
+      const active = document.activeElement;
+      if ((active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) && active.selectionStart !== active.selectionEnd) return;
+      if (window.getSelection()?.toString() || !passageRef.current || !event.clipboardData) return;
+      event.clipboardData.setData("text/plain", passageRef.current);
+      event.preventDefault();
+    };
+    document.addEventListener("copy", copyPassage);
+    return () => document.removeEventListener("copy", copyPassage);
+  }, []);
 
   /** One set_axes for `annotationId` (default: the selected finding); false when nothing was sent. */
   const handleUpdateAxes = async (axesValues: Partial<AxesValues>, confirmedAxisIds?: string[], annotationId = selectedAnnotationId): Promise<boolean> => {
@@ -4164,6 +4187,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
             <span className="pending-bar__text">New finding “{quoteSegments(view.document.text, pendingAnnotation!.segments, 40)}”</span>
             <Button type="button" variant="primary" size="sm" onClick={chooseTerm}>Choose term</Button>
             <Button type="button" variant="secondary" size="sm" onClick={discardPending}>Discard</Button>
+            <CopyTextButton text={passageRef.current} onAnnounce={announceCarried} />
           </div>
         )}
 
@@ -4245,6 +4269,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
                 {pendingIsMarkedSpan
                   ? <>
                     <p className="pending-quote">“{quoteSegments(view.document.text, pendingAnnotation.segments)}”</p>
+                    <CopyTextButton text={passageRef.current} onAnnounce={announceCarried} />
                     <p className="form-hint">Adjust the marked text with its edge handles, or mark new text to replace it.</p>
                   </>
                   : <p>
@@ -4460,6 +4485,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
               onDeselect={handleDeselectAll}
               onShowInTree={handleShowInTree}
               onSelectEvidence={(evId) => setSelectedEvidenceId(evId)}
+              onCopyAnnounce={announceCarried}
               onUpdateTerm={(...args) => { void handleUpdateTerm(...args).catch(reportError); }}
               onUpdateAxes={(axesValues) => handleUpdateAxes(axesValues, undefined, selectedAnnotationId)
                 .catch(error => { reportError(error); throw error; })}

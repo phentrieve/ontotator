@@ -109,6 +109,8 @@ What for: record a term that the text mentions.
 
 To drop a mark without adding a finding, click **Discard** or press Esc.
 
+To look the marked words up elsewhere, for example in a web search, click **Copy text** or press `Ctrl+C` (`Cmd+C` on a Mac). Both copy the marked text of the new finding, or the selected (otherwise the first) mention of the selected finding; parts of a mention with words in between are joined by a space. Text you have selected in a field is copied as usual. **Copy text** is also at each mention under **Mentions**.
+
 ## Search a term
 
 What for: find the right ontology term quickly.
@@ -134,6 +136,8 @@ What for: pick a broader or narrower term than the one you have.
 2. Click a term in the tree. Its **Synonyms**, **Translated names** and other parents (**Also under**) are shown.
 3. Click **Use this term** to give the selected finding this term.
 4. Click **Close tree**.
+
+The tree follows your work: select another finding and it opens at that finding's term. After **Use this term** it stays open and marks the new term as the current one. While you search a term for a new finding it steps aside and comes back afterwards. Select a proposal or a reference, or clear the selection, and it closes.
 
 ## Set values and confirm defaults
 
