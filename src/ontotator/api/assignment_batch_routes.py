@@ -167,6 +167,9 @@ class BatchTargetView(BaseModel):
     document_id: str
     version: int
     remaining: int
+    # Annotate: the text's "Annotations per text" (its override, else the
+    # project value; issue 422). Other tasks: 1.
+    per_text: int
     usernames: list[str]
     # Annotate: the rule is off and the translation is not accepted (the
     # dialog's acknowledgement, spec 2026-10-25 §2).
@@ -199,7 +202,12 @@ class BatchPreview(BaseModel):
     targets: list[BatchTargetView]
     skipped: list[BatchSkipView]
     people: list[BatchPersonView]
+    # Annotate: the "Annotations per text" the selected texts share (issue
+    # 422: a text's override replaces the project value), else the project
+    # value; other tasks: 1.
     per_text: int
+    # The project's "Annotations per text" (the texts without an override).
+    project_per_text: int
     digest: str
     # "Split evenly" with too few people: the most open slots of one target
     # ("Choose at least n annotators for n annotations per text"); no usernames.

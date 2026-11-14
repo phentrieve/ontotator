@@ -173,6 +173,7 @@ In the card:
 - **Other languages** switches to another language of the same case. Below 700 px width it shares a line with **Open text**.
 - Your steps stand where they act. An open problem report is a notice above the path with **Open** and **Decide on report…**. Other steps stand at the top of their part under *Next step*, for example **Resolve…** in **Translation** or **Carry to v2…** in **Annotation**. A part's other actions share its action row, for example **Open result** and **Change final…** in **Finalization**.
 - Every person's remove action is **Remove…**. Its dialog says what happens: an unsubmitted annotation is removed with its draft; other work is revoked and stays in the history.
+- In **Annotation**, a text with tool proposals names the proposal set its annotators work on, for example *Proposals set 2026-10-02 (phentrieve 1.4), 24 proposals*. When a newer set was imported for the text, *Newer set available: 2026-11-10* follows, with **How to use it** ([Work from new tool proposals](lead-change-course.md#work-from-new-tool-proposals)). A person's row names the set only when it differs from the text's, for example *newest set*.
 - In **Finalization**, **Open consolidation** opens your own running consolidation as your task; a submitted one opens read-only.
 - In **Finalization**, when submissions differ, the agreement line is followed by the findings that differ in detail; a term and its parent or child on the same passage are named as *Related terms: …* (see [Accept a result or compare results](lead-results.md#accept-a-result-or-compare-results)).
 - ✕ or Esc closes the card.
@@ -340,7 +341,12 @@ What for: assign a single review or annotation.
 2. Tick the people. To annotate yourself without the Annotator role, click **Add me as annotator**.
 3. Click the assign button, for example *Assign 2 people*.
 
-To change the limit of annotators per text from here, click the info button (i) next to the limit, then **Change for all texts**.
+To change the limit of annotators per text from here, click the info button (i) next to the limit and enter the number:
+
+- **Only for the selected text** (with several texts: **Only for the selected texts**) gives these texts their own limit, for example 4 annotators on one text for a method comparison in a project with 1. Click the button that names the number of texts, for example *Change for 1 text*. The text keeps its own value for every version, also a corrected one; the project setting and the other texts stay as they are. Entering the project's number again returns the text to the project setting.
+- **For all texts** changes the project setting. Click **Change for all texts**. Texts with their own value keep it.
+
+The text card then shows *Annotators: 4 for this text (project: 1)* in **Annotation**. Lowering the number removes nobody: annotators already assigned stay. The audit trail records a text's own value as *Annotators per text changed for one text*.
 
 ### Distribute work evenly
 

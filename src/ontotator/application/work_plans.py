@@ -62,6 +62,11 @@ from ontotator.storage.final_tables import FinalSelectionRow
 from ontotator.storage.plan_tables import DiscardedVariantRow
 from ontotator.storage.repository import _lock_id
 from ontotator.storage.tables import AssignmentRow, DocumentRow, ProjectRow
+from ontotator.storage.text_settings import (
+    per_text_override,
+    per_text_overrides,
+    write_per_text,
+)
 
 if TYPE_CHECKING:
     from ontotator.api.work_plan_routes import (
@@ -1123,14 +1128,78 @@ class WorkPlanService:
                 .all()
             )
             discarded = set(store.discarded(conn, pid))
+            # Texts with their own limit keep it (issue 422).
+            own = per_text_overrides(conn, pid)
             over = sum(
                 any(
                     counts.get(_target(chain).document_id, 0) > annotations_per_text
                     for chain in _live(chains, discarded)
                 )
-                for chains in _chains(conn, pid).values()
+                for row_key, chains in _chains(conn, pid).items()
+                if (row_key.case_id, row_key.language) not in own
             )
             return {"rows_over_target": over}
+
+    def set_annotations_per_text(
+        self,
+        key: str,
+        case_id: str,
+        language: str,
+        value: int | None,
+        reason: str | None,
+    ) -> dict[str, Any]:
+        """Set one text's own "Annotations per text" (issue 422); None clears it.
+
+        The value replaces the project's as target and as limit of that text
+        (case + language, every version). Idempotent: the same value again
+        writes and audits nothing. Lowering it below the text's annotators
+        removes nobody, as lowering the project value. Audited as
+        ``text.annotations_per_text``.
+        """
+        row_key = RowKey(case_id, language)
+        reason = (reason or "").strip() or None
+        with self.db.transaction() as conn:
+            project = self._lock(conn, key, exclusive=True)
+            pid = project["id"]
+            if row_key not in store.language_versions(conn, pid, [case_id]):
+                raise DomainError("DOCUMENT_NOT_FOUND")
+            old = per_text_override(conn, pid, case_id, language)
+            changed = old != value
+            if changed:
+                write_per_text(
+                    conn,
+                    pid,
+                    case_id,
+                    language,
+                    value,
+                    reason=reason,
+                    actor_id=self.actor.user_id,
+                )
+                record_audit(
+                    conn,
+                    self.actor,
+                    "text.annotations_per_text",
+                    target_type="text",
+                    target_id=f"{case_id} {language}",
+                    project_id=pid,
+                    details={
+                        "case_id": case_id,
+                        "language": language,
+                        "old": old,
+                        "new": value,
+                        "project_value": project["annotations_per_text"],
+                    }
+                    | ({"reason": reason} if reason else {}),
+                )
+            project_value = int(project["annotations_per_text"])
+            return {
+                "case_id": case_id,
+                "language": language,
+                "override": value,
+                "project_value": project_value,
+                "effective": project_value if value is None else value,
+                "changed": changed,
+            }
 
     def move_to_front(self, key: str, rows: Sequence[RowKey]) -> dict[str, Any]:
         """Move texts to the front of the project's order (issue 339).

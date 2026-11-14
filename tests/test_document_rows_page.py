@@ -333,6 +333,9 @@ ROW_KEYS = {
     "flagged_round_id",
     "proposal_count",
     "annotation_mode",
+    "proposal_set",
+    "newer_proposal_set",
+    "annotations_per_text",
     "consolidation_progress",
     "unreviewed_translation",
 }
@@ -370,6 +373,7 @@ WORK_KEYS = {
     "assigned_at",
     "assigned_by",
     "annotation_mode",
+    "proposal_set",
     "unreviewed_translation",
     "waiting_for_translation_review",
     "waiting_for_lead",

@@ -369,6 +369,8 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
       me: assignMe,
       consolidatorRule: page?.adjudicator_not_annotator ?? false,
       onClose: () => setAssignDialog(null),
+      // Issue 422: a changed limit shows in the row and the text card at once.
+      onLimitChanged: () => { void refreshAll(); },
       // The toast region announces the message; a second live region would say it twice (#47 A-25).
       // Issue 248: the toast follows the refreshed rows, so it never announces work the row does not show yet.
       onAssigned: message => { setAssignDialog(null); void refreshAll().then(() => showToast({ message })); },
@@ -555,6 +557,7 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
     setAssignDialog({
       mode: "cases", projectKey, caseIds, sort: batchSort(request.sort), filters, me: assignMe,
       onClose: () => setAssignDialog(null),
+      onLimitChanged: () => { void refreshAll(); },
       onAssigned: (message, skipped) => {
         // The planned work is done for this selection; the skipped cases stay one click away.
         setAssignDialog(null);

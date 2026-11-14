@@ -232,3 +232,6 @@ dl.technical-details dd { margin: 0; overflow-wrap: anywhere; font-family: var(-
   .final-panel-text-change { border-color: CanvasText; }
   .final-panel-agreement-bar { forced-color-adjust: auto; }
 }
+/* Issue 337: the proposal set line; the "Newer set available" pill and its help link wrap below it on narrow cards. */
+.text-card-proposal-set { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }
+.text-card-proposal-set .text-card-label { font-weight: var(--weight-strong); color: var(--text); }

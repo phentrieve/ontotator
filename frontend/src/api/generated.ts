@@ -1625,6 +1625,29 @@ export interface paths {
         patch: operations["patch_work_plan_api_v1_projects__key__work_plans__case_id___language__patch"];
         trace?: never;
     };
+    "/api/v1/projects/{key}/texts/{case_id}/{language}/annotations-per-text": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Annotations Per Text
+         * @description One text's own "Annotations per text", target and limit (issue 422).
+         *
+         *     Idempotent; ``value: null`` returns the text to the project value.
+         *     Assignments above a lowered value stay.
+         */
+        put: operations["set_annotations_per_text_api_v1_projects__key__texts__case_id___language__annotations_per_text_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{key}/document-rows/move-to-front": {
         parameters: {
             query?: never;
@@ -3582,6 +3605,40 @@ export interface components {
             /** Evidence */
             evidence: components["schemas"]["EvidenceSnapshot"][];
         };
+        /** AnnotationsPerTextResult */
+        AnnotationsPerTextResult: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Override */
+            override: number | null;
+            /** Project Value */
+            project_value: number;
+            /** Effective */
+            effective: number;
+            /** Changed */
+            changed: boolean;
+        };
+        /** AnnotationsPerTextSet */
+        AnnotationsPerTextSet: {
+            /** Value */
+            value: number | null;
+            /** Reason */
+            reason?: string | null;
+        };
+        /**
+         * AnnotationsPerTextView
+         * @description The text's "Annotations per text" (issue 422).
+         */
+        AnnotationsPerTextView: {
+            /** Effective */
+            effective: number;
+            /** Project */
+            project: number;
+            /** Override */
+            override?: number | null;
+        };
         /**
          * AnnotatorPairAgreement
          * @description Every text the two people both annotated.
@@ -4095,6 +4152,8 @@ export interface components {
             people: components["schemas"]["BatchPersonView"][];
             /** Per Text */
             per_text: number;
+            /** Project Per Text */
+            project_per_text: number;
             /** Digest */
             digest: string;
             /** Needs People */
@@ -4126,6 +4185,8 @@ export interface components {
             version: number;
             /** Remaining */
             remaining: number;
+            /** Per Text */
+            per_text: number;
             /** Usernames */
             usernames: string[];
             /**
@@ -5219,6 +5280,9 @@ export interface components {
              */
             proposal_count: number;
             annotation_mode?: components["schemas"]["AnnotationModeView"] | null;
+            proposal_set?: components["schemas"]["RowProposalSetView"] | null;
+            newer_proposal_set?: components["schemas"]["RowProposalSetView"] | null;
+            annotations_per_text?: components["schemas"]["AnnotationsPerTextView"] | null;
             consolidation_progress?: components["schemas"]["ConsolidationProgressView"] | null;
             /**
              * Unreviewed Translation
@@ -8513,6 +8577,27 @@ export interface components {
             active_hold_count: number;
             reporter?: components["schemas"]["PersonRefView"] | null;
         };
+        /**
+         * RowProposalSetView
+         * @description An imported tool proposal set on one text version (issue 337).
+         */
+        RowProposalSetView: {
+            /** Set Id */
+            set_id: number;
+            /**
+             * Imported At
+             * Format: date-time
+             */
+            imported_at: string;
+            /** Tool */
+            tool?: string | null;
+            /** Tool Version */
+            tool_version?: string | null;
+            /** Proposal Count */
+            proposal_count: number;
+            /** Newest */
+            newest: boolean;
+        };
         /** RowRefView */
         RowRefView: {
             /** Case Id */
@@ -10342,6 +10427,7 @@ export interface components {
             assigned_by?: components["schemas"]["PersonRefView"] | null;
             /** Annotation Mode */
             annotation_mode?: ("proposals" | "scratch") | null;
+            proposal_set?: components["schemas"]["RowProposalSetView"] | null;
             /**
              * Unreviewed Translation
              * @default false
@@ -13664,6 +13750,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlanRowResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_annotations_per_text_api_v1_projects__key__texts__case_id___language__annotations_per_text_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                case_id: string;
+                language: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnnotationsPerTextSet"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnnotationsPerTextResult"];
                 };
             };
             /** @description Validation Error */

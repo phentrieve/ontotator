@@ -904,3 +904,74 @@ def test_working_time_keeps_its_times_and_orphaned_tasks(
         ).scalar_one()
     assert [i.assignment_id for i in intervals] == [-999_999, copied_task]
     assert {(i.started_at, i.ended_at) for i in intervals} == {(started, ended)}
+
+
+def _text_overrides(db: Any, key: str) -> list[tuple[Any, ...]]:
+    from ontotator.storage.plan_tables import TextSettingRow
+
+    with db.snapshot() as conn:
+        return [
+            tuple(row)
+            for row in conn.execute(
+                select(
+                    TextSettingRow.case_id,
+                    TextSettingRow.language,
+                    TextSettingRow.annotations_per_text,
+                    TextSettingRow.reason,
+                )
+                .join(ProjectRow, ProjectRow.id == TextSettingRow.project_id)
+                .where(ProjectRow.project_key == key)
+            )
+        ]
+
+
+def _set_override(db: Any, key: str) -> None:
+    from ontotator.storage.text_settings import write_per_text
+
+    with db.transaction() as conn:
+        pid = conn.execute(
+            select(ProjectRow.id).where(ProjectRow.project_key == key)
+        ).scalar_one()
+        write_per_text(
+            conn, pid, CASE, "en", 3, reason="method comparison", actor_id=None
+        )
+
+
+def test_a_text_keeps_its_own_annotations_per_text(
+    servers: tuple[TestClient, TestClient], tmp_path: Path
+) -> None:
+    """Issue 422: the per-text override travels with the archive."""
+    source, target = servers
+    scenario = _simple_project(source.app)  # type: ignore[arg-type]
+    _set_override(_db(source), scenario.key)
+    data = _export(source, scenario.key, tmp_path)
+
+    result = project_archive.import_archive(_db(target), OPERATOR, data)
+
+    assert result["verification"]["ok"]
+    assert _text_overrides(_db(target), scenario.key) == [
+        (CASE, "en", 3, "method comparison")
+    ]
+
+
+def _without_text_settings(files: dict[str, bytes]) -> None:
+    """An archive written before per-text settings existed has no such table."""
+    manifest = _manifest(files)
+    name = "tables/text_settings.jsonl"
+    del files[name]
+    del manifest["files"][name]
+    del manifest["rows"]["text_settings"]
+    files["manifest.json"] = json.dumps(manifest).encode()
+
+
+def test_an_archive_without_per_text_settings_imports_with_the_project_value(
+    servers: tuple[TestClient, TestClient], tmp_path: Path
+) -> None:
+    source, target = servers
+    scenario = _simple_project(source.app)  # type: ignore[arg-type]
+    data = _rewrite(_export(source, scenario.key, tmp_path), _without_text_settings)
+
+    result = project_archive.import_archive(_db(target), OPERATOR, data)
+
+    assert result["verification"]["ok"]
+    assert _text_overrides(_db(target), scenario.key) == []

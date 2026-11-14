@@ -5953,6 +5953,79 @@
         "x-ontotator-project-token": true
       }
     },
+    "/api/v1/projects/{key}/texts/{case_id}/{language}/annotations-per-text": {
+      "put": {
+        "tags": [
+          "work-plans"
+        ],
+        "summary": "Set Annotations Per Text",
+        "description": "One text's own \"Annotations per text\", target and limit (issue 422).\n\nIdempotent; ``value: null`` returns the text to the project value.\nAssignments above a lowered value stay.",
+        "operationId": "set_annotations_per_text_api_v1_projects__key__texts__case_id___language__annotations_per_text_put",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "language",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Language"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationsPerTextSet"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationsPerTextResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
     "/api/v1/projects/{key}/document-rows/move-to-front": {
       "post": {
         "tags": [
@@ -11423,6 +11496,117 @@
         ],
         "title": "AnnotationVersion"
       },
+      "AnnotationsPerTextResult": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "override": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Override"
+          },
+          "project_value": {
+            "type": "integer",
+            "title": "Project Value"
+          },
+          "effective": {
+            "type": "integer",
+            "title": "Effective"
+          },
+          "changed": {
+            "type": "boolean",
+            "title": "Changed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "override",
+          "project_value",
+          "effective",
+          "changed"
+        ],
+        "title": "AnnotationsPerTextResult"
+      },
+      "AnnotationsPerTextSet": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 5.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "title": "AnnotationsPerTextSet"
+      },
+      "AnnotationsPerTextView": {
+        "properties": {
+          "effective": {
+            "type": "integer",
+            "title": "Effective"
+          },
+          "project": {
+            "type": "integer",
+            "title": "Project"
+          },
+          "override": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Override"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "effective",
+          "project"
+        ],
+        "title": "AnnotationsPerTextView",
+        "description": "The text's \"Annotations per text\" (issue 422)."
+      },
       "AnnotatorPairAgreement": {
         "properties": {
           "macro_mean": {
@@ -12731,6 +12915,10 @@
             "type": "integer",
             "title": "Per Text"
           },
+          "project_per_text": {
+            "type": "integer",
+            "title": "Project Per Text"
+          },
           "digest": {
             "type": "string",
             "title": "Digest"
@@ -12756,6 +12944,7 @@
           "skipped",
           "people",
           "per_text",
+          "project_per_text",
           "digest"
         ],
         "title": "BatchPreview"
@@ -12825,6 +13014,10 @@
             "type": "integer",
             "title": "Remaining"
           },
+          "per_text": {
+            "type": "integer",
+            "title": "Per Text"
+          },
           "usernames": {
             "items": {
               "type": "string"
@@ -12850,6 +13043,7 @@
           "document_id",
           "version",
           "remaining",
+          "per_text",
           "usernames"
         ],
         "title": "BatchTargetView"
@@ -16072,6 +16266,36 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/AnnotationModeView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proposal_set": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RowProposalSetView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "newer_proposal_set": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RowProposalSetView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "annotations_per_text": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnnotationsPerTextView"
               },
               {
                 "type": "null"
@@ -25117,6 +25341,59 @@
         ],
         "title": "RowProblemReport"
       },
+      "RowProposalSetView": {
+        "properties": {
+          "set_id": {
+            "type": "integer",
+            "title": "Set Id"
+          },
+          "imported_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Imported At"
+          },
+          "tool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool"
+          },
+          "tool_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Version"
+          },
+          "proposal_count": {
+            "type": "integer",
+            "title": "Proposal Count"
+          },
+          "newest": {
+            "type": "boolean",
+            "title": "Newest"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "set_id",
+          "imported_at",
+          "proposal_count",
+          "newest"
+        ],
+        "title": "RowProposalSetView",
+        "description": "An imported tool proposal set on one text version (issue 337)."
+      },
       "RowRefView": {
         "properties": {
           "case_id": {
@@ -30303,6 +30580,16 @@
               }
             ],
             "title": "Annotation Mode"
+          },
+          "proposal_set": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RowProposalSetView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "unreviewed_translation": {
             "type": "boolean",

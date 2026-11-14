@@ -181,6 +181,10 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     ("PUT", f"{P}/work-plans/bulk"): "project-admin",
     ("PUT", f"{P}/work-plans/rows"): "project-admin",
     ("PATCH", f"{P}/work-plans/{{case_id:path}}/{{language}}"): "project-admin",
+    (
+        "PUT",
+        f"{P}/texts/{{case_id:path}}/{{language}}/annotations-per-text",
+    ): "project-admin",
     ("GET", f"{P}/annotation-mode-changes"): "read",
     ("POST", f"{P}/annotation-mode-changes"): "project-admin",
     ("POST", f"{P}/annotation-mode-changes/preview"): "project-admin",

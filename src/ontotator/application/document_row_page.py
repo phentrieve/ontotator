@@ -6,6 +6,7 @@ the row and page dictionaries of the Documents read API.
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
@@ -503,7 +504,11 @@ def _build_row(ctx: _Context, case_id: str, language: str) -> dict[str, Any]:
     row_cells = ctx.cells[key]
     others_at = facts.others_activity.get(key)
     flagged_round = _consolidation_flags(facts, live)
-    proposal_count = facts.proposal_counts.get(_target(live or chains).document_id, 0)
+    target_document = _target(live or chains).document_id
+    proposal_count = facts.proposal_counts.get(target_document, 0)
+    proposal_set, newer_set = _row_proposal_sets(
+        ctx, target_document, [item for item in active if item.task == "annotate"]
+    )
     return {
         "case_id": case_id,
         "language": language,
@@ -599,6 +604,13 @@ def _build_row(ctx: _Context, case_id: str, language: str) -> dict[str, Any]:
         "annotation_mode": _annotation_mode(
             facts, key, versions, row_assignments, proposal_count, planned=annotate
         ),
+        "proposal_set": proposal_set,
+        "newer_proposal_set": newer_set,
+        "annotations_per_text": {
+            "effective": facts.per_text(key),
+            "project": facts.annotations_per_text,
+            "override": facts.per_text_overrides.get(key),
+        },
         "consolidation_progress": None,
         "unreviewed_translation": steps_rules.unreviewed_translation(
             ctx.step_facts[key]
@@ -660,6 +672,63 @@ def _annotation_mode(
     }
 
 
+def _set_view(facts: RowFacts, set_id: int | None) -> dict[str, Any] | None:
+    """``ProposalSetView`` fields of an imported proposal set (issue 337)."""
+    found = facts.proposal_sets.get(set_id) if set_id is not None else None
+    if found is None:
+        return None
+    return {
+        "set_id": found.set_id,
+        "imported_at": found.imported_at,
+        "tool": found.tool,
+        "tool_version": found.tool_version,
+        "proposal_count": found.proposal_count,
+        "newest": facts.newest_sets.get(found.document_id) == found.set_id,
+    }
+
+
+def _item_set(ctx: _Context, item: rules.AssignmentFact) -> int | None:
+    """The proposal set an annotation task works on (issue 337).
+
+    The set its active round started from; a task from proposals without a
+    round yet starts on the newest set of its version. None: unknown (a
+    round from before 0037), from scratch, or seed proposals.
+    """
+    if item.task != "annotate":
+        return None
+    round_fact = ctx.rounds.get(item.active_round_id or "")
+    if round_fact is not None:
+        return round_fact.proposal_set_id
+    if item.annotation_mode == "proposals":
+        return ctx.facts.newest_sets.get(item.document_id)
+    return None
+
+
+def _row_proposal_sets(
+    ctx: _Context, target_document: str, work: Sequence[rules.AssignmentFact]
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    """The set the text's annotation uses and a newer one (issue 337, 337-A).
+
+    The set most of the text's annotation tasks work on (a tie: the newer
+    one); without a task with a known set, the newest set of the current
+    version, which a new task starts from. ``newer``: the current version's
+    newest set when it is newer than that.
+    """
+    facts = ctx.facts
+    used = Counter(
+        set_id
+        for item in work
+        if (set_id := _item_set(ctx, item)) is not None
+        and set_id in facts.proposal_sets
+    )
+    newest = facts.newest_sets.get(target_document)
+    shown = max(used, key=lambda set_id: (used[set_id], set_id)) if used else newest
+    newer = (
+        newest if newest is not None and shown is not None and newest > shown else None
+    )
+    return _set_view(facts, shown), _set_view(facts, newer)
+
+
 def _consolidation_flags(facts: RowFacts, live: Sequence[rules.Chain]) -> str | None:
     """The submitted consolidation round of the row's current version (the
     target of each live chain, as the final panel compares; the first chain
@@ -711,6 +780,7 @@ def _work_item(
             ctx.person_of(item.created_by) if item.created_by is not None else None
         ),
         "annotation_mode": item.annotation_mode,
+        "proposal_set": _set_view(ctx.facts, _item_set(ctx, item)),
         "unreviewed_translation": item.unreviewed_translation,
         "waiting_for_translation_review": item.assignment_id in ctx.waiting
         and item.assignment_id not in ctx.waiting_for_lead,
@@ -1023,7 +1093,7 @@ def _row_steps(
         annotate=annotate,
         is_source=is_source,
         rule_on=facts.rule_on,
-        per_text=facts.annotations_per_text,
+        per_text=facts.per_text(key),
         open_report_id=report_id,
         orphan_pause_assignment_id=paused_id,
         unacknowledged_final_cause=any(
@@ -1086,7 +1156,7 @@ def _row_steps(
     submitted = sum(
         1 for item in on_targets if item.status == "submitted" and not item.held
     )
-    total = max(facts.annotations_per_text * len(targets), len(on_targets))
+    total = max(facts.per_text(key) * len(targets), len(on_targets))
     # Waiting on of an in-progress step: the people of every in-progress
     # step of the row (VD8, scenario 16).
     in_progress_work = [

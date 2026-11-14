@@ -537,6 +537,43 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
         )
         return preview
 
+    @register(server, scopes="project-admin", effect="changes", idempotent=True)
+    async def set_annotations_per_text(
+        project: Project,
+        case_id: str,
+        language: str,
+        annotations_per_text: Annotated[
+            int | None,
+            Field(
+                ge=1,
+                le=5,
+                description=(
+                    "The text's own number of annotators (target and limit),"
+                    " e.g. 4 for a method comparison; None returns the text to"
+                    " the project's annotations_per_text."
+                ),
+            ),
+        ],
+        reason: Annotated[str | None, Field(max_length=2000)] = None,
+    ) -> dict[str, Any]:
+        """Give one text (case + language) its own annotations per text.
+
+        It replaces the project value for that text, for every version, as
+        target and as limit; other texts keep the project value. Lowering
+        it removes nobody. Assign afterwards with assign_texts.
+        """
+        result: dict[str, Any] = await api.put(
+            project_path(
+                project,
+                "texts",
+                seg(case_id),
+                seg(language),
+                "annotations-per-text",
+            ),
+            {"value": annotations_per_text, "reason": reason},
+        )
+        return result
+
     @register(server, scopes=("read", "project-admin"), effect="destructive")
     async def move_task_to_version(
         project: Project,

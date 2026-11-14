@@ -106,6 +106,29 @@ class DocumentVersionView(_View):
     discarded: VersionDiscardView | None = None
 
 
+class RowProposalSetView(_View):
+    """An imported tool proposal set on one text version (issue 337)."""
+
+    set_id: int
+    imported_at: datetime
+    # The set's first tool actor (name and version), when it names one.
+    tool: str | None = None
+    tool_version: str | None = None
+    proposal_count: int
+    # The newest set of its version (what a new task starts from).
+    newest: bool
+
+
+class AnnotationsPerTextView(_View):
+    """The text's "Annotations per text" (issue 422)."""
+
+    # What the text gets, target and limit: ``override`` if set, else
+    # ``project``.
+    effective: int
+    project: int
+    override: int | None = None
+
+
 class WorkItemView(_View):
     assignment_id: int
     document_id: str
@@ -128,6 +151,10 @@ class WorkItemView(_View):
     assigned_at: datetime | None = None
     assigned_by: PersonRefView | None = None
     annotation_mode: AnnotationMode | None = None
+    # Issue 337: the proposal set an annotation task works on (its round's,
+    # or the newest one for a task from proposals not started yet); None:
+    # not recorded, from scratch or seed proposals.
+    proposal_set: RowProposalSetView | None = None
     # Spec 2026-10-25 §2: annotate work the lead confirmed before the
     # translation review was accepted (the History line).
     unreviewed_translation: bool = False
@@ -399,6 +426,13 @@ class DocumentRowView(_View):
     # consolidation round (shown rows only).
     proposal_count: int = 0
     annotation_mode: AnnotationModeView | None = None
+    # Issue 337: the proposal set most annotation tasks of the text work on
+    # (without tasks: the one a new task starts from) and a newer set of the
+    # current version, if there is one.
+    proposal_set: RowProposalSetView | None = None
+    newer_proposal_set: RowProposalSetView | None = None
+    # Issue 422: the text's "Annotations per text" (None in older fixtures).
+    annotations_per_text: AnnotationsPerTextView | None = None
     consolidation_progress: ConsolidationProgressView | None = None
     # Spec 2026-10-25 §2: the rule is off and the translation is not accepted,
     # so annotating it needs an explicit acknowledgement.

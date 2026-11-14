@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- A text can have its own **Annotators per text** (#422): in the assign dialog, the info button (i) next to the limit offers **Only for the selected text** (or texts) beside **For all texts**; the text card then shows *Annotators: 4 for this text (project: 1)*. The value is stored per text (case + language, migration 0039, table `text_settings`), stays across text versions and replaces the project value as target and as limit everywhere: assignment (`ANNOTATIONS_PER_TEXT_REACHED`), batch preview (`per_text` per target, `project_per_text`), Documents cells and next steps, and the lowering preview. API `PUT /api/v1/projects/{key}/texts/{case}/{language}/annotations-per-text` (`value`, `null` for the project value, optional `reason`; idempotent, audited as `text.annotations_per_text`, scope `project-admin`), MCP tool `set_annotations_per_text`. Project archives carry it; an archive without the table imports with the project value.
+- The text card names the proposal set a text's annotation works on (#337): *Proposals set 2026-10-02 (phentrieve 1.4), 24 proposals* replaces *24 tool proposals*, and *Newer set available: 2026-11-10* with **How to use it** follows when a newer set of the text was imported. A person's row names the set only when it differs, for example *newest set*. Documents rows carry `proposal_set` and `newer_proposal_set`, work items `proposal_set`. A restart onto the newest set stays an API/MCP clean restart for now (handbook: Work from new tool proposals).
+
 ## [0.10.2] - 2026-11-14
 
 ### Added
