@@ -125,8 +125,11 @@ export function roundStartingPoint(round: Pick<RoundFacts, "kind" | "round_ordin
   }
 }
 
-/** Short toolbar badge of a carry-forward round ("Round 3, continued from Round 2"); undefined otherwise. */
+/**
+ * Short toolbar badge of a carry-forward round ("Round 3, continued from Round 2") or of a round moved to a
+ * corrected text (the toolbar shows it when nothing needs a check); undefined otherwise.
+ */
 export function roundBadge(round: Pick<RoundFacts, "kind" | "round_ordinal" | "source_round_ordinal"> | null | undefined): string | undefined {
-  if (round?.kind !== "carry_forward" || !round.round_ordinal) return undefined;
-  return `Round ${round.round_ordinal}, continued from ${sourceRound(round) ?? "an earlier submission"}`;
+  if ((round?.kind !== "carry_forward" && round?.kind !== "text_change") || !round.round_ordinal) return undefined;
+  return `Round ${round.round_ordinal}, continued from ${sourceRound(round) ?? (round.kind === "text_change" ? "an earlier version" : "an earlier submission")}`;
 }
