@@ -1,4 +1,4 @@
-import{r as i,a as m,j as a,b as h}from"./index-CXWb6Z2J.js";import{M as f,r as g}from"./index-B1_r3jaV.js";function w(){const[e,t]=i.useState(null);return i.useEffect(()=>{let o=!0;return m.getAbout().then(n=>{o&&t(n)},()=>{}),()=>{o=!1}},[]),e?a.jsxs("p",{className:"help-version",title:e.revision??void 0,children:["Ontotator ",e.version,e.revision&&a.jsxs(a.Fragment,{children:[" · commit ",e.revision.slice(0,7)]})]}):null}const y=`# Ontotator user handbook
+import{r as i,a as m,j as a,b as h}from"./index-CCloIFwt.js";import{M as f,r as g}from"./index-DJMbVicu.js";function w(){const[e,t]=i.useState(null);return i.useEffect(()=>{let o=!0;return m.getAbout().then(n=>{o&&t(n)},()=>{}),()=>{o=!1}},[]),e?a.jsxs("p",{className:"help-version",title:e.revision??void 0,children:["Ontotator ",e.version,e.revision&&a.jsxs(a.Fragment,{children:[" · commit ",e.revision.slice(0,7)]})]}):null}const y=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -667,13 +667,15 @@ What for: check findings that were carried over from an earlier round, for examp
 
 If you change a finding after checking it, it needs a new check.
 
+In a task from proposals, your decisions on the proposals are carried to the new version: accepted, edited and added findings come along, and only those in a changed passage, or without a matching proposal in the new version, are marked **Check needed**. A proposal you rejected that has no counterpart in the new version is dropped.
+
 A row **Not on this text** means the finding could not be placed in this text. Select it and choose one: **Mark in text**, **Link to an existing finding**, or **Dismiss with reason…**. A finding re-created with **Mark in text** keeps the original's term, values and note.
 
 ![A carried finding with What to check and the Mark as checked button](images/annotator-carried-finding.png)
 
 ## Re-create findings after a text correction
 
-What for: move your findings to the corrected text after the text got a new version, for example from a translation review, a lead's correction or an upload, and your task moved to it. The toolbar reads **Check after text change**.
+What for: move your findings to the corrected text after the text got a new version, for example from a translation review, a lead's correction or an upload, and your task moved to it. The toolbar reads **Check after text change**. This works the same in a task from proposals: only findings in changed passages need you; your other decisions on the proposals are already carried.
 
 1. The panel **Needs review after the text change** lists the findings to place again.
 2. For each item, click **Re-create here** and mark the supporting text in the corrected version.
@@ -2042,7 +2044,7 @@ With **Annotate only after the translation review is accepted** on, you can assi
 What happens to a waiting task:
 
 - **Rejected** or **Query**: it keeps waiting. Decide on the text as usual.
-- **Accepted with corrections**, a lead correction or an uploaded correction: the task moves to the new version and opens there once that version is accepted. A task from proposals stays on the old version, as the new version needs its own proposals: the annotator sees **Waiting for the project lead**, and once the new version is accepted the text shows **Handle text change…**, where **Withdraw** is the choice that works. A paused task stays too, until you decide its report.
+- **Accepted with corrections**, a lead correction or an uploaded correction: the task moves to the new version and opens there once that version is accepted. A task from proposals waits on the old version: the annotator sees **Waiting for the project lead**, and once the new version is accepted the text shows **Handle text change…**. There you move the task to the new version, where the decisions on the proposals are carried and only changed passages need a check. If the new version has no proposals yet, import them first, or withdraw the task and annotate the new version from scratch. A paused task stays too, until you decide its report.
 - A task on an uploaded correction that was then **Rejected** or **Query**, with the older version accepted afterwards: the text shows **Handle text change…**; **Withdraw** the task, then assign the accepted version.
 - You remove the review: the task keeps waiting, and the text shows the next step for the review.
 - You turn Review off and accept the translation: the task opens. You turn Annotate off or discard the version: the task is withdrawn, as any open task.
@@ -2259,12 +2261,14 @@ What for: decide what happens when a text gets a new version while someone is st
 
 Before you start: if the task is paused by a problem report, [decide the report](#decide-on-a-problem-report) first.
 
-1. In the row, click **Handle text change…**. A task from proposals, or a task on a correction that was not accepted, only offers **Withdraw**: tool proposals mark places in the old text and cannot follow the new one. The dialog says why and what to do next.
+1. In the row, click **Handle text change…**. A task on a correction that was not accepted only offers **Withdraw**; so does a task from proposals while the new version has no proposals. The dialog says why and what to do next.
 2. Choose one:
    - Move to the new version: the annotator continues on the corrected text; their draft findings are carried and marked for checking.
    - Let the annotator finish on the old version: the result is carried to the new version for them to check.
    - **Withdraw**: the task ends, nothing of the draft is carried, and the new version needs a new annotation. Assign it afterwards.
 3. Click **Apply**.
+
+Work from proposals is carried too: the decisions on the proposals move to the matching proposals of the new version, and only what touches a changed passage is marked **Check needed**. A rejected proposal without a counterpart in the new version is dropped. If the new version has no proposals yet, the dialog says so and offers only what works: import proposals for the new version first, or annotate it from scratch.
 
 ### Carry submitted work to a new text version
 
@@ -2273,6 +2277,8 @@ What for: reuse submitted findings after the text was corrected. The row's next 
 1. In the row, click the carry button, for example *Carry to v2…*.
 2. Choose who continues: the author, **Someone else…** (then pick the **Annotator**), or annotate the new version from scratch.
 3. Click **Assign**.
+
+Work from proposals is carried too: the decisions on the proposals move to the matching proposals of the new version, and only what touches a changed passage is marked **Check needed**. A rejected proposal without a counterpart in the new version is dropped. If the new version has no proposals yet, the dialog says so and offers only what works: import proposals for the new version first, or annotate it from scratch. Without proposals on the new version, the row offers assigning it instead of *Carry to v2…*.
 
 The annotator must check the carried findings before submitting ([Review carried findings](annotator.md#review-carried-findings)).
 
