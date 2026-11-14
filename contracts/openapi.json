@@ -24739,6 +24739,17 @@
               }
             ],
             "title": "Source Version"
+          },
+          "unresolved_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unresolved Note"
           }
         },
         "additionalProperties": false,

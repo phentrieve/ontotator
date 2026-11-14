@@ -95,6 +95,9 @@ class RoundInputView(BaseModel):
     source_recorded_at: datetime | None = None
     source_language: str | None = None
     source_version: int | None = None
+    # API-only: the Unresolved note a check from proposals left on the source
+    # proposal, carried without counterpart (#414); the finding keeps it.
+    unresolved_note: str | None = None
 
     # Keys package archives leave out, so older readers (extra="forbid") still
     # accept archived workflow history.
@@ -105,6 +108,7 @@ class RoundInputView(BaseModel):
             "source_recorded_at",
             "source_language",
             "source_version",
+            "unresolved_note",
         }
     )
 

@@ -3,10 +3,11 @@
 A decision on an old proposal moves to its counterpart on the new version:
 the proposal the re-anchor job made from it (its ``source_refs`` name the old
 proposal), else the only new proposal with the same layer and term on the
-mapped span. Findings the person made (corrections and added findings) are
-re-anchored like annotation from scratch. Only what touches a changed passage,
-or an accepted or corrected proposal without a counterpart, needs a check;
-a rejection without a counterpart is dropped.
+mapped span with the same values. Findings the person made (corrections and
+added findings) are re-anchored like annotation from scratch. Only what
+touches a changed passage, or an accepted, corrected or unresolved proposal
+without a counterpart, needs a check; a rejection without a counterpart is
+dropped.
 """
 
 from __future__ import annotations
@@ -33,8 +34,9 @@ class CarriedItem:
 
     ``checked``: carried as it is (unchanged text, nothing lost); otherwise it
     is "Check needed". ``decision``: the ``changed`` decision a correction
-    came with; ``proposal``: the new proposal it replaces there (None: an own
-    finding).
+    came with, or the ``confirmed``/``uncertain`` decision of a proposal
+    without counterpart (adopted as an own finding); ``proposal``: the new
+    proposal a correction replaces there (None: an own finding).
     """
 
     original: AnnotationSnapshot
@@ -88,7 +90,8 @@ def counterpart(
     """The new proposal an old one became, if exactly one.
 
     Re-anchored sets link each proposal to its source (``source_refs``); an
-    independently imported set is matched by layer, term and mapped span.
+    independently imported set is matched by layer, term and mapped span, and
+    the match counts only with the same values and modifiers.
     """
     old_id = proposal.annotation.annotation_id
     linked = [p for p in new_proposals if old_id in p.annotation.provenance.source_refs]
@@ -104,7 +107,15 @@ def counterpart(
         and p.annotation.term_id == proposal.annotation.term_id
         and _spans(p) == spans
     ]
-    return same[0] if len(same) == 1 else None
+    if len(same) != 1:
+        return None
+    found = same[0].annotation
+    if (
+        found.axes_values != proposal.annotation.axes_values
+        or found.modifiers != mapped.target_modifiers
+    ):
+        return None  # other values: no silent carry, the item needs a check
+    return same[0]
 
 
 def plan_proposal_carry(
@@ -153,9 +164,13 @@ def plan_proposal_carry(
             continue
         proposal = by_ref.get(_key(decision.target))
         # Decision 6 (#414): a rejection without counterpart is dropped; an
-        # accepted proposal becomes an own finding to check.
+        # accepted or unresolved proposal becomes an own finding to check.
         if decision.outcome != "rejected" and proposal is not None:
-            items.append(CarriedItem(proposal, mapped_of(proposal), checked=False))
+            items.append(
+                CarriedItem(
+                    proposal, mapped_of(proposal), checked=False, decision=decision
+                )
+            )
     replaced = {_key(d.replacement): d for d in ordered if d.replacement is not None}
     decided = {_key(d.target) for d in decisions}
     for snapshot in snapshots:
