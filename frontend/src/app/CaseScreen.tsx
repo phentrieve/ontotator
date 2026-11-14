@@ -3764,7 +3764,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
             title={roundTitle ?? (roundKind !== "consolidation" && !isCarryKind(roundKind) ? badge.title : undefined)}
             className="case-mode"
           >
-            {roundKind === "consolidation" ? modeBadge("review").label : roundKind === "text_change" ? TEXT_CHANGE_ORIGIN : isCarryKind(roundKind) ? roundBadge ?? "Review carried findings" : badge.label}
+            {roundKind === "consolidation" ? modeBadge("review").label : roundKind === "text_change" && roundInputs.length > 0 ? TEXT_CHANGE_ORIGIN : isCarryKind(roundKind) ? roundBadge ?? "Review carried findings" : badge.label}
           </span>
           {readOnly && consolidationAssignmentId ? <a className="btn btn-secondary btn-sm" href={routeHref({ name: "task", assignmentId: consolidationAssignmentId })} onKeyDown={onSpaceActivate}>{BACK_TO_CONSOLIDATION}</a> : null}
           {/* The display name has a bounded width (full text in the title), so the header
@@ -4069,7 +4069,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
             <div className="sidebar-section">
               <div className="sidebar-header sidebar-header--actions">
                 {/* Confirmed proposals stay in the proposal list: in review this section holds only the annotator's own findings. */}
-                <span>{isReviewLike(view.key.mode) ? "Your own findings" : "Findings"} ({visibleAnnotations.length - copyIds.size})</span>
+                <span>{isReviewLike(view.key.mode) ? "Your own findings" : "Findings"} ({visibleAnnotations.length - copyIds.size + carriedListOrder.filter(key => key.startsWith("input:")).length})</span>
                 {!readOnly && !spanlessHiddenByProfile && <Button
                   type="button"
                   size="sm"
