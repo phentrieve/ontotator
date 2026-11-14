@@ -19,7 +19,13 @@ from sqlalchemy import Connection, RowMapping, func, insert, select, update
 
 from ontotator.application.work_plans import _chains
 from ontotator.application.work_plans import _target as _row_target
-from ontotator.application.work_rounds import WorkRoundService, require_independent
+from ontotator.application.work_rounds import (
+    WorkRoundService,
+    no_target_proposals,
+    proposal_carry_plan,
+    require_independent,
+    target_proposals,
+)
 from ontotator.application.workflow_guards import require_task_writable
 from ontotator.assignments.eligibility import (
     check_work_plan,
@@ -38,6 +44,7 @@ from ontotator.domain.canonical import canonical_hash
 from ontotator.domain.errors import AccessDenied, DomainError
 from ontotator.domain.profiles import TaskProfile
 from ontotator.domain.reanchor import NeedsReview, reanchor_annotation, text_map
+from ontotator.domain.review import ReviewDecision
 from ontotator.domain.scopes import build_scope
 from ontotator.domain.serialization import decode_snapshot
 from ontotator.domain.variants import VariantInfo
@@ -164,19 +171,9 @@ def _not_applicable(reason: str) -> DomainError:
     return DomainError("TEXT_CHANGE_NOT_APPLICABLE", {"reason": reason})
 
 
-def _from_proposals(step: Literal["move", "carry"]) -> DomainError:
-    """Work from proposals stays on its version (plan P4, A6): its decisions
-    refer to the proposals of that version. ``step`` picks the message."""
-    return DomainError(
-        "TEXT_CHANGE_NOT_APPLICABLE", {"reason": "from_proposals", "step": step}
-    )
-
-
 def _require_carryable(submission: Submission) -> None:
-    """Only annotation from scratch is carried to a new version."""
-    if submission.origin_key.mode == "proposal_check":
-        raise _from_proposals("carry")
-    if submission.origin_key.mode != "independent":
+    """Annotation from scratch and from proposals is carried (issue 414)."""
+    if submission.origin_key.mode not in ("independent", "proposal_check"):
         raise _not_applicable("not_annotation")
 
 
@@ -323,8 +320,6 @@ class TextChangeService:
         frozen into a snapshot; moving it would lose the draft (``not_open``).
         """
         TextChangeService._require_open_annotation(assignment)
-        if assignment["annotation_mode"] == "proposals":
-            raise _from_proposals("move")
         if assignment["active_round_id"] is None and assignment["status"] != "open":
             raise _not_applicable("not_open")
 
@@ -527,6 +522,17 @@ class TextChangeService:
         if source_assignment is not None:
             require_task_writable(conn, source_assignment)
 
+    def _require_target_proposals(
+        self, conn: Connection, key: str, pid: int, target: VariantInfo
+    ) -> None:
+        """Work from proposals is carried onto the target's own proposals
+        (``no_target_proposals`` while it has none: import them first)."""
+        scope = build_scope(self.repo.get_task_profile(key), "proposal_check")
+        if not target_proposals(
+            self.repo, conn, key, pid, target.document_id, scope.editable_layer_ids
+        ):
+            raise no_target_proposals()
+
     # --- operations ------------------------------------------------------------- #
 
     def preview(
@@ -551,6 +557,7 @@ class TextChangeService:
             self._lead_project(conn, access, actor, key)
             pid = self.repo._require_project(conn, key)
             snapshots: list[AnnotationSnapshot]
+            decisions: list[ReviewDecision]
             if assignment_id is not None:
                 assignment = (
                     conn.execute(
@@ -569,7 +576,8 @@ class TextChangeService:
                 author = conn.execute(
                     select(UserRow.pseudonym).where(UserRow.id == assignment["user_id"])
                 ).scalar_one()
-                snapshots = self._current_draft(conn, key, pid, assignment)
+                snapshots, decisions = self._current_draft(conn, key, pid, assignment)
+                proposals = assignment["annotation_mode"] == "proposals"
             else:
                 assert submission_id is not None
                 submission = self.repo.get_submission(submission_id, key)
@@ -579,6 +587,8 @@ class TextChangeService:
                 from_id = submission.origin_key.document_id
                 author = submission.origin_key.annotator_id
                 snapshots = list(submission.snapshots)
+                decisions = list(submission.decisions)
+                proposals = submission.origin_key.mode == "proposal_check"
             source, target = self._check_target(
                 conn, key, pid, from_id, target_document_id
             )
@@ -586,7 +596,35 @@ class TextChangeService:
             new = self.repo.get_document(key, target.document_id)
             assert old is not None and new is not None
             # Only editable layers are carried (as the final-result panel).
-            snapshots = editable_findings(snapshots, self.repo.get_task_profile(key))
+            profile = self.repo.get_task_profile(key)
+            snapshots = editable_findings(snapshots, profile)
+            if proposals:
+                # Carried decisions and findings; "unplaced" counts what needs
+                # a check (issue 414).
+                plan, _ = proposal_carry_plan(
+                    self.repo,
+                    conn,
+                    key,
+                    pid,
+                    snapshots=snapshots,
+                    decisions=decisions,
+                    old=old,
+                    new=new,
+                    editable=build_scope(profile, "proposal_check").editable_layer_ids,
+                )
+                checks = [item.mapped for item in plan.items if not item.checked]
+                carried = len(plan.decisions) + len(plan.items)
+                return TextChangePreview(
+                    from_version=source.version,
+                    to_version=target.version,
+                    findings=carried,
+                    placed=carried - len(checks),
+                    unplaced=len(checks),
+                    in_changed_passages=findings_in_changed_passages(
+                        item for item in checks if isinstance(item, NeedsReview)
+                    ),
+                    persons=self._persons(conn, pid, source, author),
+                )
             unplaced = unplaced_findings(snapshots, old.text, new.text)
             return TextChangePreview(
                 from_version=source.version,
@@ -628,21 +666,21 @@ class TextChangeService:
 
     def _current_draft(
         self, conn: Connection, key: str, pid: int, assignment: Mapping[Any, Any]
-    ) -> list[AnnotationSnapshot]:
-        """The work of the assignment's active round (none if unstarted)."""
+    ) -> tuple[list[AnnotationSnapshot], list[ReviewDecision]]:
+        """The work of the assignment's active round (none if unstarted): its
+        findings and its proposal decisions."""
         round_id = assignment["active_round_id"]
         if round_id is None:
-            return []
+            return [], []
         round_view = self.repo.work_round_in(conn, key, pid, round_id)
         workspace = round_view.workspace_key
         if (
             workspace is None
             or self.repo._draft_row(conn, pid, _key_str(workspace)) is None
         ):
-            return []
-        return self._findings(
-            conn, pid, round_view, self.repo._open_draft(conn, workspace, None)
-        )
+            return [], []
+        draft = self.repo._open_draft(conn, workspace, None)
+        return self._findings(conn, pid, round_view, draft), list(draft.decisions)
 
     def move_to_version(
         self,
@@ -699,6 +737,8 @@ class TextChangeService:
                 is not None
             ):
                 raise DomainError("ASSIGNMENT_EXISTS")
+            if old["annotation_mode"] == "proposals":
+                self._require_target_proposals(conn, key, pid, target)
             owner = conn.execute(
                 select(UserRow.pseudonym).where(UserRow.id == user_id)
             ).scalar_one()
@@ -820,6 +860,7 @@ class TextChangeService:
             snapshots=editable_findings(
                 self._findings(conn, pid, round_view, draft), profile
             ),
+            decisions=list(draft.decisions),
         )
         snapshot_id: int = conn.execute(
             insert(DraftSnapshotRow)
@@ -873,12 +914,6 @@ class TextChangeService:
             if old["workflow_revision"] != expected_workflow_revision:
                 raise DomainError("WORKFLOW_REVISION_CONFLICT")
             self._require_open_annotation(old)
-            if (
-                resolution == "finish_then_carry"
-                and old["annotation_mode"] == "proposals"
-            ):
-                # The finished work would be carried later: refused now.
-                raise _from_proposals("carry")
             require_task_writable(conn, assignment_id)
             source, target = self._check_target(
                 conn,
@@ -888,6 +923,12 @@ class TextChangeService:
                 target_document_id,
                 withdrawing=resolution == "withdrawn",
             )
+            if (
+                resolution == "finish_then_carry"
+                and old["annotation_mode"] == "proposals"
+            ):
+                # The finished work is carried later, onto these proposals.
+                self._require_target_proposals(conn, key, pid, target)
             now = datetime.now(UTC)
             if resolution == "withdrawn":
                 revoke_assignments(
@@ -988,6 +1029,8 @@ class TextChangeService:
             ).scalar_one_or_none()
             if final is not None and final != submission_id:
                 raise _not_applicable("final_exists")
+            if mode != "dismiss" and submission.origin_key.mode == "proposal_check":
+                self._require_target_proposals(conn, key, pid, target)
             now = datetime.now(UTC)
             if mode == "dismiss":
                 result = CarryResult(
@@ -1257,6 +1300,8 @@ def _auto_carry(
     # The newest version now, also when the text changed again since.
     target_id = service.current_target(conn, key, pid, from_id)
     source, target = service._check_target(conn, key, pid, from_id, target_id)
+    if submission.origin_key.mode == "proposal_check":
+        service._require_target_proposals(conn, key, pid, target)
     project_row = (
         conn.execute(select(ProjectRow).where(ProjectRow.id == pid)).mappings().one()
     )

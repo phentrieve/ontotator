@@ -68,6 +68,7 @@ from ontotator.domain.work_rounds import (
 from ontotator.domain.workspace import (
     Draft,
     MutationEnvelope,
+    RoundInputResolution,
     Submission,
     WorkspaceKey,
 )
@@ -403,6 +404,8 @@ class _InitialContent:
     decisions: list[ReviewDecision]
     # The submission a resumed draft continues, else None.
     submission: Submission | None
+    # Carried inputs a new round resolves at once (from proposals, issue 414).
+    round_input_resolutions: tuple[RoundInputResolution, ...] = ()
 
     def state(self) -> DraftState:
         latest = self.submission
@@ -428,10 +431,13 @@ class _InitialContent:
             if latest
             else (),
             round_input_resolutions=tuple(
-                r.model_dump(mode="json") for r in latest.round_input_resolutions
-            )
-            if latest
-            else (),
+                r.model_dump(mode="json")
+                for r in (
+                    latest.round_input_resolutions
+                    if latest
+                    else self.round_input_resolutions
+                )
+            ),
         )
 
 
@@ -471,7 +477,11 @@ class Repository:
         inputs = self.get_round_input_inventory(key.project_key, key.round_id)
         # A text-change round has no source submission: its inputs come from a
         # frozen draft, so the carry kind decides, not the submission list.
-        if round_view.input_submission_ids or round_view.kind in CARRY_ROUND_KINDS:
+        # A carry from proposals keeps its carried findings in the draft; its
+        # inputs are the new version's proposals, as a first round's (#414).
+        if key.mode != "proposal_check" and (
+            round_view.input_submission_ids or round_view.kind in CARRY_ROUND_KINDS
+        ):
             return [
                 decode_snapshot(item["target_snapshot"])
                 for item in inputs
@@ -3201,8 +3211,13 @@ class Repository:
         key: WorkspaceKey,
         key_string: str,
         targets: ReviewTargetSet | None,
+        start: _InitialContent | None = None,
     ) -> None:
-        """Create the draft row; a new draft resumes the latest submission of its key."""
+        """Create the draft row; a new draft resumes the latest submission of its key.
+
+        ``start``: the content of a new round's draft computed by the caller
+        (a carry from proposals); else ``_initial_content``.
+        """
         effective = targets if targets is not None else ReviewTargetSet.create([])
         draft_id = conn.execute(
             pg_insert(DraftRow)
@@ -3223,13 +3238,17 @@ class Repository:
         ).scalar_one_or_none()
         if draft_id is None:
             return  # created by a concurrent request; the caller reads it
-        start = self._initial_content(conn, project_id, key)
+        start = start or self._initial_content(conn, project_id, key)
         self._insert_snapshots(conn, project_id, start.annotations, start.evidence)
         self._write_draft_content(
             conn, draft_id, start.annotations, start.evidence, start.decisions
         )
         values: dict[str, Any] = {"initial_state": start.state().to_json()}
         latest = start.submission
+        if start.round_input_resolutions:
+            values["round_input_resolutions"] = [
+                r.model_dump(mode="json") for r in start.round_input_resolutions
+            ]
         if latest is not None:
             values |= {
                 "reanchor_inputs": [

@@ -305,7 +305,8 @@ class SubmissionService:
         finish on an old version (a ``finish_then_carry`` resolution), else
         None. One read before the submit transaction; the hook re-reads it
         under the lock. With ``conn``, read in that transaction."""
-        if key.mode != "independent":
+        # Annotation from scratch and from proposals (issue 414).
+        if key.mode not in ("independent", "proposal_check"):
             return None
         from ontotator.storage.overview_tables import TextChangeResolutionRow
         from ontotator.storage.tables import AssignmentRow, ProjectRow, UserRow
