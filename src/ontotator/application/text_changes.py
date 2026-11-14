@@ -1225,6 +1225,12 @@ class TextChangeService:
             owner=owner,
         )
         carried = len(self.repo.get_round_input_inventory(key, round_view.round_id))
+        workspace = round_view.workspace_key
+        if workspace is not None and workspace.mode == "proposal_check":
+            # As the preview: carried decisions and findings; a correction's
+            # ``changed`` decision belongs to its carried finding (#414).
+            draft = self.repo._open_draft(conn, workspace, None)
+            carried += sum(d.outcome != "changed" for d in draft.decisions)
         return CarryResult(
             resolution="carried" if mode == "author" else "handed_over",
             assignment_id=assignment_id,
