@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Ontology upload: malformed ontology JSON (`[1]`, `{"graphs":[1]}`, or nesting too deep to parse) is refused with `INVALID_ONTOLOGY` (HTTP 422) instead of a 500 (#397).
+
 ## [0.10.2] - 2026-11-14
 
 ### Added

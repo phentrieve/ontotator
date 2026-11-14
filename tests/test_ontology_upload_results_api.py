@@ -122,6 +122,22 @@ def test_valid_first_input_persists_when_later_file_is_invalid(staged):
     assert len(audits(app)) == 1
 
 
+@pytest.mark.parametrize(
+    "data",
+    [b"[1]", b'{"graphs":[1]}', b"[" * 200_000],
+    ids=["top-level-list", "graph-not-object", "deep-nesting"],
+)
+def test_malformed_ontology_json_is_a_422_not_a_500(staged, data):
+    """Wrong JSON shapes and too deep nesting map to INVALID_ONTOLOGY (#397)."""
+    _app, client = staged
+    response = client.post(
+        BASE + "/upload-results", files=[("files[]", ("broken.json", data))]
+    )
+    assert response.status_code == 422, response.text
+    assert response.json()["code"] == "INVALID_ONTOLOGY"
+    assert client.get(BASE + "/").json() == []
+
+
 def test_aggregate_limit_is_checked_before_any_real_store_change(staged):
     app, client = staged
     app.state.config.max_ontology_bytes = len(HP) + 1
