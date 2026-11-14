@@ -6,7 +6,7 @@ import { api, ApiError, AuthError, type Profile } from "../src/api/client";
 import { ProfilePage } from "../src/me/ProfilePage";
 
 const profile: Profile = { qualification: null, username: "long-username-123", pseudonym: "ann-0042", display_name: "Alex", email: "alex@example.org", orcid: "0000-0002-1825-0097", orcid_consent: true, languages: ["en"] };
-beforeEach(() => { vi.spyOn(api, "getProfile").mockResolvedValue(profile); vi.spyOn(api, "getPreferences").mockResolvedValue({}); vi.spyOn(api, "listMyTokens").mockResolvedValue([]); });
+beforeEach(() => { vi.spyOn(api, "getProfile").mockResolvedValue(profile); vi.spyOn(api, "getPreferences").mockResolvedValue({}); vi.spyOn(api, "listMyTokens").mockResolvedValue([]); vi.spyOn(api, "listMyTechnicalReports").mockResolvedValue([]); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 const loaded = async () => { await screen.findByText("ann-0042"); };
 const passwordForm = () => screen.getByRole("form", { name: "Change password" });
@@ -178,6 +178,18 @@ describe("ProfilePage component", () => {
     await userEvent.setup().click(within(passwordForm()).getByRole("button", { name: "Change password" }));
     await screen.findByText("Password changed. Other sessions were logged out and your API tokens were revoked.");
     await waitFor(() => expect(api.listMyTokens).toHaveBeenCalledTimes(2));
+  });
+
+  it("shows My technical reports and opens there from the report dialog's link (issue 269)", async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    try {
+      render(<ProfilePage section="technical-reports" />); await loaded();
+      const section = await screen.findByRole("region", { name: "My technical reports" });
+      expect(await within(section).findByText("You have not reported a technical problem.")).toBeDefined();
+      await waitFor(() => expect(scroll).toHaveBeenCalledWith({ block: "start" }));
+      expect(scroll.mock.contexts[0]).toBe(section);
+    } finally { delete (Element.prototype as Partial<Element>).scrollIntoView; }
   });
 
   it("ignores a save result after unmount instead of updating caller identity", async () => {

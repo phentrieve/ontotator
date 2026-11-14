@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Technical reports: **Profile** › **My technical reports** lists the reports a user sent (reference, date, text, *Open* or *Done*), linked from the report dialog (**My reports**) and after sending (*Sent as TR-12.* **See my reports**). The new endpoint `GET /api/v1/me/technical-reports` returns only the caller's own reports and none of the administrators' details (#269).
+
 ## [0.10.2] - 2026-11-14
 
 ### Added

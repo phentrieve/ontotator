@@ -719,6 +719,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/technical-reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Own Reports
+         * @description The caller's own reports, newest first: reference, text and status.
+         */
+        get: operations["list_own_reports_api_v1_me_technical_reports_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/technical-reports": {
         parameters: {
             query?: never;
@@ -6738,6 +6758,29 @@ export interface components {
             report_id: string;
         };
         /**
+         * OwnTechnicalReportView
+         * @description One report as its reporter reads it (issue 269): what they wrote and
+         *     whether it is handled. No context, no administrator names.
+         */
+        OwnTechnicalReportView: {
+            /** Id */
+            id: number;
+            /** Reference */
+            reference: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "done";
+            /** Description */
+            description: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
          * PairAgreement
          * @description Two people's annotations of one text: a row of agreement.csv.
          */
@@ -11934,6 +11977,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TechnicalReportReceipt"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_own_reports_api_v1_me_technical_reports_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnTechnicalReportView"][];
                 };
             };
             /** @description Validation Error */

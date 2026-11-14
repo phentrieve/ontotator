@@ -7,6 +7,10 @@ const MAX_CRASH_MESSAGE = 2000;
 
 /** The entry's label in the editor's More menu, the navigation and the crash screen. */
 export const REPORT_ENTRY_LABEL = "Report a technical problem…";
+/** Sent on `window` after a report was stored: Profile › My technical reports reloads. */
+export const TECHNICAL_REPORT_SENT = "ontotator:technical-report-sent";
+/** Profile › My technical reports (issue 269), where the dialog links to. */
+export const MY_TECHNICAL_REPORTS_HREF = "#/me?section=technical-reports";
 /** The same entry in the narrow navigation, on one line. */
 export const REPORT_NAV_LABEL = "Technical problem…";
 

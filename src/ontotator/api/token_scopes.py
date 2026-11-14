@@ -60,6 +60,7 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     ("GET", "/api/v1/preferences"): SESSION,
     ("PUT", "/api/v1/preferences"): SESSION,
     ("POST", "/api/v1/technical-reports"): SESSION,
+    ("GET", "/api/v1/me/technical-reports"): SESSION,
     # A token reads its own record (expiry, scopes) with any non-admin scope.
     ("GET", "/api/v1/me/token"): ("read", "import", "export", "project-admin"),
     # API tokens: never with a token

@@ -30,7 +30,7 @@ it("shows a way back, a reload and the technical report with the crash message",
   expect(within(dialog).getByText("Error message: RangeError: Assignment ID must be a positive safe integer")).toBeDefined();
   await input.type(within(dialog).getByLabelText("What happened?"), "Opened My tasks");
   await input.click(within(dialog).getByRole("button", { name: "Send report" }));
-  await screen.findByText(/Reference: TR-12/);
+  await screen.findByText("Sent as TR-12.");
   expect(send.mock.calls[0][0].context?.crash_message).toBe("RangeError: Assignment ID must be a positive safe integer");
   await input.click(screen.getByRole("button", { name: "Go to My tasks" }));
   expect(home).toHaveBeenCalledTimes(1);
