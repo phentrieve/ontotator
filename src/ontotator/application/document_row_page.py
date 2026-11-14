@@ -902,6 +902,13 @@ def _old_work(
                 or item.user_id in holders
                 or ctx.submission_resolutions.get(submission, set()) & _SETTLED
                 or target.document_id in ctx.dismissed_to.get(submission, set())
+                # Work from proposals is carried only onto the target's own
+                # proposals (issue 414); until they are imported the row
+                # offers assigning the target (rule 8), not a carry.
+                or (
+                    item.annotation_mode == "proposals"
+                    and not ctx.facts.proposal_counts.get(target.document_id)
+                )
             ):
                 continue
             old_submitted.append(replace(entry, submission_id=submission))
