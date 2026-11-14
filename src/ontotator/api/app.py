@@ -562,6 +562,7 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
                     "MODE_CHANGE_ALREADY_RESTORED": 409,
                     "MODE_CHANGE_NOT_LATEST": 409,
                     "ANNOTATION_MODE_FINAL_SELECTED": 409,
+                    "PREVIEW_STALE": 409,
                     "ASSIGNMENT_BATCH_REFUSED": 409,
                     "ASSIGNMENT_BATCH_STALE": 409,
                     "GUIDELINE_TOO_LARGE": 413,

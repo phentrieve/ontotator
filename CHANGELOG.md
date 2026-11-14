@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Documents: **Withdraw final…** next to **Change final…** in the text card's **Finalization** takes a final result back. The dialog lists what follows (the text needs a final result again; final exports already made stay; **Change mode…** is possible again; submissions and consolidation stay) and asks for a **Reason** and **I understand**. `POST /api/v1/projects/{key}/final-selections/withdraw` (scope `project-admin`) takes `case_id`, `language`, `expected_revision` and `reason`, answers `REVISION_CONFLICT` when the final changed and is audited as `project.final_withdrawn`; the text card's History shows the withdrawal. The next choice of a final continues the revision, so a client still holding the withdrawn final's revision is refused. Migration 0039 lets the application role delete a row of `final_selections` (the history in `final_selection_events` stays append-only). MCP: `withdraw_final_result` (#343).
+- `POST /api/v1/projects/{key}/final-selections/accept-agreeing` (scope `project-admin`) accepts every text whose annotations agree in full on the server: `{"preview": true}` lists the texts that would become final, the texts left out with a reason (open task, fewer than two submissions, consolidation, differing results), the number of texts that already have a final result (not changed) and a `preview_token`; applying with that token makes all listed texts final or none, and a token that no longer matches is refused with `PREVIEW_STALE` (409) and a fresh preview. Each text is audited like a single selection (`via: accept_agreeing`). The MCP tool `accept_agreeing_texts` now makes one request instead of two per text and needs the dry run's `preview_token` to confirm; its scope is `project-admin` only (#354).
+
 ## [0.10.2] - 2026-11-14
 
 ### Added

@@ -53,6 +53,7 @@ export interface RemoveModifierPayload { command: "remove_modifier"; annotation_
 export interface ConvertToModifierPayload { command: "convert_to_modifier"; annotation_id: string; target_annotation_id: string; link_span?: boolean }
 export type FinalPreflight = components["schemas"]["FinalPreflight"];
 export type FinalSelectionView = components["schemas"]["FinalSelectionView"];
+export type FinalWithdrawalView = components["schemas"]["FinalWithdrawalView"];
 export type FinalExportRequest = components["schemas"]["FinalExportRequest"];
 export type DocumentRowsPage = components["schemas"]["DocumentRowsPage"];
 export type DocumentRowView = components["schemas"]["DocumentRowView"];
@@ -879,6 +880,10 @@ export class ApiClient {
   }
   async selectFinalResult(projectKey: string, payload: components["schemas"]["FinalSelectionRequest"]): Promise<FinalSelectionView> {
     return this.request<FinalSelectionView>(`/api/v1/projects/${encodeURIComponent(projectKey)}/final-selections`, { method: "PUT", body: JSON.stringify(payload) });
+  }
+  /** Withdraw a text's final result, with a reason (issue 343). */
+  async withdrawFinalResult(projectKey: string, payload: components["schemas"]["FinalWithdrawalRequest"]): Promise<FinalWithdrawalView> {
+    return this.request<FinalWithdrawalView>(`/api/v1/projects/${encodeURIComponent(projectKey)}/final-selections/withdraw`, { method: "POST", body: JSON.stringify(payload) });
   }
   async startFinalExport(projectKey: string, payload: FinalExportRequest): Promise<{ job_id: number }> {
     return this.request<{ job_id: number }>(`/api/v1/projects/${encodeURIComponent(projectKey)}/exports/final`, { method: "POST", body: JSON.stringify(payload) });

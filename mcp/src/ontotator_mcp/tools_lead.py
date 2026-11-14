@@ -362,6 +362,66 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
         )
         return {"applied": True, "plan": plan, "final": selected}
 
+    @register(server, scopes=("read", "project-admin"), effect="destructive")
+    async def withdraw_final_result(
+        project: Project,
+        case_id: str,
+        language: str,
+        reason: Annotated[
+            str,
+            Field(
+                min_length=1,
+                max_length=2000,
+                description="Why, e.g. 'Re-annotation with guideline 2.3'.",
+            ),
+        ],
+        confirm: Confirm = False,
+    ) -> dict[str, Any]:
+        """Withdraw the final result of one text, after a dry run.
+
+        The text then has no final result until one is chosen again
+        (set_final_result, accept_agreeing_texts); its submissions and
+        consolidations stay, final exports already made stay as they are,
+        and change_annotation_mode is possible again. The reason is recorded
+        in the audit and the text's history. Refused if the final result
+        changed since the dry run.
+        """
+        found, _ = await rows(api, project, case=case_id, language=[language])
+        row = next(
+            (
+                r
+                for r in found
+                if r.get("case_id") == case_id and r.get("language") == language
+            ),
+            None,
+        )
+        if row is None:
+            raise OntotatorError(f"Project {project} has no text {case_id} {language}.")
+        final = row.get("final")
+        if not final:
+            raise OntotatorError(f"{case_id} {language} has no final result.")
+        plan = {
+            "current_final": final,
+            "consequences": [
+                "The text has no final result until one is chosen again.",
+                "Final exports already made stay as they are.",
+                "The annotation mode can be changed again.",
+                "Submissions and consolidations stay.",
+            ],
+        }
+        if not confirm:
+            return {"applied": False, "plan": plan}
+        withdrawn: dict[str, Any] = await api.post(
+            project_path(project, "final-selections", "withdraw"),
+            {
+                "case_id": case_id,
+                "language": language,
+                "expected_revision": int(final["revision"]),
+                "reason": reason,
+            },
+        )
+        return {"applied": True, "plan": plan, "withdrawn": withdrawn}
+
     async def _variant(project: str, document_id: str) -> dict[str, Any]:
         found: dict[str, Any] = await api.get(
             project_path(project, "documents", seg(document_id), "variant")

@@ -650,13 +650,16 @@ def final_panel(
     key: str,
     case_id: str,
     language: str,
+    *,
+    ctx: _Context | None = None,
 ) -> dict[str, Any]:
-    """``FinalPanelView`` fields of row (case_id, language)."""
+    """``FinalPanelView`` fields of row (case_id, language). ``ctx`` reuses a
+    context built from the same ``facts`` (several rows in one request)."""
     pid = Repository._project_id(conn, key)
     if pid is None:  # the caller authorized the project
         raise DomainError("PROJECT_NOT_FOUND")
     listing = build_submissions(conn, key, pid, case_id, language, facts.viewer_user_id)
-    ctx = page_context(facts)
+    ctx = ctx or page_context(facts)
     comparison = row_comparison(ctx, case_id, language)
     recorded_at = {
         item["submission_id"]: item["recorded_at"] for item in listing["submissions"]

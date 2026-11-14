@@ -4040,6 +4040,116 @@
         "x-ontotator-project-token": true
       }
     },
+    "/api/v1/projects/{key}/final-selections/withdraw": {
+      "post": {
+        "tags": [
+          "final-results"
+        ],
+        "summary": "Withdraw Final",
+        "description": "Withdraw a text's final result, with a reason (#343).\n\nThe text has no final result until a lead chooses one again; submissions,\nconsolidations and final exports already made stay. 409\n``REVISION_CONFLICT`` when the final changed since ``expected_revision``.",
+        "operationId": "withdraw_final_api_v1_projects__key__final_selections_withdraw_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinalWithdrawalRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinalWithdrawalView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/final-selections/accept-agreeing": {
+      "post": {
+        "tags": [
+          "final-results"
+        ],
+        "summary": "Accept Agreeing",
+        "description": "Accept the result of every text whose annotations agree in full (#354).\n\n``preview: true`` lists the texts that would become final, the texts left\nout and why, and a ``preview_token``. Applying sends that token: all\nlisted texts become final, or none (409 ``PREVIEW_STALE`` with a fresh\n``preview`` in the details when anything changed). Texts that already\nhave a final result are only counted.",
+        "operationId": "accept_agreeing_api_v1_projects__key__final_selections_accept_agreeing_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptAgreeingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptAgreeingView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
     "/api/v1/projects/{key}/exports/final/preflight": {
       "post": {
         "tags": [
@@ -10391,6 +10501,90 @@
         "title": "About",
         "description": "What a user quotes when reporting a problem."
       },
+      "AcceptAgreeingRequest": {
+        "properties": {
+          "preview": {
+            "type": "boolean",
+            "title": "Preview",
+            "default": false
+          },
+          "preview_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Token"
+          },
+          "case_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AcceptAgreeingRequest",
+        "description": "Preview (``preview``) or apply (``preview_token``) accepting every\nagreeing text (#354)."
+      },
+      "AcceptAgreeingView": {
+        "properties": {
+          "project": {
+            "type": "string",
+            "title": "Project"
+          },
+          "applied": {
+            "type": "boolean",
+            "title": "Applied"
+          },
+          "texts": {
+            "items": {
+              "$ref": "#/components/schemas/AgreeingText"
+            },
+            "type": "array",
+            "title": "Texts"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/AgreeingSkip"
+            },
+            "type": "array",
+            "title": "Skipped"
+          },
+          "already_final": {
+            "type": "integer",
+            "title": "Already Final"
+          },
+          "preview_token": {
+            "type": "string",
+            "title": "Preview Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project",
+          "applied",
+          "texts",
+          "skipped",
+          "already_final",
+          "preview_token"
+        ],
+        "title": "AcceptAgreeingView"
+      },
       "AcceptExternalReview": {
         "properties": {
           "reason": {
@@ -10731,6 +10925,79 @@
           "task"
         ],
         "title": "AffectedTask"
+      },
+      "AgreeingSkip": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "open_task",
+              "fewer_than_two",
+              "consolidation",
+              "differ"
+            ],
+            "title": "Reason"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "reason",
+          "message"
+        ],
+        "title": "AgreeingSkip"
+      },
+      "AgreeingText": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "submission_id": {
+            "type": "string",
+            "title": "Submission Id"
+          },
+          "findings": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Findings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "document_id",
+          "submission_id"
+        ],
+        "title": "AgreeingText"
       },
       "AgreementDetailView": {
         "properties": {
@@ -17556,6 +17823,72 @@
           "destination"
         ],
         "title": "FinalWarning"
+      },
+      "FinalWithdrawalRequest": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Revision"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "expected_revision",
+          "reason"
+        ],
+        "title": "FinalWithdrawalRequest",
+        "description": "Withdraw the final result of one text (#343)."
+      },
+      "FinalWithdrawalView": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "submission_id": {
+            "type": "string",
+            "title": "Submission Id"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "document_id",
+          "submission_id",
+          "revision"
+        ],
+        "title": "FinalWithdrawalView"
       },
       "FrozenTranslation": {
         "properties": {
@@ -24854,7 +25187,8 @@
             "enum": [
               "reassigned",
               "mode_changed",
-              "mode_restored"
+              "mode_restored",
+              "final_withdrawn"
             ],
             "title": "Kind"
           },
@@ -24935,7 +25269,7 @@
           "at"
         ],
         "title": "RowChangeView",
-        "description": "A change of who works on a row, or how: its History line."
+        "description": "A change of who works on a row, or how: its History line. A withdrawn\nfinal result (#343) names the lead in ``from_person``."
       },
       "RowItemView": {
         "properties": {

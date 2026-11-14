@@ -1325,6 +1325,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{key}/final-selections/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw Final
+         * @description Withdraw a text's final result, with a reason (#343).
+         *
+         *     The text has no final result until a lead chooses one again; submissions,
+         *     consolidations and final exports already made stay. 409
+         *     ``REVISION_CONFLICT`` when the final changed since ``expected_revision``.
+         */
+        post: operations["withdraw_final_api_v1_projects__key__final_selections_withdraw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{key}/final-selections/accept-agreeing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Agreeing
+         * @description Accept the result of every text whose annotations agree in full (#354).
+         *
+         *     ``preview: true`` lists the texts that would become final, the texts left
+         *     out and why, and a ``preview_token``. Applying sends that token: all
+         *     listed texts become final, or none (409 ``PREVIEW_STALE`` with a fresh
+         *     ``preview`` in the details when anything changed). Texts that already
+         *     have a final result are only counted.
+         */
+        post: operations["accept_agreeing_api_v1_projects__key__final_selections_accept_agreeing_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{key}/exports/final/preflight": {
         parameters: {
             query?: never;
@@ -3181,6 +3231,37 @@ export interface components {
             /** Revision */
             revision: string | null;
         };
+        /**
+         * AcceptAgreeingRequest
+         * @description Preview (``preview``) or apply (``preview_token``) accepting every
+         *     agreeing text (#354).
+         */
+        AcceptAgreeingRequest: {
+            /**
+             * Preview
+             * @default false
+             */
+            preview: boolean;
+            /** Preview Token */
+            preview_token?: string | null;
+            /** Case Ids */
+            case_ids?: string[] | null;
+        };
+        /** AcceptAgreeingView */
+        AcceptAgreeingView: {
+            /** Project */
+            project: string;
+            /** Applied */
+            applied: boolean;
+            /** Texts */
+            texts: components["schemas"]["AgreeingText"][];
+            /** Skipped */
+            skipped: components["schemas"]["AgreeingSkip"][];
+            /** Already Final */
+            already_final: number;
+            /** Preview Token */
+            preview_token: string;
+        };
         /** AcceptExternalReview */
         AcceptExternalReview: {
             /** Reason */
@@ -3321,6 +3402,33 @@ export interface components {
              * @enum {string}
              */
             task: "annotate" | "review" | "translation_review";
+        };
+        /** AgreeingSkip */
+        AgreeingSkip: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "open_task" | "fewer_than_two" | "consolidation" | "differ";
+            /** Message */
+            message: string;
+        };
+        /** AgreeingText */
+        AgreeingText: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Document Id */
+            document_id: string;
+            /** Submission Id */
+            submission_id: string;
+            /** Findings */
+            findings?: number | null;
         };
         /**
          * AgreementDetailView
@@ -5714,6 +5822,33 @@ export interface components {
             reason: string;
             /** Destination */
             destination: string;
+        };
+        /**
+         * FinalWithdrawalRequest
+         * @description Withdraw the final result of one text (#343).
+         */
+        FinalWithdrawalRequest: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Expected Revision */
+            expected_revision: number;
+            /** Reason */
+            reason: string;
+        };
+        /** FinalWithdrawalView */
+        FinalWithdrawalView: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Document Id */
+            document_id: string;
+            /** Submission Id */
+            submission_id: string;
+            /** Revision */
+            revision: number;
         };
         /**
          * FrozenTranslation
@@ -8443,14 +8578,15 @@ export interface components {
         };
         /**
          * RowChangeView
-         * @description A change of who works on a row, or how: its History line.
+         * @description A change of who works on a row, or how: its History line. A withdrawn
+         *     final result (#343) names the lead in ``from_person``.
          */
         RowChangeView: {
             /**
              * Kind
              * @enum {string}
              */
-            kind: "reassigned" | "mode_changed" | "mode_restored";
+            kind: "reassigned" | "mode_changed" | "mode_restored" | "final_withdrawn";
             /**
              * At
              * Format: date-time
@@ -13078,6 +13214,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FinalSelectionView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    withdraw_final_api_v1_projects__key__final_selections_withdraw_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FinalWithdrawalRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinalWithdrawalView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_agreeing_api_v1_projects__key__final_selections_accept_agreeing_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptAgreeingRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptAgreeingView"];
                 };
             };
             /** @description Validation Error */

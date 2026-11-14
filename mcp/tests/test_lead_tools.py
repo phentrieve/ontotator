@@ -176,6 +176,28 @@ async def test_set_final_result_replaces_or_confirms_with_the_revision(
         await call(mcp_client, "set_final_result", args | {"submission_id": "zz"})
 
 
+async def test_withdraw_final_result_sends_the_finals_revision(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    fake.on("GET", f"{P}/document-rows", page([row("c", final=_final("s1", 4))]))
+    args = {"project": "p", "case_id": "c", "language": "en", "reason": "Redo"}
+    dry = await call(mcp_client, "withdraw_final_result", args)
+    assert dry["applied"] is False
+    assert dry["plan"]["current_final"]["submission_id"] == "s1"
+    assert _writes(fake) == []
+    await call(mcp_client, "withdraw_final_result", args | {"confirm": True})
+    [withdrawn] = fake.calls_to("POST", f"{P}/final-selections/withdraw")
+    assert withdrawn.json() == {
+        "case_id": "c",
+        "language": "en",
+        "expected_revision": 4,
+        "reason": "Redo",
+    }
+    fake.on("GET", f"{P}/document-rows", page([row("c")]))
+    with pytest.raises(ToolFailed, match="has no final result"):
+        await call(mcp_client, "withdraw_final_result", args | {"confirm": True})
+
+
 async def test_undo_and_discard_return_the_work_they_would_withdraw(
     fake: FakeApi, mcp_client: Client
 ) -> None:
