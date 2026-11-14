@@ -69,7 +69,11 @@ def test_route_gives_the_figures_of_the_final_export(tmp_path):
     body = answer.json()
     archive = final_archive(env, "agreement-route")
 
-    summary = {r.pop("scope"): r for r in rows(archive.read("agreement-summary.csv"))}
+    summary = {
+        r.pop("scope"): r
+        for r in rows(archive.read("agreement-summary.csv"))
+        if r.pop("modes") == "all"
+    }
     assert set(summary) == set(body["summary"]) == {"macro_mean", "pooled"}
     for scope, expected in summary.items():
         # The macro mean has no counts: empty cells in the CSV.

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Final export: agreement.csv names the annotation mode of both submissions of a pair (new columns `mode_a`, `mode_b`: `scratch` or `proposals`), and agreement-summary.csv has a new column `modes` with the rows of all pairs (`all`, as before) followed by the same two rows for `scratch-scratch`, `proposals-proposals` and `mixed` pairs. Two proposal checks start from the same proposals, so pooling them with work from scratch reported an agreement that was neither. The README of the export and the scientific workflow guide explain the columns. The project agreement route (`GET /api/v1/projects/{key}/agreement`) is unchanged (#389).
+
 ### Fixed
 
 - Text changes: proposals copied to a corrected text version keep the tool that produced them (actor and method of the source set) instead of naming the copy job `ontotator-reanchor`; the copy stays recorded by the set's origin and each proposal's `source_refs`. The editor names the original tool, and proposals.csv and the tool tables of the final export count the proposals under it. Sets copied by earlier releases are not rewritten: the editor, the proposal set metadata and the export credit them at read time to the one tool of the set they were copied from, and re-running the copy for such a text no longer fails with `REANCHOR_SET_COLLISION` (#417).

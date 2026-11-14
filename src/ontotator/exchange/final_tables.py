@@ -102,12 +102,28 @@ AGREEMENT_COLUMNS = (
     "source_text_line",
     "submission_a",
     "pseudonym_a",
+    "mode_a",
     "submission_b",
     "pseudonym_b",
+    "mode_b",
     *F1_COLUMNS,
     *COUNT_COLUMNS,
 )
-AGREEMENT_SUMMARY_COLUMNS = ("scope", "texts", "pairs", *F1_COLUMNS, *COUNT_COLUMNS)
+AGREEMENT_SUMMARY_COLUMNS = (
+    "scope",
+    "modes",
+    "texts",
+    "pairs",
+    *F1_COLUMNS,
+    *COUNT_COLUMNS,
+)
+# The annotation mode of a submission in agreement.csv (#389): from scratch,
+# or from proposals (a proposal check, also one carried to a new version).
+SCRATCH, PROPOSALS = "scratch", "proposals"
+# The mode pairs of agreement-summary.csv after the rows of all pairs: pairs
+# of proposal checks share the proposals they started from, so their
+# agreement is no from-scratch agreement.
+MODE_PAIRS = ("scratch-scratch", "proposals-proposals", "mixed")
 PROPOSALS_COLUMNS = (
     "row_type",
     "tool",
@@ -530,6 +546,13 @@ class AgreementPair:
     submission_b: str
     values: Mapping[str, float | None]
     counts: Mapping[str, int]
+    mode_a: str = SCRATCH
+    mode_b: str = SCRATCH
+
+    @property
+    def modes(self) -> str:
+        """``scratch-scratch``, ``proposals-proposals`` or ``mixed``."""
+        return f"{self.mode_a}-{self.mode_b}" if self.mode_a == self.mode_b else "mixed"
 
 
 def agreement_pairs(
@@ -578,9 +601,15 @@ def agreement_pairs(
                     right.submission_id,
                     values,
                     _counts(found, len(a), len(b), related),
+                    _mode(context, left.submission_id),
+                    _mode(context, right.submission_id),
                 )
             )
     return pairs
+
+
+def _mode(context: SubmissionFacts, sid: str) -> str:
+    return PROPOSALS if context.from_proposals(sid) else SCRATCH
 
 
 def agreement_summary(pairs: Sequence[AgreementPair]) -> dict[str, dict[str, Any]]:
@@ -637,23 +666,30 @@ def build_agreement_csv(
             **context.text(pair.document_id),
             "submission_a": pair.submission_a,
             "pseudonym_a": context.author(pair.submission_a),
+            "mode_a": pair.mode_a,
             "submission_b": pair.submission_b,
             "pseudonym_b": context.author(pair.submission_b),
+            "mode_b": pair.mode_b,
             **{name: _number(pair.values[name]) for name in F1_COLUMNS},
             **{name: str(pair.counts[name]) for name in COUNT_COLUMNS},
         }
         for pair in pairs
     ]
-    summary = agreement_summary(pairs)
+    # All pairs first, then the same two rows per mode pair (#389).
+    groups = [("all", pairs)] + [
+        (modes, [pair for pair in pairs if pair.modes == modes]) for modes in MODE_PAIRS
+    ]
     summary_rows = [
         {
             "scope": scope,
+            "modes": modes,
             **{
                 name: _number(value) if name in F1_COLUMNS else str(value)
                 for name, value in values.items()
             },
         }
-        for scope, values in summary.items()
+        for modes, group in groups
+        for scope, values in agreement_summary(group).items()
     ]
     return {
         "agreement.csv": _csv(AGREEMENT_COLUMNS, rows),

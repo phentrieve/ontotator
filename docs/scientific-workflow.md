@@ -223,8 +223,10 @@ for that earlier version (`text_version` and `source_text_line` name it).
 They are the agreement behind the text's final result, and for a carried
 result the only one; filter on `text_version` to compare one version only.
 
-Each row names the text, both submissions and pseudonyms, and gives the
-values of `ontospan.agreement`, the matching Ontotator's consolidation and the
+Each row names the text, both submissions and pseudonyms, the mode of each
+submission (`mode_a`, `mode_b`: `scratch` for annotation from scratch,
+`proposals` for a proposal check, also one carried to a new version), and gives
+the values of `ontospan.agreement`, the matching Ontotator's consolidation and the
 ontospan benchmark share. Findings pair only within a layer, one to one, by
 an optimal assignment:
 
@@ -245,17 +247,23 @@ and descendant in the layer's ontology ("Seizure" and "Focal seizure"). It
 only flags the smaller disagreement; every F1 value counts such a pair as a
 term conflict, as before. Two submissions without findings agree (F1 1).
 
-`agreement-summary.csv` has two rows. `macro_mean` averages each value over
-the pairs of a text, then over the texts. `pooled` computes each value from
-the counts summed over all pairs (micro average) and lists those sums.
-Without any pair (for example when every text had one annotator), both rows
+`agreement-summary.csv` has two rows per group of pairs. `macro_mean`
+averages each value over the pairs of a text, then over the texts. `pooled`
+computes each value from the counts summed over the pairs (micro average) and
+lists those sums. Column `modes` names the group: `all` (every pair), then
+`scratch-scratch`, `proposals-proposals` and `mixed` (one submission of each
+mode). Two proposal checks start from the same proposals, so their agreement
+runs higher than that of two people annotating from scratch; in a project
+that mixes both modes, compare the mode rows, not only `all`. Without any
+pair in a group (for example when every text had one annotator), its rows
 have `pairs` 0 and empty values.
 
 The same figures are available before an export: `GET
 /api/v1/projects/{key}/agreement` (token scope `read`; leads only, like the
 final export, because it names the annotators) computes them with the same
 code for the current final results. Its `summary` and `pairs` are the rows of
-the two files (unrounded, without `source_text_line`); `annotator_pairs` and
+the two files (unrounded, without `source_text_line`; `summary` holds the
+`all` rows, and neither names the modes yet); `annotator_pairs` and
 `texts` apply the summary to the pairs of two people and of one text. The MCP
 tool `agreement_summary` reads it.
 
