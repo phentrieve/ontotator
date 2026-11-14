@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from ontotator.domain.annotations import AnnotationRef, AnnotationSnapshot
 from ontotator.domain.canonical import canonical_hash
 from ontotator.domain.errors import DomainError
+from ontotator.domain.review import ReviewDecision
 from ontotator.domain.scopes import TaskScope
 from ontotator.domain.serialization import decode_snapshot, encode_snapshot
 from ontotator.domain.variants import (
@@ -146,6 +147,9 @@ class DraftSnapshotPayload(BaseModel):
     document_version: int
     text_sha256: str
     snapshots: list[AnnotationSnapshot]
+    # The proposal decisions of a draft from proposals (issue 414); left out
+    # of the stored payload while empty, so older payloads stay as they are.
+    decisions: list[ReviewDecision] = Field(default_factory=list)
 
     @model_validator(mode="before")
     @classmethod
@@ -167,7 +171,11 @@ class DraftSnapshotPayload(BaseModel):
             "document_version": self.document_version,
             "text_sha256": self.text_sha256,
             "snapshots": [encode_snapshot(item) for item in self.snapshots],
-        }
+        } | (
+            {"decisions": [d.model_dump(mode="json") for d in self.decisions]}
+            if self.decisions
+            else {}
+        )
 
 
 # Archived rounds (package ``workflow_history``) keep the inputs in the shape

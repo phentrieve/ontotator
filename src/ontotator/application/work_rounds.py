@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal
@@ -22,19 +22,22 @@ from ontotator.domain.annotation_modes import workspace_mode
 from ontotator.domain.annotations import AnnotationRef, AnnotationSnapshot, snapshot
 from ontotator.domain.canonical import canonical_hash
 from ontotator.domain.documents import (
+    Document,
     EvidenceMention,
     EvidenceRef,
     EvidenceSnapshot,
     Segment,
 )
 from ontotator.domain.errors import AccessDenied, DomainError
+from ontotator.domain.proposal_carry import ProposalCarryPlan, plan_proposal_carry
 from ontotator.domain.reanchor import (
     Carried,
     NeedsReview,
+    TextMap,
     reanchor_annotation,
     text_map,
 )
-from ontotator.domain.review import ReviewTargetSet
+from ontotator.domain.review import ReviewDecision, ReviewTargetSet
 from ontotator.domain.scopes import TaskScope, build_scope, is_review_like
 from ontotator.domain.serialization import encode_snapshot
 from ontotator.domain.work_rounds import (
@@ -45,7 +48,12 @@ from ontotator.domain.work_rounds import (
     WorkRoundView,
     is_exact_ancestor,
 )
-from ontotator.domain.workspace import Draft, MutationEnvelope, WorkspaceKey
+from ontotator.domain.workspace import (
+    Draft,
+    MutationEnvelope,
+    RoundInputResolution,
+    WorkspaceKey,
+)
 from ontotator.storage.database import Database
 from ontotator.storage.live_submissions import discarded_ids, live_submission
 from ontotator.storage.overview_tables import DraftSnapshotRow
@@ -53,7 +61,12 @@ from ontotator.storage.proposal_queries import (
     newest_proposal_refs,
     newest_proposal_set,
 )
-from ontotator.storage.repository import Repository, _key_str, _lock_id
+from ontotator.storage.repository import (
+    Repository,
+    _InitialContent,
+    _key_str,
+    _lock_id,
+)
 from ontotator.storage.tables import (
     AssignmentRow,
     DocumentRow,
@@ -117,6 +130,74 @@ class RoundSource:
     scope: TaskScope | None
     source_submission_id: str | None
     source_draft_snapshot_id: int | None
+    # The proposal decisions of work from proposals (issue 414).
+    decisions: list[ReviewDecision]
+
+
+def no_target_proposals() -> DomainError:
+    """Work from proposals needs proposals on the version it is carried to."""
+    return DomainError("TEXT_CHANGE_NOT_APPLICABLE", {"reason": "no_target_proposals"})
+
+
+def target_proposals(
+    repo: Repository,
+    conn: Connection,
+    project: str,
+    pid: int,
+    document_id: str,
+    editable: Sequence[str],
+) -> list[AnnotationSnapshot]:
+    """The newest proposal set of ``document_id`` on the editable layers (the
+    targets a round from proposals starts with), ordered by identity."""
+    newest = {
+        (ref.annotation_id, ref.version)
+        for ref in newest_proposal_refs(conn, pid, document_id)
+    }
+    return [
+        s
+        for s in repo.list_annotations_for_document(project, document_id)
+        if (s.annotation.annotation_id, s.version) in newest
+        and s.annotation.layer_id in editable
+    ]
+
+
+def proposal_carry_plan(
+    repo: Repository,
+    conn: Connection,
+    project: str,
+    pid: int,
+    *,
+    snapshots: Sequence[AnnotationSnapshot],
+    decisions: Sequence[ReviewDecision],
+    old: Document,
+    new: Document,
+    editable: Sequence[str],
+    mapping: TextMap | None = None,
+) -> tuple[ProposalCarryPlan, list[AnnotationSnapshot]]:
+    """The carry plan of work from proposals on ``old`` to ``new`` and the new
+    version's target proposals.
+
+    Raises:
+        DomainError: ``TEXT_CHANGE_NOT_APPLICABLE`` (``no_target_proposals``).
+    """
+    targets = target_proposals(repo, conn, project, pid, new.document_id, editable)
+    if not targets:
+        raise no_target_proposals()
+    old_proposals = [
+        s
+        for s in repo.list_annotations_for_document(project, old.document_id)
+        if s.annotation.layer_id in editable
+    ]
+    plan = plan_proposal_carry(
+        snapshots,
+        decisions,
+        old_proposals,
+        targets,
+        old.text,
+        new.text,
+        mapping or text_map(old.text, new.text),
+    )
+    return plan, targets
 
 
 def require_independent(
@@ -414,6 +495,7 @@ class WorkRoundService:
                 scope=submission.scope,
                 source_submission_id=source,
                 source_draft_snapshot_id=None,
+                decisions=list(submission.decisions),
             )
         stored = conn.execute(
             select(DraftSnapshotRow.payload).where(
@@ -429,6 +511,7 @@ class WorkRoundService:
             scope=payload.scope,
             source_submission_id=None,
             source_draft_snapshot_id=source,
+            decisions=payload.decisions,
         )
 
     def create_in(
@@ -521,19 +604,19 @@ class WorkRoundService:
                 "ROUND_INPUT_INVALID",
                 "Consolidation needs a reviewer and at least two selected submissions",
             )
-        if kind == "carry_forward" and (mode != "independent" or len(sources) != 1):
+        # Annotation from scratch and from proposals is carried (issue 414).
+        carrying = mode in {"independent", "proposal_check"}
+        if kind == "carry_forward" and (not carrying or len(sources) != 1):
             raise DomainError(
                 "ROUND_INPUT_INVALID", "Carry-forward needs one own submission"
             )
         if kind == "text_change" and (
-            not lead or mode != "independent" or sources or len(draft_sources) != 1
+            not lead or not carrying or sources or len(draft_sources) != 1
         ):
             raise DomainError(
                 "ROUND_INPUT_INVALID", "A text change carries one frozen draft"
             )
-        if kind == "handover" and (
-            not lead or mode != "independent" or len(sources) != 1
-        ):
+        if kind == "handover" and (not lead or not carrying or len(sources) != 1):
             raise DomainError(
                 "ROUND_INPUT_INVALID", "A handover is a lead's carry of one submission"
             )
@@ -563,6 +646,8 @@ class WorkRoundService:
             )
         rid = f"round-{uuid4().hex}"
         inputs: list[dict[str, Any]] = []
+        plan: ProposalCarryPlan | None = None
+        carried_targets: list[AnnotationSnapshot] = []
         items: list[str | int] = [*sources, *draft_sources]
         if discarded_ids(conn, pid, sources):
             # Work discarded by a mode change (#109) is no input.
@@ -618,7 +703,7 @@ class WorkRoundService:
                     raise DomainError("ROUND_INPUT_STALE")
             if kind in CARRY_ROUND_KINDS:
                 own = source.origin_key.annotator_id == owner
-                if source.origin_key.mode != "independent" or (
+                if source.origin_key.mode != mode or (
                     own if kind == "handover" else not own
                 ):
                     raise DomainError(
@@ -648,7 +733,36 @@ class WorkRoundService:
             # One map per source text, not per snapshot: this runs under the
             # exclusive project lock.
             mapping = text_map(old_document.text, document.text)
-            for original in source.snapshots:
+            entries: list[tuple[AnnotationSnapshot, Carried | NeedsReview]]
+            if mode == "proposal_check" and kind in CARRY_ROUND_KINDS:
+                plan, carried_targets = proposal_carry_plan(
+                    self.repo,
+                    conn,
+                    project,
+                    pid,
+                    snapshots=source.snapshots,
+                    decisions=source.decisions,
+                    old=old_document,
+                    new=document,
+                    editable=scope.editable_layer_ids,
+                    mapping=mapping,
+                )
+                entries = [(item.original, item.mapped) for item in plan.items]
+            else:
+                entries = [
+                    (
+                        original,
+                        reanchor_annotation(
+                            original,
+                            original.evidence,
+                            old_document.text,
+                            document.text,
+                            mapping,
+                        ),
+                    )
+                    for original in source.snapshots
+                ]
+            for position, (original, mapped) in enumerate(entries):
                 if original.annotation.layer_id not in scope.editable_layer_ids:
                     raise DomainError(
                         "ROUND_INPUT_INVALID",
@@ -669,13 +783,6 @@ class WorkRoundService:
                         "id": original.annotation.annotation_id,
                     }
                 )
-                mapped = reanchor_annotation(
-                    original,
-                    original.evidence,
-                    old_document.text,
-                    document.text,
-                    mapping,
-                )
                 target = None
                 if isinstance(mapped, Carried):
                     evidence = [
@@ -695,6 +802,13 @@ class WorkRoundService:
                         )
                         for index, ev in enumerate(mapped.evidence)
                     ]
+                    source_refs = [f"round-input:{iid}"]
+                    replaces = plan.items[position].proposal if plan else None
+                    if replaces is not None:
+                        # The editor's link of a correction to its proposal.
+                        source_refs.insert(
+                            0, f"{replaces.annotation_id}:{replaces.version}"
+                        )
                     annotation = original.annotation.model_copy(
                         deep=True,
                         update={
@@ -709,7 +823,7 @@ class WorkRoundService:
                             ],
                             "modifiers": mapped.target_modifiers,
                             "provenance": original.annotation.provenance.model_copy(
-                                update={"source_refs": [f"round-input:{iid}"]}
+                                update={"source_refs": source_refs}
                             ),
                         },
                     )
@@ -751,6 +865,18 @@ class WorkRoundService:
                     if (ref.annotation_id, ref.version) in editable
                 ]
             )
+        if plan is not None:
+            # The new version's proposals are the targets, as in a first round.
+            targets = ReviewTargetSet.create(
+                [
+                    AnnotationRef(
+                        annotation_id=s.annotation.annotation_id, version=s.version
+                    )
+                    for s in carried_targets
+                ]
+            )
+            newest = newest_proposal_set(conn, pid, document.document_id)
+            proposal_set_id = newest.id if newest is not None else None
         key = WorkspaceKey(
             format_version="ontotator-workspace-key/v3",
             round_id=rid,
@@ -830,7 +956,8 @@ class WorkRoundService:
                 updated_at=now,
             )
         )
-        self.repo._create_draft(conn, pid, key, _key_str(key), targets)
+        start = _carried_start(key, plan, inputs) if plan is not None else None
+        self.repo._create_draft(conn, pid, key, _key_str(key), targets, start)
         if kind == "consolidation":
             # Matching findings are kept automatically (U14, T9); both start
             # paths (the assignment's rounds and the start command) end here.
@@ -840,6 +967,68 @@ class WorkRoundService:
 
             take_over_matches(conn, self.repo, pid, key)
         return self.repo.get_work_round(project, rid)
+
+
+def _carried_start(
+    key: WorkspaceKey, plan: ProposalCarryPlan, inputs: list[dict[str, Any]]
+) -> _InitialContent:
+    """The first draft of a carry from proposals (issue 414).
+
+    The carried findings, the decisions moved to the new proposals (a carried
+    correction's ``changed`` decision names its carried finding) and the
+    resolutions of the inputs that need no check: those are checked at once.
+    """
+    from ontotator.domain.serialization import decode_snapshot
+
+    def decision(
+        target: AnnotationRef,
+        outcome: Any,
+        note: str | None,
+        replacement: AnnotationRef | None = None,
+    ) -> ReviewDecision:
+        return ReviewDecision(
+            decision_id=canonical_hash(
+                {"workspace": key.model_dump(), "target": target.model_dump()}
+            ),
+            target=target,
+            outcome=outcome,
+            replacement=replacement,
+            note=note,
+            reviewer_id=key.annotator_id,
+        )
+
+    annotations: list[AnnotationSnapshot] = []
+    decisions = [
+        decision(d.target, d.decision.outcome, d.decision.note) for d in plan.decisions
+    ]
+    resolutions: list[RoundInputResolution] = []
+    for item, payload in zip(plan.items, inputs, strict=True):
+        if payload["target_snapshot"] is None:
+            continue
+        carried = decode_snapshot(payload["target_snapshot"])
+        annotations.append(carried)
+        ref = AnnotationRef(
+            annotation_id=carried.annotation.annotation_id, version=carried.version
+        )
+        if item.proposal is not None:
+            decisions.append(
+                decision(
+                    item.proposal,
+                    "changed",
+                    item.decision.note if item.decision else None,
+                    ref,
+                )
+            )
+        if item.checked:
+            resolutions.append(
+                RoundInputResolution(
+                    input_id=payload["input_id"],
+                    outcome="completed",
+                    annotation_ref=ref,
+                )
+            )
+    evidence = [e for a in annotations for e in a.evidence]
+    return _InitialContent(annotations, evidence, decisions, None, tuple(resolutions))
 
 
 def validate_round_input_resolutions(repo: Repository, draft: Any) -> None:
