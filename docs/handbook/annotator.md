@@ -269,13 +269,15 @@ What for: check findings that were carried over from an earlier round, for examp
 
 If you change a finding after checking it, it needs a new check.
 
+In a task from proposals, your decisions on the proposals are carried to the new version: accepted, edited and added findings come along, and only those in a changed passage, or without a matching proposal in the new version, are marked **Check needed**. A proposal you rejected that has no counterpart in the new version is dropped.
+
 A row **Not on this text** means the finding could not be placed in this text. Select it and choose one: **Mark in text**, **Link to an existing finding**, or **Dismiss with reason…**. A finding re-created with **Mark in text** keeps the original's term, values and note.
 
 ![A carried finding with What to check and the Mark as checked button](images/annotator-carried-finding.png)
 
 ## Re-create findings after a text correction
 
-What for: move your findings to the corrected text after the text got a new version, for example from a translation review, a lead's correction or an upload, and your task moved to it. The toolbar reads **Check after text change**.
+What for: move your findings to the corrected text after the text got a new version, for example from a translation review, a lead's correction or an upload, and your task moved to it. The toolbar reads **Check after text change**. This works the same in a task from proposals: only findings in changed passages need you; your other decisions on the proposals are already carried.
 
 1. The panel **Needs review after the text change** lists the findings to place again.
 2. For each item, click **Re-create here** and mark the supporting text in the corrected version.
