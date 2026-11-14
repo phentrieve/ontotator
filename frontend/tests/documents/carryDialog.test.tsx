@@ -116,11 +116,33 @@ describe("CarryDialog", () => {
     expect(describe("Someone else…")).toBe("Another annotator continues on v2 from these decisions; only the changed passages need a check.");
   });
 
-  it("a refused preview (no proposals on v2) explains why and offers only Annotate v2 from scratch, without Retry", async () => {
-    vi.mocked(api.previewTextChange).mockRejectedValue(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "no_target_proposals" }));
+  it("work from proposals: the carry counts decisions and findings", async () => {
+    vi.spyOn(api, "carrySubmission").mockResolvedValue(carried());
+    const props = setup("proposals");
+    expect(await within(dialog()).findByText("Ana Weber submitted on v1 (Round 1, 3 decisions and findings).")).toBeDefined();
+    fireEvent.click(assign());
+    await waitFor(() => expect(props.onDone).toHaveBeenCalledWith("Ana Weber continues on v2 with 3 carried decisions and findings."));
+  });
+
+  it("no proposals on v2 yet: the choices stay, author preselected, the line says to wait or import, and Retry checks again", async () => {
+    vi.mocked(api.previewTextChange).mockRejectedValueOnce(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "no_target_proposals" }));
+    setup("proposals");
+    expect(await within(dialog()).findByText(
+      "v2 has no proposals yet: their automatic transfer may still be running, or they must be imported. Wait for or import the proposals for v2, then try again.",
+    )).toBeDefined();
+    expect(within(dialog()).queryByText(/from scratch\./)).toBeNull();
+    expect((screen.getByRole("radio", { name: "Ana Weber (author)" }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("radio", { name: "Annotate v2 from scratch" }) as HTMLInputElement).checked).toBe(false);
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Retry" }));
+    expect(await within(dialog()).findByText("Ana Weber submitted on v1 (Round 1, 3 decisions and findings).")).toBeDefined();
+    expect(api.previewTextChange).toHaveBeenCalledTimes(2);
+  });
+
+  it("another refused preview offers only Annotate v2 from scratch, without Retry", async () => {
+    vi.mocked(api.previewTextChange).mockRejectedValue(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "final_exists" }));
     const carry = vi.spyOn(api, "carrySubmission").mockResolvedValue(carried({ resolution: "dismissed", assignment: null, carried_findings: 0 }));
     const props = setup("proposals");
-    expect(await within(dialog()).findByText(/The new version has no proposals yet/)).toBeDefined();
+    await waitFor(() => expect(within(dialog()).getAllByRole("radio")).toHaveLength(1));
     expect(within(dialog()).queryByRole("button", { name: "Retry" })).toBeNull();
     expect(within(dialog()).getAllByRole("radio").map(radio => radio.getAttribute("value"))).toEqual(["dismiss"]);
     expect((screen.getByRole("radio", { name: "Annotate v2 from scratch" }) as HTMLInputElement).checked).toBe(true);

@@ -42,11 +42,25 @@ describe("HandleTextChangeDialog", () => {
     await screen.findByText(/could not be placed/);
   });
 
-  it("a refused preview (no proposals on v2) offers only Withdraw, preselected, with the reason", async () => {
-    vi.mocked(api.previewTextChange).mockRejectedValue(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "no_target_proposals" }));
+  it("no proposals on v2 yet: Move stays preselected, the line says to wait or import, and Retry checks again", async () => {
+    vi.mocked(api.previewTextChange).mockRejectedValueOnce(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "no_target_proposals" }));
+    setup({ mode: "proposals" });
+    expect(await within(dialog()).findByText(
+      "v2 has no proposals yet: their automatic transfer may still be running, or they must be imported. Wait for or import the proposals for v2, then try again.",
+    )).toBeDefined();
+    expect((screen.getByRole("radio", { name: "Move to v2" }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("radio", { name: "Withdraw" }) as HTMLInputElement).checked).toBe(false);
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("1 of 3 decisions and findings could not be placed and need Tom Reis’s decision.")).toBeDefined();
+    expect(within(dialog()).queryByRole("button", { name: "Retry" })).toBeNull();
+  });
+
+  it("another refused preview offers only Withdraw, preselected, with the reason and without Retry", async () => {
+    vi.mocked(api.previewTextChange).mockRejectedValue(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "not_open" }));
     const resolve = vi.spyOn(api, "resolveTextChange").mockResolvedValue({} as AssignmentView);
     const props = setup({ mode: "proposals" });
-    expect(await within(dialog()).findByText("The new version has no proposals yet, so this work cannot be carried. Import proposals for the new version first, or annotate it from scratch. That is why Withdraw is the only choice.")).toBeDefined();
+    expect(await within(dialog()).findByText(/That is why Withdraw is the only choice\./)).toBeDefined();
+    expect(within(dialog()).queryByRole("button", { name: "Retry" })).toBeNull();
     expect((screen.getByRole("radio", { name: "Withdraw" }) as HTMLInputElement).checked).toBe(true);
     expect(screen.queryByRole("radio", { name: "Move to v2" })).toBeNull();
     expect(screen.queryByRole("radio", { name: "Let Tom Reis finish on v1" })).toBeNull();
