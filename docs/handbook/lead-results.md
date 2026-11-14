@@ -141,12 +141,14 @@ What for: decide what happens when a text gets a new version while someone is st
 
 Before you start: if the task is paused by a problem report, [decide the report](#decide-on-a-problem-report) first.
 
-1. In the row, click **Handle text change…**. A task from proposals, or a task on a correction that was not accepted, only offers **Withdraw**: tool proposals mark places in the old text and cannot follow the new one. The dialog says why and what to do next.
+1. In the row, click **Handle text change…**. A task on a correction that was not accepted only offers **Withdraw**; so does a task from proposals while the new version has no proposals. The dialog says why and what to do next.
 2. Choose one:
    - Move to the new version: the annotator continues on the corrected text; their draft findings are carried and marked for checking.
    - Let the annotator finish on the old version: the result is carried to the new version for them to check.
    - **Withdraw**: the task ends, nothing of the draft is carried, and the new version needs a new annotation. Assign it afterwards.
 3. Click **Apply**.
+
+Work from proposals is carried too: the decisions on the proposals move to the matching proposals of the new version, and only what touches a changed passage is marked **Check needed**. A rejected proposal without a counterpart in the new version is dropped. If the new version has no proposals yet, the dialog says so and offers only what works: import proposals for the new version first, or annotate it from scratch.
 
 ### Carry submitted work to a new text version
 
@@ -155,6 +157,8 @@ What for: reuse submitted findings after the text was corrected. The row's next 
 1. In the row, click the carry button, for example *Carry to v2…*.
 2. Choose who continues: the author, **Someone else…** (then pick the **Annotator**), or annotate the new version from scratch.
 3. Click **Assign**.
+
+Work from proposals is carried too: the decisions on the proposals move to the matching proposals of the new version, and only what touches a changed passage is marked **Check needed**. A rejected proposal without a counterpart in the new version is dropped. If the new version has no proposals yet, the dialog says so and offers only what works: import proposals for the new version first, or annotate it from scratch. Without proposals on the new version, the row offers assigning it instead of *Carry to v2…*.
 
 The annotator must check the carried findings before submitting ([Review carried findings](annotator.md#review-carried-findings)).
 
