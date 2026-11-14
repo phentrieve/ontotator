@@ -238,7 +238,9 @@ export function ConsolidationScreen(props: ConsolidationScreenProps): JSX.Elemen
     setReopeningAll({ open: false, busy: false });
     if (!ok) { show({ message: "Could not reopen the decisions. Nothing changed." }); return; }
     setSummaries(new Map());
-    const first = textOrder(viewRef.current?.groups ?? [], viewRef.current?.text ?? "").find(group => group.state === "open");
+    // The refreshed view: viewRef still holds the view from before the reopen until it renders (issue 375).
+    const fresh = data.latestView() ?? viewRef.current;
+    const first = textOrder(fresh?.groups ?? [], fresh?.text ?? "").find(group => group.state === "open");
     if (first) select(first.group_id, true);
     show({ message: `Reopened ${decidedCount} decided ${decidedCount === 1 ? "group" : "groups"}.`, undo: true, onAction: () => {
       void data.undoReopenAll().then(restored => show({ message: restored ? "Decisions restored." : "Could not restore the decisions." }));
