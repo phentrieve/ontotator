@@ -1,4 +1,4 @@
-import{r as i,a as m,j as a,b as h}from"./index-BIYkGFnj.js";import{M as f,r as g}from"./index-CBrGNkOO.js";function w(){const[e,t]=i.useState(null);return i.useEffect(()=>{let o=!0;return m.getAbout().then(n=>{o&&t(n)},()=>{}),()=>{o=!1}},[]),e?a.jsxs("p",{className:"help-version",title:e.revision??void 0,children:["Ontotator ",e.version,e.revision&&a.jsxs(a.Fragment,{children:[" · commit ",e.revision.slice(0,7)]})]}):null}const y=`# Ontotator user handbook
+import{r as i,a as m,j as a,b as h}from"./index-B5FK3X7z.js";import{M as f,r as g}from"./index-BAD1hwQS.js";function w(){const[e,t]=i.useState(null);return i.useEffect(()=>{let o=!0;return m.getAbout().then(n=>{o&&t(n)},()=>{}),()=>{o=!1}},[]),e?a.jsxs("p",{className:"help-version",title:e.revision??void 0,children:["Ontotator ",e.version,e.revision&&a.jsxs(a.Fragment,{children:[" · commit ",e.revision.slice(0,7)]})]}):null}const y=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -1187,6 +1187,10 @@ The result has findings with values filled in by default, modifier terms used as
 ### I cannot accept a result
 
 In projects where the consolidator of a text may not be one of its annotators, you cannot choose a result you made yourself. Another lead must choose it. See [Accept a result or compare results](lead-results.md#accept-a-result-or-compare-results).
+
+### Undo after Reopen… or Withdraw open tasks… says "Undo is no longer possible: the texts changed since."
+
+Undo of these bulk actions works only while nothing changed on the texts since, for example nobody saved a draft and nobody was assigned. Reopen or withdraw the remaining tasks again, or assign the work anew. If the dialog itself says *The texts changed since the preview. Check the new preview.*, nothing was changed yet: read the new preview and confirm again. See [Reopen or withdraw the tasks of several texts](lead-documents.md#reopen-or-withdraw-the-tasks-of-several-texts).
 
 ### My uploaded texts do not show up
 
