@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Fixed
 
 - Documents: after **Carry to v2…** the **Annotation** column no longer counts the submission on the old version, which read *1/2 submitted* with one annotation per text. The column counts only work on the newest version, also after **Start v2 fresh** and once the carried work is submitted (#420).
+- Text changes: the Unresolved note of a proposal carried without counterpart is now stored with its **Check needed** item when the carried round is created, and a work package carries it beside the round's inputs (`unresolved_notes`, as `review_reasons`). Open work moved to a new version therefore keeps the note after a package export and import, which has no frozen draft to read it from. Older packages still import; their moved work shows no note, as before (#418).
 
 ## [0.10.2] - 2026-11-14
 
