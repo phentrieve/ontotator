@@ -116,9 +116,10 @@ function LimitInfo({ projectKey, current, project, texts, textName, onSaved }: {
         {forTexts ? `Change for ${plural(texts.length, "text")}` : "Change for all texts"}</Button>
     </>}>
       <div id={`${id}-limit`} className="assign-limit-popover">
-        <h3>{`Up to ${annotators(current)} per text`}</h3>
-        {own
-          ? <p>{texts.length === 1 ? "This text has" : "These texts have"} <strong>{texts.length === 1 ? "its own value" : "their own value"}</strong>{`: the project setting is ${project}. Fewer is fine.`}</p>
+        {/* The title says whose limit it is; the explanation follows the chosen scope (issue 422). */}
+        <h3>{own ? `Up to ${annotators(current)} for ${texts.length === 1 ? "this text" : "these texts"} (project: ${project})` : `Up to ${annotators(current)} per text`}</h3>
+        {forTexts
+          ? <p>{`Sets the most annotators for ${texts.length === 1 ? "this text" : `these ${texts.length} texts`} only (project: ${project}). Fewer is fine.`}</p>
           : <p>This is a <strong>project setting</strong>: the most annotators any text can get. Fewer is fine.</p>}
         {/* R-11: a compact inline number field, as high as the small buttons. */}
         <p className="assign-limit-field"><label htmlFor={`${id}-per-text`}>Annotators per text</label>

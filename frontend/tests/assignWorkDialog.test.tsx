@@ -748,6 +748,8 @@ it("one text: \"Only for the selected text\" gives it its own limit, the project
   fireEvent.click(screen.getByRole("button", { name: "About the limit: 1 annotator per text" }));
   const popover = screen.getByRole("dialog", { name: "Annotators per text" });
   expect((within(popover).getByRole("radio", { name: "Only for the selected text (case-0101 de)" }) as HTMLInputElement).checked).toBe(true);
+  expect(within(popover).getByText("Sets the most annotators for this text only (project: 1). Fewer is fine.")).toBeDefined();
+  expect(within(popover).queryByText(/project setting/)).toBeNull();
   fireEvent.change(within(popover).getByRole("spinbutton", { name: /Annotators per text/ }), { target: { value: "4" } });
   fireEvent.click(within(popover).getByRole("button", { name: "Change for 1 text" }));
   await waitFor(() => expect(own).toHaveBeenCalledWith("p/key", "case-0101", "de", 4));
@@ -755,10 +757,16 @@ it("one text: \"Only for the selected text\" gives it its own limit, the project
   expect(await screen.findByText("Annotators per text: 4, for case-0101 de.")).toBeDefined();
   expect(await screen.findByText("0 assigned · 4 more possible (limit 4)")).toBeDefined();
   expect(changed).toHaveBeenCalled();
-  // The popover now says the text has its own value; the project value again clears it.
+  // The popover now names the text's own value; the project value again clears it.
   fireEvent.click(screen.getByRole("button", { name: "About the limit: 4 annotators per text" }));
   const again = screen.getByRole("dialog", { name: "Annotators per text" });
-  expect(within(again).getByText(/the project setting is 1/)).toBeDefined();
+  expect(within(again).getByRole("heading", { name: "Up to 4 annotators for this text (project: 1)" })).toBeDefined();
+  expect(within(again).getByText("Sets the most annotators for this text only (project: 1). Fewer is fine.")).toBeDefined();
+  // "For all texts" explains the project setting instead.
+  fireEvent.click(within(again).getByRole("radio", { name: "For all texts" }));
+  expect(within(again).queryByText(/for this text only/)).toBeNull();
+  expect(within(again).getByText(/the most annotators any text can get/)).toBeDefined();
+  fireEvent.click(within(again).getByRole("radio", { name: "Only for the selected text (case-0101 de)" }));
   fireEvent.change(within(again).getByRole("spinbutton", { name: /Annotators per text/ }), { target: { value: "1" } });
   fireEvent.click(within(again).getByRole("button", { name: "Change for 1 text" }));
   await waitFor(() => expect(own).toHaveBeenLastCalledWith("p/key", "case-0101", "de", null));
