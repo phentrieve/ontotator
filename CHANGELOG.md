@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Documents: a regression test covers **Select all N filtered texts** with a filter and hidden texts not in plan; it counts and selects only the rows the table can show (#379, fixed in 0.10.0 by #383).
+
 ## [0.10.2] - 2026-11-14
 
 ### Added
