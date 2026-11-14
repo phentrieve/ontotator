@@ -94,6 +94,9 @@ _SEGMENTS: dict[StepKind, Segment | None] = {
 }
 
 
+CarryBlock = Literal["no_target_proposals"]
+
+
 @dataclass(frozen=True)
 class OldItem:
     """Annotation work on an older text version (documents overview V5)."""
@@ -102,6 +105,9 @@ class OldItem:
     from_version: int
     assignment_id: int | None = None
     submission_id: str | None = None
+    # Rule 3b: work from proposals waits for the target's own proposals
+    # (issue 414); the carry step is shown but cannot run yet.
+    blocked: CarryBlock | None = None
 
 
 @dataclass(frozen=True)
@@ -161,6 +167,7 @@ class Step:
     # Rules 3a / 3b: the one old work item the step handles.
     assignment_id: int | None = None
     submission_id: str | None = None
+    blocked: CarryBlock | None = None
 
 
 def in_plan(facts: StepFacts) -> bool:
@@ -268,8 +275,12 @@ def derive_steps(facts: StepFacts, *, row: object = None) -> list[Step]:
                     _decision("carry_text_change", "annotation", "carry_text_change"),
                     assignment_id=item.assignment_id,
                     submission_id=item.submission_id,
+                    blocked=item.blocked,
                 )
-                for item in facts.old_submitted
+                # A carry that can run comes before a blocked one.
+                for item in sorted(
+                    facts.old_submitted, key=lambda item: item.blocked is not None
+                )
             )
     # 4: rejected or queried translation without an open review.
     if facts.review and translation and not open_review:
