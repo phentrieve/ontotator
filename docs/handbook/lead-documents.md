@@ -288,7 +288,7 @@ Once someone is assigned, started or submitted work, a line *Fixed: …* says wh
 - While the work is not submitted, remove the assignment ([Remove, reassign or reopen an assignment](#remove-reassign-or-reopen-an-assignment)), then choose.
 - To change it anyway, click **Change mode…** next to the line. The dialog names whose work is affected. Enter the **Reason**, then click **Change mode**, or **Discard work and change mode** if submitted work is discarded. Their assignments are removed. Discarded work is kept, not deleted: it no longer counts for progress, consolidation, the final result or exports.
 - The mode change always discards the work of the whole text, never of single people.
-- Once a final result is chosen, the mode stays: the dialog says *A final result was chosen for this text, so its annotation mode stays.* A final result can be changed but not withdrawn ([Change a final result](lead-results.md#change-a-final-result)).
+- Once a final result is chosen, the mode is locked: **Change mode…** is refused and the dialog says *A final result was chosen for this text, so its annotation mode stays.* The API and the MCP server refuse it with the error code `ANNOTATION_MODE_FINAL_SELECTED`. A final result can only be replaced with **Change final…**, never withdrawn, so the lock stays as long as the text has a final result ([Change a final result](lead-results.md#change-a-final-result)).
 - **Restore…** in the text card brings the discarded work back while no new annotation has started.
 
 **History** in the text card shows the change and its reason.
