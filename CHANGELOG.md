@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- MCP: a second translation review of an accepted translation is easier to find. `request_translation_correction` now says what it does: a new translation review (a correction or a second opinion) of an **accepted** version, however it was accepted, by any translation reviewer, with a reason. `assign_texts` with `task: review_accepted_translation` covers versions accepted by a lead or an import override; for a version a translation review accepted (or marked reviewed in its import package) it now refuses with `NOT_A_TRANSLATION` and `reason: accepted_by_review` and a hint naming `request_translation_correction` (**Request correction…** in the web interface). Refused rows of `POST /projects/{key}/assignments` have a new optional `reason` field (#409).
+
 ## [0.10.2] - 2026-11-14
 
 ### Added

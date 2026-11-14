@@ -675,6 +675,8 @@ def test_new_review_of_externally_accepted_translation(env):
         )
     )
     assert package.code == "NOT_A_TRANSLATION"
+    # Marked reviewed in the package: the new review is a correction (issue 409).
+    assert package.details == {"reason": "accepted_by_review"}
     assert flags_of(env, "c2", "de").review is False
 
 
