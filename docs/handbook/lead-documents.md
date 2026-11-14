@@ -148,7 +148,7 @@ Active filters show as chips above the table. Remove one with its ✕, or click 
 
 Below 1600 px width each text keeps one line in the table. Where the table is still wider than the page, it scrolls sideways with the **Text** column kept at the left:
 
-- The stage columns show a shorter state and leave out the names, which **Waiting on** already shows. For example *assigned, not started (Ana Weber)* reads *not started*, *1 of 2 submitted* reads *1/2 submitted*, *ready to compare* reads *to compare* and *Final is on old text* reads *on old text*.
+- The stage columns show a shorter state and leave out the names, which **Waiting on** already shows. For example *assigned, not started (Ana Weber)* reads *not started*, *1 of 2 submitted* reads *1/2 submitted*, *ready to compare* reads *to compare* and *Final is on old text* reads *on old text*. Submitted work from proposals that waits for the new version's proposals reads *v1 work waits* (*v2 has no proposals yet*).
 - **Waiting on** shows one name and *+n* for the others.
 - **Text** keeps *source*, the version marker and **NEW** on the line and cuts a long case ID with *…*.
 - Point at a cell to see the full state with the names in its tooltip. Screen readers read the full state.
@@ -312,7 +312,7 @@ With **Annotate only after the translation review is accepted** on, you can assi
 What happens to a waiting task:
 
 - **Rejected** or **Query**: it keeps waiting. Decide on the text as usual.
-- **Accepted with corrections**, a lead correction or an uploaded correction: the task moves to the new version and opens there once that version is accepted. A task from proposals waits on the old version: the annotator sees **Waiting for the project lead**, and once the new version is accepted the text shows **Handle text change…**. There you move the task to the new version, where the decisions on the proposals are carried and only changed passages need a check. If the new version has no proposals yet, wait for them (their automatic transfer may still be running) or import them, then move the task. A paused task stays too, until you decide its report.
+- **Accepted with corrections**, a lead correction or an uploaded correction: the task moves to the new version and opens there once that version is accepted. A task from proposals waits on the old version: the annotator sees **Waiting for the project lead**, and once the new version is accepted the text shows **Handle text change…**. There you move the task to the new version, where the decisions on the proposals are carried and only changed passages need a check. If the new version has no proposals yet, moving is not available: wait for them (their automatic transfer may still be running) or import them, click **Retry**, then move the task. A paused task stays too, until you decide its report.
 - A task on an uploaded correction that was then **Rejected** or **Query**, with the older version accepted afterwards: the text shows **Handle text change…**; **Withdraw** the task, then assign the accepted version.
 - You remove the review: the task keeps waiting, and the text shows the next step for the review.
 - You turn Review off and accept the translation: the task opens. You turn Annotate off or discard the version: the task is withdrawn, as any open task.

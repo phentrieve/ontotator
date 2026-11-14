@@ -35,7 +35,7 @@ The toolbar shows the text name, its language and the mode:
 | **Annotate from scratch** | You see neither tool proposals nor other people's work. |
 | **Annotate from proposals** | You see a tool's proposals, never other people's work. See [Review tool proposals](#review-tool-proposals). |
 | **Review carried findings**, or the round name such as *Round 2, continued from Round 1* | Findings were carried over from earlier work. See [Review carried findings](#review-carried-findings). |
-| **Check after text change** | The text was corrected. See [Re-create findings after a text correction](#re-create-findings-after-a-text-correction). |
+| **Check after text change** | The text was corrected and some findings are marked **Check needed**. See [Re-create findings after a text correction](#re-create-findings-after-a-text-correction). If nothing needs a check, the toolbar shows the round instead, such as *Round 1, continued from an earlier version*. |
 
 Next to the mode, the save status tells you whether your work is stored: **Saved**, **Saving...** or **Unsaved changes**. Work is saved automatically; there is no save button. If it reads **Offline** or shows an error, click **Retry**.
 
@@ -277,7 +277,7 @@ A row **Not on this text** means the finding could not be placed in this text. S
 
 ## Re-create findings after a text correction
 
-What for: move your findings to the corrected text after the text got a new version, for example from a translation review, a lead's correction or an upload, and your task moved to it. The toolbar reads **Check after text change**. This works the same in a task from proposals: only findings in changed passages need you; your other decisions on the proposals are already carried.
+What for: move your findings to the corrected text after the text got a new version, for example from a translation review, a lead's correction or an upload, and your task moved to it. The toolbar reads **Check after text change** while findings are marked **Check needed**. This works the same in a task from proposals: only findings in changed passages need you; your other decisions on the proposals are already carried.
 
 1. The panel **Needs review after the text change** lists the findings to place again.
 2. For each item, click **Re-create here** and mark the supporting text in the corrected version.
