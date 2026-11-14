@@ -907,7 +907,7 @@ def _old_work(
                 # offers assigning the target (rule 8), not a carry.
                 or (
                     item.annotation_mode == "proposals"
-                    and not ctx.facts.proposal_counts.get(target.document_id)
+                    and not ctx.facts.carry_proposal_counts.get(target.document_id)
                 )
             ):
                 continue
