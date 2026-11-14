@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type RefObject } from "react";
 import { api, ApiError, type DocumentRowView, type NextStepView, type TextChangePreview } from "../api/client";
 import { textLabel } from "../app/identity";
 import { errorMessage } from "../admin/errors";
@@ -6,7 +6,7 @@ import { personName } from "../admin/assignSummary";
 import { Button, ConfirmDialog, Dialog } from "../ui";
 import {
   CHECKING, finishDescription, finishingMessage, finishLabel, handleTitle, heldLine, moveDescription, movedMessage, moveLabel, nextAfterWithdrawLine,
-  noTargetProposalsLine, notNewerLine, openWorkLine, RELOADED_MESSAGE, unplacedLine, WITHDRAW_LABEL, withdrawDescription, withdrawnMessage,
+  CHOOSE_WITHDRAW, noTargetOptionLine, noTargetProposalsLine, notNewerLine, openWorkLine, RELOADED_MESSAGE, unplacedLine, WITHDRAW_LABEL, withdrawDescription, withdrawnMessage,
 } from "./textChangeText";
 
 export type TextChangeChoice = "move" | "finish" | "withdraw";
@@ -39,6 +39,24 @@ export const isNoTargetProposals = (error: unknown): boolean =>
 export const isTextChangeRefusal = (error: unknown): boolean =>
   error instanceof ApiError && !!error.code && error.status >= 400 && error.status < 500 && !isTextChangeConflict(error) && !isNoTargetProposals(error);
 
+/** A failure retrying may cure: network, no code, or a server error (5xx). */
+export const isTransientError = (error: unknown): boolean => !(error instanceof ApiError) || !error.code || error.status >= 500;
+
+/**
+ * Retry replaces its own button while the preview reloads: focus would fall to the page. After the reload,
+ * focus goes to the new Retry button, else to the first choice that can be taken.
+ */
+export function useRetryFocus(preview: unknown, previewError: unknown): { body: RefObject<HTMLDivElement>; retried: () => void } {
+  const body = useRef<HTMLDivElement>(null);
+  const pending = useRef(false);
+  useEffect(() => {
+    if (!pending.current || (preview === null && previewError === null)) return;
+    pending.current = false;
+    body.current?.querySelector<HTMLElement>("[data-retry], input[type=radio]:not(:disabled)")?.focus();
+  }, [preview, previewError]);
+  return { body, retried: () => { pending.current = true; } };
+}
+
 /** "Handle text change…": an open annotation on an old version (spec V5). */
 export function HandleTextChangeDialog(props: HandleTextChangeDialogProps): JSX.Element {
   const { projectKey, row, step } = props;
@@ -62,8 +80,12 @@ export function HandleTextChangeDialog(props: HandleTextChangeDialogProps): JSX.
   const [previewError, setPreviewError] = useState<unknown>(null);
   const previewFailed = previewError !== null;
   const withdrawOnly = notNewer || isTextChangeRefusal(previewError);
-  const choice = withdrawOnly ? "withdraw" : chosen;
+  // No proposals on the new version: Move and Finish would be refused, so nothing but Withdraw can be chosen.
+  const noTarget = isNoTargetProposals(previewError);
+  const choice: TextChangeChoice | null = withdrawOnly ? "withdraw" : noTarget && chosen !== "withdraw" ? null : chosen;
   const [reload, setReload] = useState(0);
+  const { body, retried } = useRetryFocus(preview, previewError);
+  const retry = () => { retried(); setReload(value => value + 1); };
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [unreviewed, setUnreviewed] = useState(false);
@@ -83,7 +105,7 @@ export function HandleTextChangeDialog(props: HandleTextChangeDialogProps): JSX.
   }, [projectKey, assignmentId, targetId, held, notNewer, reload]);
 
   const apply = async (confirmUnreviewed = false) => {
-    if (writing.current || assignmentId === null) return;
+    if (writing.current || assignmentId === null || !choice) return;
     writing.current = true; setBusy(true); setFailure(null);
     try {
       const current = (await api.listAssignments(projectKey, { document_id: item?.document_id })).find(entry => entry.id === assignmentId);
@@ -101,6 +123,8 @@ export function HandleTextChangeDialog(props: HandleTextChangeDialogProps): JSX.
       setUnreviewed(false);
       if (isTextChangeConflict(error)) { setFailure(RELOADED_MESSAGE); props.onReload(); setReload(value => value + 1); }
       else if (error instanceof ApiError && error.code === "TRANSLATION_NOT_REVIEWED" && !confirmUnreviewed) setUnreviewed(true);
+      // Shown once, by the no-proposals line with its Retry (it also disables Move and Finish).
+      else if (isNoTargetProposals(error)) setPreviewError(error);
       else setFailure(errorMessage(error));
     } finally {
       writing.current = false;
@@ -108,11 +132,12 @@ export function HandleTextChangeDialog(props: HandleTextChangeDialogProps): JSX.
     }
   };
 
-  const options: { value: TextChangeChoice; label: string; description: string; extra?: string | null }[] = [
+  const options: { value: TextChangeChoice; label: string; description: string; extra?: string | null; disabled?: boolean }[] = [
     ...(withdrawOnly ? [] : [
-      { value: "move" as const, label: moveLabel(to), description: moveDescription(person, fromProposals),
-        extra: preview ? (preview.unplaced > 0 ? unplacedLine(preview.unplaced, preview.findings, person, fromProposals) : null) : previewFailed ? null : CHECKING },
-      { value: "finish" as const, label: finishLabel(person, from), description: finishDescription(person, to) },
+      { value: "move" as const, label: moveLabel(to), description: moveDescription(person, fromProposals), disabled: noTarget,
+        extra: noTarget ? noTargetOptionLine(to) : preview ? (preview.unplaced > 0 ? unplacedLine(preview.unplaced, preview.findings, person, fromProposals) : null) : previewFailed ? null : CHECKING },
+      { value: "finish" as const, label: finishLabel(person, from), description: finishDescription(person, to), disabled: noTarget,
+        extra: noTarget ? noTargetOptionLine(to) : null },
     ]),
     { value: "withdraw", label: WITHDRAW_LABEL, description: withdrawDescription(person, to) },
   ];
@@ -120,13 +145,15 @@ export function HandleTextChangeDialog(props: HandleTextChangeDialogProps): JSX.
 
   return <Dialog open size="sm" title={handleTitle(text)} onClose={busy ? undefined : props.onClose} footer={<>
     {failure && <p className="text-change-error" role="alert">{failure}</p>}
+    {!held && !choice && <span id={`${id}-reason`} className="dialog-footer-reason">{CHOOSE_WITHDRAW}</span>}
     <Button disabled={busy} onClick={props.onClose}>Cancel</Button>
-    {!held && <Button variant="primary" loading={busy} onClick={() => { void apply(); }}>Apply</Button>}
+    {!held && <Button variant="primary" loading={busy} aria-disabled={choice ? undefined : "true"} aria-describedby={choice ? undefined : `${id}-reason`}
+      onClick={() => { void apply(); }}>Apply</Button>}
   </>}>
-    <div className="text-change-dialog">
+    <div className="text-change-dialog" ref={body}>
       <p>{openWorkLine(person, from, to)}</p>
-      {isNoTargetProposals(previewError) && !held && <p className="text-change-error">{noTargetProposalsLine(to)}{" "}
-        <Button size="sm" onClick={() => setReload(value => value + 1)}>Retry</Button></p>}
+      {noTarget && !held && <p className="text-change-error"><span role="alert">{noTargetProposalsLine(to)}</span>{" "}
+        <Button size="sm" data-retry onClick={retry}>Retry</Button></p>}
       {withdrawOnly && !held && <>
         <p>{notNewer ? notNewerLine(from, to) : `${errorMessage(previewError)} That is why Withdraw is the only choice.`}</p>
         <p>{nextAfterWithdrawLine(to)}</p>
@@ -141,7 +168,7 @@ export function HandleTextChangeDialog(props: HandleTextChangeDialogProps): JSX.
           const descriptionId = `${inputId}-description`;
           const extraId = `${inputId}-extra`;
           return <div key={option.value} className="text-change-option">
-            <input id={inputId} type="radio" name={`${id}-choice`} value={option.value} checked={choice === option.value}
+            <input id={inputId} type="radio" name={`${id}-choice`} value={option.value} checked={choice === option.value} disabled={option.disabled}
               aria-describedby={[descriptionId, option.extra && extraId].filter(Boolean).join(" ")}
               onChange={() => { if (!busy) { setChoice(option.value); setFailure(null); } }} />
             <label htmlFor={inputId}>{option.label}</label>

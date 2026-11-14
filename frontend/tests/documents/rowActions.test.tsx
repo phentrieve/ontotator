@@ -88,3 +88,13 @@ it("Accept result… when the final has one submission to choose (final.state ch
   render(<Harness row={scenario7b()} />);
   expect(screen.getByRole("button", { name: "Compare results…, case-107 en" })).toBeTruthy();
 });
+
+it("a carry waiting for proposals shows disabled with the reason", () => {
+  const step = { ...stepOf("carry_text_change"), blocked: "no_target_proposals" as const };
+  render(<Harness row={stagedRow("case-110", "de", { steps: [step] })} />);
+  const button = screen.getByRole("button", { name: /^Carry to v.*, case-110 de$/ });
+  expect(button.getAttribute("aria-disabled")).toBe("true");
+  expect(document.getElementById(button.getAttribute("aria-describedby")!)?.textContent).toMatch(/^Import proposals for /);
+  fireEvent.click(button);
+  expect(onAction).not.toHaveBeenCalled();
+});

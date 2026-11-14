@@ -11,8 +11,8 @@ export const handleTitle = (text: string): string => `Handle text change: ${text
 export const openWorkLine = (person: string, from: string, to: string): string => `${person} has an open annotation on ${from}. The text is now ${to}.`;
 export const moveLabel = (to: string): string => `Move to ${to}`;
 export const moveDescription = (person: string, fromProposals = false): string => fromProposals
-  ? `${person} continues on the corrected text. Their decisions on the proposals are carried; only items in changed passages are marked “check after text change”.`
-  : `${person} continues on the corrected text. Their draft findings are carried and marked “check after text change”.`;
+  ? `${person} continues on the corrected text. Their decisions on the proposals are carried; only items in changed passages are marked Check needed.`
+  : `${person} continues on the corrected text. Their draft findings are carried and marked Check needed.`;
 /** Work from proposals carries decisions and findings (issue 414): the counts name both. */
 const items = (count: number, fromProposals: boolean, carried = false): string => !fromProposals
   ? plural(count, carried ? "carried finding" : "finding")
@@ -48,11 +48,14 @@ export const someoneElseDescription = (to: string, fromProposals = false): strin
   ? `Another annotator continues on ${to} from these decisions; only the changed passages need a check.`
   : `Another annotator continues on ${to} from this result.`;
 export const ALREADY_ANNOTATING = "already annotating this text";
-export const fromScratchLabel = (to: string): string => `Annotate ${to} from scratch`;
+export const fromScratchLabel = (to: string): string => `Start ${to} fresh`;
 export const FROM_SCRATCH_DESCRIPTION = "Nothing is carried; the assign dialog opens next.";
 export const carriedMessage = (person: string, to: string, findings: number, fromProposals = false): string =>
   `${person} continues on ${to} with ${items(findings, fromProposals, true)}.`;
 /** Issue 414: a carry of work from proposals waits for the new version's proposals; that can change, so Retry is offered. */
 export const noTargetProposalsLine = (to: string): string =>
   `${to} has no proposals yet: their automatic transfer may still be running, or they must be imported. Wait for or import the proposals for ${to}, then try again.`;
+/** Why Move and Finish are not offered while the new version has no proposals (issue 414). */
+export const noTargetOptionLine = (to: string): string => `Not possible until ${to} has proposals.`;
+export const CHOOSE_WITHDRAW = "Choose Withdraw, or wait for the proposals and click Retry.";
 export const CHOOSE_PERSON = "Choose a person first.";

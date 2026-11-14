@@ -94,6 +94,8 @@ describe("Annotation cell", () => {
   it("old_text_open", () => expect(text("annotation", cell("old_text_open", "decision", { people: [tom], from_version: 1, version: 2 }))).toEqual(["⚠ In progress on old text", "Tom Reis works on v1"]));
   it("old_text_submitted", () => expect(text("annotation", cell("old_text_submitted", "decision", { people: [ana], from_version: 1, version: 2, note: "v2_not_annotated" })))
     .toEqual(["⚠ Submitted on v1", "Ana Weber, v2 not annotated"]));
+  it("old_text_submitted waiting for proposals", () => expect(text("annotation", cell("old_text_submitted", "decision", { people: [ana], from_version: 1, version: 2, note: "no_target_proposals" })))
+    .toEqual(["○ v1 work waits", "Ana Weber, v2 has no proposals yet"]));
   it("finishing_on_old", () => expect(text("annotation", cell("finishing_on_old", "running", { people: [tom], from_version: 1, version: 2, note: "carried_on_submit" })))
     .toEqual(["◐ Finishing on v1", "Tom Reis, carried to v2 on submit"]));
   it("submitted", () => {

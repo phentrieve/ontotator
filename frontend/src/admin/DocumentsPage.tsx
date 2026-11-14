@@ -29,7 +29,7 @@ import { FilterPopover } from "../documents/FilterPopover";
 import { DocumentCards } from "../documents/DocumentCards";
 import { DocumentsTable, tableRows, type ColumnSort, type HeaderSort, type TableSelection } from "../documents/DocumentsTable";
 import { consolidationStartedToast, panelStep } from "../documents/finalPanelText";
-import { leadSteps, rowActionLabel } from "../documents/nextStepLabels";
+import { leadSteps, rowActionLabel, stepBlockedReason } from "../documents/nextStepLabels";
 import { TranslationCorrectionAction } from "../variants/TranslationCorrectionAction";
 import { DecisionBlock } from "../documents/FinalPanel";
 import { StageActions, type StageActionsProps } from "../documents/StageActions";
@@ -768,7 +768,13 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
   // The row shows one next-step button; the card offers every other lead step its parts do not cover.
   // The card places each step where it acts (the report banner, its part; issue 332).
   const cardSteps = (row: DocumentRowView): CardStep[] => (isActiveRow(row) ? leadSteps(row).filter(step => !CARD_PART_ACTIONS.has(step.action ?? "")) : [])
-    .map(step => ({ step, button: <Button size="sm" onClick={() => { closeCard(); onAction(row, step); }}>{rowActionLabel(step, row)}</Button> }));
+    .map(step => {
+      const blocked = stepBlockedReason(step, row);
+      return { step, button: blocked
+        ? <><Button size="sm" aria-disabled title={blocked} aria-describedby={`card-step-reason-${step.submission_id}`}>{rowActionLabel(step, row)}</Button>
+          {" "}<span id={`card-step-reason-${step.submission_id}`} className="action-reason">{blocked}</span></>
+        : <Button size="sm" onClick={() => { closeCard(); onAction(row, step); }}>{rowActionLabel(step, row)}</Button> };
+    });
   // U-4: the Translation column and filter group show once a translation exists or a language beyond the sources is set up.
   const translations = !inventory || inventory.cases.some(item => item.variants.some(variant => variant.origin !== "native")) || !settings
     || (settings.languages ?? []).some(language => !inventory.cases.some(item => item.variants.some(variant => variant.language === language)));

@@ -1011,7 +1011,7 @@ describe("text changes (V5)", () => {
     expect(screen.getByRole("dialog", { name: "Handle text change: case-202 de" })).toBe(dialog);
   });
 
-  it("Carry to v2… opens the carry dialog; Annotate v2 from scratch opens the assign dialog", async () => {
+  it("Carry to v2… opens the carry dialog; Start v2 fresh opens the assign dialog", async () => {
     const carry = stepOf("carry_text_change", { stage: "annotation", assignment_id: 51, submission_id: "sub-1", document_id: "case-202-de-v2" });
     const de = planRow("case-202", "de", carry, { versions: tcVersions("case-202"),
       work: [work({ assignment_id: 51, document_id: "case-202-de-v1", person: ana, status: "submitted", round_ordinal: 1 })] });
@@ -1021,7 +1021,7 @@ describe("text changes (V5)", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Carry to v2…, case-202 de" }));
     const dialog = await screen.findByRole("dialog", { name: "Carry to v2: case-202 de" });
     expect(await within(dialog).findByText("Ana Weber submitted on v1 (Round 1, 3 findings).")).toBeDefined();
-    fireEvent.click(within(dialog).getByRole("radio", { name: "Annotate v2 from scratch" }));
+    fireEvent.click(within(dialog).getByRole("radio", { name: "Start v2 fresh" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "Assign" }));
     await waitFor(() => expect(carrySpy).toHaveBeenCalledWith("p", "sub-1", expect.objectContaining({ mode: "dismiss", target_document_id: "case-202-de-v2" })));
     await waitFor(() => expect(lastAssign()).toMatchObject({ mode: "row", task: "annotate" }));
