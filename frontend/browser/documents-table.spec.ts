@@ -122,7 +122,8 @@ test("S0 synthetic-accepted: the final is on old text after v2 corrected it; en 
     expect(Math.max(...heights), `${width} px row height`).toBeLessThanOrEqual(41);
   }
   await expect(rowCell(de, "finalization")).toContainText("Final is on old text");
-  await expect(rowCell(de, "annotation")).toContainText(new RegExp(`\\d+ of \\d+ submitted, not started · open: ${ann}`));
+  // One annotation per text: the v1 submission carried to v2 does not count on v2 (issue 420, never "1 of 2 submitted").
+  await expect(rowCell(de, "annotation")).toContainText(new RegExp(`^\\s*assigned, not started · open: ${ann}`));
   await expect(rowCell(de, "waiting")).toHaveText("You");
   await expect(rowCell(de, "next").getByRole("button").first()).toHaveAccessibleName(textNamePattern("Review changes…, ", caseId, "de"));
 
