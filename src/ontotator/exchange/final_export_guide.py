@@ -517,8 +517,10 @@ def build_readme(
         ),
         *_wrap(
             "proposals.csv names each tool and version as the imported proposals "
-            'recorded them. Rows "annotator" count the decisions of each person\'s '
-            'proposal checks; rows "source" compare the tool\'s proposals with the '
+            "recorded them; proposals copied to a corrected text version count "
+            'for the tool that produced them. Rows "annotator" count the '
+            "decisions of each person's proposal checks; "
+            'rows "source" compare the tool\'s proposals with the '
             "selected final result of the same text (tolerant matching): "
             "precision = matched / proposals, recall = matched / final_findings. "
             "Recall counts every text with a selected result on which a proposal "

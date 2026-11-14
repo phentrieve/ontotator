@@ -1070,3 +1070,107 @@ def test_changed_modifier_text_sends_the_whole_proposal_to_review():
     ]
     # The stored item stays a valid ReanchorItem (no contract change in M1b).
     ReanchorItem.model_validate({**pending, "proposal_set_id": 1})
+
+
+LEGACY_ACTOR = {
+    "actor_id": "ontotator-reanchor",
+    "kind": "tool",
+    "name": "ontotator-reanchor",
+    "version": "0.10.1",
+    "model": None,
+    "run_id": None,
+}
+
+
+def _as_before_417(monkeypatch):
+    """Make the job write its sets as it did before #417: the job itself as
+    the one actor of the set and of every proposal (stored sets are
+    append-only, so a legacy set is written, not rewritten)."""
+    from dataclasses import replace
+
+    from ontotator.exchange import reanchor_job
+
+    original = reanchor_job.reanchor_sources
+
+    def legacy_sources(*args, **kwargs):
+        return [
+            replace(
+                source,
+                actors=(LEGACY_ACTOR,),
+                actor_alias={
+                    snap.annotation.provenance.actor.actor_id: LEGACY_ACTOR["actor_id"]
+                    for snap in source.annotations
+                },
+            )
+            for source in original(*args, **kwargs)
+        ]
+
+    monkeypatch.setattr(reanchor_job, "reanchor_sources", legacy_sources)
+
+
+def test_reanchored_set_keeps_the_producing_tool(runtime):
+    """The copy names the source set's tool, not the re-anchor job (#417)."""
+    env = runtime
+    corrected(env)
+    assert execute(env, children(env)[0]).status == "succeeded"
+    [output] = generated(env)
+    tool = env.source.annotation_set.actors[0].model_dump(
+        mode="json", exclude_none=True
+    )
+    assert output["actors"] == [tool]
+    assert output["payload"]["actors"][0]["actor_id"] == tool["actor_id"]
+    assert {
+        item["provenance"]["actor"]["actor_id"]
+        for item in output["payload"]["annotations"]
+    } == {tool["actor_id"]}
+    snapshots = env.app.state.repo.list_annotations_for_document(
+        "proj", output["document_id"]
+    )
+    assert {s.annotation.provenance.actor.actor_id for s in snapshots} == {
+        tool["actor_id"]
+    }
+    assert all(s.annotation.provenance.method == "tool" for s in snapshots)
+    metadata = env.app.state.repo.get_proposal_set("proj", output["id"])
+    assert metadata["actors"] == [tool]
+
+
+def test_legacy_reanchored_set_is_credited_to_its_source_tool(runtime, monkeypatch):
+    """A set stored before #417 is read as its source's tool, replays without
+    a collision and its own copy is credited to that tool."""
+    from ontotator.exchange.proposal_checks import proposal_set_chances
+
+    env = runtime
+    v2 = correction_unit(env.source, "Prefix " + TEXT)
+    v3 = correction_unit(v2, "More Prefix " + TEXT)
+    imported(env, [v3, v2, env.source])
+    upstream, downstream = children(env)
+    with monkeypatch.context() as patched:
+        _as_before_417(patched)
+        assert execute(env, upstream).status == "succeeded"
+    [legacy_set] = generated(env)
+    assert legacy_set["actors"][0]["actor_id"] == "ontotator-reanchor"
+    snapshots = env.app.state.repo.list_annotations_for_document(
+        "proj", legacy_set["document_id"]
+    )
+    assert {s.annotation.provenance.actor.actor_id for s in snapshots} == {
+        "ontotator-reanchor"
+    }
+    tool = env.source.annotation_set.actors[0].model_dump(
+        mode="json", exclude_none=True
+    )
+
+    metadata = env.app.state.repo.get_proposal_set("proj", legacy_set["id"])
+    assert metadata["actors"] == [tool]
+    with env.db.transaction() as conn:
+        chances = proposal_set_chances(conn, env.pid, [legacy_set["document_id"]])
+    assert (tool["name"], tool["version"]) in chances
+    assert all(name != "ontotator-reanchor" for name, _version in chances)
+
+    # The v3 job re-checks the v1 -> v2 pair: the legacy set is the same set.
+    outcome = execute(env, downstream)
+    assert outcome.status == "succeeded", outcome.error
+    assert outcome.result == {"sets": 1, "carried": 2, "needs_review": 0}
+    [row] = rows(env, ProposalSetRow, ProposalSetRow.id == legacy_set["id"])
+    assert row["actors"][0]["actor_id"] == "ontotator-reanchor"  # stored as is
+    [newest] = [r for r in generated(env) if r["id"] != legacy_set["id"]]
+    assert newest["actors"] == [tool]

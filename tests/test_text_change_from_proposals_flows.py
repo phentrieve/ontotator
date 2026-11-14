@@ -348,22 +348,23 @@ def test_corrections_added_and_unresolved_work_is_carried_and_exported(tmp_path)
         new["a3"].annotation.annotation_id: "uncertain",
         added["annotation"]["annotation_id"]: "carried",
     }
-    # The carried submission is counted for the tool of v2's proposals (the
-    # re-anchor job's set); the v1 submission for the original tool.
+    # The carried submission is counted for the tool that produced the
+    # proposals, as the v1 submission is: v2's re-anchored set keeps the
+    # original tool, no re-anchor pseudo-tool appears (#417).
     person = opened["view"]["key"]["annotator_id"]
+    assert {r["tool"] for r in exported["proposals"]} == {"test-tool"}
     [row] = [
         r
         for r in exported["proposals"]
-        if r["row_type"] == "annotator"
-        and r["pseudonym"] == person
-        and r["tool"] == "ontotator-reanchor"
+        if r["row_type"] == "annotator" and r["pseudonym"] == person
     ]
-    assert (row["submissions"], row["changed"], row["uncertain"], row["added"]) == (
-        "1",
-        "1",
-        "1",
-        "1",
-    )
+    assert (
+        row["submissions"],
+        row["confirmed"],
+        row["changed"],
+        row["uncertain"],
+        row["added"],
+    ) == ("2", "1", "2", "2", "2")
     # The Unresolved proposal is no finding of the person: 2 final findings.
     sources = [r for r in exported["proposals"] if r["row_type"] == "source"]
     assert sources and {r["final_findings"] for r in sources} == {"2"}

@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Text changes: proposals copied to a corrected text version keep the tool that produced them (actor and method of the source set) instead of naming the copy job `ontotator-reanchor`; the copy stays recorded by the set's origin and each proposal's `source_refs`. The editor names the original tool, and proposals.csv and the tool tables of the final export count the proposals under it. Sets copied by earlier releases are not rewritten: the editor, the proposal set metadata and the export credit them at read time to the one tool of the set they were copied from, and re-running the copy for such a text no longer fails with `REANCHOR_SET_COLLISION` (#417).
 - Ontology upload: malformed ontology JSON (`[1]`, `{"graphs":[1]}`, or nesting too deep to parse) is refused with `INVALID_ONTOLOGY` (HTTP 422) instead of a 500 (#397).
 
 ## [0.10.2] - 2026-11-14

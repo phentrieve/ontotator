@@ -276,6 +276,10 @@ decision words of Ontotator; `receipt.json` writes `corrected` for
 `tool` and `tool_version` are the name and version of the proposal's actor
 as the imported bundle recorded them (the actor ID when it had no name). A
 round on a text without proposals counts its findings under an empty tool.
+Proposals copied to a corrected text version keep the tool that produced
+them and count under it. Sets copied by earlier releases name the copy job
+(`ontotator-reanchor`); the export reads them as the one tool of the set they
+were copied from, without changing the stored set.
 
 Rows of `row_type` `source`, one per tool and version, compare the tool's
 proposals on each text with that text's selected final result, using the
