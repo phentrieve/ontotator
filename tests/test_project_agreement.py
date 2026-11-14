@@ -85,9 +85,13 @@ def test_route_gives_the_figures_of_the_final_export(tmp_path):
 
     table = rows(archive.read("agreement.csv"))
     assert len(table) == len(body["pairs"]) == 2
-    columns = tuple(name for name in table[0] if name != "source_text_line")
+    # The route does not name the modes of a pair (#389 changed the CSV only).
+    csv_only = {"source_text_line", "mode_a", "mode_b"}
+    columns = tuple(name for name in table[0] if name not in csv_only)
     for expected, pair in zip(table, body["pairs"], strict=True):
-        del expected["source_text_line"]
+        assert (expected["mode_a"], expected["mode_b"]) == ("scratch", "scratch")
+        for name in csv_only:
+            del expected[name]
         assert as_csv(pair, columns) == expected
 
     assert body["selected_texts"] == 2
