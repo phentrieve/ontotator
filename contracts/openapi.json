@@ -19672,6 +19672,18 @@
               }
             ],
             "title": "Document Id"
+          },
+          "blocked": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "no_target_proposals"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked"
           }
         },
         "additionalProperties": false,
@@ -26294,6 +26306,7 @@
                   "not_exported",
                   "carried_on_submit",
                   "v2_not_annotated",
+                  "no_target_proposals",
                   "correction",
                   "new_review",
                   "source_changed",

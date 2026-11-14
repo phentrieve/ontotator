@@ -516,10 +516,12 @@ def test_without_proposals_on_the_new_version_nothing_is_carried(tmp_path):
     assert _refusal(_finish_then_carry(env, moving["id"], v2)) == expected
     assert _refusal(_preview_carry(env, submission_id, v2)) == expected
     assert _refusal(_carry(env, submission_id, v2)) == expected
-    # The row offers assigning v2 (after the proposal import), not a carry.
-    codes = _codes(env)
-    assert "carry_text_change" not in codes
-    assert "assign_annotation" in codes
+    # The row shows the carry as blocked until v2 has proposals; assigning
+    # v2 stays offered (rule 8: the waiting author does not count).
+    steps = _rows(env)[("c1", "en")]["steps"]
+    carries = [s for s in steps if s["code"] == "carry_text_change"]
+    assert [s.get("blocked") for s in carries] == ["no_target_proposals"]
+    assert "assign_annotation" in _codes(env)
     # Dismissing needs no proposals.
     assert _carry(env, submission_id, v2, mode="dismiss").status_code == 200
     stays = _assignment(env, moving["id"])

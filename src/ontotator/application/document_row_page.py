@@ -902,14 +902,22 @@ def _old_work(
                 or item.user_id in holders
                 or ctx.submission_resolutions.get(submission, set()) & _SETTLED
                 or target.document_id in ctx.dismissed_to.get(submission, set())
-                # Work from proposals is carried only onto the target's own
-                # proposals (issue 414); until they are imported the row
-                # offers assigning the target (rule 8), not a carry.
-                or (
-                    item.annotation_mode == "proposals"
-                    and not ctx.facts.carry_proposal_counts.get(target.document_id)
-                )
             ):
+                continue
+            # Work from proposals is carried only onto the target's own
+            # proposals (issue 414): until they are imported the carry step
+            # shows but is blocked, and its author does not count for rule 8
+            # (assigning the target stays open).
+            if item.annotation_mode == "proposals" and not (
+                ctx.facts.carry_proposal_counts.get(target.document_id)
+            ):
+                old_submitted.append(
+                    replace(
+                        entry,
+                        submission_id=submission,
+                        blocked="no_target_proposals",
+                    )
+                )
                 continue
             old_submitted.append(replace(entry, submission_id=submission))
             people.add(item.user_id)
@@ -1209,6 +1217,7 @@ def _row_steps(
                 "assignment_id": assignment_id,
                 "submission_id": step.submission_id,
                 "document_id": version.document_id if version is not None else None,
+                "blocked": step.blocked,
             }
         )
     if not views:

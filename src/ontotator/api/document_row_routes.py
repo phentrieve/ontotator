@@ -36,6 +36,7 @@ from ontotator.domain.annotation_modes import AnnotationMode, ModeSource, TextMo
 from ontotator.domain.document_rows import BarCategory
 from ontotator.domain.next_steps import (
     Badge,
+    CarryBlock,
     RowAction,
     Stage,
     StepCode,
@@ -309,6 +310,8 @@ class NextStepView(_View):
     # Text changes (V5): the submitted old-version work of "Carry to v2…".
     submission_id: str | None = None
     document_id: str | None = None
+    # A carry that cannot run yet (issue 414): the target has no proposals.
+    blocked: CarryBlock | None = None
 
 
 class AnnotationModeView(_View):
