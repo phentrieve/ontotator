@@ -55,6 +55,6 @@ it("names the queue limit of a refused job (issue 396)", () => {
 
 it("explains a text change refused because the new version has no proposals (issue 414)", () => {
   expect(errorMessage(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "no_target_proposals" })))
-    .toBe("The new version has no proposals yet, so this work cannot be carried. Import proposals for the new version first, or annotate it from scratch.");
+    .toBe("The new version has no proposals yet: their automatic transfer may still be running, or they must be imported. Wait for or import the proposals for the new version, then try again.");
   expect(errorMessage(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "from_proposals" }))).toBe(ERROR_MESSAGES.TEXT_CHANGE_NOT_APPLICABLE);
 });

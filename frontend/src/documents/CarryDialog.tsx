@@ -4,10 +4,10 @@ import { textLabel } from "../app/identity";
 import { errorMessage } from "../admin/errors";
 import { personName } from "../admin/assignSummary";
 import { Button, Dialog } from "../ui";
-import { isTextChangeConflict, isTextChangeRefusal } from "./HandleTextChangeDialog";
+import { isNoTargetProposals, isTextChangeConflict, isTextChangeRefusal } from "./HandleTextChangeDialog";
 import {
   ALREADY_ANNOTATING, authorDescription, authorLabel, carriedMessage, carryTitle, CHECKING, CHOOSE_PERSON, FROM_SCRATCH_DESCRIPTION,
-  fromScratchLabel, RELOADED_MESSAGE, SOMEONE_ELSE, someoneElseDescription, submittedLine,
+  fromScratchLabel, noTargetProposalsLine, RELOADED_MESSAGE, SOMEONE_ELSE, someoneElseDescription, submittedLine,
 } from "./textChangeText";
 
 /** The submission to carry and the version it goes to. */
@@ -65,7 +65,8 @@ export function CarryDialog(props: CarryDialogProps): JSX.Element {
   const [preview, setPreview] = useState<TextChangePreview | null>(null);
   const [previewError, setPreviewError] = useState<unknown>(null);
   const [reload, setReload] = useState(0);
-  // A refused preview refuses the carry too: only "Annotate from scratch" is left.
+  // A refused preview refuses the carry too: only "Annotate from scratch" is left. Missing proposals
+  // on the new version are no such refusal: they may still arrive, so the choices stay (with Retry).
   const refused = isTextChangeRefusal(previewError);
   const mode: Mode = refused ? "dismiss" : chosenMode;
   const [busy, setBusy] = useState(false);
@@ -107,7 +108,7 @@ export function CarryDialog(props: CarryDialogProps): JSX.Element {
       });
       if (!alive.current) return;
       if (mode === "dismiss") props.onFromScratch();
-      else props.onDone(carriedMessage(mode === "other" && chosen ? chosen.display_name : author, to, result.carried_findings));
+      else props.onDone(carriedMessage(mode === "other" && chosen ? chosen.display_name : author, to, result.carried_findings, source.fromProposals));
     } catch (error: unknown) {
       if (!alive.current) return;
       if (isTextChangeConflict(error)) { setFailure(RELOADED_MESSAGE); props.onReload(); setReload(value => value + 1); }
@@ -138,8 +139,8 @@ export function CarryDialog(props: CarryDialogProps): JSX.Element {
       onClick={() => { void carry(false); }}>Assign</Button>
   </>}>
     <div className="text-change-dialog">
-      <p>{preview ? submittedLine(author, from, source.roundOrdinal, preview.findings) : previewError ? submittedLine(author, from, source.roundOrdinal, null) : CHECKING}</p>
-      {previewError !== null && <p className="text-change-error">{errorMessage(previewError)}{!refused && <>{" "}<Button size="sm" onClick={() => setReload(value => value + 1)}>Retry</Button></>}</p>}
+      <p>{preview ? submittedLine(author, from, source.roundOrdinal, preview.findings, source.fromProposals) : previewError ? submittedLine(author, from, source.roundOrdinal, null) : CHECKING}</p>
+      {previewError !== null && <p className="text-change-error">{isNoTargetProposals(previewError) ? noTargetProposalsLine(to) : errorMessage(previewError)}{!refused && <>{" "}<Button size="sm" onClick={() => setReload(value => value + 1)}>Retry</Button></>}</p>}
       <fieldset className="text-change-options">
         <legend className="visually-hidden">Who continues</legend>
         {options.map(option => {

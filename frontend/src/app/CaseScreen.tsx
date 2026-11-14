@@ -1,6 +1,6 @@
 import { ReanchorPanel, currentReanchorResolution, reanchorKey, reanchorRef, useReanchorContext } from "../variants/ReanchorPanel";
 import { useCarriedReview } from "../editor/carried/useCarriedReview";
-import { carriedChosenAxisIds, carriedListOrder as orderCarriedFirst, deriveCarriedStates, nextUncheckedKey, rowKeyOf, type CarriedState, type SnapshotLike } from "../editor/carried/checkState";
+import { carriedChosenAxisIds, carriedListOrder as orderCarriedFirst, carriedNote, deriveCarriedStates, nextUncheckedKey, rowKeyOf, type CarriedState, type SnapshotLike } from "../editor/carried/checkState";
 import { canRestore, captureDeletedFinding, modifierRestoreCommands, restoreCommands, type DeletedFinding } from "../editor/restoreFinding";
 import { carriedOriginLine, TEXT_CHANGE_ORIGIN, instructionLine, missingReason, roundName, textSpanLine, valuesLines, whatToCheckContext, type WhatToCheckContext } from "../editor/carried/instructions";
 import { CarriedSection, type CarriedReadOnly } from "../editor/carried/CarriedSection";
@@ -1604,7 +1604,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const selectedCarriedState = selectedCarriedStates.length ? carriedShownState(selectedCarriedStates) : undefined;
   const carriedSection = selectedCarriedState && selectedAnnotation ? (() => {
     const state = selectedCarriedState, input = state.input;
-    const sourceNote = input.source_snapshot.annotation.note?.trim() ?? "";
+    const sourceNote = carriedNote(input);
     const defaulted = new Set(selectedAnnotation.annotation.axes_defaulted ?? []);
     return <CarriedSection key={input.input_id} state={state}
       origin={carriedOriginLine(input)} recordedAt={input.source_draft_snapshot_id != null ? null : input.source_recorded_at}
@@ -2047,7 +2047,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
         ...(!pending.reanchorItem ? {search_event_id:searchId} : {}),
         ...(pending.isSpanless && spanlessReason.trim() ? { note: spanlessReason.trim() } : {}),
         // Issue 157: a re-created carried finding keeps the original's note (for a spanless one, its reason).
-        ...(pending.carriedInput?.source_snapshot.annotation.note?.trim() ? { note: pending.carriedInput.source_snapshot.annotation.note.trim() } : {}),
+        ...(pending.carriedInput && carriedNote(pending.carriedInput) ? { note: carriedNote(pending.carriedInput) } : {}),
         segments: pending.segments,
         axes_values: pending.reanchorItem?.axes_values ?? (pending.carriedInput ? { ...pending.carriedInput.source_snapshot.annotation.axes_values }
           : { ...initialAxisValues(type?.axes ?? [], termId), ...view.creation_defaults?.[pending.layerId]?.[pending.typeId] }),
@@ -4286,7 +4286,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
             </section>
           ) : selectedInputState ? (() => {
             const state = selectedInputState, source = state.input.source_snapshot;
-            const sourceNote = source.annotation.note?.trim();
+            const sourceNote = carriedNote(state.input);
             return <div className="detail-pane">
               <ExceptionPanel key={state.input.input_id} state={state}
                 origin={carriedOriginLine(state.input)} recordedAt={state.input.source_draft_snapshot_id != null ? null : state.input.source_recorded_at}

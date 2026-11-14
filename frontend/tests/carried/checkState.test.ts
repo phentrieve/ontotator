@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { carriedChosenAxisIds, carriedListOrder, checkStateBadge, deriveCarriedStates, nextUncheckedKey, progressText, rowKeyOf, type CarriedInputLike } from "../../src/editor/carried/checkState";
+import { carriedChosenAxisIds, carriedListOrder, carriedNote, checkStateBadge, deriveCarriedStates, nextUncheckedKey, progressText, rowKeyOf, type CarriedInputLike } from "../../src/editor/carried/checkState";
 
 const snap = (id: string, version = "v1", evidence = 0) => ({ annotation: { annotation_id: id, layer_id: "hpo", type_id: "phenotype", term_id: "HP:1", evidence_refs: Array.from({ length: evidence }, (_, i) => ({ evidence_id: `e${i}`, version: "1" })), axes_values: {}, axes_defaulted: [] }, version, evidence: [], text_sha256: "t1" }) as any;
 const input = (id: string, target: any) => ({ input_id: id, source_submission_id: "s1", source_snapshot: snap("orig"), target_snapshot: target, mapping_status: target ? "carried" : "needs_review" }) as any;
@@ -93,5 +93,17 @@ describe("carriedChosenAxisIds", () => {
   it("chooses nothing when every value was defaulted", () => {
     const source = { ...snap("orig").annotation, axes_values: { assertion: "present" }, axes_defaulted: ["assertion"] };
     expect(carriedChosenAxisIds(source, ["assertion"])).toEqual([]);
+  });
+});
+
+describe("carriedNote (issue 414)", () => {
+  const input = (note: string | null, unresolved: string | null) => ({
+    source_snapshot: { annotation: { annotation_id: "p", layer_id: "hpo", type_id: "t", term_id: "HP:1", note }, version: "v" },
+    unresolved_note: unresolved,
+  });
+  it("keeps the original's note and adds an Unresolved decision's note once", () => {
+    expect(carriedNote(input("score 0.91", "absent?"))).toBe("score 0.91\n\nabsent?");
+    expect(carriedNote(input(" same ", "same"))).toBe("same");
+    expect(carriedNote(input(null, null))).toBe("");
   });
 });

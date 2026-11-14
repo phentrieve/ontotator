@@ -6,7 +6,7 @@ import { personName } from "../admin/assignSummary";
 import { Button, ConfirmDialog, Dialog } from "../ui";
 import {
   CHECKING, finishDescription, finishingMessage, finishLabel, handleTitle, heldLine, moveDescription, movedMessage, moveLabel, nextAfterWithdrawLine,
-  notNewerLine, openWorkLine, RELOADED_MESSAGE, unplacedLine, WITHDRAW_LABEL, withdrawDescription, withdrawnMessage,
+  noTargetProposalsLine, notNewerLine, openWorkLine, RELOADED_MESSAGE, unplacedLine, WITHDRAW_LABEL, withdrawDescription, withdrawnMessage,
 } from "./textChangeText";
 
 export type TextChangeChoice = "move" | "finish" | "withdraw";
@@ -30,9 +30,14 @@ export interface HandleTextChangeDialogProps {
 export const isTextChangeConflict = (error: unknown): boolean =>
   error instanceof ApiError && (error.code === "TEXT_CHANGE_CHANGED" || error.code === "WORKFLOW_REVISION_CONFLICT");
 
-/** A domain refusal (4xx with a code, not a conflict): retrying cannot help, and the refused choices would fail again. */
+/** The new version has no proposals yet (issue 414): this can change, so the choices stay and Retry is offered. */
+export const isNoTargetProposals = (error: unknown): boolean =>
+  error instanceof ApiError && error.code === "TEXT_CHANGE_NOT_APPLICABLE" && typeof error.details === "object" && error.details !== null
+  && error.details.reason === "no_target_proposals";
+
+/** A domain refusal (4xx with a code, not a conflict, not a wait for proposals): retrying cannot help, and the refused choices would fail again. */
 export const isTextChangeRefusal = (error: unknown): boolean =>
-  error instanceof ApiError && !!error.code && error.status >= 400 && error.status < 500 && !isTextChangeConflict(error);
+  error instanceof ApiError && !!error.code && error.status >= 400 && error.status < 500 && !isTextChangeConflict(error) && !isNoTargetProposals(error);
 
 /** "Handle text change…": an open annotation on an old version (spec V5). */
 export function HandleTextChangeDialog(props: HandleTextChangeDialogProps): JSX.Element {
@@ -48,7 +53,8 @@ export function HandleTextChangeDialog(props: HandleTextChangeDialogProps): JSX.
   const targetId = step.document_id ?? target?.document_id ?? "";
 
   const fromProposals = item?.annotation_mode === "proposals";
-  // A correction that does not count has no way back, and a refused preview (e.g. no proposals on the new version) refuses move and finish too: only Withdraw works.
+  // A correction that does not count has no way back, and a refused preview refuses move and finish too: only Withdraw works.
+  // No proposals on the new version yet is no refusal of that kind: they may still arrive (Retry).
   const notNewer = !!item && !!target && target.version < (item.version ?? 0);
 
   const [chosen, setChoice] = useState<TextChangeChoice>("move");
@@ -105,7 +111,7 @@ export function HandleTextChangeDialog(props: HandleTextChangeDialogProps): JSX.
   const options: { value: TextChangeChoice; label: string; description: string; extra?: string | null }[] = [
     ...(withdrawOnly ? [] : [
       { value: "move" as const, label: moveLabel(to), description: moveDescription(person, fromProposals),
-        extra: preview ? (preview.unplaced > 0 ? unplacedLine(preview.unplaced, preview.findings, person) : null) : previewFailed ? null : CHECKING },
+        extra: preview ? (preview.unplaced > 0 ? unplacedLine(preview.unplaced, preview.findings, person, fromProposals) : null) : previewFailed ? null : CHECKING },
       { value: "finish" as const, label: finishLabel(person, from), description: finishDescription(person, to) },
     ]),
     { value: "withdraw", label: WITHDRAW_LABEL, description: withdrawDescription(person, to) },
@@ -119,6 +125,8 @@ export function HandleTextChangeDialog(props: HandleTextChangeDialogProps): JSX.
   </>}>
     <div className="text-change-dialog">
       <p>{openWorkLine(person, from, to)}</p>
+      {isNoTargetProposals(previewError) && !held && <p className="text-change-error">{noTargetProposalsLine(to)}{" "}
+        <Button size="sm" onClick={() => setReload(value => value + 1)}>Retry</Button></p>}
       {withdrawOnly && !held && <>
         <p>{notNewer ? notNewerLine(from, to) : `${errorMessage(previewError)} That is why Withdraw is the only choice.`}</p>
         <p>{nextAfterWithdrawLine(to)}</p>

@@ -31,6 +31,14 @@ export interface CarriedInputLike {
   source_recorded_at?: string | null;
   source_language?: string | null;
   source_version?: number | null;
+  /** The Unresolved note left on a proposal carried without counterpart (issue 414). */
+  unresolved_note?: string | null;
+}
+
+/** The note a carried finding keeps: the original's, and an Unresolved decision's note, so neither is lost (as the server's carried note). */
+export function carriedNote(input: Pick<CarriedInputLike, "source_snapshot" | "unresolved_note">): string {
+  const parts = [input.source_snapshot.annotation.note, input.unresolved_note].map(note => note?.trim() ?? "").filter(Boolean);
+  return [...new Set(parts)].join("\n\n");
 }
 
 export interface ResolutionLike {

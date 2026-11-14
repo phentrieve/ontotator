@@ -8412,6 +8412,8 @@ export interface components {
             source_language?: string | null;
             /** Source Version */
             source_version?: number | null;
+            /** Unresolved Note */
+            unresolved_note?: string | null;
         };
         /** RoundSourceView */
         RoundSourceView: {
