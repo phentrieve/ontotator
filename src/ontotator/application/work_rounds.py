@@ -19,7 +19,13 @@ from ontotator.auth.authority import lock_user_authority
 from ontotator.authz.policy import Access, Action, can, may_take
 from ontotator.authz.visibility import current_access, require_document
 from ontotator.domain.annotation_modes import workspace_mode
-from ontotator.domain.annotations import AnnotationRef, AnnotationSnapshot, snapshot
+from ontotator.domain.annotations import (
+    ActorRef,
+    AnnotationRef,
+    AnnotationSnapshot,
+    Provenance,
+    snapshot,
+)
 from ontotator.domain.canonical import canonical_hash
 from ontotator.domain.documents import (
     Document,
@@ -29,7 +35,11 @@ from ontotator.domain.documents import (
     Segment,
 )
 from ontotator.domain.errors import AccessDenied, DomainError
-from ontotator.domain.proposal_carry import ProposalCarryPlan, plan_proposal_carry
+from ontotator.domain.proposal_carry import (
+    CarriedItem,
+    ProposalCarryPlan,
+    plan_proposal_carry,
+)
 from ontotator.domain.reanchor import (
     Carried,
     NeedsReview,
@@ -132,6 +142,23 @@ class RoundSource:
     source_draft_snapshot_id: int | None
     # The proposal decisions of work from proposals (issue 414).
     decisions: list[ReviewDecision]
+
+
+def adopted_decision(item: CarriedItem) -> ReviewDecision | None:
+    """The confirmed or uncertain decision of a proposal carried without a
+    counterpart (it becomes an own finding), else None."""
+    decision = item.decision
+    if decision is None or item.proposal is not None or decision.outcome == "changed":
+        return None
+    return decision
+
+
+def carried_note(note: str | None, decision: ReviewDecision) -> str | None:
+    """The note of a proposal carried without counterpart: its own note and an
+    Unresolved decision's note, so neither is lost (#414)."""
+    extra = decision.note if decision.outcome == "uncertain" else None
+    parts = [n.strip() for n in (note, extra) if n and n.strip()]
+    return "\n\n".join(dict.fromkeys(parts)) or None
 
 
 def no_target_proposals() -> DomainError:
@@ -803,12 +830,27 @@ class WorkRoundService:
                         for index, ev in enumerate(mapped.evidence)
                     ]
                     source_refs = [f"round-input:{iid}"]
-                    replaces = plan.items[position].proposal if plan else None
+                    planned = plan.items[position] if plan else None
+                    replaces = planned.proposal if planned else None
                     if replaces is not None:
                         # The editor's link of a correction to its proposal.
                         source_refs.insert(
                             0, f"{replaces.annotation_id}:{replaces.version}"
                         )
+                    provenance = original.annotation.provenance.model_copy(
+                        update={"source_refs": source_refs}
+                    )
+                    note = original.annotation.note
+                    adopted = adopted_decision(planned) if planned else None
+                    if adopted is not None:
+                        # A proposal without counterpart becomes the person's
+                        # own finding, recorded as an adopted proposal (#414).
+                        provenance = Provenance(
+                            actor=ActorRef(actor_id=adopted.reviewer_id, kind="human"),
+                            method="adopted",
+                            source_refs=source_refs,
+                        )
+                        note = carried_note(note, adopted)
                     annotation = original.annotation.model_copy(
                         deep=True,
                         update={
@@ -822,9 +864,8 @@ class WorkRoundService:
                                 for e in evidence
                             ],
                             "modifiers": mapped.target_modifiers,
-                            "provenance": original.annotation.provenance.model_copy(
-                                update={"source_refs": source_refs}
-                            ),
+                            "note": note,
+                            "provenance": provenance,
                         },
                     )
                     target = snapshot(annotation, evidence, document, profile)

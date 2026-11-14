@@ -276,6 +276,7 @@ def enrich_inputs(
                 and v.input_id not in archived_ids
             },
         )
+        notes = _unresolved_notes(conn, pid, views, archived_ids)
     result = []
     for view in views:
         sid = view.source_submission_id or ""
@@ -297,10 +298,60 @@ def enrich_inputs(
                     "source_recorded_at": row.recorded_at if row is not None else None,
                     "source_language": variant.language if variant else None,
                     "source_version": version,
+                    "unresolved_note": notes.get(view.input_id),
                 }
             )
         )
     return result
+
+
+def _unresolved_notes(
+    conn: Connection, pid: int, views: list[RoundInputView], archived_ids: set[str]
+) -> dict[str, str]:
+    """input_id -> the note of the Unresolved decision the source work left on
+    the input's proposal (carried without counterpart, #414)."""
+    from ontotator.storage.overview_tables import DraftSnapshotRow
+
+    tool = [
+        v for v in views if v.source_snapshot.annotation.provenance.actor.kind == "tool"
+    ]
+    sids = {v.source_submission_id for v in tool if v.source_submission_id}
+    dids = {
+        v.source_draft_snapshot_id
+        for v in tool
+        if v.source_draft_snapshot_id is not None and v.input_id not in archived_ids
+    }
+    decisions: dict[str | int, list[dict[str, Any]]] = {}
+    if sids:
+        for sid, stored in conn.execute(
+            select(
+                SubmissionRow.submission_id, SubmissionRow.payload["decisions"]
+            ).where(
+                SubmissionRow.project_id == pid,
+                SubmissionRow.submission_id.in_(sorted(sids)),
+            )
+        ):
+            decisions[sid] = stored or []
+    if dids:
+        for did, stored in conn.execute(
+            select(DraftSnapshotRow.id, DraftSnapshotRow.payload["decisions"]).where(
+                DraftSnapshotRow.project_id == pid,
+                DraftSnapshotRow.id.in_(sorted(dids)),
+            )
+        ):
+            decisions[did] = stored or []
+    notes: dict[str, str] = {}
+    for view in tool:
+        source = view.source_submission_id or view.source_draft_snapshot_id
+        target = view.source_ref.model_dump()
+        for decision in decisions.get(source or "", []):
+            if (
+                decision["outcome"] == "uncertain"
+                and decision["target"] == target
+                and (decision.get("note") or "").strip()
+            ):
+                notes[view.input_id] = decision["note"].strip()
+    return notes
 
 
 def enrich_sources(
