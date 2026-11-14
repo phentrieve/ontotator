@@ -197,6 +197,42 @@ test('real wrapping pairs equal-count paragraphs in both directions without chan
   await openViewer(page, s, s.documents.corrected); await openComparison(page, s);
 });
 
+test('both panes have their selects in the same place above their text, and both texts start at the same height (#412)', async ({ page }) => {
+  const s = await scenario(page); await loginExisting(page, s.users.lead);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openViewer(page, s); await openComparison(page, s);
+  const groups = [page.getByRole('group', { name: 'Current text identity', exact: true }), comparison(page).getByRole('group', { name: 'Comparison text identity', exact: true })];
+  // The toolbar keeps Compare; the current text's selects moved into its own group.
+  await expect(page.locator('.text-view-toolbar').getByLabel('Language and version', { exact: true })).toHaveCount(0);
+  for (const group of groups) for (const name of ['Language and version', 'Show']) await expect(group.getByLabel(name, { exact: true })).toBeVisible();
+  const check = async () => {
+    const [leftGroup, rightGroup] = await Promise.all(groups.map(group => group.boundingBox()));
+    expect(Math.abs(leftGroup!.y - rightGroup!.y)).toBeLessThanOrEqual(1);
+    for (const name of ['Language and version', 'Show']) {
+      const [l, r] = await Promise.all(groups.map(group => group.getByLabel(name, { exact: true }).boundingBox()));
+      expect(Math.abs(l!.y - r!.y)).toBeLessThanOrEqual(1); expect(Math.abs(l!.width - r!.width)).toBeLessThanOrEqual(1);
+      // Mirrored: the same offset from the start of each column.
+      expect(Math.abs((l!.x - leftGroup!.x) - (r!.x - rightGroup!.x))).toBeLessThanOrEqual(1);
+    }
+    const [left, right] = await Promise.all([viewerLeft(page).boundingBox(), rightText(page).boundingBox()]);
+    expect(Math.abs(left!.y - right!.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(await firstLineOffset(viewerLeft(page)) - await firstLineOffset(rightText(page)))).toBeLessThanOrEqual(1);
+  };
+  await check();
+  // A note in the shared controls (unequal paragraph counts) moves both texts together.
+  await comparison(page).getByLabel('Language and version', { exact: true }).selectOption(s.documents.other);
+  await expect(comparisonStatus(page).getByText(/^Paragraphs differ/)).toBeVisible();
+  await check();
+  // Stacked below 1100 px, each group still sits directly above its own text.
+  await page.setViewportSize({ width: 800, height: 800 });
+  for (const [group, text] of [[groups[0], viewerLeft(page)], [groups[1], rightText(page)]] as const) {
+    const [g, t] = await Promise.all([group.boundingBox(), text.boundingBox()]);
+    expect(t!.y).toBeGreaterThan(g!.y + g!.height - 1); expect(t!.y - (g!.y + g!.height)).toBeLessThan(40);
+  }
+  await comparisonControls(page).getByRole('button', { name: 'Close comparison', exact: true }).click();
+  await expect(page.locator('.text-view-toolbar').getByLabel('Language and version', { exact: true })).toHaveValue(s.documents.target);
+});
+
 test('unequal counts map proportionally, toggle off and below1100 suspend coupling, resize back resumes it', async ({ page }) => {
   const s = await scenario(page); await loginExisting(page, s.users.lead);
   await page.setViewportSize({ width: 1280, height: 720 });

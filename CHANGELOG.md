@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Text view: with **Compare** open, both panes have their **Language and version** and **Show** selects in the same place, directly above their text (**Current text** and **Comparison text**), so the two texts start at the same height (#412).
+
 ## [0.10.2] - 2026-11-14
 
 ### Added

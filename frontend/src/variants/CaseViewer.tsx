@@ -185,11 +185,15 @@ export function CaseViewer({ projectKey, caseId, variant, show, annotations, com
   const supported = tasks?.identity === identity ? tasks.value.filter(row => row.project_key === projectKey && row.document_id === current.document_id) : [];
   const payloadFailed = payloadError?.identity === payloadIdentity;
   const layerLabel = layers.entries?.find(entry => entry.ref && layerKey(entry.ref) === selection)?.label ?? ref?.label ?? '';
+  // Small visible labels (#47 X-15); the selects keep their aria-label as the name. While comparing they move above
+  // the current text, mirroring the comparison text's selects, so both texts start at the same height (#412).
+  const identitySelects = <>
+    <label className="text-view-field"><span>Language and version</span><VersionSelect caseDetail={detail} value={current.document_id} onChange={id => move(id)} /></label>
+    <label className="text-view-field"><span>Show</span><ShowSelect entries={layers.entries ?? []} value={selection} otherLabel={ref?.label} onChange={key => move(current.document_id, key)} /></label>
+  </>;
   return <section className={`case-viewer${compareOpen ? " case-comparing" : ""}`} aria-label="Case viewer">
     <TextViewToolbar projectKey={projectKey} caseId={detail.case_id} language={current.language} documents={documents} onNavigate={onNavigate}>
-      {/* Small visible labels (#47 X-15); the selects keep their aria-label as the name. */}
-      <label className="text-view-field"><span>Language and version</span><VersionSelect caseDetail={detail} value={current.document_id} onChange={id => move(id)} /></label>
-      <label className="text-view-field"><span>Show</span><ShowSelect entries={layers.entries ?? []} value={selection} otherLabel={ref?.label} onChange={key => move(current.document_id, key)} /></label>
+      {!compareOpen && identitySelects}
       {access.allowed && <Button ref={compareButton} size="sm" aria-expanded={compareOpen} onClick={() => compareOpen ? closeComparison() : setCompareIdentity(identity)}>Compare</Button>}
       <SubmissionHistory projectKey={projectKey} caseId={caseId} documentId={current.document_id} language={current.language} version={current.version}
         username={username} canManage={access.canManage} onNavigate={onNavigate} documents={documents} />
@@ -209,6 +213,10 @@ export function CaseViewer({ projectKey, caseId, variant, show, annotations, com
     {ref?.kind === 'submission' && <SubmissionCarriedChecks projectKey={projectKey} documentId={current.document_id} submissionId={ref.id} />}
     <div className="comparison-reading">
     {compareOpen && <div className="comparison-toolbar-slot" ref={setComparisonToolbar} />}
+    {compareOpen && <div role="group" aria-label="Current text identity" className="comparison-pane-identity comparison-current-identity">
+      <h2 className="comparison-pane-title">Current text</h2>
+      <div className="text-view-selects">{identitySelects}</div>
+    </div>}
     {textError?.identity === contentIdentity ? <><ErrorNotice error={textError.error} />{retryButton}</> : text ? <>
       {ref && !snapshot && !payloadFailed && <InlineMessage tone="info">Loading annotation version...</InlineMessage>}
       <ReadOnlyAnnotationView onTextElement={setLeftElement} key={JSON.stringify([username, projectKey, caseId, selectedId, selection, retry])} text={text.text} annotations={snapshot?.annotations ?? []} evidence={snapshot?.evidence ?? []} labelFor={labelFor} proposalContext={ref?.kind === "proposals" && snapshot ? {projectKey,documentId:current.document_id,scope:JSON.stringify([username,projectKey,caseId,selectedId,selection,retry]),setId:ref.id} : undefined} />

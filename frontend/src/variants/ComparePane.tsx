@@ -122,10 +122,11 @@ export function ComparePane({ projectKey, username, caseDetail, leftDocumentId, 
     {toolbarHost === undefined && globalControls}
     <div role="group" aria-label="Comparison text identity" className="comparison-pane-identity">
     {toolbarHost !== undefined && <h2 className="comparison-pane-title">Comparison text</h2>}
+    {/* Same labelled selects as the current text's group, so both panes are symmetric (#412). */}
     {layers ? <div className="text-view-selects">
-      <VersionSelect caseDetail={caseDetail} value={selectedId ?? ''} onChange={select} />
-      <ShowSelect entries={current?.entries ?? []} value={selection} otherLabel={ref?.label}
-        onChange={key => { if (key === 'text' || find(key, refs ?? [])) setChoice({ identity: selectionIdentity, key }); }} />
+      <label className="text-view-field"><span>Language and version</span><VersionSelect caseDetail={caseDetail} value={selectedId ?? ''} onChange={select} /></label>
+      <label className="text-view-field"><span>Show</span><ShowSelect entries={current?.entries ?? []} value={selection} otherLabel={ref?.label}
+        onChange={key => { if (key === 'text' || find(key, refs ?? [])) setChoice({ identity: selectionIdentity, key }); }} /></label>
     </div> : <VariantSelectors caseDetail={caseDetail} currentDocumentId={selectedId ?? ''} annotationOptions={annotationOptions(refs ?? [], false)} selectedAnnotation={selection}
       onLanguage={language => { const id = pickVariant(caseDetail, language); if (id) select(id); }} onVersion={select}
       onAnnotation={key => { if (key === 'text' || find(key, refs ?? [])) setChoice({ identity: selectionIdentity, key }); }} />}

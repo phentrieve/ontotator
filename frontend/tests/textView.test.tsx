@@ -39,7 +39,9 @@ const viewer = async (extra: Record<string, unknown> = {}) => {
   const { CaseViewer } = await import('../src/variants/CaseViewer');
   const mounted = render(<CaseViewer {...props} {...extra} />);
   await screen.findByText('Immutable target');
-  await waitFor(() => expect(options(within(screen.getByRole('group', { name: 'Text view' })).getByLabelText('Show')).length).toBeGreaterThan(1));
+  // While comparing, the current text's selects sit in their own group above the text (#412).
+  const identity = () => screen.queryByRole('group', { name: 'Current text identity' }) ?? screen.getByRole('group', { name: 'Text view' });
+  await waitFor(() => expect(options(within(identity()).getByLabelText('Show')).length).toBeGreaterThan(1));
   return { CaseViewer, mounted };
 };
 
