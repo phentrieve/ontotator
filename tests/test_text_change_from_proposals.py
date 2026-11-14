@@ -81,7 +81,11 @@ def _run_reanchor_jobs(env: Any) -> None:
         ids = list(
             conn.execute(
                 select(JobRow.id)
-                .where(JobRow.kind == "reanchor", JobRow.project_id == env.pid)
+                .where(
+                    JobRow.kind == "reanchor",
+                    JobRow.project_id == env.pid,
+                    JobRow.status == "queued",
+                )
                 .order_by(JobRow.id)
             ).scalars()
         )
