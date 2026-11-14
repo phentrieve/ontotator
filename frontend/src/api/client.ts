@@ -127,6 +127,11 @@ export type RowRefView = components["schemas"]["RowRefView"];
 export type RowSelection = readonly string[] | { readonly rows: readonly RowRefView[] };
 export type DocumentRowKeysRequest = Defaulted<components["schemas"]["DocumentRowKeysRequest"], "sort" | "exclude" | "active_only">;
 export type MoveToFrontResult = components["schemas"]["MoveToFrontResult"];
+export type BulkReopenRequest = components["schemas"]["BulkReopenRequest"];
+export type BulkWithdrawRequest = components["schemas"]["BulkWithdrawRequest"];
+export type BulkTaskActionView = components["schemas"]["BulkTaskActionView"];
+export type BulkUndoView = components["schemas"]["BulkUndoView"];
+export type BulkUndoResult = components["schemas"]["BulkUndoResult"];
 export type DocumentRowKeys = components["schemas"]["DocumentRowKeys"];
 export type DocumentsVisitView = components["schemas"]["DocumentsVisitView"];
 export type DocumentsSummaryView = components["schemas"]["DocumentsSummaryView"];
@@ -490,6 +495,12 @@ export class ApiClient {
   async documentRowKeys(key: string, body: DocumentRowKeysRequest = {}): Promise<DocumentRowKeys> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/document-rows/keys`, { method: "POST", body: JSON.stringify(body) }); }
   /** Moves the texts to the front of the project's order, so first in My tasks (lead only, issue 339). */
   async moveToFront(key: string, rows: readonly RowRefView[]): Promise<MoveToFrontResult> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/document-rows/move-to-front`, { method: "POST", body: JSON.stringify({ rows }) }); }
+  /** Bulk Reopen of the selected texts' submitted tasks: preview, or apply with the preview's token (lead only, issue 336). */
+  async bulkReopen(key: string, body: BulkReopenRequest): Promise<BulkTaskActionView> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/bulk-task-actions/reopen`, { method: "POST", body: JSON.stringify(body) }); }
+  /** Bulk withdrawal of the selected texts' open tasks: preview, or apply with the preview's token (lead only, issues 336, 339). */
+  async bulkWithdraw(key: string, body: BulkWithdrawRequest): Promise<BulkTaskActionView> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/bulk-task-actions/withdraw`, { method: "POST", body: JSON.stringify(body) }); }
+  /** Undo of an applied bulk action while its texts are unchanged (409 BULK_UNDO_STALE otherwise). */
+  async bulkUndo(key: string, body: BulkUndoView): Promise<BulkUndoResult> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/bulk-task-actions/undo`, { method: "POST", body: JSON.stringify(body) }); }
   /** Record an opening of Documents (lead only); returns the NEW baseline (start of the previous visit). */
   async recordDocumentsVisit(key: string): Promise<DocumentsVisitView> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/documents/visit`, { method: "POST" }); }
   /** Navigation counter: rows needing the lead's decision, undecided rows included (lead only). */

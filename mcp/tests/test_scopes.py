@@ -138,6 +138,19 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
         "withdraw_task": {"assignment_id": 3},
         "remove_task": {"assignment_id": 3},
         "reopen_task": {"assignment_id": 3},
+        "reopen_texts": {
+            "project": "p",
+            "texts": [{"case_id": "c", "language": "en"}],
+            "reason": "Guideline 2.3",
+            "confirm": True,
+            "preview_token": "sha256:x",
+        },
+        "withdraw_open_tasks": {
+            "project": "p",
+            "texts": [{"case_id": "c", "language": "en"}],
+            "confirm": True,
+            "preview_token": "sha256:x",
+        },
         "hand_over_open_tasks": {
             "project": "p",
             "from_username": "leaving",

@@ -331,6 +331,7 @@ ROW_KEYS = {
     "flagged_unclear",
     "flagged_group_id",
     "flagged_round_id",
+    "over_limit",
     "proposal_count",
     "annotation_mode",
     "consolidation_progress",

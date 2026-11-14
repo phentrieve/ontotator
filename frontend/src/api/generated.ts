@@ -1679,6 +1679,83 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{key}/bulk-task-actions/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk Reopen
+         * @description Reopen the submitted tasks of many texts (issue 336).
+         *
+         *     ``preview: true`` lists the tasks that would be reopened, the tasks kept
+         *     and why, the texts skipped (a final result is chosen) and a
+         *     ``preview_token``. Applying sends that token and a ``reason``: every
+         *     listed task is reopened, or none (409 ``PREVIEW_STALE`` with a fresh
+         *     ``preview`` in the details when anything changed). Each task is audited
+         *     like a single reopen (``via: bulk_reopen``).
+         */
+        post: operations["bulk_reopen_api_v1_projects__key__bulk_task_actions_reopen_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{key}/bulk-task-actions/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk Withdraw
+         * @description Withdraw the open tasks of many texts (issues 336, 339).
+         *
+         *     Like a single withdrawal the drafts stay. Started tasks only with
+         *     ``include_started``; ``over_limit_only`` withdraws only annotations above
+         *     "annotators per text" of their version (submitted, then started, then the
+         *     oldest stay). Preview and apply as ``bulk-task-actions/reopen``; each
+         *     task is audited like a single withdrawal (``via: bulk_withdraw``).
+         */
+        post: operations["bulk_withdraw_api_v1_projects__key__bulk_task_actions_withdraw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{key}/bulk-task-actions/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk Undo
+         * @description Undo a bulk reopen or withdrawal with the ``undo`` of its apply.
+         *
+         *     Only while the texts are exactly as the action left them; otherwise 409
+         *     ``BULK_UNDO_STALE`` and nothing is undone. Reopened tasks are submitted
+         *     again; withdrawn tasks come back with their drafts.
+         */
+        post: operations["bulk_undo_api_v1_projects__key__bulk_task_actions_undo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{key}/annotation-mode-changes": {
         parameters: {
             query?: never;
@@ -4193,6 +4270,34 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** BulkKeptTaskView */
+        BulkKeptTaskView: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Assignment Id */
+            assignment_id: number;
+            /** Document Id */
+            document_id: string;
+            /** Version */
+            version: number;
+            /**
+             * Task
+             * @enum {string}
+             */
+            task: "annotate" | "review" | "translation_review";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "in_progress" | "submitted" | "reopened";
+            person: components["schemas"]["PersonRefView"];
+            /** Reason */
+            reason: string;
+            /** Message */
+            message: string;
+        };
         /** BulkPlanRequest */
         BulkPlanRequest: {
             /** Case Ids */
@@ -4242,6 +4347,23 @@ export interface components {
             /** Skipped Rows */
             skipped_rows?: components["schemas"]["RowRefView"][];
         };
+        /**
+         * BulkReopenRequest
+         * @description Reopen the submitted tasks of the selected texts. ``reason`` is
+         *     required to apply; the people see it in My tasks.
+         */
+        BulkReopenRequest: {
+            /** Rows */
+            rows: components["schemas"]["RowRefView"][];
+            /** Tasks */
+            tasks?: ("annotate" | "review" | "translation_review")[];
+            /** Preview */
+            preview?: boolean;
+            /** Preview Token */
+            preview_token?: string | null;
+            /** Reason */
+            reason?: string | null;
+        };
         /** BulkResult */
         BulkResult: {
             /** Changed Rows */
@@ -4260,6 +4382,20 @@ export interface components {
             /** Mode No Proposals */
             mode_no_proposals?: components["schemas"]["RowRefView"][];
         };
+        /** BulkSkippedTextView */
+        BulkSkippedTextView: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /**
+             * Reason
+             * @constant
+             */
+            reason: "final_chosen";
+            /** Message */
+            message: string;
+        };
         /** BulkTargetView */
         BulkTargetView: {
             /** Document Id */
@@ -4269,6 +4405,100 @@ export interface components {
              * @enum {string}
              */
             mode: "checkbox" | "choose_in_versions";
+        };
+        /** BulkTaskActionView */
+        BulkTaskActionView: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "reopen" | "withdraw";
+            /** Applied */
+            applied: boolean;
+            /** Texts */
+            texts: number;
+            /** Changes */
+            changes: components["schemas"]["BulkTaskView"][];
+            /** Kept */
+            kept: components["schemas"]["BulkKeptTaskView"][];
+            /** Skipped */
+            skipped: components["schemas"]["BulkSkippedTextView"][];
+            /** Preview Token */
+            preview_token: string;
+            undo?: components["schemas"]["BulkUndoView"] | null;
+        };
+        /** BulkTaskView */
+        BulkTaskView: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Assignment Id */
+            assignment_id: number;
+            /** Document Id */
+            document_id: string;
+            /** Version */
+            version: number;
+            /**
+             * Task
+             * @enum {string}
+             */
+            task: "annotate" | "review" | "translation_review";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "in_progress" | "submitted" | "reopened";
+            person: components["schemas"]["PersonRefView"];
+        };
+        /** BulkUndoRequest */
+        BulkUndoRequest: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "reopen" | "withdraw";
+            /** Assignment Ids */
+            assignment_ids: number[];
+            /** Token */
+            token: string;
+        };
+        /** BulkUndoResult */
+        BulkUndoResult: {
+            /** Undone */
+            undone: number;
+        };
+        /** BulkUndoView */
+        BulkUndoView: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "reopen" | "withdraw";
+            /** Assignment Ids */
+            assignment_ids: number[];
+            /** Token */
+            token: string;
+        };
+        /**
+         * BulkWithdrawRequest
+         * @description Withdraw the open tasks of the selected texts; drafts stay.
+         */
+        BulkWithdrawRequest: {
+            /** Rows */
+            rows: components["schemas"]["RowRefView"][];
+            /** Tasks */
+            tasks?: ("annotate" | "review" | "translation_review")[];
+            /** Preview */
+            preview?: boolean;
+            /** Preview Token */
+            preview_token?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Include Started */
+            include_started?: boolean;
+            /** Over Limit Only */
+            over_limit_only?: boolean;
         };
         /**
          * CarryPerson
@@ -5100,7 +5330,7 @@ export interface components {
             /** Waiting On */
             waiting_on?: string | string[] | null;
             /** Flags */
-            flags?: "guidelines_unclear" | "guidelines_unclear"[] | null;
+            flags?: ("guidelines_unclear" | "over_limit") | ("guidelines_unclear" | "over_limit")[] | null;
             /** Proposals */
             proposals?: ("with" | "without") | ("with" | "without")[] | null;
         };
@@ -5213,6 +5443,8 @@ export interface components {
             flagged_group_id?: string | null;
             /** Flagged Round Id */
             flagged_round_id?: string | null;
+            /** Over Limit */
+            over_limit?: boolean;
             /**
              * Proposal Count
              * @default 0
@@ -13248,7 +13480,7 @@ export interface operations {
                 final_state?: ("none" | "after_annotation" | "after_review" | "choose" | "confirm" | "old_text" | "may_be_outdated" | "final")[] | null;
                 /** @description "me" or a pseudonym */
                 waiting_on?: string[] | null;
-                flags?: "guidelines_unclear"[] | null;
+                flags?: ("guidelines_unclear" | "over_limit")[] | null;
                 proposals?: ("with" | "without")[] | null;
             };
             header?: never;
@@ -13308,7 +13540,7 @@ export interface operations {
                 final_state?: ("none" | "after_annotation" | "after_review" | "choose" | "confirm" | "old_text" | "may_be_outdated" | "final")[] | null;
                 /** @description "me" or a pseudonym */
                 waiting_on?: string[] | null;
-                flags?: "guidelines_unclear"[] | null;
+                flags?: ("guidelines_unclear" | "over_limit")[] | null;
                 proposals?: ("with" | "without")[] | null;
             };
             header?: never;
@@ -13770,6 +14002,111 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DiscardResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_reopen_api_v1_projects__key__bulk_task_actions_reopen_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkReopenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkTaskActionView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_withdraw_api_v1_projects__key__bulk_task_actions_withdraw_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkWithdrawRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkTaskActionView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_undo_api_v1_projects__key__bulk_task_actions_undo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkUndoRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkUndoResult"];
                 };
             };
             /** @description Validation Error */

@@ -393,6 +393,9 @@ class DocumentRowView(_View):
     flagged_unclear: int = 0
     flagged_group_id: str | None = None
     flagged_round_id: str | None = None
+    # More unrevoked annotate tasks on a current version than "annotators per
+    # text" (filter flags=over_limit, issue 339 b).
+    over_limit: bool = Field(default_factory=lambda: False)
     # Spec 2026-10-23 §2, §2b: proposals of the newest proposal set of the
     # row's target document, the text's annotation mode (None: not planned
     # for annotation and no annotation work) and the progress of an active

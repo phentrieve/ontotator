@@ -554,6 +554,8 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
                     "MEMBER_HAS_ASSIGNMENTS": 409,
                     "WORK_PLAN_CONFIRMATION_REQUIRED": 409,
                     "WORK_PLAN_CHANGED": 409,
+                    "PREVIEW_STALE": 409,
+                    "BULK_UNDO_STALE": 409,
                     "WORK_PLAN_INVALID": 422,
                     "NOT_IN_WORK_PLAN": 409,
                     "CASE_IDS_TOO_MANY": 422,
@@ -642,6 +644,11 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
     from ontotator.api.work_plan_routes import router as work_plan_router
 
     app.include_router(work_plan_router)
+    from ontotator.api.bulk_task_action_routes import (
+        router as bulk_task_action_router,
+    )
+
+    app.include_router(bulk_task_action_router)
     from ontotator.api.annotation_mode_change_routes import (
         router as annotation_mode_change_router,
     )

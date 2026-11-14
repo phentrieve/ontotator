@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Documents: **More actions** in the selection bar holds bulk actions on the tasks of the selected texts, each in a dialog like **Plan…**: a preview grouped by consequence (for example *Reopen 9 submitted tasks · Tom Reis 5, R. Roe 4*, *Skip 3 texts · final result chosen*, *Keep 2 open tasks · not submitted yet*, every text behind **Show all**), a consequences step with **I understand**, and Undo in the message while the texts stay unchanged. **Reopen…** reopens the submitted tasks with a required reason; **Withdraw open tasks…** withdraws open tasks (drafts stay), started ones only on request, or only the annotations above **Annotators per text**. An entry that does nothing for the selection says why. Server routes `POST /api/v1/projects/{key}/bulk-task-actions/reopen` and `.../withdraw` (scope `project-admin`) take `preview: true` for the preview and its `preview_token` to apply all or nothing (409 `PREVIEW_STALE` with a fresh preview); `.../undo` takes the apply's `undo` (409 `BULK_UNDO_STALE` once the texts changed). Each task is audited as a single `assignment.reopen` or `assignment.revoke` with `via`. New MCP tools `reopen_texts` and `withdraw_open_tasks` (dry run, then confirm with the token) (#336).
+- Documents: the filter **More annotators than the limit** under **Flags** lists texts whose current version has more annotation tasks than **Annotators per text** (`flags=over_limit`; rows have `over_limit`) (#339).
+
 ## [0.10.2] - 2026-11-14
 
 ### Added
