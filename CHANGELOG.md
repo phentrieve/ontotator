@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-11-14
+
+### Added
+
+- Text changes: annotation from proposals is now carried to a corrected text version, as annotation from scratch already was. **Carry to v2…** (submitted work) and **Handle text change…** (open work: move, or finish on the old version and carry) move each decision on a proposal to the matching proposal of the new version, found through the link the automatic proposal transfer writes, or for an independent import through the same term, values and modifiers on the mapped passage. Only items in a changed passage, and accepted or Unresolved proposals without a counterpart (they become the person's own findings, the Unresolved note kept), are marked **Check needed**; a rejection without a counterpart is dropped. A carried submission counts like any submission on the new version in agreement, consolidation and the final export (#414).
+
+### Changed
+
+- When the new version has no proposals yet, the Documents row shows *v1 work waits* and a disabled **Carry to v2…** with *Import proposals for v2*; it becomes active once proposals arrive. The dialogs refuse with `TEXT_CHANGE_NOT_APPLICABLE` (`reason: no_target_proposals`), offer Retry for this reason only and preselect nothing that would fail. The carry option that carries nothing is now **Start v2 fresh**. `NextStepView` has a new optional `blocked` field (#413, #414).
+
+### Fixed
+
+- Text-change dialogs no longer offer carry options that the server refuses, and no longer show Retry for refusals that a retry cannot change; the reason is announced to screen readers and shown once (#413).
+- Final export: carried submissions from proposals keep their proposal semantics (Unresolved proposals are not counted as the person's findings; origins confirmed/changed/uncertain and the per-tool tables include them).
+- Annotator: the toolbar shows **Check after text change** only when items need a check, the own findings count includes carried findings that are not on the text, and the carried findings strip on the case page has its padding.
+
 ## [0.10.1] - 2026-11-10
 
 ### Changed
@@ -323,7 +339,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 First public release.
 
-[Unreleased]: https://github.com/phentrieve/ontotator/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/phentrieve/ontotator/compare/v0.10.2...HEAD
+[0.10.2]: https://github.com/phentrieve/ontotator/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/phentrieve/ontotator/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/phentrieve/ontotator/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/phentrieve/ontotator/compare/v0.8.1...v0.9.0
