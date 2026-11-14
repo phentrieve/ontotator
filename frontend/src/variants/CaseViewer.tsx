@@ -107,7 +107,7 @@ export function CaseViewer({ projectKey, caseId, variant, show, annotations, com
   const [compareIdentity, setCompareIdentity] = useState<object | null>(null);
   const compareOpen = access.allowed && (compareIdentity === identity || compare !== undefined);
   const [leftElement, setLeftElement] = useState<HTMLDivElement | null>(null);
-  // Change marks of the current text while the comparison shows changes (#411).
+  // Change marks of the current text while the comparison shows changes (issue 411).
   const [leftChanges, setLeftChanges] = useState<TextChanges | null>(null);
   const [comparisonToolbar, setComparisonToolbar] = useState<HTMLDivElement | null>(null);
   const compareButton = useRef<HTMLButtonElement | null>(null);
@@ -189,7 +189,7 @@ export function CaseViewer({ projectKey, caseId, variant, show, annotations, com
   const payloadFailed = payloadError?.identity === payloadIdentity;
   const layerLabel = layers.entries?.find(entry => entry.ref && layerKey(entry.ref) === selection)?.label ?? ref?.label ?? '';
   // Small visible labels (#47 X-15); the selects keep their aria-label as the name. While comparing they move above
-  // the current text, mirroring the comparison text's selects, so both texts start at the same height (#412).
+  // the current text, mirroring the comparison text's selects, so both texts start at the same height (issue 412).
   const identitySelects = <>
     <label className="text-view-field"><span>Language and version</span><VersionSelect caseDetail={detail} value={current.document_id} onChange={id => move(id)} /></label>
     <label className="text-view-field"><span>Show</span><ShowSelect entries={layers.entries ?? []} value={selection} otherLabel={ref?.label} onChange={key => move(current.document_id, key)} /></label>

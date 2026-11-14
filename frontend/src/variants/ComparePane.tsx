@@ -91,7 +91,7 @@ export function ComparePane({ projectKey, username, caseDetail, leftDocumentId, 
   const coupled = couplingRequested && pairing.available;
   const couplingUnavailable = editing ? 'Coupled scrolling is available in read-only views.'
     : !pairing.available ? 'Widen the window to at least 1100 px to couple scrolling in side-by-side panes.' : null;
-  // Show changes (#411): two different texts of one language; the older version is "before" (struck through
+  // Show changes (issue 411): two different texts of one language; the older version is "before" (struck through
   // removals), the newer "after" (underlined additions). Off by default; the choice outlives a new right version.
   const leftVariant = caseDetail.variants.find(row => row.document_id === leftDocumentId);
   const rightVariant = available ? caseDetail.variants.find(row => row.document_id === selectedId) : undefined;
@@ -155,7 +155,7 @@ export function ComparePane({ projectKey, username, caseDetail, leftDocumentId, 
     {toolbarHost === undefined && globalControls}
     <div role="group" aria-label="Comparison text identity" className="comparison-pane-identity">
     {toolbarHost !== undefined && <h2 className="comparison-pane-title">Comparison text</h2>}
-    {/* Same labelled selects as the current text's group, so both panes are symmetric (#412). */}
+    {/* Same labelled selects as the current text's group, so both panes are symmetric (issue 412). */}
     {layers ? <div className="text-view-selects">
       <label className="text-view-field"><span>Language and version</span><VersionSelect caseDetail={caseDetail} value={selectedId ?? ''} onChange={select} /></label>
       <label className="text-view-field"><span>Show</span><ShowSelect entries={current?.entries ?? []} value={selection} otherLabel={ref?.label}

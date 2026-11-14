@@ -133,7 +133,7 @@ export interface SidebarWidthState {
  * current limits; it is written after a drag end or 300 ms after the last key, never
  * during render. Reset removes the stored key. `inspectorWithGuidelines`: the inspector
  * holds the guidelines (at least 420 px), which lowers the maximum. Another resizable panel
- * (the translation review's "Your review", #410) passes its own `storageKeyFor` and `limitsFor`.
+ * (the translation review's "Your review", issue 410) passes its own `storageKeyFor` and `limitsFor`.
  */
 export function useSidebarWidth(username: string | undefined, { inspectorWithGuidelines = false, storageKeyFor = storageKey, limitsFor = findingsLimits }: SidebarWidthOptions = {}): SidebarWidthState {
   const keyRef = useRef(storageKeyFor);

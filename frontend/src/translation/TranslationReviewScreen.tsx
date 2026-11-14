@@ -92,11 +92,11 @@ function paragraphAbove(element: HTMLElement, y: number): number {
   return paragraph;
 }
 
-/** Storage key of the reviewer's "Your review" width (#410). */
+/** Storage key of the reviewer's "Your review" width (issue 410). */
 const reviewPanelKey = (username: string) => `ontotator.translationReview.panelWidth.v1:${username}`;
 
 /**
- * Limits of the "Your review" rail from 1100 px (#410): at least 300 px, at most half the window and never so wide
+ * Limits of the "Your review" rail from 1100 px (issue 410): at least 300 px, at most half the window and never so wide
  * that the texts get less than 560 px; by default clamp(360 px, 22 vw, 440 px), as before it could be resized.
  */
 function reviewPanelLimits(viewport: number): SidebarLimits {
@@ -386,7 +386,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   }, [startsRevision]);
   /** At least 1100 px: decision in a pinned rail; narrower: decision follows the texts and a bar pins Submit. */
   const wide = useMediaQuery("(min-width: 1100px)");
-  /** "Your review" rail (#410): from 1100 px it can be resized and collapsed; both are remembered per user in this browser. */
+  /** "Your review" rail (issue 410): from 1100 px it can be resized and collapsed; both are remembered per user in this browser. */
   const panel = useSidebarWidth(props.username, { storageKeyFor: reviewPanelKey, limitsFor: reviewPanelLimits });
   const panelCollapsedKey = `ontotator.translationReview.panelCollapsed.v1:${props.username}`;
   const [panelCollapsed, setPanelCollapsed] = useState(() => { try { return window.localStorage.getItem(panelCollapsedKey) === "1"; } catch { return false; } });
