@@ -730,7 +730,10 @@ it("one text the preview cannot assign says why instead of a made-up limit (R-12
   const why = "This text has no translation review under way. Annotation can be assigned once a review is assigned or the translation is accepted.";
   expect(screen.getByText(why, { selector: ".assign-limit-hint" })).toBeDefined();
   expect(screen.queryByText(/possible/)).toBeNull();
-  expect(screen.getByText(why, { selector: ".dialog-footer-reason" })).toBeDefined();
+  // Said once: the footer does not repeat it; Assign is described by the hint.
+  expect(screen.queryByText(why, { selector: ".dialog-footer-reason" })).toBeNull();
+  const assignButton = screen.getByRole("button", { name: "Assign" });
+  expect(document.getElementById(assignButton.getAttribute("aria-describedby")!)?.textContent).toContain(why);
   expect(screen.getByRole("checkbox", { name: /Ana Weber/ }).getAttribute("aria-disabled")).toBe("true");
   expect(screen.queryByText(/limit reached/)).toBeNull();
 });

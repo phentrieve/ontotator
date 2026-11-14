@@ -4,7 +4,7 @@ import { textLabel } from "../app/identity";
 import { errorMessage } from "../admin/errors";
 import { personName } from "../admin/assignSummary";
 import { Button, Dialog } from "../ui";
-import { isNoTargetProposals, isTextChangeConflict, isTextChangeRefusal } from "./HandleTextChangeDialog";
+import { isNoTargetProposals, isTextChangeConflict, isTextChangeRefusal, isTransientError, useRetryFocus } from "./HandleTextChangeDialog";
 import {
   ALREADY_ANNOTATING, authorDescription, authorLabel, carriedMessage, carryTitle, CHECKING, CHOOSE_PERSON, FROM_SCRATCH_DESCRIPTION,
   fromScratchLabel, noTargetProposalsLine, RELOADED_MESSAGE, SOMEONE_ELSE, someoneElseDescription, submittedLine,
@@ -65,12 +65,16 @@ export function CarryDialog(props: CarryDialogProps): JSX.Element {
   const [preview, setPreview] = useState<TextChangePreview | null>(null);
   const [previewError, setPreviewError] = useState<unknown>(null);
   const [reload, setReload] = useState(0);
+  const { body, retried } = useRetryFocus(preview, previewError);
+  const retryPreview = () => { retried(); setReload(value => value + 1); };
   // A refused preview refuses the carry too: only "Annotate from scratch" is left. Missing proposals
   // on the new version are no such refusal: they may still arrive, so the choices stay (with Retry).
   const refused = isTextChangeRefusal(previewError);
   const mode: Mode = refused ? "dismiss" : chosenMode;
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  // A server or network failure of Assign: Retry sends the same request again.
+  const [retryCarry, setRetryCarry] = useState<(() => void) | null>(null);
   const [confirming, setConfirming] = useState<"language" | "unreviewed" | null>(null);
   const [confirmedLanguage, setConfirmedLanguage] = useState(false);
   const writing = useRef(false);
@@ -97,7 +101,7 @@ export function CarryDialog(props: CarryDialogProps): JSX.Element {
   const chosen = others.find(person => person.username === username) ?? null;
   const reason = mode === "other" && (!chosen || chosen.has_work) ? CHOOSE_PERSON : null;
 
-  const reset = () => { setFailure(null); setConfirming(null); };
+  const reset = () => { setFailure(null); setRetryCarry(null); setConfirming(null); };
   const carry = async (confirmLanguage: boolean, confirmUnreviewed = false) => {
     if (writing.current || reason) return;
     writing.current = true; setBusy(true); reset();
@@ -114,7 +118,12 @@ export function CarryDialog(props: CarryDialogProps): JSX.Element {
       if (isTextChangeConflict(error)) { setFailure(RELOADED_MESSAGE); props.onReload(); setReload(value => value + 1); }
       else if (error instanceof ApiError && error.code === "LANGUAGE_CONFIRMATION_REQUIRED" && !confirmLanguage) setConfirming("language");
       else if (error instanceof ApiError && error.code === "TRANSLATION_NOT_REVIEWED" && !confirmUnreviewed) { setConfirmedLanguage(confirmLanguage); setConfirming("unreviewed"); }
-      else setFailure(errorMessage(error));
+      // Shown once, by the no-proposals line with its Retry.
+      else if (isNoTargetProposals(error)) setPreviewError(error);
+      else {
+        setFailure(errorMessage(error));
+        if (isTransientError(error)) setRetryCarry(() => () => { void carry(confirmLanguage, confirmUnreviewed); });
+      }
     } finally {
       writing.current = false;
       if (alive.current) setBusy(false);
@@ -132,15 +141,15 @@ export function CarryDialog(props: CarryDialogProps): JSX.Element {
   ];
 
   return <Dialog open size="sm" title={carryTitle(to, textLabel(row))} onClose={busy ? undefined : props.onClose} footer={<>
-    {failure && <p className="text-change-error" role="alert">{failure}</p>}
+    {failure && <p className="text-change-error" role="alert">{failure}{retryCarry && <>{" "}<Button size="sm" disabled={busy} onClick={retryCarry}>Retry</Button></>}</p>}
     {reason && <span id={reasonId} className="dialog-footer-reason">{reason}</span>}
     <Button disabled={busy} onClick={props.onClose}>Cancel</Button>
     <Button variant="primary" loading={busy} aria-disabled={reason ? "true" : undefined} aria-describedby={reason ? reasonId : undefined}
       onClick={() => { void carry(false); }}>Assign</Button>
   </>}>
-    <div className="text-change-dialog">
+    <div className="text-change-dialog" ref={body}>
       <p>{preview ? submittedLine(author, from, source.roundOrdinal, preview.findings, source.fromProposals) : previewError ? submittedLine(author, from, source.roundOrdinal, null) : CHECKING}</p>
-      {previewError !== null && <p className="text-change-error">{isNoTargetProposals(previewError) ? noTargetProposalsLine(to) : errorMessage(previewError)}{!refused && <>{" "}<Button size="sm" onClick={() => setReload(value => value + 1)}>Retry</Button></>}</p>}
+      {previewError !== null && <p className="text-change-error"><span role="alert">{isNoTargetProposals(previewError) ? noTargetProposalsLine(to) : errorMessage(previewError)}</span>{!refused && <>{" "}<Button size="sm" data-retry onClick={retryPreview}>Retry</Button></>}</p>}
       <fieldset className="text-change-options">
         <legend className="visually-hidden">Who continues</legend>
         {options.map(option => {

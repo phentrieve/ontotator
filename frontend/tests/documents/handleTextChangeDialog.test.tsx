@@ -37,22 +37,38 @@ describe("HandleTextChangeDialog", () => {
     const move = screen.getByRole("radio", { name: "Move to v2" }) as HTMLInputElement;
     expect(move.checked).toBe(true);
     expect(document.getElementById(move.getAttribute("aria-describedby")!.split(" ")[0])?.textContent)
-      .toBe("Tom Reis continues on the corrected text. Their decisions on the proposals are carried; only items in changed passages are marked “check after text change”.");
+      .toBe("Tom Reis continues on the corrected text. Their decisions on the proposals are carried; only items in changed passages are marked Check needed.");
     expect(screen.getByRole("radio", { name: "Let Tom Reis finish on v1" })).toBeDefined();
     await screen.findByText(/could not be placed/);
   });
 
-  it("no proposals on v2 yet: Move stays preselected, the line says to wait or import, and Retry checks again", async () => {
+  it("no proposals on v2 yet: Move and Finish are disabled with the reason, nothing is chosen, and Retry checks again with focus kept", async () => {
     vi.mocked(api.previewTextChange).mockRejectedValueOnce(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "no_target_proposals" }));
     setup({ mode: "proposals" });
-    expect(await within(dialog()).findByText(
-      "v2 has no proposals yet: their automatic transfer may still be running, or they must be imported. Wait for or import the proposals for v2, then try again.",
-    )).toBeDefined();
-    expect((screen.getByRole("radio", { name: "Move to v2" }) as HTMLInputElement).checked).toBe(true);
+    const line = await within(dialog()).findByRole("alert");
+    expect(line.textContent).toBe("v2 has no proposals yet: their automatic transfer may still be running, or they must be imported. Wait for or import the proposals for v2, then try again.");
+    const move = screen.getByRole("radio", { name: "Move to v2" }) as HTMLInputElement;
+    const finish = screen.getByRole("radio", { name: "Let Tom Reis finish on v1" }) as HTMLInputElement;
+    expect([move.disabled, move.checked, finish.disabled, finish.checked]).toEqual([true, false, true, false]);
+    expect(move.getAttribute("aria-describedby")!.split(" ").map(id => document.getElementById(id)?.textContent)).toContain("Not possible until v2 has proposals.");
     expect((screen.getByRole("radio", { name: "Withdraw" }) as HTMLInputElement).checked).toBe(false);
+    expect(apply().getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(screen.getByRole("radio", { name: "Withdraw" }));
+    expect(apply().getAttribute("aria-disabled")).toBeNull();
     fireEvent.click(within(dialog()).getByRole("button", { name: "Retry" }));
     expect(await screen.findByText("1 of 3 decisions and findings could not be placed and need Tom Reis’s decision.")).toBeDefined();
     expect(within(dialog()).queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("radio", { name: "Move to v2" }));
+  });
+
+  it("a move refused for missing proposals shows the reason once, with Retry, and disables Move", async () => {
+    vi.spyOn(api, "moveToVersion").mockRejectedValue(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "no_target_proposals" }));
+    setup({ mode: "proposals" });
+    await screen.findByText(/could not be placed/);
+    fireEvent.click(apply());
+    expect(await within(dialog()).findByRole("button", { name: "Retry" })).toBeDefined();
+    expect(within(dialog()).getAllByText(/has no proposals yet/)).toHaveLength(1);
+    expect((screen.getByRole("radio", { name: "Move to v2" }) as HTMLInputElement).disabled).toBe(true);
   });
 
   it("another refused preview offers only Withdraw, preselected, with the reason and without Retry", async () => {
@@ -152,7 +168,7 @@ describe("HandleTextChangeDialog", () => {
     setup();
     const move = screen.getByRole("radio", { name: "Move to v2" });
     const described = (move.getAttribute("aria-describedby") ?? "").split(" ").map(id => document.getElementById(id)?.textContent).join(" ");
-    expect(described).toContain("Tom Reis continues on the corrected text. Their draft findings are carried and marked “check after text change”.");
+    expect(described).toContain("Tom Reis continues on the corrected text. Their draft findings are carried and marked Check needed.");
     const withdraw = screen.getByRole("radio", { name: "Withdraw" });
     expect(document.getElementById(withdraw.getAttribute("aria-describedby")!)?.textContent).toBe("Tom Reis’s task ends. Nothing of the draft is carried to v2; v2 needs a new annotation.");
     fireEvent.click(withdraw);

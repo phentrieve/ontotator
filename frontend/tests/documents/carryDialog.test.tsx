@@ -50,10 +50,10 @@ describe("CarryDialog", () => {
     await waitFor(() => expect(carry).toHaveBeenCalledWith("demo", "sub-ana-1", expect.objectContaining({ mode: "other", username: "mia", target_document_id: "case-113-de-v2", confirm_language: false })));
   });
 
-  it("Annotate v2 from scratch records dismiss and opens the assign dialog", async () => {
+  it("Start v2 fresh records dismiss and opens the assign dialog", async () => {
     const carry = vi.spyOn(api, "carrySubmission").mockResolvedValue(carried({ resolution: "dismissed", assignment: null, carried_findings: 0 }));
     const props = setup();
-    fireEvent.click(screen.getByRole("radio", { name: "Annotate v2 from scratch" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Start v2 fresh" }));
     fireEvent.click(assign());
     await waitFor(() => expect(props.onFromScratch).toHaveBeenCalled());
     expect(carry).toHaveBeenCalledWith("demo", "sub-ana-1", expect.objectContaining({ mode: "dismiss" }));
@@ -132,23 +132,42 @@ describe("CarryDialog", () => {
     )).toBeDefined();
     expect(within(dialog()).queryByText(/from scratch\./)).toBeNull();
     expect((screen.getByRole("radio", { name: "Ana Weber (author)" }) as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByRole("radio", { name: "Annotate v2 from scratch" }) as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByRole("radio", { name: "Start v2 fresh" }) as HTMLInputElement).checked).toBe(false);
     fireEvent.click(within(dialog()).getByRole("button", { name: "Retry" }));
     expect(await within(dialog()).findByText("Ana Weber submitted on v1 (Round 1, 3 decisions and findings).")).toBeDefined();
     expect(api.previewTextChange).toHaveBeenCalledTimes(2);
   });
 
-  it("another refused preview offers only Annotate v2 from scratch, without Retry", async () => {
+  it("another refused preview offers only Start v2 fresh, without Retry", async () => {
     vi.mocked(api.previewTextChange).mockRejectedValue(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "final_exists" }));
     const carry = vi.spyOn(api, "carrySubmission").mockResolvedValue(carried({ resolution: "dismissed", assignment: null, carried_findings: 0 }));
     const props = setup("proposals");
     await waitFor(() => expect(within(dialog()).getAllByRole("radio")).toHaveLength(1));
     expect(within(dialog()).queryByRole("button", { name: "Retry" })).toBeNull();
     expect(within(dialog()).getAllByRole("radio").map(radio => radio.getAttribute("value"))).toEqual(["dismiss"]);
-    expect((screen.getByRole("radio", { name: "Annotate v2 from scratch" }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("radio", { name: "Start v2 fresh" }) as HTMLInputElement).checked).toBe(true);
     fireEvent.click(assign());
     await waitFor(() => expect(props.onFromScratch).toHaveBeenCalled());
     expect(carry).toHaveBeenCalledWith("demo", "sub-ana-1", expect.objectContaining({ mode: "dismiss" }));
+  });
+
+  it("Assign refused for missing proposals shows the reason once with Retry", async () => {
+    vi.spyOn(api, "carrySubmission").mockRejectedValue(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "no_target_proposals" }));
+    setup("proposals");
+    await within(dialog()).findByText("Ana Weber submitted on v1 (Round 1, 3 decisions and findings).");
+    fireEvent.click(assign());
+    expect(await within(dialog()).findByRole("button", { name: "Retry" })).toBeDefined();
+    expect(within(dialog()).getAllByText(/has no proposals yet/)).toHaveLength(1);
+  });
+
+  it("a server error of Assign offers Retry, which sends it again", async () => {
+    const carry = vi.spyOn(api, "carrySubmission").mockRejectedValueOnce(new ApiError(503, "Service unavailable")).mockResolvedValue(carried());
+    const props = setup();
+    await within(dialog()).findByText("Ana Weber submitted on v1 (Round 1, 3 findings).");
+    fireEvent.click(assign());
+    fireEvent.click(await within(dialog()).findByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(props.onDone).toHaveBeenCalled());
+    expect(carry).toHaveBeenCalledTimes(2);
   });
 
   it("a lost connection offers Retry and keeps the carry options", async () => {

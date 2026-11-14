@@ -7,7 +7,7 @@
 import type { DocumentRowView, NextStepView } from "../api/client";
 import type { Route } from "../app/router";
 import { Button } from "../ui/Button";
-import { leadSteps, rowActionLabel } from "./nextStepLabels";
+import { leadSteps, rowActionLabel, stepBlockedReason } from "./nextStepLabels";
 import { documentsRowId, RouteLink, rowName } from "./RowCells";
 import { isUndecided } from "./stageLabels";
 
@@ -52,9 +52,13 @@ export function RowActionCell({ row, onAction, block = false, onNavigate, onAddT
   const first = active ? leadSteps(row)[0] : undefined;
   if (!first) return null;
   const firstLabel = rowActionLabel(first, row);
+  const blocked = stepBlockedReason(first, row);
+  const actionId = documentsRowId(row.case_id, row.language, "action");
   return <span className={className}>
-    {onAction && <Button key="first" id={documentsRowId(row.case_id, row.language, "action")} size="sm"
+    {onAction && <Button key="first" id={actionId} size="sm"
         className={["documents-action", block && "documents-action--block"].filter(Boolean).join(" ")}
-        aria-label={`${firstLabel}, ${name}`} onClick={() => onAction(row, first)}>{firstLabel}</Button>}
+        aria-label={`${firstLabel}, ${name}`} aria-disabled={blocked ? true : undefined} aria-describedby={blocked ? `${actionId}-reason` : undefined}
+        title={blocked ?? undefined} onClick={() => { if (!blocked) onAction(row, first); }}>{firstLabel}</Button>}
+    {onAction && blocked && <span id={`${actionId}-reason`} className="action-reason">{blocked}</span>}
   </span>;
 }

@@ -486,11 +486,13 @@ function AssignWorkEditor(props: AssignWorkDialogProps): JSX.Element {
       });
     }} />;
 
+  // The body's limit hint already says why the text is blocked: the footer does not repeat it.
+  const reasonInBody = reason !== null && reason === blocked;
   return <Dialog open title={title} size="md" onClose={closing} footer={<>
-    {reason && <span id={reasonId} className="dialog-footer-reason">{reason}</span>}
+    {reason && !reasonInBody && <span id={reasonId} className="dialog-footer-reason">{reason}</span>}
     <Button disabled={busy} onClick={close}>{reported ? "Close" : "Cancel"}</Button>
     {props.mode === "cases" && current && nextStep([...done.steps, ...done.passed, current]) && <Button disabled={busy} onClick={() => whileBusy(() => advance({ skip: true }))}>Skip this task</Button>}
-    <Button variant="primary" loading={busy} aria-disabled={reason ? "true" : undefined} aria-describedby={reason ? reasonId : undefined} onClick={assign}>{confirming ? "Assign anyway" : rowMulti
+    <Button variant="primary" loading={busy} aria-disabled={reason ? "true" : undefined} aria-describedby={reason ? (reasonInBody ? limitReachedId : reasonId) : undefined} onClick={assign}>{confirming ? "Assign anyway" : rowMulti
       ? (picked ? `Assign ${picked === 1 ? "1 person" : `${picked} people`}` : "Assign") : !count || (isRow && !usernames.length) ? "Assign" : `Assign ${count}`}</Button>
   </>}>
     <div className="assign-dialog">

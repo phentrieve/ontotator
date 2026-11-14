@@ -219,6 +219,10 @@ function annotationText(cell: StageCellView): StageText {
     case "old_text_open":
       return { symbol: "⚠", word: "In progress on old text", detail: people ? `${people} ${several ? "work" : "works"} on ${version(detail.from_version) ?? "the old text"}` : "" };
     case "old_text_submitted":
+      // Issue 414: work from proposals waits until the new version has its own proposals.
+      if (detail.note === "no_target_proposals") {
+        return { symbol: "○", word: `${version(detail.from_version) ?? "Old"} work waits`, detail: join(people, `${version(detail.version) ?? "the new text"} has no proposals yet`) };
+      }
       return { symbol: "⚠", word: `Submitted on ${version(detail.from_version) ?? "old text"}`, detail: join(people, `${version(detail.version) ?? "new text"} not annotated`) };
     case "finishing_on_old":
       return { symbol: "◐", word: `Finishing on ${version(detail.from_version) ?? "old text"}`, detail: join(people, `carried to ${version(detail.version) ?? "the new text"} on submit`) };
