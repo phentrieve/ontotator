@@ -33,6 +33,13 @@ RUN --mount=type=secret,id=github_token,required=false \
             GIT_CONFIG_VALUE_0='!f() { if [ "$1" = get ]; then printf "username=x-access-token\npassword="; cat /run/secrets/github_token; printf "\n"; fi; }; f'; \
     fi \
     && uv sync --frozen --no-dev --no-editable --compile-bytecode
+# The MCP server (issue 388) in a venv of its own, from its own lockfile:
+# `ontotator-mcp --http` is the remote MCP service of docker-compose.yml.
+COPY mcp/pyproject.toml mcp/uv.lock mcp/README.md /mcp/
+COPY mcp/src/ /mcp/src/
+RUN --mount=type=cache,target=/root/.cache/uv \
+    cd /mcp \
+    && UV_PROJECT_ENVIRONMENT=/opt/ontotator-mcp uv sync --frozen --no-dev --no-editable --compile-bytecode
 
 FROM python:3.12-slim-bookworm@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258 AS runtime
 RUN apt-get update \
@@ -45,6 +52,8 @@ RUN apt-get update \
     && chown 1001:1001 /data
 WORKDIR /app
 COPY --from=build /app/.venv /app/.venv
+COPY --from=build /opt/ontotator-mcp /opt/ontotator-mcp
+RUN ln -s /opt/ontotator-mcp/bin/ontotator-mcp /usr/local/bin/ontotator-mcp
 COPY THIRD_PARTY_NOTICES.md ./
 COPY LICENSES/ ./LICENSES/
 ENV PATH="/app/.venv/bin:$PATH" \

@@ -2477,6 +2477,73 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/oauth/authorization": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Authorization
+         * @description The authorization request the consent page asks the user about.
+         */
+        get: operations["authorization_api_v1_oauth_authorization_get"];
+        put?: never;
+        /**
+         * Decide Authorization
+         * @description Approve (with the scopes left ticked) or decline the request.
+         *
+         *     Approving creates a single-use code valid for five minutes, audited as
+         *     ``oauth.authorize``; the browser follows ``redirect_to`` back to the app.
+         */
+        post: operations["decide_authorization_api_v1_oauth_authorization_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Connections
+         * @description The user's connected apps, newest first (ended ones for 30 days).
+         */
+        get: operations["list_connections_api_v1_me_connections_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/connections/{grant_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke Connection
+         * @description Disconnect an app: its access and refresh tokens stop working at once.
+         */
+        post: operations["revoke_connection_api_v1_me_connections__grant_id__revoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/profile": {
         parameters: {
             query?: never;
@@ -3946,6 +4013,65 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** AuthorizationDecision */
+        AuthorizationDecision: {
+            params: components["schemas"]["AuthorizationParams"];
+            /** Approve */
+            approve: boolean;
+            /** Scopes */
+            scopes?: ("read" | "import" | "export" | "project-admin" | "admin")[];
+        };
+        /**
+         * AuthorizationParams
+         * @description The parameters of an authorization request, as the consent page has them.
+         */
+        AuthorizationParams: {
+            /** Response Type */
+            response_type: string;
+            /** Client Id */
+            client_id: string;
+            /** Redirect Uri */
+            redirect_uri: string;
+            /** Code Challenge */
+            code_challenge: string;
+            /** Code Challenge Method */
+            code_challenge_method: string;
+            /** Scope */
+            scope?: string | null;
+            /** Resource */
+            resource?: string | null;
+            /** State */
+            state?: string | null;
+        };
+        /**
+         * AuthorizationRedirect
+         * @description Where the browser goes next: back to the app, with a code or an error.
+         */
+        AuthorizationRedirect: {
+            /** Redirect To */
+            redirect_to: string;
+        };
+        /**
+         * AuthorizationView
+         * @description What the consent page shows: who asks, for what, and where it goes back.
+         */
+        AuthorizationView: {
+            /** Client Name */
+            client_name: string;
+            /** Client Id */
+            client_id: string;
+            /** Redirect Uri */
+            redirect_uri: string;
+            /** Redirect Host */
+            redirect_host: string;
+            /** Resource */
+            resource: string;
+            /** Requested Scopes */
+            requested_scopes: ("read" | "import" | "export" | "project-admin" | "admin")[];
+            /** Allowed Scopes */
+            allowed_scopes: ("read" | "import" | "export" | "project-admin" | "admin")[];
+            params: components["schemas"]["AuthorizationParams"];
+        };
         /**
          * AxisDefinition
          * @description Definition of an individual annotation contextual axis.
@@ -4448,6 +4574,50 @@ export interface components {
             /** Plan Cases */
             plan_cases?: components["schemas"]["CasePlanChoice"][];
             accept_external_review?: components["schemas"]["ImportAcceptance"] | null;
+        };
+        /**
+         * ConnectionView
+         * @description An app the user connected with OAuth (a grant), without any token.
+         */
+        ConnectionView: {
+            /** Id */
+            id: number;
+            /** Client Name */
+            client_name: string;
+            /** Redirect Host */
+            redirect_host: string;
+            /** Scopes */
+            scopes: ("read" | "import" | "export" | "project-admin" | "admin")[];
+            /** Resource */
+            resource: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** Revoked At */
+            revoked_at: string | null;
+            /** Revoked Reason */
+            revoked_reason: string | null;
+        };
+        /**
+         * Connections
+         * @description Profile > Connected apps; ``enabled`` is false without ``ONTOTATOR_MCP_URL``.
+         */
+        Connections: {
+            /** Enabled */
+            enabled: boolean;
+            /** Mcp Url */
+            mcp_url: string | null;
+            /** Connections */
+            connections: components["schemas"]["ConnectionView"][];
         };
         /** ConsequencesView */
         ConsequencesView: {
@@ -9708,6 +9878,8 @@ export interface components {
             revoked_at: string | null;
             /** Revoked Reason */
             revoked_reason: string | null;
+            /** Resource */
+            resource?: string | null;
         };
         /**
          * TranslationCheck
@@ -15358,6 +15530,128 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TokenView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    authorization_api_v1_oauth_authorization_get: {
+        parameters: {
+            query: {
+                response_type: string;
+                client_id: string;
+                redirect_uri: string;
+                code_challenge: string;
+                code_challenge_method: string;
+                scope?: string | null;
+                resource?: string | null;
+                state?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthorizationView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_authorization_api_v1_oauth_authorization_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthorizationDecision"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthorizationRedirect"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_connections_api_v1_me_connections_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Connections"];
+                };
+            };
+        };
+    };
+    revoke_connection_api_v1_me_connections__grant_id__revoke_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grant_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionView"];
                 };
             };
             /** @description Validation Error */

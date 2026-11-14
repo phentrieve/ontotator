@@ -356,6 +356,7 @@ def spanless_decisions_package() -> ValidatedPackage:
 FIXTURE_SPECS = (
     "decision-semantics",
     "design",
+    "oauth-consent",
     "practice",
     "quick-fixes",
     "spans",
@@ -1363,6 +1364,9 @@ if __name__ == "__main__":
             ontology_paths=[ONTOLOGY, MONDO_ONTOLOGY],
             port=PORT,
             web_dir=ROOT / "frontend/dist",
+            # OAuth for the remote MCP server is on (issue 388), so the
+            # consent page and Profile > Connected apps can be driven.
+            mcp_url=f"http://127.0.0.1:{PORT}/mcp",
         )
         app = create_app(config)
         for ontology_path in (ONTOLOGY, MONDO_ONTOLOGY):

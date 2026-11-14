@@ -11,6 +11,7 @@ import { MyTasks } from "./tasks/MyTasks";
 import { forgetProject, landingProject, rememberProject } from "./app/lastProject";
 import { useSessionRestored } from "./app/useSessionRestored";
 import { ProfilePage } from "./me/ProfilePage";
+import { OAuthConsentPage } from "./me/OAuthConsentPage";
 import { PracticeFrame } from "./practice/PracticeFrame";
 import { SettingsPage } from "./admin/SettingsPage";
 import { ErrorNotice } from "./admin/ErrorNotice";
@@ -372,6 +373,7 @@ export function App({ user: givenUser, onLogout }: AppProps): JSX.Element {
       : notice("Server settings", "Only system administrators can change server settings."); break;
     case "help": content = <Suspense fallback={<InlineMessage tone="info">Loading the handbook…</InlineMessage>}>
       <HelpPage chapter={route.chapter} section={route.section} /></Suspense>; break;
+    case "oauthAuthorize": content = <OAuthConsentPage params={route.params} user={user} onNavigate={go} />; break;
     case "notFound": content = <NotFound onNavigate={go} />; break;
     default: content = <EmptyState title="This page is not available yet.">This section is planned for a later step.</EmptyState>;
   }

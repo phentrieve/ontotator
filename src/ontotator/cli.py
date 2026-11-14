@@ -235,6 +235,7 @@ def serve(
         demo_logins = settings.demo_logins(
             public_origin=canonical_public_origin, bind_host=host
         )
+        mcp_url = settings.mcp_url(production=False)
     except settings.SettingsError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
@@ -296,6 +297,7 @@ def serve(
         admin_password_hash=admin_password_hash,
         trusted_hosts=trusted_hosts,
         demo_logins=demo_logins,
+        mcp_url=mcp_url,
     )
 
     try:

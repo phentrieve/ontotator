@@ -896,8 +896,15 @@ def test_every_app_route_is_mapped_session_only_or_public(app: FastAPI) -> None:
     unmapped = api - set(ROUTE_SCOPES)
     assert not unmapped, f"routes without a token scope: {sorted(unmapped)}"
     # Outside /api/ the middleware asks for no credentials: only the schema,
-    # the development docs and the static frontend live there.
+    # the development docs, the static frontend and the OAuth protocol
+    # endpoints (issue 388), which authenticate the client themselves, live
+    # there.
     assert other <= {
+        "/.well-known/oauth-authorization-server",
+        "/oauth/register",
+        "/oauth/authorize",
+        "/oauth/token",
+        "/oauth/revoke",
         "/openapi.json",
         "/docs",
         "/docs/oauth2-redirect",

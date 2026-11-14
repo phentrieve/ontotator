@@ -264,7 +264,87 @@ Which change revokes which tokens. A revoked token's `revoked_reason` names the 
 
 A kept personal token loses the lost role's rights at once: every request reads the owner's current admin flag and project roles, so the token's reach is always its scopes intersected with what the owner may do now. Granting the admin role revokes nothing: a personal token then reaches what its owner reaches, which is what a token acting as its owner means, and no personal or project token can hold the `admin` scope, so none gains the user-administration routes.
 
-The [MCP server](../mcp/README.md) (`ontotator-mcp`) uses such a token from the user's computer: it runs there, speaks MCP over stdio and calls the API of the instance named by `ONTOTATOR_URL`. It needs no change on the server. Give it a project token with only the scopes the work needs; ontology uploads and new projects need a system token.
+The [MCP server](../mcp/README.md) (`ontotator-mcp`) uses such a token from the user's computer: it runs there, speaks MCP over stdio and calls the API of the instance named by `ONTOTATOR_URL`. It needs no change on the server. Give it a project token with only the scopes the work needs; ontology uploads and new projects need a system token. It can also run on the server for remote clients; see [Remote MCP server](#remote-mcp-server).
+
+### Remote MCP server
+
+`ontotator-mcp --http HOST:PORT` serves the same tools over Streamable HTTP (stateless, JSON responses on `/mcp`), so an MCP client that cannot start a local program, such as a claude.ai custom connector, can use Ontotator without anyone installing anything. Every request carries its caller's own token; the server keeps no state, no token and no file between requests. Two kinds of token work:
+
+- an **OAuth access token** that Ontotator issued for this MCP server: a claude.ai connector gets one by itself through the OAuth flow below, the user logs in to Ontotator and consents;
+- a plain **API token** from Profile › **API tokens**, for a client that can send a fixed `Authorization: Bearer` header.
+
+The image contains the command, and `docker-compose.yml` has the service `ontotator_mcp`, off by default (Compose profile `mcp`). To turn it on, set in `.env.docker`:
+
+```bash
+COMPOSE_PROFILES=mcp
+ONTOTATOR_MCP_URL=https://editor.example.org/mcp # the address clients use
+```
+
+and run `docker compose up -d --wait`. `ONTOTATOR_MCP_URL` goes to both containers: the MCP server takes it as its resource identifier and only Host it answers to, and the app becomes an OAuth authorization server for that one resource. Empty, every OAuth endpoint of the app answers 404 and Profile shows no **Connected apps**. The service runs like the app: read-only root file system, no capabilities, `no-new-privileges`, a small tmpfs, memory, CPU and process limits, no published port and no volume. It reaches the API through the reverse proxy at `ONTOTATOR_PUBLIC_ORIGIN` (override with `ONTOTATOR_MCP_API_URL`), because in production the app accepts no peer but the proxy; if the host cannot reach its own public address from a container (no hairpin NAT), add `extra_hosts: ["editor.example.org:<NPM's pinned address>"]` in an override file. `ONTOTATOR_MCP_ALLOWED_ORIGINS` lists further browser origins allowed to call it (comma-separated, exact); requests without `Origin`, as a connector's backend and Claude Code send them, need none.
+
+The MCP server refuses to start in remote mode without `ONTOTATOR_MCP_URL`, with a plain-http `ONTOTATOR_MCP_URL` off loopback, with `ONTOTATOR_TOKEN` set (one fixed token would let everyone who reaches the server act as its owner) and with `ONTOTATOR_MCP_FILES_DIR` set (remotely, "local" files would be the server's disk; the file tools refuse in remote mode). Per request it answers:
+
+| Request | Answer |
+| --- | --- |
+| `Origin` not the public origin or in `ONTOTATOR_MCP_ALLOWED_ORIGINS` | 403, before any token check |
+| `Host` other than the public host (loopback aside, for the health check) | 421 |
+| no token, or one Ontotator does not accept | 401 with `WWW-Authenticate: Bearer ... resource_metadata="https://editor.example.org/.well-known/oauth-protected-resource/mcp"` |
+| an OAuth token issued for another resource | 401 |
+| a valid token | the tool runs; each API call it makes carries that token and no other |
+
+#### What the hosting setup must add
+
+The proxy host rules live outside this repository (decision 388-B). On the existing proxy host of `ONTOTATOR_PUBLIC_ORIGIN`, add two locations that go to the MCP service instead of the app, in NPM as custom locations or in the Advanced tab:
+
+```nginx
+# Remote MCP (issue 388): only these two paths go to ontotator_mcp.
+# A variable with Docker's resolver, so nginx still starts while the MCP
+# container is down (a literal host name must resolve when nginx starts).
+location = /mcp {
+  resolver 127.0.0.11 valid=30s;
+  set $ontotator_mcp http://ontotator_mcp:8765;
+  client_max_body_size 4m;              # the MCP server's own limit
+  proxy_read_timeout 960s;              # a tool may wait up to 900 s for a job
+  proxy_buffering off;
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-Proto $scheme;
+  proxy_set_header X-Forwarded-For $realip_remote_addr;
+  proxy_pass $ontotator_mcp;
+}
+location = /.well-known/oauth-protected-resource/mcp {
+  resolver 127.0.0.11 valid=30s;
+  set $ontotator_mcp http://ontotator_mcp:8765;
+  proxy_set_header Host $host;
+  proxy_pass $ontotator_mcp;
+}
+```
+
+Everything else, `/.well-known/oauth-authorization-server` and `/oauth/...` included, stays with the app. Keep `Host` as sent (`Host $host`): both containers check it. Also rate-limit `/oauth/register` and `/oauth/token` per client address like the login (see [Internet exposure](#internet-exposure)); the app limits registrations to 100 an hour for the whole server. A separate host such as `mcp.editor.example.org` works as well: then `ONTOTATOR_MCP_URL=https://mcp.editor.example.org/mcp`, the whole host goes to `ontotator_mcp:8765`, and `/.well-known/oauth-authorization-server` stays on the app's host, where the metadata points.
+
+Check from outside: `curl -i -X POST https://editor.example.org/mcp -H 'Content-Type: application/json' -d '{}'` answers 401 with the `resource_metadata` header; that URL answers JSON naming `https://editor.example.org` as its authorization server; `curl https://editor.example.org/.well-known/oauth-authorization-server` answers the app's metadata. Then add a custom connector in claude.ai with `https://editor.example.org/mcp` and connect: the browser shows the Ontotator login, then the consent page.
+
+#### OAuth design
+
+Ontotator itself is the authorization server, so people log in with their Ontotator account as always, and what a connected app may do follows their Ontotator roles. The flow is OAuth 2.1 as the MCP authorization spec requires:
+
+- Discovery: the MCP server's protected resource metadata (RFC 9728) names the Ontotator origin as authorization server; the app serves its metadata (RFC 8414) at `/.well-known/oauth-authorization-server`, with `S256` the only PKCE method and `authorization_response_iss_parameter_supported` (RFC 9207).
+- Registration: open dynamic client registration (RFC 7591) at `POST /oauth/register`, since claude.ai registers itself. Redirect URIs must be https, or http on a loopback address, without fragment or user info, at most 5. Public clients (`none`) and confidential ones (`client_secret_basic`, `client_secret_post`; the secret is stored as a SHA-256 digest) are accepted. Registering grants nothing. Audited as `oauth.client.register`.
+- Authorization: `GET /oauth/authorize` requires `response_type=code`, a `code_challenge` with `code_challenge_method=S256`, and checks the client and the exact redirect URI first: if either is wrong, the browser gets an error page and is never redirected. `resource` (RFC 8707) must be `ONTOTATOR_MCP_URL` when given. The browser then goes to the web app's consent page (`#/oauth/authorize`), which asks for the Ontotator login when needed and shows the app's name, the host it returns to and the scopes. Scopes beyond `read` are offered only to someone who leads a (non-practice) project or is a system administrator, and `admin` never. Consent is a session-only write with CSRF (`/api/v1/oauth/authorization`); no token reaches it. It is audited as `oauth.authorize` and returns a single-use code valid for 5 minutes, stored as a digest and bound to the client, the redirect URI, the PKCE challenge, the scopes and the resource.
+- Token: `POST /oauth/token` (`application/x-www-form-urlencoded`, `Cache-Control: no-store`) exchanges the code with the PKCE verifier, the same redirect URI and the client's own authentication for an access token (one hour) and a refresh token (30 days), audited as `oauth.grant.create`. A code used a second time revokes everything the first use gave (`oauth.code.reuse`). Every refresh token is used once and replaced (rotation); a used one presented again revokes the grant (`oauth.refresh.reuse`), and a refresh may narrow but not widen the scopes. A grant ends after 90 days at the latest, when the user consents again.
+- Revocation: the client at `POST /oauth/revoke` (RFC 7009), the user under Profile › **Connected apps**, and every change that revokes the user's API tokens (new password, reset code, deactivation, anonymisation; see the table above) end the grant: its access and refresh tokens stop at once. Audited as `oauth.grant.revoke`.
+
+The access token is deliberately an Ontotator API token: an `api_tokens` row of kind `personal` that names its grant (`oauth_grant_id`) and whose record (`GET /api/v1/me/token`) carries `resource`. The MCP server accepts a token only if its `resource` is its own URL or empty (a plain API token) and forwards exactly that token to the Ontotator API, which checks scope and the owner's current roles on every request as for any token. This is not the token passthrough the MCP spec forbids: the token was issued for this MCP server and for no other service, and the API it reaches is the one that issued it. The trade-off is that whoever obtains the access token can also call the API directly within its scopes for the rest of its hour, exactly as with an API token; it never reaches the session-only routes (tokens, consent, connected apps, annotation work). OAuth access tokens do not appear in the API token lists; their grant does, as a connected app.
+
+Migration 0039 adds the empty tables `oauth_clients`, `oauth_grants`, `oauth_codes` and `oauth_refresh_tokens` and the nullable column `api_tokens.oauth_grant_id`.
+
+#### Security considerations
+
+- New surface: the OAuth endpoints are reachable without a session by design. `/oauth/register` is open: anyone can register a client with any name, so the consent page shows the host the browser returns to and says that Ontotator cannot check an app's name. A phishing link to a consent page still needs the user to log in and press **Connect**; the code only ever goes to a redirect URI the client registered.
+- Only digests are stored for client secrets, codes, refresh tokens and access tokens; codes and refresh tokens are single-use, and their reuse revokes the grant.
+- PKCE is mandatory and `S256` only; `plain` is refused. Redirect URIs are compared exactly. Every parameter may appear once.
+- Tokens are short-lived (one hour) and bound to one resource; the MCP server refuses tokens for another resource and never sends a token anywhere but `ONTOTATOR_URL` (no redirects, no cookies kept between callers, the token redacted from every message).
+- Remote mode has no local file access and no fixed token. Origin and Host are checked before authentication (DNS rebinding, cross-site requests from a browser).
+- Not done here, to decide in the security review: per-address rate limits of the OAuth endpoints in the app itself (only the hourly registration cap; the proxy should limit `/oauth/*`), a clean-up of clients that never got a grant, Client ID Metadata Documents (claude.ai can register dynamically instead), CORS on the OAuth endpoints (not needed by server-side clients; browser-based MCP clients cannot use them), and an administrators' overview of every user's connected apps (the audit trail has every grant).
 
 ## Upgrades
 

@@ -143,6 +143,8 @@ export type Route =
   | { name: "projectConsolidation"; key: string; roundId: string; group?: string; documents?: ProjectDocumentsQuery }
   /** The bundled user handbook (docs/handbook); without `chapter` its README. `section` is a heading id to scroll to. */
   | { name: "help"; chapter?: string; section?: string }
+  /** The OAuth consent page (issue 388): `/oauth/authorize` sends the browser here with the checked request. */
+  | { name: "oauthAuthorize"; params: Record<string, string> }
   | { name: "notFound"; hash: string };
 
 /** Every "My tasks" link: an explicit All, so a reload or a new tab never runs the last-used landing. */
@@ -179,6 +181,7 @@ export function parseRoute(hash: string): Route {
       case "#/admin/reports": return { name: "adminReports" };
       case "#/projects": return { name: "projects" };
       case "#/projects/new": return { name: "projectNew" };
+      case "#/oauth/authorize": return { name: "oauthAuthorize", params: Object.fromEntries(params) };
     }
     const help = /^#\/help(?:\/([A-Za-z0-9_-]+))?$/.exec(path);
     if (help) {
@@ -289,6 +292,10 @@ export function routeHref(route: Route): string {
     ])}`;
     case "projectConsolidation": return `#/projects/${encodeURIComponent(route.key)}/consolidations/${encodeURIComponent(route.roundId)}${querySuffix([["group", route.group], ...documentsEntries(route.documents, "documents_")])}`;
     case "help": return `#/help${route.chapter && route.chapter !== "README" ? `/${route.chapter}` : ""}${querySuffix([["section", route.section]])}`;
+    case "oauthAuthorize": {
+      const query = new URLSearchParams(route.params).toString();
+      return `#/oauth/authorize${query ? `?${query}` : ""}`;
+    }
     case "notFound": return route.hash;
   }
 }

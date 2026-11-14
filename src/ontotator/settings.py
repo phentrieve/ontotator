@@ -38,6 +38,35 @@ class ServerSettings:
     database_url: URL = field(repr=False)
     lock_timeout_ms: int = LOCK_TIMEOUT_MS
     statement_timeout_ms: int = STATEMENT_TIMEOUT_MS
+    # The remote MCP server this instance issues OAuth tokens for (issue 388).
+    mcp_url: str | None = None
+
+
+MCP_URL_ENV = "ONTOTATOR_MCP_URL"
+
+
+def mcp_url(env: Mapping[str, str] | None = None, *, production: bool) -> str | None:
+    """``ONTOTATOR_MCP_URL``: the public URL of the remote MCP server, or None.
+
+    Set, it turns on the OAuth authorization server for that one resource
+    (issue 388). It must be https in production.
+    """
+    env = os.environ if env is None else env
+    raw = env.get(MCP_URL_ENV, "").strip()
+    if not raw:
+        return None
+    from ontotator.auth.oauth import canonical_resource
+
+    try:
+        url = canonical_resource(raw)
+    except ValueError:
+        raise SettingsError(
+            f"{MCP_URL_ENV} must be an absolute http(s) URL like"
+            " https://ontotator.example.org/mcp, without query or fragment"
+        ) from None
+    if production and not url.startswith("https://"):
+        raise SettingsError(f"{MCP_URL_ENV} must be an https:// URL in production")
+    return url
 
 
 def _milliseconds(name: str, default: int, env: Mapping[str, str]) -> int:
@@ -122,6 +151,7 @@ def server_settings(env: Mapping[str, str] | None = None) -> ServerSettings:
         statement_timeout_ms=_milliseconds(
             "ONTOTATOR_STATEMENT_TIMEOUT_MS", STATEMENT_TIMEOUT_MS, env
         ),
+        mcp_url=mcp_url(env, production=production),
     )
 
 

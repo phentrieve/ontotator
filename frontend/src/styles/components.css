@@ -1220,3 +1220,14 @@ button.stage-path-seg--current:focus-visible::after { border-color: var(--on-acc
 .paused-notice--open .paused-notice__reason { white-space: pre-wrap; overflow: visible; }
 .paused-notice__toggle { flex: none; }
 .notice-content:has(> .paused-notice) { flex: 1; }
+
+/* OAuth consent page and Profile > Connected apps (issue 388). */
+.oauth-consent { max-width: 44rem; }
+.oauth-consent-facts { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-1) var(--space-3); }
+.oauth-consent-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.oauth-consent-facts code, .oauth-mcp-url { overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .oauth-consent-facts { grid-template-columns: 1fr; }
+  .oauth-consent-facts dd { margin-bottom: var(--space-2); }
+}
+.oauth-host { white-space: nowrap; }

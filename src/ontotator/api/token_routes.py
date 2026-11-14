@@ -52,6 +52,9 @@ class TokenView(BaseModel):
     last_used_at: datetime | None
     revoked_at: datetime | None
     revoked_reason: str | None
+    # An OAuth access token (issue 388): the MCP server URL it was issued
+    # for (RFC 8707). None for every token made on a Profile or settings page.
+    resource: str | None = None
 
     @classmethod
     def of(cls, token: ApiToken) -> TokenView:
@@ -68,6 +71,7 @@ class TokenView(BaseModel):
             last_used_at=token.last_used_at,
             revoked_at=token.revoked_at,
             revoked_reason=token.revoked_reason,
+            resource=token.resource,
         )
 
 

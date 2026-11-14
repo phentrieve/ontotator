@@ -1,6 +1,6 @@
 # Ontotator MCP server
 
-`ontotator-mcp` lets an MCP client, such as Claude Desktop or Claude Code, set up and run an [Ontotator](../README.md) project for you: upload ontologies, create a project, import texts and machine proposals, assign people, follow progress and agreement, accept agreeing results and download exports. It runs on your computer, speaks MCP over stdio and calls the HTTP API of your Ontotator instance with an [API token](../docs/operations.md#api-tokens).
+`ontotator-mcp` lets an MCP client, such as Claude Desktop or Claude Code, set up and run an [Ontotator](../README.md) project for you: upload ontologies, create a project, import texts and machine proposals, assign people, follow progress and agreement, accept agreeing results and download exports. It runs on your computer, speaks MCP over stdio and calls the HTTP API of your Ontotator instance with an [API token](../docs/operations.md#api-tokens). It can also run on the server for remote clients such as a claude.ai connector, see [Remote use](#remote-use-streamable-http).
 
 What it does not do: annotation, review and translation review stay in the web interface. No tool reads or writes annotators' drafts or the findings of their submissions (`get_text_detail` lists submissions by author, time and mode only), and the server refuses the annotation routes to every API token anyway.
 
@@ -76,6 +76,26 @@ Add the server to `claude_desktop_config.json` (Settings › Developer › **Edi
 If the client cannot find the command, give its full path (`which ontotator-mcp`), or use `"command": "uvx"` with `"args": ["--from", "git+https://github.com/phentrieve/ontotator@v0.10.2#subdirectory=mcp", "ontotator-mcp"]`.
 
 Ask the client to call `whoami` first: it shows the token's kind, scopes, project and expiry (with a warning two weeks before), who it acts as and the server's version.
+
+## Remote use (Streamable HTTP)
+
+`ontotator-mcp --http HOST:PORT` runs the same tools as a remote MCP server over Streamable HTTP (stateless, JSON responses on the path of `ONTOTATOR_MCP_URL`, normally `/mcp`), for clients that cannot start a local program, such as a claude.ai custom connector. An Ontotator server can run it next to the app; [Remote MCP server](../docs/operations.md#remote-mcp-server) describes the service in `docker-compose.yml`, the two proxy routes and the OAuth design.
+
+| Variable | Meaning |
+| --- | --- |
+| `ONTOTATOR_URL` | The Ontotator instance, as above; its origin is also the OAuth authorization server. |
+| `ONTOTATOR_MCP_URL` | Required. The address clients use, for example `https://ontotator.example.org/mcp`: https (plain http only on loopback). It is the OAuth resource every token is checked against and the only `Host` the server answers to. Set the same value for the Ontotator app, which then issues OAuth tokens for it. |
+| `ONTOTATOR_MCP_ALLOWED_ORIGINS` | Further browser origins allowed to call it, exact and comma-separated. The public URL's own origin always is; a request without `Origin` (a server-side client) needs none. |
+
+`ONTOTATOR_TOKEN` and `ONTOTATOR_MCP_FILES_DIR` must be unset: the server refuses to start otherwise. Each request brings its caller's own token in `Authorization: Bearer`, either an OAuth access token that Ontotator issued for this server (a claude.ai connector gets one by itself: the user logs in to Ontotator and consents) or a personal or project API token. The server checks it with `GET /api/v1/me/token`, refuses a token issued for another resource, and sends exactly that token, to `ONTOTATOR_URL` only, with every API call of that request; it keeps no token, session or cookie between requests. A foreign `Origin` gets 403 before any token check, another `Host` 421, and a request without a usable token 401 with `WWW-Authenticate: Bearer ... resource_metadata="..."`, which points the client to the protected resource metadata at `/.well-known/oauth-protected-resource/mcp`. The tools that read or write local files refuse in remote mode. `/healthz` answers `ok` for the container's health check.
+
+To try it locally against a development server (`ontotator serve` with `ONTOTATOR_MCP_URL=http://127.0.0.1:8765/mcp` set for the app as well):
+
+```bash
+ONTOTATOR_URL=http://127.0.0.1:8000 ONTOTATOR_MCP_URL=http://127.0.0.1:8765/mcp \
+  ontotator-mcp --http 127.0.0.1:8765
+claude mcp add --transport http ontotator-remote http://127.0.0.1:8765/mcp
+```
 
 ## Tools
 

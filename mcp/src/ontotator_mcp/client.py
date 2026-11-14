@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import http.cookiejar
 import os
 import tempfile
 import time
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 from contextlib import ExitStack
 from pathlib import Path
 from typing import IO, Any
@@ -106,8 +107,51 @@ def open_files(
         yield parts
 
 
+def caller_token() -> str | None:
+    """The bearer token of the MCP request being served (remote mode)."""
+    # Imported here: stdio mode never needs the auth machinery.
+    from mcp.server.auth.middleware.auth_context import get_access_token
+
+    access = get_access_token()
+    return access.token if access is not None else None
+
+
+class Bearer(httpx.Auth):
+    """``Authorization: Bearer`` from ``token()``, read for every request.
+
+    Remote mode (issue 388) gives each request the token of the MCP request
+    it serves, never a token of another caller; without one it refuses
+    instead of sending the request unauthenticated.
+    """
+
+    def __init__(self, token: Callable[[], str | None]) -> None:
+        self._token = token
+
+    def auth_flow(
+        self, request: httpx.Request
+    ) -> Generator[httpx.Request, httpx.Response, None]:
+        token = self._token()
+        if not token:
+            raise OntotatorError(
+                "This MCP request carries no Ontotator token; nothing was sent."
+            )
+        request.headers["Authorization"] = f"Bearer {token}"
+        yield request
+
+
+class _NoCookies(http.cookiejar.DefaultCookiePolicy):
+    """Keep no cookie: one client serves many callers in remote mode."""
+
+    def set_ok(self, cookie: http.cookiejar.Cookie, request: object) -> bool:
+        return False
+
+
 class OntotatorClient:
-    """Calls one Ontotator instance with ``Authorization: Bearer <token>``."""
+    """Calls one Ontotator instance with ``Authorization: Bearer <token>``.
+
+    The token is ``settings.token`` (stdio: one user, one token) or, when
+    that is None (``--http``), the caller's own token of each MCP request.
+    """
 
     def __init__(
         self,
@@ -116,13 +160,16 @@ class OntotatorClient:
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self.settings = settings
+        fixed = settings.token
+        self._auth = Bearer((lambda: fixed) if fixed is not None else caller_token)
         self._http = httpx.AsyncClient(
             base_url=settings.url,
             headers={
-                "Authorization": f"Bearer {settings.token}",
                 "User-Agent": f"ontotator-mcp/{__version__}",
                 "Accept": "application/json",
             },
+            auth=self._auth,
+            cookies=httpx.Cookies(http.cookiejar.CookieJar(policy=_NoCookies())),
             timeout=httpx.Timeout(settings.timeout, connect=min(settings.timeout, 15)),
             transport=transport,
             follow_redirects=False,
@@ -133,8 +180,25 @@ class OntotatorClient:
     async def aclose(self) -> None:
         await self._http.aclose()
 
+    def _secret(self) -> str | None:
+        """The token in use, so that messages can leave it out."""
+        return self.settings.token or caller_token()
+
     def _unreachable(self, exc: httpx.HTTPError) -> OntotatorError:
-        return transport_error(self.settings.url, exc, self.settings.token)
+        return transport_error(self.settings.url, exc, self._secret())
+
+    async def token_record(self, token: str) -> httpx.Response:
+        """``GET /api/v1/me/token`` with ``token``: how remote mode checks one."""
+        try:
+            return await self._http.get("/api/v1/me/token", auth=Bearer(lambda: token))
+        except httpx.HTTPError as exc:
+            raise OntotatorError(
+                redact(
+                    f"Cannot reach Ontotator at {self.settings.url} to check a"
+                    f" token ({type(exc).__name__}).",
+                    token,
+                )
+            ) from None
 
     async def _send(
         self,
@@ -168,9 +232,7 @@ class OntotatorClient:
         except httpx.HTTPError as exc:
             raise self._unreachable(exc) from None
         if response.is_redirect:
-            location = redact(
-                response.headers.get("location", "?"), self.settings.token
-            )
+            location = redact(response.headers.get("location", "?"), self._secret())
             raise OntotatorError(
                 f"Ontotator answered {method} {path} with a redirect to"
                 f" {location}. Set ONTOTATOR_URL to the final address; the token"
@@ -223,12 +285,23 @@ class OntotatorClient:
     async def patch(self, path: str, body: Any) -> Any:
         return await self.request("PATCH", path, json=body)
 
+    def _no_remote_files(self) -> None:
+        if self.settings.token is None:
+            raise OntotatorError(
+                "This is a remote MCP server: tools that read or write local"
+                " files are off, because 'local' would be the server's disk."
+                " Use the local MCP server (stdio) for files, or the web"
+                " interface."
+            )
+
     def local_path(self, path: str) -> Path:
         """``path`` resolved and checked against ONTOTATOR_MCP_FILES_DIR."""
+        self._no_remote_files()
         return local_path(path, self.settings.files_dirs)
 
     def local_files(self, paths: Sequence[str]) -> list[Path]:
         """The existing files ``paths`` names, resolved and checked."""
+        self._no_remote_files()
         return [local_file(path, self.settings.files_dirs) for path in paths]
 
     async def upload(

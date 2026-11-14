@@ -25,6 +25,7 @@ from sqlalchemy import Connection, and_, exists, not_, or_, select, update
 
 from ontotator.storage.tables import (
     ApiTokenRow,
+    OAuthGrantRow,
     ProjectMembershipRow,
     SessionRow,
     UserRow,
@@ -67,10 +68,19 @@ def revoke_user_sessions(
 def revoke_user_tokens(
     conn: Connection, user_id: int, reason: str, at: datetime
 ) -> int:
-    """Revoke every usable API token ``user_id`` owns, of every kind; the count."""
+    """Revoke every usable API token ``user_id`` owns, of every kind; the count.
+
+    The user's OAuth grants (issue 388) end too, so that no refresh token
+    can issue a new access token afterwards.
+    """
     result = conn.execute(
         update(ApiTokenRow)
         .where(ApiTokenRow.owner_id == user_id, ApiTokenRow.revoked_at.is_(None))
+        .values(revoked_at=at, revoked_reason=reason)
+    )
+    conn.execute(
+        update(OAuthGrantRow)
+        .where(OAuthGrantRow.user_id == user_id, OAuthGrantRow.revoked_at.is_(None))
         .values(revoked_at=at, revoked_reason=reason)
     )
     return result.rowcount

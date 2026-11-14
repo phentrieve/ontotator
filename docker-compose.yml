@@ -92,6 +92,9 @@ services:
       ONTOTATOR_DATABASE_PASSWORD_FILE: /run/secrets/app-password
       ONTOTATOR_ADMIN_PASSWORD_HASH_FILE: /run/secrets/admin-password-hash
       ONTOTATOR_DATA_DIR: /data
+      # The remote MCP server's public URL (issue 388): set, the app is the
+      # OAuth authorization server for it; empty, OAuth is off.
+      ONTOTATOR_MCP_URL: ${ONTOTATOR_MCP_URL:-}
       # Upload spools, ontology parse and export temp files go to the data volume:
       # a 300 MiB ontology upload holds up to three copies at once, more than
       # the /tmp tmpfs (which also counts toward mem_limit) can take.
@@ -113,6 +116,44 @@ services:
     stop_grace_period: 70s
     # /readyz healthcheck is inherited from the verified image.
     # Prefixed service name: NPM and other stacks on the shared network may have an app.
+    networks: [backend, npm_proxy_network]
+
+  # The remote MCP server (issue 388), opt-in: COMPOSE_PROFILES=mcp. It serves
+  # MCP over Streamable HTTP on 8765 behind the reverse proxy; the proxy rule
+  # lives in the hosting setup (docs/operations.md, Remote MCP server). Each
+  # request brings its caller's own token; it keeps no state, no token, no
+  # files and has no port of its own on the host.
+  ontotator_mcp:
+    <<: *runtime
+    profiles: [mcp]
+    image: ${ONTOTATOR_IMAGE:?Set the verified image}
+    init: false # The image already runs tini as PID 1.
+    entrypoint: ["/usr/bin/tini", "--", "ontotator-mcp"]
+    command: ["--http", "0.0.0.0:8765"]
+    environment:
+      # The API is reached through the reverse proxy, as the browser reaches
+      # it: the app accepts no other peer in production.
+      ONTOTATOR_URL: ${ONTOTATOR_MCP_API_URL:-${ONTOTATOR_PUBLIC_ORIGIN:?Set the public HTTPS origin}}
+      ONTOTATOR_MCP_URL: ${ONTOTATOR_MCP_URL:-}
+      ONTOTATOR_MCP_ALLOWED_ORIGINS: ${ONTOTATOR_MCP_ALLOWED_ORIGINS:-}
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    depends_on:
+      ontotator_app:
+        condition: service_healthy
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 64
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/healthz', timeout=4).close()
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks: [backend, npm_proxy_network]
 
 volumes:
