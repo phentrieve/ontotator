@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Documents: after **Carry to v2…** the **Annotation** column no longer counts the submission on the old version, which read *1/2 submitted* with one annotation per text. The column counts only work on the newest version, also after **Start v2 fresh** and once the carried work is submitted (#420).
+
 ## [0.10.2] - 2026-11-14
 
 ### Added
