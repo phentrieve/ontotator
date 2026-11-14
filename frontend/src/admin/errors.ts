@@ -293,10 +293,8 @@ export function errorMessage(error: unknown): string {
     const max = error.details.max;
     if (typeof max === "number" && Number.isSafeInteger(max) && max > 0) return `You already have ${max} jobs waiting. Try again when one of them has started.`;
   }
-  if (error instanceof ApiError && error.code === "TEXT_CHANGE_NOT_APPLICABLE" && typeof error.details === "object" && error.details !== null && error.details.reason === "from_proposals") {
-    return error.details.step === "carry"
-      ? "Annotation from proposals is not carried to a new version. Assign the new version; it is annotated from its own proposals."
-      : "Annotation from proposals stays on its version. Remove the assignment and assign the new version; its draft is discarded.";
+  if (error instanceof ApiError && error.code === "TEXT_CHANGE_NOT_APPLICABLE" && typeof error.details === "object" && error.details !== null && error.details.reason === "no_target_proposals") {
+    return "The new version has no proposals yet, so this work cannot be carried. Import proposals for the new version first, or annotate it from scratch.";
   }
   // Practice (issue 266): the server says why it is not available.
   if (error instanceof ApiError && error.code === "PRACTICE_UNAVAILABLE" && typeof error.details === "object" && error.details !== null

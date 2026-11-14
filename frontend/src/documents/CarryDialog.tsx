@@ -4,7 +4,7 @@ import { textLabel } from "../app/identity";
 import { errorMessage } from "../admin/errors";
 import { personName } from "../admin/assignSummary";
 import { Button, Dialog } from "../ui";
-import { isTextChangeConflict } from "./HandleTextChangeDialog";
+import { isTextChangeConflict, isTextChangeRefusal } from "./HandleTextChangeDialog";
 import {
   ALREADY_ANNOTATING, authorDescription, authorLabel, carriedMessage, carryTitle, CHECKING, CHOOSE_PERSON, FROM_SCRATCH_DESCRIPTION,
   fromScratchLabel, RELOADED_MESSAGE, SOMEONE_ELSE, someoneElseDescription, submittedLine,
@@ -18,6 +18,8 @@ export interface CarrySource {
   roundOrdinal: number | null;
   /** Author's name when the row knows it; otherwise the preview's author. */
   author: string | null;
+  /** Annotation from proposals: its decisions on the proposals are carried. */
+  fromProposals?: boolean;
 }
 
 /** Source of a row's `carry_text_change` step (submitted work on an old version). */
@@ -29,6 +31,7 @@ export function carrySourceOfStep(row: DocumentRowView, step: NextStepView): Car
     fromVersion: item?.version ?? null,
     roundOrdinal: item?.round_ordinal ?? null,
     author: item ? personName(item.person ?? { pseudonym: item.author_label }) : null,
+    fromProposals: item?.annotation_mode === "proposals",
   };
 }
 
@@ -57,11 +60,14 @@ type Mode = CarryRequest["mode"];
 export function CarryDialog(props: CarryDialogProps): JSX.Element {
   const { projectKey, row, source } = props;
   const id = useId();
-  const [mode, setMode] = useState<Mode>("author");
+  const [chosenMode, setMode] = useState<Mode>("author");
   const [username, setUsername] = useState<string | null>(null);
   const [preview, setPreview] = useState<TextChangePreview | null>(null);
   const [previewError, setPreviewError] = useState<unknown>(null);
   const [reload, setReload] = useState(0);
+  // A refused preview refuses the carry too: only "Annotate from scratch" is left.
+  const refused = isTextChangeRefusal(previewError);
+  const mode: Mode = refused ? "dismiss" : chosenMode;
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<"language" | "unreviewed" | null>(null);
@@ -117,8 +123,10 @@ export function CarryDialog(props: CarryDialogProps): JSX.Element {
   const reasonId = `${id}-reason`;
   const choose = (value: Mode) => { if (!busy) { setMode(value); reset(); } };
   const options: { value: Mode; label: string; description: string }[] = [
-    { value: "author", label: authorLabel(author), description: authorDescription(to) },
-    { value: "other", label: SOMEONE_ELSE, description: someoneElseDescription(to) },
+    ...(refused ? [] : [
+      { value: "author" as const, label: authorLabel(author), description: authorDescription(to, source.fromProposals) },
+      { value: "other" as const, label: SOMEONE_ELSE, description: someoneElseDescription(to, source.fromProposals) },
+    ]),
     { value: "dismiss", label: fromScratchLabel(to), description: FROM_SCRATCH_DESCRIPTION },
   ];
 
@@ -131,7 +139,7 @@ export function CarryDialog(props: CarryDialogProps): JSX.Element {
   </>}>
     <div className="text-change-dialog">
       <p>{preview ? submittedLine(author, from, source.roundOrdinal, preview.findings) : previewError ? submittedLine(author, from, source.roundOrdinal, null) : CHECKING}</p>
-      {previewError !== null && <p className="text-change-error">{errorMessage(previewError)} <Button size="sm" onClick={() => setReload(value => value + 1)}>Retry</Button></p>}
+      {previewError !== null && <p className="text-change-error">{errorMessage(previewError)}{!refused && <>{" "}<Button size="sm" onClick={() => setReload(value => value + 1)}>Retry</Button></>}</p>}
       <fieldset className="text-change-options">
         <legend className="visually-hidden">Who continues</legend>
         {options.map(option => {

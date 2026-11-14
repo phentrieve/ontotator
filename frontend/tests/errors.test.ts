@@ -52,3 +52,9 @@ it("names the queue limit of a refused job (issue 396)", () => {
   expect(errorMessage(new ApiError(429, "raw", "JOB_QUEUE_LIMIT", { max: 3 }))).toBe("You already have 3 jobs waiting. Try again when one of them has started.");
   expect(errorMessage(new ApiError(429, "raw", "JOB_QUEUE_LIMIT"))).toBe(ERROR_MESSAGES.JOB_QUEUE_LIMIT);
 });
+
+it("explains a text change refused because the new version has no proposals (issue 414)", () => {
+  expect(errorMessage(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "no_target_proposals" })))
+    .toBe("The new version has no proposals yet, so this work cannot be carried. Import proposals for the new version first, or annotate it from scratch.");
+  expect(errorMessage(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "from_proposals" }))).toBe(ERROR_MESSAGES.TEXT_CHANGE_NOT_APPLICABLE);
+});
