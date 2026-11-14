@@ -5,7 +5,7 @@ import { errorMessage } from "../admin/errors";
 import { personName } from "../admin/assignSummary";
 import { Button, ConfirmDialog, Dialog } from "../ui";
 import {
-  CHECKING, finishDescription, finishingMessage, finishLabel, fromProposalsLine, handleTitle, heldLine, moveDescription, movedMessage, moveLabel, nextAfterWithdrawLine,
+  CHECKING, finishDescription, finishingMessage, finishLabel, handleTitle, heldLine, moveDescription, movedMessage, moveLabel, nextAfterWithdrawLine,
   notNewerLine, openWorkLine, RELOADED_MESSAGE, unplacedLine, WITHDRAW_LABEL, withdrawDescription, withdrawnMessage,
 } from "./textChangeText";
 
@@ -30,6 +30,10 @@ export interface HandleTextChangeDialogProps {
 export const isTextChangeConflict = (error: unknown): boolean =>
   error instanceof ApiError && (error.code === "TEXT_CHANGE_CHANGED" || error.code === "WORKFLOW_REVISION_CONFLICT");
 
+/** A domain refusal (4xx with a code, not a conflict): retrying cannot help, and the refused choices would fail again. */
+export const isTextChangeRefusal = (error: unknown): boolean =>
+  error instanceof ApiError && !!error.code && error.status >= 400 && error.status < 500 && !isTextChangeConflict(error);
+
 /** "Handle text change…": an open annotation on an old version (spec V5). */
 export function HandleTextChangeDialog(props: HandleTextChangeDialogProps): JSX.Element {
   const { projectKey, row, step } = props;
@@ -43,15 +47,16 @@ export function HandleTextChangeDialog(props: HandleTextChangeDialogProps): JSX.
   const assignmentId = step.assignment_id ?? item?.assignment_id ?? null;
   const targetId = step.document_id ?? target?.document_id ?? "";
 
-  // Work from proposals stays on its version, and a correction that does not count has no way back: only Withdraw works.
   const fromProposals = item?.annotation_mode === "proposals";
+  // A correction that does not count has no way back, and a refused preview (e.g. no proposals on the new version) refuses move and finish too: only Withdraw works.
   const notNewer = !!item && !!target && target.version < (item.version ?? 0);
-  const withdrawOnly = fromProposals || notNewer;
 
   const [chosen, setChoice] = useState<TextChangeChoice>("move");
-  const choice = withdrawOnly ? "withdraw" : chosen;
   const [preview, setPreview] = useState<TextChangePreview | null>(null);
-  const [previewFailed, setPreviewFailed] = useState(false);
+  const [previewError, setPreviewError] = useState<unknown>(null);
+  const previewFailed = previewError !== null;
+  const withdrawOnly = notNewer || isTextChangeRefusal(previewError);
+  const choice = withdrawOnly ? "withdraw" : chosen;
   const [reload, setReload] = useState(0);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
@@ -61,15 +66,15 @@ export function HandleTextChangeDialog(props: HandleTextChangeDialogProps): JSX.
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
   useEffect(() => {
-    if (held || withdrawOnly || assignmentId === null || !targetId) return;
+    if (held || notNewer || assignmentId === null || !targetId) return;
     let active = true;
-    setPreview(null); setPreviewFailed(false);
+    setPreview(null); setPreviewError(null);
     void api.previewTextChange(projectKey, { assignment_id: assignmentId, target_document_id: targetId }).then(
       value => { if (active) setPreview(value); },
-      () => { if (active) setPreviewFailed(true); },
+      error => { if (active) setPreviewError(error); },
     );
     return () => { active = false; };
-  }, [projectKey, assignmentId, targetId, held, withdrawOnly, reload]);
+  }, [projectKey, assignmentId, targetId, held, notNewer, reload]);
 
   const apply = async (confirmUnreviewed = false) => {
     if (writing.current || assignmentId === null) return;
@@ -99,7 +104,7 @@ export function HandleTextChangeDialog(props: HandleTextChangeDialogProps): JSX.
 
   const options: { value: TextChangeChoice; label: string; description: string; extra?: string | null }[] = [
     ...(withdrawOnly ? [] : [
-      { value: "move" as const, label: moveLabel(to), description: moveDescription(person),
+      { value: "move" as const, label: moveLabel(to), description: moveDescription(person, fromProposals),
         extra: preview ? (preview.unplaced > 0 ? unplacedLine(preview.unplaced, preview.findings, person) : null) : previewFailed ? null : CHECKING },
       { value: "finish" as const, label: finishLabel(person, from), description: finishDescription(person, to) },
     ]),
@@ -115,7 +120,7 @@ export function HandleTextChangeDialog(props: HandleTextChangeDialogProps): JSX.
     <div className="text-change-dialog">
       <p>{openWorkLine(person, from, to)}</p>
       {withdrawOnly && !held && <>
-        <p>{fromProposals ? fromProposalsLine(person, from, to) : notNewerLine(from, to)}</p>
+        <p>{notNewer ? notNewerLine(from, to) : `${errorMessage(previewError)} That is why Withdraw is the only choice.`}</p>
         <p>{nextAfterWithdrawLine(to)}</p>
       </>}
       {held ? <p className="text-change-held">

@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, ApiError, type AssignmentView, type CarryResponse } from "../../src/api/client";
+import { api, ApiError, NetworkError, type AssignmentView, type CarryResponse } from "../../src/api/client";
 import { CarryDialog, carrySourceOfFinal, carrySourceOfStep } from "../../src/documents/CarryDialog";
 import { final } from "./fixtures";
 import { preview, submittedOnOldText } from "./textChangeFixtures";
@@ -10,8 +10,9 @@ const carried = (overrides: Partial<CarryResponse> = {}): CarryResponse => ({ re
 beforeEach(() => { vi.spyOn(api, "previewTextChange").mockResolvedValue(preview()); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
-function setup() {
-  const { row, step } = submittedOnOldText();
+function setup(mode: "proposals" | null = null) {
+  const { row: base, step } = submittedOnOldText();
+  const row = { ...base, work: base.work.map(item => ({ ...item, annotation_mode: mode })) };
   const props = { onClose: vi.fn(), onDone: vi.fn(), onReload: vi.fn(), onFromScratch: vi.fn() };
   render(<CarryDialog projectKey="demo" row={row} source={carrySourceOfStep(row, step)} {...props} />);
   return props;
@@ -105,6 +106,36 @@ describe("CarryDialog", () => {
     fireEvent.click(within(dialog()).getByRole("button", { name: "Annotate before the review is accepted" }));
     await waitFor(() => expect(props.onDone).toHaveBeenCalled());
     expect(carry).toHaveBeenLastCalledWith("demo", "sub-ana-1", expect.objectContaining({ confirm_language: true, confirm_unreviewed_translation: true }));
+  });
+
+  it("work from proposals: the options say its decisions are carried and only changed passages need a check", async () => {
+    setup("proposals");
+    await screen.findByText(/submitted on v1/);
+    const describe = (name: string) => document.getElementById(screen.getByRole("radio", { name }).getAttribute("aria-describedby")!)?.textContent;
+    expect(describe("Ana Weber (author)")).toBe("Their decisions on the proposals are carried to v2; they check only the changed passages.");
+    expect(describe("Someone else…")).toBe("Another annotator continues on v2 from these decisions; only the changed passages need a check.");
+  });
+
+  it("a refused preview (no proposals on v2) explains why and offers only Annotate v2 from scratch, without Retry", async () => {
+    vi.mocked(api.previewTextChange).mockRejectedValue(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "no_target_proposals" }));
+    const carry = vi.spyOn(api, "carrySubmission").mockResolvedValue(carried({ resolution: "dismissed", assignment: null, carried_findings: 0 }));
+    const props = setup("proposals");
+    expect(await within(dialog()).findByText(/The new version has no proposals yet/)).toBeDefined();
+    expect(within(dialog()).queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(within(dialog()).getAllByRole("radio").map(radio => radio.getAttribute("value"))).toEqual(["dismiss"]);
+    expect((screen.getByRole("radio", { name: "Annotate v2 from scratch" }) as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(assign());
+    await waitFor(() => expect(props.onFromScratch).toHaveBeenCalled());
+    expect(carry).toHaveBeenCalledWith("demo", "sub-ana-1", expect.objectContaining({ mode: "dismiss" }));
+  });
+
+  it("a lost connection offers Retry and keeps the carry options", async () => {
+    vi.mocked(api.previewTextChange).mockRejectedValueOnce(new NetworkError(new TypeError("Failed to fetch")));
+    setup();
+    fireEvent.click(await within(dialog()).findByRole("button", { name: "Retry" }));
+    expect(screen.getByRole("radio", { name: "Ana Weber (author)" })).toBeDefined();
+    expect(await within(dialog()).findByText("Ana Weber submitted on v1 (Round 1, 3 findings).")).toBeDefined();
+    expect(api.previewTextChange).toHaveBeenCalledTimes(2);
   });
 
   it("carries a final's submission to the corrected version", () => {
