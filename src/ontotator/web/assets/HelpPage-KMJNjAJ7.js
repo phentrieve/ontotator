@@ -1,4 +1,4 @@
-import{r as i,a as m,j as a,b as h}from"./index-CE05F5rN.js";import{M as f,r as g}from"./index-tkdelq62.js";function w(){const[e,t]=i.useState(null);return i.useEffect(()=>{let o=!0;return m.getAbout().then(n=>{o&&t(n)},()=>{}),()=>{o=!1}},[]),e?a.jsxs("p",{className:"help-version",title:e.revision??void 0,children:["Ontotator ",e.version,e.revision&&a.jsxs(a.Fragment,{children:[" · commit ",e.revision.slice(0,7)]})]}):null}const y=`# Ontotator user handbook
+import{r as i,a as m,j as a,b as h}from"./index-DJrXsu3P.js";import{M as f,r as g}from"./index-ienZed5U.js";function w(){const[e,t]=i.useState(null);return i.useEffect(()=>{let o=!0;return m.getAbout().then(n=>{o&&t(n)},()=>{}),()=>{o=!1}},[]),e?a.jsxs("p",{className:"help-version",title:e.revision??void 0,children:["Ontotator ",e.version,e.revision&&a.jsxs(a.Fragment,{children:[" · commit ",e.revision.slice(0,7)]})]}):null}const y=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -433,7 +433,7 @@ The toolbar shows the text name, its language and the mode:
 | **Annotate from scratch** | You see neither tool proposals nor other people's work. |
 | **Annotate from proposals** | You see a tool's proposals, never other people's work. See [Review tool proposals](#review-tool-proposals). |
 | **Review carried findings**, or the round name such as *Round 2, continued from Round 1* | Findings were carried over from earlier work. See [Review carried findings](#review-carried-findings). |
-| **Check after text change** | The text was corrected. See [Re-create findings after a text correction](#re-create-findings-after-a-text-correction). |
+| **Check after text change** | The text was corrected and some findings are marked **Check needed**. See [Re-create findings after a text correction](#re-create-findings-after-a-text-correction). If nothing needs a check, the toolbar shows the round instead, such as *Round 1, continued from an earlier version*. |
 
 Next to the mode, the save status tells you whether your work is stored: **Saved**, **Saving...** or **Unsaved changes**. Work is saved automatically; there is no save button. If it reads **Offline** or shows an error, click **Retry**.
 
@@ -675,7 +675,7 @@ A row **Not on this text** means the finding could not be placed in this text. S
 
 ## Re-create findings after a text correction
 
-What for: move your findings to the corrected text after the text got a new version, for example from a translation review, a lead's correction or an upload, and your task moved to it. The toolbar reads **Check after text change**. This works the same in a task from proposals: only findings in changed passages need you; your other decisions on the proposals are already carried.
+What for: move your findings to the corrected text after the text got a new version, for example from a translation review, a lead's correction or an upload, and your task moved to it. The toolbar reads **Check after text change** while findings are marked **Check needed**. This works the same in a task from proposals: only findings in changed passages need you; your other decisions on the proposals are already carried.
 
 1. The panel **Needs review after the text change** lists the findings to place again.
 2. For each item, click **Re-create here** and mark the supporting text in the corrected version.
@@ -1880,7 +1880,7 @@ Active filters show as chips above the table. Remove one with its ✕, or click 
 
 Below 1600 px width each text keeps one line in the table. Where the table is still wider than the page, it scrolls sideways with the **Text** column kept at the left:
 
-- The stage columns show a shorter state and leave out the names, which **Waiting on** already shows. For example *assigned, not started (Ana Weber)* reads *not started*, *1 of 2 submitted* reads *1/2 submitted*, *ready to compare* reads *to compare* and *Final is on old text* reads *on old text*.
+- The stage columns show a shorter state and leave out the names, which **Waiting on** already shows. For example *assigned, not started (Ana Weber)* reads *not started*, *1 of 2 submitted* reads *1/2 submitted*, *ready to compare* reads *to compare* and *Final is on old text* reads *on old text*. Submitted work from proposals that waits for the new version's proposals reads *v1 work waits* (*v2 has no proposals yet*).
 - **Waiting on** shows one name and *+n* for the others.
 - **Text** keeps *source*, the version marker and **NEW** on the line and cuts a long case ID with *…*.
 - Point at a cell to see the full state with the names in its tooltip. Screen readers read the full state.
@@ -2044,7 +2044,7 @@ With **Annotate only after the translation review is accepted** on, you can assi
 What happens to a waiting task:
 
 - **Rejected** or **Query**: it keeps waiting. Decide on the text as usual.
-- **Accepted with corrections**, a lead correction or an uploaded correction: the task moves to the new version and opens there once that version is accepted. A task from proposals waits on the old version: the annotator sees **Waiting for the project lead**, and once the new version is accepted the text shows **Handle text change…**. There you move the task to the new version, where the decisions on the proposals are carried and only changed passages need a check. If the new version has no proposals yet, wait for them (their automatic transfer may still be running) or import them, then move the task. A paused task stays too, until you decide its report.
+- **Accepted with corrections**, a lead correction or an uploaded correction: the task moves to the new version and opens there once that version is accepted. A task from proposals waits on the old version: the annotator sees **Waiting for the project lead**, and once the new version is accepted the text shows **Handle text change…**. There you move the task to the new version, where the decisions on the proposals are carried and only changed passages need a check. If the new version has no proposals yet, moving is not available: wait for them (their automatic transfer may still be running) or import them, click **Retry**, then move the task. A paused task stays too, until you decide its report.
 - A task on an uploaded correction that was then **Rejected** or **Query**, with the older version accepted afterwards: the text shows **Handle text change…**; **Withdraw** the task, then assign the accepted version.
 - You remove the review: the task keeps waiting, and the text shows the next step for the review.
 - You turn Review off and accept the translation: the task opens. You turn Annotate off or discard the version: the task is withdrawn, as any open task.
@@ -2268,17 +2268,19 @@ Before you start: if the task is paused by a problem report, [decide the report]
    - **Withdraw**: the task ends, nothing of the draft is carried, and the new version needs a new annotation. Assign it afterwards.
 3. Click **Apply**.
 
-Work from proposals is carried too: the decisions on the proposals move to the matching proposals of the new version, and only what touches a changed passage is marked **Check needed**. An accepted, edited or Unresolved proposal without a counterpart in the new version becomes the annotator's own finding and is marked **Check needed** too; an Unresolved one keeps its note. A rejected proposal without a counterpart is dropped. If the new version has no proposals yet, the dialog says so: their automatic transfer may still be running, or they must be imported. Wait for or import the proposals for the new version, then click **Retry**. To annotate the new version from scratch instead, [change the annotation mode of the text](lead-documents.md#change-the-annotation-mode-of-one-text); that discards the work of the whole text.
+Work from proposals is carried too: the decisions on the proposals move to the matching proposals of the new version, and only what touches a changed passage is marked **Check needed**. An accepted, edited or Unresolved proposal without a counterpart in the new version becomes the annotator's own finding and is marked **Check needed** too; an Unresolved one keeps its note. A rejected proposal without a counterpart is dropped. If the new version has no proposals yet, the dialog says so: their automatic transfer may still be running, or they must be imported. Until then the move and finishing on the old version are not available, and nothing is preselected. Wait for or import the proposals for the new version, then click **Retry**, or choose **Withdraw**. To annotate the new version from scratch instead, [change the annotation mode of the text](lead-documents.md#change-the-annotation-mode-of-one-text); that discards the work of the whole text.
 
 ### Carry submitted work to a new text version
 
 What for: reuse submitted findings after the text was corrected. The row's next step reads, for example, *Carry to v2…*.
 
 1. In the row, click the carry button, for example *Carry to v2…*.
-2. Choose who continues: the author, **Someone else…** (then pick the **Annotator**), or annotate the new version from scratch.
+2. Choose who continues: the author, **Someone else…** (then pick the **Annotator**), or start the new version fresh, for example *Start v2 fresh*: nothing is carried, and the assign dialog opens next.
 3. Click **Assign**.
 
-Work from proposals is carried too: the decisions on the proposals move to the matching proposals of the new version, and only what touches a changed passage is marked **Check needed**. An accepted, edited or Unresolved proposal without a counterpart in the new version becomes the annotator's own finding and is marked **Check needed** too; an Unresolved one keeps its note. A rejected proposal without a counterpart is dropped. If the new version has no proposals yet, the dialog says so: their automatic transfer may still be running, or they must be imported. Wait for or import the proposals for the new version, then click **Retry**. To annotate the new version from scratch instead, [change the annotation mode of the text](lead-documents.md#change-the-annotation-mode-of-one-text); that discards the work of the whole text. Without proposals on the new version, the row offers assigning it instead of *Carry to v2…*.
+Work from proposals is carried too: the decisions on the proposals move to the matching proposals of the new version, and only what touches a changed passage is marked **Check needed**. An accepted, edited or Unresolved proposal without a counterpart in the new version becomes the annotator's own finding and is marked **Check needed** too; an Unresolved one keeps its note. A rejected proposal without a counterpart is dropped. If the new version has no proposals yet, the dialog says so: their automatic transfer may still be running, or they must be imported. Wait for or import the proposals for the new version, then click **Retry**. To annotate the new version from scratch instead, [change the annotation mode of the text](lead-documents.md#change-the-annotation-mode-of-one-text); that discards the work of the whole text. Until the new version has proposals, the row's **Annotation** column reads *v1 work waits* with *v2 has no proposals yet*, and *Carry to v2…* is disabled with the hint *Import proposals for v2*; it works as soon as the proposals are there. To assign the new version anew instead, use the text card.
+
+If **Assign** fails because the new version has no proposals, or because of a server or connection problem, the dialog offers **Retry**. Other refusals say why, without **Retry**.
 
 The annotator must check the carried findings before submitting ([Review carried findings](annotator.md#review-carried-findings)).
 
