@@ -1,4 +1,4 @@
-import{r as i,a as m,j as a,b as h}from"./index-8qiru17v.js";import{M as f,r as g}from"./index-ajwcAu0K.js";function w(){const[e,t]=i.useState(null);return i.useEffect(()=>{let o=!0;return m.getAbout().then(n=>{o&&t(n)},()=>{}),()=>{o=!1}},[]),e?a.jsxs("p",{className:"help-version",title:e.revision??void 0,children:["Ontotator ",e.version,e.revision&&a.jsxs(a.Fragment,{children:[" · commit ",e.revision.slice(0,7)]})]}):null}const y=`# Ontotator user handbook
+import{r as i,a as m,j as a,b as h}from"./index-D0k-CDN-.js";import{M as f,r as g}from"./index-VwPK-n37.js";function w(){const[e,t]=i.useState(null);return i.useEffect(()=>{let o=!0;return m.getAbout().then(n=>{o&&t(n)},()=>{}),()=>{o=!1}},[]),e?a.jsxs("p",{className:"help-version",title:e.revision??void 0,children:["Ontotator ",e.version,e.revision&&a.jsxs(a.Fragment,{children:[" · commit ",e.revision.slice(0,7)]})]}):null}const y=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -223,7 +223,7 @@ You cannot deactivate your own account. In project member lists the person shows
 What for: check what was changed on an account and by whom.
 
 1. On **Users**, click **More…** in the row and choose **History**. For anonymised accounts, click the **History** button in the row.
-2. Read the table: **When**, **By**, **What**, **Whom**, **Project**, **Details**. **What** names the change in plain words, for example *Project settings changed*, *Final export created* or *Phenopackets created*. Research exports are listed too, for example *Edit log exported* or *Working time exported*.
+2. Read the table: **When**, **By**, **What**, **Whom**, **Project**, **Details**. **What** names the change in plain words, for example *Project settings changed*, *Final export created* or *Phenopackets created*. Research exports are listed too, for example *Edit log exported* or *Working time exported*. A text given its own number of annotators reads *Annotators per text changed for one text*, with the text, the old and new value and the project value under **Details**.
 3. Changes made with an API token name it under **Details** (*Via API token*); the single requests a token made are left out here. The dialog shows the newest 200 entries. For the whole trail, use the command \`ontotator admin audit\`, see [Server operations](../operations.md#users-ontologies-and-projects).
 
 ## Anonymise a deactivated account
@@ -2078,7 +2078,7 @@ What for: assign a single review or annotation.
 
 To change the limit of annotators per text from here, click the info button (i) next to the limit and enter the number:
 
-- **Only for the selected text** (with several texts: **Only for the selected texts**) gives these texts their own limit, for example 4 annotators on one text for a method comparison in a project with 1. Click the button that names the number of texts, for example *Change for 1 text*. The text keeps its own value for every version, also a corrected one; the project setting and the other texts stay as they are. Entering the project's number again returns the text to the project setting.
+- **Only for the selected text** (with several texts: **Only for the selected texts**) gives these texts their own limit, for example 4 annotators on one text for a method comparison in a project with 1. Click the button that names the number of texts, for example *Change for 1 text*. The text keeps its own value for every version, also a corrected one; the project setting and the other texts stay as they are. Entering the project's number again returns the text to the project setting. The popover then explains *Sets the most annotators for this text only (project: 1)*, and for a text that already has its own value its title reads, for example, *Up to 4 annotators for this text (project: 1)*.
 - **For all texts** changes the project setting. Click **Change for all texts**. Texts with their own value keep it.
 
 The text card then shows *Annotators: 4 for this text (project: 1)* in **Annotation**. Lowering the number removes nobody: annotators already assigned stay. The audit trail records a text's own value as *Annotators per text changed for one text*.
