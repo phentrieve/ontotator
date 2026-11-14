@@ -71,7 +71,7 @@ export function proposalFor(annotation: AnnotationSnapshot | null, proposals: re
     ?? proposals.find(p => annotation.annotation.provenance.source_refs?.includes(`${p.annotation.annotation_id}:${p.version}`));
 }
 const text = (value: unknown): string | undefined => typeof value === "string" && value.length ? value : undefined;
-/** Actor id of the re-anchor job in proposals it copied before #417; the server credits their set to the source tool. */
+/** Actor id of the re-anchor job in proposals it copied before issue 417; the server credits their set to the source tool. */
 export const LEGACY_REANCHOR_ACTOR_ID = "ontotator-reanchor";
 export function matchingTool(source: EditorProposal, metadata: ProposalSetView | null | undefined) {
   const actor = source.annotation.provenance.actor;
