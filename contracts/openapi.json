@@ -949,6 +949,59 @@
         "x-ontotator-project-token": true
       }
     },
+    "/api/v1/rounds/{round_id}/source-text": {
+      "get": {
+        "tags": [
+          "work-rounds"
+        ],
+        "summary": "Round Source",
+        "description": "The earlier text version a carried round's work came from, for \"Show\nchanges since vN\" (issue 421); null when the round was not carried from\nanother version. Everyone who may see the round may read it.",
+        "operationId": "round_source_api_v1_rounds__round_id__source_text_get",
+        "parameters": [
+          {
+            "name": "round_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Round Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/RoundSourceText"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Round Source Api V1 Rounds  Round Id  Source Text Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "read",
+        "x-ontotator-project-token": true
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/round-input-resolutions": {
       "post": {
         "tags": [
@@ -24775,6 +24828,36 @@
         ],
         "title": "RoundInputView"
       },
+      "RoundSourceText": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "document_id",
+          "language",
+          "version",
+          "text"
+        ],
+        "title": "RoundSourceText",
+        "description": "The earlier text version a carried round's work came from (read-only).\n\nThe same ``(old, new)`` pair the carry re-anchored with ``text_map``: the\ndocument of the source submission, or of the frozen draft of a text\nchange. Only for rounds whose source is another version of the text."
+      },
       "RoundSourceView": {
         "properties": {
           "submission_id": {
@@ -26906,6 +26989,16 @@
             "type": "array",
             "title": "Round Input Resolutions",
             "default": []
+          },
+          "carried_from": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoundSourceText"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",

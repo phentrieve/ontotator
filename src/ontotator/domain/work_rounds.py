@@ -270,6 +270,21 @@ class WorkRoundView(BaseModel):
     )
 
 
+class RoundSourceText(BaseModel):
+    """The earlier text version a carried round's work came from (read-only).
+
+    The same ``(old, new)`` pair the carry re-anchored with ``text_map``: the
+    document of the source submission, or of the frozen draft of a text
+    change. Only for rounds whose source is another version of the text.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    document_id: str
+    language: str
+    version: int
+    text: str
+
+
 class SourceReviewObligation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

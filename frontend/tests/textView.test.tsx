@@ -143,6 +143,23 @@ it('nothing is editable', async () => {
   expect(screen.queryByRole('button', { name: /Save|Delete|Remove/ })).toBeNull();
 });
 
+it('an annotation carried from an earlier version offers Show changes since that version (issue 421)', async () => {
+  vi.spyOn(api, 'getSubmissionHistory').mockResolvedValue({
+    summary: { submission_id: 'sub-tom', document_id: 'target', author_label: 'ann-1', created_at, mode: 'independent' },
+    annotations: [], evidence: [], decisions: [],
+    carried_from: { document_id: 'older', language: 'de', version: 1, text: 'Immutable draft' },
+  } as any);
+  const { mounted } = await viewer({ show: 'submission:sub-tom' });
+  const toggle = await screen.findByRole<HTMLInputElement>('checkbox', { name: 'Show changes since v1' });
+  expect(toggle.checked).toBe(false);
+  fireEvent.click(toggle);
+  const text = mounted.container.querySelector<HTMLElement>('.text-container')!;
+  await waitFor(() => expect(text.querySelector('.change-passage')?.textContent).toBe('target'));
+  expect(screen.getByText('1 passage changed')).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Changed text. In v1: draft' })).toBeTruthy();
+  expect(text.textContent).toBe('Immutable target');
+});
+
 it('legacy annotations= links map to show', async () => {
   vi.mocked(api.listTextLayers).mockResolvedValue([...leadLayers, { kind: 'own', ref: ownRef, label: ownRef.label, state: 'submitted', available: true }]);
   await viewer({ annotations: refKey(ownRef) });

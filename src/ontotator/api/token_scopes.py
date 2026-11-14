@@ -207,6 +207,7 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     ("POST", "/api/v1/assignments/{assignment_id}/open"): SESSION,
     ("POST", "/api/v1/rounds/{round_id}/open"): SESSION,
     ("GET", "/api/v1/rounds/{round_id}/inputs"): "read",
+    ("GET", "/api/v1/rounds/{round_id}/source-text"): "read",
     ("GET", "/api/v1/rounds/{round_id}/consolidation"): "read",
     ("POST", "/api/v1/workspaces/open"): SESSION,
     ("POST", "/api/v1/workspaces/review-inputs"): SESSION,
@@ -324,6 +325,7 @@ PROJECT_RESOLVED: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/api/v1/problem-reports/{report_id}/actions"),
         # Rounds: _visible_round (api.work_round_routes).
         ("GET", "/api/v1/rounds/{round_id}/inputs"),
+        ("GET", "/api/v1/rounds/{round_id}/source-text"),
         ("GET", "/api/v1/rounds/{round_id}/consolidation"),
         # Translation reviews: TranslationReviewService._authority.
         ("GET", "/api/v1/translation-reviews/{assignment_id}"),
