@@ -32,15 +32,39 @@ describe("HandleTextChangeDialog", () => {
     await screen.findByText(/could not be placed/);
   });
 
-  it("work from proposals offers only Withdraw, preselected, and asks no preview", async () => {
+  it("work from proposals can move: its decisions on the proposals are carried", async () => {
+    setup({ mode: "proposals" });
+    const move = screen.getByRole("radio", { name: "Move to v2" }) as HTMLInputElement;
+    expect(move.checked).toBe(true);
+    expect(document.getElementById(move.getAttribute("aria-describedby")!.split(" ")[0])?.textContent)
+      .toBe("Tom Reis continues on the corrected text. Their decisions on the proposals are carried; only items in changed passages are marked “check after text change”.");
+    expect(screen.getByRole("radio", { name: "Let Tom Reis finish on v1" })).toBeDefined();
+    await screen.findByText(/could not be placed/);
+  });
+
+  it("no proposals on v2 yet: Move stays preselected, the line says to wait or import, and Retry checks again", async () => {
+    vi.mocked(api.previewTextChange).mockRejectedValueOnce(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "no_target_proposals" }));
+    setup({ mode: "proposals" });
+    expect(await within(dialog()).findByText(
+      "v2 has no proposals yet: their automatic transfer may still be running, or they must be imported. Wait for or import the proposals for v2, then try again.",
+    )).toBeDefined();
+    expect((screen.getByRole("radio", { name: "Move to v2" }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("radio", { name: "Withdraw" }) as HTMLInputElement).checked).toBe(false);
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("1 of 3 decisions and findings could not be placed and need Tom Reis’s decision.")).toBeDefined();
+    expect(within(dialog()).queryByRole("button", { name: "Retry" })).toBeNull();
+  });
+
+  it("another refused preview offers only Withdraw, preselected, with the reason and without Retry", async () => {
+    vi.mocked(api.previewTextChange).mockRejectedValue(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "not_open" }));
     const resolve = vi.spyOn(api, "resolveTextChange").mockResolvedValue({} as AssignmentView);
     const props = setup({ mode: "proposals" });
+    expect(await within(dialog()).findByText(/That is why Withdraw is the only choice\./)).toBeDefined();
+    expect(within(dialog()).queryByRole("button", { name: "Retry" })).toBeNull();
     expect((screen.getByRole("radio", { name: "Withdraw" }) as HTMLInputElement).checked).toBe(true);
     expect(screen.queryByRole("radio", { name: "Move to v2" })).toBeNull();
     expect(screen.queryByRole("radio", { name: "Let Tom Reis finish on v1" })).toBeNull();
-    expect(within(dialog()).getByText("Tom Reis checks tool proposals that were made for the text of v1. The proposals mark places in that text, so they cannot be moved to v2, and the task cannot either. That is why Withdraw is the only choice.")).toBeDefined();
     expect(within(dialog()).getByText("Next: click Apply to withdraw the task, then assign an annotation of v2.")).toBeDefined();
-    expect(api.previewTextChange).not.toHaveBeenCalled();
     fireEvent.click(apply());
     await waitFor(() => expect(resolve).toHaveBeenCalledWith(41, { resolution: "withdrawn", target_document_id: V2, expected_workflow_revision: 7 }));
     expect(props.onDone).toHaveBeenCalledWith("Tom Reis’s task is withdrawn. v2 needs a new annotation.");

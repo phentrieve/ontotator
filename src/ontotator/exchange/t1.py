@@ -918,16 +918,15 @@ def submission_to_unit(
         review = reviewed.get((item.annotation_id, snap.version))
         if review is not None:
             sources = set(review[1])
-            if _method(item.provenance) == "merged":
+            merged = _method(item.provenance) == "merged"
+            method = "merged" if len(sources) > 1 or merged else review[0]
+            if merged or review[0] == "edited":
+                # A correction keeps its other refs too, e.g. the round input
+                # it was carried from (#414).
                 sources.update(
                     normalize_source_ref(ref) for ref in item.provenance.source_refs
                 )
             source_refs = tuple(sorted(sources))
-            method = (
-                "merged"
-                if len(source_refs) > 1 or _method(item.provenance) == "merged"
-                else review[0]
-            )
             provenance = reviewed_provenance(reviewer, method, source_refs)
         else:
             provenance = ontospan.Provenance(

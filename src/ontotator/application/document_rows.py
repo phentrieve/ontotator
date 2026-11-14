@@ -42,7 +42,9 @@ from ontotator.authz.scoped import ScopedRepository
 from ontotator.domain import document_rows as rules
 from ontotator.domain.annotation_modes import AnnotationMode
 from ontotator.domain.next_steps import Stage, StepCode
+from ontotator.domain.profiles import TaskProfile
 from ontotator.domain.review import ReviewDecision
+from ontotator.domain.scopes import build_scope
 from ontotator.domain.work_plans import PlanFlags, RowKey
 from ontotator.domain.workspace import WorkspaceKey
 from ontotator.storage import work_plan_store
@@ -324,6 +326,9 @@ class RowFacts:
     # overrides per row; annotation submissions per document as
     # (recorded_at, annotation mode), oldest first.
     proposal_counts: dict[str, int] = field(default_factory=dict)
+    # The same on the editable layers: the targets a carry of work from
+    # proposals needs (``work_rounds.target_proposals``, #414).
+    carry_proposal_counts: dict[str, int] = field(default_factory=dict)
     project_mode: AnnotationMode = "proposals"
     mode_overrides: dict[RowKey, AnnotationMode] = field(default_factory=dict)
     annotation_submissions: dict[str, list[tuple[datetime, AnnotationMode]]] = field(
@@ -1104,6 +1109,7 @@ def load_facts(
             ProjectRow.annotate_accepted_translations_only,
             ProjectRow.annotations_per_text,
             ProjectRow.tool_proposal_mode,
+            ProjectRow.task_profile,
         ).where(ProjectRow.id == pid)
     ).one()
     viewer = conn.execute(
@@ -1203,6 +1209,13 @@ def load_facts(
         source_obligations=_source_obligations(causes),
         consolidation_flags={} if lean else load_consolidation_flags(conn, pid),
         proposal_counts=newest_proposal_counts(conn, pid),
+        carry_proposal_counts=newest_proposal_counts(
+            conn,
+            pid,
+            build_scope(
+                TaskProfile.model_validate(project.task_profile), "proposal_check"
+            ).editable_layer_ids,
+        ),
         project_mode=project.tool_proposal_mode,
         mode_overrides=_mode_overrides(conn, pid),
         annotation_submissions=_annotation_submissions(conn, pid),

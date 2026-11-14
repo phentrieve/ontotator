@@ -244,6 +244,11 @@ class SubmissionFacts:
     def kind(self, sid: str) -> str:
         return submission_kind(self.submissions[sid], self.round_kinds)
 
+    def from_proposals(self, sid: str) -> bool:
+        """Annotation from proposals, also carried to a new version (its kind
+        is then ``carry_forward``, #414): its decisions are proposal checks."""
+        return bool(self.submissions[sid]["origin_key"]["mode"] == "proposal_check")
+
     def author(self, sid: str) -> str:
         return str(self.submissions[sid]["origin_key"]["annotator_id"])
 
@@ -286,7 +291,7 @@ def _uncertain_targets(context: SubmissionFacts, sid: str) -> set[str]:
     """Proposals a proposal check left uncertain: kept in the submission and
     the bundle, but no finding of the person. (In other submissions an
     uncertain decision flags the person's own finding, which stays one.)"""
-    if context.kind(sid) != "proposal_check":
+    if not context.from_proposals(sid):
         return set()
     return {
         d["target"]["annotation_id"]
@@ -310,7 +315,7 @@ def finding_origin(
             if item["annotation_id"] == annotation_id:
                 return str(item["origin"])
         return "decided"
-    if kind == "proposal_check":
+    if context.from_proposals(sid):
         if annotation_id in _uncertain_targets(context, sid):
             return "uncertain"
         for decision in context.decisions(sid):
@@ -322,6 +327,8 @@ def finding_origin(
                 and decision["target"]["annotation_id"] == annotation_id
             ):
                 return "confirmed"
+        if kind == "carry_forward" and annotation.provenance.source_refs:
+            return "carried"
         return "added"
     if kind == "carry_forward":
         return "carried" if annotation.provenance.source_refs else "added"
@@ -728,7 +735,7 @@ def build_proposals_csv(
     people: dict[tuple[str, str, str], dict[str, int]] = {}
     for item in units:
         sid = item.submission_id
-        if context.kind(sid) != "proposal_check":
+        if not context.from_proposals(sid):
             continue
         targets = sorted(
             of_submission.get(sid, []), key=lambda p: p.annotation.annotation_id

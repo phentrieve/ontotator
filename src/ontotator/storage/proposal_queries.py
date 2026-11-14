@@ -8,6 +8,7 @@ no imported set.
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from dataclasses import dataclass
 
 from sqlalchemy import Connection, Subquery, and_, func, select
@@ -32,19 +33,28 @@ class ProposalSetRef:
     annotation_set_id: str | None
 
 
-def _in_newest_set(project_id: int) -> Subquery:
+def _in_newest_set(project_id: int, *, with_layer: bool = False) -> Subquery:
     """(document_id, annotation_id, version) of each document's newest set.
 
     One join on purpose: right after an import the planner has no statistics
     for the project, and joining the proposals to a per-document ``max`` of
     themselves then ran for minutes. NULLS LAST: seed proposals rank first
-    only without an imported set.
+    only without an imported set. ``with_layer`` adds each proposal's layer.
     """
     ranked = (
         select(
             AnnotationSnapshotRow.document_id,
             ProposalAnnotationRow.annotation_id,
             ProposalAnnotationRow.version,
+            *(
+                [
+                    AnnotationSnapshotRow.payload["annotation"]["layer_id"]
+                    .as_string()
+                    .label("layer_id")
+                ]
+                if with_layer
+                else []
+            ),
             func.rank()
             .over(
                 partition_by=AnnotationSnapshotRow.document_id,
@@ -94,10 +104,16 @@ def newest_proposal_refs(
     return [AnnotationRef(annotation_id=row[0], version=row[1]) for row in rows]
 
 
-def newest_proposal_counts(conn: Connection, project_id: int) -> dict[str, int]:
-    """Proposals of the newest set per document id (documents without proposals absent); one query."""
-    newest = _in_newest_set(project_id)
-    rows = conn.execute(
-        select(newest.c.document_id, func.count()).group_by(newest.c.document_id)
-    ).all()
+def newest_proposal_counts(
+    conn: Connection, project_id: int, layer_ids: Collection[str] | None = None
+) -> dict[str, int]:
+    """Proposals of the newest set per document id (documents without proposals
+    absent); one query. ``layer_ids``: count only those layers' proposals."""
+    newest = _in_newest_set(project_id, with_layer=layer_ids is not None)
+    statement = select(newest.c.document_id, func.count()).group_by(
+        newest.c.document_id
+    )
+    if layer_ids is not None:
+        statement = statement.where(newest.c.layer_id.in_(sorted(layer_ids)))
+    rows = conn.execute(statement).all()
     return {document_id: count for document_id, count in rows}
