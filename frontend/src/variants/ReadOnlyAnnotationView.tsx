@@ -11,6 +11,7 @@ import { modifierMarks } from '../editor/modifiers';
 import type { MentionDisplay } from '../spans/adapter';
 import { Button } from '../ui';
 import { actorName } from "../editor/actorName";
+import type { TextChanges } from '../translation/textDiff';
 
 export interface ReadOnlyAnnotationViewProps {
   header?: import('react').ReactNode;
@@ -20,8 +21,10 @@ export interface ReadOnlyAnnotationViewProps {
   annotations: AnnotationSnapshot[];
   evidence: AnnotationVersion['evidence'];
   labelFor: (layerId: string | undefined, termId: string) => string | null;
+  /** Display-only change marks against another version of this text (Show changes). */
+  changes?: TextChanges | null;
 }
-export function ReadOnlyAnnotationView({ header, text, annotations, evidence, labelFor, onTextElement, proposalContext }: ReadOnlyAnnotationViewProps): JSX.Element {
+export function ReadOnlyAnnotationView({ header, text, annotations, evidence, labelFor, onTextElement, proposalContext, changes }: ReadOnlyAnnotationViewProps): JSX.Element {
   const [selected, setSelected] = useState<string | null>(null);
   const [element,setElement] = useState<HTMLDivElement|null>(null);
   const attachElement=useCallback((value:HTMLDivElement|null)=>{setElement(value);onTextElement?.(value);},[onTextElement]);
@@ -72,7 +75,7 @@ export function ReadOnlyAnnotationView({ header, text, annotations, evidence, la
         </p>)}
       </li>)}</ul>
     </aside>}
-    <TextPane header={header} onTextElement={attachElement} contextSegments={context.contextSegments} text={text} mentions={mentions} selectedEvidenceId={selected} selectionIntent="new_mention"
+    <TextPane header={header} onTextElement={attachElement} contextSegments={context.contextSegments} changes={changes} text={text} mentions={mentions} selectedEvidenceId={selected} selectionIntent="new_mention"
       readOnly isAttachingMention={false} resizableEvidenceIds={[]} onPick={setSelected} onSelection={() => {}} onChangeIntent={() => {}} />
   </div>;
   return proposalContext && setId !== null ? <ProposalMetadataProvider scope={proposalContext.scope} projectKey={proposalContext.projectKey} proposals={sources}>{content}</ProposalMetadataProvider> : content;

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Text view: with **Compare** open on two texts of the same language (for example v1 and its correction v2), **Show changes** marks what changed, with the word diff of the translation review: the older version strikes through the removed passages, the newer one underlines the added ones, and a line above the texts counts them. It is off by default, a plain checkbox, and changes neither the texts, the findings nor **Couple scrolling**. The marks are a display option of the reading text (`TextPane` `changes`), so other reading views can reuse them (#411).
+
 ### Fixed
 
 - Text view: with **Compare** open, both panes have their **Language and version** and **Show** selects in the same place, directly above their text (**Current text** and **Comparison text**), so the two texts start at the same height (#412).

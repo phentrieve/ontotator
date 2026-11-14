@@ -22,6 +22,7 @@ import { VersionSelect } from './VersionSelect';
 import { ShowSelect } from './ShowSelect';
 import { LayerFindings, layerTerms } from './LayerFindings';
 import { layerKey, legacyLayerKey, refForLayer, useTextLayers } from './useTextLayers';
+import type { TextChanges } from '../translation/textDiff';
 import './textView.css';
 import { onSpaceActivate } from '../ui/spaceActivates';
 
@@ -106,6 +107,8 @@ export function CaseViewer({ projectKey, caseId, variant, show, annotations, com
   const [compareIdentity, setCompareIdentity] = useState<object | null>(null);
   const compareOpen = access.allowed && (compareIdentity === identity || compare !== undefined);
   const [leftElement, setLeftElement] = useState<HTMLDivElement | null>(null);
+  // Change marks of the current text while the comparison shows changes (#411).
+  const [leftChanges, setLeftChanges] = useState<TextChanges | null>(null);
   const [comparisonToolbar, setComparisonToolbar] = useState<HTMLDivElement | null>(null);
   const compareButton = useRef<HTMLButtonElement | null>(null);
   const wasComparing = useRef(false);
@@ -219,11 +222,11 @@ export function CaseViewer({ projectKey, caseId, variant, show, annotations, com
     </div>}
     {textError?.identity === contentIdentity ? <><ErrorNotice error={textError.error} />{retryButton}</> : text ? <>
       {ref && !snapshot && !payloadFailed && <InlineMessage tone="info">Loading annotation version...</InlineMessage>}
-      <ReadOnlyAnnotationView onTextElement={setLeftElement} key={JSON.stringify([username, projectKey, caseId, selectedId, selection, retry])} text={text.text} annotations={snapshot?.annotations ?? []} evidence={snapshot?.evidence ?? []} labelFor={labelFor} proposalContext={ref?.kind === "proposals" && snapshot ? {projectKey,documentId:current.document_id,scope:JSON.stringify([username,projectKey,caseId,selectedId,selection,retry]),setId:ref.id} : undefined} />
+      <ReadOnlyAnnotationView onTextElement={setLeftElement} key={JSON.stringify([username, projectKey, caseId, selectedId, selection, retry])} text={text.text} changes={compareOpen ? leftChanges : null} annotations={snapshot?.annotations ?? []} evidence={snapshot?.evidence ?? []} labelFor={labelFor} proposalContext={ref?.kind === "proposals" && snapshot ? {projectKey,documentId:current.document_id,scope:JSON.stringify([username,projectKey,caseId,selectedId,selection,retry]),setId:ref.id} : undefined} />
     </> : <InlineMessage tone="info">Loading text...</InlineMessage>}
     {snapshot && <LayerFindings key={selection} label={layerLabel} annotations={snapshot.annotations} labelFor={labelFor} text={text?.text ?? ''} />}
       {compareOpen && <ComparePane layers projectKey={projectKey} username={username} caseDetail={detail} leftDocumentId={current.document_id}
-        leftText={text?.text ?? ""} leftElement={text ? leftElement : null} suspended={!text || !detailFresh} leftContext={JSON.stringify([selectedId, selection, retry])} onClose={closeComparison} toolbarHost={comparisonToolbar}
+        leftText={text?.text ?? ""} leftElement={text ? leftElement : null} suspended={!text || !detailFresh} leftContext={JSON.stringify([selectedId, selection, retry])} onClose={closeComparison} toolbarHost={comparisonToolbar} onLeftChanges={setLeftChanges}
         initialRight={compare !== undefined ? { documentId: compare, refKey: compareShow ?? 'text' } : undefined} />}
       </div>
   </section>;

@@ -182,6 +182,37 @@ it('an explicit "Text only" stays on the text even with a final result', async (
   expect(api.getAnnotationVersion).not.toHaveBeenCalled();
 });
 
+it('Show changes (off by default) marks removed text in the older and added text in the newer version, text unchanged', async () => {
+  const { mounted } = await viewer({ compare: 'corrected' });
+  const panel = await screen.findByRole('region', { name: 'Comparison' });
+  await waitFor(() => expect(panel.querySelector('.text-container')?.textContent).toBe('Immutable corrected'));
+  const toggle = screen.getByRole<HTMLInputElement>('checkbox', { name: 'Show changes' });
+  expect(toggle.checked).toBe(false);
+  const left = () => mounted.container.querySelector('.comparison-reading > .readonly-annotation-view .text-container')!;
+  const right = () => panel.querySelector('.text-container')!;
+  expect(mounted.container.querySelectorAll('.run--marker')).toHaveLength(0);
+  fireEvent.click(toggle);
+  // v1 on the left is the older text: "target" is removed there; v2 on the right adds "corrected".
+  await waitFor(() => expect([...left().querySelectorAll('.run--marker')].map(run => run.textContent)).toEqual(['target']));
+  expect(left().getAttribute('data-changes')).toBe('delete');
+  expect([...right().querySelectorAll('.run--marker')].map(run => run.textContent)).toEqual(['corrected']);
+  expect(right().getAttribute('data-changes')).toBe('insert');
+  expect(left().textContent).toBe('Immutable target'); expect(right().textContent).toBe('Immutable corrected');
+  expect(screen.getByText('1 passage added, 1 passage removed.')).toBeTruthy();
+  expect(screen.getByText(/^Changes from the current text \(de, version 1\) to the comparison text \(de, version 2\)/)).toBeTruthy();
+  expect(toggle.getAttribute('aria-describedby')).toBeTruthy();
+  fireEvent.click(toggle);
+  await waitFor(() => expect(mounted.container.querySelectorAll('.run--marker')).toHaveLength(0));
+  expect(left().hasAttribute('data-changes')).toBe(false);
+});
+
+it('Show changes is offered only for two texts of the same language', async () => {
+  await viewer({ compare: 'source' });
+  const panel = await screen.findByRole('region', { name: 'Comparison' });
+  await waitFor(() => expect(panel.querySelector('.text-container')?.textContent).toBe('Immutable source'));
+  expect(screen.queryByRole('checkbox', { name: 'Show changes' })).toBeNull();
+});
+
 it('closing a deep-linked comparison keeps an explicit "Text only"', async () => {
   await viewer({ show: 'text', compare: 'target' });
   fireEvent.click(await screen.findByRole('button', { name: 'Close comparison' }));

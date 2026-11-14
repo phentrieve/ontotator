@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { diffText } from "../src/translation/textDiff";
+import { changeRanges, diffText } from "../src/translation/textDiff";
 
 const reconstructed = (parts: ReturnType<typeof diffText>, side: "before" | "after") =>
   parts.filter(part => part.op !== (side === "before" ? "insert" : "delete")).map(part => part.text).join("");
@@ -55,5 +55,22 @@ describe("review word diff", () => {
     expect(parts.filter(part => part.op === "insert").map(part => part.text).join("")).toContain("\r\n");
     expect(reconstructed(parts, "before")).toBe(" \t\n");
     expect(reconstructed(parts, "after")).toBe("  \r\n");
+  });
+});
+
+describe("change ranges (Show changes in a reading text)", () => {
+  const slices = (text: string, ranges: { start: number; end: number }[]) => ranges.map(range => text.slice(range.start, range.end));
+
+  it("gives the removed passages of the older and the added passages of the newer text in their own offsets", () => {
+    const before = "No fever 😀. Mild cough.", after = "😀 High fever 😀. Mild cough and rash.";
+    const { removed, added } = changeRanges(before, after);
+    expect(slices(before, removed).join("|")).toBe(diffText(before, after).filter(part => part.op === "delete").map(part => part.text).join("|"));
+    expect(slices(after, added).join("|")).toBe(diffText(before, after).filter(part => part.op === "insert").map(part => part.text).join("|"));
+    expect(slices(after, added).join("")).toContain("rash");
+    expect(slices(before, removed).join("")).toContain("No");
+  });
+
+  it("is empty for equal texts", () => {
+    expect(changeRanges("same 😀", "same 😀")).toEqual({ removed: [], added: [] });
   });
 });

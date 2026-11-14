@@ -233,6 +233,45 @@ test('both panes have their selects in the same place above their text, and both
   await expect(page.locator('.text-view-toolbar').getByLabel('Language and version', { exact: true })).toHaveValue(s.documents.target);
 });
 
+test('Show changes marks removed and added passages in both panes, by keyboard, without breaking coupled scrolling (#411)', async ({ page }) => {
+  const s = await scenario(page); await loginExisting(page, s.users.lead);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openViewer(page, s); await openComparison(page, s);
+  // Source (en) against the de translation: two languages, nothing to diff.
+  await expect(comparisonControls(page).getByLabel('Show changes', { exact: true })).toHaveCount(0);
+  const pane = comparison(page), left = viewerLeft(page), right = rightText(page);
+  const marked = (surface: Locator) => surface.locator('.run--marker').evaluateAll(runs => runs.map(run => run.textContent ?? '').join(''));
+  await pane.getByLabel('Language and version', { exact: true }).selectOption(s.documents.corrected);
+  await expect(right).toContainText('Corrected conclusion.');
+  const toggle = comparisonControls(page).getByLabel('Show changes', { exact: true });
+  await expect(toggle).not.toBeChecked();
+  await expect(page.locator('.run--marker')).toHaveCount(0);
+  await toggle.focus(); await page.keyboard.press('Space');
+  await expect(toggle).toBeChecked();
+  // v1 left, v2 right: v2 only adds the conclusion.
+  await expect.poll(() => marked(right)).toBe('\n\nCorrected conclusion.');
+  await expect(left.locator('.run--marker')).toHaveCount(0);
+  await expect(right).toHaveAttribute('data-changes', 'insert');
+  await expect(comparisonStatus(page).getByText('1 passage added, 0 passages removed.', { exact: true })).toBeVisible();
+  // Not colour only: added text is underlined, removed text struck through.
+  expect(await right.locator('.run--marker', { hasText: 'Corrected' }).evaluate(run => getComputedStyle(run).textDecorationLine)).toBe('underline');
+  // Another de translation on the right: removals on the left, additions on the right; the texts stay exact.
+  await pane.getByLabel('Language and version', { exact: true }).selectOption(s.documents.other);
+  await expect.poll(() => marked(left)).toContain('Hypotonia');
+  await expect.poll(() => marked(right)).toContain('Alternative');
+  await expect(left).toHaveAttribute('data-changes', 'delete');
+  expect(await left.locator('.run--marker', { hasText: 'Hypotonia' }).first().evaluate(run => getComputedStyle(run).textDecorationLine)).toBe('line-through');
+  await exactText(left, s.texts.target);
+  await expect(left.locator('[data-paragraph]')).toHaveCount(13); await expect(right.locator('[data-paragraph]')).toHaveCount(9);
+  // Coupled scrolling still pairs paragraphs with the marks on.
+  await comparisonControls(page).getByLabel('Couple scrolling', { exact: true }).check();
+  await scrollParagraph(left, 6); await align(right, 4);
+  await toggle.uncheck();
+  await expect(page.locator('.run--marker')).toHaveCount(0);
+  await expect(comparisonControls(page).getByLabel('Couple scrolling', { exact: true })).toBeChecked();
+  await afterEchoWindow(page); await scrollParagraph(right, 3); await align(left, 5);
+});
+
 test('unequal counts map proportionally, toggle off and below1100 suspend coupling, resize back resumes it', async ({ page }) => {
   const s = await scenario(page); await loginExisting(page, s.users.lead);
   await page.setViewportSize({ width: 1280, height: 720 });
