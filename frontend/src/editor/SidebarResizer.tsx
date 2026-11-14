@@ -13,6 +13,15 @@ export interface SidebarResizerProps {
   onChange: (width: number) => void;
   onReset: () => void;
   onCommit: (source: SidebarCommitSource) => void;
+  /** Accessible name (default "Resize findings column"). */
+  label?: string;
+  /** Keyboard help entry (default "Resize the findings column (focus the divider)"). */
+  hint?: string;
+  /**
+   * Edge of the panel the divider sits on: "end" (default, the findings column on the left: moving right widens it)
+   * or "start" (a panel on the right, such as "Your review": moving left widens it).
+   */
+  side?: "start" | "end";
 }
 
 interface Drag {
@@ -23,13 +32,16 @@ interface Drag {
 }
 
 /** Vertical separator between the findings column and the text pane (spec section 10). */
-export function SidebarResizer({ width, limits, controls, onChange, onReset, onCommit }: SidebarResizerProps) {
+export function SidebarResizer({ width, limits, controls, onChange, onReset, onCommit, label = "Resize findings column",
+  hint = "Resize the findings column (focus the divider)", side = "end" }: SidebarResizerProps) {
   const drag = useRef<Drag | null>(null);
   const frame = useRef<number | null>(null);
+  /** +1: moving right widens the panel; -1: moving left does. */
+  const direction = side === "start" ? -1 : 1;
 
   useShortcutHint(
     ["← / →", "Shift + ← / →", "Home / End", "Enter"],
-    "Resize the findings column (focus the divider)",
+    hint,
     { group: "Layout" },
   );
 
@@ -67,8 +79,8 @@ export function SidebarResizer({ width, limits, controls, onChange, onReset, onC
     }
     let next: number | null = null;
     const step = event.shiftKey ? LARGE_STEP : STEP;
-    if (event.key === "ArrowLeft") next = width - step;
-    else if (event.key === "ArrowRight") next = width + step;
+    if (event.key === "ArrowLeft") next = width - step * direction;
+    else if (event.key === "ArrowRight") next = width + step * direction;
     else if (event.key === "Home") next = limits.min;
     else if (event.key === "End") next = limits.max;
     if (next == null) return;
@@ -89,7 +101,7 @@ export function SidebarResizer({ width, limits, controls, onChange, onReset, onC
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
     const current = drag.current;
     if (!current || event.pointerId !== current.pointerId || !Number.isFinite(event.clientX)) return;
-    current.latest = clampSidebarWidth(current.startWidth + (event.clientX - current.startX), limits);
+    current.latest = clampSidebarWidth(current.startWidth + direction * (event.clientX - current.startX), limits);
     if (frame.current != null) return;
     frame.current = requestAnimationFrame(() => {
       frame.current = null;
@@ -119,7 +131,7 @@ export function SidebarResizer({ width, limits, controls, onChange, onReset, onC
       role="separator"
       aria-orientation="vertical"
       aria-controls={controls}
-      aria-label="Resize findings column"
+      aria-label={label}
       aria-valuenow={width}
       aria-valuemin={limits.min}
       aria-valuemax={limits.max}
