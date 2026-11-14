@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Text view: with **Compare** open on two texts of the same language (for example v1 and its correction v2), **Show changes** marks what changed, with the word diff of the translation review: the older version strikes through the removed passages, the newer one underlines the added ones, and a line above the texts counts them. It is off by default, a plain checkbox, and changes neither the texts, the findings nor **Couple scrolling**. The marks are a display option of the reading text (`TextPane` `changes`), so other reading views can reuse them (#411).
 - Translation review: on a wide screen the **Your review** column can be resized by dragging its left edge (or with the arrow keys on it) and folded to a narrow strip with **Collapse review panel**; the bottom bar then keeps the decision and **Submit review…**. Width and folding are remembered per user in this browser (#410).
 
+### Changed
+
+- Dependencies: `diff` 8.0.4 in the web UI (it brings its own type declarations, so `@types/diff` is gone), vite 8, vitest 5 and `@vitejs/plugin-react` 6 for building and testing it (development only; esbuild 0.27 now only minifies the CSS, which keeps the `vh` fallbacks before `dvh` heights), and locust 2.47.0 with brotli 1.2.1 and certifi 2026.10.23 for the load tests. None of the flagged advisories was reachable in production. `scripts/check.sh` and `scripts/check-affected.sh` no longer pass `--minWorkers`, which vitest 5 removed (#395).
+
 ### Fixed
 
 - Text view: with **Compare** open, both panes have their **Language and version** and **Show** selects in the same place, directly above their text (**Current text** and **Comparison text**), so the two texts start at the same height (#412).
