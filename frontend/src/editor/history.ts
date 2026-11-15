@@ -1,4 +1,4 @@
-import type { HistoryStepView } from "../api/client";
+import type { DraftHistoryView, HistoryStepView } from "../api/client";
 
 /**
  * Issue 320: the editor's name for one undo or redo step ("delete finding Seizure"), shown as
@@ -42,4 +42,24 @@ export function stepText(step: HistoryStepView, term: (layerId: string, termId: 
     case "reset_changes": return "reset all my changes";
     default: return "the last change";
   }
+}
+
+/**
+ * Whether Undo and Redo can be pressed, and the step each names. `history` is the last history read, `revision`
+ * the revision of the draft the editor shows. Right after a change is saved, the history of the new revision is
+ * still being read (or the next queued change is saving): the controls then stay available as the last history
+ * says, and any change since then can be undone, so an Undo pressed in that moment is not lost. The editor takes
+ * the step from the history of the saved draft, which it reads first; with nothing to take back, nothing happens.
+ * Only the history of exactly this revision names a step.
+ */
+export function historyControls(history: DraftHistoryView | null, revision: number): {
+  undo: HistoryStepView | null; redo: HistoryStepView | null; canUndo: boolean; canRedo: boolean;
+} {
+  if (!history) return { undo: null, redo: null, canUndo: false, canRedo: false };
+  if (history.revision === revision) {
+    const undo = history.undo ?? null;
+    const redo = history.redo ?? null;
+    return { undo, redo, canUndo: !!undo, canRedo: !!redo };
+  }
+  return { undo: null, redo: null, canUndo: !!history.undo || revision > history.revision, canRedo: !!history.redo };
 }

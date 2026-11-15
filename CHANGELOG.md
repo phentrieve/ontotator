@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Editor: **Undo** (button and Ctrl+Z) pressed right after a change was saved, while the editor was still reading the new history, did nothing; it now takes that change back.
+
 ## [0.10.2] - 2026-11-14
 
 ### Added

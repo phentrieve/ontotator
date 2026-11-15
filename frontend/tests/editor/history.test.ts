@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { HistoryStepView } from "../../src/api/client";
-import { stepText } from "../../src/editor/history";
+import type { DraftHistoryView, HistoryStepView } from "../../src/api/client";
+import { historyControls, stepText } from "../../src/editor/history";
 
 const step = (action: string, outcome: string | null = null, term = true): HistoryStepView => ({
   before_revision: 1, after_revision: 2, action, outcome, commands: 1,
@@ -34,5 +34,25 @@ describe("stepText (issue 320)", () => {
     expect(name(step("resolve_round_input", "completed"))).toBe("mark carried finding Seizure as checked");
     expect(name(step("resolve_round_input", "linked"))).toBe("link carried finding Seizure");
     expect(name(step("resolve_round_input", "dismissed"))).toBe("dismiss carried finding Seizure");
+  });
+});
+
+describe("historyControls: an undo right after a change is not lost", () => {
+  const view = (revision: number, undo: HistoryStepView | null, redo: HistoryStepView | null = null): DraftHistoryView => ({
+    available: true, revision, undo, redo, undo_count: undo ? 1 : 0, redo_count: redo ? 1 : 0, changed: !!undo,
+  });
+  const values = { ...step("set_axes"), before_revision: 2, after_revision: 3 };
+
+  it("the history of the shown revision names the steps", () => {
+    expect(historyControls(view(3, values), 3)).toEqual({ undo: values, redo: null, canUndo: true, canRedo: false });
+    expect(historyControls(view(3, null), 3)).toEqual({ undo: null, redo: null, canUndo: false, canRedo: false });
+    expect(historyControls(null, 3)).toEqual({ undo: null, redo: null, canUndo: false, canRedo: false });
+  });
+
+  it("a change was saved but its history is not read yet: Undo stays available, no step is named", () => {
+    // The first change of the round: the last history had nothing to undo.
+    expect(historyControls(view(3, null), 4)).toEqual({ undo: null, redo: null, canUndo: true, canRedo: false });
+    // A later change (review F1: Ctrl+Z right after a value change).
+    expect(historyControls(view(3, values, values), 4)).toEqual({ undo: null, redo: null, canUndo: true, canRedo: true });
   });
 });

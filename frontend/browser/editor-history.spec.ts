@@ -21,6 +21,33 @@ const historyResponse = (page: Page, command: string) => page.waitForResponse(re
   response.url().endsWith("/history") && response.request().method() === "POST"
   && (response.request().postDataJSON() as { payload?: { command?: string } } | null)?.payload?.command === command);
 
+/**
+ * Holds the answers to the workspace requests ending in `/{path}` with `method`: the server handles them, the
+ * editor sees the answer only after `release()`. `held` resolves once the first request is held. This puts a key
+ * press exactly into the moment under test instead of relying on how fast the server answers.
+ */
+async function holdAnswers(page: Page, method: string, path: "commands" | "history") {
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  let isHeld!: () => void;
+  const held = new Promise<void>(resolve => { isHeld = resolve; });
+  let released = false;
+  const answering: Promise<void>[] = [];
+  // The route stays (an unroute can strand a request passing through it); once released it holds nothing.
+  await page.route(url => /^\/api\/v1\/workspaces\/[^/]+\//.test(url.pathname) && url.pathname.endsWith(`/${path}`), async route => {
+    if (released || route.request().method() !== method) { await route.fallback(); return; }
+    const answered = (async () => {
+      const response = await route.fetch();
+      isHeld();
+      await gate;
+      await route.fulfill({ response });
+    })();
+    answering.push(answered);
+    await answered;
+  });
+  return { held, release: async () => { released = true; release(); await Promise.all(answering); } };
+}
+
 async function openLoop(page: Page): Promise<ReviewFlowScenario> {
   await page.setViewportSize({ width: 1440, height: 900 });
   const s = await reviewFlowScenario(page, "ANNOTATION_LOOP");
@@ -112,19 +139,41 @@ test("Ctrl+Z right after a value change undoes that change (review F1)", async (
   const refused: string[] = [];
   page.on("response", response => { if (response.url().endsWith("/history") && response.status() >= 400) refused.push(`${response.status()}`); });
 
-  // The undo is pressed before the change is saved or the history is read again.
+  // The undo is pressed while the change is still saving: it waits for the save and takes that change back.
+  const saving = await holdAnswers(page, "POST", "commands");
   const undone = historyResponse(page, "undo_step");
   await radio("Absent").check();
+  await saving.held;
   await page.keyboard.press("Control+z");
+  await saving.release();
   expect((await undone).ok()).toBeTruthy();
   await expect(radio("Present")).toBeChecked();
   await expect(undoButton(page)).toHaveAttribute("title", "Undo: change the values of Seizure");
   await expect(redoButton(page)).toHaveAttribute("title", "Redo: change the values of Seizure");
 
-  // Two quick changes are one step (handbook): one Ctrl+Z takes both back.
+  // Pressed once the change is saved but while the history of the new revision is still being read: the key
+  // used to be dropped then, as the controls knew no step for that revision.
+  const reading = await holdAnswers(page, "GET", "history");
+  const saved = page.waitForResponse(response => response.request().method() === "POST" && response.url().endsWith("/commands"));
+  const afterSave = historyResponse(page, "undo_step");
+  await radio("Absent").check();
+  await saved;
+  await reading.held;
+  await expect(undoButton(page)).toBeEnabled();
+  await page.keyboard.press("Control+z");
+  await reading.release();
+  expect((await afterSave).ok()).toBeTruthy();
+  await expect(radio("Present")).toBeChecked();
+  await expect(undoButton(page)).toHaveAttribute("title", "Undo: change the values of Seizure");
+
+  // Two quick changes are one step (handbook): the second comes while the first is still saving, and one
+  // Ctrl+Z takes both back.
+  const first = await holdAnswers(page, "POST", "commands");
   const second = historyResponse(page, "undo_step");
   await radio("Uncertain").check();
+  await first.held;
   await radio("Absent").check();
+  await first.release();
   await page.keyboard.press("Control+z");
   expect((await second).ok()).toBeTruthy();
   await expect(radio("Present")).toBeChecked();
