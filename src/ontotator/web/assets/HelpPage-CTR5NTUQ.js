@@ -1,4 +1,4 @@
-import{r as i,a as m,j as a,b as h}from"./index-B5FK3X7z.js";import{M as f,r as g}from"./index-BAD1hwQS.js";function w(){const[e,t]=i.useState(null);return i.useEffect(()=>{let o=!0;return m.getAbout().then(n=>{o&&t(n)},()=>{}),()=>{o=!1}},[]),e?a.jsxs("p",{className:"help-version",title:e.revision??void 0,children:["Ontotator ",e.version,e.revision&&a.jsxs(a.Fragment,{children:[" · commit ",e.revision.slice(0,7)]})]}):null}const y=`# Ontotator user handbook
+import{r as i,a as m,j as a,b as h}from"./index-ydrvOOIU.js";import{M as f,r as g}from"./index-NgFaoEKq.js";function w(){const[e,t]=i.useState(null);return i.useEffect(()=>{let o=!0;return m.getAbout().then(n=>{o&&t(n)},()=>{}),()=>{o=!1}},[]),e?a.jsxs("p",{className:"help-version",title:e.revision??void 0,children:["Ontotator ",e.version,e.revision&&a.jsxs(a.Fragment,{children:[" · commit ",e.revision.slice(0,7)]})]}):null}const y=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -1190,7 +1190,7 @@ In projects where the consolidator of a text may not be one of its annotators, y
 
 ### Undo after Reopen… or Withdraw open tasks… says "Undo is no longer possible: the texts changed since."
 
-Undo of these bulk actions works only while nothing changed on the texts since, for example nobody saved a draft and nobody was assigned. Reopen or withdraw the remaining tasks again, or assign the work anew. If the dialog itself says *The texts changed since the preview. Check the new preview.*, nothing was changed yet: read the new preview and confirm again. See [Reopen or withdraw the tasks of several texts](lead-documents.md#reopen-or-withdraw-the-tasks-of-several-texts).
+Undo of these bulk actions works once, for the lead who made the change, within an hour, and only while nothing changed on the texts since, for example nobody saved a draft and nobody was assigned. Reopen or withdraw the remaining tasks again, or assign the work anew. If the dialog itself says *The texts changed since the preview. Check the new preview.*, nothing was changed yet: read the new preview and confirm again. See [Reopen or withdraw the tasks of several texts](lead-documents.md#reopen-or-withdraw-the-tasks-of-several-texts).
 
 ### My uploaded texts do not show up
 
@@ -2078,7 +2078,10 @@ What for: let the annotators revise many texts at once, for example after a guid
 
 Every listed task changes, or none: if the texts changed since the preview, the dialog says *The texts changed since the preview. Check the new preview.* and shows it. Each task is recorded in the audit trail as a single reopen or withdrawal would be, so the history of every text shows it.
 
-**Undo** in the message, for example *Reopened 14 assignments in 12 texts.*, takes the change back: reopened tasks count as submitted again; withdrawn tasks come back with their drafts. This works only while nothing changed on these texts since, for example nobody saved a draft and nobody was assigned; otherwise the message says *Undo is no longer possible: the texts changed since.*
+**Undo** in the message, for example *Reopened 14 assignments in 12 texts.*, takes the change back: reopened tasks count as submitted again; withdrawn tasks come back with their drafts. Undo is for the lead who made the change, once, within an hour, and only while nothing changed on these texts since: nobody saved a draft, nobody was assigned, the plan, the final result and the text version are the same. Otherwise the message says *Undo is no longer possible: the texts changed since.*
+
+- Reopened translation reviews have no Undo: the review starts again from the current text of its version, and the earlier draft cannot be brought back. The dialog says so before you confirm. The submitted decision stays in the history.
+- Undo is recorded as a change of its own. A person who has the task open may be asked to reload it.
 
 ### Move texts to the front of the queue
 
