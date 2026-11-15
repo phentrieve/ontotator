@@ -1,4 +1,4 @@
-import{r as i,a as m,j as a,b as h}from"./index-BmXR3EuO.js";import{M as f,r as g}from"./index-XvkNeAlw.js";function w(){const[e,t]=i.useState(null);return i.useEffect(()=>{let o=!0;return m.getAbout().then(n=>{o&&t(n)},()=>{}),()=>{o=!1}},[]),e?a.jsxs("p",{className:"help-version",title:e.revision??void 0,children:["Ontotator ",e.version,e.revision&&a.jsxs(a.Fragment,{children:[" · commit ",e.revision.slice(0,7)]})]}):null}const y=`# Ontotator user handbook
+import{r as i,a as m,j as a,b as h}from"./index-C1Zp_Ad8.js";import{M as f,r as g}from"./index-C1xhsY_Z.js";function w(){const[e,t]=i.useState(null);return i.useEffect(()=>{let o=!0;return m.getAbout().then(n=>{o&&t(n)},()=>{}),()=>{o=!1}},[]),e?a.jsxs("p",{className:"help-version",title:e.revision??void 0,children:["Ontotator ",e.version,e.revision&&a.jsxs(a.Fragment,{children:[" · commit ",e.revision.slice(0,7)]})]}):null}const y=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -2233,7 +2233,7 @@ What for: take a final result back, for example before finished texts are annota
 3. Read what happens: the text has no final result until you choose one again; final exports already made stay as they are; **Change mode…** is possible again; submissions and consolidation stay.
 4. Enter the **Reason**, tick **I understand** and click **Withdraw final result**.
 
-The text asks for a final result again. **History** in the text card shows the withdrawal with your reason. If someone changed the final result meanwhile, nothing is withdrawn: the dialog says so; close it and look again.
+The text asks for a final result again. **History** in the text card shows the withdrawal with your reason. If someone changed the final result meanwhile, nothing is withdrawn: the dialog says *This final result changed. Nothing was withdrawn.* and loads the current one. Check it, then tick **I understand** again to withdraw it, or click **Cancel**.
 
 ## Translation and text-change decisions
 
