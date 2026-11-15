@@ -1,5 +1,6 @@
 """Bulk lead actions on the tasks of the selected texts (issue 336, step 1)."""
 
+from datetime import datetime
 from typing import Any, Literal, Self
 
 from fastapi import APIRouter, Request
@@ -32,10 +33,15 @@ def _annotations() -> list[Task]:
 
 class _BulkRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    # The cap of every selection action (Plan…, Move to front): texts of at
+    # most ``MAX_SELECTED_CASES`` cases. The MCP tools take fewer per call.
     rows: list[RowRefView] = Field(min_length=1, max_length=MAX_SELECTED_ROWS)
     # Which tasks of the texts; default: annotations.
     tasks: list[Task] = Field(default_factory=_annotations, min_length=1)
     preview: bool = Field(default_factory=lambda: False)
+    # With ``preview``: only the counts and the token, no task lists (the
+    # selection bar asks this to know whether an action can do anything).
+    summary_only: bool = Field(default_factory=lambda: False)
     # The token of the preview being applied; required unless ``preview``.
     preview_token: str | None = Field(default=None, max_length=80)
 
@@ -91,9 +97,11 @@ class BulkSkippedTextView(BaseModel):
 
 
 class BulkUndoView(BaseModel):
-    action: BulkAction
-    assignment_ids: list[int]
-    token: str
+    """The server's record of an applied action; ``id`` undoes it once,
+    before ``expires_at``, for the lead who applied it."""
+
+    id: int
+    expires_at: datetime
 
 
 class BulkTaskActionView(BaseModel):
@@ -102,19 +110,24 @@ class BulkTaskActionView(BaseModel):
     applied: bool
     # Selected texts found.
     texts: int
+    # Counts of the three lists below; the lists are empty with
+    # ``summary_only``.
+    change_count: int
+    kept_count: int
+    skipped_count: int
     changes: list[BulkTaskView]
     kept: list[BulkKeptTaskView]
     skipped: list[BulkSkippedTextView]
     preview_token: str
-    # After apply with changes: send it to ``bulk-task-actions/undo``.
+    # After apply with changes: send its ``id`` to ``bulk-task-actions/undo``.
+    # None when nothing changed or a translation review was reopened.
     undo: BulkUndoView | None = None
 
 
 class BulkUndoRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    action: BulkAction
-    assignment_ids: list[int] = Field(min_length=1, max_length=MAX_SELECTED_ROWS)
-    token: str = Field(max_length=80)
+    # ``undo.id`` of the apply.
+    undo_id: int = Field(ge=1)
 
 
 class BulkUndoResult(BaseModel):
@@ -155,6 +168,7 @@ def bulk_reopen(
         Options("reopen", tuple(dict.fromkeys(body.tasks)), body.reason),
         preview=body.preview,
         preview_token=body.preview_token,
+        summary_only=body.summary_only,
     )
 
 
@@ -182,6 +196,7 @@ def bulk_withdraw(
         ),
         preview=body.preview,
         preview_token=body.preview_token,
+        summary_only=body.summary_only,
     )
 
 
@@ -189,12 +204,14 @@ def bulk_withdraw(
 def bulk_undo(
     key: str, body: BulkUndoRequest, principal: PrincipalDep, request: Request
 ) -> dict[str, Any]:
-    """Undo a bulk reopen or withdrawal with the ``undo`` of its apply.
+    """Undo a bulk reopen or withdrawal by the ``undo.id`` of its apply.
 
-    Only while the texts are exactly as the action left them; otherwise 409
-    ``BULK_UNDO_STALE`` and nothing is undone. Reopened tasks are submitted
-    again; withdrawn tasks come back with their drafts.
+    The server keeps what the action changed; the request names only that
+    record. It works once, for the lead who applied the action, before
+    ``undo.expires_at``, and only while the texts are exactly as the action
+    left them (tasks, drafts, review drafts, rounds, final results, plan,
+    versions); otherwise 409 ``BULK_UNDO_STALE`` and nothing is undone.
+    Reopened tasks are submitted again; withdrawn tasks come back with their
+    drafts. An action that reopened a translation review has no Undo.
     """
-    return _service(request, key, principal).undo(
-        key, body.action, body.assignment_ids, body.token
-    )
+    return _service(request, key, principal).undo(key, body.undo_id)

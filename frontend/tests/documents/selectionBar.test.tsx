@@ -36,7 +36,7 @@ beforeEach(() => {
   vi.spyOn(api, "previewWorkPlans").mockResolvedValue(preview());
   vi.spyOn(api, "setWorkPlanRows").mockResolvedValue({ ...result, revisions: { "case-0101": 3 } });
   // "More actions" checks which bulk actions can act on the selection (issue 336).
-  const nothing = { applied: false, texts: 20, changes: [], kept: [], skipped: [], preview_token: "sha256:x", undo: null };
+  const nothing = { applied: false, texts: 20, change_count: 0, kept_count: 0, skipped_count: 0, changes: [], kept: [], skipped: [], preview_token: "sha256:x", undo: null };
   vi.spyOn(api, "bulkReopen").mockResolvedValue({ action: "reopen", ...nothing });
   vi.spyOn(api, "bulkWithdraw").mockResolvedValue({ action: "withdraw", ...nothing });
 });

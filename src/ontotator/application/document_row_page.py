@@ -16,6 +16,7 @@ from ontotator.application import document_row_stages as stages
 from ontotator.domain import document_rows as rules
 from ontotator.domain import next_steps as steps_rules
 from ontotator.domain import stage_cells as cells_rules
+from ontotator.domain.annotation_limits import effective_annotation_limit
 from ontotator.domain.annotation_modes import AnnotationMode, text_mode
 from ontotator.domain.document_rows import PAGE_SIZE
 from ontotator.domain.work_plans import PlanFlags
@@ -986,7 +987,10 @@ def _row_steps(
     ]
     # Filter "More annotators than the limit" (issue 339 b), as the limit
     # notice counts: unrevoked annotate tasks on a current version.
-    ctx.over_limit[key] = any(n > facts.annotations_per_text for n in per_target)
+    ctx.over_limit[key] = any(
+        n > effective_annotation_limit(facts.annotations_per_text, *key)
+        for n in per_target
+    )
     old_work = _old_work(ctx, live, targets, annotations)
     # Rule 8 compares annotation_assignments + pending_old_people with
     # "Annotations per text": the pair adds up to the minimum over the

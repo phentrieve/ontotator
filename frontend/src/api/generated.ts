@@ -1743,11 +1743,15 @@ export interface paths {
         put?: never;
         /**
          * Bulk Undo
-         * @description Undo a bulk reopen or withdrawal with the ``undo`` of its apply.
+         * @description Undo a bulk reopen or withdrawal by the ``undo.id`` of its apply.
          *
-         *     Only while the texts are exactly as the action left them; otherwise 409
-         *     ``BULK_UNDO_STALE`` and nothing is undone. Reopened tasks are submitted
-         *     again; withdrawn tasks come back with their drafts.
+         *     The server keeps what the action changed; the request names only that
+         *     record. It works once, for the lead who applied the action, before
+         *     ``undo.expires_at``, and only while the texts are exactly as the action
+         *     left them (tasks, drafts, review drafts, rounds, final results, plan,
+         *     versions); otherwise 409 ``BULK_UNDO_STALE`` and nothing is undone.
+         *     Reopened tasks are submitted again; withdrawn tasks come back with their
+         *     drafts. An action that reopened a translation review has no Undo.
          */
         post: operations["bulk_undo_api_v1_projects__key__bulk_task_actions_undo_post"];
         delete?: never;
@@ -4359,6 +4363,8 @@ export interface components {
             tasks?: ("annotate" | "review" | "translation_review")[];
             /** Preview */
             preview?: boolean;
+            /** Summary Only */
+            summary_only?: boolean;
             /** Preview Token */
             preview_token?: string | null;
             /** Reason */
@@ -4417,6 +4423,12 @@ export interface components {
             applied: boolean;
             /** Texts */
             texts: number;
+            /** Change Count */
+            change_count: number;
+            /** Kept Count */
+            kept_count: number;
+            /** Skipped Count */
+            skipped_count: number;
             /** Changes */
             changes: components["schemas"]["BulkTaskView"][];
             /** Kept */
@@ -4453,32 +4465,27 @@ export interface components {
         };
         /** BulkUndoRequest */
         BulkUndoRequest: {
-            /**
-             * Action
-             * @enum {string}
-             */
-            action: "reopen" | "withdraw";
-            /** Assignment Ids */
-            assignment_ids: number[];
-            /** Token */
-            token: string;
+            /** Undo Id */
+            undo_id: number;
         };
         /** BulkUndoResult */
         BulkUndoResult: {
             /** Undone */
             undone: number;
         };
-        /** BulkUndoView */
+        /**
+         * BulkUndoView
+         * @description The server's record of an applied action; ``id`` undoes it once,
+         *     before ``expires_at``, for the lead who applied it.
+         */
         BulkUndoView: {
+            /** Id */
+            id: number;
             /**
-             * Action
-             * @enum {string}
+             * Expires At
+             * Format: date-time
              */
-            action: "reopen" | "withdraw";
-            /** Assignment Ids */
-            assignment_ids: number[];
-            /** Token */
-            token: string;
+            expires_at: string;
         };
         /**
          * BulkWithdrawRequest
@@ -4491,6 +4498,8 @@ export interface components {
             tasks?: ("annotate" | "review" | "translation_review")[];
             /** Preview */
             preview?: boolean;
+            /** Summary Only */
+            summary_only?: boolean;
             /** Preview Token */
             preview_token?: string | null;
             /** Reason */

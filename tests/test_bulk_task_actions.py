@@ -3,13 +3,28 @@ filter "More annotators than the limit" (issue 339 b)."""
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Any
 
 import pytest
-from sqlalchemy import select, update
-from work_plan_support import BASE, assign, doc, plan_env, select_final, submit
+from sqlalchemy import event, insert, select, update
+from work_plan_support import (
+    BASE,
+    assign,
+    doc,
+    plan_env,
+    select_final,
+    submit,
+    write,
+)
 
-from ontotator.storage.tables import AssignmentRow, AuditEventRow, ProjectRow
+from ontotator.domain.work_plans import PlanFlags, RowKey
+from ontotator.storage.tables import (
+    AssignmentRow,
+    AuditEventRow,
+    ProjectRow,
+    TranslationReviewDraftRow,
+)
 
 REOPEN = f"{BASE}/bulk-task-actions/reopen"
 WITHDRAW = f"{BASE}/bulk-task-actions/withdraw"
@@ -51,6 +66,41 @@ def _audits(env: Any, action: str) -> list[tuple[str, dict[str, Any]]]:
                 .order_by(AuditEventRow.id)
             )
         ]
+
+
+def _undo(env: Any, result: dict[str, Any], who: Any = None) -> Any:
+    return (who or env.lead).post(UNDO, json={"undo_id": result["undo"]["id"]})
+
+
+def _apply(env: Any, url: str, **body: Any) -> dict[str, Any]:
+    token = _post(env, url, preview=True, **body).json()["preview_token"]
+    extra = {"reason": "Guideline 2.3"} if url == REOPEN else {}
+    applied = _post(env, url, preview_token=token, **extra, **body)
+    assert applied.status_code == 200, applied.text
+    return dict(applied.json())
+
+
+def _set(env: Any, assignment_id: int, **values: Any) -> None:
+    with env.db.transaction() as conn:
+        conn.execute(
+            update(AssignmentRow)
+            .where(AssignmentRow.id == assignment_id)
+            .values(**values)
+        )
+
+
+def _review(env: Any, case: str, status: str) -> int:
+    """A translation review of ``case`` de by ana, in ``status``, with a draft."""
+    write(env, {RowKey(case, "de"): PlanFlags(True, True)})
+    review = assign(env, doc(case, "de"), "ana", "translation_review")
+    _set(env, review, status=status)
+    with env.db.transaction() as conn:
+        conn.execute(
+            insert(TranslationReviewDraftRow).values(
+                assignment_id=review, text="Edited by ana", form={"decision": "x"}
+            )
+        )
+    return review
 
 
 def _post(env: Any, url: str, **body: Any) -> Any:
@@ -103,9 +153,10 @@ def test_reopen_preview_groups_apply_all_or_nothing_audit_and_undo(env):
     [(target, details)] = _audits(env, "assignment.reopen")
     assert target == str(a1)
     assert details == {"reason": "Guideline 2.3", "via": "bulk_reopen"}
-    assert result["undo"]["assignment_ids"] == [a1]
+    # The Undo is the server's record: the client gets its id only.
+    assert set(result["undo"]) == {"id", "expires_at"}
 
-    undone = env.lead.post(UNDO, json=result["undo"])
+    undone = _undo(env, result)
     assert undone.status_code == 200, undone.text
     assert undone.json() == {"undone": 1}
     assert _status(env, a1) == ("submitted", False)
@@ -113,7 +164,7 @@ def test_reopen_preview_groups_apply_all_or_nothing_audit_and_undo(env):
         "bulk_reopen_undo"
     ]
     # Once undone, the same Undo is stale.
-    again = env.lead.post(UNDO, json=result["undo"])
+    again = _undo(env, result)
     assert again.status_code == 409
     assert again.json()["code"] == "BULK_UNDO_STALE"
 
@@ -126,7 +177,7 @@ def test_undo_is_refused_once_the_texts_changed(env):
     assert _status(env, a1) == ("open", True)
     # Someone else is assigned in the meantime.
     assign(env, doc("c1", "en"), "anno2", "annotate")
-    refused = env.lead.post(UNDO, json=result["undo"])
+    refused = _undo(env, result)
     assert refused.status_code == 409
     assert refused.json()["code"] == "BULK_UNDO_STALE"
     assert _status(env, a1) == ("open", True)
@@ -178,7 +229,7 @@ def test_withdraw_keeps_started_submitted_and_within_limit_tasks(env):
     assert {d["reason"] for _, d in audits} == {"Scope narrowed"}
 
     # Undo brings the tasks back with their status (drafts were never touched).
-    assert env.lead.post(UNDO, json=applied.json()["undo"]).status_code == 200
+    assert _undo(env, applied.json()).status_code == 200
     assert _status(env, started) == ("in_progress", False)
     assert _status(env, review) == ("open", False)
     assert len(_audits(env, "assignment.restore")) == 3
@@ -221,3 +272,180 @@ def test_bulk_actions_are_for_leads_only(env):
     response = annotator.post(REOPEN, json={"rows": ROWS, "preview": True})
     assert response.status_code in {403, 404}
     assert env.lead.post(REOPEN, json={"rows": ROWS}).status_code == 422
+
+
+# --- Undo is the server's record (review of PR 433) ------------------------- #
+
+
+def test_undo_touches_only_the_tasks_the_action_changed(env):
+    """A task reopened singly before the bulk action is not the action's: the
+    client cannot name tasks, so the Undo leaves it reopened."""
+    _limit(env, 2)
+    a1 = assign(env, doc("c1", "en"), "anno", "annotate")
+    submit(env, a1, "s1")
+    a2 = assign(env, doc("c1", "en"), "anno2", "annotate")
+    submit(env, a2, "s2")
+    single = env.lead.post(f"/api/v1/assignments/{a2}/reopen", json={"reason": "x"})
+    assert single.status_code == 200, single.text
+    result = _apply(env, REOPEN)
+    assert [item["assignment_id"] for item in result["changes"]] == [a1]
+    # The earlier request shape, with the tasks and the action chosen by the
+    # client, is refused outright.
+    forged = env.lead.post(
+        UNDO,
+        json={
+            "undo_id": result["undo"]["id"],
+            "action": "reopen",
+            "assignment_ids": [a1, a2],
+        },
+    )
+    assert forged.status_code == 422
+    assert _undo(env, result).json() == {"undone": 1}
+    assert _status(env, a1) == ("submitted", False)
+    assert _status(env, a2) == ("reopened", False)
+
+
+def test_an_undo_keeps_its_action_its_lead_and_its_time(env, monkeypatch):
+    from auth_harness import logged_in
+
+    from ontotator.application import bulk_task_actions
+
+    _limit(env, 2)
+    other = assign(env, doc("c2", "en"), "anno2", "annotate")
+    _set(env, other, status="reopened")
+    a1 = assign(env, doc("c1", "en"), "anno", "annotate")
+    result = _apply(env, WITHDRAW, rows=[{"case_id": "c1", "language": "en"}])
+    assert _status(env, a1) == ("open", True)
+    # A withdrawal's Undo cannot be turned into "mark submitted" of another
+    # task: the action and the tasks are the record's.
+    assert (
+        env.lead.post(
+            UNDO,
+            json={"undo_id": result["undo"]["id"], "action": "reopen"},
+        ).status_code
+        == 422
+    )
+    assert _status(env, other) == ("reopened", False)
+    # Another lead, an unknown id and another kind of audit event: refused.
+    second = logged_in(env.app, "lead2", projects={"proj": ["lead"]}, assignments=[])
+    assert _undo(env, result, second).json()["details"] == {"reason": "not_found"}
+    with env.db.transaction() as conn:
+        revoke_event = conn.execute(
+            select(AuditEventRow.id).where(AuditEventRow.action == "assignment.revoke")
+        ).scalar_one()
+    for undo_id in (revoke_event, 10**9):
+        refused = env.lead.post(UNDO, json={"undo_id": undo_id})
+        assert refused.status_code == 409
+        assert refused.json()["code"] == "BULK_UNDO_STALE"
+    # Expired.
+    monkeypatch.setattr(bulk_task_actions, "UNDO_MINUTES", -1)
+    late = _apply(
+        env,
+        WITHDRAW,
+        rows=[{"case_id": "c2", "language": "en"}],
+        **{"include_started": True},
+    )
+    assert _undo(env, late).json()["details"] == {"reason": "expired"}
+    monkeypatch.undo()
+    assert _undo(env, result).json() == {"undone": 1}
+    assert _status(env, a1) == ("open", False)
+    assert _status(env, other) == ("reopened", True)
+
+
+def test_a_reopened_translation_review_has_no_undo(env):
+    """Reopening restarts the review draft from the current text; the earlier
+    draft is gone, so the action offers no Undo."""
+    review = _review(env, "c1", "submitted")
+    result = _apply(
+        env,
+        REOPEN,
+        rows=[{"case_id": "c1", "language": "de"}],
+        tasks=["translation_review"],
+    )
+    assert [item["assignment_id"] for item in result["changes"]] == [review]
+    assert result["undo"] is None
+    assert _status(env, review) == ("reopened", False)
+    with env.db.transaction() as conn:
+        record = conn.execute(
+            select(AuditEventRow.id, AuditEventRow.details).where(
+                AuditEventRow.action == "project.bulk_task_action"
+            )
+        ).one()
+    assert record.details["undoable"] is False
+    refused = env.lead.post(UNDO, json={"undo_id": record.id})
+    assert refused.json()["details"] == {"reason": "not_undoable"}
+    assert _status(env, review) == ("reopened", False)
+
+
+def test_undo_is_refused_after_a_save_a_plan_change_or_other_work(env):
+    _limit(env, 2)
+    rows = [{"case_id": "c1", "language": "de"}]
+    # A started translation review is withdrawn; its reviewer's draft moves on.
+    review = _review(env, "c1", "in_progress")
+    result = _apply(
+        env, WITHDRAW, rows=rows, tasks=["translation_review"], include_started=True
+    )
+    with env.db.transaction() as conn:
+        conn.execute(
+            update(TranslationReviewDraftRow)
+            .where(TranslationReviewDraftRow.assignment_id == review)
+            .values(revision=TranslationReviewDraftRow.revision + 1)
+        )
+    refused = _undo(env, result)
+    assert refused.status_code == 409
+    assert refused.json()["details"] == {"reason": "changed"}
+    assert _status(env, review) == ("in_progress", True)
+
+    # A reopened annotation is saved again (the assignment's updated_at).
+    a1 = assign(env, doc("c1", "en"), "anno", "annotate")
+    submit(env, a1, "s1")
+    reopened = _apply(env, REOPEN, rows=[{"case_id": "c1", "language": "en"}])
+    with env.db.transaction() as conn:
+        conn.execute(
+            update(AssignmentRow)
+            .where(AssignmentRow.id == a1)
+            .values(updated_at=AssignmentRow.updated_at + timedelta(seconds=5))
+        )
+    assert _undo(env, reopened).json()["details"] == {"reason": "changed"}
+    assert _status(env, a1) == ("reopened", False)
+
+    # A withdrawn task does not come back once its text left the plan.
+    b1 = assign(env, doc("c2", "en"), "anno", "annotate")
+    withdrawn = _apply(env, WITHDRAW, rows=[{"case_id": "c2", "language": "en"}])
+    write(env, {RowKey("c2", "en"): PlanFlags(False, False)})
+    assert _undo(env, withdrawn).status_code == 409
+    assert _status(env, b1) == ("open", True)
+
+
+def test_summary_only_preview_and_a_flat_number_of_queries(env):
+    _limit(env, 2)
+    for case in ("c1", "c2"):
+        for user in ("anno", "anno2"):
+            submit(env, assign(env, doc(case, "en"), user, "annotate"), f"{case}{user}")
+    summary = _post(env, REOPEN, preview=True, summary_only=True).json()
+    assert (summary["change_count"], summary["kept_count"], summary["texts"]) == (
+        4,
+        0,
+        2,
+    )
+    assert summary["changes"] == summary["kept"] == summary["skipped"] == []
+    full = _post(env, REOPEN, preview=True).json()
+    assert full["preview_token"] == summary["preview_token"]
+    assert len(full["changes"]) == full["change_count"] == 4
+
+    def statements(rows: list[dict[str, str]]) -> int:
+        seen: list[str] = []
+
+        def count(conn, cursor, statement, *args):
+            seen.append(statement)
+
+        event.listen(env.db.engine, "before_cursor_execute", count)
+        try:
+            found = env.lead.post(REOPEN, json={"rows": rows, "preview": True}).json()
+        finally:
+            event.remove(env.db.engine, "before_cursor_execute", count)
+        assert found["change_count"] == 2 * len(rows)
+        return len(seen)
+
+    # Two tasks or four: the same number of statements.
+    assert statements(ROWS[:1]) == statements(ROWS)

@@ -115,8 +115,8 @@ export function nothingChangedText(result: BulkResult, selected: number): string
   return "Nothing changed: the selected texts already have this plan.";
 }
 
-/** Every task kind, started tasks included: what the menu checks to know whether an entry can act at all. */
-const BROAD = { tasks: ["annotate", "translation_review", "review"] as ("annotate" | "translation_review" | "review")[], preview: true };
+/** Every task kind, started tasks included, counts only: what the menu asks to know whether an entry can act at all. */
+const BROAD = { tasks: ["annotate", "translation_review", "review"] as ("annotate" | "translation_review" | "review")[], preview: true, summary_only: true };
 
 type Undo = { kind: "conflict"; undo: UndoView; consequences: ConsequencesView; withdrawn: readonly RowRefView[] } | { kind: "changed" };
 
@@ -156,14 +156,16 @@ export function SelectionBar({
     if (rows.length < MIN_TEXTS) return;
     let active = true;
     const key = idsKey;
+    // A newer selection aborts the requests of the older one.
+    const abort = new AbortController();
     const timer = window.setTimeout(() => {
       const quiet = (request: Promise<BulkTaskActionView>) => request.catch(() => null);
       void Promise.all([
-        quiet(api.bulkReopen(projectKey, { rows, ...BROAD })),
-        quiet(api.bulkWithdraw(projectKey, { rows, ...BROAD, include_started: true })),
+        quiet(api.bulkReopen(projectKey, { rows, ...BROAD }, abort.signal)),
+        quiet(api.bulkWithdraw(projectKey, { rows, ...BROAD, include_started: true }, abort.signal)),
       ]).then(([reopen, withdraw]) => { if (active) setReach({ key, reopen, withdraw }); });
     }, SUMMARY_DELAY_MS);
-    return () => { active = false; window.clearTimeout(timer); };
+    return () => { active = false; window.clearTimeout(timer); abort.abort(); };
     // The key stands for the selection.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectKey, idsKey, refresh]);
@@ -243,7 +245,7 @@ export function SelectionBar({
         undo: true,
         onAction: () => {
           latest.current.onAnnounce("Saving…");
-          api.bulkUndo(projectKey, undoToken).then(() => {
+          api.bulkUndo(projectKey, undoToken.id).then(() => {
             const done = result.action === "reopen" ? "The reopened tasks are submitted again." : "The withdrawn tasks are back.";
             latest.current.onAnnounce(done);
             latest.current.showToast({ message: done });

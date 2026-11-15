@@ -19,16 +19,21 @@ Step 1 has two actions:
   the first "annotators per text" annotations of each version and withdraws
   the open ones above the limit (issue 339 b).
 
-Apply returns an ``undo`` token: while the changed texts stay exactly as the
-action left them (assignments, drafts, rounds, final results), Undo restores
-the earlier state (``undo``).
+Undo is kept on the server: apply records one ``project.bulk_task_action``
+audit event with the action, the exact tasks it changed and a digest of the
+state it left, and returns only that event's id. The client cannot choose
+the action or the tasks of an Undo. ``undo`` works for the lead who applied
+the action, in that project, once, within ``UNDO_MINUTES``, and only while
+the texts are exactly as the action left them. A reopened translation review
+restarts its draft from the current text, which cannot be brought back: an
+action that reopened one has no Undo.
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, cast
 
 from sqlalchemy import (
@@ -36,7 +41,6 @@ from sqlalchemy import (
     RowMapping,
     and_,
     func,
-    or_,
     select,
     tuple_,
     update,
@@ -44,10 +48,12 @@ from sqlalchemy import (
 
 from ontotator.application.people import person_refs
 from ontotator.application.workflow_warnings import state_digest
+from ontotator.assignments.eligibility import plan_for
 from ontotator.assignments.service import AssignmentService
 from ontotator.auth.audit import Actor, record_audit
 from ontotator.authz.policy import Action, Task
 from ontotator.authz.project_authority import require_project_management
+from ontotator.domain.annotation_limits import effective_annotation_limit
 from ontotator.domain.errors import DomainError
 from ontotator.domain.work_plans import RowKey
 from ontotator.projects.assignments import revoke_assignments
@@ -57,15 +63,20 @@ from ontotator.storage.plan_tables import DiscardedVariantRow
 from ontotator.storage.repository import _lock_id
 from ontotator.storage.tables import (
     AssignmentRow,
+    AuditEventRow,
     DocumentRow,
     DraftRow,
     ProjectRow,
+    TranslationReviewDraftRow,
 )
 from ontotator.storage.workflow_tables import WorkRoundStateRow
 
 BulkAction = Literal["reopen", "withdraw"]
 TASKS: tuple[Task, ...] = ("annotate", "translation_review", "review")
-_OPEN = ("open", "in_progress", "reopened")
+# How long an applied action can be undone.
+UNDO_MINUTES = 60
+APPLIED = "project.bulk_task_action"
+UNDONE = "project.bulk_task_action_undone"
 
 # Why a task stays as it is, with the words the dialog and the MCP tools show.
 KEEP_REASONS: dict[str, str] = {
@@ -112,6 +123,10 @@ def _rank(row: RowMapping) -> tuple[int, int]:
     return (order.get(str(row["status"]), 3), int(row["id"]))
 
 
+def _stale(reason: str) -> DomainError:
+    return DomainError("BULK_UNDO_STALE", {"reason": reason})
+
+
 class BulkTaskActionService:
     def __init__(self, db: Database, actor: Actor):
         self.db, self.actor = db, actor
@@ -146,7 +161,7 @@ class BulkTaskActionService:
         conn: Connection, pid: int, rows: Sequence[RowKey], *, lock: bool
     ) -> tuple[list[RowKey], list[RowMapping]]:
         """The selected texts that exist, in selection order, and their
-        unrevoked assignments (locked), by id."""
+        unrevoked assignments (locked to apply), by id."""
         wanted = list(dict.fromkeys(rows))
         if not wanted:
             return [], []
@@ -204,6 +219,76 @@ class BulkTaskActionService:
             ).tuples()
         }
 
+    @staticmethod
+    def _reopen_keeps(
+        conn: Connection, project: RowMapping, items: Sequence[RowMapping]
+    ) -> dict[int, str]:
+        """Why each of ``items`` cannot be reopened (absent: it can).
+
+        The rules and their order are ``AssignmentService.reopen_refusal``'s,
+        asked for all tasks at once: two queries for the versions and one
+        membership check per person and task kind, however many tasks.
+        """
+        pid = int(project["id"])
+        submitted = [item for item in items if item["status"] == "submitted"]
+        documents = sorted({str(item["document_id"]) for item in submitted})
+        discarded: set[str] = set()
+        correction_open: set[str] = set()
+        if documents:
+            discarded = set(
+                conn.execute(
+                    select(DiscardedVariantRow.document_id).where(
+                        DiscardedVariantRow.project_id == pid,
+                        DiscardedVariantRow.document_id.in_(documents),
+                    )
+                ).scalars()
+            )
+            correction_open = set(
+                conn.execute(
+                    select(AssignmentRow.document_id).where(
+                        AssignmentRow.project_id == pid,
+                        AssignmentRow.document_id.in_(documents),
+                        AssignmentRow.task == "translation_review",
+                        AssignmentRow.lead_correction.is_(True),
+                        AssignmentRow.status != "submitted",
+                        AssignmentRow.revoked_at.is_(None),
+                    )
+                ).scalars()
+            )
+        may_take: dict[tuple[int, str], bool] = {}
+
+        def available(item: RowMapping) -> bool:
+            who = (int(item["user_id"]), str(item["task"]))
+            if who not in may_take:
+                try:
+                    AssignmentService._require_target(
+                        conn, project, who[0], cast(Task, who[1])
+                    )
+                    may_take[who] = True
+                except DomainError:
+                    may_take[who] = False
+            return may_take[who]
+
+        keeps: dict[int, str] = {}
+        for item in items:
+            if item["status"] != "submitted":
+                reason = "not_submitted"
+            elif item["document_id"] in discarded:
+                reason = "discarded"
+            elif item["lead_correction"]:
+                reason = "lead_correction"
+            elif not available(item):
+                reason = "person_unavailable"
+            elif (
+                item["task"] == "translation_review"
+                and item["document_id"] in correction_open
+            ):
+                reason = "lead_correction_open"
+            else:
+                continue
+            keeps[int(item["id"])] = reason
+        return keeps
+
     def _plan(
         self,
         conn: Connection,
@@ -212,9 +297,12 @@ class BulkTaskActionService:
         o: Options,
         *,
         lock: bool,
+        summary_only: bool = False,
     ) -> dict[str, Any]:
         """What ``o`` would do to ``rows`` now: changed tasks, kept tasks with
-        a reason, skipped texts. Pure reads under the caller's locks."""
+        a reason, skipped texts. Pure reads under the caller's locks; the
+        number of queries does not grow with the number of tasks.
+        ``summary_only``: counts and the token, no lists."""
         pid = int(project["id"])
         found, assignments = self._rows(conn, pid, rows, lock=lock)
         wanted = set(o.tasks)
@@ -224,16 +312,19 @@ class BulkTaskActionService:
         if o.action == "reopen":
             finals = self._finals(conn, pid, found)
             skipped = [(row, "final_chosen") for row in found if row in finals]
-            for item in assignments:
-                if item["task"] not in wanted:
-                    continue
-                if RowKey(item["case_id"], item["language"]) in finals:
-                    continue
-                refusal = AssignmentService.reopen_refusal(conn, project, item)
-                if refusal is None:
+            candidates = [
+                item
+                for item in assignments
+                if item["task"] in wanted
+                and RowKey(item["case_id"], item["language"]) not in finals
+            ]
+            keeps = self._reopen_keeps(conn, project, candidates)
+            for item in candidates:
+                why = keeps.get(int(item["id"]))
+                if why is None:
                     changes.append(item)
-                    continue
-                kept.append((item, _reopen_keep(refusal)))
+                else:
+                    kept.append((item, why))
         else:
             keep_ids = (
                 self._within_limit(project, assignments) if o.over_limit_only else set()
@@ -258,6 +349,31 @@ class BulkTaskActionService:
                     changes.append(item)
                     continue
                 kept.append((item, reason))
+        digest = state_digest(
+            {
+                "options": o.digest_view(),
+                "rows": [[row.case_id, row.language] for row in found],
+                "changes": [
+                    [item["id"], item["status"], item["updated_at"].isoformat()]
+                    for item in changes
+                ],
+                "kept": [[item["id"], reason] for item, reason in kept],
+                "skipped": [[r.case_id, r.language, why] for r, why in skipped],
+            }
+        )
+        result: dict[str, Any] = {
+            "action": o.action,
+            "texts": len(found),
+            "change_count": len(changes),
+            "kept_count": len(kept),
+            "skipped_count": len(skipped),
+            "changes": [],
+            "kept": [],
+            "skipped": [],
+            "preview_token": f"sha256:{digest}",
+        }
+        if summary_only:
+            return result
         people = person_refs(
             conn,
             {int(item["user_id"]) for item in [*changes, *(k for k, _ in kept)]},
@@ -277,11 +393,12 @@ class BulkTaskActionService:
                 "person": people[int(item["user_id"])].model_dump(),
             }
 
-        kept_view = [
+        result["changes"] = [task(item) for item in changes]
+        result["kept"] = [
             task(item) | {"reason": reason, "message": KEEP_REASONS[reason]}
             for item, reason in kept
         ]
-        skipped_view = [
+        result["skipped"] = [
             {
                 "case_id": row.case_id,
                 "language": row.language,
@@ -290,33 +407,14 @@ class BulkTaskActionService:
             }
             for row, reason in skipped
         ]
-        digest = state_digest(
-            {
-                "options": o.digest_view(),
-                "rows": [[row.case_id, row.language] for row in found],
-                "changes": [
-                    [item["id"], item["status"], item["updated_at"].isoformat()]
-                    for item in changes
-                ],
-                "kept": [[item["id"], reason] for item, reason in kept],
-                "skipped": [[r.case_id, r.language, why] for r, why in skipped],
-            }
-        )
-        return {
-            "action": o.action,
-            "texts": len(found),
-            "changes": [task(item) for item in changes],
-            "kept": kept_view,
-            "skipped": skipped_view,
-            "preview_token": f"sha256:{digest}",
-        }
+        return result
 
     @staticmethod
     def _within_limit(
         project: RowMapping, assignments: Iterable[RowMapping]
     ) -> set[int]:
-        """Annotate assignments within "annotators per text" of their version."""
-        limit = int(project["annotations_per_text"])
+        """Annotate assignments within "annotators per text" of their version
+        (the limit of each text from ``effective_annotation_limit``)."""
         by_document: dict[str, list[RowMapping]] = {}
         for item in assignments:
             if item["task"] == "annotate":
@@ -324,7 +422,13 @@ class BulkTaskActionService:
         return {
             int(item["id"])
             for items in by_document.values()
-            for item in sorted(items, key=_rank)[:limit]
+            for item in sorted(items, key=_rank)[
+                : effective_annotation_limit(
+                    int(project["annotations_per_text"]),
+                    items[0]["case_id"],
+                    items[0]["language"],
+                )
+            ]
         }
 
     def run(
@@ -335,6 +439,7 @@ class BulkTaskActionService:
         *,
         preview: bool,
         preview_token: str | None,
+        summary_only: bool = False,
     ) -> dict[str, Any]:
         """Preview, or apply all or nothing (``preview_token`` of the preview
         shown). Apply recomputes the preview under the project lock; a token
@@ -345,7 +450,14 @@ class BulkTaskActionService:
             raise DomainError("BULK_REASON_REQUIRED")
         with self.db.transaction() as conn:
             project = self._lock(conn, key, exclusive=not preview)
-            plan = self._plan(conn, project, rows, options, lock=not preview)
+            plan = self._plan(
+                conn,
+                project,
+                rows,
+                options,
+                lock=not preview,
+                summary_only=preview and summary_only,
+            )
             if preview:
                 return plan | {"applied": False, "undo": None}
             if preview_token != plan["preview_token"]:
@@ -353,6 +465,7 @@ class BulkTaskActionService:
                     "PREVIEW_STALE",
                     {"preview": plan | {"applied": False, "undo": None}},
                 )
+            pid = int(project["id"])
             now = datetime.now(UTC)
             ids = [item["assignment_id"] for item in plan["changes"]]
             locked = {
@@ -377,60 +490,137 @@ class BulkTaskActionService:
                 revoke_assignments(
                     conn,
                     self.actor,
-                    int(project["id"]),
+                    pid,
                     [dict(locked[assignment_id]) for assignment_id in ids],
                     now,
                     reason=reason,
                     via=via,
                 )
-            undo = (
-                {
-                    "action": options.action,
-                    "assignment_ids": ids,
-                    "token": f"sha256:{_after_state(conn, int(project['id']), ids)}",
-                }
-                if ids
-                else None
-            )
+            undo = self._record(conn, key, pid, options.action, ids, locked, now)
             return plan | {"applied": True, "undo": undo}
 
-    def undo(
-        self, key: str, action: BulkAction, assignment_ids: Sequence[int], token: str
-    ) -> dict[str, Any]:
+    def _record(
+        self,
+        conn: Connection,
+        key: str,
+        pid: int,
+        action: BulkAction,
+        ids: Sequence[int],
+        changed: dict[int, RowMapping],
+        now: datetime,
+    ) -> dict[str, Any] | None:
+        """Record the applied action (one audit event) and what its Undo
+        needs; returns the Undo's handle, or None when it has none: nothing
+        changed, or a translation review was reopened (its draft restarted
+        from the current text and the earlier draft is gone)."""
+        if not ids:
+            return None
+        undoable = not (
+            action == "reopen"
+            and any(changed[i]["task"] == "translation_review" for i in ids)
+        )
+        expires = now + timedelta(minutes=UNDO_MINUTES)
+        details: dict[str, Any] = {
+            "action": action,
+            "assignment_ids": sorted(ids),
+            "undoable": undoable,
+        }
+        if undoable:
+            details |= {
+                "state": _after_state(conn, pid, ids),
+                "expires_at": expires.isoformat(),
+            }
+        record_audit(
+            conn,
+            self.actor,
+            APPLIED,
+            target_type="project",
+            target_id=key,
+            project_id=pid,
+            details=details,
+            at=now,
+        )
+        if not undoable:
+            return None
+        # Under the exclusive project lock: the newest such event is this one.
+        event_id = conn.execute(
+            select(func.max(AuditEventRow.id)).where(
+                AuditEventRow.project_id == pid, AuditEventRow.action == APPLIED
+            )
+        ).scalar_one()
+        return {"id": int(event_id), "expires_at": expires}
+
+    def undo(self, key: str, undo_id: int) -> dict[str, Any]:
         """Undo an applied bulk action while its texts are unchanged since.
 
-        ``token`` is the apply's ``undo.token``: the state of every assignment,
-        draft, round and final result of the changed texts right after the
-        action. Any change since (a save, a new task, a final result) refuses
-        the Undo with ``BULK_UNDO_STALE``; then nothing is undone. Reopened
-        tasks are submitted again; withdrawn tasks come back with their
-        drafts. Each is audited (``assignment.reopen_undone``,
-        ``assignment.restore``).
+        ``undo_id`` names the server's record of the action (``_record``):
+        the action and the tasks come from there, never from the request. It
+        works for the lead who applied it, in this project, once, before it
+        expires, and only while every assignment, draft, review draft, round,
+        final result, plan row and version of the changed texts is as the
+        action left it; otherwise ``BULK_UNDO_STALE`` and nothing is undone.
+        Reopened tasks are submitted again; withdrawn tasks come back with
+        their drafts, if their text still takes the task. Each is audited
+        (``assignment.reopen_undone``, ``assignment.restore``).
+
+        The Undo is a change of its own: ``updated_at`` moves on, and the
+        round and workflow revisions of a reopened task are two higher than
+        before the action, so a client holding older revisions reloads.
         """
-        ids = sorted(set(assignment_ids))
-        if not ids:
-            return {"undone": 0}
         with self.db.transaction() as conn:
             project = self._lock(conn, key, exclusive=True)
             pid = int(project["id"])
+            event = conn.execute(
+                select(AuditEventRow).where(
+                    AuditEventRow.id == undo_id,
+                    AuditEventRow.project_id == pid,
+                    AuditEventRow.action == APPLIED,
+                )
+            ).one_or_none()
+            if event is None or event.actor_user_id != self.actor.user_id:
+                raise _stale("not_found")
+            record = dict(event.details)
+            if not record.get("undoable"):
+                raise _stale("not_undoable")
+            now = datetime.now(UTC)
+            if now > datetime.fromisoformat(record["expires_at"]):
+                raise _stale("expired")
+            if (
+                conn.execute(
+                    select(AuditEventRow.id).where(
+                        AuditEventRow.project_id == pid,
+                        AuditEventRow.action == UNDONE,
+                        AuditEventRow.details["undo_of"].as_integer() == undo_id,
+                    )
+                ).first()
+                is not None
+            ):
+                raise _stale("already_undone")
+            action: BulkAction = record["action"]
+            ids = [int(i) for i in record["assignment_ids"]]
             rows = list(
                 conn.execute(
-                    select(AssignmentRow)
+                    select(AssignmentRow, DocumentRow.case_id, DocumentRow.language)
+                    .join(
+                        DocumentRow,
+                        and_(
+                            DocumentRow.project_id == AssignmentRow.project_id,
+                            DocumentRow.document_id == AssignmentRow.document_id,
+                        ),
+                    )
                     .where(AssignmentRow.project_id == pid, AssignmentRow.id.in_(ids))
                     .order_by(AssignmentRow.id)
-                    .with_for_update(key_share=True)
+                    .with_for_update(key_share=True, of=AssignmentRow)
                 ).mappings()
             )
-            if (
-                len(rows) != len(ids)
-                or token != f"sha256:{_after_state(conn, pid, ids)}"
-            ):
-                raise DomainError("BULK_UNDO_STALE")
-            now = datetime.now(UTC)
+            if len(rows) != len(ids) or record["state"] != _after_state(conn, pid, ids):
+                raise _stale("changed")
+            if action == "withdraw":
+                self._require_restorable(conn, project, rows)
             for row in rows:
                 if action == "reopen":
                     if row["revoked_at"] is not None or row["status"] != "reopened":
-                        raise DomainError("BULK_UNDO_STALE")
+                        raise _stale("changed")
                     conn.execute(
                         update(AssignmentRow)
                         .where(AssignmentRow.id == row["id"])
@@ -452,24 +642,20 @@ class BulkTaskActionService:
                                 workflow_revision=AssignmentRow.workflow_revision + 1
                             )
                         )
-                    event = "assignment.reopen_undone"
+                    name = "assignment.reopen_undone"
                 else:
                     if row["revoked_at"] is None:
-                        raise DomainError("BULK_UNDO_STALE")
-                    # The person must still be able to take the task.
-                    AssignmentService._require_target(
-                        conn, project, int(row["user_id"]), cast(Task, row["task"])
-                    )
+                        raise _stale("changed")
                     conn.execute(
                         update(AssignmentRow)
                         .where(AssignmentRow.id == row["id"])
                         .values(revoked_at=None, revoked_by=None, updated_at=now)
                     )
-                    event = "assignment.restore"
+                    name = "assignment.restore"
                 record_audit(
                     conn,
                     self.actor,
-                    event,
+                    name,
                     target_type="assignment",
                     target_id=int(row["id"]),
                     project_id=pid,
@@ -480,47 +666,92 @@ class BulkTaskActionService:
                     },
                     at=now,
                 )
+            record_audit(
+                conn,
+                self.actor,
+                UNDONE,
+                target_type="project",
+                target_id=key,
+                project_id=pid,
+                details={"undo_of": undo_id, "action": action, "assignment_ids": ids},
+                at=now,
+            )
             return {"undone": len(rows)}
 
-
-def _reopen_keep(refusal: DomainError) -> str:
-    details = refusal.details if isinstance(refusal.details, dict) else {}
-    if refusal.code == "ASSIGNMENT_NOT_SUBMITTED":
-        return "not_submitted"
-    if refusal.code == "NOT_IN_WORK_PLAN":
-        return "discarded"
-    if refusal.code == "LEAD_CORRECTION_NOT_AVAILABLE":
-        return "lead_correction"
-    if refusal.code == "ASSIGNMENT_EXISTS" and details.get("reason") == (
-        "lead_correction_open"
-    ):
-        return "lead_correction_open"
-    return "person_unavailable"
-
-
-def _after_state(conn: Connection, pid: int, assignment_ids: Sequence[int]) -> str:
-    """Digest of everything an Undo would restore over: every assignment and
-    draft of the versions the action touched, their rounds, and the final
-    results of their texts."""
-    documents = sorted(
-        set(
+    @staticmethod
+    def _require_restorable(
+        conn: Connection, project: RowMapping, rows: Sequence[RowMapping]
+    ) -> None:
+        """A withdrawn task comes back only where a new one could be given:
+        its person can still take it, its text plans the task and its version
+        is not discarded. The limit of annotators is not asked again: the
+        state digest says the text has exactly the tasks it had."""
+        pid = int(project["id"])
+        plan = plan_for(
+            conn, pid, {RowKey(row["case_id"], row["language"]) for row in rows}
+        )
+        discarded = set(
             conn.execute(
-                select(AssignmentRow.document_id).where(
-                    AssignmentRow.project_id == pid,
-                    AssignmentRow.id.in_(list(assignment_ids)),
+                select(DiscardedVariantRow.document_id).where(
+                    DiscardedVariantRow.project_id == pid,
+                    DiscardedVariantRow.document_id.in_(
+                        sorted({str(row["document_id"]) for row in rows})
+                    ),
                 )
             ).scalars()
         )
-    )
+        checked: set[tuple[int, str]] = set()
+        for row in rows:
+            flags = plan.get(RowKey(row["case_id"], row["language"]))
+            planned = flags is not None and (
+                flags.review if row["task"] == "translation_review" else flags.annotate
+            )
+            if not planned or row["document_id"] in discarded:
+                raise _stale("not_in_plan")
+            who = (int(row["user_id"]), str(row["task"]))
+            if who not in checked:
+                try:
+                    AssignmentService._require_target(
+                        conn, project, who[0], cast(Task, who[1])
+                    )
+                except DomainError as refusal:
+                    raise _stale("person_unavailable") from refusal
+                checked.add(who)
+
+
+def _after_state(conn: Connection, pid: int, assignment_ids: Sequence[int]) -> str:
+    """Digest of everything an Undo would restore over, for the texts the
+    action touched: their versions, plan rows and final results, and every
+    assignment (with ``updated_at``), annotation draft, translation review
+    draft, round and discard of those versions."""
     texts = sorted(
         set(
             conn.execute(
-                select(DocumentRow.case_id, DocumentRow.language).where(
-                    DocumentRow.project_id == pid,
-                    DocumentRow.document_id.in_(documents),
+                select(DocumentRow.case_id, DocumentRow.language)
+                .join(
+                    AssignmentRow,
+                    and_(
+                        AssignmentRow.project_id == DocumentRow.project_id,
+                        AssignmentRow.document_id == DocumentRow.document_id,
+                    ),
+                )
+                .where(
+                    AssignmentRow.project_id == pid,
+                    AssignmentRow.id.in_(list(assignment_ids)),
                 )
             ).tuples()
         )
+    )
+    if not texts:
+        return state_digest({"texts": []})
+    # Every version of those texts: a new version changes the digest.
+    documents = sorted(
+        conn.execute(
+            select(DocumentRow.document_id).where(
+                DocumentRow.project_id == pid,
+                tuple_(DocumentRow.case_id, DocumentRow.language).in_(texts),
+            )
+        ).scalars()
     )
     assignments = [
         [
@@ -534,6 +765,7 @@ def _after_state(conn: Connection, pid: int, assignment_ids: Sequence[int]) -> s
             row.workflow_revision,
             row.active_round_id,
             row.last_submission_id,
+            row.updated_at.isoformat(),
         ]
         for row in conn.execute(
             select(AssignmentRow)
@@ -545,8 +777,16 @@ def _after_state(conn: Connection, pid: int, assignment_ids: Sequence[int]) -> s
         )
     ]
     rounds = sorted({str(item[8]) for item in assignments if item[8] is not None})
+    plan = plan_for(conn, pid, {RowKey(*text) for text in texts})
+    wanted = set(texts)
     return state_digest(
         {
+            "documents": documents,
+            "plan": sorted(
+                [key.case_id, key.language, flags.review, flags.annotate]
+                for key, flags in plan.items()
+                if (key.case_id, key.language) in wanted
+            ),
             "assignments": assignments,
             "drafts": [
                 list(row)
@@ -561,6 +801,21 @@ def _after_state(conn: Connection, pid: int, assignment_ids: Sequence[int]) -> s
                         DraftRow.project_id == pid, DraftRow.document_id.in_(documents)
                     )
                     .order_by(DraftRow.id)
+                ).tuples()
+            ],
+            "review_drafts": [
+                list(row)
+                for row in conn.execute(
+                    select(
+                        TranslationReviewDraftRow.assignment_id,
+                        TranslationReviewDraftRow.revision,
+                    )
+                    .where(
+                        TranslationReviewDraftRow.assignment_id.in_(
+                            [item[0] for item in assignments]
+                        )
+                    )
+                    .order_by(TranslationReviewDraftRow.assignment_id)
                 ).tuples()
             ],
             "rounds": [
@@ -585,17 +840,9 @@ def _after_state(conn: Connection, pid: int, assignment_ids: Sequence[int]) -> s
                     )
                     .where(
                         FinalSelectionRow.project_id == pid,
-                        or_(
-                            *[
-                                and_(
-                                    FinalSelectionRow.case_id == case_id,
-                                    FinalSelectionRow.language == language,
-                                )
-                                for case_id, language in texts
-                            ]
-                        )
-                        if texts
-                        else FinalSelectionRow.id.is_(None),
+                        tuple_(
+                            FinalSelectionRow.case_id, FinalSelectionRow.language
+                        ).in_(texts),
                     )
                     .order_by(FinalSelectionRow.case_id, FinalSelectionRow.language)
                 ).tuples()

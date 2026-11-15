@@ -65,21 +65,23 @@ export function BulkTaskDialog({ projectKey, action, rows, onClose, onApplied }:
   const options = action === "reopen" ? { tasks } : { tasks, include_started: includeStarted, over_limit_only: overLimit };
   const requestKey = JSON.stringify(options);
   const rowsKey = JSON.stringify(rows);
-  const send = (body: { preview?: boolean; preview_token?: string; reason?: string }) => {
+  const send = (body: { preview?: boolean; preview_token?: string; reason?: string }, signal?: AbortSignal) => {
     const request = { rows: [...rows], ...options, ...body };
-    return action === "reopen" ? api.bulkReopen(projectKey, request) : api.bulkWithdraw(projectKey, request);
+    return action === "reopen" ? api.bulkReopen(projectKey, request, signal) : api.bulkWithdraw(projectKey, request, signal);
   };
 
   useEffect(() => {
     if (!tasks.length) return;
     const id = ++generation.current;
+    // Changed options abort the preview still under way.
+    const abort = new AbortController();
     const timer = window.setTimeout(() => {
-      send({ preview: true }).then(data => {
+      send({ preview: true }, abort.signal).then(data => {
         if (!alive.current || generation.current !== id) return;
         setPreview({ request: requestKey, data }); setPreviewError(undefined);
-      }, (failure: unknown) => { if (alive.current && generation.current === id) setPreviewError(failure); });
+      }, (failure: unknown) => { if (alive.current && generation.current === id && !abort.signal.aborted) setPreviewError(failure); });
     }, preview ? DEBOUNCE_MS : 0);
-    return () => window.clearTimeout(timer);
+    return () => { window.clearTimeout(timer); abort.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- requestKey and rowsKey stand for the request
   }, [projectKey, action, requestKey, rowsKey, reload]);
 

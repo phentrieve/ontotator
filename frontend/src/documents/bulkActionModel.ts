@@ -99,7 +99,10 @@ export function consequenceLines(preview: BulkTaskActionView): string[] {
   if (preview.action === "reopen") return [
     `${who} ${people === 1 ? "gets" : "get"} their tasks back in My tasks, with your reason.`,
     "Their submissions stay in the history; a result chosen later uses what they submit again.",
-    "Undo in the message submits the tasks again while nobody has changed them.",
+    // A reopened review restarts from the current text: the server offers no Undo then.
+    preview.changes.some(item => item.task === "translation_review")
+      ? "Translation reviews start again from the current text of their version. This cannot be undone."
+      : "Undo in the message submits the tasks again while nobody has changed them.",
   ];
   return [
     `The tasks leave My tasks of ${who}. Drafts are kept; submitted work stays.`,
@@ -114,10 +117,10 @@ export function appliedText(result: BulkTaskActionView): string {
   return `${result.action === "reopen" ? "Reopened" : "Withdrew"} ${plural(result.changes.length, "assignment")} in ${texts}.`;
 }
 
-/** A menu entry that does nothing for the selection gives its reason (decision 336-C); null when it acts. */
+/** A menu entry that does nothing for the selection gives its reason (decision 336-C); null when it acts. Reads the counts only (`summary_only`). */
 export function unavailableReason(action: BulkAction, preview: BulkTaskActionView | null | undefined): string | null {
-  if (!preview || preview.changes.length) return null;
-  if (action === "reopen") return preview.skipped.length && preview.skipped.length >= preview.texts
+  if (!preview || preview.change_count) return null;
+  if (action === "reopen") return preview.skipped_count && preview.skipped_count >= preview.texts
     ? "The selected texts have a final result: use Change final… first."
     : "No submitted tasks in the selected texts.";
   return "No open tasks in the selected texts.";

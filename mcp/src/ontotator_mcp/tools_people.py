@@ -49,7 +49,10 @@ Texts = Annotated[
     Field(
         min_length=1,
         max_length=10000,
-        description="The texts, each {'case_id': ..., 'language': ...}.",
+        description=(
+            "The texts, each {'case_id': ..., 'language': ...}: at most 10000"
+            " per call, of at most 2000 cases (the server's selection cap)."
+        ),
     ),
 ]
 Tasks = Annotated[
@@ -96,9 +99,9 @@ def bulk_summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
     return {
         "applied": applied,
         "changed" if applied else "would_change": _cut(changes, MAX_BULK_LISTED),
-        "change_count": len(changes),
+        "change_count": found.get("change_count", len(changes)),
         "kept": _cut(kept, MAX_BULK_LISTED),
-        "kept_count": len(kept),
+        "kept_count": found.get("kept_count", len(kept)),
         "skipped_texts": _cut(skipped, MAX_BULK_LISTED),
         "preview_token": found.get("preview_token"),
     }
