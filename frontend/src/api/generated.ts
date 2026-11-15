@@ -1686,7 +1686,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Preview Accept Version
+         * @description Read only: whether this version can be accepted, and why not.
+         */
+        get: operations["preview_accept_version_api_v1_projects__key__variants__document_id__accept_get"];
         put?: never;
         /**
          * Accept Version
@@ -3209,6 +3213,28 @@ export interface components {
         AcceptExternalReview: {
             /** Reason */
             reason: string;
+        };
+        /**
+         * AcceptVersionPreview
+         * @description Whether "Accept this version…" would accept it, and the text hash to send.
+         */
+        AcceptVersionPreview: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Document Id */
+            document_id: string;
+            /** Version */
+            version: number;
+            /** Translation Status */
+            translation_status: string | null;
+            /** Acceptable */
+            acceptable: boolean;
+            /** Reason */
+            reason: string | null;
+            /** Text Sha256 */
+            text_sha256: string;
         };
         /**
          * AcceptVersionRequest
@@ -6289,11 +6315,17 @@ export interface components {
             available: boolean;
             /** Reason */
             reason: string | null;
+            /** Reviewed Again */
+            reviewed_again: boolean;
             /** Review On */
             review_on: boolean;
             /** Annotate Accepted Only */
             annotate_accepted_only: boolean;
             annotations: components["schemas"]["LeadCorrectionAnnotationsView"];
+            /** Open Consolidations */
+            open_consolidations: number;
+            /** Final Result */
+            final_result: boolean;
         };
         /** LeadCorrectionRequest */
         LeadCorrectionRequest: {
@@ -8438,6 +8470,11 @@ export interface components {
              * @default false
              */
             lead_correction: boolean;
+            /**
+             * Reviewed Again
+             * @default false
+             */
+            reviewed_again: boolean;
             checked_sentences?: components["schemas"]["CheckedSentences"];
         };
         /** RevokedAssignmentView */
@@ -13850,6 +13887,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DiscardResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_accept_version_api_v1_projects__key__variants__document_id__accept_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptVersionPreview"];
                 };
             };
             /** @description Validation Error */

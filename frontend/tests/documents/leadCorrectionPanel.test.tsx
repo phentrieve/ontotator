@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api, ApiError, type AssignmentView, type LeadCorrectionPreview, type VariantSummary } from "../../src/api/client";
-import { annotationConsequence, LeadCorrectionPanel } from "../../src/documents/LeadCorrectionPanel";
+import { annotationConsequence, correctionConsequences, LeadCorrectionPanel, reviewedAgain } from "../../src/documents/LeadCorrectionPanel";
 import { planRow, rejectedRow, stepOf, version } from "./fixtures";
 
 const assignment = (id: number) => ({ id, project_key: "p", document_id: "case-0101-de", task: "translation_review", status: "open", lead_correction: true }) as AssignmentView;
@@ -98,7 +98,7 @@ const acceptedRow = () => planRow("case-0101", "de", stepOf("annotation_in_progr
 });
 const preview = (overrides: Partial<LeadCorrectionPreview> = {}): LeadCorrectionPreview => ({
   document_id: "case-0101-de", version: 1, next_version: 2, translation_status: "accepted", available: true, reason: null,
-  review_on: false, annotate_accepted_only: false, annotations: { submitted: 2, open: 1 }, ...overrides,
+  reviewed_again: true, review_on: false, annotate_accepted_only: false, annotations: { submitted: 2, open: 1 }, open_consolidations: 0, final_result: false, ...overrides,
 });
 
 it("annotationConsequence counts the annotations that stay on the version", () => {
@@ -132,4 +132,26 @@ it("explains a preview that is not available and does not start", async () => {
   expect(button.getAttribute("aria-disabled")).toBe("true");
   fireEvent.click(button);
   expect(api.startLeadCorrection).not.toHaveBeenCalled();
+});
+
+it("correctionConsequences adds open consolidations and a final result on the version", () => {
+  expect(correctionConsequences(preview({ annotations: { submitted: 0, open: 0 }, open_consolidations: 1, final_result: true })))
+    .toEqual(["1 open consolidation stays on v1.", "The final result stays on v1."]);
+  expect(correctionConsequences(preview({ open_consolidations: 2 }))).toHaveLength(2);
+});
+
+it("a rejected correction of an accepted version: the next correction is reviewed again", async () => {
+  const row = planRow("case-0101", "de", stepOf("resolve_rejected", { document_id: "case-0101-de-v2" }), {
+    versions: [
+      version({ document_id: "case-0101-de", version: 1, chain_name: "DeepL", origin: "machine_translation", translation_status: "accepted", is_newest_in_chain: false }),
+      version({ document_id: "case-0101-de-v2", version: 2, chain_name: "DeepL", origin: "correction", derived_from: "case-0101-de", translation_status: "reviewed", latest_review_decision: "rejected" }),
+    ],
+  });
+  expect(reviewedAgain(row, "case-0101-de-v2")).toBe(true);
+  expect(reviewedAgain(rejectedRow("case-0101", "de"), "case-0101-de")).toBe(false);
+  vi.spyOn(api, "getLeadCorrectionPreview").mockResolvedValue(preview({ document_id: "case-0101-de-v2", version: 2, next_version: 3, translation_status: "reviewed", annotations: { submitted: 0, open: 0 } }));
+  render(<LeadCorrectionPanel row={row} projectKey="p" onNavigate={vi.fn()} onCancel={vi.fn()} />);
+  expect(screen.getByText("You review v2 yourself and submit it as Accepted with corrections. The corrected text becomes v3 and is reviewed again.")).toBeTruthy();
+  expect(await screen.findByText("v3 starts as a correction with review On.")).toBeTruthy();
+  expect(screen.queryByText(/counts as accepted/)).toBeNull();
 });

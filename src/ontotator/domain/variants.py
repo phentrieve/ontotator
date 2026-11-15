@@ -30,6 +30,23 @@ class VariantInfo:
     text_sha256: str
 
 
+def descends_from_accepted(
+    variant: VariantInfo, lookup: Callable[[str], VariantInfo | None]
+) -> bool:
+    """``variant`` or a version it was corrected from is accepted (issue 341 b):
+    a lead correction of it is reviewed again, not accepted at once."""
+    seen: set[str] = set()
+    current: VariantInfo | None = variant
+    while current is not None and current.document_id not in seen:
+        if current.translation_status == "accepted":
+            return True
+        seen.add(current.document_id)
+        if current.origin != "correction" or current.derived_from is None:
+            return False
+        current = lookup(current.derived_from)
+    return False
+
+
 def is_translation_chain(
     variant: VariantInfo, lookup: Callable[[str], VariantInfo | None]
 ) -> bool:

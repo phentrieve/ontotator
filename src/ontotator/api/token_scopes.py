@@ -138,6 +138,8 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     ("POST", f"{P}/variants/{{document_id:path}}/discard"): "project-admin",
     # Issue 341 d: accept exactly one version, as the discard above.
     ("POST", f"{P}/variants/{{document_id:path}}/accept"): "project-admin",
+    # Its dry run: only a token that may accept needs it.
+    ("GET", f"{P}/variants/{{document_id:path}}/accept"): "project-admin",
     ("GET", f"{P}/proposal-sets/{{set_id}}"): "read",
     ("GET", f"{P}/workflow-warnings"): "read",
     # Import

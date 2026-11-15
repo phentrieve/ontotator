@@ -302,6 +302,19 @@ class AcceptVersionResult(BaseModel):
     translation_status: Literal["accepted"]
 
 
+class AcceptVersionPreview(BaseModel):
+    """Whether "Accept this version…" would accept it, and the text hash to send."""
+
+    case_id: str
+    language: str
+    document_id: str
+    version: int
+    translation_status: str | None
+    acceptable: bool
+    reason: str | None
+    text_sha256: str
+
+
 def _service(request: Request, key: str, principal: Any) -> WorkPlanService:
     access = get_access(request)
     if not can(access, Action.VIEW_PROJECT, key):
@@ -404,3 +417,11 @@ def accept_version(
     return _service(request, key, principal).accept_version(
         key, document_id, body.reason, body.expected_text_sha256
     )
+
+
+@router.get("/variants/{document_id:path}/accept", response_model=AcceptVersionPreview)
+def preview_accept_version(
+    key: str, document_id: str, principal: PrincipalDep, request: Request
+) -> dict[str, Any]:
+    """Read only: whether this version can be accepted, and why not."""
+    return _service(request, key, principal).accept_version_preview(key, document_id)

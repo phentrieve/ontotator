@@ -115,8 +115,10 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   const held = props.held ?? workspace.assignment.held;
   const leadCorrection = workspace.lead_correction;
   // Issue 341 b: the lead corrects an accepted version; the new version is reviewed again.
-  const correctsAccepted = leadCorrection && workspace.variant.translation_status === "accepted";
-  const leadNote = correctsAccepted ? acceptedCorrection.note : leadCorrectionNote;
+  // `reviewed_again` also covers a further correction after that new version was rejected or queried.
+  const correctsAccepted = leadCorrection && !!workspace.reviewed_again;
+  const versionAccepted = workspace.variant.translation_status === "accepted";
+  const leadNote = !correctsAccepted ? leadCorrectionNote : versionAccepted ? acceptedCorrection.note : acceptedCorrection.noteNotAccepted;
   const leadDescriptions = correctsAccepted ? { accepted_corrected: acceptedCorrection.description } : undefined;
   const editable = !immutableReadOnly && !held;
   // A stored Query/Rejected draft without the implied clinical change is normalised once on open (and saved).
@@ -829,7 +831,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     {form && <ConfirmDialog focusConfirm open={confirming} title="Submit this review?" confirmLabel="Submit review" cancelLabel="Keep editing" busy={busy}
       message={<SubmitSummary decision={form.decision} clinical={form.clinical_change} categories={form.categories ?? []} rationale={form.rationale}
         failedChecks={form.decision === "accepted_unchanged" ? workspace.failed_checks.map(check => check.code) : []}
-        consequence={correctsAccepted ? acceptedCorrection.consequence : undefined} />}
+        consequence={!correctsAccepted ? undefined : versionAccepted ? acceptedCorrection.consequence : acceptedCorrection.consequenceNotAccepted} />}
       onCancel={() => setConfirming(false)} onConfirm={() => { void submit(); }} />}
     {leave && <Dialog open title={leave.kind === "logout" ? "Unsaved changes" : "Changes not saved"} onClose={busy ? undefined : () => closeLeave(false)} footer={<>
       <Button disabled={busy} onClick={() => closeLeave(false)}>Cancel</Button>

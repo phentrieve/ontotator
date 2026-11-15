@@ -427,7 +427,7 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
         )
         return assignment_summary(task)
 
-    @register(server, scopes=("read", "project-admin"), effect="changes")
+    @register(server, scopes="project-admin", effect="changes")
     async def accept_translation_version(
         project: Project,
         document_id: DocumentId,
@@ -435,38 +435,41 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
             str,
             Field(min_length=1, description="Why it counts as reviewed (audited)."),
         ],
+        expected_text_sha256: Annotated[
+            str | None,
+            Field(
+                description=(
+                    "With confirm: the text_sha256 the dry run returned, so the"
+                    " text that was checked is the text that is accepted."
+                )
+            ),
+        ] = None,
         confirm: Confirm = False,
     ) -> dict[str, Any]:
         """Accept exactly one translation version as reviewed outside Ontotator, after a dry run.
 
         Only the newest version of its translation: other translations of
         the same text stay as they are (unlike update_work_plan's
-        accept_external_review). The acceptance is recorded with the
-        token owner's name, the reason and the time. Refused for a version
-        already accepted or reviewed, an older or discarded version, and
-        while a translation review of it is open.
+        accept_external_review). The dry run says whether the version is
+        acceptable, the reason if not (accepted, reviewed, not_newest,
+        discarded, review_open) and its text_sha256; confirm sends that
+        hash back as expected_text_sha256 and is refused if the text
+        changed since. The acceptance is recorded with the token owner's
+        name, the reason and the time.
         """
-        variant = await _variant(project, document_id)
-        plan = {
-            "variant": {
-                key: variant.get(key)
-                for key in (
-                    "document_id",
-                    "case_id",
-                    "language",
-                    "version",
-                    "origin",
-                    "translation_status",
-                )
-            }
-        }
+        path = project_path(project, "variants", seg(document_id), "accept")
         if not confirm:
+            plan: dict[str, Any] = await api.get(path)
             return {"applied": False, "plan": plan}
+        if not expected_text_sha256:
+            raise OntotatorError(
+                "Run the dry run first and pass its text_sha256 as"
+                " expected_text_sha256."
+            )
         result: dict[str, Any] = await api.post(
-            project_path(project, "variants", seg(document_id), "accept"),
-            {"reason": reason, "expected_text_sha256": variant["text_sha256"]},
+            path, {"reason": reason, "expected_text_sha256": expected_text_sha256}
         )
-        return {"applied": True, "plan": plan, "result": result}
+        return {"applied": True, "result": result}
 
     @register(server, scopes=("read", "project-admin"), effect="destructive")
     async def discard_translation(

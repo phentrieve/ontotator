@@ -190,6 +190,7 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "project": "p",
             "document_id": "d",
             "reason": "Checked against the DeepL output",
+            "expected_text_sha256": "a" * 64,
             "confirm": True,
         },
         "discard_translation": {

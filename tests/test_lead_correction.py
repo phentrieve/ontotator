@@ -788,6 +788,9 @@ def test_preview_lists_the_annotation_work_on_the_accepted_version(accepted):
         "review_on": flags_of(env, "case", "de").review,
         "annotate_accepted_only": True,
         "annotations": {"submitted": 1, "open": 1},
+        "reviewed_again": True,
+        "open_consolidations": 0,
+        "final_result": False,
     }
     response = logged_in(env.app, "leader").get(
         f"{BASE}/documents/target/lead-correction"
@@ -863,3 +866,200 @@ def test_correction_of_accepted_version_refused_while_a_review_is_open(review_en
     with pytest.raises(DomainError) as caught:
         start(env)
     assert caught.value.details == {"reason": "review_open"}
+
+
+# --- issue 341 b, review follow-ups ----------------------------------------- #
+
+
+def review_as(env: Any, name: str, document_id: str, decision: str, text: str):
+    """``name`` gets an ordinary review of ``document_id`` and submits it."""
+    assignment = AssignmentService(env.db).assign(
+        HARNESS, "proj", document_id, name, "translation_review", confirm_language=True
+    )
+    access = env.accesses[name]
+    opened = env.service.open(access, assignment.id)
+    form = (
+        {"clinical_change": True, "categories": ["omission"], "rationale": "Missing"}
+        if decision in ("rejected", "query")
+        else {"clinical_change": False}
+    )
+    revision = env.service.save_draft(
+        access,
+        assignment.id,
+        expected_revision=opened.draft.revision,
+        text=text,
+        form={"decision": decision, **form},
+    )
+    return env.service.submit(access, assignment.id, expected_revision=revision)
+
+
+def test_correction_request_refused_while_a_lead_correction_is_open(accepted):
+    """Two open reviews of an accepted version would decide against each
+    other: the correction request waits for the lead's correction."""
+    env = accepted
+    correction = start(env)
+    with pytest.raises(DomainError) as caught:
+        workflow(env).assign_correction(
+            lead(env),
+            "proj",
+            "target",
+            "bob",
+            expected_text_sha256=target_hash(env),
+            reason="Dose missing",
+            confirm_language=True,
+        )
+    assert caught.value.code == "ASSIGNMENT_EXISTS"
+    assert caught.value.details == {"reason": "lead_correction_open"}
+    with env.db.transaction() as conn:
+        reviews = conn.execute(
+            select(AssignmentRow.id).where(
+                AssignmentRow.document_id == "target",
+                AssignmentRow.task == "translation_review",
+                AssignmentRow.revoked_at.is_(None),
+                AssignmentRow.status != "submitted",
+            )
+        ).scalars()
+        assert list(reviews) == [correction.id]
+    response = logged_in(env.app, "leader").post(
+        f"{BASE}/documents/target/translation-correction-assignment",
+        json={
+            "username": "bob",
+            "expected_text_sha256": target_hash(env),
+            "reason": "Dose missing",
+            "confirm_language": True,
+        },
+    )
+    assert response.status_code == 409, response.text
+    assert response.json()["details"] == {"reason": "lead_correction_open"}
+
+
+def test_second_lead_correction_after_a_rejection_is_reviewed_again(accepted):
+    """v1 accepted, lead correction v2, v2 rejected, lead correction v3: v3
+    descends from an accepted version and is not accepted unreviewed."""
+    env = accepted
+    first = submit_as_lead(env, start(env).id, "accepted_corrected", "Korrigiert")
+    v2 = first.created_variant_id
+    rejected = review_as(env, "alice", v2, "rejected", "Korrigiert")
+    assert (rejected.status_before, rejected.status_after) == (
+        "ready_for_review",
+        "reviewed",
+    )
+    preview = workflow(env).lead_correction_preview(lead(env), "proj", v2)
+    assert (preview["available"], preview["reviewed_again"]) == (True, True)
+    again = start(env, v2)
+    assert env.service.open(env.accesses["leader"], again.id).reviewed_again is True
+    second = submit_as_lead(env, again.id, "accepted_corrected", "Nochmals korrigiert")
+    assert (second.status_before, second.status_after) == ("reviewed", "reviewed")
+    repo = env.app.state.repo
+    v3 = repo.get_variant("proj", second.created_variant_id)
+    assert (v3.version, v3.derived_from) == (3, v2)
+    assert v3.translation_status == "ready_for_review"
+    assert repo.get_variant("proj", v2).translation_status == "reviewed"
+    assert repo.get_variant("proj", "target").translation_status == "accepted"
+    # An ordinary reviewer's accepted correction of v3 still accepts v4.
+    final = review_as(env, "bob", v3.document_id, "accepted_corrected", "Endgültig")
+    v4 = repo.get_variant("proj", final.created_variant_id)
+    assert v4.translation_status == "accepted"
+
+
+def test_correction_of_a_rejected_first_version_still_counts_as_accepted(rejected):
+    env = rejected
+    assignment = start(env)
+    opened = env.service.open(env.accesses["leader"], assignment.id)
+    assert opened.reviewed_again is False
+    preview = workflow(env).lead_correction_preview(lead(env), "proj", "target")
+    assert preview["reviewed_again"] is False
+    record = submit_as_lead(env, assignment.id, "accepted_corrected", "Korrigiert")
+    child = env.app.state.repo.get_variant("proj", record.created_variant_id)
+    assert child.translation_status == "accepted"
+
+
+def test_preview_names_consolidations_final_result_and_the_leads_own_review(accepted):
+    from ontotator.storage.final_tables import FinalSelectionRow
+
+    env = accepted
+    leader = env.accesses["leader"].user_id
+    with env.db.transaction() as conn:
+        conn.execute(
+            insert(AssignmentRow).values(
+                project_id=env.pid,
+                document_id="target",
+                user_id=env.accesses["alice"].user_id,
+                task="review",
+                status="open",
+            )
+        )
+        conn.execute(
+            insert(FinalSelectionRow).values(
+                project_id=env.pid,
+                case_id="case",
+                language="de",
+                document_id="target",
+                submission_id="sub-1",
+                revision=1,
+                actor_id=leader,
+                acknowledged_cause_ids=[],
+            )
+        )
+    preview = workflow(env).lead_correction_preview(lead(env), "proj", "target")
+    assert preview["available"] is True
+    assert preview["open_consolidations"] == 1
+    assert preview["final_result"] is True
+    # The lead's own ordinary review of the version is open: start refuses.
+    with env.db.transaction() as conn:
+        conn.execute(
+            insert(AssignmentRow).values(
+                project_id=env.pid,
+                document_id="target",
+                user_id=leader,
+                task="translation_review",
+                status="open",
+            )
+        )
+    preview = workflow(env).lead_correction_preview(lead(env), "proj", "target")
+    assert (preview["available"], preview["reason"]) == (False, "review_open")
+    with pytest.raises(DomainError) as caught:
+        start(env)
+    assert caught.value.details == {"reason": "review_open"}
+
+
+def test_review_export_of_a_lead_correction_of_an_accepted_version(accepted):
+    """The export row of the lead's correction: status accepted before and
+    after, the created version named; the reviewer's later rejection of that
+    version exports as an ordinary row."""
+    import json
+
+    from ontotator.application.translation_reviews import TranslationReviewRecord
+    from ontotator.exchange.review_export import serialize_review_export
+    from ontotator.storage.repository import Repository
+    from ontotator.storage.tables import TranslationReviewRow
+
+    env = accepted
+    first = submit_as_lead(env, start(env).id, "accepted_corrected", "Korrigiert")
+    review_as(env, "alice", first.created_variant_id, "rejected", "Korrigiert")
+    with env.db.transaction() as conn:
+        records = [
+            TranslationReviewRecord.model_validate(row)
+            for row in conn.execute(
+                select(TranslationReviewRow).order_by(TranslationReviewRow.id)
+            ).mappings()
+        ]
+    variants = {v.document_id: v for v in Repository(env.db)._variants("proj")}
+    exported = serialize_review_export("proj", env.pid, records, variants)
+    lines = [json.loads(line) for line in exported.decode().splitlines()]
+    rows = [
+        (
+            row["reviewed_variant"]["version"],
+            row["decision"],
+            row["status_before"],
+            row["status_after"],
+            row["created_variant"] and row["created_variant"]["version"],
+        )
+        for row in lines
+    ]
+    assert rows == [
+        (1, "accepted_unchanged", "automatic_check_failed", "accepted", None),
+        (1, "accepted_corrected", "accepted", "accepted", 2),
+        (2, "rejected", "ready_for_review", "reviewed", None),
+    ]
+    assert lines[1]["reviewer"]["pseudonym"] == env.accesses["leader"].pseudonym

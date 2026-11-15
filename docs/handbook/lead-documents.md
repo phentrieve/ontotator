@@ -217,7 +217,7 @@ What for: have a translation corrected by a reviewer.
 3. Choose the **Translation reviewer** and enter the **Reason for another review**.
 4. Click **Assign correction review**, then **Close**.
 
-If the reviewer submits **Accepted with corrections**, the corrected text becomes a new text version.
+If the reviewer submits **Accepted with corrections**, the corrected text becomes a new text version. While a lead is correcting the same version themselves, the request is refused with *A lead is correcting this version.* ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
 
 ## Work plans and assignments
 

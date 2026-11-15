@@ -95,6 +95,34 @@ test("b: the correction of an accepted version names the annotation work that st
   expect(errors).toEqual([]);
 });
 
+test("b: Request correction… is refused while the lead's own correction of the version is open", async ({ page }) => {
+  const errors = consoleErrors(page);
+  const s = await leadScenario(page, "ACCEPTED_TRANSLATION_FOR_LEAD");
+  const caseId = s.cases!.accepted;
+  await loginLead(page, s);
+  const card = await openTextCard(page, caseId, "de");
+  const [v1] = await (await textVersionItems(card, 1)).all();
+  await v1.getByRole("button", { name: `Correct the translation v1 of ${caseId} de…`, exact: true }).click();
+  await page.getByRole("dialog", { name: `Correct the translation, ${caseId} de v1, accepted`, exact: true })
+    .getByRole("button", { name: "Open translation review", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Translation (de)", exact: true })).toBeVisible({ timeout: 30_000 });
+
+  // The correction is open: a second review of the accepted v1 is refused, in words.
+  await page.goBack();
+  await documentsReady(page);
+  const again = await openTextCard(page, caseId, "de");
+  const [version] = await (await textVersionItems(again, 1)).all();
+  await version.getByRole("button", { name: "Request correction…", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: /^Request translation correction/ });
+  await dialog.getByLabel("Translation reviewer").selectOption({ index: 1 });
+  await dialog.getByLabel("Reason for another review").fill("Dose missing");
+  await dialog.getByRole("button", { name: "Assign correction review", exact: true }).click();
+  await expect(dialog).toContainText("A lead is correcting this version. Request the correction after that correction is submitted");
+  await evidence(page, "341-request-refused");
+  // The refusal is an expected 409: the browser logs the failed request, nothing else.
+  expect(errors.filter(text => !/409/.test(text))).toEqual([]);
+});
+
 test("d: Accept this version… accepts exactly that version with a reason", async ({ page }) => {
   const errors = consoleErrors(page);
   const s = await leadScenario(page, "ACCEPTED_TRANSLATION_FOR_LEAD");

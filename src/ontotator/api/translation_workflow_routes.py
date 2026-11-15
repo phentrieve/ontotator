@@ -45,9 +45,12 @@ class LeadCorrectionPreview(BaseModel):
     translation_status: str | None
     available: bool
     reason: str | None
+    reviewed_again: bool
     review_on: bool
     annotate_accepted_only: bool
     annotations: LeadCorrectionAnnotationsView
+    open_consolidations: int
+    final_result: bool
 
 
 class SourceObligationView(SourceReviewObligation):

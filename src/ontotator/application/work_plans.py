@@ -1450,6 +1450,81 @@ class WorkPlanService:
 
     # --- accepting one version (issue 341 d) ------------------------------- #
 
+    def _acceptable_version(
+        self, conn: Connection, key: str, pid: int, document_id: str
+    ) -> tuple[RowKey, rules.Version, str, str | None]:
+        """The row, the version, its text hash and why it cannot be accepted
+        (``None``: it can). Caller holds the project lock."""
+        document = conn.execute(
+            select(
+                DocumentRow.case_id,
+                DocumentRow.language,
+                DocumentRow.text_sha256,
+            ).where(
+                DocumentRow.project_id == pid,
+                DocumentRow.document_id == document_id,
+            )
+        ).one_or_none()
+        if document is None:
+            raise DomainError("DOCUMENT_NOT_FOUND")
+        require_project_management(
+            conn, self.actor, key, pid, Action.OVERRIDE_TRANSLATION_STATUS
+        )
+        row_key = RowKey(document.case_id, document.language)
+        chain = next(
+            c
+            for c in _chains(conn, pid, [document.case_id])[row_key]
+            if any(v.document_id == document_id for v in c.versions)
+        )
+        if chain.root.origin == "native":
+            raise DomainError("NOT_A_TRANSLATION", {"reason": "not_a_translation"})
+        target = next(v for v in chain.versions if v.document_id == document_id)
+        ids = [v.document_id for v in chain.versions]
+        refusal: str | None = None
+        if set(ids) & set(store.discarded(conn, pid)):
+            refusal = "discarded"
+        elif chain.newest.document_id != document_id:
+            refusal = "not_newest"
+        elif target.translation_status == "accepted":
+            refusal = "accepted"
+        elif target.translation_status == "reviewed":
+            refusal = "reviewed"
+        elif (
+            conn.execute(
+                select(AssignmentRow.id)
+                .where(
+                    AssignmentRow.project_id == pid,
+                    AssignmentRow.document_id.in_(ids),
+                    AssignmentRow.task == "translation_review",
+                    AssignmentRow.revoked_at.is_(None),
+                    AssignmentRow.status != "submitted",
+                )
+                .limit(1)
+            ).first()
+            is not None
+        ):
+            refusal = "review_open"
+        return row_key, target, document.text_sha256, refusal
+
+    def accept_version_preview(self, key: str, document_id: str) -> dict[str, Any]:
+        """Read only: whether ``accept_version`` would accept this version, the
+        refusal ``reason`` if not, and the text hash the acceptance must name."""
+        with self.db.transaction() as conn:
+            project = self._lock(conn, key, exclusive=False)
+            row_key, target, text_sha256, refusal = self._acceptable_version(
+                conn, key, project["id"], document_id
+            )
+            return {
+                "case_id": row_key.case_id,
+                "language": row_key.language,
+                "document_id": document_id,
+                "version": target.version,
+                "translation_status": target.translation_status,
+                "acceptable": refusal is None,
+                "reason": refusal,
+                "text_sha256": text_sha256,
+            }
+
     def accept_version(
         self, key: str, document_id: str, reason: str, expected_text_sha256: str
     ) -> dict[str, Any]:
@@ -1469,57 +1544,11 @@ class WorkPlanService:
         with self.db.transaction() as conn:
             project = self._lock(conn, key, exclusive=True)
             pid = project["id"]
-            document = conn.execute(
-                select(
-                    DocumentRow.case_id,
-                    DocumentRow.language,
-                    DocumentRow.text_sha256,
-                ).where(
-                    DocumentRow.project_id == pid,
-                    DocumentRow.document_id == document_id,
-                )
-            ).one_or_none()
-            if document is None:
-                raise DomainError("DOCUMENT_NOT_FOUND")
-            require_project_management(
-                conn, self.actor, key, pid, Action.OVERRIDE_TRANSLATION_STATUS
+            row_key, target, text_sha256, refusal = self._acceptable_version(
+                conn, key, pid, document_id
             )
-            row_key = RowKey(document.case_id, document.language)
-            chain = next(
-                c
-                for c in _chains(conn, pid, [document.case_id])[row_key]
-                if any(v.document_id == document_id for v in c.versions)
-            )
-            if chain.root.origin == "native":
-                raise DomainError("NOT_A_TRANSLATION", {"reason": "not_a_translation"})
-            if document.text_sha256 != expected_text_sha256:
+            if text_sha256 != expected_text_sha256:
                 raise DomainError("VARIANT_REVIEW_STALE")
-            target = next(v for v in chain.versions if v.document_id == document_id)
-            ids = [v.document_id for v in chain.versions]
-            refusal: str | None = None
-            if set(ids) & set(store.discarded(conn, pid)):
-                refusal = "discarded"
-            elif chain.newest.document_id != document_id:
-                refusal = "not_newest"
-            elif target.translation_status == "accepted":
-                refusal = "accepted"
-            elif target.translation_status == "reviewed":
-                refusal = "reviewed"
-            elif (
-                conn.execute(
-                    select(AssignmentRow.id)
-                    .where(
-                        AssignmentRow.project_id == pid,
-                        AssignmentRow.document_id.in_(ids),
-                        AssignmentRow.task == "translation_review",
-                        AssignmentRow.revoked_at.is_(None),
-                        AssignmentRow.status != "submitted",
-                    )
-                    .limit(1)
-                ).first()
-                is not None
-            ):
-                refusal = "review_open"
             if refusal is not None:
                 raise DomainError("VERSION_NOT_ACCEPTABLE", {"reason": refusal})
             now = datetime.now(UTC)

@@ -50,8 +50,11 @@ export const leadCorrectionKeyHint = "Ctrl + Enter submits";
 /** Issue 341 b: the lead's correction of an accepted version becomes a new version that is reviewed again. */
 export const acceptedCorrection = {
   note: "You are correcting this accepted translation as project lead. The corrected text becomes a new version that is reviewed again.",
+  /** A further correction after the lead's corrected version was rejected or queried. */
+  noteNotAccepted: "You are correcting this translation as project lead. The corrected text becomes a new version that is reviewed again.",
   description: "Your corrected version is reviewed again.",
   consequence: "Your corrected text will be saved as a new version, which starts as a correction with review On. This version stays accepted, and the annotation work on it stays here.",
+  consequenceNotAccepted: "Your corrected text will be saved as a new version, which starts as a correction with review On.",
   outcome: "Your corrected text was saved as a new version. It is reviewed again before annotation.",
 } as const;
 

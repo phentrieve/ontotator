@@ -49,6 +49,29 @@ export function annotationConsequence(preview: Pick<LeadCorrectionPreview, "vers
   return `${plural(total, "annotation")} (${parts}) ${total === 1 ? "stays" : "stay"} on v${preview.version}. After saving, the row offers Handle text change…${when}.`;
 }
 
+/** Every consequence line of the warning block: annotations, open consolidations and a final result on the version. */
+export function correctionConsequences(preview: Pick<LeadCorrectionPreview, "version" | "next_version" | "annotations" | "annotate_accepted_only" | "open_consolidations" | "final_result">): string[] {
+  const count = preview.open_consolidations;
+  return [
+    annotationConsequence(preview),
+    count ? `${plural(count, "open consolidation")} ${count === 1 ? "stays" : "stay"} on v${preview.version}.` : null,
+    preview.final_result ? `The final result stays on v${preview.version}.` : null,
+  ].filter((line): line is string => line !== null);
+}
+
+/** The corrected version is reviewed again: this version or one it was corrected from is accepted (issue 341 b). */
+export function reviewedAgain(row: Pick<DocumentRowView, "versions">, documentId: string): boolean {
+  const seen = new Set<string>();
+  let current = row.versions.find(item => item.document_id === documentId);
+  while (current && !seen.has(current.document_id)) {
+    if (current.translation_status === "accepted") return true;
+    seen.add(current.document_id);
+    const parent = current.origin === "correction" ? current.derived_from : null;
+    current = parent ? row.versions.find(item => item.document_id === parent) : undefined;
+  }
+  return false;
+}
+
 /** Refusals whose generic admin message does not fit starting a correction. */
 const START_REFUSED: Readonly<Record<string, string>> = {
   TASK_HELD: "Your earlier review of this version is paused. Resume it in the version list before you correct the translation yourself.",
@@ -108,6 +131,7 @@ export function LeadCorrectionPanel({ row, projectKey, onNavigate, onCancel, hea
   const entry = row.versions.find(item => item.document_id === documentId);
   const version = entry?.version ?? 1;
   const accepted = entry?.translation_status === "accepted";
+  const again = reviewedAgain(row, documentId);
   const [preview, setPreview] = useState<LeadCorrectionPreview | null>(null);
   const [previewError, setPreviewError] = useState<unknown>();
   const unavailable = preview && !preview.available ? NOT_AVAILABLE[preview.reason ?? ""] ?? null : null;
@@ -115,13 +139,13 @@ export function LeadCorrectionPanel({ row, projectKey, onNavigate, onCancel, hea
   const blocked = unconfirmed || unavailable !== null;
 
   useEffect(() => { if (!inDialog) heading.current?.focus(); }, [inDialog]);
-  // Issue 341 b: the consequences for the annotation work on an accepted version, before saving.
+  // Issue 341 b: the consequences for the work on an accepted version (or its rejected correction), before saving.
   useEffect(() => {
-    if (!accepted) return;
+    if (!again) return;
     let live = true;
     api.getLeadCorrectionPreview(projectKey, documentId).then(value => { if (live) setPreview(value); }, failure => { if (live) setPreviewError(failure); });
     return () => { live = false; };
-  }, [accepted, projectKey, documentId]);
+  }, [again, projectKey, documentId]);
 
   const start = async () => {
     if (writing.current || blocked) return;
@@ -137,14 +161,19 @@ export function LeadCorrectionPanel({ row, projectKey, onNavigate, onCancel, hea
   };
 
   const next = preview?.next_version ?? version + 1;
-  const consequence = preview ? annotationConsequence(preview) : null;
+  const consequences = preview ? correctionConsequences(preview) : [];
+  const annotated = preview ? preview.annotations.submitted + preview.annotations.open > 0 : false;
   return <div className="documents-resolve" role="group" aria-labelledby={inDialog ? undefined : `${id}-title`} aria-label={inDialog ? `Correct the translation, ${textLabel(row)} v${version}` : undefined}>
     {!inDialog && <Heading id={`${id}-title`} ref={heading} tabIndex={-1} className="inline-confirm-title">{`Correct the translation, ${textLabel(row)}`}</Heading>}
     {accepted
       ? <p>{`You correct the accepted v${version} yourself in the translation review and submit it as Accepted with corrections. The corrected text becomes v${next}.`}</p>
-      : <p>{`You review v${version} yourself and submit it as Accepted with corrections. The corrected text becomes v${version + 1} and counts as accepted.`}</p>}
-    {consequence && <InlineMessage tone="warning" title={`Annotation has work on v${version}.`}>{consequence}</InlineMessage>}
-    {accepted && <p className="field-hint">{`v${next} starts as a correction with review On.`}</p>}
+      : again
+        ? <p>{`You review v${version} yourself and submit it as Accepted with corrections. The corrected text becomes v${next} and is reviewed again.`}</p>
+        : <p>{`You review v${version} yourself and submit it as Accepted with corrections. The corrected text becomes v${version + 1} and counts as accepted.`}</p>}
+    {consequences.length > 0 && <InlineMessage tone="warning" title={annotated ? `Annotation has work on v${version}.` : `v${version} has work.`}>
+      {consequences.map(line => <span key={line} className="lead-correction-consequence">{line} </span>)}
+    </InlineMessage>}
+    {again && <p className="field-hint">{`v${next} starts as a correction with review On.`}</p>}
     {unavailable && <InlineMessage tone="warning">{unavailable}</InlineMessage>}
     {previewError !== undefined && <ErrorNotice error={previewError} />}
     {missing !== null && <Checkbox id={`${id}-language`} label={`Correct despite missing ${missing.join(", ")} in your profile`}

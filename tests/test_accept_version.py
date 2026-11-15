@@ -155,3 +155,63 @@ def test_route_accepts_for_the_lead_only(unreviewed):
     assert versions["target"]["acceptance"]["source"] == "lead"
     assert versions["target"]["acceptance"]["reason"] == "Checked"
     assert versions["comparison"].get("acceptance") is None
+
+
+def _review(env: Any, name: str, decision: str, text: str) -> Any:
+    access = env.accesses[name]
+    opened = env.service.open(access, env.ids[name])
+    clinical = decision in ("rejected", "query")
+    form: dict[str, Any] = {"decision": decision, "clinical_change": clinical}
+    if clinical:
+        form |= {"categories": ["omission"], "rationale": "Missing"}
+    revision = env.service.save_draft(
+        access,
+        env.ids[name],
+        expected_revision=opened.draft.revision,
+        text=text,
+        form=form,
+    )
+    return env.service.submit(access, env.ids[name], expected_revision=revision)
+
+
+def test_refuses_an_older_version(review_env):
+    env = review_env
+    AssignmentService(env.db).revoke(HARNESS, env.ids["bob"])
+    record = _review(env, "alice", "accepted_corrected", "Korrigiert")
+    # v1 was corrected into v2: an older version.
+    with pytest.raises(DomainError) as caught:
+        accept(env)
+    assert caught.value.details == {"reason": "not_newest"}
+    with pytest.raises(DomainError) as caught:
+        accept(env, record.created_variant_id)
+    assert caught.value.details == {"reason": "accepted"}
+
+
+def test_refuses_a_rejected_version_and_previews_the_refusal(review_env):
+    env = review_env
+    AssignmentService(env.db).revoke(HARNESS, env.ids["bob"])
+    _review(env, "alice", "rejected", "Übersetzt")
+    with pytest.raises(DomainError) as caught:
+        accept(env)
+    assert caught.value.code == "VERSION_NOT_ACCEPTABLE"
+    assert caught.value.details == {"reason": "reviewed"}
+    client = logged_in(env.app, "leader")
+    preview = client.get(f"{BASE}/variants/target/accept")
+    assert preview.status_code == 200, preview.text
+    assert preview.json() == {
+        "case_id": "case",
+        "language": "de",
+        "document_id": "target",
+        "version": 1,
+        "translation_status": "reviewed",
+        "acceptable": False,
+        "reason": "reviewed",
+        "text_sha256": sha(env),
+    }
+    other = client.get(f"{BASE}/variants/comparison/accept").json()
+    assert (other["acceptable"], other["reason"]) == (True, None)
+    assert other["text_sha256"] == sha(env, "comparison")
+    # The preview writes nothing.
+    assert status(env, "comparison") != "accepted"
+    refused = logged_in(env.app, "alice").get(f"{BASE}/variants/target/accept")
+    assert refused.status_code == 403

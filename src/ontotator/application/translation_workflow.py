@@ -21,13 +21,14 @@ from ontotator.auth.audit import Actor, record_audit
 from ontotator.authz.policy import Access
 from ontotator.domain.canonical import canonical_hash
 from ontotator.domain.errors import AccessDenied, DomainError, RevisionConflict
-from ontotator.domain.variants import VariantInfo
+from ontotator.domain.variants import VariantInfo, descends_from_accepted
 from ontotator.domain.work_plans import RowKey
 from ontotator.domain.work_rounds import derive_source_obligations
 from ontotator.jobs.queue import JobQueue
 from ontotator.projects.assignments import revoke_assignments
 from ontotator.storage import work_plan_store
 from ontotator.storage.database import Database
+from ontotator.storage.final_tables import FinalSelectionRow
 from ontotator.storage.plan_tables import DiscardedVariantRow
 from ontotator.storage.tables import (
     AssignmentRow,
@@ -87,6 +88,12 @@ class TranslationWorkflowService:
                 variants=variants,
                 allow_accepted_translation_review=True,
                 check_plan=False,
+            )
+            # An open lead correction is the version's one review (FD3), as
+            # for an ordinary assignment: two open reviews of an accepted
+            # version would decide against each other (issue 341 b).
+            assignments._require_no_open_lead_correction(
+                conn, project["id"], document_id
             )
             existing = assignments.active_for(
                 conn, project["id"], document_id, target, "translation_review"
@@ -333,6 +340,9 @@ class TranslationWorkflowService:
         acceptance); ``annotations`` counts the live
         annotation tasks on this version (submitted, open), which stay on it:
         after the correction the row offers the text-change steps.
+        ``open_consolidations`` and ``final_result`` name consolidation tasks
+        and a final result on this version (they stay on it as well);
+        ``reviewed_again``: the corrected version starts "ready for review".
         """
         if actor.user_id is None:
             raise AccessDenied("NOT_ALLOWED", "Only a project lead can do this.")
@@ -361,15 +371,39 @@ class TranslationWorkflowService:
                         if isinstance(details, Mapping)
                         else "not_available"
                     )
-            statuses = list(
+            own = assignments.active_for(
+                conn, pid, document_id, actor.user_id, "translation_review"
+            )
+            if (
+                reason is None
+                and own is not None
+                and not own.lead_correction
+                and own.status != "submitted"
+            ):
+                # The lead's own ordinary review is open: start refuses too.
+                reason = "review_open"
+            work = conn.execute(
+                select(AssignmentRow.task, AssignmentRow.status).where(
+                    AssignmentRow.project_id == pid,
+                    AssignmentRow.document_id == document_id,
+                    AssignmentRow.task.in_(("annotate", "review")),
+                    AssignmentRow.revoked_at.is_(None),
+                )
+            ).all()
+            statuses = [row.status for row in work if row.task == "annotate"]
+            consolidations = sum(
+                1 for row in work if row.task == "review" and row.status != "submitted"
+            )
+            final_here = (
                 conn.execute(
-                    select(AssignmentRow.status).where(
-                        AssignmentRow.project_id == pid,
-                        AssignmentRow.document_id == document_id,
-                        AssignmentRow.task == "annotate",
-                        AssignmentRow.revoked_at.is_(None),
+                    select(FinalSelectionRow.document_id).where(
+                        FinalSelectionRow.project_id == pid,
+                        FinalSelectionRow.case_id == variant.case_id,
+                        FinalSelectionRow.language == variant.language,
+                        FinalSelectionRow.document_id == document_id,
                     )
-                ).scalars()
+                ).first()
+                is not None
             )
             key = RowKey(variant.case_id, variant.language)
             flags = work_plan_store.effective_plan(conn, pid, [variant.case_id]).get(
@@ -389,6 +423,7 @@ class TranslationWorkflowService:
                 "translation_status": variant.translation_status,
                 "available": reason is None,
                 "reason": reason,
+                "reviewed_again": descends_from_accepted(variant, variants.get),
                 "review_on": bool(flags and flags.review),
                 "annotate_accepted_only": bool(
                     project["annotate_accepted_translations_only"]
@@ -397,6 +432,8 @@ class TranslationWorkflowService:
                     "submitted": submitted,
                     "open": len(statuses) - submitted,
                 },
+                "open_consolidations": consolidations,
+                "final_result": final_here,
             }
 
     @staticmethod
