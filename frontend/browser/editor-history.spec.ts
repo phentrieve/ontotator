@@ -177,6 +177,51 @@ test("Ctrl+Z right after a value change undoes that change (review F1)", async (
   await page.keyboard.press("Control+z");
   expect((await second).ok()).toBeTruthy();
   await expect(radio("Present")).toBeChecked();
+  await expect(undoButton(page)).toHaveAttribute("title", "Undo: change the values of Seizure");
+  await expect(redoButton(page)).toHaveAttribute("title", "Redo: change the values of Seizure");
+
+  // Redo right after an undo, while the history of the undone revision is still being read: the key is not lost.
+  const afterUndo = await holdAnswers(page, "GET", "history");
+  const undoFirst = historyResponse(page, "undo_step");
+  const redoInGap = historyResponse(page, "redo_step");
+  await page.keyboard.press("Control+z");
+  expect((await undoFirst).ok()).toBeTruthy();
+  await afterUndo.held;
+  await expect(page.locator("[data-confirm-defaults]")).toHaveText(/^Confirm defaults \(3\)/);
+  await expect(redoButton(page)).toBeEnabled();
+  await page.locator("h1.case-title").click();
+  await page.keyboard.press("Control+Shift+z");
+  await afterUndo.release();
+  expect((await redoInGap).ok()).toBeTruthy();
+  await expect(page.locator("[data-confirm-defaults]")).toHaveCount(0);
+  await expect(redoButton(page)).toHaveAttribute("title", "Redo: change the values of Seizure");
+
+  // And Undo right after a redo, before the history of the redone revision is read.
+  const afterRedo = await holdAnswers(page, "GET", "history");
+  const redoFirst = historyResponse(page, "redo_step");
+  const undoInGap = historyResponse(page, "undo_step");
+  await page.keyboard.press("Control+Shift+z");
+  expect((await redoFirst).ok()).toBeTruthy();
+  await afterRedo.held;
+  await expect(radio("Absent")).toBeChecked();
+  await expect(undoButton(page)).toBeEnabled();
+  // The redone step was the last undone one: there is nothing more to redo.
+  await expect(redoButton(page)).toBeDisabled();
+  await page.keyboard.press("Control+z");
+  await afterRedo.release();
+  expect((await undoInGap).ok()).toBeTruthy();
+  await expect(radio("Present")).toBeChecked();
+
+  // A new change ends the redo at once, also while its history is still being read.
+  await expect(redoButton(page)).toHaveAttribute("title", "Redo: change the values of Seizure");
+  const afterChange = await holdAnswers(page, "GET", "history");
+  await radio("Uncertain").check();
+  await afterChange.held;
+  await expect(redoButton(page)).toBeDisabled();
+  await expect(undoButton(page)).toBeEnabled();
+  await afterChange.release();
+  await expect(undoButton(page)).toHaveAttribute("title", "Undo: change the values of Seizure");
+  await expect(redoButton(page)).toBeDisabled();
   await expect(page.getByRole("alert")).toHaveCount(0);
   expect(refused).toEqual([]);
 });
