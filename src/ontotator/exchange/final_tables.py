@@ -118,7 +118,9 @@ AGREEMENT_SUMMARY_COLUMNS = (
     *COUNT_COLUMNS,
 )
 # The annotation mode of a submission in agreement.csv (#389): from scratch,
-# or from proposals (a proposal check, also one carried to a new version).
+# or from proposals (a proposal check). It is the mode of the task: a proposal
+# check on a text without proposals is "proposals" too. Carried submissions
+# are no annotation of their own and form no pair.
 SCRATCH, PROPOSALS = "scratch", "proposals"
 # The mode pairs of agreement-summary.csv after the rows of all pairs: pairs
 # of proposal checks share the proposals they started from, so their

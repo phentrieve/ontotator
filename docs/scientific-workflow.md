@@ -225,7 +225,7 @@ result the only one; filter on `text_version` to compare one version only.
 
 Each row names the text, both submissions and pseudonyms, the mode of each
 submission (`mode_a`, `mode_b`: `scratch` for annotation from scratch,
-`proposals` for a proposal check, also one carried to a new version), and gives
+`proposals` for a proposal check), and gives
 the values of `ontospan.agreement`, the matching Ontotator's consolidation and the
 ontospan benchmark share. Findings pair only within a layer, one to one, by
 an optimal assignment:
@@ -254,7 +254,11 @@ lists those sums. Column `modes` names the group: `all` (every pair), then
 `scratch-scratch`, `proposals-proposals` and `mixed` (one submission of each
 mode). Two proposal checks start from the same proposals, so their agreement
 runs higher than that of two people annotating from scratch; in a project
-that mixes both modes, compare the mode rows, not only `all`. Without any
+that mixes both modes, compare the mode rows, not only `all`. The mode is
+that of the task: a proposal check on a text for which the tool proposed
+nothing is `proposals` too, although the person in effect annotated from
+scratch. Submissions carried to a new text version form no pair, so no row
+has their mode. Without any
 pair in a group (for example when every text had one annotator), its rows
 have `pairs` 0 and empty values.
 
