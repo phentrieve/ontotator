@@ -126,3 +126,96 @@ test("lead: the annotation carried to v2 shows the same switch in the text view"
   await expect(page.getByRole("checkbox", { name: /Show changes since/ })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+/** Viewport point of the left edge (or, for `end`, the right edge) of the character at `offset`. */
+const pointAt = (page: Page, offset: number, end = false) => text(page).evaluate((node, [at, atEnd]) => {
+  const index = atEnd ? (at as number) - 1 : (at as number);
+  for (const run of node.querySelectorAll<HTMLElement>(".run")) {
+    const start = Number(run.dataset.start), value = run.firstChild;
+    if (!value || index < start || index >= start + (value.textContent?.length ?? 0)) continue;
+    const range = document.createRange();
+    range.setStart(value, index - start); range.setEnd(value, index - start + 1);
+    const box = range.getBoundingClientRect();
+    return { x: atEnd ? box.right - 1 : box.left + 1, y: box.top + box.height / 2 };
+  }
+  throw new Error(`No character at ${index}`);
+}, [offset, end] as const);
+
+/** Selects [start, end) with a real mouse drag and returns what the editor marked. */
+async function dragSelect(page: Page, start: number, end: number) {
+  const from = await pointAt(page, start), to = await pointAt(page, end, true);
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move((from.x + to.x) / 2, (from.y + to.y) / 2, { steps: 4 });
+  await page.mouse.move(to.x, to.y, { steps: 4 });
+  await page.mouse.up();
+  const discard = page.locator(".inspector-pane").getByRole("button", { name: "Discard", exact: true });
+  await expect(discard).toBeVisible();
+  const result = await marked(page);
+  await discard.click();
+  await expect.poll(() => marked(page)).toBeNull();
+  return result;
+}
+
+test("a mouse drag across a passage frame and next to the removed-text marker marks the same offsets as with the switch off", async ({ page }) => {
+  const errors = consoleErrors(page);
+  const s = await scenario(page, "corrected");
+  await loginExisting(page, s.username);
+  await page.goto(`/#/tasks/${s.assignment_id}`);
+  await expect(text(page)).toBeVisible();
+  // "Sommer treten" starts before the passage and crosses the marker and the frame; "treten epileptische" starts
+  // right after the marker; "Anfälle auf. Bei" leaves the frame at its end.
+  const spans = ["Sommer treten", "treten epileptische", "Anfälle auf. Bei"].map(part => ({ start: s.text.indexOf(part), end: s.text.indexOf(part) + part.length, part }));
+  const off = [];
+  for (const span of spans) off.push(await dragSelect(page, span.start, span.end));
+  expect(off).toEqual(spans.map(span => ({ start: span.start, text: span.part })));
+  await page.getByRole("checkbox", { name: "Show changes since v1" }).check();
+  await expect(marker(page)).toHaveCount(1);
+  const on = [];
+  for (const span of spans) on.push(await dragSelect(page, span.start, span.end));
+  expect(on).toEqual(off);
+  expect(await text(page).evaluate(node => node.textContent)).toBe(s.text);
+  expect(errors).toEqual([]);
+});
+
+test("the removed-text tooltip stays inside the viewport and closes with Esc after hover", async ({ page }) => {
+  const errors = consoleErrors(page);
+  const s = await scenario(page, "corrected_done");
+  await loginExisting(page, s.lead_username!);
+  await page.goto(`/#/projects/${encodeURIComponent(s.project)}/cases/${encodeURIComponent(s.case_id)}?variant=${encodeURIComponent(s.documents[1])}&show=${encodeURIComponent(`submission:${s.submissions.round2}`)}`);
+  await page.getByRole("checkbox", { name: "Show changes since v1" }).check();
+  const tip = page.getByRole("tooltip");
+  const inside = async () => {
+    const box = (await tip.boundingBox())!, view = page.viewportSize()!;
+    expect(box.x).toBeGreaterThanOrEqual(0); expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(view.width); expect(box.y + box.height).toBeLessThanOrEqual(view.height);
+    return box;
+  };
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await marker(page).scrollIntoViewIfNeeded();
+    // The marker ends up just above the bottom edge: no room below, so the tooltip opens above it.
+    const at = (await marker(page).boundingBox())!;
+    await page.setViewportSize({ width, height: Math.ceil(at.y + at.height + 12) });
+    await marker(page).focus();
+    await expect(tip).toBeVisible();
+    const box = await inside();
+    const now = (await marker(page).boundingBox())!;
+    expect(box.y + box.height).toBeLessThanOrEqual(now.y);
+    await page.keyboard.press("Escape");
+    await expect(tip).toHaveCount(0);
+    await marker(page).blur();
+  }
+  // Opened by hover (focus elsewhere): it stays while the pointer is on it, and Esc closes it.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.getByRole("checkbox", { name: "Show changes since v1" }).focus();
+  await marker(page).hover();
+  await expect(tip).toBeVisible();
+  await inside();
+  await tip.hover();
+  await page.waitForTimeout(400);
+  await expect(tip).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(tip).toHaveCount(0);
+  expect(errors).toEqual([]);
+});

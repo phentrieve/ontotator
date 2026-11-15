@@ -281,7 +281,7 @@ When the carried work comes from an earlier version of the text, for example aft
 2. Click **Next ›** or **‹ Previous** to scroll to the next or previous passage; it gets a solid frame and the line reads, for example, *1 passage changed · 1 of 1*.
 3. Where text was removed, a small **−** marker stands in the text. Point at it or move to it with `Tab` to see the earlier wording, with the removed words struck through. `Esc` closes it.
 
-The marks are only shown over the text: the text stays exactly this version, so you can mark text, add or re-create findings and check carried findings as usual while they are on. A changed sentence the tool did not propose a finding for may need a new finding. Untick the box to hide the marks.
+The marks are only shown over the text: the text stays exactly this version, so you can mark text, add or re-create findings and check carried findings as usual while they are on. A changed sentence the tool did not propose a finding for may need a new finding. The marks compare the two versions word by word, while **Check needed** is decided from the exact characters under each finding, so a finding inside a marked passage is not always marked **Check needed**, and the other way round. Untick the box to hide the marks.
 
 ![A carried finding with What to check and the Mark as checked button](images/annotator-carried-finding.png)
 
