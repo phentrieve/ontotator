@@ -364,8 +364,18 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
             app.state.api_tokens = api_tokens
             # The OAuth authorization server for the remote MCP server (issue
             # 388); off (every OAuth endpoint 404) without ONTOTATOR_MCP_URL.
+            # It needs the public origin as its issuer: one taken from a
+            # request's Host header would be the sender's choice.
+            if config.mcp_url and not config.public_origin:
+                logger.warning(
+                    "ONTOTATOR_MCP_URL is set without a public origin, so OAuth "
+                    "for the remote MCP server stays off. Set "
+                    "ONTOTATOR_PUBLIC_ORIGIN (serve --public-origin)."
+                )
             app.state.oauth = (
-                OAuthService(db, config.mcp_url) if config.mcp_url else None
+                OAuthService(db, config.mcp_url)
+                if config.mcp_url and config.public_origin
+                else None
             )
             app.state.preferences = UserPreferencesStore(db)
             app.state.runtime_lease = RuntimeLease(unlimited_db.engine)

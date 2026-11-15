@@ -55,14 +55,15 @@ def mcp_url(env: Mapping[str, str] | None = None, *, production: bool) -> str | 
     raw = env.get(MCP_URL_ENV, "").strip()
     if not raw:
         return None
-    from ontotator.auth.oauth import canonical_resource
+    from ontotator.auth.oauth import canonical_mcp_url
 
     try:
-        url = canonical_resource(raw)
+        url = canonical_mcp_url(raw)
     except ValueError:
         raise SettingsError(
             f"{MCP_URL_ENV} must be an absolute http(s) URL like"
-            " https://ontotator.example.org/mcp, without query or fragment"
+            " https://ontotator.example.org/mcp, with a path and without query"
+            " or fragment"
         ) from None
     if production and not url.startswith("https://"):
         raise SettingsError(f"{MCP_URL_ENV} must be an https:// URL in production")

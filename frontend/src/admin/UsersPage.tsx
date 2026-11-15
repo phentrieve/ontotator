@@ -54,7 +54,6 @@ const auditActions: Readonly<Record<string, string>> = {
   "api_token.create": "API token created",
   "api_token.revoke": "API token revoked",
   "api_token.use": "Change made with an API token",
-  "oauth.client.register": "App registered for OAuth",
   "oauth.authorize": "App connection approved",
   "oauth.grant.create": "App connected",
   "oauth.grant.revoke": "App disconnected",

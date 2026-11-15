@@ -1367,6 +1367,7 @@ if __name__ == "__main__":
             # OAuth for the remote MCP server is on (issue 388), so the
             # consent page and Profile > Connected apps can be driven.
             mcp_url=f"http://127.0.0.1:{PORT}/mcp",
+            public_origin=f"http://127.0.0.1:{PORT}",  # the OAuth issuer
         )
         app = create_app(config)
         for ontology_path in (ONTOLOGY, MONDO_ONTOLOGY):

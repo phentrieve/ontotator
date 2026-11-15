@@ -32,6 +32,10 @@ environment:
 with --http (ONTOTATOR_TOKEN and ONTOTATOR_MCP_FILES_DIR must be unset):
   ONTOTATOR_MCP_URL        the public address clients use, e.g.
                            https://ontotator.example.org/mcp (required)
+  ONTOTATOR_MCP_ISSUER     the public origin of the Ontotator instance, announced
+                           as the OAuth authorization server (default: the
+                           origin of ONTOTATOR_URL; set it when that is an
+                           internal address)
   ONTOTATOR_MCP_ALLOWED_ORIGINS
                            further browser origins allowed to call, separated
                            by commas (the public URL's own origin always is)

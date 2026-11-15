@@ -16,7 +16,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
-from auth_harness import HARNESS, logged_in
+from auth_harness import HARNESS, PASSWORD, logged_in
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -192,8 +192,8 @@ def test_registration_accepts_https_and_loopback(app: FastAPI) -> None:
     )
     assert registered["client_id"].startswith(oauth.CLIENT_PREFIX)
     assert "client_secret" not in registered
-    [event] = _audit(app, "oauth.client.register")
-    assert event.details["name"] == "Claude"
+    # An unauthenticated registration writes nothing to the audit trail.
+    assert _audit(app, "oauth.client.register") == []
 
 
 def test_a_confidential_client_gets_a_secret_stored_as_its_digest(
@@ -224,6 +224,43 @@ def test_registration_refuses_unsupported_metadata(
     )
     assert response.status_code == 400, response.text
     assert response.json()["error"] == "invalid_client_metadata"
+
+
+def test_one_address_cannot_use_up_everyones_registrations(app: FastAPI) -> None:
+    """The attack: 100 junk registrations locked every real client out."""
+    service = app.state.oauth
+    junk = {"redirect_uris": ["https://junk.example/cb"]}
+    for _ in range(oauth.REGISTRATIONS_PER_ADDRESS_PER_HOUR):
+        service.register(junk, client_address="203.0.113.9")
+    with pytest.raises(oauth.OAuthError) as refused:
+        service.register(junk, client_address="203.0.113.9")
+    assert refused.value.status == 429
+    # Another address, and the HTTP route (address "testclient"), still work.
+    service.register({"redirect_uris": [REDIRECT]}, client_address="198.51.100.7")
+    _register(app)
+    with app.state.repo.db.transaction() as conn:
+        addresses = set(conn.execute(select(OAuthClientRow.registered_from)).scalars())
+    assert addresses == {"203.0.113.9", "198.51.100.7", "testclient"}
+
+
+def test_clients_that_never_got_a_grant_are_deleted_after_a_week(
+    app: FastAPI, lead: TestClient
+) -> None:
+    service = app.state.oauth
+    kept, _, _ = _connected(app, lead)  # has a grant: stays for good
+    unused = _register(app, client_name="Never used")
+    pending = _register(app, client_name="Abandoned consent")
+    _, challenge = _pkce()
+    _consent(lead, _params(pending["client_id"], challenge))  # a code, no grant
+    week = datetime.now(UTC) + oauth.UNUSED_CLIENT_LIFETIME + timedelta(minutes=1)
+    service._now = lambda: week
+    fresh = _register(app, client_name="Fresh")  # every registration purges
+    with app.state.repo.db.transaction() as conn:
+        left = set(conn.execute(select(OAuthClientRow.client_id)).scalars())
+        codes = conn.execute(select(OAuthCodeRow.client_id)).all()
+    assert left == {kept["client_id"], fresh["client_id"]}
+    assert unused["client_id"] not in left and len(codes) == 1
+    assert service.client(unused["client_id"]) is None
 
 
 def test_registration_is_rate_limited(
@@ -289,7 +326,7 @@ def test_an_unknown_client_or_redirect_uri_is_never_redirected(app: FastAPI) -> 
         ({"resource": "https://other.example/mcp"}, "invalid_target"),
     ],
 )
-def test_a_faulty_request_is_sent_back_with_an_error(
+def test_a_faulty_request_gets_an_error_page_and_no_redirect(
     app: FastAPI, extra: dict[str, str], error: str
 ) -> None:
     client = _register(app)
@@ -299,12 +336,31 @@ def test_a_faulty_request_is_sent_back_with_an_error(
         params=_params(client["client_id"], challenge, **extra),
         follow_redirects=False,
     )
-    assert response.status_code == 302
-    target = urlsplit(response.headers["location"])
-    assert f"{target.scheme}://{target.netloc}{target.path}" == REDIRECT
-    query = parse_qs(target.query)
-    assert query["error"] == [error]
-    assert query["state"] == ["xyz"] and query["iss"] == [ISSUER]
+    assert response.status_code == 400
+    assert "location" not in response.headers
+    assert error in response.text
+
+
+def test_the_authorization_endpoint_is_no_open_redirector(app: FastAPI) -> None:
+    """Anyone may register any https address; nobody is logged in here."""
+    phish = "https://evil.example/phish"
+    client = _register(app, redirect_uris=[phish])
+    for params in (
+        {"client_id": client["client_id"], "response_type": "token"},
+        {"client_id": client["client_id"], "redirect_uri": phish},
+        {
+            "client_id": client["client_id"],
+            "redirect_uri": phish,
+            "response_type": "code",
+            "scope": "nonsense",
+        },
+    ):
+        response = TestClient(app).get(
+            "/oauth/authorize", params=params, follow_redirects=False
+        )
+        assert response.status_code == 400, params
+        assert "location" not in response.headers
+        assert "evil.example" not in response.text
 
 
 def test_offline_access_is_accepted_and_dropped(app: FastAPI, lead: TestClient) -> None:
@@ -625,7 +681,10 @@ def test_a_refresh_rotates_and_a_reused_refresh_token_revokes_the_grant(
     new = refreshed.json()
     assert new["refresh_token"] != tokens["refresh_token"]
     assert _bearer(app, new["access_token"]).get("/api/v1/me/token").status_code == 200
-    # The old refresh token again: stolen or replayed, so the grant ends.
+    # The old refresh token again, after the retry grace: stolen or
+    # replayed, so the grant ends.
+    later = datetime.now(UTC) + oauth.REFRESH_GRACE + timedelta(seconds=5)
+    app.state.oauth._now = lambda: later
     replay = _token(
         app,
         grant_type="refresh_token",
@@ -832,3 +891,242 @@ def test_the_mcp_url_setting_must_be_https_in_production() -> None:
     with pytest.raises(SettingsError, match="absolute"):
         mcp_url({"ONTOTATOR_MCP_URL": "https://ex.org/mcp?x=1"}, production=True)
     assert mcp_url({}, production=True) is None
+
+
+# Consent given before the credentials changed must not become a grant
+
+
+@pytest.mark.parametrize("change", ["reset_code", "deactivate", "password"])
+def test_a_pending_code_dies_with_the_credentials(
+    app: FastAPI, lead: TestClient, change: str
+) -> None:
+    """The attack: consent in a stolen session, exchange after the reset."""
+    client, code, verifier = _code(app, lead)
+    if change == "reset_code":
+        app.state.accounts.issue_reset_code(HARNESS, "lena")
+    elif change == "deactivate":
+        app.state.accounts.set_active(HARNESS, "lena", False)
+    else:
+        changed = lead.post(
+            "/api/v1/me/password",
+            json={
+                "current_password": PASSWORD,
+                "new_password": "another long passphrase",
+            },
+        )
+        assert changed.status_code in (200, 204), changed.text
+    response = _token(
+        app,
+        grant_type="authorization_code",
+        code=code,
+        redirect_uri=REDIRECT,
+        code_verifier=verifier,
+        client_id=client["client_id"],
+    )
+    assert response.status_code == 400, response.text
+    assert response.json()["error"] == "invalid_grant"
+    with app.state.repo.db.transaction() as conn:
+        assert conn.execute(select(ApiTokenRow.id)).all() == []
+
+
+# Which address a connection returns to
+
+
+def test_connected_apps_shows_the_host_the_grant_really_used(
+    app: FastAPI, lead: TestClient
+) -> None:
+    """The attack: register [claude.ai, evil.example], use the second."""
+    evil = "https://evil.example/cb"
+    client = _register(app, redirect_uris=[REDIRECT, evil])
+    verifier, challenge = _pkce()
+    params = _params(client["client_id"], challenge, redirect_uri=evil)
+    shown = lead.get("/api/v1/oauth/authorization", params=params).json()
+    assert shown["redirect_host"] == "evil.example"
+    decision = lead.post(
+        "/api/v1/oauth/authorization",
+        json={"params": shown["params"], "approve": True, "scopes": ["read"]},
+    ).json()
+    code = parse_qs(urlsplit(decision["redirect_to"]).query)["code"][0]
+    exchanged = _token(
+        app,
+        grant_type="authorization_code",
+        code=code,
+        redirect_uri=evil,
+        code_verifier=verifier,
+        client_id=client["client_id"],
+    )
+    assert exchanged.status_code == 200, exchanged.text
+    [connection] = lead.get("/api/v1/me/connections").json()["connections"]
+    assert connection["redirect_host"] == "evil.example"
+
+
+# Conformance
+
+
+def test_a_loopback_redirect_matches_on_any_port(
+    app: FastAPI, lead: TestClient
+) -> None:
+    client = _register(app, redirect_uris=["http://127.0.0.1/callback"])
+    verifier, challenge = _pkce()
+    used = "http://127.0.0.1:51004/callback"
+    params = _params(client["client_id"], challenge, redirect_uri=used)
+    shown = lead.get("/api/v1/oauth/authorization", params=params)
+    assert shown.status_code == 200, shown.text
+    decision = lead.post(
+        "/api/v1/oauth/authorization",
+        json={"params": shown.json()["params"], "approve": True, "scopes": ["read"]},
+    ).json()
+    assert decision["redirect_to"].startswith(used + "?")
+    code = parse_qs(urlsplit(decision["redirect_to"]).query)["code"][0]
+    exchanged = _token(
+        app,
+        grant_type="authorization_code",
+        code=code,
+        redirect_uri=used,
+        code_verifier=verifier,
+        client_id=client["client_id"],
+    )
+    assert exchanged.status_code == 200, exchanged.text
+
+
+@pytest.mark.parametrize(
+    "requested",
+    [
+        "http://127.0.0.1:51004/other",  # another path
+        "https://127.0.0.1:51004/callback",  # another scheme
+        "http://localhost:51004/callback",  # another loopback name
+        "http://127.0.0.1.evil.example:51004/callback",
+        "http://127.0.0.1:51004@evil.example/callback",
+    ],
+)
+def test_only_the_port_of_a_loopback_redirect_is_free(requested: str) -> None:
+    assert not oauth.registered_redirect(requested, ["http://127.0.0.1/callback"])
+    # And never for an https address.
+    assert not oauth.registered_redirect(
+        "https://claude.ai:8443/cb", ["https://claude.ai/cb"]
+    )
+
+
+def test_no_refresh_token_without_the_refresh_grant_type(
+    app: FastAPI, lead: TestClient
+) -> None:
+    client = _register(app, grant_types=["authorization_code"])
+    verifier, challenge = _pkce()
+    code = _consent(lead, _params(client["client_id"], challenge))["code"][0]
+    response = _token(
+        app,
+        grant_type="authorization_code",
+        code=code,
+        redirect_uri=REDIRECT,
+        code_verifier=verifier,
+        client_id=client["client_id"],
+    )
+    assert response.status_code == 200, response.text
+    assert "refresh_token" not in response.json()
+    with app.state.repo.db.transaction() as conn:
+        assert conn.execute(select(OAuthRefreshTokenRow.id)).all() == []
+    refused = _token(
+        app,
+        grant_type="refresh_token",
+        refresh_token="otr_anything",
+        client_id=client["client_id"],
+    )
+    assert refused.json()["error"] == "unauthorized_client"
+
+
+def _refresh(app: FastAPI, client: dict[str, Any], token: str) -> Any:
+    return _token(
+        app,
+        grant_type="refresh_token",
+        refresh_token=token,
+        client_id=client["client_id"],
+    )
+
+
+def test_a_retried_refresh_gets_the_same_answer_within_the_grace(
+    app: FastAPI, lead: TestClient
+) -> None:
+    client, tokens, _ = _connected(app, lead)
+    first = _refresh(app, client, tokens["refresh_token"])
+    retry = _refresh(app, client, tokens["refresh_token"])
+    assert first.status_code == retry.status_code == 200, retry.text
+    assert retry.json()["access_token"] == first.json()["access_token"]
+    assert retry.json()["refresh_token"] == first.json()["refresh_token"]
+    assert _audit(app, "oauth.refresh.reuse") == []
+    # Still one chain: one successor row, and it works once.
+    with app.state.repo.db.transaction() as conn:
+        rows = conn.execute(select(OAuthRefreshTokenRow.used_at)).all()
+    assert len(rows) == 2
+    assert _refresh(app, client, first.json()["refresh_token"]).status_code == 200
+
+
+def test_the_grace_does_not_weaken_theft_detection(
+    app: FastAPI, lead: TestClient
+) -> None:
+    client, tokens, _ = _connected(app, lead)
+    first = _refresh(app, client, tokens["refresh_token"]).json()
+    # The chain moves on; the old token again, even at once, ends the grant.
+    second = _refresh(app, client, first["refresh_token"])
+    assert second.status_code == 200
+    replay = _refresh(app, client, tokens["refresh_token"])
+    assert replay.json()["error"] == "invalid_grant"
+    assert len(_audit(app, "oauth.refresh.reuse")) == 1
+    assert (
+        _bearer(app, second.json()["access_token"]).get("/api/v1/me/token").status_code
+        == 401
+    )
+
+
+def test_after_the_grace_a_used_refresh_token_revokes_the_grant(
+    app: FastAPI, lead: TestClient
+) -> None:
+    client, tokens, _ = _connected(app, lead)
+    first = _refresh(app, client, tokens["refresh_token"]).json()
+    later = datetime.now(UTC) + oauth.REFRESH_GRACE + timedelta(seconds=5)
+    app.state.oauth._now = lambda: later
+    replay = _refresh(app, client, tokens["refresh_token"])
+    assert replay.json()["error"] == "invalid_grant"
+    assert (
+        _refresh(app, client, first["refresh_token"]).json()["error"] == "invalid_grant"
+    )
+
+
+def test_the_successor_cannot_be_computed_from_the_database_or_the_token() -> None:
+    old = "otr_" + "a" * 43
+    one = oauth._derived(old, "00" * 32, "refresh")
+    assert one != oauth._derived(old, "01" * 32, "refresh")
+    assert one != oauth._derived(old, "00" * 32, "access")
+    assert len(one) == 43
+
+
+# Issuer and resource configuration
+
+
+def test_oauth_stays_off_without_a_configured_public_origin(tmp_path) -> None:
+    """The issuer must never come from a request's Host header."""
+    app = _app(tmp_path, mcp_url=MCP_URL)
+    client = TestClient(app, headers={"Host": "evil.example"})
+    assert client.get("/.well-known/oauth-authorization-server").status_code == 404
+    assert client.post("/oauth/register", json={}).status_code == 404
+    assert app.state.oauth is None
+
+
+def test_the_issuer_ignores_the_host_header(app: FastAPI) -> None:
+    body = TestClient(app).get(
+        "/.well-known/oauth-authorization-server", headers={"Host": "evil.example"}
+    )
+    assert body.json()["issuer"] == ISSUER
+
+
+@pytest.mark.parametrize(
+    "value", ["https://mcp.example.org", "https://mcp.example.org/"]
+)
+def test_an_mcp_url_without_a_path_is_refused(value: str) -> None:
+    """The MCP server would default the path and the two sides disagree."""
+    from ontotator.config import AppConfig
+    from ontotator.settings import SettingsError, mcp_url
+
+    with pytest.raises(SettingsError, match="path"):
+        mcp_url({"ONTOTATOR_MCP_URL": value}, production=True)
+    with pytest.raises(ValueError):
+        AppConfig(workspace_dir=".", mcp_url=value)

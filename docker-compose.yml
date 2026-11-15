@@ -135,6 +135,9 @@ services:
       # it: the app accepts no other peer in production.
       ONTOTATOR_URL: ${ONTOTATOR_MCP_API_URL:-${ONTOTATOR_PUBLIC_ORIGIN:?Set the public HTTPS origin}}
       ONTOTATOR_MCP_URL: ${ONTOTATOR_MCP_URL:-}
+      # The authorization server announced to clients: always the public
+      # origin, also when ONTOTATOR_MCP_API_URL is an internal address.
+      ONTOTATOR_MCP_ISSUER: ${ONTOTATOR_PUBLIC_ORIGIN:?Set the public HTTPS origin}
       ONTOTATOR_MCP_ALLOWED_ORIGINS: ${ONTOTATOR_MCP_ALLOWED_ORIGINS:-}
     tmpfs:
       - /tmp:size=16m,mode=1777

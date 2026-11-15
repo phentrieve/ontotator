@@ -7,8 +7,8 @@ middleware (they authenticate the client themselves), all 404 unless
 - ``GET /.well-known/oauth-authorization-server`` (RFC 8414)
 - ``POST /oauth/register`` (RFC 7591, open)
 - ``GET /oauth/authorize``: checks the request and sends the browser on to
-  the consent page of the web app (``#/oauth/authorize?...``); a bad client
-  or redirect URI gets a plain error page and is never redirected
+  the consent page of the web app (``#/oauth/authorize?...``); a faulty
+  request gets a plain error page and is never redirected anywhere
 - ``POST /oauth/token``: ``authorization_code`` with PKCE, ``refresh_token``
 - ``POST /oauth/revoke`` (RFC 7009)
 
@@ -33,8 +33,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
 
 from ontotator.api.identity import PrincipalDep
-from ontotator.api.security import expected_origin
 from ontotator.auth.api_tokens import TokenScope
+from ontotator.auth.login_attempts import client_address
 from ontotator.auth.oauth import (
     AUTH_METHODS,
     GRANT_TYPES,
@@ -45,7 +45,6 @@ from ontotator.auth.oauth import (
     InvalidAuthorizationLink,
     OAuthError,
     OAuthService,
-    redirect_with,
 )
 from ontotator.domain.errors import DomainError
 
@@ -74,10 +73,15 @@ def _service(request: Request) -> OAuthService | None:
 
 
 def issuer(request: Request) -> str:
-    """The issuer identifier: the public origin (always set in production)."""
-    config = getattr(request.app.state, "config", None)
-    public = getattr(config, "public_origin", None)
-    return expected_origin(request, public)
+    """The issuer identifier: the configured public origin, never the Host header.
+
+    OAuth is on only with a public origin (``create_app``), so every
+    endpoint that reaches this has one.
+    """
+    public: str | None = request.app.state.config.public_origin
+    if public is None:  # unreachable: the service exists only with it
+        raise RuntimeError("OAuth needs a configured public origin")
+    return public
 
 
 def _not_found() -> JSONResponse:
@@ -163,7 +167,14 @@ async def register(request: Request) -> Response:
             OAuthError("invalid_client_metadata", "The metadata must be an object.")
         )
     try:
-        registered = await run_in_threadpool(service.register, body)
+        registered = await run_in_threadpool(
+            lambda: service.register(
+                body,
+                client_address=client_address(
+                    request.client.host if request.client else None
+                ),
+            )
+        )
     except OAuthError as exc:
         return _oauth_error(exc)
     return JSONResponse(status_code=201, content=registered, headers=NO_STORE)
@@ -189,7 +200,15 @@ def _error_page(message: str) -> HTMLResponse:
 
 @protocol_router.get("/oauth/authorize")
 async def authorize(request: Request) -> Response:
-    """Check the request, then hand over to the consent page of the web app."""
+    """Check the request, then hand over to the consent page of the web app.
+
+    Nobody is logged in here, and anyone may register a client with any
+    redirect URI, so a faulty request is answered with an error page and
+    never with a redirect: a redirect would make this endpoint an open
+    redirector to any registered address (RFC 9700 section 4.11). The only
+    redirects back to a client come from the consent page, after the user
+    logged in and decided.
+    """
     service = _service(request)
     if service is None:
         return _not_found()
@@ -198,25 +217,11 @@ async def authorize(request: Request) -> Response:
     except OAuthError as exc:
         return _error_page(exc.description)
     try:
-        _, redirect_uri = await run_in_threadpool(service.check_link, params)
+        checked = await run_in_threadpool(service.check_authorization, params)
     except InvalidAuthorizationLink as exc:
         return _error_page(str(exc))
-    try:
-        checked = await run_in_threadpool(service.check_authorization, params)
     except OAuthError as exc:
-        return RedirectResponse(
-            redirect_with(
-                redirect_uri,
-                {
-                    "error": exc.error,
-                    "error_description": exc.description,
-                    "state": params.get("state"),
-                    "iss": issuer(request),
-                },
-            ),
-            status_code=302,
-            headers=NO_STORE,
-        )
+        return _error_page(f"{exc.description} ({exc.error})")
     return RedirectResponse(
         f"{CONSENT_PATH}?{urlencode(checked.params())}",
         status_code=302,

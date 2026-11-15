@@ -23,7 +23,9 @@ gets 401 with ``WWW-Authenticate: Bearer resource_metadata=...``.
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import time
 from datetime import datetime
 from typing import Any
 from urllib.parse import urlsplit
@@ -53,6 +55,11 @@ MAX_TOKEN_LENGTH = 512
 # The token scopes the tools use (``tooling.Scope`` without admin, which an
 # OAuth token never holds).
 SCOPES = ("read", "import", "export", "project-admin")
+# Tokens Ontotator refused are remembered this long (by their SHA-256, at
+# most this many), so a stream of junk bearers costs one API call each, not
+# one per request.
+REFUSED_TTL = 30.0
+REFUSED_MAX = 4096
 
 
 class OntotatorTokenVerifier:
@@ -61,16 +68,45 @@ class OntotatorTokenVerifier:
     def __init__(self, api: OntotatorClient, resource: str) -> None:
         self.api = api
         self.resource = resource.rstrip("/")
+        # SHA-256 of a refused token -> when to ask Ontotator again. Only
+        # refusals are cached: an accepted token is checked on every
+        # request, so a revocation takes effect at once.
+        self._refused: dict[str, float] = {}
+
+    def _was_refused(self, digest: str) -> bool:
+        until = self._refused.get(digest)
+        if until is None:
+            return False
+        if until <= time.monotonic():
+            del self._refused[digest]
+            return False
+        return True
+
+    def _remember_refused(self, digest: str) -> None:
+        now = time.monotonic()
+        if len(self._refused) >= REFUSED_MAX:
+            for key in [k for k, until in self._refused.items() if until <= now]:
+                del self._refused[key]
+            while len(self._refused) >= REFUSED_MAX:  # still full: drop oldest
+                del self._refused[next(iter(self._refused))]
+        self._refused[digest] = now + REFUSED_TTL
 
     async def verify_token(self, token: str) -> AccessToken | None:
         token = token.strip()
         if not token or len(token) > MAX_TOKEN_LENGTH or not token.isascii():
+            return None
+        digest = hashlib.sha256(token.encode("ascii")).hexdigest()
+        if self._was_refused(digest):
             return None
         try:
             response = await self.api.token_record(token)
         except OntotatorError as exc:
             # Ontotator unreachable: refuse, but say why in the log.
             logger.warning("Token check failed: %s", exc)
+            return None
+        if response.status_code in (401, 403):
+            # Unknown, expired or revoked: it cannot become valid later.
+            self._remember_refused(digest)
             return None
         if response.status_code != 200:
             return None
@@ -107,10 +143,20 @@ class OriginGuard:
     nothing and causes no token check. A request without ``Origin`` (a
     server-side client such as a claude.ai connector, Claude Code) passes.
     Loopback hosts are always allowed, for the container's health check.
+
+    ``open_paths`` (the protected resource metadata) skip the Origin check,
+    not the Host check: a browser-based MCP client on any site must be able
+    to read where to authorize, and the document is public.
     """
 
-    def __init__(self, app: ASGIApp, settings: HttpSettings) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        settings: HttpSettings,
+        open_paths: frozenset[str] = frozenset(),
+    ) -> None:
         self.app = app
+        self.open_paths = open_paths
         self.hosts = {host.lower() for host in settings.allowed_hosts}
         self.origins = {origin.lower() for origin in settings.allowed_origins}
 
@@ -131,7 +177,11 @@ class OriginGuard:
         }
         origin = headers.get("origin")
         response: Response | None = None
-        if origin is not None and origin.lower().rstrip("/") not in self.origins:
+        if (
+            origin is not None
+            and scope.get("path", "") not in self.open_paths
+            and origin.lower().rstrip("/") not in self.origins
+        ):
             response = JSONResponse(
                 {"error": "forbidden", "error_description": "Origin not allowed."},
                 status_code=403,
@@ -192,7 +242,7 @@ def http_app(server: MCPServer, settings: HttpSettings) -> ASGIApp:
         )
     )
     path = urlsplit(str(build_resource_metadata_url(auth.resource_server_url))).path
-    return OriginGuard(_Dispatch(app, {path: metadata}), settings)
+    return OriginGuard(_Dispatch(app, {path: metadata}), settings, frozenset({path}))
 
 
 class _Dispatch:

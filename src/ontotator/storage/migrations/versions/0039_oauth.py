@@ -10,7 +10,10 @@ without blocking writes.
 
 Only SHA-256 digests of client secrets, codes and refresh tokens are
 stored. The application role may revoke, mark used and record last use
-(UPDATE) but never delete: the audit trail names grants by their id.
+(UPDATE) but never delete grants or refresh tokens: the audit trail names
+grants by their id. It may delete ``oauth_clients`` and ``oauth_codes``
+rows, which the server does only for a client that never got a grant
+(open registration would otherwise fill the table for good).
 """
 
 from datetime import datetime
@@ -58,6 +61,8 @@ def upgrade() -> None:
         sa.Column("name", sa.Text(), nullable=False),
         sa.Column("redirect_uris", postgresql.ARRAY(sa.Text()), nullable=False),
         sa.Column("auth_method", sa.Text(), nullable=False),
+        sa.Column("grant_types", postgresql.ARRAY(sa.Text()), nullable=False),
+        sa.Column("registered_from", sa.Text(), nullable=True),
         _created(),
         sa.PrimaryKeyConstraint("id", name="pk_oauth_clients"),
         sa.UniqueConstraint("client_id", name="uq_oauth_clients_client_id"),
@@ -85,6 +90,7 @@ def upgrade() -> None:
         sa.Column("user_id", sa.BigInteger(), nullable=False),
         sa.Column("scopes", postgresql.ARRAY(sa.Text()), nullable=False),
         sa.Column("resource", sa.Text(), nullable=False),
+        sa.Column("redirect_uri", sa.Text(), nullable=False),
         _created(),
         sa.Column("expires_at", _ts(), nullable=False),
         sa.Column("last_used_at", _ts(), nullable=True),
@@ -123,6 +129,7 @@ def upgrade() -> None:
         _created(),
         sa.Column("expires_at", _ts(), nullable=False),
         sa.Column("used_at", _ts(), nullable=True),
+        sa.Column("revoked_at", _ts(), nullable=True),
         sa.Column("grant_id", sa.BigInteger(), nullable=True),
         sa.PrimaryKeyConstraint("id", name="pk_oauth_codes"),
         sa.UniqueConstraint("code_sha256", name="uq_oauth_codes_code_sha256"),
@@ -148,6 +155,7 @@ def upgrade() -> None:
         _created(),
         sa.Column("expires_at", _ts(), nullable=False),
         sa.Column("used_at", _ts(), nullable=True),
+        sa.Column("successor_nonce", sa.Text(), nullable=True),
         sa.PrimaryKeyConstraint("id", name="pk_oauth_refresh_tokens"),
         sa.UniqueConstraint(
             "token_sha256", name="uq_oauth_refresh_tokens_token_sha256"
@@ -201,6 +209,8 @@ def upgrade() -> None:
         op.execute(
             f"GRANT USAGE, SELECT ON SEQUENCE {SCHEMA}.{table}_id_seq TO {APP_ROLE}"
         )
+    for table in ("oauth_clients", "oauth_codes"):
+        op.execute(f"GRANT DELETE ON {SCHEMA}.{table} TO {APP_ROLE}")
 
 
 def downgrade() -> None:

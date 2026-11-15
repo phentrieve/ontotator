@@ -32,6 +32,9 @@ def test_the_mcp_service_has_no_port_no_volume_and_the_runtime_hardening() -> No
     assert "ONTOTATOR_TOKEN" not in block
     assert "ONTOTATOR_MCP_FILES_DIR" not in block
     assert "ONTOTATOR_MCP_URL: ${ONTOTATOR_MCP_URL:-}" in block
+    # The announced authorization server is the public origin, whatever
+    # address the API is reached at.
+    assert "ONTOTATOR_MCP_ISSUER: ${ONTOTATOR_PUBLIC_ORIGIN:?" in block
 
 
 def test_the_app_knows_the_mcp_url_for_oauth() -> None:

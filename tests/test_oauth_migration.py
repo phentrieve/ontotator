@@ -5,7 +5,7 @@ from collections.abc import Iterator
 import pytest
 from pg_harness import unmigrated_database_url
 from sqlalchemy import Engine, create_engine, text
-from sqlalchemy.exc import DBAPIError, IntegrityError
+from sqlalchemy.exc import IntegrityError
 
 from ontotator.storage.schema import upgrade
 
@@ -44,8 +44,9 @@ def _client(conn) -> int:  # type: ignore[no-untyped-def]
         conn.execute(
             text(
                 f"INSERT INTO {S}.oauth_clients (client_id, name, redirect_uris,"
-                " auth_method) VALUES ('otc_x', 'Claude',"
-                " ARRAY['https://claude.ai/cb'], 'none') RETURNING id"
+                " auth_method, grant_types) VALUES ('otc_x', 'Claude',"
+                " ARRAY['https://claude.ai/cb'], 'none',"
+                " ARRAY['authorization_code']) RETURNING id"
             )
         ).scalar_one()
     )
@@ -57,7 +58,8 @@ def _grant(conn, scopes: list[str]) -> int:  # type: ignore[no-untyped-def]
         conn.execute(
             text(
                 f"INSERT INTO {S}.oauth_grants (client_id, user_id, scopes, resource,"
-                " expires_at) SELECT :client, id, :scopes, 'https://ex.org/mcp',"
+                " redirect_uri, expires_at) SELECT :client, id, :scopes,"
+                " 'https://ex.org/mcp', 'https://claude.ai/cb',"
                 f" now() + interval '90 days' FROM {S}.users RETURNING id"
             ),
             {"client": client, "scopes": scopes},
@@ -107,15 +109,28 @@ def test_a_public_client_has_no_secret(migrated: Engine) -> None:
         conn.execute(
             text(
                 f"INSERT INTO {S}.oauth_clients (client_id, secret_sha256, name,"
-                " redirect_uris, auth_method) VALUES ('otc_y', 'x', 'C',"
-                " ARRAY['https://c/cb'], 'none')"
+                " redirect_uris, auth_method, grant_types) VALUES ('otc_y', 'x',"
+                " 'C', ARRAY['https://c/cb'], 'none', ARRAY['authorization_code'])"
             )
         )
 
 
-def test_the_application_role_cannot_delete_grants(migrated: Engine) -> None:
+def _may_delete(conn, table: str) -> bool:  # type: ignore[no-untyped-def]
+    return bool(
+        conn.execute(
+            text("SELECT has_table_privilege('ontotator_app', :table, 'DELETE')"),
+            {"table": f"{S}.{table}"},
+        ).scalar_one()
+    )
+
+
+def test_the_application_role_deletes_unused_clients_and_codes_only(
+    migrated: Engine,
+) -> None:
+    """Grants and refresh tokens stay for good; the audit trail names them."""
     with migrated.begin() as conn:
-        _grant(conn, ["read"])
-    with pytest.raises(DBAPIError, match="permission denied"), migrated.begin() as conn:
-        conn.execute(text("SET ROLE ontotator_app"))
-        conn.execute(text(f"DELETE FROM {S}.oauth_grants"))
+        assert _may_delete(conn, "oauth_clients")
+        assert _may_delete(conn, "oauth_codes")
+        assert not _may_delete(conn, "oauth_grants")
+        assert not _may_delete(conn, "oauth_refresh_tokens")
+        assert not _may_delete(conn, "api_tokens")

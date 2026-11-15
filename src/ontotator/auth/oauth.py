@@ -5,7 +5,9 @@ be handed an API token; it gets one through the authorization code flow of
 the MCP authorization spec instead:
 
 1. It registers itself (RFC 7591 dynamic client registration): a name and
-   its redirect URIs. Nothing is granted by registering.
+   its redirect URIs. Nothing is granted by registering, so it is logged,
+   not audited; registrations are limited per client address and hour, and
+   a client that never got a grant is deleted after a week.
 2. It sends the user to the authorization endpoint with a PKCE challenge
    (S256 only) and the ``resource`` it wants a token for (RFC 8707). The
    user logs in to Ontotator as usual and consents on the consent page,
@@ -13,7 +15,8 @@ the MCP authorization spec instead:
 3. It exchanges the single-use, short-lived code with the PKCE verifier for
    an access token and a refresh token, and refreshes from then on; every
    refresh token is used once and replaced (rotation). A refresh token or
-   code used a second time revokes the whole grant (theft detection).
+   code used a second time revokes the whole grant (theft detection); only
+   a retry of a refresh within 30 seconds gets the same answer again.
 
 Design: the access token **is an Ontotator API token** (an ``api_tokens``
 row of kind ``personal`` that names its grant), bound to the one MCP
@@ -26,6 +29,9 @@ that MCP server, which is the only thing it is valid for. It is short-lived
 (one hour), never holds the ``admin`` scope, and cannot reach the
 session-only routes (tokens, consent, preferences).
 
+The ``resource`` binding is enforced by the MCP server only: at the
+Ontotator API the access token works like any API token of its scopes.
+
 Codes, refresh tokens and client secrets are stored only as SHA-256
 digests. Revoking a grant (Profile > Connected apps, the client's
 revocation endpoint, a new password, deactivation, anonymisation) revokes
@@ -36,17 +42,19 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import hmac
+import logging
 import re
 import secrets
 import unicodedata
 from collections.abc import Callable, Iterable, Mapping
-from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, cast
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
-from sqlalchemy import Connection, exists, func, insert, select, update
+from sqlalchemy import Connection, delete, exists, func, insert, select, update
+from sqlalchemy.exc import IntegrityError
 
 from ontotator.auth.api_tokens import TOKEN_PREFIX, TokenScope, new_token
 from ontotator.auth.audit import Actor, record_audit
@@ -64,6 +72,8 @@ from ontotator.storage.tables import (
     ProjectRow,
     UserRow,
 )
+
+logger = logging.getLogger(__name__)
 
 OAUTH_SCOPES: tuple[TokenScope, ...] = ("read", "import", "export", "project-admin")
 DEFAULT_SCOPES: tuple[TokenScope, ...] = ("read",)
@@ -83,8 +93,16 @@ ACCESS_TOKEN_LIFETIME = timedelta(hours=1)
 REFRESH_TOKEN_LIFETIME = timedelta(days=30)
 # After this the user consents again, whatever the refreshes.
 GRANT_LIFETIME = timedelta(days=90)
-# Open registration is rate limited for the whole server.
-REGISTRATIONS_PER_HOUR = 100
+# Open registration is limited per client address (an IPv6 /64), so one
+# sender cannot use up everyone's registrations; the ceiling for the whole
+# server only bounds what many addresses together can store.
+REGISTRATIONS_PER_ADDRESS_PER_HOUR = 10
+REGISTRATIONS_PER_HOUR = 500
+# A client that never got a grant is deleted after this time.
+UNUSED_CLIENT_LIFETIME = timedelta(days=7)
+# A refresh token presented again this soon after its use (a retry whose
+# answer was lost, two requests at once) gets the same answer again.
+REFRESH_GRACE = timedelta(seconds=30)
 
 CLIENT_PREFIX = "otc_"
 SECRET_PREFIX = "ots_"
@@ -126,6 +144,8 @@ class Client:
     name: str
     redirect_uris: tuple[str, ...]
     auth_method: AuthMethod
+    # Registered with the refresh_token grant type: gets refresh tokens.
+    refresh: bool = True
 
 
 @dataclass(frozen=True)
@@ -158,18 +178,21 @@ class AuthorizationRequest:
 @dataclass(frozen=True)
 class IssuedTokens:
     access_token: str
-    refresh_token: str
+    # None for a client registered without the refresh_token grant type.
+    refresh_token: str | None
     expires_in: int
     scopes: tuple[TokenScope, ...]
 
     def body(self) -> dict[str, Any]:
-        return {
+        body: dict[str, Any] = {
             "access_token": self.access_token,
             "token_type": "Bearer",
             "expires_in": self.expires_in,
-            "refresh_token": self.refresh_token,
             "scope": " ".join(self.scopes),
         }
+        if self.refresh_token is not None:
+            body["refresh_token"] = self.refresh_token
+        return body
 
 
 @dataclass(frozen=True)
@@ -216,8 +239,60 @@ def canonical_resource(value: str) -> str:
     return urlunsplit((parts.scheme, host, parts.path.rstrip("/"), "", ""))
 
 
+def canonical_mcp_url(value: str) -> str:
+    """``ONTOTATOR_MCP_URL`` as the resource both sides bind tokens to.
+
+    ``canonical_resource``, and the URL must name a path such as ``/mcp``:
+    the MCP server (``ontotator_mcp.config.HttpSettings``) applies the same
+    rule, so the two can never disagree on the resource.
+    """
+    url = canonical_resource(value)
+    if not urlsplit(url).path:
+        raise ValueError("the URL needs a path such as /mcp")
+    return url
+
+
 def _loopback(host: str | None) -> bool:
     return host is not None and host.lower() in _LOOPBACK
+
+
+def _without_port(uri: str) -> str | None:
+    """A plain-http loopback URI without its port, or None for any other."""
+    parts = urlsplit(uri)
+    if parts.scheme != "http" or not _loopback(parts.hostname):
+        return None
+    host = parts.hostname or ""
+    if ":" in host:
+        host = f"[{host}]"
+    return urlunsplit((parts.scheme, host.lower(), parts.path, parts.query, ""))
+
+
+def registered_redirect(requested: str, registered: Iterable[str]) -> bool:
+    """Whether ``requested`` is a registered redirect URI.
+
+    Compared exactly, except that a plain-http loopback URI matches on any
+    port (RFC 8252 section 7.3: native apps listen on an ephemeral port).
+    """
+    registered = tuple(registered)
+    if requested in registered:
+        return True
+    try:
+        check_redirect_uri(requested)
+        bare = _without_port(requested)
+    except (OAuthError, ValueError):
+        return False
+    return bare is not None and any(bare == _without_port(uri) for uri in registered)
+
+
+def _derived(old: str, nonce: str, label: str) -> str:
+    """A successor token of the used refresh token ``old`` (43 characters).
+
+    HMAC-SHA256 keyed with the random ``nonce`` stored on the used token's
+    row. Neither side alone gives it: the database holds the nonce but only
+    a digest of ``old``, the client holds ``old`` but never the nonce.
+    """
+    mac = hmac.new(bytes.fromhex(nonce), f"{label}:{old}".encode(), hashlib.sha256)
+    return base64.urlsafe_b64encode(mac.digest()).rstrip(b"=").decode("ascii")
 
 
 def check_redirect_uri(uri: str) -> str:
@@ -309,15 +384,20 @@ class OAuthService:
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self.db = db
-        self.resource = canonical_resource(resource)
+        self.resource = canonical_mcp_url(resource)
         self._now = now
 
     # Registration (RFC 7591)
 
-    def register(self, metadata: Mapping[str, Any]) -> dict[str, Any]:
+    def register(
+        self, metadata: Mapping[str, Any], *, client_address: str | None = None
+    ) -> dict[str, Any]:
         """Register a client from its metadata; the registration response.
 
         A confidential client's secret is in the response only.
+        ``client_address`` is what the hourly limit counts
+        (``ontotator.auth.login_attempts.client_address``). Each call also
+        deletes clients that never got a grant within a week.
         """
         uris = metadata.get("redirect_uris")
         if not isinstance(uris, list) or not 1 <= len(uris) <= MAX_REDIRECT_URIS:
@@ -361,16 +441,26 @@ class OAuthService:
         client_id = CLIENT_PREFIX + secrets.token_urlsafe(24)
         secret = None if method == "none" else SECRET_PREFIX + secrets.token_urlsafe(32)
         with self.db.transaction() as conn:
-            # One registration at a time, so the hourly limit holds.
+            # One registration at a time, so the hourly limits hold.
             conn.execute(
                 select(func.pg_advisory_xact_lock(func.hashtext("oauth_register")))
             )
+            _purge_unused_clients(conn, now)
+            hour = OAuthClientRow.created_at > now - timedelta(hours=1)
             recent = conn.execute(
-                select(func.count())
+                select(
+                    func.count(),
+                    func.count().filter(
+                        OAuthClientRow.registered_from == client_address
+                    ),
+                )
                 .select_from(OAuthClientRow)
-                .where(OAuthClientRow.created_at > now - timedelta(hours=1))
-            ).scalar_one()
-            if recent >= REGISTRATIONS_PER_HOUR:
+                .where(hour)
+            ).one()
+            if recent[0] >= REGISTRATIONS_PER_HOUR or (
+                client_address is not None
+                and recent[1] >= REGISTRATIONS_PER_ADDRESS_PER_HOUR
+            ):
                 raise OAuthError(
                     "temporarily_unavailable",
                     "Too many client registrations; try again later.",
@@ -384,24 +474,21 @@ class OAuthService:
                     name=name,
                     redirect_uris=redirect_uris,
                     auth_method=method,
+                    grant_types=list(grant_types),
+                    registered_from=client_address,
                     created_at=now,
                 )
                 .returning(OAuthClientRow.id)
             ).scalar_one()
-            record_audit(
-                conn,
-                Actor(None, "oauth:registration"),
-                "oauth.client.register",
-                target_type="oauth_client",
-                target_id=row_id,
-                details={
-                    "client_id": client_id,
-                    "name": name,
-                    "redirect_uris": redirect_uris,
-                    "auth_method": method,
-                },
-                at=now,
-            )
+        # Not audited: an unauthenticated request that grants nothing must
+        # not write to the append-only trail. Consent and the grant name the
+        # client, its redirect URI and its scopes there.
+        logger.info(
+            "OAuth client %s registered from %s (row %s)",
+            client_id,
+            client_address or "the server",
+            row_id,
+        )
         body: dict[str, Any] = {
             "client_id": client_id,
             "client_id_issued_at": int(now.timestamp()),
@@ -475,7 +562,9 @@ class OAuthService:
         redirect_uri = params.get("redirect_uri")
         if redirect_uri is None and len(client.redirect_uris) == 1:
             redirect_uri = client.redirect_uris[0]
-        if redirect_uri is None or redirect_uri not in client.redirect_uris:
+        if redirect_uri is None or not registered_redirect(
+            redirect_uri, client.redirect_uris
+        ):
             raise InvalidAuthorizationLink(
                 "The app asked to send you back to an address it did not register."
             )
@@ -670,6 +759,9 @@ class OAuthService:
         """The first use of a code: check it and issue the grant's tokens."""
         if now >= row.expires_at:
             raise OAuthError("invalid_grant", "The code has expired.")
+        if row.revoked_at is not None:
+            # The user's password changed or the account went after consent.
+            raise OAuthError("invalid_grant", "The code is no longer valid.")
         if redirect_uri != row.redirect_uri:
             raise OAuthError("invalid_grant", "redirect_uri does not match.")
         if not pkce_matches(verifier, row.code_challenge):
@@ -690,6 +782,7 @@ class OAuthService:
                 user_id=row.user_id,
                 scopes=list(row.scopes),
                 resource=row.resource,
+                redirect_uri=row.redirect_uri,
                 created_at=now,
                 expires_at=now + GRANT_LIFETIME,
                 last_used_at=now,
@@ -709,6 +802,7 @@ class OAuthService:
             scopes=tuple(cast(TokenScope, s) for s in row.scopes),
             refresh_until=now + GRANT_LIFETIME,
             now=now,
+            refresh=client.refresh,
         )
         record_audit(
             conn,
@@ -721,6 +815,7 @@ class OAuthService:
                 "client_name": client.name,
                 "scopes": list(row.scopes),
                 "resource": row.resource,
+                "redirect_uri": row.redirect_uri,
             },
             at=now,
         )
@@ -733,7 +828,17 @@ class OAuthService:
         scope: str | None,
         resource: str | None,
     ) -> IssuedTokens:
-        """New tokens for a refresh token, which is used up (rotation)."""
+        """New tokens for a refresh token, which is used up (rotation).
+
+        The same token again within ``REFRESH_GRACE`` (a retry, or two
+        requests at once) gets the same tokens again; any later use, or one
+        after the successor was used itself, revokes the grant.
+        """
+        if not client.refresh:
+            raise OAuthError(
+                "unauthorized_client",
+                "This client did not register the refresh_token grant type.",
+            )
         if (
             not refresh_token
             or not refresh_token.startswith(REFRESH_PREFIX)
@@ -758,82 +863,87 @@ class OAuthService:
         now: datetime,
     ) -> IssuedTokens | None:
         """New tokens, or None when a used refresh token revoked its grant."""
-        with nullcontext():
-            row = conn.execute(
-                select(
-                    OAuthRefreshTokenRow.id,
-                    OAuthRefreshTokenRow.expires_at,
-                    OAuthRefreshTokenRow.used_at,
-                    OAuthGrantRow.id.label("grant_id"),
-                    OAuthGrantRow.client_id,
-                    OAuthGrantRow.user_id,
-                    OAuthGrantRow.scopes,
-                    OAuthGrantRow.resource,
-                    OAuthGrantRow.expires_at.label("grant_expires_at"),
-                    OAuthGrantRow.revoked_at,
-                    UserRow.active,
-                    UserRow.anonymised_at,
-                )
-                .join(OAuthGrantRow, OAuthGrantRow.id == OAuthRefreshTokenRow.grant_id)
-                .join(UserRow, UserRow.id == OAuthGrantRow.user_id)
-                .where(OAuthRefreshTokenRow.token_sha256 == token_digest(refresh_token))
-                .with_for_update(of=[OAuthRefreshTokenRow, OAuthGrantRow])
-            ).one_or_none()
-            if row is None or row.client_id != client.id:
-                raise OAuthError("invalid_grant", "The refresh token is invalid.")
-            if row.used_at is not None:
-                # Rotation: a used refresh token is either stolen or replayed.
-                if row.revoked_at is None:
-                    _revoke_grant(conn, row.grant_id, "refresh_reused", now)
-                record_audit(
-                    conn,
-                    Actor(None, "oauth:token"),
-                    "oauth.refresh.reuse",
-                    target_type="oauth_grant",
-                    target_id=row.grant_id,
-                    details={"client_id": client.client_id},
-                    at=now,
-                )
-                return None
-            if (
-                row.revoked_at is not None
-                or now >= row.expires_at
-                or now >= row.grant_expires_at
-                or not row.active
-                or row.anonymised_at is not None
-            ):
-                raise OAuthError(
-                    "invalid_grant", "The refresh token is expired or revoked."
-                )
-            if resource is not None and _resource(resource) != row.resource:
-                raise OAuthError("invalid_target", "resource does not match.")
-            granted = tuple(cast(TokenScope, s) for s in row.scopes)
-            scopes = granted
-            if scope is not None and scope.strip():
-                scopes = _scopes(scope, default=granted)
-                if not set(scopes) <= set(granted):
-                    raise OAuthError(
-                        "invalid_scope", "A refresh cannot widen the granted scopes."
-                    )
-            conn.execute(
-                update(OAuthRefreshTokenRow)
-                .where(OAuthRefreshTokenRow.id == row.id)
-                .values(used_at=now)
+        row = conn.execute(
+            select(
+                OAuthRefreshTokenRow.id,
+                OAuthRefreshTokenRow.expires_at,
+                OAuthRefreshTokenRow.used_at,
+                OAuthRefreshTokenRow.successor_nonce,
+                OAuthGrantRow.id.label("grant_id"),
+                OAuthGrantRow.client_id,
+                OAuthGrantRow.user_id,
+                OAuthGrantRow.scopes,
+                OAuthGrantRow.resource,
+                OAuthGrantRow.expires_at.label("grant_expires_at"),
+                OAuthGrantRow.revoked_at,
+                UserRow.active,
+                UserRow.anonymised_at,
             )
-            conn.execute(
-                update(OAuthGrantRow)
-                .where(OAuthGrantRow.id == row.grant_id)
-                .values(last_used_at=now)
-            )
-            return _issue(
+            .join(OAuthGrantRow, OAuthGrantRow.id == OAuthRefreshTokenRow.grant_id)
+            .join(UserRow, UserRow.id == OAuthGrantRow.user_id)
+            .where(OAuthRefreshTokenRow.token_sha256 == token_digest(refresh_token))
+            .with_for_update(of=[OAuthRefreshTokenRow, OAuthGrantRow])
+        ).one_or_none()
+        if row is None or row.client_id != client.id:
+            raise OAuthError("invalid_grant", "The refresh token is invalid.")
+        if row.used_at is not None:
+            again = _same_answer(conn, row, refresh_token, now)
+            if again is not None:
+                return again
+            # Rotation: a used refresh token is either stolen or replayed.
+            if row.revoked_at is None:
+                _revoke_grant(conn, row.grant_id, "refresh_reused", now)
+            record_audit(
                 conn,
-                grant_id=row.grant_id,
-                user_id=row.user_id,
-                name=client.name,
-                scopes=scopes,
-                refresh_until=row.grant_expires_at,
-                now=now,
+                Actor(None, "oauth:token"),
+                "oauth.refresh.reuse",
+                target_type="oauth_grant",
+                target_id=row.grant_id,
+                details={"client_id": client.client_id},
+                at=now,
             )
+            return None
+        if (
+            row.revoked_at is not None
+            or now >= row.expires_at
+            or now >= row.grant_expires_at
+            or not row.active
+            or row.anonymised_at is not None
+        ):
+            raise OAuthError(
+                "invalid_grant", "The refresh token is expired or revoked."
+            )
+        if resource is not None and _resource(resource) != row.resource:
+            raise OAuthError("invalid_target", "resource does not match.")
+        granted = tuple(cast(TokenScope, s) for s in row.scopes)
+        scopes = granted
+        if scope is not None and scope.strip():
+            scopes = _scopes(scope, default=granted)
+            if not set(scopes) <= set(granted):
+                raise OAuthError(
+                    "invalid_scope", "A refresh cannot widen the granted scopes."
+                )
+        nonce = secrets.token_hex(32)
+        conn.execute(
+            update(OAuthRefreshTokenRow)
+            .where(OAuthRefreshTokenRow.id == row.id)
+            .values(used_at=now, successor_nonce=nonce)
+        )
+        conn.execute(
+            update(OAuthGrantRow)
+            .where(OAuthGrantRow.id == row.grant_id)
+            .values(last_used_at=now)
+        )
+        return _issue(
+            conn,
+            grant_id=row.grant_id,
+            user_id=row.user_id,
+            name=client.name,
+            scopes=scopes,
+            refresh_until=row.grant_expires_at,
+            now=now,
+            derive=(refresh_token, nonce),
+        )
 
     def revoke_token(self, client: Client, token: str | None) -> None:
         """RFC 7009: end the grant behind ``token`` if it is this client's.
@@ -905,7 +1015,7 @@ class OAuthService:
                 select(
                     OAuthGrantRow.id,
                     OAuthClientRow.name,
-                    OAuthClientRow.redirect_uris,
+                    OAuthGrantRow.redirect_uri,
                     OAuthGrantRow.scopes,
                     OAuthGrantRow.resource,
                     OAuthGrantRow.created_at,
@@ -926,7 +1036,7 @@ class OAuthService:
             ConnectedApp(
                 id=row.id,
                 client_name=row.name,
-                redirect_host=urlsplit(row.redirect_uris[0]).hostname or "",
+                redirect_host=urlsplit(row.redirect_uri).hostname or "",
                 scopes=tuple(cast(TokenScope, s) for s in row.scopes),
                 resource=row.resource,
                 created_at=row.created_at,
@@ -984,6 +1094,7 @@ def _client(conn: Connection, client_id: str) -> Client | None:
             OAuthClientRow.name,
             OAuthClientRow.redirect_uris,
             OAuthClientRow.auth_method,
+            OAuthClientRow.grant_types,
         ).where(OAuthClientRow.client_id == client_id)
     ).one_or_none()
     if row is None:
@@ -994,6 +1105,78 @@ def _client(conn: Connection, client_id: str) -> Client | None:
         name=row.name,
         redirect_uris=tuple(row.redirect_uris),
         auth_method=cast(AuthMethod, row.auth_method),
+        refresh="refresh_token" in row.grant_types,
+    )
+
+
+def _purge_unused_clients(conn: Connection, now: datetime) -> None:
+    """Delete clients that never got a grant in ``UNUSED_CLIENT_LIFETIME``.
+
+    With their codes, none of which can still be exchanged. A client that
+    ever got a grant stays for good: the audit trail and Connected apps
+    name it.
+    """
+    stale = (
+        select(OAuthClientRow.id)
+        .where(
+            OAuthClientRow.created_at < now - UNUSED_CLIENT_LIFETIME,
+            ~exists().where(OAuthGrantRow.client_id == OAuthClientRow.id),
+            ~exists().where(
+                OAuthCodeRow.client_id == OAuthClientRow.id,
+                OAuthCodeRow.expires_at > now,
+            ),
+        )
+        .scalar_subquery()
+    )
+    try:
+        # A savepoint: a consent arriving this moment for a week-old client
+        # keeps it (foreign key), and the registration goes on.
+        with conn.begin_nested():
+            conn.execute(delete(OAuthCodeRow).where(OAuthCodeRow.client_id.in_(stale)))
+            conn.execute(delete(OAuthClientRow).where(OAuthClientRow.id.in_(stale)))
+    except IntegrityError:
+        logger.info("Unused OAuth clients were not purged this time.")
+
+
+def _same_answer(
+    conn: Connection, row: Any, refresh_token: str, now: datetime
+) -> IssuedTokens | None:
+    """The tokens the first use of ``refresh_token`` gave, within the grace.
+
+    None when the use is not a retry: too late, the grant ended, or the
+    successor refresh token was used already (the chain moved on, so this
+    token is in the wrong hands or badly out of date).
+    """
+    if (
+        row.successor_nonce is None
+        or row.revoked_at is not None
+        or now - row.used_at > REFRESH_GRACE
+        or not row.active
+        or row.anonymised_at is not None
+    ):
+        return None
+    access = TOKEN_PREFIX + _derived(refresh_token, row.successor_nonce, "access")
+    refresh = REFRESH_PREFIX + _derived(refresh_token, row.successor_nonce, "refresh")
+    successor = conn.execute(
+        select(OAuthRefreshTokenRow.used_at).where(
+            OAuthRefreshTokenRow.token_sha256 == token_digest(refresh),
+            OAuthRefreshTokenRow.grant_id == row.grant_id,
+        )
+    ).one_or_none()
+    token = conn.execute(
+        select(ApiTokenRow.scopes, ApiTokenRow.expires_at).where(
+            ApiTokenRow.token_sha256 == token_digest(access),
+            ApiTokenRow.oauth_grant_id == row.grant_id,
+            ApiTokenRow.revoked_at.is_(None),
+        )
+    ).one_or_none()
+    if successor is None or successor.used_at is not None or token is None:
+        return None
+    return IssuedTokens(
+        access_token=access,
+        refresh_token=refresh,
+        expires_in=max(0, int((token.expires_at - now).total_seconds())),
+        scopes=tuple(cast(TokenScope, s) for s in token.scopes),
     )
 
 
@@ -1006,9 +1189,18 @@ def _issue(
     scopes: tuple[TokenScope, ...],
     refresh_until: datetime,
     now: datetime,
+    refresh: bool = True,
+    derive: tuple[str, str] | None = None,
 ) -> IssuedTokens:
-    """A new access token (an API token of the grant) and refresh token."""
-    access = new_token()
+    """A new access token (an API token of the grant) and refresh token.
+
+    Random, or with ``derive`` (the used refresh token and its nonce)
+    derived from them, so that ``_same_answer`` can give them again.
+    Without ``refresh`` there is no refresh token.
+    """
+    access = (
+        new_token() if derive is None else TOKEN_PREFIX + _derived(*derive, "access")
+    )
     access_until = min(now + ACCESS_TOKEN_LIFETIME, refresh_until)
     conn.execute(
         insert(ApiTokenRow).values(
@@ -1022,18 +1214,24 @@ def _issue(
             oauth_grant_id=grant_id,
         )
     )
-    refresh = REFRESH_PREFIX + secrets.token_urlsafe(32)
-    conn.execute(
-        insert(OAuthRefreshTokenRow).values(
-            grant_id=grant_id,
-            token_sha256=token_digest(refresh),
-            created_at=now,
-            expires_at=min(now + REFRESH_TOKEN_LIFETIME, refresh_until),
+    new_refresh: str | None = None
+    if refresh:
+        new_refresh = REFRESH_PREFIX + (
+            secrets.token_urlsafe(32)
+            if derive is None
+            else _derived(*derive, "refresh")
         )
-    )
+        conn.execute(
+            insert(OAuthRefreshTokenRow).values(
+                grant_id=grant_id,
+                token_sha256=token_digest(new_refresh),
+                created_at=now,
+                expires_at=min(now + REFRESH_TOKEN_LIFETIME, refresh_until),
+            )
+        )
     return IssuedTokens(
         access_token=access,
-        refresh_token=refresh,
+        refresh_token=new_refresh,
         expires_in=int((access_until - now).total_seconds()),
         scopes=scopes,
     )

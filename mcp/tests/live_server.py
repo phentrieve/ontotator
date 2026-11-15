@@ -51,6 +51,8 @@ def main() -> None:
                 database_url=database_url_for(root / "mcp.db"),
                 port=port,
                 mcp_url=mcp_url,
+                # The OAuth issuer; without it OAuth stays off.
+                public_origin=f"http://127.0.0.1:{port}",
             )
         )
         try:

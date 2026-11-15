@@ -19,6 +19,7 @@ FILES_DIR_VARIABLE = "ONTOTATOR_MCP_FILES_DIR"
 # Remote mode (--http, issue 388).
 PUBLIC_URL_VARIABLE = "ONTOTATOR_MCP_URL"
 ORIGINS_VARIABLE = "ONTOTATOR_MCP_ALLOWED_ORIGINS"
+ISSUER_VARIABLE = "ONTOTATOR_MCP_ISSUER"
 
 
 class ConfigError(ValueError):
@@ -161,6 +162,10 @@ class HttpSettings:
     one Host the server answers to and the base of its protected resource
     metadata. ``allowed_origins`` are the browser origins that may call it;
     a request without ``Origin`` (a server-side client) is allowed.
+    ``issuer`` is the public origin of the Ontotator instance, announced as
+    the OAuth authorization server (``ONTOTATOR_MCP_ISSUER``); None means
+    the origin of ``ONTOTATOR_URL``, which is right unless that is an
+    internal address.
     """
 
     host: str
@@ -169,6 +174,7 @@ class HttpSettings:
     path: str
     allowed_hosts: tuple[str, ...]
     allowed_origins: tuple[str, ...]
+    issuer: str | None = None
 
     @classmethod
     def from_env(cls, bind: str, env: Mapping[str, str] | None = None) -> HttpSettings:
@@ -204,7 +210,15 @@ class HttpSettings:
                 f"{PUBLIC_URL_VARIABLE} must be https (plain http only on"
                 " localhost): bearer tokens would travel unencrypted."
             )
-        path = parts.path.rstrip("/") or "/mcp"
+        # The Ontotator app binds tokens to this URL as it is written
+        # (``ontotator.auth.oauth.canonical_mcp_url``, the same rules): a
+        # default path here would make the two disagree on the resource.
+        path = parts.path.rstrip("/")
+        if not path:
+            raise ConfigError(
+                f"{PUBLIC_URL_VARIABLE} needs a path such as /mcp, for example"
+                " https://ontotator.example.org/mcp."
+            )
         netloc = hostname.lower()
         if ":" in netloc:
             netloc = f"[{netloc}]"
@@ -240,10 +254,45 @@ class HttpSettings:
             host=host,
             port=port,
             public_url=public_url,
+            issuer=_issuer(env),
             path=path,
             allowed_hosts=(netloc,),
             allowed_origins=tuple(dict.fromkeys(origins)),
         )
+
+
+def _issuer(env: Mapping[str, str]) -> str | None:
+    """``ONTOTATOR_MCP_ISSUER`` as an origin, or None when it is unset."""
+    raw = env.get(ISSUER_VARIABLE, "").strip().rstrip("/")
+    if not raw:
+        return None
+    try:
+        parts = urlsplit(raw)
+        port = parts.port
+    except ValueError:
+        raise ConfigError(f"{ISSUER_VARIABLE} is not a valid URL.") from None
+    if (
+        parts.scheme not in ("http", "https")
+        or not parts.hostname
+        or parts.path
+        or parts.query
+        or parts.fragment
+        or "@" in parts.netloc
+    ):
+        raise ConfigError(
+            f"{ISSUER_VARIABLE} must be the public origin of the Ontotator"
+            " instance, for example https://ontotator.example.org."
+        )
+    if parts.scheme == "http" and not _loopback(parts.hostname):
+        raise ConfigError(
+            f"{ISSUER_VARIABLE} must be https (plain http only on localhost)."
+        )
+    host = parts.hostname.lower()
+    if ":" in host:
+        host = f"[{host}]"
+    if port is not None and port != {"http": 80, "https": 443}[parts.scheme]:
+        host = f"{host}:{port}"
+    return f"{parts.scheme}://{host}"
 
 
 def _bind(value: str) -> tuple[str, int]:

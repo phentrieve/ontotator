@@ -607,7 +607,10 @@ class OAuthClientRow(Base):
 
     Registration is open, as the MCP authorization spec expects: a client is
     only a name and its redirect URIs until a user consents. Only the
-    SHA-256 of a confidential client's secret is stored.
+    SHA-256 of a confidential client's secret is stored. A client that
+    never got a grant is deleted after a week (with its unused codes); the
+    application role may delete rows of this table and of ``oauth_codes``
+    for that, and of no other OAuth table.
     """
 
     __tablename__ = "oauth_clients"
@@ -631,6 +634,11 @@ class OAuthClientRow(Base):
     name: Mapped[str]
     redirect_uris: Mapped[list[str]] = mapped_column(ARRAY(Text))
     auth_method: Mapped[str]
+    # Without ``refresh_token`` here the client gets no refresh tokens.
+    grant_types: Mapped[list[str]] = mapped_column(ARRAY(Text))
+    # The client address the registration came from (an IPv6 /64), which
+    # the hourly limit per address counts; None for one made on the server.
+    registered_from: Mapped[str | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
@@ -658,6 +666,8 @@ class OAuthGrantRow(Base):
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(UserRow.id))
     scopes: Mapped[list[str]] = mapped_column(ARRAY(Text))
     resource: Mapped[str]
+    # Where the code of this grant went: its host is what Connected apps shows.
+    redirect_uri: Mapped[str]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     expires_at: Mapped[datetime]
     last_used_at: Mapped[datetime | None]
@@ -690,6 +700,9 @@ class OAuthCodeRow(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     expires_at: Mapped[datetime]
     used_at: Mapped[datetime | None]
+    # Set when the user's credentials changed or the account went before
+    # the code was used: it can no longer be exchanged.
+    revoked_at: Mapped[datetime | None]
     grant_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey(OAuthGrantRow.id)
     )
@@ -710,6 +723,10 @@ class OAuthRefreshTokenRow(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     expires_at: Mapped[datetime]
     used_at: Mapped[datetime | None]
+    # Random, set when the token is used: its successors are derived from
+    # the token itself and this nonce, so a retry within the grace window
+    # gets the same answer although only digests are stored.
+    successor_nonce: Mapped[str | None]
 
 
 class ApiTokenRow(Base):

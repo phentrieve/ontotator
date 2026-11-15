@@ -74,9 +74,14 @@ def build_server(
 
         from ontotator_mcp.remote import OntotatorTokenVerifier, auth_settings
 
+        # The authorization server clients are sent to is a public address:
+        # ONTOTATOR_MCP_ISSUER, else the origin of ONTOTATOR_URL. With an
+        # internal ONTOTATOR_URL the issuer must be set, or the metadata
+        # would publish the internal host.
         parts = urlsplit(settings.url)
+        issuer = http.issuer or f"{parts.scheme}://{parts.netloc}"
         remote = {
-            "auth": auth_settings(http, f"{parts.scheme}://{parts.netloc}"),
+            "auth": auth_settings(http, issuer),
             "token_verifier": OntotatorTokenVerifier(api, http.public_url),
         }
 

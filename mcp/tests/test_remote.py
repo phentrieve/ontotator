@@ -308,3 +308,115 @@ def test_the_command_refuses_to_start_without_auth_config(
     with pytest.raises(SystemExit):
         main(["--http", "0.0.0.0:8765"])
     assert TOKEN_A not in capsys.readouterr().err
+
+
+# Review findings (PR 429)
+
+
+@pytest.mark.parametrize("url", ["https://mcp.example.org", "https://mcp.example.org/"])
+def test_a_public_url_without_a_path_is_refused(url: str) -> None:
+    """The app binds tokens to the URL as written; a default path here would
+    make this server refuse every OAuth token (a reconnect loop)."""
+    with pytest.raises(ConfigError, match="needs a path"):
+        HttpSettings.from_env("0.0.0.0:8765", {"ONTOTATOR_MCP_URL": url})
+
+
+@pytest.mark.parametrize(
+    ("given", "canonical"),
+    [
+        ("https://Ex.ORG/mcp/", "https://ex.org/mcp"),
+        ("https://ex.org:443/mcp", "https://ex.org/mcp"),
+        ("http://127.0.0.1:8765/mcp", "http://127.0.0.1:8765/mcp"),
+    ],
+)
+def test_the_resource_is_canonical_as_in_the_app(given: str, canonical: str) -> None:
+    # The same vectors as tests/test_oauth.py::test_resources_compare_canonically.
+    settings = HttpSettings.from_env("0.0.0.0:8765", {"ONTOTATOR_MCP_URL": given})
+    assert settings.public_url == canonical
+
+
+def test_the_announced_issuer_is_public_with_an_internal_api_url(fake: FakeApi) -> None:
+    """ONTOTATOR_URL may be an internal address; clients must not be sent there."""
+    http = _http(ONTOTATOR_MCP_ISSUER="https://ontotator.test/")
+    settings = Settings(url="http://ontotator_app:8000", token=None)
+    server = build_server(settings, transport=httpx.MockTransport(fake), http=http)
+    with TestClient(http_app(server, http), base_url="https://ontotator.test") as tc:
+        body = tc.get("/.well-known/oauth-protected-resource/mcp").json()
+    assert [s.rstrip("/") for s in body["authorization_servers"]] == [
+        "https://ontotator.test"
+    ]
+    assert "ontotator_app" not in json.dumps(body)
+
+
+@pytest.mark.parametrize(
+    "issuer", ["http://ontotator.test", "https://ontotator.test/path", "nonsense"]
+)
+def test_an_unusable_issuer_is_refused(issuer: str) -> None:
+    with pytest.raises(ConfigError, match="ONTOTATOR_MCP_ISSUER"):
+        _http(ONTOTATOR_MCP_ISSUER=issuer)
+
+
+def test_browser_clients_can_read_the_resource_metadata(client: TestClient) -> None:
+    """The Origin check belongs on /mcp; the metadata is public."""
+    foreign = {"Origin": "https://some-mcp-client.example"}
+    response = client.get("/.well-known/oauth-protected-resource/mcp", headers=foreign)
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "*"
+    # /mcp itself still refuses that origin, and the metadata another Host.
+    assert _post(client, _rpc("tools/list"), TOKEN_A, **foreign).status_code == 403
+    other_host = client.get(
+        "/.well-known/oauth-protected-resource/mcp", headers={"Host": "evil.example"}
+    )
+    assert other_host.status_code == 421
+
+
+def test_refused_tokens_are_not_checked_again_for_a_while(
+    client: TestClient, fake: FakeApi, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Junk bearers must not each cost a call to Ontotator."""
+    from ontotator_mcp import remote
+
+    fake.on(
+        "GET", "/api/v1/me/token", httpx.Response(401, json={"code": "TOKEN_INVALID"})
+    )
+    fake.accepted = frozenset({"ott_junk", "ott_other"})
+    for _ in range(20):
+        assert _post(client, _rpc("tools/list"), "ott_junk").status_code == 401
+    assert len(fake.calls) == 1
+    assert _post(client, _rpc("tools/list"), "ott_other").status_code == 401
+    assert len(fake.calls) == 2
+    # After the TTL the token is asked about again.
+    clock = remote.time.monotonic()
+    monkeypatch.setattr(
+        remote.time, "monotonic", lambda: clock + remote.REFUSED_TTL + 1
+    )
+    assert _post(client, _rpc("tools/list"), "ott_junk").status_code == 401
+    assert len(fake.calls) == 3
+
+
+def test_the_refusal_cache_is_bounded_and_never_caches_acceptance(
+    client: TestClient, fake: FakeApi, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from ontotator_mcp import remote
+    from ontotator_mcp.client import OntotatorClient
+
+    monkeypatch.setattr(remote, "REFUSED_MAX", 3)
+    verifier = remote.OntotatorTokenVerifier(
+        OntotatorClient(Settings(url=API, token=None)), PUBLIC
+    )
+    for index in range(10):
+        verifier._remember_refused(f"digest-{index}")
+    assert len(verifier._refused) == 3
+    # A valid token is checked on every request (a revocation counts at once).
+    for _ in range(3):
+        assert _post(client, _rpc("tools/list"), TOKEN_A).status_code == 200
+    assert len(fake.calls) == 3
+
+
+def test_an_unreachable_ontotator_is_not_remembered_as_a_refusal(
+    client: TestClient, fake: FakeApi
+) -> None:
+    fake.on("GET", "/api/v1/me/token", httpx.Response(503, text="busy"))
+    assert _post(client, _rpc("tools/list"), TOKEN_A).status_code == 401
+    fake.on("GET", "/api/v1/me/token", token_view(id=1, owner="anna"))
+    assert _post(client, _rpc("tools/list"), TOKEN_A).status_code == 200

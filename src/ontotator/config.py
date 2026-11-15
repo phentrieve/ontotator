@@ -49,8 +49,9 @@ class AppConfig(BaseModel):
     max_request_bytes: int = 1024 * 1024
     # Limits of web requests on the database (0: none). Jobs have none.
     # The public URL of the remote MCP server (ONTOTATOR_MCP_URL, issue 388).
-    # Set, the server is an OAuth authorization server for that resource;
-    # None, every OAuth endpoint answers 404.
+    # Set together with ``public_origin`` (the issuer), the server is an
+    # OAuth authorization server for that resource; otherwise every OAuth
+    # endpoint answers 404.
     mcp_url: str | None = None
     lock_timeout_ms: NonNegativeInt = settings.LOCK_TIMEOUT_MS
     statement_timeout_ms: NonNegativeInt = settings.STATEMENT_TIMEOUT_MS
@@ -72,9 +73,9 @@ class AppConfig(BaseModel):
     def _canonical_mcp_url(cls, value: str | None) -> str | None:
         if value is None:
             return None
-        from ontotator.auth.oauth import canonical_resource
+        from ontotator.auth.oauth import canonical_mcp_url
 
-        return canonical_resource(value)
+        return canonical_mcp_url(value)
 
     @field_validator("trusted_hosts")
     @classmethod
