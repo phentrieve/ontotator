@@ -206,6 +206,23 @@ it('Show changes (off by default) marks removed text in the older and added text
   expect(left().hasAttribute('data-changes')).toBe(false);
 });
 
+it('Show changes says so when the texts differ too much, and marks nothing', async () => {
+  const text = (seed: number) => Array.from({ length: 6000 }, (_, index) => `w${index}x${seed}`).join(' ');
+  vi.mocked(api.getVariantText).mockImplementation(async (_project, doc) => ({ document_id: doc, text: text(doc === 'corrected' ? 2 : 1), text_sha256: 'text' }));
+  const { CaseViewer } = await import('../src/variants/CaseViewer');
+  const mounted = render(<CaseViewer {...props} compare="corrected" />);
+  const toggle = await screen.findByRole<HTMLInputElement>('checkbox', { name: 'Show changes' });
+  await waitFor(() => expect(mounted.container.querySelectorAll('.text-container')).toHaveLength(2));
+  fireEvent.click(toggle);
+  const note = await screen.findByText('The texts differ too much to show the changes.');
+  expect(note.getAttribute('role')).toBe('status');
+  expect(toggle.getAttribute('aria-describedby')).toBe(note.id);
+  expect(toggle.checked).toBe(true);
+  expect(mounted.container.querySelectorAll('.run--marker')).toHaveLength(0);
+  expect(mounted.container.querySelector('[data-changes]')).toBeNull();
+  expect(screen.queryByText(/removed text is struck through/)).toBeNull();
+});
+
 it('Show changes is offered only for two texts of the same language', async () => {
   await viewer({ compare: 'source' });
   const panel = await screen.findByRole('region', { name: 'Comparison' });
