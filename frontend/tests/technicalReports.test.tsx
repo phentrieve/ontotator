@@ -145,6 +145,35 @@ describe("Profile › My technical reports (issue 269)", () => {
     await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
   });
 
+  it("offers older reports when the page is full and appends them without duplicates", async () => {
+    const page = Array.from({ length: 100 }, (_, index) => own({ id: 200 - index, reference: `TR-${200 - index}` }));
+    const list = vi.spyOn(api, "listMyTechnicalReports").mockResolvedValueOnce(page)
+      .mockResolvedValueOnce([own({ id: 101, reference: "TR-101" }), own({ id: 100, reference: "TR-100" }), own({ id: 99, reference: "TR-99" })]);
+    render(<TechnicalReportsSection />);
+    expect(await screen.findByText("Showing your newest 100 reports.")).toBeDefined();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Show older reports" }));
+    await screen.findByText("TR-99");
+    expect(list).toHaveBeenLastCalledWith(100);
+    expect(screen.getAllByText("TR-101")).toHaveLength(1);
+    expect(within(screen.getByRole("table", { name: "My technical reports" })).getAllByRole("row")).toHaveLength(103);
+    expect(screen.queryByRole("button", { name: "Show older reports" })).toBeNull();
+  });
+
+  it("requests one page and scrolls into view when the dialog's link is followed on the same address", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => jsonResponse(200, []));
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    try {
+      render(<><TechnicalReportsSection /><TechnicalReportDialog onClose={vi.fn()} /></>);
+      await screen.findByText("You have not reported a technical problem.");
+      expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/v1/me/technical-reports?limit=100&offset=0");
+      expect(scroll).not.toHaveBeenCalled();
+      await userEvent.setup().click(screen.getByRole("link", { name: "My reports" }));
+      expect(scroll).toHaveBeenCalledWith({ block: "start" });
+      expect(scroll.mock.contexts[0]).toBe(screen.getByRole("region", { name: "My technical reports" }));
+    } finally { delete (Element.prototype as Partial<Element>).scrollIntoView; }
+  });
+
   it("folds a long text behind its first line and says when there is nothing", async () => {
     vi.spyOn(api, "listMyTechnicalReports").mockResolvedValueOnce([own({ description: "First line\nSecond line" })]);
     render(<TechnicalReportsSection />);

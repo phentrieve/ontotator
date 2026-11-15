@@ -458,6 +458,8 @@ export interface ApiClientOptions {
  * throws, so `isNetworkError` (editor autosave) keeps recognising it.
  */
 const TECHNICAL_REPORTS = "/api/v1/technical-reports";
+/** Own technical reports per request; a full page means older ones may follow. */
+export const TECHNICAL_REPORTS_PAGE = 100;
 
 export class NetworkError extends TypeError {
   constructor(readonly cause: unknown) { super("Connection lost. Try again."); this.name = "NetworkError"; }
@@ -724,8 +726,8 @@ export class ApiClient {
   }
 
   /** The caller's own technical reports, newest first (issue 269): reference, text and status only. */
-  async listMyTechnicalReports(): Promise<OwnTechnicalReportView[]> {
-    return this.request<OwnTechnicalReportView[]>("/api/v1/me/technical-reports", { method: "GET" });
+  async listMyTechnicalReports(offset = 0): Promise<OwnTechnicalReportView[]> {
+    return this.request<OwnTechnicalReportView[]>(`/api/v1/me/technical-reports?limit=${TECHNICAL_REPORTS_PAGE}&offset=${offset}`, { method: "GET" });
   }
 
   async adminListTechnicalReports(status?: TechnicalReportStatus): Promise<TechnicalReportView[]> {

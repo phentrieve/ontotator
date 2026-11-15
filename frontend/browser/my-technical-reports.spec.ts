@@ -54,5 +54,14 @@ test("the report dialog links to the own reports, which show Open and Done", asy
   await page.getByRole("button", { name: "Report a technical problem…" }).click();
   await page.getByRole("dialog", { name: "Report a technical problem" }).getByRole("link", { name: "My reports" }).click();
   await expect(page.getByRole("heading", { name: "My technical reports" })).toBeInViewport();
+
+  // On the same address, after scrolling away: sending and "See my reports" scrolls back to the list.
+  await page.getByRole("heading", { name: "Profile", level: 1 }).scrollIntoViewIfNeeded();
+  await expect(page.getByRole("heading", { name: "My technical reports" })).not.toBeInViewport();
+  const third = await sendReport(page, "A third report");
+  await page.getByRole("link", { name: "See my reports" }).click();
+  await expect(page.getByRole("dialog", { name: "Report a technical problem" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "My technical reports" })).toBeInViewport();
+  await expect(table.getByRole("row").nth(1)).toContainText(third);
   expect(errors).toEqual([]);
 });
