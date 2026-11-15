@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-BMc_j1z_.js";import{n as a,t as o}from"./lib-CvJHhkVV.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-Bwa1UJqs.js";import{n as a,t as o}from"./lib-OCEowdk0.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -679,7 +679,7 @@ When the carried work comes from an earlier version of the text, for example aft
 2. Click **Next ›** or **‹ Previous** to scroll to the next or previous passage; it gets a solid frame and the line reads, for example, *1 passage changed · 1 of 1*.
 3. Where text was removed, a small **−** marker stands in the text. Point at it or move to it with \`Tab\` to see the earlier wording, with the removed words struck through. \`Esc\` closes it.
 
-The marks are only shown over the text: the text stays exactly this version, so you can mark text, add or re-create findings and check carried findings as usual while they are on. A changed sentence the tool did not propose a finding for may need a new finding. Untick the box to hide the marks.
+The marks are only shown over the text: the text stays exactly this version, so you can mark text, add or re-create findings and check carried findings as usual while they are on. A changed sentence the tool did not propose a finding for may need a new finding. The marks compare the two versions word by word, while **Check needed** is decided from the exact characters under each finding, so a finding inside a marked passage is not always marked **Check needed**, and the other way round. Untick the box to hide the marks.
 
 ![A carried finding with What to check and the Mark as checked button](images/annotator-carried-finding.png)
 
