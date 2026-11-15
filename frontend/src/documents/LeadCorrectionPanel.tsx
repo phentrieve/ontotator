@@ -1,11 +1,13 @@
 /**
- * The lead's own correction of a rejected or queried translation (spec F1, FD1 to FD9): an inline
+ * The lead's own correction of a rejected, queried or accepted translation (spec F1, FD1 to FD9): a
  * panel that explains the outcome, starts the lead correction (`startLeadCorrection`) and opens the
  * ordinary translation review screen (`#/tasks/{assignment_id}`). Shown from the inline Resolve options
- * under the Documents row ("Correct the translation…"; documents overview Change 13).
+ * under the Documents row ("Correct the translation…"; documents overview Change 13) and, for an accepted
+ * version, in a dialog from its row in the Translation part's version list (issue 341 b): before anything
+ * is saved it lists the annotation work that stays on the accepted version (`getLeadCorrectionPreview`).
  */
 import { useEffect, useId, useRef, useState } from "react";
-import { api, ApiError, type DocumentRowView } from "../api/client";
+import { api, ApiError, type DocumentRowView, type LeadCorrectionPreview } from "../api/client";
 import { textLabel } from "../app/identity";
 import type { Route } from "../app/router";
 import { ErrorNotice } from "../admin/ErrorNotice";
@@ -27,9 +29,25 @@ const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filt
 
 const NOT_AVAILABLE: Readonly<Record<string, string>> = {
   not_newest: "A newer version of this translation exists. Reload the row to see it.",
-  not_rejected_or_queried: "This version is no longer rejected or queried. Reload the row to see its current state.",
+  not_rejected_or_queried: "This version is no longer rejected, queried or accepted. Reload the row to see its current state.",
   review_open: "A translation review of this version is open. Withdraw it with Remove… in the reviewer’s row of the Translation part before you correct the translation yourself.",
+  discarded: "This translation was discarded. Reload the row to see its current state.",
 };
+
+const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
+
+/**
+ * Issue 341 b: what correcting an accepted version means for the annotation work on it (shown before saving):
+ * "3 annotations (2 submitted, 1 open) stay on v1. After saving, the row offers Handle text change…".
+ */
+export function annotationConsequence(preview: Pick<LeadCorrectionPreview, "version" | "next_version" | "annotations" | "annotate_accepted_only">): string | null {
+  const { submitted, open } = preview.annotations;
+  const total = submitted + open;
+  if (!total) return null;
+  const parts = [submitted ? `${submitted} submitted` : null, open ? `${open} open` : null].filter(Boolean).join(", ");
+  const when = preview.annotate_accepted_only ? ` once v${preview.next_version} is accepted` : "";
+  return `${plural(total, "annotation")} (${parts}) ${total === 1 ? "stays" : "stay"} on v${preview.version}. After saving, the row offers Handle text change…${when}.`;
+}
 
 /** Refusals whose generic admin message does not fit starting a correction. */
 const START_REFUSED: Readonly<Record<string, string>> = {
@@ -70,9 +88,13 @@ export interface LeadCorrectionPanelProps {
   onCancel: () => void;
   /** Heading level under the row: 3 in the table (below the hidden h2 "Texts"), 5 in a card. */
   headingLevel?: 3 | 5;
+  /** The version to correct (default `correctionDocumentId`): an accepted version from its version row. */
+  documentId?: string;
+  /** Inside a dialog whose title names the action: no heading of its own. */
+  inDialog?: boolean;
 }
 
-export function LeadCorrectionPanel({ row, projectKey, onNavigate, onCancel, headingLevel = 3 }: LeadCorrectionPanelProps): JSX.Element {
+export function LeadCorrectionPanel({ row, projectKey, onNavigate, onCancel, headingLevel = 3, documentId: chosen, inDialog = false }: LeadCorrectionPanelProps): JSX.Element {
   const Heading = `h${headingLevel}` as "h3";
   const id = useId();
   const heading = useRef<HTMLHeadingElement>(null);
@@ -82,14 +104,27 @@ export function LeadCorrectionPanel({ row, projectKey, onNavigate, onCancel, hea
   /** Missing profile languages once the server asked for the confirmation (stays until answered). */
   const [missing, setMissing] = useState<string[] | null>(null);
   const [confirmLanguage, setConfirmLanguage] = useState(false);
-  const documentId = correctionDocumentId(row);
-  const version = row.versions.find(entry => entry.document_id === documentId)?.version ?? 1;
+  const documentId = chosen ?? correctionDocumentId(row);
+  const entry = row.versions.find(item => item.document_id === documentId);
+  const version = entry?.version ?? 1;
+  const accepted = entry?.translation_status === "accepted";
+  const [preview, setPreview] = useState<LeadCorrectionPreview | null>(null);
+  const [previewError, setPreviewError] = useState<unknown>();
+  const unavailable = preview && !preview.available ? NOT_AVAILABLE[preview.reason ?? ""] ?? null : null;
   const unconfirmed = missing !== null && !confirmLanguage;
+  const blocked = unconfirmed || unavailable !== null;
 
-  useEffect(() => { heading.current?.focus(); }, []);
+  useEffect(() => { if (!inDialog) heading.current?.focus(); }, [inDialog]);
+  // Issue 341 b: the consequences for the annotation work on an accepted version, before saving.
+  useEffect(() => {
+    if (!accepted) return;
+    let live = true;
+    api.getLeadCorrectionPreview(projectKey, documentId).then(value => { if (live) setPreview(value); }, failure => { if (live) setPreviewError(failure); });
+    return () => { live = false; };
+  }, [accepted, projectKey, documentId]);
 
   const start = async () => {
-    if (writing.current || unconfirmed) return;
+    if (writing.current || blocked) return;
     writing.current = true; setBusy(true); setFailure(null);
     try {
       const { text_sha256 } = await api.getVariantMetadata(projectKey, documentId);
@@ -101,9 +136,17 @@ export function LeadCorrectionPanel({ row, projectKey, onNavigate, onCancel, hea
     } finally { writing.current = false; setBusy(false); }
   };
 
-  return <div className="documents-resolve" role="group" aria-labelledby={`${id}-title`}>
-    <Heading id={`${id}-title`} ref={heading} tabIndex={-1} className="inline-confirm-title">{`Correct the translation, ${textLabel(row)}`}</Heading>
-    <p>{`You review v${version} yourself and submit it as Accepted with corrections. The corrected text becomes v${version + 1} and counts as accepted.`}</p>
+  const next = preview?.next_version ?? version + 1;
+  const consequence = preview ? annotationConsequence(preview) : null;
+  return <div className="documents-resolve" role="group" aria-labelledby={inDialog ? undefined : `${id}-title`} aria-label={inDialog ? `Correct the translation, ${textLabel(row)} v${version}` : undefined}>
+    {!inDialog && <Heading id={`${id}-title`} ref={heading} tabIndex={-1} className="inline-confirm-title">{`Correct the translation, ${textLabel(row)}`}</Heading>}
+    {accepted
+      ? <p>{`You correct the accepted v${version} yourself in the translation review and submit it as Accepted with corrections. The corrected text becomes v${next}.`}</p>
+      : <p>{`You review v${version} yourself and submit it as Accepted with corrections. The corrected text becomes v${version + 1} and counts as accepted.`}</p>}
+    {consequence && <InlineMessage tone="warning" title={`Annotation has work on v${version}.`}>{consequence}</InlineMessage>}
+    {accepted && <p className="field-hint">{`v${next} starts as a correction with review On.`}</p>}
+    {unavailable && <InlineMessage tone="warning">{unavailable}</InlineMessage>}
+    {previewError !== undefined && <ErrorNotice error={previewError} />}
     {missing !== null && <Checkbox id={`${id}-language`} label={`Correct despite missing ${missing.join(", ")} in your profile`}
       checked={confirmLanguage} onChange={event => setConfirmLanguage(event.target.checked)} />}
     {failure?.kind === "qualification" && <InlineMessage tone="warning">
@@ -115,7 +158,7 @@ export function LeadCorrectionPanel({ row, projectKey, onNavigate, onCancel, hea
     {unconfirmed && <p id={`${id}-unconfirmed`} className="action-reason">Confirm the missing languages.</p>}
     <div className="documents-resolve-actions">
       <Button size="sm" onClick={onCancel}>Cancel</Button>
-      <Button size="sm" variant="primary" loading={busy} aria-disabled={unconfirmed || busy ? true : undefined}
+      <Button size="sm" variant="primary" loading={busy} aria-disabled={blocked || busy ? true : undefined}
         aria-describedby={unconfirmed ? `${id}-unconfirmed` : undefined} onClick={() => { void start(); }}>Open translation review</Button>
     </div>
   </div>;

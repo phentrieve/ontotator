@@ -31,6 +31,25 @@ class LeadCorrectionRequest(BaseModel):
     confirm_language: bool = False
 
 
+class LeadCorrectionAnnotationsView(BaseModel):
+    submitted: int
+    open: int
+
+
+class LeadCorrectionPreview(BaseModel):
+    """What "Correct the translation…" would start (issue 341 b)."""
+
+    document_id: str
+    version: int
+    next_version: int
+    translation_status: str | None
+    available: bool
+    reason: str | None
+    review_on: bool
+    annotate_accepted_only: bool
+    annotations: LeadCorrectionAnnotationsView
+
+
 class SourceObligationView(SourceReviewObligation):
     old_source_text: str
     new_source_text: str
@@ -70,11 +89,23 @@ def start_lead_correction(
     request: Request,
     principal: PrincipalDep,
 ) -> AssignmentView:
-    """F1: the lead reviews a rejected or queried version themselves."""
+    """F1: the lead reviews a rejected, queried or accepted version themselves."""
     row = _service(request).start_lead_correction(
         Actor.user(principal.user_id, principal.username), key, doc, **body.model_dump()
     )
     return _views(request, [row])[0]
+
+
+@router.get("/projects/{key}/documents/{doc:path}/lead-correction")
+def preview_lead_correction(
+    key: str, doc: str, request: Request, principal: PrincipalDep
+) -> LeadCorrectionPreview:
+    """Issue 341 b: availability and the annotation work that stays on the version."""
+    return LeadCorrectionPreview.model_validate(
+        _service(request).lead_correction_preview(
+            Actor.user(principal.user_id, principal.username), key, doc
+        )
+    )
 
 
 @router.get("/translation-reviews/{assignment_id}/source-obligations")

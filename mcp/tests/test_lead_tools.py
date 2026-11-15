@@ -301,6 +301,25 @@ async def test_translation_tools_send_the_versions_text_hash(
     assert lead.json() == {"expected_text_sha256": "a" * 64, "confirm_language": False}
 
 
+async def test_accept_translation_version_sends_the_text_hash_after_a_dry_run(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    variant = build("VariantSummary", document_id="d", text_sha256="b" * 64)
+    fake.on("GET", f"{P}/documents/{{doc}}/variant", variant)
+    accept = f"{P}/variants/{{document_id}}/accept"
+    args = {"project": "p", "document_id": "d", "reason": "Checked"}
+    dry = await call(mcp_client, "accept_translation_version", args)
+    assert dry["applied"] is False
+    assert dry["plan"]["variant"]["document_id"] == "d"
+    assert not fake.calls_to("POST", accept)
+    done = await call(
+        mcp_client, "accept_translation_version", args | {"confirm": True}
+    )
+    assert done["applied"] is True
+    [sent] = fake.calls_to("POST", accept)
+    assert sent.json() == {"reason": "Checked", "expected_text_sha256": "b" * 64}
+
+
 async def test_assign_texts_asks_for_a_review_of_an_accepted_translation(
     fake: FakeApi, mcp_client: Client
 ) -> None:

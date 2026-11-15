@@ -211,7 +211,6 @@ def _open_review(env: Any) -> None:
 @pytest.mark.parametrize(
     ("setup", "reason"),
     [
-        (_accepted, "not_rejected_or_queried"),
         (_pending, "not_rejected_or_queried"),
         (_older, "not_newest"),
         (_open_review, "review_open"),
@@ -750,3 +749,117 @@ def test_a_project_token_starts_the_lead_correction(rejected):
     (audit,) = audits(env, "translation.lead_correction_started")
     token_id = tokens["admin"].get("/api/v1/me/token").json()["id"]
     assert audit["api_token"]["id"] == token_id
+
+
+# --- issue 341 b: lead correction of an accepted version ------------------- #
+
+
+@pytest.fixture
+def accepted(review_env):
+    """``target`` accepted unchanged by Alice; Bob's open review withdrawn;
+    Bob annotates it (open), the leader's earlier annotation is submitted."""
+    env = review_env
+    _accepted(env)
+    with env.db.transaction() as conn:
+        for name, status in (("bob", "open"), ("root", "submitted")):
+            conn.execute(
+                insert(AssignmentRow).values(
+                    project_id=env.pid,
+                    document_id="target",
+                    user_id=env.accesses[name].user_id,
+                    task="annotate",
+                    annotation_mode="scratch",
+                    status=status,
+                )
+            )
+    return env
+
+
+def test_preview_lists_the_annotation_work_on_the_accepted_version(accepted):
+    env = accepted
+    preview = workflow(env).lead_correction_preview(lead(env), "proj", "target")
+    assert preview == {
+        "document_id": "target",
+        "version": 1,
+        "next_version": 2,
+        "translation_status": "accepted",
+        "available": True,
+        "reason": None,
+        "review_on": flags_of(env, "case", "de").review,
+        "annotate_accepted_only": True,
+        "annotations": {"submitted": 1, "open": 1},
+    }
+    response = logged_in(env.app, "leader").get(
+        f"{BASE}/documents/target/lead-correction"
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["annotations"] == {"submitted": 1, "open": 1}
+
+
+def test_preview_names_the_refusal_and_writes_nothing(review_env):
+    env = review_env
+    before = len(audits(env, "translation.lead_correction_started"))
+    preview = workflow(env).lead_correction_preview(lead(env), "proj", "target")
+    assert preview["available"] is False
+    assert preview["reason"] == "not_rejected_or_queried"
+    assert preview["annotations"] == {"submitted": 0, "open": 0}
+    assert len(audits(env, "translation.lead_correction_started")) == before
+    refused = logged_in(env.app, "alice").get(
+        f"{BASE}/documents/target/lead-correction"
+    )
+    assert refused.status_code == 403, refused.text
+
+
+def test_correction_of_accepted_version_is_reviewed_again(accepted):
+    env = accepted
+    write(env, {RowKey("case", "de"): PlanFlags(False, True)})
+    assignment = start(env)
+    assert assignment.lead_correction is True
+    # Review turned on: the new version is reviewed again (D26).
+    assert flags_of(env, "case", "de").review is True
+    record = submit_as_lead(env, assignment.id, "accepted_corrected", "Korrigiert")
+    assert (record.status_before, record.status_after) == ("accepted", "accepted")
+    child = env.app.state.repo.get_variant("proj", record.created_variant_id)
+    assert child.origin == "correction"
+    assert child.derived_from == "target"
+    assert child.version == 2
+    assert child.translation_status == "ready_for_review"
+    # The accepted version and its annotation work stay (text-change path).
+    parent = env.app.state.repo.get_variant("proj", "target")
+    assert parent.translation_status == "accepted"
+    with env.db.transaction() as conn:
+        annotations = conn.execute(
+            select(AssignmentRow.document_id, AssignmentRow.status).where(
+                AssignmentRow.task == "annotate",
+                AssignmentRow.revoked_at.is_(None),
+            )
+        ).all()
+    assert sorted(annotations) == [("target", "open"), ("target", "submitted")]
+    # The new version takes an ordinary translation review.
+    review = AssignmentService(env.db).assign(
+        HARNESS,
+        "proj",
+        record.created_variant_id,
+        "alice",
+        "translation_review",
+        confirm_language=True,
+    )
+    assert review.document_id == record.created_variant_id
+
+
+def test_correction_of_accepted_version_refused_while_a_review_is_open(review_env):
+    env = review_env
+    AssignmentService(env.db).revoke(HARNESS, env.ids["bob"])
+    decide(env, "accepted_unchanged")
+    workflow(env).assign_correction(
+        lead(env),
+        "proj",
+        "target",
+        "bob",
+        expected_text_sha256=target_hash(env),
+        reason="Dose missing",
+        confirm_language=True,
+    )
+    with pytest.raises(DomainError) as caught:
+        start(env)
+    assert caught.value.details == {"reason": "review_open"}

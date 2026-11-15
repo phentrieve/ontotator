@@ -116,13 +116,14 @@ What for: decide what happens after a reviewer rejected or queried a translation
 
 ### Correct a translation yourself
 
-What for: fix a queried or rejected translation without assigning another review.
+What for: fix a queried, rejected or accepted translation without assigning another review.
 
-1. In the row, click **Resolve…**, then **Correct the translation…** (or **Continue your correction**).
-2. Read the panel: you review the version yourself, and your corrected text becomes the next text version and counts as accepted. If your profile lists languages but not this one, tick *Correct despite missing de in your profile*. Without a qualification in your profile, the panel links to **Add your qualification in your profile**; after saving, **Back to Documents** returns you to the texts.
-3. Click **Open translation review**. The screen says **You are correcting this translation as project lead.**
+1. For a queried or rejected translation: in the row, click **Resolve…**, then **Correct the translation…** (or **Continue your correction**). For an accepted translation: open the text card, click **Translation** and, at the newest accepted version, click **Correct the translation…**.
+2. Read the panel: you review the version yourself, and your corrected text becomes the next text version. After a rejection or a query, it counts as accepted. A correction of an accepted version starts as a correction with review On: it is reviewed again before annotation moves to it. If people annotated the accepted version, the dialog says so before you start, for example *Annotation has work on v1. 3 annotations (2 submitted, 1 open) stay on v1. After saving, the row offers Handle text change…*. Nothing is carried automatically. If your profile lists languages but not this one, tick *Correct despite missing de in your profile*. Without a qualification in your profile, the panel links to **Add your qualification in your profile**; after saving, **Back to Documents** returns you to the texts.
+3. Click **Open translation review**. The screen says **You are correcting this translation as project lead.** (for an accepted version: **You are correcting this accepted translation as project lead.**)
 4. Correct the translation as described in [Review a translation](annotator.md#review-a-translation). Only **Accepted with corrections** is offered.
 5. Submit with **Submit review…** (or `Ctrl+Enter`), then click **Back to Documents**.
+6. After the correction of an accepted version, assign the review of the new version as usual. The annotation work on the old version is handled with **Handle text change…** and *Carry to v2…* ([Handle a text change for open annotation work](#handle-a-text-change-for-open-annotation-work)); with **Annotate only after the translation review is accepted** on, the row offers them once the new version is accepted.
 
 ### Accept a translation that was not reviewed
 
@@ -133,7 +134,18 @@ What for: annotate a translation that was reviewed outside Ontotator. The row's 
    - Click **Turn translation review on**, then assign a review.
    - Tick **This translation was reviewed outside Ontotator — accept it as it is**, enter a **Reason** and click **Accept and annotate**.
 
-Ontotator records the acceptance with your name, the reason and the time. It accepts the newest version of every translation of the text, parallel translations included. To have an accepted translation reviewed after all, click **Assign a new review…** in the **Translation** part of the text card.
+Ontotator records the acceptance with your name, the reason and the time. It accepts the newest version of every translation of the text, parallel translations included. To accept only one of them, use [Accept one translation version](#accept-one-translation-version). To have an accepted translation reviewed after all, click **Assign a new review…** in the **Translation** part of the text card.
+
+### Accept one translation version
+
+What for: accept exactly one version, for example an imported correction that was checked outside Ontotator, without touching the other translations of the text.
+
+1. Open the text card and click **Translation**.
+2. At the version, click **Accept this version…**. It is offered at the newest version of a translation that is neither reviewed nor accepted.
+3. Enter a **Reason**, for example *Checked against the DeepL output*. *The acceptance is recorded with your name, the reason and the time.*
+4. Click the button that names the version, for example *Accept v2*.
+
+The version then reads like other acceptances, for example *Accepted: reviewed outside Ontotator, Project lead (ann-0002), 14 Nov, 19:40, Checked against the DeepL output*. While a translation review of the version is open, the acceptance is refused: withdraw the review with **Remove…** first.
 
 ### Handle a text change for open annotation work
 

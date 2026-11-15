@@ -1447,3 +1447,120 @@ class WorkPlanService:
                 "revision": revision,
                 "withdrawn": self._withdrawn_views(conn, key, result.withdrawn),
             }
+
+    # --- accepting one version (issue 341 d) ------------------------------- #
+
+    def accept_version(
+        self, key: str, document_id: str, reason: str, expected_text_sha256: str
+    ) -> dict[str, Any]:
+        """Accept exactly one translation version as reviewed outside Ontotator.
+
+        The same rule and record as the work plan's acceptance (D20: reason
+        required, ``source="lead"``, audited
+        ``translation.accept_external_review``), but for the newest version of
+        one chain only: parallel translations of the row stay as they are.
+        Refused (``VERSION_NOT_ACCEPTABLE``) for an older version, a discarded
+        one, one already accepted or reviewed, and while a translation review
+        of its chain is open.
+        """
+        reason = reason.strip()
+        if not reason:
+            raise DomainError("OVERRIDE_REASON_REQUIRED")
+        with self.db.transaction() as conn:
+            project = self._lock(conn, key, exclusive=True)
+            pid = project["id"]
+            document = conn.execute(
+                select(
+                    DocumentRow.case_id,
+                    DocumentRow.language,
+                    DocumentRow.text_sha256,
+                ).where(
+                    DocumentRow.project_id == pid,
+                    DocumentRow.document_id == document_id,
+                )
+            ).one_or_none()
+            if document is None:
+                raise DomainError("DOCUMENT_NOT_FOUND")
+            require_project_management(
+                conn, self.actor, key, pid, Action.OVERRIDE_TRANSLATION_STATUS
+            )
+            row_key = RowKey(document.case_id, document.language)
+            chain = next(
+                c
+                for c in _chains(conn, pid, [document.case_id])[row_key]
+                if any(v.document_id == document_id for v in c.versions)
+            )
+            if chain.root.origin == "native":
+                raise DomainError("NOT_A_TRANSLATION", {"reason": "not_a_translation"})
+            if document.text_sha256 != expected_text_sha256:
+                raise DomainError("VARIANT_REVIEW_STALE")
+            target = next(v for v in chain.versions if v.document_id == document_id)
+            ids = [v.document_id for v in chain.versions]
+            refusal: str | None = None
+            if set(ids) & set(store.discarded(conn, pid)):
+                refusal = "discarded"
+            elif chain.newest.document_id != document_id:
+                refusal = "not_newest"
+            elif target.translation_status == "accepted":
+                refusal = "accepted"
+            elif target.translation_status == "reviewed":
+                refusal = "reviewed"
+            elif (
+                conn.execute(
+                    select(AssignmentRow.id)
+                    .where(
+                        AssignmentRow.project_id == pid,
+                        AssignmentRow.document_id.in_(ids),
+                        AssignmentRow.task == "translation_review",
+                        AssignmentRow.revoked_at.is_(None),
+                        AssignmentRow.status != "submitted",
+                    )
+                    .limit(1)
+                ).first()
+                is not None
+            ):
+                refusal = "review_open"
+            if refusal is not None:
+                raise DomainError("VERSION_NOT_ACCEPTABLE", {"reason": refusal})
+            now = datetime.now(UTC)
+            conn.execute(
+                update(DocumentRow)
+                .where(
+                    DocumentRow.project_id == pid,
+                    DocumentRow.document_id == document_id,
+                )
+                .values(translation_status="accepted", status_reason=reason)
+            )
+            store.add_acceptance(
+                conn,
+                pid,
+                document_id,
+                source="lead",
+                reason=reason,
+                accepted_by=self.actor.user_id,
+            )
+            record_audit(
+                conn,
+                self.actor,
+                "translation.accept_external_review",
+                target_type="document",
+                target_id=document_id,
+                project_id=pid,
+                details={
+                    "document_id": document_id,
+                    "case_id": row_key.case_id,
+                    "language": row_key.language,
+                    "from": target.translation_status,
+                    "to": "accepted",
+                    "reason": reason,
+                    "scope": "version",
+                },
+                at=now,
+            )
+            return {
+                "case_id": row_key.case_id,
+                "language": row_key.language,
+                "document_id": document_id,
+                "version": target.version,
+                "translation_status": "accepted",
+            }

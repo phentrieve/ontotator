@@ -1679,6 +1679,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{key}/variants/{document_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Version
+         * @description Accept this one version, audited with the reason (issue 341 d).
+         */
+        post: operations["accept_version_api_v1_projects__key__variants__document_id__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{key}/annotation-mode-changes": {
         parameters: {
             query?: never;
@@ -1759,11 +1779,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Preview Lead Correction
+         * @description Issue 341 b: availability and the annotation work that stays on the version.
+         */
+        get: operations["preview_lead_correction_api_v1_projects__key__documents__doc__lead_correction_get"];
         put?: never;
         /**
          * Start Lead Correction
-         * @description F1: the lead reviews a rejected or queried version themselves.
+         * @description F1: the lead reviews a rejected, queried or accepted version themselves.
          */
         post: operations["start_lead_correction_api_v1_projects__key__documents__doc__lead_correction_post"];
         delete?: never;
@@ -3185,6 +3209,32 @@ export interface components {
         AcceptExternalReview: {
             /** Reason */
             reason: string;
+        };
+        /**
+         * AcceptVersionRequest
+         * @description Issue 341 d: accept exactly one version as reviewed outside Ontotator.
+         */
+        AcceptVersionRequest: {
+            /** Reason */
+            reason: string;
+            /** Expected Text Sha256 */
+            expected_text_sha256: string;
+        };
+        /** AcceptVersionResult */
+        AcceptVersionResult: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Document Id */
+            document_id: string;
+            /** Version */
+            version: number;
+            /**
+             * Translation Status
+             * @constant
+             */
+            translation_status: "accepted";
         };
         /**
          * ActiveHoldView
@@ -6214,6 +6264,36 @@ export interface components {
             default_type_id: string;
             /** Annotation Types */
             annotation_types: components["schemas"]["AnnotationTypeDefinition"][];
+        };
+        /** LeadCorrectionAnnotationsView */
+        LeadCorrectionAnnotationsView: {
+            /** Submitted */
+            submitted: number;
+            /** Open */
+            open: number;
+        };
+        /**
+         * LeadCorrectionPreview
+         * @description What "Correct the translation…" would start (issue 341 b).
+         */
+        LeadCorrectionPreview: {
+            /** Document Id */
+            document_id: string;
+            /** Version */
+            version: number;
+            /** Next Version */
+            next_version: number;
+            /** Translation Status */
+            translation_status: string | null;
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason: string | null;
+            /** Review On */
+            review_on: boolean;
+            /** Annotate Accepted Only */
+            annotate_accepted_only: boolean;
+            annotations: components["schemas"]["LeadCorrectionAnnotationsView"];
         };
         /** LeadCorrectionRequest */
         LeadCorrectionRequest: {
@@ -13783,6 +13863,42 @@ export interface operations {
             };
         };
     };
+    accept_version_api_v1_projects__key__variants__document_id__accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptVersionResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_mode_changes_api_v1_projects__key__annotation_mode_changes_get: {
         parameters: {
             query?: {
@@ -13946,6 +14062,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AssignmentView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_lead_correction_api_v1_projects__key__documents__doc__lead_correction_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                doc: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadCorrectionPreview"];
                 };
             };
             /** @description Validation Error */

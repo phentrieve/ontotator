@@ -172,6 +172,10 @@ The text is not in the work plan. Plan it first. See [Add a text to the plan](le
 
 You assigned a translation review to someone who already reviewed this version, for example after they rejected it. A second assignment is not possible; reopen their review instead: **Resolve…**, then the reopen item, for example *Reopen Ana Weber's review…*. See [Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation).
 
+### "This version can no longer be accepted here."
+
+**Accept this version…** was refused: the version was accepted or reviewed meanwhile, a newer version exists, it was discarded, or a translation review of it is open. The dialog names the reason. Close it and look at the version list again. See [Accept one translation version](lead-results.md#accept-one-translation-version).
+
 ### A task is still paused after I closed the report
 
 Closing a report does not always release the pause. The row shows **Resume task…**; click it and release the pause. See [Decide on a problem report](lead-results.md#decide-on-a-problem-report).

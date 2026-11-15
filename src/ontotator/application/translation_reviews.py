@@ -35,6 +35,7 @@ from ontotator.domain.translation_review import (
     next_status,
 )
 from ontotator.domain.variants import (
+    TranslationStatus,
     VariantInfo,
     resolve_translation_lineage,
     translation_review_comparisons,
@@ -657,6 +658,12 @@ class TranslationReviewService:
             before = variant.translation_status
             assert before is not None
             after, child_status = next_status(form.decision)
+            corrected_status: TranslationStatus | None = child_status
+            if assignment.lead_correction and before == "accepted":
+                # Issue 341 b: the lead's correction of an accepted version is
+                # a new text that is reviewed again; the accepted version and
+                # the annotation work on it stay (text-change steps follow).
+                after, corrected_status = "accepted", "ready_for_review"
             child = None
             if child_status:
                 latest = max(
@@ -676,7 +683,7 @@ class TranslationReviewService:
                     origin="correction",
                     derived_from=variant.document_id,
                     translation=None,
-                    translation_status=child_status,
+                    translation_status=corrected_status,
                 )
             proposed = canonical_text(draft.text)
             sha = hashlib.sha256(proposed.encode("utf-8")).hexdigest()

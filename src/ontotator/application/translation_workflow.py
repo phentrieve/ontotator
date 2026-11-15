@@ -26,6 +26,7 @@ from ontotator.domain.work_plans import RowKey
 from ontotator.domain.work_rounds import derive_source_obligations
 from ontotator.jobs.queue import JobQueue
 from ontotator.projects.assignments import revoke_assignments
+from ontotator.storage import work_plan_store
 from ontotator.storage.database import Database
 from ontotator.storage.plan_tables import DiscardedVariantRow
 from ontotator.storage.tables import (
@@ -191,12 +192,14 @@ class TranslationWorkflowService:
         expected_text_sha256: str,
         confirm_language: bool = False,
     ) -> Assignment:
-        """F1: the lead reviews a rejected or queried version themselves.
+        """F1: the lead reviews a rejected, queried or accepted version themselves.
 
         An ordinary translation review assigned to the lead with
         ``lead_correction`` (FD1); only the lead role grants it (FD2), so the
         task-role check is not applied. Submitted only as
-        ``accepted_corrected`` (FD4, ``TranslationReviewService.submit``).
+        ``accepted_corrected`` (FD4, ``TranslationReviewService.submit``). The
+        correction of an accepted version (issue 341 b) becomes a new version
+        that is reviewed again; the accepted version and its annotations stay.
         """
         if actor.user_id is None:
             raise AccessDenied("NOT_ALLOWED", "Only a project lead can do this.")
@@ -253,7 +256,11 @@ class TranslationWorkflowService:
                 select(UserRow.qualification).where(UserRow.id == lead)
             ).scalar_one()
             required = check_variant_assignable(
-                project, variant, "translation_review", variants.get
+                project,
+                variant,
+                "translation_review",
+                variants.get,
+                allow_accepted_translation_review=True,
             )
             languages = list(
                 conn.execute(
@@ -314,6 +321,84 @@ class TranslationWorkflowService:
             )
             return assignment
 
+    def lead_correction_preview(
+        self, actor: Actor, project_key: str, document_id: str
+    ) -> dict[str, Any]:
+        """What a lead correction of ``document_id`` would start (issue 341 b).
+
+        Read only. ``available`` with the refusal ``reason`` of
+        ``start_lead_correction`` (``not_newest``, ``not_rejected_or_queried``,
+        ``review_open``, ``discarded``); ``annotate_accepted_only`` is the
+        project's rule (the text-change steps wait for the new version's
+        acceptance); ``annotations`` counts the live
+        annotation tasks on this version (submitted, open), which stay on it:
+        after the correction the row offers the text-change steps.
+        """
+        if actor.user_id is None:
+            raise AccessDenied("NOT_ALLOWED", "Only a project lead can do this.")
+        assignments = AssignmentService(self.db)
+        with self.db.transaction() as conn:
+            project = assignments._prepare(conn, actor, project_key)
+            pid = project["id"]
+            variants = load_variants(conn, pid)
+            variant = variants.get(document_id)
+            if variant is None:
+                raise DomainError("DOCUMENT_NOT_FOUND")
+            reason: str | None = None
+            try:
+                self._require_not_discarded(conn, pid, variant)
+            except DomainError:
+                reason = "discarded"
+            if reason is None:
+                try:
+                    self._require_lead_correction_available(
+                        conn, pid, variant, variants, actor.user_id
+                    )
+                except DomainError as refused:
+                    details = refused.details
+                    reason = (
+                        str(details.get("reason"))
+                        if isinstance(details, Mapping)
+                        else "not_available"
+                    )
+            statuses = list(
+                conn.execute(
+                    select(AssignmentRow.status).where(
+                        AssignmentRow.project_id == pid,
+                        AssignmentRow.document_id == document_id,
+                        AssignmentRow.task == "annotate",
+                        AssignmentRow.revoked_at.is_(None),
+                    )
+                ).scalars()
+            )
+            key = RowKey(variant.case_id, variant.language)
+            flags = work_plan_store.effective_plan(conn, pid, [variant.case_id]).get(
+                key
+            )
+            newest = max(
+                v.version
+                for v in variants.values()
+                if (v.external_id, v.language)
+                == (variant.external_id, variant.language)
+            )
+            submitted = sum(1 for status in statuses if status == "submitted")
+            return {
+                "document_id": document_id,
+                "version": variant.version,
+                "next_version": newest + 1,
+                "translation_status": variant.translation_status,
+                "available": reason is None,
+                "reason": reason,
+                "review_on": bool(flags and flags.review),
+                "annotate_accepted_only": bool(
+                    project["annotate_accepted_translations_only"]
+                ),
+                "annotations": {
+                    "submitted": submitted,
+                    "open": len(statuses) - submitted,
+                },
+            }
+
     @staticmethod
     def _require_lead_correction_available(
         conn: Connection,
@@ -323,7 +408,8 @@ class TranslationWorkflowService:
         lead: int,
     ) -> None:
         """FD3: the newest version of its chain, last decided rejected or
-        query, with no open translation review of someone else."""
+        query or accepted (issue 341 b), with no open translation review of
+        someone else."""
         decision = conn.execute(
             select(TranslationReviewRow.decision)
             .where(
@@ -340,9 +426,9 @@ class TranslationWorkflowService:
             if (v.external_id, v.language) == (variant.external_id, variant.language)
         ):
             reason = "not_newest"
-        elif variant.translation_status != "reviewed" or decision not in (
-            "rejected",
-            "query",
+        elif variant.translation_status != "accepted" and (
+            variant.translation_status != "reviewed"
+            or decision not in ("rejected", "query")
         ):
             reason = "not_rejected_or_queried"
         elif (

@@ -409,6 +409,8 @@ Steps:
 7. Click **Submit review…** (or press `Ctrl+Enter`), read what will happen, then click **Submit review**.
 8. A message confirms the review, with **View result**. Your next open task opens on its own, another translation review first, or **My tasks** if none is left. If you also annotate this text and your review finished its translation, your annotation of the text opens instead and the message adds *Annotate this text now*. Finished means: the translation is accepted (with corrections, on the corrected version), every other translation of the text is accepted too, and no further review or decision of the lead is pending. After **Query** or **Rejected** it does not come first.
 
+A project lead who corrects a translation themselves sees only **Accepted with corrections**. When the lead corrects a translation that was already accepted, the corrected version is reviewed again: it then appears as a new translation review task, usually for you ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
+
 If the source text was updated, **Source updates to review** appears. Open it, compare **Original source** and **Updated source**, and click **Submit review and resolve source update**.
 
 ![A translation review: the source on the left, the translation on the right, the failed automatic check above them. On the right, Query is chosen with the category Number or unit and a rationale, above Submit review…](images/annotator-translation-review.png)

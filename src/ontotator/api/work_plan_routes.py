@@ -286,6 +286,22 @@ class DiscardResult(BaseModel):
     withdrawn: list[WithdrawnTaskView]
 
 
+class AcceptVersionRequest(BaseModel):
+    """Issue 341 d: accept exactly one version as reviewed outside Ontotator."""
+
+    model_config = ConfigDict(extra="forbid")
+    reason: str = Field(min_length=1, max_length=2000)
+    expected_text_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+class AcceptVersionResult(BaseModel):
+    case_id: str
+    language: str
+    document_id: str
+    version: int
+    translation_status: Literal["accepted"]
+
+
 def _service(request: Request, key: str, principal: Any) -> WorkPlanService:
     access = get_access(request)
     if not can(access, Action.VIEW_PROJECT, key):
@@ -373,4 +389,18 @@ def discard_variant(
 ) -> dict[str, Any]:
     return _service(request, key, principal).discard(
         key, document_id, body.reason, body.confirm
+    )
+
+
+@router.post("/variants/{document_id:path}/accept", response_model=AcceptVersionResult)
+def accept_version(
+    key: str,
+    document_id: str,
+    body: AcceptVersionRequest,
+    principal: PrincipalDep,
+    request: Request,
+) -> dict[str, Any]:
+    """Accept this one version, audited with the reason (issue 341 d)."""
+    return _service(request, key, principal).accept_version(
+        key, document_id, body.reason, body.expected_text_sha256
     )

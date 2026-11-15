@@ -186,6 +186,12 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "reason": "Dose missing",
         },
         "start_lead_correction": {"project": "p", "document_id": "d"},
+        "accept_translation_version": {
+            "project": "p",
+            "document_id": "d",
+            "reason": "Checked against the DeepL output",
+            "confirm": True,
+        },
         "discard_translation": {
             "project": "p",
             "document_id": "d",

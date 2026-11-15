@@ -406,13 +406,16 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
     async def start_lead_correction(
         project: Project, document_id: DocumentId, confirm_language: bool = False
     ) -> dict[str, Any]:
-        """Take over the correction of a rejected or queried translation as the lead.
+        """Take over the correction of a rejected, queried or accepted translation as the lead.
 
         Gives the token's owner, a lead of the project, a translation review
         task (``lead_correction``) on the newest version; the review itself
         is done in the web interface and submitted only as accepted after
-        correction. An earlier submitted review of the lead is withdrawn
-        (it stays recorded). Calling it again returns the same task.
+        correction. The correction of an accepted version becomes a new
+        version that is reviewed again; annotation work stays on the
+        accepted version (handle it with the text-change tools). An earlier
+        submitted review of the lead is withdrawn (it stays recorded).
+        Calling it again returns the same task.
         """
         variant = await _variant(project, document_id)
         task: dict[str, Any] = await api.post(
@@ -423,6 +426,47 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
             },
         )
         return assignment_summary(task)
+
+    @register(server, scopes=("read", "project-admin"), effect="changes")
+    async def accept_translation_version(
+        project: Project,
+        document_id: DocumentId,
+        reason: Annotated[
+            str,
+            Field(min_length=1, description="Why it counts as reviewed (audited)."),
+        ],
+        confirm: Confirm = False,
+    ) -> dict[str, Any]:
+        """Accept exactly one translation version as reviewed outside Ontotator, after a dry run.
+
+        Only the newest version of its translation: other translations of
+        the same text stay as they are (unlike update_work_plan's
+        accept_external_review). The acceptance is recorded with the
+        token owner's name, the reason and the time. Refused for a version
+        already accepted or reviewed, an older or discarded version, and
+        while a translation review of it is open.
+        """
+        variant = await _variant(project, document_id)
+        plan = {
+            "variant": {
+                key: variant.get(key)
+                for key in (
+                    "document_id",
+                    "case_id",
+                    "language",
+                    "version",
+                    "origin",
+                    "translation_status",
+                )
+            }
+        }
+        if not confirm:
+            return {"applied": False, "plan": plan}
+        result: dict[str, Any] = await api.post(
+            project_path(project, "variants", seg(document_id), "accept"),
+            {"reason": reason, "expected_text_sha256": variant["text_sha256"]},
+        )
+        return {"applied": True, "plan": plan, "result": result}
 
     @register(server, scopes=("read", "project-admin"), effect="destructive")
     async def discard_translation(
