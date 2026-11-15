@@ -1,6 +1,6 @@
 import { useId, useMemo, useState, type ReactNode } from "react";
 import type { RoundSourceText } from "../api/client";
-import { changePassages, changeRanges, diffText, type ChangePassage, type TextChanges } from "../translation/textDiff";
+import { changePassages, changeRanges, diffTextBounded, type ChangePassage, type TextChanges } from "../translation/textDiff";
 import { Button, Checkbox } from "../ui";
 
 /** The earlier version carried work came from: the version number and its exact text. */
@@ -19,6 +19,8 @@ export interface ChangesSinceView {
   current: number;
 }
 
+/** Shown instead of marks when the bounded word diff gives up (`diffTextBounded`). */
+export const TOO_DIFFERENT = "The texts differ too much to show the changes.";
 export const changesSinceLabel = (version: number): string => `Show changes since v${version}`;
 
 /** "1 passage changed", "3 passages changed · 2 of 3", "No text changes since v1". */
@@ -39,11 +41,15 @@ export function useChangesSince(source: ChangesSource | null | undefined, text: 
   const sourceText = source?.text;
   const diff = useMemo(() => {
     if (!on || sourceText === undefined) return null;
-    const parts = diffText(sourceText, text);
-    return { added: changeRanges(sourceText, text, parts).added, passages: changePassages(sourceText, text, parts) };
+    // Bounded as every Show changes: two texts that differ too much get a line instead of marks.
+    const parts = diffTextBounded(sourceText, text);
+    const added = changeRanges(sourceText, text, parts)?.added, passages = changePassages(sourceText, text, parts);
+    return added && passages ? { added, passages } : "too-different" as const;
   }, [on, sourceText, text]);
   if (!source) return null;
-  const count = diff?.passages.length ?? 0;
+  const tooDifferent = diff === "too-different";
+  const shown = diff && diff !== "too-different" ? diff : null;
+  const count = shown?.passages.length ?? 0;
   const goTo = (index: number) => {
     const passage = textElement?.querySelector<HTMLElement>(`.change-passage[data-passage="${index}"]`);
     if (!passage) return;
@@ -55,7 +61,8 @@ export function useChangesSince(source: ChangesSource | null | undefined, text: 
   const bar = <div className="changes-since" role="group" aria-label="Text changes">
     <Checkbox id={`${id}-show`} label={changesSinceLabel(source.version)} checked={on}
       onChange={event => { setOn(event.target.checked); setCurrent(-1); }} />
-    {diff && <p className="changes-since__nav">
+    {tooDifferent && <p className="changes-since__nav"><span role="status">{TOO_DIFFERENT}</span></p>}
+    {shown && <p className="changes-since__nav">
       <span role="status">{passageCountText(count, current, source.version)}</span>
       {count > 0 && <>
         <Button size="sm" variant="quiet" onClick={() => goTo(current <= 0 ? count - 1 : current - 1)}>‹ Previous</Button>
@@ -65,8 +72,8 @@ export function useChangesSince(source: ChangesSource | null | undefined, text: 
   </div>;
   return {
     bar,
-    changes: diff ? { op: "insert", ranges: diff.added } : null,
-    passages: diff?.passages ?? null,
+    changes: shown ? { op: "insert", ranges: shown.added } : null,
+    passages: shown?.passages ?? null,
     since: `v${source.version}`,
     current,
   };

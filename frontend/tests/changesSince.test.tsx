@@ -3,7 +3,10 @@ import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TextPane } from "../src/editor/TextPane";
 import { passageCountText, useChangesSince } from "../src/editor/ChangesSince";
-import { changePassages } from "../src/translation/textDiff";
+import { changePassages as boundedPassages, DIFF_LIMITS } from "../src/translation/textDiff";
+
+/** The passages of two texts within the diff bound. */
+const changePassages = (before: string, after: string) => boundedPassages(before, after)!;
 import { SpanEditor } from "../src/vendor/spans.js";
 
 afterEach(cleanup);
@@ -39,6 +42,28 @@ describe("changePassages", () => {
     expect(passages[0].start).toBe(passages[0].end);
     expect(passages[0].before).toEqual([{ text: " and cough", removed: true }]);
     expect(changePassages("same", "same")).toEqual([]);
+  });
+});
+
+describe("changePassages display rules and bound", () => {
+  it("leaves out whitespace-only changes and never splits a grapheme", () => {
+    expect(changePassages("Fever.\r\nCough and\u00a0cold.", "Fever.\nCough and cold.")).toEqual([]);
+    // A changed person inside a ZWJ emoji: the passage covers the whole emoji on both sides.
+    const before = "Family \u{1f468}\u200d\u{1f469}\u200d\u{1f467} at home", after = "Family \u{1f468}\u200d\u{1f469}\u200d\u{1f466} at home";
+    const [passage, ...rest] = changePassages(before, after);
+    expect(rest).toEqual([]);
+    expect(after.slice(passage.start, passage.end)).toBe("\u{1f468}\u200d\u{1f469}\u200d\u{1f466}");
+    expect(passage.before.map(part => part.text).join("")).toBe("\u{1f468}\u200d\u{1f469}\u200d\u{1f467}");
+  });
+
+  it("is null when the texts differ too much", () => {
+    const words = (prefix: string) => Array.from({ length: 30 }, (_, index) => `${prefix}${index}`).join(" ");
+    expect(boundedPassages(words("a"), words("b"), undefined)).not.toBeNull();
+    const original = { ...DIFF_LIMITS };
+    try {
+      DIFF_LIMITS.maxEditLength = 5;
+      expect(boundedPassages(words("a"), words("b"))).toBeNull();
+    } finally { Object.assign(DIFF_LIMITS, original); }
   });
 });
 
@@ -114,6 +139,21 @@ describe("Show changes since vN", () => {
   it("is offered only with an earlier version", () => {
     render(<Harness source={null} />);
     expect(screen.queryByRole("checkbox", { name: /Show changes since/ })).toBeNull();
+  });
+
+  it("says so instead of marking when the texts differ too much", () => {
+    const original = { ...DIFF_LIMITS };
+    try {
+      DIFF_LIMITS.maxEditLength = 1;
+      const mounted = render(<Harness source={{ version: 1, text: V1 }} />);
+      fireEvent.click(screen.getByRole("checkbox", { name: "Show changes since v1" }));
+      expect(screen.getByRole("status").textContent).toBe("The texts differ too much to show the changes.");
+      const text = mounted.container.querySelector<HTMLElement>(".text-container")!;
+      expect(text.querySelector(".change-passage, .change-removed, .run--marker")).toBeNull();
+      expect(text.hasAttribute("data-changes")).toBe(false);
+      expect(screen.queryByRole("button", { name: "Next ›" })).toBeNull();
+      expect(text.textContent).toBe(V2);
+    } finally { Object.assign(DIFF_LIMITS, original); }
   });
 
   it("is off by default; on, it marks added text and steps through the passages", () => {

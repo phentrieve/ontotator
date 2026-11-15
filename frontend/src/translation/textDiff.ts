@@ -5,11 +5,37 @@ export interface TextDiffPart {
   text: string;
 }
 
-/** Word diff over exact raw text; display rules and normalization live elsewhere. */
+/**
+ * Bounds of the word diff. Its cost grows with the number of differing words, not with the text length: similar
+ * texts of any size are fast, two unrelated texts of 10,000 words would block the tab for many seconds.
+ */
+export interface DiffLimits {
+  /** Give up beyond this many inserted plus deleted tokens (words, punctuation, whitespace runs). */
+  maxEditLength: number;
+  /** Give up after this many milliseconds. */
+  timeoutMs: number;
+}
+export const DIFF_LIMITS: DiffLimits = { maxEditLength: 4000, timeoutMs: 400 };
+
+/**
+ * Word diff over exact raw text, bounded by `limits`: `null` when the texts differ too much to diff in time.
+ * Every view that diffs whole texts on the main thread (Show changes) uses this, so one bound applies everywhere.
+ */
+export function diffTextBounded(before: string, after: string, limits: DiffLimits = DIFF_LIMITS): TextDiffPart[] | null {
+  if (before === after) return [{ op: "equal", text: before }];
+  const changes = diffWordsWithSpace(before, after, { maxEditLength: limits.maxEditLength, timeout: limits.timeoutMs });
+  return changes ? partsOf(changes) : null;
+}
+
+/** Word diff over exact raw text; display rules and normalization live elsewhere. Unbounded: see `diffTextBounded`. */
 export function diffText(before: string, after: string): TextDiffPart[] {
   if (before === after) return [{ op: "equal", text: before }];
+  return partsOf(diffWordsWithSpace(before, after));
+}
+
+function partsOf(changes: readonly { value: string; added?: boolean; removed?: boolean }[]): TextDiffPart[] {
   const parts: TextDiffPart[] = [];
-  for (const change of diffWordsWithSpace(before, after)) {
+  for (const change of changes) {
     if (change.value.length === 0) continue;
     const op = change.added ? "insert" : change.removed ? "delete" : "equal";
     const previous = parts[parts.length - 1];
@@ -34,8 +60,45 @@ export interface TextChanges {
   ranges: TextRange[];
 }
 
-/** Removed passages of `before` and added passages of `after`, from the same word diff as the review screen's DiffView. */
-export function changeRanges(before: string, after: string, parts: readonly TextDiffPart[] = diffText(before, after)): { removed: TextRange[]; added: TextRange[] } {
+/** Starts and ends of the graphemes of `text` that span several UTF-16 units (emoji sequences, combining marks). */
+function longGraphemes(text: string): TextRange[] {
+  // Plain ASCII has no such grapheme except CR LF, which a range may split.
+  if (typeof Intl === "undefined" || typeof Intl.Segmenter !== "function" || !/[^\x00-\x7f]/.test(text)) return [];
+  const found: TextRange[] = [];
+  for (const { segment, index } of new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(text))
+    if (segment.length > 1) found.push({ start: index, end: index + segment.length });
+  return found;
+}
+
+/**
+ * Display rules for marks: a range never splits a grapheme (it grows to the grapheme's edges, so a changed person in
+ * a ZWJ emoji marks the whole emoji), overlapping ranges merge, and a whitespace-only change (CRLF to LF, a
+ * no-break space to a space) is left out: its mark would be invisible, and it is no passage a reader can find.
+ */
+function displayRanges(text: string, ranges: readonly TextRange[]): TextRange[] {
+  if (!ranges.length) return [];
+  const graphemes = longGraphemes(text), result: TextRange[] = [];
+  let cursor = 0;
+  for (const range of ranges) {
+    let { start, end } = range;
+    while (cursor < graphemes.length && graphemes[cursor].end <= start) cursor++;
+    for (let index = cursor; index < graphemes.length && graphemes[index].start < end; index++) {
+      start = Math.min(start, graphemes[index].start); end = Math.max(end, graphemes[index].end);
+    }
+    const last = result[result.length - 1];
+    if (last && start <= last.end) last.end = Math.max(last.end, end);
+    else result.push({ start, end });
+  }
+  return result.filter(range => /\S/.test(text.slice(range.start, range.end)));
+}
+
+/**
+ * Removed passages of `before` and added passages of `after`, from the same word diff as the review screen's
+ * DiffView, ready to display (see `displayRanges`); the lengths of the two lists are the passage counts.
+ * `null` when the texts differ too much (`diffTextBounded`): show no marks and say so.
+ */
+export function changeRanges(before: string, after: string, parts: readonly TextDiffPart[] | null = diffTextBounded(before, after)): { removed: TextRange[]; added: TextRange[] } | null {
+  if (!parts) return null;
   const removed: TextRange[] = [], added: TextRange[] = [];
   let inBefore = 0, inAfter = 0;
   for (const part of parts) {
@@ -44,7 +107,7 @@ export function changeRanges(before: string, after: string, parts: readonly Text
     else if (part.op === "insert") { added.push({ start: inAfter, end: inAfter + length }); inAfter += length; }
     else { inBefore += length; inAfter += length; }
   }
-  return { removed, added };
+  return { removed: displayRanges(before, removed), added: displayRanges(after, added) };
 }
 
 /** A part of the older wording of a changed passage: kept, or removed by the newer text. */
@@ -68,6 +131,16 @@ export interface ChangePassage {
   hasRemoved: boolean;
 }
 
+/** Grows `[start, end)` to the edges of the long graphemes it cuts (as `displayRanges` does for marks). */
+function growToGraphemes(graphemes: readonly TextRange[], start: number, end: number): TextRange {
+  if (end > start) for (const grapheme of graphemes) {
+    if (grapheme.end <= start) continue;
+    if (grapheme.start >= end) break;
+    start = Math.min(start, grapheme.start); end = Math.max(end, grapheme.end);
+  }
+  return { start, end };
+}
+
 /** Words of an unchanged stretch that still joins two changes into one passage; never across a line break. */
 const JOIN_WORDS = 2;
 const joins = (equal: string): boolean => !/[\r\n]/.test(equal) && (equal.match(/[\p{L}\p{N}]+/gu)?.length ?? 0) <= JOIN_WORDS;
@@ -76,10 +149,14 @@ const joins = (equal: string): boolean => !/[\r\n]/.test(equal) && (equal.match(
  * Changed passages of `after` against `before`, from the same word diff as `changeRanges`: neighbouring changes with
  * at most two unchanged words between them on one line read as one passage ("Puls regelmäßig, apikal auskultierte
  * Herzfrequenz 120/min, Temperatur"), so the count and the Previous / Next steps follow sentences, not single words.
+ * The display rules of `changeRanges` apply: a passage never splits a grapheme, and a passage whose changes are all
+ * whitespace (CRLF to LF, a no-break space to a space) is left out. `null` when the texts differ too much
+ * (`diffTextBounded`): show no marks and say so.
  */
-export function changePassages(before: string, after: string, parts: readonly TextDiffPart[] = diffText(before, after)): ChangePassage[] {
-  const passages: ChangePassage[] = [];
-  let current: ChangePassage | null = null;
+export function changePassages(before: string, after: string, parts: readonly TextDiffPart[] | null = diffTextBounded(before, after)): ChangePassage[] | null {
+  if (!parts) return null;
+  const passages: Array<ChangePassage & { visible: boolean }> = [];
+  let current: (ChangePassage & { visible: boolean }) | null = null;
   let gap: string | null = null;
   let inBefore = 0, inAfter = 0;
   for (const part of parts) {
@@ -90,12 +167,14 @@ export function changePassages(before: string, after: string, parts: readonly Te
       continue;
     }
     if (current && gap !== null && !joins(gap)) { passages.push(current); current = null; }
-    if (!current) current = { start: inAfter, end: inAfter, beforeStart: inBefore, beforeEnd: inBefore, before: [], hasRemoved: false };
+    if (!current) current = { start: inAfter, end: inAfter, beforeStart: inBefore, beforeEnd: inBefore, before: [], hasRemoved: false, visible: false };
     else if (gap !== null) current.before.push({ text: gap, removed: false });
     gap = null;
+    const visible = /\S/.test(part.text);
+    if (visible) current.visible = true;
     if (part.op === "delete") {
       current.before.push({ text: part.text, removed: true });
-      current.hasRemoved = true;
+      if (visible) current.hasRemoved = true;
       inBefore += length;
     } else {
       inAfter += length;
@@ -103,5 +182,20 @@ export function changePassages(before: string, after: string, parts: readonly Te
     current.end = inAfter; current.beforeEnd = inBefore;
   }
   if (current) passages.push(current);
-  return passages;
+  const inAfterText = longGraphemes(after), inBeforeText = longGraphemes(before), result: ChangePassage[] = [];
+  for (const { visible, ...passage } of passages) {
+    if (!visible) continue;
+    const shown = growToGraphemes(inAfterText, passage.start, passage.end);
+    const earlier = growToGraphemes(inBeforeText, passage.beforeStart, passage.beforeEnd);
+    // The earlier wording covers whole graphemes too: the unchanged rest of a cut grapheme joins it.
+    const head = before.slice(earlier.start, passage.beforeStart), tail = before.slice(passage.beforeEnd, earlier.end);
+    const grown: ChangePassage = { ...passage, ...shown, beforeStart: earlier.start, beforeEnd: earlier.end,
+      before: [...(head ? [{ text: head, removed: false }] : []), ...passage.before, ...(tail ? [{ text: tail, removed: false }] : [])] };
+    const last = result[result.length - 1];
+    if (last && last.end > last.start && grown.start < last.end) {
+      last.end = Math.max(last.end, grown.end); last.beforeEnd = Math.max(last.beforeEnd, grown.beforeEnd);
+      last.before.push(...grown.before); last.hasRemoved ||= grown.hasRemoved;
+    } else result.push(grown);
+  }
+  return result;
 }

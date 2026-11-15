@@ -103,9 +103,12 @@ export function ComparePane({ projectKey, username, caseDetail, leftDocumentId, 
   const leftIsBefore = !leftVariant || !rightVariant || leftVariant.version <= rightVariant.version;
   const changes = useMemo(() => {
     if (!changesOn) return null;
-    const { removed, added } = leftIsBefore ? changeRanges(leftText, rightText!) : changeRanges(rightText!, leftText);
+    const ranges = leftIsBefore ? changeRanges(leftText, rightText!) : changeRanges(rightText!, leftText);
+    // Too different to diff in time (textDiff DIFF_LIMITS): no marks, the line above the texts says why.
+    if (!ranges) return { left: null, right: null, removed: 0, added: 0, tooDifferent: true };
+    const { removed, added } = ranges;
     const before: TextChanges = { op: 'delete', ranges: removed }, after: TextChanges = { op: 'insert', ranges: added };
-    return { left: leftIsBefore ? before : after, right: leftIsBefore ? after : before, removed: removed.length, added: added.length };
+    return { left: leftIsBefore ? before : after, right: leftIsBefore ? after : before, removed: removed.length, added: added.length, tooDifferent: false };
   }, [changesOn, leftIsBefore, leftText, rightText]);
   useEffect(() => { onLeftChanges?.(changes?.left ?? null); }, [changes, onLeftChanges]);
   useEffect(() => () => onLeftChanges?.(null), [onLeftChanges]);
@@ -142,7 +145,8 @@ export function ComparePane({ projectKey, username, caseDetail, leftDocumentId, 
       <IconButton label="Close comparison" icon={<IconClose />} onClick={onClose} />
     </div>
     {couplingUnavailable && <p id={couplingNoteId}>{couplingUnavailable}</p>}
-    {changes && <p id={changesNoteId} className="text-changes-legend">
+    {changes?.tooDifferent && <p id={changesNoteId} className="text-changes-legend" role="status">The texts differ too much to show the changes.</p>}
+    {changes && !changes.tooDifferent && <p id={changesNoteId} className="text-changes-legend">
       Changes from the {beforeName} to the {afterName}: <del>removed text is struck through</del>, <ins>added text is underlined</ins>.{' '}
       <span role="status">{changes.added + changes.removed === 0 ? 'No changes between these texts.' : `${passages(changes.added, 'added')}, ${passages(changes.removed, 'removed')}.`}</span>
     </p>}
