@@ -257,9 +257,12 @@ def enable_review_for_accepted(
 
     Returns True when ``document_id`` qualifies; turns Review on for its row
     (audited ``work_plan.update``, no consequences) if it was off. A newest
-    version accepted by a translation review (or marked reviewed in its import
+    version whose newest acceptance record is not a lead's or an override's
+    (accepted only by a translation review, or marked reviewed in its import
     package) is refused with reason ``accepted_by_review``: its new review is a
     correction request (``translation-correction-assignment``), issue 409.
+    Only the acceptance record decides: a lead-accepted version stays
+    eligible after a later review accepted it as well.
     """
     document = conn.execute(
         select(

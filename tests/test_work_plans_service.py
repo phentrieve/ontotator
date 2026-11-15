@@ -632,7 +632,7 @@ def test_new_review_of_externally_accepted_translation(env):
     before = len(audits(env, "work_plan.update"))
     refusal = refused(lambda: assign(env, doc("c1", "de"), "ana", "translation_review"))
     assert refusal.code == "NOT_A_TRANSLATION"
-    assign(
+    first = assign(
         env,
         doc("c1", "de"),
         "ana",
@@ -641,6 +641,22 @@ def test_new_review_of_externally_accepted_translation(env):
     )
     assert flags_of(env, "c1", "de") == PlanFlags(True, True)
     assert len(audits(env, "work_plan.update")) == before + 1
+    # Only the acceptance record decides: after that review accepted the
+    # version too, the lead acceptance still allows another new review.
+    insert_review(env.db, "proj", doc("c1", "de"), "accepted_unchanged")
+    with env.db.transaction() as conn:
+        conn.execute(
+            update(AssignmentRow)
+            .where(AssignmentRow.id == first)
+            .values(status="submitted")
+        )
+    assign(
+        env,
+        doc("c1", "de"),
+        "anno",
+        "translation_review",
+        review_accepted_translation=True,
+    )
     # An override acceptance qualifies; a package acceptance does not.
     lead = env.app.state.accounts.get_by_username("leader")
     for document_id, source in (

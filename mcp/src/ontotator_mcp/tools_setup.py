@@ -106,9 +106,11 @@ def upload_summary(view: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-# Issue 409: the path that works for a version a translation review accepted.
+# Issue 409: the path that works for a version without a lead or override
+# acceptance.
 ACCEPTED_BY_REVIEW_HINT = (
-    "This version was accepted by a translation review. Ask for its new review"
+    "This version has no acceptance by a lead or an import override (it was"
+    " accepted by a translation review or in its package). Ask for its new review"
     " (a correction or a second opinion) with request_translation_correction"
     " (in the web interface: Request correction... at the accepted version)."
 )
@@ -690,7 +692,7 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
                     "'review_accepted_translation': a new translation review of"
                     " a version already accepted by a lead or by an import"
                     " override (accept_external_review of commit_upload). A"
-                    " version accepted by a translation review is refused"
+                    " version accepted only by a translation review is refused"
                     " (reason accepted_by_review): ask for its new review"
                     " with request_translation_correction."
                 )
