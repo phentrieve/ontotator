@@ -597,6 +597,7 @@ def _preview(**fields: Any) -> dict[str, Any]:
             texts=[text],
             skipped=[skipped],
             already_final=3,
+            unknown_case_ids=["nope"],
             preview_token="sha256:one",
         )
         | fields
@@ -616,6 +617,8 @@ async def test_accept_agreeing_texts_dry_run_asks_the_server_once(
     assert result["applied"] is False
     assert [t["case_id"] for t in result["would_accept"]] == ["agree"]
     assert result["skipped"][0]["message"].startswith("No result")
+    assert result["skipped_by_reason"] == {"differ": 1}
+    assert result["unknown_case_ids"] == ["nope"]
     assert (result["already_final"], result["preview_token"]) == (3, "sha256:one")
 
 

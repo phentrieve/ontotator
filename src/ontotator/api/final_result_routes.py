@@ -87,7 +87,14 @@ class AgreeingText(BaseModel):
 class AgreeingSkip(BaseModel):
     case_id: str
     language: str
-    reason: Literal["open_task", "fewer_than_two", "consolidation", "differ"]
+    reason: Literal[
+        "open_task",
+        "not_ready",
+        "not_in_plan",
+        "fewer_than_two",
+        "consolidation",
+        "differ",
+    ]
     message: str
 
 
@@ -99,6 +106,8 @@ class AcceptAgreeingView(BaseModel):
     skipped: list[AgreeingSkip]
     # Texts that already have a final result: not changed (Change final…).
     already_final: int
+    # Requested ``case_ids`` the project does not have.
+    unknown_case_ids: list[str] = Field(default_factory=list)
     preview_token: str
 
 
@@ -288,8 +297,9 @@ def accept_agreeing(
 ) -> dict[str, Any]:
     """Accept the result of every text whose annotations agree in full (#354).
 
-    ``preview: true`` lists the texts that would become final, the texts left
-    out and why, and a ``preview_token``. Applying sends that token: all
+    ``preview: true`` lists the texts that would become final, every other
+    text without a final result with the reason it is left out, and a
+    ``preview_token``; unknown ``case_ids`` are named. Applying sends that token: all
     listed texts become final, or none (409 ``PREVIEW_STALE`` with a fresh
     ``preview`` in the details when anything changed). Texts that already
     have a final result are only counted.

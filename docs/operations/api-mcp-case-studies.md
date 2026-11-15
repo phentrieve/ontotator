@@ -92,8 +92,8 @@ In week six, 80 new letters arrive, one student leaves for a clinical rotation, 
 | Problem reports filed by annotators | `GET P/problem-reports` | `read` | `list_problem_reports` | added in this PR (listing) |
 | Pause more tasks, release, restart empty or resolve a report | `GET /problem-reports/{id}`, `/pause-candidates`, `POST /problem-reports/{id}/actions` | `read`, `project-admin` | `act_on_problem_report` | covered (#346) |
 | A translation reviewer or the lead corrects a rejected translation; discard a translation | `POST P/documents/{doc}/translation-correction-assignment`, `/lead-correction`, `POST P/variants/{doc}/discard` | `read`, `project-admin` (lead correction no longer session only, #345) | `request_translation_correction`, `start_lead_correction`, `discard_translation` | covered (#345, #346) |
-| Choose or change the final result of one text | `GET P/document-rows/{case}/{language}/final-panel`, `PUT P/final-selections` | `read`, `project-admin` | `set_final_result` (dry run, `expected_revision`) | covered (#346) |
-| Withdraw the final result of one text | `GET P/document-rows`, `POST P/final-selections/withdraw` | `read`, `project-admin` | `withdraw_final_result` (dry run, `expected_revision`, reason) | covered (#343) |
+| Choose or change the final result of one text | `GET P/document-rows/{case}/{language}/final-panel`, `PUT P/final-selections` | `read`, `project-admin` | `set_final_result` (dry run shows the revision; pass it as `expected_revision` to refuse a final that changed meanwhile) | covered (#346) |
+| Withdraw the final result of one text | `GET P/document-rows`, `POST P/final-selections/withdraw` | `read`, `project-admin` | `withdraw_final_result` (dry run shows the revision; confirm needs it as `expected_revision`; reason) | covered (#343) |
 
 Verdict: **sufficient after this work**. Before it, the most common change of a running project, a person leaving, needed the web interface for every task, and a project token could not reassign at all because the task routes have no project in their path.
 

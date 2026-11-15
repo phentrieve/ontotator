@@ -382,6 +382,8 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
   const [correctionFor, setCorrectionFor] = useState<{ row: DocumentRowView; variant: VariantSummary } | null>(null);
   /** "Withdraw final…" (issue 343): the row whose final result the dialog takes back. */
   const [withdrawFor, setWithdrawFor] = useState<DocumentRowView | null>(null);
+  /** The row as the page shows it now (after a refused withdrawal the reload brings the new revision). */
+  const withdrawRow = withdrawFor ? pageRows.find(entry => rowKeyOf(entry) === rowKeyOf(withdrawFor)) ?? withdrawFor : null;
   const textVersionTools = useMemo<TextVersionsTools | undefined>(() => {
     if (!inventory) return undefined;
     const variants = new Map<string, VariantSummary>(inventory.cases.flatMap(item => item.variants).map(variant => [variant.document_id, variant]));
@@ -952,7 +954,8 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
       <TranslationCorrectionAction projectKey={projectKey} variant={correctionFor.variant} username={textVersionTools.username}
         requiredLanguages={textVersionTools.requiredLanguages(correctionFor.variant.document_id)} defaultOpen inDialog />
     </Dialog>}
-    {withdrawFor && <WithdrawFinalDialog projectKey={projectKey} row={withdrawFor} onCancel={() => setWithdrawFor(null)}
+    {withdrawFor && withdrawRow && <WithdrawFinalDialog projectKey={projectKey} row={withdrawRow} onCancel={() => setWithdrawFor(null)}
+      onStale={reloadAfterAction}
       onWithdrawn={() => {
         setWithdrawFor(null);
         notifyFinalSelectionChanged(projectKey);

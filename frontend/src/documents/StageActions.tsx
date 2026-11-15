@@ -27,7 +27,7 @@ export interface StageActionsProps {
   canRequestCorrection?: (row: DocumentRowView) => boolean;
   onChangeFinal?: (row: DocumentRowView) => void;
   canChangeFinal?: (row: DocumentRowView) => boolean;
-  /** "Withdraw final…" of a row with a final result (issue 343), next to "Change final…". */
+  /** "Withdraw final…" (issue 343), next to "Change final…" and under the same condition (`canChangeFinal`). */
   onWithdrawFinal?: (row: DocumentRowView) => void;
   textVersionTools?: TextVersionsTools;
   /** The text card: its person rows carry every person's Reassign… / Reopen… / Remove…, its versions Request correction. */
@@ -37,8 +37,7 @@ export interface StageActionsProps {
 /**
  * Admin actions of the given stage, or of every stage: Annotation "Reassign…" (one direct button per open
  * task, S3) and "Reopen…" of a submitted annotation; Translation "Reopen…" of a submitted review, "Request
- * correction…", "Assign a new review…"; Finalization "Change final…" of a decided row and "Withdraw final…" of a row
- * with a final result.
+ * correction…", "Assign a new review…"; Finalization "Change final…" and "Withdraw final…" of a decided row.
  */
 export function StageActions({ row, stage, onAssign, onRequestCorrection, canRequestCorrection, onChangeFinal, canChangeFinal, onWithdrawFinal, textVersionTools, inCard = false }: StageActionsProps): JSX.Element | null {
   const show = (name: PanelStage) => !stage || stage === name;
@@ -58,7 +57,8 @@ export function StageActions({ row, stage, onAssign, onRequestCorrection, canReq
   const correction = show("review") && !inCard && onRequestCorrection && canRequestCorrection?.(row);
   const newReview = show("review") && onAssign && canAssignNewReview(row);
   const changeFinal = show("final") && onChangeFinal && canChangeFinal?.(row);
-  const withdrawFinal = show("final") && onWithdrawFinal && row.final != null;
+  // Like "Change final…": not while the row's final decision is open (the decision block then holds the final).
+  const withdrawFinal = show("final") && onWithdrawFinal && row.final != null && canChangeFinal?.(row);
   if (!reassignable.length && !reopenable.length && !correction && !newReview && !changeFinal && !withdrawFinal) return null;
   const personOf = (pseudonym: string) => {
     const display = textVersionTools?.members.find(member => member.pseudonym === pseudonym)?.display_name?.trim();

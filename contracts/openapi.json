@@ -4101,7 +4101,7 @@
           "final-results"
         ],
         "summary": "Accept Agreeing",
-        "description": "Accept the result of every text whose annotations agree in full (#354).\n\n``preview: true`` lists the texts that would become final, the texts left\nout and why, and a ``preview_token``. Applying sends that token: all\nlisted texts become final, or none (409 ``PREVIEW_STALE`` with a fresh\n``preview`` in the details when anything changed). Texts that already\nhave a final result are only counted.",
+        "description": "Accept the result of every text whose annotations agree in full (#354).\n\n``preview: true`` lists the texts that would become final, every other\ntext without a final result with the reason it is left out, and a\n``preview_token``; unknown ``case_ids`` are named. Applying sends that token: all\nlisted texts become final, or none (409 ``PREVIEW_STALE`` with a fresh\n``preview`` in the details when anything changed). Texts that already\nhave a final result are only counted.",
         "operationId": "accept_agreeing_api_v1_projects__key__final_selections_accept_agreeing_post",
         "parameters": [
           {
@@ -10569,6 +10569,13 @@
             "type": "integer",
             "title": "Already Final"
           },
+          "unknown_case_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unknown Case Ids"
+          },
           "preview_token": {
             "type": "string",
             "title": "Preview Token"
@@ -10940,6 +10947,8 @@
             "type": "string",
             "enum": [
               "open_task",
+              "not_ready",
+              "not_in_plan",
               "fewer_than_two",
               "consolidation",
               "differ"

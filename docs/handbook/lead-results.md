@@ -109,7 +109,7 @@ What for: take a final result back, for example before finished texts are annota
 3. Read what happens: the text has no final result until you choose one again; final exports already made stay as they are; **Change mode…** is possible again; submissions and consolidation stay.
 4. Enter the **Reason**, tick **I understand** and click **Withdraw final result**.
 
-The text asks for a final result again. **History** in the text card shows the withdrawal with your reason. If someone changed the final result meanwhile, nothing is withdrawn: the dialog says so; close it and look again.
+The text asks for a final result again. **History** in the text card shows the withdrawal with your reason. If someone changed the final result meanwhile, nothing is withdrawn: the dialog says *This final result changed. Nothing was withdrawn.* and loads the current one. Check it, then tick **I understand** again to withdraw it, or click **Cancel**.
 
 ## Translation and text-change decisions
 

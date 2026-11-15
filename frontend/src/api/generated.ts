@@ -1362,8 +1362,9 @@ export interface paths {
          * Accept Agreeing
          * @description Accept the result of every text whose annotations agree in full (#354).
          *
-         *     ``preview: true`` lists the texts that would become final, the texts left
-         *     out and why, and a ``preview_token``. Applying sends that token: all
+         *     ``preview: true`` lists the texts that would become final, every other
+         *     text without a final result with the reason it is left out, and a
+         *     ``preview_token``; unknown ``case_ids`` are named. Applying sends that token: all
          *     listed texts become final, or none (409 ``PREVIEW_STALE`` with a fresh
          *     ``preview`` in the details when anything changed). Texts that already
          *     have a final result are only counted.
@@ -3259,6 +3260,8 @@ export interface components {
             skipped: components["schemas"]["AgreeingSkip"][];
             /** Already Final */
             already_final: number;
+            /** Unknown Case Ids */
+            unknown_case_ids?: string[];
             /** Preview Token */
             preview_token: string;
         };
@@ -3413,7 +3416,7 @@ export interface components {
              * Reason
              * @enum {string}
              */
-            reason: "open_task" | "fewer_than_two" | "consolidation" | "differ";
+            reason: "open_task" | "not_ready" | "not_in_plan" | "fewer_than_two" | "consolidation" | "differ";
             /** Message */
             message: string;
         };

@@ -53,6 +53,14 @@ def _audits(env: Any, action: str) -> list[dict[str, Any]]:
         ]
 
 
+def _skips(body: dict[str, Any]) -> list[tuple[str, str]]:
+    """(case, reason) of the skipped source texts; the translations of the
+    fixture have Annotate off (``not_in_plan``)."""
+    return [
+        (s["case_id"], s["reason"]) for s in body["skipped"] if s["language"] == "en"
+    ]
+
+
 def _agreeing(env: Any, case: str, sid: str) -> None:
     target = doc(case, "en")
     seizure = span_of(env, target, "Neonatalzeit")
@@ -171,8 +179,8 @@ def test_preview_lists_agreeing_texts_and_skips_with_reasons(env):
             "findings": 1,
         }
     ]
-    assert [(s["case_id"], s["reason"]) for s in body["skipped"]] == [("c2", "differ")]
-    assert body["skipped"][0]["message"]
+    assert _skips(body) == [("c2", "differ")]
+    assert all(s["message"] for s in body["skipped"])
     assert body["already_final"] == 0
     assert body["preview_token"].startswith("sha256:")
     # A preview changes nothing; the same state gives the same token.
@@ -181,7 +189,7 @@ def test_preview_lists_agreeing_texts_and_skips_with_reasons(env):
     assert again["preview_token"] == body["preview_token"]
     # Only some cases.
     only = env.lead.post(ACCEPT, json={"preview": True, "case_ids": ["c2"]}).json()
-    assert only["texts"] == [] and len(only["skipped"]) == 1
+    assert only["texts"] == [] and _skips(only) == [("c2", "differ")]
     assert only["preview_token"] != body["preview_token"]
 
 
@@ -192,10 +200,31 @@ def test_open_work_and_single_submissions_are_skipped(env):
     submit_findings(env, assign(env, doc("c2", "en"), "anno", "annotate"), "c2-a", [])
     body = env.lead.post(ACCEPT, json={"preview": True}).json()
     assert body["texts"] == []
-    assert [(s["case_id"], s["reason"]) for s in body["skipped"]] == [
-        ("c1", "open_task"),
-        ("c2", "fewer_than_two"),
-    ]
+    assert _skips(body) == [("c1", "open_task"), ("c2", "fewer_than_two")]
+
+
+def test_every_text_is_accounted_for_and_unknown_case_ids_are_named(env):
+    """A text is accepted, skipped with a reason or counted as already final;
+    case IDs the project does not have are named, not ignored."""
+    _agreeing(env, "c1", "c1")
+    assign(env, doc("c2", "en"), "anno", "annotate")  # nothing submitted yet
+    body = env.lead.post(ACCEPT, json={"preview": True}).json()
+    assert [t["case_id"] for t in body["texts"]] == ["c1"]
+    assert _skips(body) == [("c2", "not_ready")]
+    # The translations have Annotate off in the plan.
+    assert {(s["case_id"], s["language"]) for s in body["skipped"]} - {
+        ("c2", "en")
+    } == {(case, language) for case in ("c1", "c2") for language in ("de", "fr")}
+    assert {s["reason"] for s in body["skipped"] if s["language"] != "en"} == {
+        "not_in_plan"
+    }
+    assert len(body["texts"]) + len(body["skipped"]) + body["already_final"] == 6
+    assert body["unknown_case_ids"] == []
+    named = env.lead.post(
+        ACCEPT, json={"preview": True, "case_ids": ["c1", "nope", "C2"]}
+    ).json()
+    assert named["unknown_case_ids"] == ["C2", "nope"]
+    assert [t["case_id"] for t in named["texts"]] == ["c1"]
 
 
 def test_apply_accepts_all_audits_each_and_counts_finals_afterwards(env):
@@ -214,6 +243,15 @@ def test_apply_accepts_all_audits_each_and_counts_finals_afterwards(env):
     ]
     after = env.lead.post(ACCEPT, json={"preview": True}).json()
     assert (after["texts"], after["already_final"]) == ([], 2)
+
+
+def test_a_withdrawn_text_is_accepted_again_with_a_continued_revision(env):
+    _agreeing(env, "c1", "c1")
+    select_final(env, doc("c1", "en"), "c1-b")
+    assert withdraw(env, 1).status_code == 200
+    token = env.lead.post(ACCEPT, json={"preview": True}).json()["preview_token"]
+    assert env.lead.post(ACCEPT, json={"preview_token": token}).json()["applied"]
+    assert _finals(env) == {("c1", "en"): ("c1-a", 3)}
 
 
 def test_stale_token_refuses_everything_with_a_fresh_preview(env):
@@ -242,3 +280,39 @@ def test_request_needs_preview_or_token_and_a_lead(env):
         env.app, "anno", projects={"proj": ["annotator"]}, assignments=[]
     )
     assert annotator.post(ACCEPT, json={"preview": True}).status_code == 403
+
+
+def _statements(env: Any, call: Any) -> int:
+    """SQL statements ``call`` sends (the request's session lookups included)."""
+    from sqlalchemy import event
+
+    seen: list[str] = []
+
+    def count(_conn: Any, _cursor: Any, statement: str, *_rest: Any) -> None:
+        seen.append(statement)
+
+    event.listen(env.db.engine, "before_cursor_execute", count)
+    try:
+        response = call()
+    finally:
+        event.remove(env.db.engine, "before_cursor_execute", count)
+    assert response.status_code == 200, response.text
+    return len(seen)
+
+
+def test_statements_do_not_grow_with_every_text(env):
+    """The preview reads the candidates in batches (a constant number of
+    statements); applying adds a small constant per accepted text, and the
+    withdrawn revisions are read once, not per text."""
+    _agreeing(env, "c1", "c1")
+    one = _statements(env, lambda: env.lead.post(ACCEPT, json={"preview": True}))
+    _agreeing(env, "c2", "c2")
+    two = _statements(env, lambda: env.lead.post(ACCEPT, json={"preview": True}))
+    token = env.lead.post(ACCEPT, json={"preview": True}).json()["preview_token"]
+    applied = _statements(
+        env, lambda: env.lead.post(ACCEPT, json={"preview_token": token})
+    )
+    # Per accepted text: read the text and the submission, lock the slot,
+    # write the selection, its event and the audit entry, settle the plan.
+    assert two == one
+    assert applied - two <= 4 + 2 * 8

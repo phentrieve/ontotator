@@ -157,7 +157,16 @@ async def test_set_final_result_replaces_or_confirms_with_the_revision(
     dry = await call(mcp_client, "set_final_result", args)
     assert dry["applied"] is False
     assert dry["plan"]["replaces_final"] is True
+    assert dry["plan"]["revision"] == 3
     assert dry["plan"]["acknowledges"] == []
+    assert _writes(fake) == []
+    # The final result changed since a dry run that showed revision 2.
+    with pytest.raises(ToolFailed, match="changed since the dry run"):
+        await call(
+            mcp_client,
+            "set_final_result",
+            args | {"confirm": True, "expected_revision": 2},
+        )
     assert _writes(fake) == []
     await call(mcp_client, "set_final_result", args | {"confirm": True})
     [replaced] = fake.calls_to("PUT", f"{P}/final-selections")
@@ -184,7 +193,12 @@ async def test_withdraw_final_result_sends_the_finals_revision(
     dry = await call(mcp_client, "withdraw_final_result", args)
     assert dry["applied"] is False
     assert dry["plan"]["current_final"]["submission_id"] == "s1"
+    assert dry["plan"]["revision"] == 4
     assert _writes(fake) == []
+    with pytest.raises(ToolFailed, match="expected_revision"):
+        await call(mcp_client, "withdraw_final_result", args | {"confirm": True})
+    assert _writes(fake) == []
+    args["expected_revision"] = 4
     await call(mcp_client, "withdraw_final_result", args | {"confirm": True})
     [withdrawn] = fake.calls_to("POST", f"{P}/final-selections/withdraw")
     assert withdrawn.json() == {
@@ -193,6 +207,19 @@ async def test_withdraw_final_result_sends_the_finals_revision(
         "expected_revision": 4,
         "reason": "Redo",
     }
+    # Another lead changed the final result after the dry run: the revision
+    # of the dry run is sent, and the server's refusal is passed on.
+    fake.calls.clear()
+    fake.on("GET", f"{P}/document-rows", page([row("c", final=_final("s2", 5))]))
+    fake.on(
+        "POST",
+        f"{P}/final-selections/withdraw",
+        refusal(409, "REVISION_CONFLICT", {"current_revision": 5}),
+    )
+    with pytest.raises(ToolFailed, match="REVISION_CONFLICT"):
+        await call(mcp_client, "withdraw_final_result", args | {"confirm": True})
+    [stale] = fake.calls_to("POST", f"{P}/final-selections/withdraw")
+    assert stale.json()["expected_revision"] == 4
     fake.on("GET", f"{P}/document-rows", page([row("c")]))
     with pytest.raises(ToolFailed, match="has no final result"):
         await call(mcp_client, "withdraw_final_result", args | {"confirm": True})

@@ -189,6 +189,7 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "language": "en",
             "reason": "Re-annotation",
             "confirm": True,
+            "expected_revision": 1,
         },
         "request_translation_correction": {
             "project": "p",

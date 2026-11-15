@@ -138,9 +138,11 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
         final result, no open task, at least two submissions, no
         consolidation, and all findings match (also notes and modifier text
         spans; unresolved findings never count as agreed). The dry run lists
-        what would be accepted, why the others are not, how many texts
-        already have a final result (they are not changed; set_final_result
-        changes one) and a preview_token. Confirm with that token: all listed
+        what would be accepted, why each other text is not (skipped, with
+        the counts per reason in skipped_by_reason), how many texts already
+        have a final result (they are not changed; set_final_result changes
+        one), the case_ids the project does not have (unknown_case_ids) and
+        a preview_token. Confirm with that token: all listed
         texts become final, or none when anything changed since the dry run;
         then the answer is a fresh dry run with a new token
         (``stale``). A final result can be changed later with
@@ -151,15 +153,22 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
 
         def summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
             skipped = [
-                {key: item[key] for key in ("case_id", "language", "message")}
+                {key: item[key] for key in ("case_id", "language", "reason", "message")}
                 for item in found.get("skipped", [])
             ]
+            # Texts with Annotate off are counted, and listed last.
+            skipped.sort(key=lambda item: item["reason"] == "not_in_plan")
+            by_reason: dict[str, int] = {}
+            for item in skipped:
+                by_reason[item["reason"]] = by_reason.get(item["reason"], 0) + 1
             return {
                 "applied": applied,
                 "accepted" if applied else "would_accept": found.get("texts", []),
                 "skipped": skipped[:MAX_LISTED],
                 "skipped_count": len(skipped),
+                "skipped_by_reason": by_reason,
                 "already_final": found.get("already_final", 0),
+                "unknown_case_ids": found.get("unknown_case_ids", []),
                 "preview_token": found.get("preview_token"),
             }
 

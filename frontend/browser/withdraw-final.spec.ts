@@ -70,3 +70,41 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
     expect(errors).toEqual([]);
   });
 }
+
+test("a final result that changed meanwhile is not withdrawn: the dialog says so and loads the current one", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const s = await documentsScenario(page, "S5");
+  await loginExisting(page, s.users.lead);
+  const api = `/api/v1/projects/${encodeURIComponent(s.project)}`;
+  await page.goto(`/#/projects/${encodeURIComponent(s.project)}/documents?panel=${encodeURIComponent("case-0377:en")}`);
+  const card = page.getByRole("dialog");
+  await showSegment(card, "Finalization");
+  await card.locator(".text-card-part").getByRole("button", { name: "Withdraw final…", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Withdraw final result: case-0377 en" });
+  await dialog.getByLabel(/^Reason/).fill("Re-annotation with guideline 2.3");
+  await dialog.getByLabel("I understand").check();
+
+  // Meanwhile the final result changes (another lead; here the same session over the API).
+  const panel = await (await page.request.get(`${api}/document-rows/case-0377/en/final-panel`)).json() as { submissions: { submission_id: string; document_id: string }[] };
+  const rows = await (await page.request.get(`${api}/document-rows?case=case-0377`)).json() as { groups: { rows: { final: { submission_id: string; revision: number } }[] }[] };
+  const current = rows.groups[0].rows[0].final;
+  const other = panel.submissions.find(item => item.submission_id !== current.submission_id)!;
+  const { csrf_token } = await (await page.request.get("/api/v1/auth/me")).json() as { csrf_token: string };
+  const changed = await page.request.put(`${api}/final-selections`, {
+    headers: { Origin: new URL(page.url()).origin, "X-CSRF-Token": csrf_token },
+    data: { document_id: other.document_id, submission_id: other.submission_id, expected_revision: current.revision },
+  });
+  expect(changed.ok(), await changed.text()).toBeTruthy();
+
+  const confirm = dialog.getByRole("button", { name: "Withdraw final result", exact: true });
+  await confirm.click();
+  await expect(dialog.getByRole("alert")).toContainText("This final result changed. Nothing was withdrawn.");
+  await expect(dialog.getByText("The current final result is loaded. Tick “I understand” again to withdraw it.")).toBeVisible();
+  await expect(dialog.getByLabel("I understand")).not.toBeChecked();
+  await expect(confirm).toHaveAttribute("aria-disabled", "true");
+  await shot(page, "343-changed-after");
+  await dialog.getByLabel("I understand").check();
+  await confirm.click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText("Final result of case-0377 en withdrawn.")).toBeVisible();
+});

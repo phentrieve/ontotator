@@ -1,5 +1,6 @@
 """Lead-selected immutable results and transactional final export preflight."""
 
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -74,27 +75,44 @@ def _conflict(conn: Connection, old: Any) -> dict[str, Any]:
     }
 
 
-def _withdrawn_revision(conn: Connection, pid: int, doc: Any) -> int:
-    """The last revision a withdrawn final of this text had (#343), else 0.
+def _withdrawn_revisions(
+    conn: Connection, pid: int, doc: Any = None
+) -> dict[tuple[str, str], int]:
+    """(case, language) -> the highest revision in the text's final-selection
+    events (#343); of one text with ``doc``, else of the whole project.
 
-    The events keep every selection and withdrawal with its revision; while
-    the slot has a row, its revision is the current one instead.
+    The events keep every selection and withdrawal with its revision. After a
+    withdrawal the slot has no row, and the next choice continues from here.
     """
     payload = FinalSelectionEventRow.payload
-    last = conn.execute(
-        select(func.max(payload["revision"].as_integer())).where(
-            FinalSelectionEventRow.project_id == pid,
-            payload["case_id"].astext == doc.case_id,
-            payload["language"].astext == doc.language,
-        )
-    ).scalar_one_or_none()
-    return int(last or 0)
+    case_id, language = payload["case_id"].astext, payload["language"].astext
+    query = (
+        select(case_id, language, func.max(payload["revision"].as_integer()))
+        .where(FinalSelectionEventRow.project_id == pid)
+        .group_by(case_id, language)
+    )
+    if doc is not None:
+        query = query.where(case_id == doc.case_id, language == doc.language)
+    return {(row[0], row[1]): int(row[2] or 0) for row in conn.execute(query)}
+
+
+@dataclass(frozen=True)
+class _Bulk:
+    """What every selection of one bulk action shares, read once (#354)."""
+
+    via: str
+    rule: bool
+    selected_by: str | None
+    withdrawn: dict[tuple[str, str], int]
 
 
 # Why accept_agreeing leaves a text out (#354), with the words the MCP tool
 # and a later Documents dialog show.
 AGREEING_SKIPS = {
     "open_task": "Other work on the text is still open.",
+    "not_ready": "The text is not ready for a final result: nothing is"
+    " submitted on its current version, or an earlier step is open.",
+    "not_in_plan": "Annotation is off for this text in the work plan.",
     "fewer_than_two": "Fewer than two submissions to compare.",
     "consolidation": "The text has a consolidation; accept it on Documents.",
     # Also when only the caller's own submission would match and the project
@@ -149,10 +167,11 @@ class FinalResultService:
         expected_revision: int,
         acknowledged_cause_ids: list[str],
         *,
-        via: str | None = None,
+        bulk: _Bulk | None = None,
     ) -> dict[str, Any]:
         """``select`` on ``conn``, which holds the exclusive project lock.
-        ``via`` names a bulk action in the audit entry."""
+        ``bulk`` carries what a bulk action read once for all its texts and
+        names it in the audit entry."""
         doc = conn.execute(
             select(DocumentRow.case_id, DocumentRow.language).where(
                 DocumentRow.project_id == pid, DocumentRow.document_id == document
@@ -169,9 +188,13 @@ class FinalResultService:
         ).first()
         if doc is None or exact is None:
             raise DomainError("VERSION_NOT_FOUND")
-        rule = conn.execute(
-            select(ProjectRow.adjudicator_not_annotator).where(ProjectRow.id == pid)
-        ).scalar_one()
+        rule = (
+            bulk.rule
+            if bulk is not None
+            else conn.execute(
+                select(ProjectRow.adjudicator_not_annotator).where(ProjectRow.id == pid)
+            ).scalar_one()
+        )
         slot = (
             FinalSelectionRow.project_id == pid,
             FinalSelectionRow.case_id == doc.case_id,
@@ -186,7 +209,11 @@ class FinalResultService:
             raise RevisionConflict(_conflict(conn, old))
         # After the revision check: a stale request learns of the newer
         # selection first instead of the rule refusal.
-        selected_by = _pseudonym(conn, self.actor.user_id)
+        selected_by = (
+            bulk.selected_by
+            if bulk is not None
+            else _pseudonym(conn, self.actor.user_id)
+        )
         if rule and exact.annotator_id == selected_by:
             raise DomainError(
                 "OWN_RESULT_NOT_SELECTABLE",
@@ -224,7 +251,14 @@ class FinalResultService:
         # After a withdrawal (#343) the slot has no row; its next revision
         # continues the withdrawn one, so a client that still holds the
         # withdrawn final's revision cannot overwrite the new choice.
-        base = old["revision"] if old else _withdrawn_revision(conn, pid, doc)
+        withdrawn = (
+            {}
+            if old
+            else bulk.withdrawn
+            if bulk is not None
+            else _withdrawn_revisions(conn, pid, doc)
+        )
+        base = old["revision"] if old else withdrawn.get((doc.case_id, doc.language), 0)
         now = datetime.now(UTC)
         values = {
             "project_id": pid,
@@ -274,7 +308,7 @@ class FinalResultService:
             target_type="project",
             target_id=key,
             project_id=pid,
-            details=event if via is None else {**event, "via": via},
+            details=event if bulk is None else {**event, "via": bulk.via},
         )
         return result | {
             "selected_at": values["selected_at"],
@@ -326,7 +360,7 @@ class FinalResultService:
                 "document_id": old["document_id"],
                 "submission_id": old["submission_id"],
                 # The withdrawal is a revision of its own: the next choice
-                # continues from it (``_withdrawn_revision``).
+                # continues from it (``_withdrawn_revisions``).
                 "revision": old["revision"] + 1,
                 "withdrawn": True,
                 "reason": reason,
@@ -358,18 +392,26 @@ class FinalResultService:
         """Which texts accept_agreeing would make final now (#354).
 
         A text qualifies when it has no final result, no open work, at least
-        two submissions, none of them a consolidation, and all findings
-        match in full (the final panel's ``all_match``, notes and modifier
-        spans included) with a submission the caller may accept. Texts with
-        a final result are only counted: Change final… changes them. Texts
-        without submissions are not named.
+        two submissions to compare, no consolidation among its eligible
+        submissions, and all findings match in full (the final panel's
+        ``all_match``, notes and modifier spans included) with a submission
+        the caller may accept. Every text of the scope is in exactly one of
+        ``texts``, ``skipped`` (with the reason) and ``already_final`` (only
+        counted: Change final… changes them); ``case_ids`` the project does
+        not have are named in ``unknown_case_ids``. The submissions are read
+        in a fixed number of statements, whatever the number of texts.
         """
         assert self.actor.user_id is not None
         facts = load_facts(conn, self.repo, key, pid, self.actor.user_id, scope="panel")
         ctx = page_context(facts)
         wanted = None if case_ids is None else set(case_ids)
-        texts: list[dict[str, Any]] = []
+        unknown = (
+            []
+            if wanted is None
+            else sorted(wanted - {case_id for case_id, _ in ctx.by_row})
+        )
         skipped: list[dict[str, Any]] = []
+        candidates: list[tuple[str, str]] = []
         already_final = 0
         for case_id, language in sorted(ctx.by_row):
             if wanted is not None and case_id not in wanted:
@@ -378,56 +420,29 @@ class FinalResultService:
             if row["final"] is not None:
                 already_final += 1
                 continue
+            ref = {"case_id": case_id, "language": language}
             open_work = any(
                 item["status"] != "submitted" and item.get("moved_to_version") is None
                 for item in row["work"]
             )
-            ready = any(step["code"] == "choose_final" for step in row["steps"])
-            if not ready and not (
-                open_work and row_comparison(ctx, case_id, language).eligible
-            ):
-                continue
-            ref = {"case_id": case_id, "language": language}
-            if open_work:
+            if open_work and row_comparison(ctx, case_id, language).eligible:
                 skipped.append(ref | {"reason": "open_task"})
-                continue
-            panel = document_row_panel.final_panel(
-                conn, facts, key, case_id, language, ctx=ctx
-            )
-            listed = [
-                item
-                for item in panel["submissions"]
-                if item.get("is_latest_in_round") is not False
-            ]
-            chosen = next(
-                (
-                    item
-                    for item in listed
-                    if item["submission_id"] == panel["all_match_submission_id"]
-                ),
-                None,
-            )
-            reason = (
-                "fewer_than_two"
-                if len(listed) < 2
-                else "consolidation"
-                if any(item["kind"] == "consolidation" for item in listed)
-                else "differ"
-                if chosen is None
-                else None
-            )
-            if reason is not None:
+            elif any(step["code"] == "choose_final" for step in row["steps"]):
+                candidates.append((case_id, language))
+            elif not row["plan_row"]["annotate"]:
+                skipped.append(ref | {"reason": "not_in_plan"})
+            else:
+                skipped.append(ref | {"reason": "not_ready"})
+        texts: list[dict[str, Any]] = []
+        choices = document_row_panel.agreeing_choices(conn, pid, ctx, candidates)
+        for case_id, language in candidates:
+            ref = {"case_id": case_id, "language": language}
+            reason, chosen = choices[(case_id, language)]
+            if chosen is None:
                 skipped.append(ref | {"reason": reason})
-                continue
-            assert chosen is not None
-            texts.append(
-                ref
-                | {
-                    "document_id": chosen["document_id"],
-                    "submission_id": chosen["submission_id"],
-                    "findings": chosen.get("finding_count"),
-                }
-            )
+            else:
+                texts.append(ref | chosen)
+        skipped.sort(key=lambda item: (item["case_id"], item["language"]))
         for item in skipped:
             item["message"] = AGREEING_SKIPS[item["reason"]]
         digest = state_digest(
@@ -443,6 +458,7 @@ class FinalResultService:
             "texts": texts,
             "skipped": skipped,
             "already_final": already_final,
+            "unknown_case_ids": unknown,
             "preview_token": f"sha256:{digest}",
         }
 
@@ -473,6 +489,18 @@ class FinalResultService:
                 raise DomainError(
                     "PREVIEW_STALE", {"preview": found | {"applied": False}}
                 )
+            bulk = _Bulk(
+                via="accept_agreeing",
+                rule=bool(
+                    conn.execute(
+                        select(ProjectRow.adjudicator_not_annotator).where(
+                            ProjectRow.id == pid
+                        )
+                    ).scalar_one()
+                ),
+                selected_by=_pseudonym(conn, self.actor.user_id),
+                withdrawn=_withdrawn_revisions(conn, pid),
+            )
             for item in found["texts"]:
                 self._select(
                     conn,
@@ -482,7 +510,7 @@ class FinalResultService:
                     item["submission_id"],
                     0,
                     [],
-                    via="accept_agreeing",
+                    bulk=bulk,
                 )
             return found | {"applied": True}
 
