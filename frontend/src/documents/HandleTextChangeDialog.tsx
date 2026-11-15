@@ -95,7 +95,8 @@ export function HandleTextChangeDialog(props: HandleTextChangeDialogProps): JSX.
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
   useEffect(() => {
-    if (held || notNewer || assignmentId === null || !targetId) return;
+    // No preview for this state (also when it changes during a request): nothing stays busy or kept.
+    if (held || notNewer || assignmentId === null || !targetId) { setChecking(false); setPreview(null); setPreviewError(null); return; }
     let active = true;
     // Missing proposals stay shown while Retry reloads: Move and Finish stay disabled and Move does not
     // flash selected before the answer (issue 419). Retry shows busy and keeps focus.
@@ -103,7 +104,9 @@ export function HandleTextChangeDialog(props: HandleTextChangeDialogProps): JSX.
     setChecking(true);
     void api.previewTextChange(projectKey, { assignment_id: assignmentId, target_document_id: targetId }).then(
       value => { if (active) { setPreview(value); setPreviewError(null); setChecking(false); } },
-      error => { if (active) { setPreviewError(error); setChecking(false); } },
+      // A Retry that fails on the network or the server says nothing about the proposals: the reason, its Retry
+      // and the disabled Move and Finish stay.
+      error => { if (active) { setPreviewError((current: unknown) => isNoTargetProposals(current) && isTransientError(error) ? current : error); setChecking(false); } },
     );
     return () => { active = false; };
   }, [projectKey, assignmentId, targetId, held, notNewer, reload]);

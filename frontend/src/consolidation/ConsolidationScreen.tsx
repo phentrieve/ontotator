@@ -5,7 +5,7 @@
  * after submission); a withdrawn input or a lost assignment makes it read-only with the reason.
  */
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
-import { api, ApiError, type ConsolidationAnnotatePayload, type ConsolidationGroupView, type ConsolidationResolvePayload, type SearchCandidate, type TaskSummary } from "../api/client";
+import { api, ApiError, type ConsolidationAnnotatePayload, type ConsolidationGroupView, type ConsolidationResolvePayload, type SearchCandidate, type TaskSummary, type ConsolidationView } from "../api/client";
 import { ErrorNotice } from "../admin/ErrorNotice";
 import type { WorkspaceView } from "../app/CaseScreen";
 import { nextOpenTask } from "../app/caseOrder";
@@ -173,6 +173,18 @@ export function ConsolidationScreen(props: ConsolidationScreenProps): JSX.Elemen
     setSelected(groupId);
     if (focus) setFocusRequest({ groupId });
   };
+  const selectFirstOpen = (fresh: ConsolidationView) => {
+    const first = textOrder(fresh.groups, fresh.text).find(group => group.state === "open");
+    if (first) select(first.group_id, true);
+  };
+  // Reopen all whose view read failed: waits for a view newer than `after`.
+  const awaitedView = useRef<{ after: ConsolidationView | null } | null>(null);
+  useEffect(() => {
+    if (!awaitedView.current || !view || view === awaitedView.current.after) return;
+    awaitedView.current = null;
+    selectFirstOpen(view);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new view selects
+  }, [view]);
   const announceTimer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(announceTimer.current), []);
   const announce = (text: string) => {
@@ -234,14 +246,16 @@ export function ConsolidationScreen(props: ConsolidationScreenProps): JSX.Elemen
   const reopenAll = async () => {
     setReopeningAll(current => ({ ...current, busy: true }));
     setLastDecision(null); setRestoring(null);
+    const before = data.latestView();
     const ok = await data.reopenAll();
     setReopeningAll({ open: false, busy: false });
     if (!ok) { show({ message: "Could not reopen the decisions. Nothing changed." }); return; }
     setSummaries(new Map());
-    // The refreshed view: viewRef still holds the view from before the reopen until it renders (issue 375).
-    const fresh = data.latestView() ?? viewRef.current;
-    const first = textOrder(fresh?.groups ?? [], fresh?.text ?? "").find(group => group.state === "open");
-    if (first) select(first.group_id, true);
+    // The view read after the reopen: viewRef still holds the old one until it renders (issue 375). When that
+    // read failed, the first open group is selected once the next view arrives.
+    const fresh = data.latestView();
+    if (fresh && fresh !== before) selectFirstOpen(fresh);
+    else awaitedView.current = { after: before };
     show({ message: `Reopened ${decidedCount} decided ${decidedCount === 1 ? "group" : "groups"}.`, undo: true, onAction: () => {
       void data.undoReopenAll().then(restored => show({ message: restored ? "Decisions restored." : "Could not restore the decisions." }));
     } });
