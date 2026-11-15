@@ -159,6 +159,10 @@ class BatchSkipView(BaseModel):
     ]
     # Set when only this root of a text with parallel roots is skipped.
     document_id: str | None = None
+    # Annotate, ``already_assigned``: the annotators the text holds (the
+    # limit popover warns when a lower limit is below it, issue 422).
+    assigned: int | None = None
+    per_text: int | None = None
 
 
 class BatchTargetView(BaseModel):

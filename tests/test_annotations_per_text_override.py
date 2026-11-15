@@ -187,3 +187,66 @@ def test_refusals(tmp_path):
     annotator = _put(env, 2, by=client(env, "anno"))
     assert annotator.status_code in (403, 404), annotator.text
     assert _audits(env) == []
+
+
+def _put_many(env: Any, cases: list[str], value: int | None, **extra: Any) -> Any:
+    return env.lead.put(
+        f"{BASE}/texts/annotations-per-text",
+        json={
+            "texts": [{"case_id": case, "language": "en"} for case in cases],
+            "value": value,
+            **extra,
+        },
+    )
+
+
+def test_several_texts_change_together_each_compared_with_its_own_value(tmp_path):
+    env = proposal_env(tmp_path, per_text=1)
+    assert _put(env, 3).status_code == 200
+    response = _put_many(env, ["c1", "c2"], 3, reason="pilot")
+    assert response.status_code == 200, response.text
+    assert [(t["case_id"], t["changed"]) for t in response.json()["texts"]] == [
+        ("c1", False),
+        ("c2", True),
+    ]
+    # Clearing a mixed selection: only the text with a value changes.
+    assert _put(env, None, case="c2").status_code == 200
+    cleared = _put_many(env, ["c1", "c2"], None)
+    assert [(t["case_id"], t["changed"]) for t in cleared.json()["texts"]] == [
+        ("c1", True),
+        ("c2", False),
+    ]
+    changes = [(a["case_id"], a["old"], a["new"]) for a in _audits(env)]
+    assert changes == [
+        ("c1", None, 3),
+        ("c2", None, 3),
+        ("c2", 3, None),
+        ("c1", 3, None),
+    ]
+
+
+def test_one_unknown_text_refuses_the_whole_request(tmp_path):
+    env = proposal_env(tmp_path, per_text=1)
+    response = _put_many(env, ["c1", "nope"], 3)
+    assert response.status_code == 404, response.text
+    assert response.json()["code"] == "DOCUMENT_NOT_FOUND"
+    assert response.json()["details"]["texts"] == [
+        {"case_id": "nope", "language": "en"}
+    ]
+    assert _audits(env) == []
+    assert _row(env, "c1")["annotations_per_text"]["override"] is None
+    assert _put_many(env, [], 3).status_code == 422
+
+
+def test_a_full_text_names_its_annotators_in_the_preview(tmp_path):
+    """The limit popover warns when a lower limit is below them."""
+    env = proposal_env(tmp_path, per_text=1)
+    assert _put(env, 2).status_code == 200
+    assign(env, env.c1, "anno")
+    assign(env, env.c1, "anno2")
+    (skip,) = _preview(env, ["c1"])["skipped"]
+    assert (skip["reason"], skip["assigned"], skip["per_text"]) == (
+        "already_assigned",
+        2,
+        2,
+    )

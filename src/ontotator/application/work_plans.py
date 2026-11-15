@@ -62,11 +62,7 @@ from ontotator.storage.final_tables import FinalSelectionRow
 from ontotator.storage.plan_tables import DiscardedVariantRow
 from ontotator.storage.repository import _lock_id
 from ontotator.storage.tables import AssignmentRow, DocumentRow, ProjectRow
-from ontotator.storage.text_settings import (
-    per_text_override,
-    per_text_overrides,
-    write_per_text,
-)
+from ontotator.storage.text_settings import per_text_overrides, write_per_text
 
 if TYPE_CHECKING:
     from ontotator.api.work_plan_routes import (
@@ -1156,50 +1152,80 @@ class WorkPlanService:
         removes nobody, as lowering the project value. Audited as
         ``text.annotations_per_text``.
         """
-        row_key = RowKey(case_id, language)
+        (result,) = self.set_annotations_per_texts(
+            key, [RowKey(case_id, language)], value, reason
+        )["texts"]
+        return cast(dict[str, Any], result)
+
+    def set_annotations_per_texts(
+        self,
+        key: str,
+        rows: Sequence[RowKey],
+        value: int | None,
+        reason: str | None,
+    ) -> dict[str, Any]:
+        """``set_annotations_per_text`` for several texts at once.
+
+        One project lock and one transaction: an unknown text refuses the
+        whole request (``DOCUMENT_NOT_FOUND`` with the texts) and nothing is
+        written. Each text is compared with its own stored value, so texts
+        that already have ``value`` are left alone; one audit entry per
+        changed text.
+        """
+        wanted = list(dict.fromkeys(rows))
         reason = (reason or "").strip() or None
         with self.db.transaction() as conn:
             project = self._lock(conn, key, exclusive=True)
             pid = project["id"]
-            if row_key not in store.language_versions(conn, pid, [case_id]):
-                raise DomainError("DOCUMENT_NOT_FOUND")
-            old = per_text_override(conn, pid, case_id, language)
-            changed = old != value
-            if changed:
-                write_per_text(
-                    conn,
-                    pid,
-                    case_id,
-                    language,
-                    value,
-                    reason=reason,
-                    actor_id=self.actor.user_id,
-                )
-                record_audit(
-                    conn,
-                    self.actor,
-                    "text.annotations_per_text",
-                    target_type="text",
-                    target_id=f"{case_id} {language}",
-                    project_id=pid,
-                    details={
-                        "case_id": case_id,
-                        "language": language,
-                        "old": old,
-                        "new": value,
-                        "project_value": project["annotations_per_text"],
-                    }
-                    | ({"reason": reason} if reason else {}),
-                )
             project_value = int(project["annotations_per_text"])
-            return {
-                "case_id": case_id,
-                "language": language,
-                "override": value,
-                "project_value": project_value,
-                "effective": project_value if value is None else value,
-                "changed": changed,
-            }
+            known = store.language_versions(
+                conn, pid, sorted({row.case_id for row in wanted})
+            )
+            unknown = [_ref(row) for row in wanted if row not in known]
+            if unknown:
+                raise DomainError("DOCUMENT_NOT_FOUND", {"texts": unknown})
+            stored = per_text_overrides(conn, pid)
+            results: list[dict[str, Any]] = []
+            for row in wanted:
+                old = stored.get((row.case_id, row.language))
+                changed = old != value
+                if changed:
+                    write_per_text(
+                        conn,
+                        pid,
+                        row.case_id,
+                        row.language,
+                        value,
+                        reason=reason,
+                        actor_id=self.actor.user_id,
+                    )
+                    record_audit(
+                        conn,
+                        self.actor,
+                        "text.annotations_per_text",
+                        target_type="text",
+                        target_id=f"{row.case_id} {row.language}",
+                        project_id=pid,
+                        details={
+                            "case_id": row.case_id,
+                            "language": row.language,
+                            "old": old,
+                            "new": value,
+                            "project_value": project_value,
+                        }
+                        | ({"reason": reason} if reason else {}),
+                    )
+                results.append(
+                    {
+                        "case_id": row.case_id,
+                        "language": row.language,
+                        "override": value,
+                        "project_value": project_value,
+                        "effective": project_value if value is None else value,
+                        "changed": changed,
+                    }
+                )
+            return {"texts": results}
 
     def move_to_front(self, key: str, rows: Sequence[RowKey]) -> dict[str, Any]:
         """Move texts to the front of the project's order (issue 339).

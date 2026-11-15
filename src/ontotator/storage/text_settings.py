@@ -35,20 +35,6 @@ def per_text_overrides(conn: Connection, project_id: int) -> dict[TextKey, int]:
     }
 
 
-def per_text_override(
-    conn: Connection, project_id: int, case_id: str, language: str
-) -> int | None:
-    """One text's override; None follows the project value."""
-    value: int | None = conn.execute(
-        select(TextSettingRow.annotations_per_text).where(
-            TextSettingRow.project_id == project_id,
-            TextSettingRow.case_id == case_id,
-            TextSettingRow.language == language,
-        )
-    ).scalar_one_or_none()
-    return value
-
-
 def effective_per_text(
     conn: Connection, project_id: int, document_id: str, project_value: int
 ) -> int:

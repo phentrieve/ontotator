@@ -215,6 +215,34 @@ describe("annotation part", () => {
     expect(within(part()).queryByText(/Newer set available/)).toBeNull();
   });
 
+  it("names the older set while any task is on it, and says when a set was not recorded (issue 337)", () => {
+    const set = (set_id: number, imported_at: string, newest: boolean) => ({ set_id, imported_at, tool: "phentrieve", tool_version: "1.4", proposal_count: 24, newest });
+    const part = () => within(card()).getByRole("region", { name: "Annotation" });
+    const older = set(1, "2026-10-02T09:00:00", false), newer = set(2, "2026-11-10T09:00:00", true);
+    // The mockup: Tom submitted on the old set, Luc is assigned and will start on the newest.
+    renderCard({ row: assignRow({ proposal_set: older, newer_proposal_set: newer, work: [
+      annotateItem({ assignment_id: 1, person: tom, author_label: "ann-0004", assigned_at: "2026-10-20T16:44:00", status: "submitted", proposal_set: older }),
+      annotateItem({ assignment_id: 2, person: luc, author_label: "ann-0005", assigned_at: "2026-10-20T16:44:00", proposal_set: newer }),
+    ] }) });
+    expect(within(part()).getByText("Proposals").closest("p")!.textContent).toBe("Proposals set 2026-10-02 (phentrieve 1.4), 24 proposals Newer set available: 2026-11-10 How to use it");
+    expect(within(part()).getByText("Luc Martin").closest("li")!.textContent).toContain("newest set");
+    cleanup();
+    // Every task began before sets were recorded: no set is claimed, no pill.
+    renderCard({ row: assignRow({ proposal_set: null, newer_proposal_set: null, proposal_set_unrecorded: true, work: [
+      annotateItem({ assignment_id: 1, person: tom, author_label: "ann-0004", assigned_at: "2026-10-20T16:44:00", proposal_set_unrecorded: true }),
+    ] }) });
+    expect(within(part()).getByText("Proposals").closest("p")!.textContent).toBe("Proposals set not recorded (the tasks started before sets were recorded)");
+    expect(within(part()).queryByText(/Newer set available/)).toBeNull();
+    expect(within(part()).getByText("Tom Reis").closest("li")!.textContent).not.toContain("set not recorded");
+    cleanup();
+    // One person without a recorded set beside a known one: said in their row.
+    renderCard({ row: assignRow({ proposal_set: older, newer_proposal_set: newer, work: [
+      annotateItem({ assignment_id: 1, person: tom, author_label: "ann-0004", assigned_at: "2026-10-20T16:44:00", proposal_set: older }),
+      annotateItem({ assignment_id: 2, person: luc, author_label: "ann-0005", assigned_at: "2026-10-20T16:44:00", proposal_set_unrecorded: true }),
+    ] }) });
+    expect(within(part()).getByText("Luc Martin").closest("li")!.textContent).toContain("set not recorded");
+  });
+
   it("names a text's own annotator limit beside the project's (issue 422)", () => {
     const part = () => within(card()).getByRole("region", { name: "Annotation" });
     renderCard({ row: assignRow({ annotations_per_text: { effective: 4, project: 1, override: 4 } }) });

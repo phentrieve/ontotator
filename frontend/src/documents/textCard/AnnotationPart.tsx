@@ -31,8 +31,10 @@ export function proposalSetText(set: RowProposalSetView): string {
 }
 
 /** A person row names their set only when it differs from the text's: "newest set" or "set 2026-10-02". */
-export function personSetText(item: Pick<CardWorkItem, "proposal_set">, shown: RowProposalSetView | null | undefined): string | null {
+export function personSetText(item: Pick<CardWorkItem, "proposal_set" | "proposal_set_unrecorded">, shown: RowProposalSetView | null | undefined): string | null {
   const own = item.proposal_set;
+  // Started before sets were recorded: said per person only when the text's line names a set.
+  if (item.proposal_set_unrecorded && shown) return "set not recorded";
   if (!own || !shown || own.set_id === shown.set_id) return null;
   return own.newest ? "newest set" : `set ${setDate(own.imported_at)}`;
 }
@@ -133,7 +135,9 @@ export function AnnotationPart({ row, projectKey, query, submissions, canManage,
           {" "}<StatusBadge tone="info">{`Newer set available: ${setDate(row.newer_proposal_set.imported_at)}`}</StatusBadge>
           {" "}<a href={helpHref("newerProposals")} target="_blank" rel="noopener noreferrer">How to use it</a>
         </>}</p>
-      : <p className="text-card-muted">{plural(proposals, "tool proposal")}</p>)}
+      : row.proposal_set_unrecorded
+        ? <p className="text-card-muted text-card-proposal-set"><span className="text-card-label">Proposals</span> set not recorded (the tasks started before sets were recorded)</p>
+        : <p className="text-card-muted">{plural(proposals, "tool proposal")}</p>)}
     {ownLimit && <p className="text-card-muted">{ownLimit}</p>}
     {annotating && row.unreviewed_translation && <p className="text-card-muted">Translation not reviewed yet</p>}
     {annotating && status && <p id={`${id}-status`}>{status}</p>}

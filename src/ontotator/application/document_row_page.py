@@ -506,7 +506,7 @@ def _build_row(ctx: _Context, case_id: str, language: str) -> dict[str, Any]:
     flagged_round = _consolidation_flags(facts, live)
     target_document = _target(live or chains).document_id
     proposal_count = facts.proposal_counts.get(target_document, 0)
-    proposal_set, newer_set = _row_proposal_sets(
+    proposal_set, newer_set, set_unrecorded = _row_proposal_sets(
         ctx, target_document, [item for item in active if item.task == "annotate"]
     )
     return {
@@ -606,6 +606,7 @@ def _build_row(ctx: _Context, case_id: str, language: str) -> dict[str, Any]:
         ),
         "proposal_set": proposal_set,
         "newer_proposal_set": newer_set,
+        "proposal_set_unrecorded": set_unrecorded,
         "annotations_per_text": {
             "effective": facts.per_text(key),
             "project": facts.annotations_per_text,
@@ -687,46 +688,85 @@ def _set_view(facts: RowFacts, set_id: int | None) -> dict[str, Any] | None:
     }
 
 
+def _item_round(ctx: _Context, item: rules.AssignmentFact) -> Any:
+    return ctx.rounds.get(item.active_round_id or "")
+
+
+def _from_proposals(ctx: _Context, item: rules.AssignmentFact) -> bool:
+    """An annotation task that works (or will work) on tool proposals."""
+    if item.task != "annotate":
+        return False
+    round_fact = _item_round(ctx, item)
+    if round_fact is not None:
+        return bool(round_fact.mode == "proposal_check")
+    return item.annotation_mode == "proposals"
+
+
 def _item_set(ctx: _Context, item: rules.AssignmentFact) -> int | None:
     """The proposal set an annotation task works on (issue 337).
 
     The set its active round started from; a task from proposals without a
-    round yet starts on the newest set of its version. None: unknown (a
+    round yet starts on the newest set of its version. None: not recorded (a
     round from before 0037), from scratch, or seed proposals.
     """
-    if item.task != "annotate":
+    if not _from_proposals(ctx, item):
         return None
-    round_fact = ctx.rounds.get(item.active_round_id or "")
+    round_fact = _item_round(ctx, item)
     if round_fact is not None:
-        return round_fact.proposal_set_id
-    if item.annotation_mode == "proposals":
-        return ctx.facts.newest_sets.get(item.document_id)
-    return None
+        found: int | None = round_fact.proposal_set_id
+        return found
+    return ctx.facts.newest_sets.get(item.document_id)
+
+
+def _set_unrecorded(ctx: _Context, item: rules.AssignmentFact) -> bool:
+    """A started task from proposals whose round did not record its set (it
+    began before migration 0037) on a text that has imported sets."""
+    round_fact = _item_round(ctx, item)
+    return (
+        round_fact is not None
+        and _from_proposals(ctx, item)
+        and round_fact.proposal_set_id is None
+        and item.document_id in ctx.facts.newest_sets
+    )
 
 
 def _row_proposal_sets(
     ctx: _Context, target_document: str, work: Sequence[rules.AssignmentFact]
-) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
-    """The set the text's annotation uses and a newer one (issue 337, 337-A).
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None, bool]:
+    """``(proposal_set, newer_proposal_set, unrecorded)`` (issue 337, 337-A).
 
-    The set most of the text's annotation tasks work on (a tie: the newer
-    one); without a task with a known set, the newest set of the current
-    version, which a new task starts from. ``newer``: the current version's
-    newest set when it is newer than that.
+    While any task of the text works on an older set than the newest of the
+    current version, the line names that older set and ``newer`` the newest
+    one: "Newer set available" stays until every task is on the newest set.
+    Among several older sets: the one with the most started or submitted
+    tasks, then the most tasks, then the older set. With every task on the
+    newest set, or without tasks, the newest set is named (a new task starts
+    from it). ``unrecorded``: no task has a known set and at least one
+    started before sets were recorded; then no set is claimed for the text.
     """
     facts = ctx.facts
-    used = Counter(
-        set_id
-        for item in work
-        if (set_id := _item_set(ctx, item)) is not None
-        and set_id in facts.proposal_sets
-    )
+    started: Counter[int] = Counter()
+    total: Counter[int] = Counter()
+    unrecorded = False
+    for item in work:
+        set_id = _item_set(ctx, item)
+        if set_id is None or set_id not in facts.proposal_sets:
+            unrecorded = unrecorded or _set_unrecorded(ctx, item)
+            continue
+        total[set_id] += 1
+        if _item_round(ctx, item) is not None:
+            started[set_id] += 1
     newest = facts.newest_sets.get(target_document)
-    shown = max(used, key=lambda set_id: (used[set_id], set_id)) if used else newest
-    newer = (
-        newest if newest is not None and shown is not None and newest > shown else None
-    )
-    return _set_view(facts, shown), _set_view(facts, newer)
+    if not total:
+        if unrecorded:
+            return None, None, True
+        return _set_view(facts, newest), None, False
+    older = [set_id for set_id in total if newest is not None and set_id < newest]
+    if not older:
+        shown = newest if newest in total else max(total)
+        return _set_view(facts, shown), None, False
+    shown = max(older, key=lambda set_id: (started[set_id], total[set_id], -set_id))
+    return _set_view(facts, shown), _set_view(facts, newest), False
 
 
 def _consolidation_flags(facts: RowFacts, live: Sequence[rules.Chain]) -> str | None:
@@ -781,6 +821,7 @@ def _work_item(
         ),
         "annotation_mode": item.annotation_mode,
         "proposal_set": _set_view(ctx.facts, _item_set(ctx, item)),
+        "proposal_set_unrecorded": _set_unrecorded(ctx, item),
         "unreviewed_translation": item.unreviewed_translation,
         "waiting_for_translation_review": item.assignment_id in ctx.waiting
         and item.assignment_id not in ctx.waiting_for_lead,

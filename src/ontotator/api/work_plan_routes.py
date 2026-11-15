@@ -365,6 +365,39 @@ class AnnotationsPerTextResult(BaseModel):
     changed: bool
 
 
+class AnnotationsPerTextBulkSet(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    texts: list[RowRefView] = Field(min_length=1, max_length=MAX_SELECTED_ROWS)
+    # The texts' own "Annotations per text"; None follows the project value.
+    value: int | None = Field(ge=1, le=5)
+    reason: str | None = Field(default=None, max_length=2000)
+
+
+class AnnotationsPerTextBulkResult(BaseModel):
+    texts: list[AnnotationsPerTextResult]
+
+
+# Before the single-text route: its case ID is a path.
+@router.put("/texts/annotations-per-text", response_model=AnnotationsPerTextBulkResult)
+def set_annotations_per_texts(
+    key: str,
+    body: AnnotationsPerTextBulkSet,
+    principal: PrincipalDep,
+    request: Request,
+) -> dict[str, Any]:
+    """Several texts' own "Annotations per text" at once (issue 422).
+
+    All or nothing: one unknown text refuses the request. Each text is
+    compared with its own value; texts that already have it are unchanged.
+    """
+    return _service(request, key, principal).set_annotations_per_texts(
+        key,
+        [RowKey(row.case_id, row.language) for row in body.texts],
+        body.value,
+        body.reason,
+    )
+
+
 @router.put(
     "/texts/{case_id:path}/{language}/annotations-per-text",
     response_model=AnnotationsPerTextResult,

@@ -629,6 +629,8 @@ def test_a_review_of_one_root_lets_only_that_root_wait(env):
             "language": "de",
             "reason": "waiting_for_review",
             "document_id": OTHER_ROOT,
+            "assigned": None,
+            "per_text": None,
         }
     ]
     assert_closed(env, assigned(env, "annotate")["id"])

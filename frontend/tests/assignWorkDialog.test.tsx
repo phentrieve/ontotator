@@ -736,9 +736,9 @@ it("one text: saving 2 in the popover shows the new room and a second person can
 
 it("one text: \"Only for the selected text\" gives it its own limit, the project keeps its value (issue 422)", async () => {
   perText = 1; remainingOf = () => 1;
-  const own = vi.spyOn(api, "setAnnotationsPerText").mockImplementation(async (_key, caseId, _language, value) => {
-    ownPerText = new Map([[caseId, value ?? perText]]); remainingOf = () => value ?? perText;
-    return { case_id: caseId, language: "de", override: value, project_value: 1, effective: value ?? 1, changed: true };
+  const own = vi.spyOn(api, "setAnnotationsPerTexts").mockImplementation(async (_key, texts, value) => {
+    ownPerText = new Map(texts.map(text => [text.case_id, value ?? perText])); remainingOf = () => value ?? perText;
+    return { texts: texts.map(text => ({ ...text, override: value, project_value: 1, effective: value ?? 1, changed: true })) };
   });
   const project = vi.spyOn(api, "updateProjectSettings");
   const changed = vi.fn();
@@ -752,7 +752,7 @@ it("one text: \"Only for the selected text\" gives it its own limit, the project
   expect(within(popover).queryByText(/project setting/)).toBeNull();
   fireEvent.change(within(popover).getByRole("spinbutton", { name: /Annotators per text/ }), { target: { value: "4" } });
   fireEvent.click(within(popover).getByRole("button", { name: "Change for 1 text" }));
-  await waitFor(() => expect(own).toHaveBeenCalledWith("p/key", "case-0101", "de", 4));
+  await waitFor(() => expect(own).toHaveBeenCalledWith("p/key", [{ case_id: "case-0101", language: "de" }], 4));
   expect(project).not.toHaveBeenCalled();
   expect(await screen.findByText("Annotators per text: 4, for case-0101 de.")).toBeDefined();
   expect(await screen.findByText("0 assigned · 4 more possible (limit 4)")).toBeDefined();
@@ -762,14 +762,70 @@ it("one text: \"Only for the selected text\" gives it its own limit, the project
   const again = screen.getByRole("dialog", { name: "Annotators per text" });
   expect(within(again).getByRole("heading", { name: "Up to 4 annotators for this text (project: 1)" })).toBeDefined();
   expect(within(again).getByText("Sets the most annotators for this text only (project: 1). Fewer is fine.")).toBeDefined();
-  // "For all texts" explains the project setting instead.
+  // "For all texts" explains the project setting instead and starts from the project's value, not the text's.
+  const field = within(again).getByRole("spinbutton", { name: /Annotators per text/ });
+  expect(field).toHaveProperty("value", "4");
   fireEvent.click(within(again).getByRole("radio", { name: "For all texts" }));
+  expect(field).toHaveProperty("value", "1");
+  expect(within(again).getByRole("button", { name: "Change for all texts" }).getAttribute("aria-disabled")).toBe("true");
   expect(within(again).queryByText(/for this text only/)).toBeNull();
   expect(within(again).getByText(/the most annotators any text can get/)).toBeDefined();
   fireEvent.click(within(again).getByRole("radio", { name: "Only for the selected text (case-0101 de)" }));
-  fireEvent.change(within(again).getByRole("spinbutton", { name: /Annotators per text/ }), { target: { value: "1" } });
+  expect(field).toHaveProperty("value", "4");
+  fireEvent.change(field, { target: { value: "1" } });
   fireEvent.click(within(again).getByRole("button", { name: "Change for 1 text" }));
-  await waitFor(() => expect(own).toHaveBeenLastCalledWith("p/key", "case-0101", "de", null));
+  await waitFor(() => expect(own).toHaveBeenLastCalledWith("p/key", [{ case_id: "case-0101", language: "de" }], null));
+});
+
+it("one text: a limit below its annotators warns that they stay; a refused save reloads (issue 422)", async () => {
+  perText = 1; ownPerText = new Map([["case-0101", 4]]); remainingOf = () => 1;
+  const own = vi.spyOn(api, "setAnnotationsPerTexts").mockRejectedValue(new ApiError(404, "not found", "DOCUMENT_NOT_FOUND"));
+  render(<AssignWorkDialog mode="row" projectKey="p/key" row={row} task="annotate" onClose={vi.fn()} onAssigned={vi.fn()} />);
+  await ready();
+  expect(screen.getByText("3 assigned · 1 more possible (limit 4)")).toBeDefined();
+  fireEvent.click(screen.getByRole("button", { name: "About the limit: 4 annotators per text" }));
+  const popover = screen.getByRole("dialog", { name: "Annotators per text" });
+  const field = within(popover).getByRole("spinbutton", { name: /Annotators per text/ });
+  expect(within(popover).queryByText(/already has more/)).toBeNull();
+  fireEvent.change(field, { target: { value: "3" } });
+  expect(within(popover).queryByText(/already has more/)).toBeNull();
+  fireEvent.change(field, { target: { value: "2" } });
+  expect(within(popover).getByText("This text already has more; its assignments stay.")).toBeDefined();
+  const previews = vi.mocked(api.previewAssignmentBatch).mock.calls.length;
+  fireEvent.click(within(popover).getByRole("button", { name: "Change for 1 text" }));
+  await waitFor(() => expect(own).toHaveBeenCalled());
+  // Refused: the popover stays with the error and the dialog reloads its preview.
+  await waitFor(() => expect(vi.mocked(api.previewAssignmentBatch).mock.calls.length).toBeGreaterThan(previews));
+  expect(screen.getByRole("dialog", { name: "Annotators per text" })).toBeDefined();
+});
+
+it("several texts with different limits: people up to the highest limit; the project value clears the own ones (issue 422)", async () => {
+  perText = 1; ownPerText = new Map([["case-0101", 3]]); remainingOf = id => perTextOf(id);
+  vi.mocked(api.selectionSummary).mockResolvedValue(summary([{ task: "annotate", language: "de", versions: 20, cases: 20 }]));
+  const own = vi.spyOn(api, "setAnnotationsPerTexts").mockImplementation(async (_key, texts, value) => {
+    ownPerText = new Map();
+    return { texts: texts.map(text => ({ ...text, override: value, project_value: 1, effective: value ?? 1, changed: true })) };
+  });
+  render(<AssignWorkDialog {...casesProps()} />); await ready();
+  expect(screen.getByText("Up to 3 per text; limits differ (1 to 3)")).toBeDefined();
+  // Not capped at the project's 1: the text with room for 3 takes a second and third person.
+  fireEvent.click(screen.getByRole("checkbox", { name: /Ana Weber/ }));
+  const ben = screen.getByRole("checkbox", { name: /Ben Roth/ });
+  expect(ben.getAttribute("aria-disabled")).toBeNull();
+  fireEvent.click(ben);
+  await waitForPreviewOf(["ana", "ben"]);
+  expect((ben as HTMLInputElement).checked).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "About the limit: 1 annotator per text" }));
+  const popover = screen.getByRole("dialog", { name: "Annotators per text" });
+  expect(within(popover).getByRole("heading", { name: "Limits differ: 1 to 3 annotators per text (project: 1)" })).toBeDefined();
+  // The project's value is a change here: it returns the text with its own value to the project.
+  const change = within(popover).getByRole("button", { name: "Change for 20 texts" });
+  expect(change.getAttribute("aria-disabled")).toBeNull();
+  fireEvent.click(change);
+  await waitFor(() => expect(own).toHaveBeenCalledTimes(1));
+  expect(own.mock.calls[0][1]).toHaveLength(20);
+  expect(own.mock.calls[0][2]).toBeNull();
+  await waitFor(() => expect(screen.getByText("Up to 1 per text")).toBeDefined());
 });
 
 it("one text the preview cannot assign says why instead of a made-up limit (R-12)", async () => {

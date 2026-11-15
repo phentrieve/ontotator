@@ -1625,6 +1625,29 @@ export interface paths {
         patch: operations["patch_work_plan_api_v1_projects__key__work_plans__case_id___language__patch"];
         trace?: never;
     };
+    "/api/v1/projects/{key}/texts/annotations-per-text": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Annotations Per Texts
+         * @description Several texts' own "Annotations per text" at once (issue 422).
+         *
+         *     All or nothing: one unknown text refuses the request. Each text is
+         *     compared with its own value; texts that already have it are unchanged.
+         */
+        put: operations["set_annotations_per_texts_api_v1_projects__key__texts_annotations_per_text_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{key}/texts/{case_id}/{language}/annotations-per-text": {
         parameters: {
             query?: never;
@@ -3605,6 +3628,20 @@ export interface components {
             /** Evidence */
             evidence: components["schemas"]["EvidenceSnapshot"][];
         };
+        /** AnnotationsPerTextBulkResult */
+        AnnotationsPerTextBulkResult: {
+            /** Texts */
+            texts: components["schemas"]["AnnotationsPerTextResult"][];
+        };
+        /** AnnotationsPerTextBulkSet */
+        AnnotationsPerTextBulkSet: {
+            /** Texts */
+            texts: components["schemas"]["RowRefView"][];
+            /** Value */
+            value: number | null;
+            /** Reason */
+            reason?: string | null;
+        };
         /** AnnotationsPerTextResult */
         AnnotationsPerTextResult: {
             /** Case Id */
@@ -4172,6 +4209,10 @@ export interface components {
             reason: "waiting_for_review" | "not_in_plan" | "already_assigned" | "step_differs" | "discarded" | "no_proposals_on_version" | "other_root_in_review";
             /** Document Id */
             document_id?: string | null;
+            /** Assigned */
+            assigned?: number | null;
+            /** Per Text */
+            per_text?: number | null;
         };
         /** BatchTargetView */
         BatchTargetView: {
@@ -5282,6 +5323,8 @@ export interface components {
             annotation_mode?: components["schemas"]["AnnotationModeView"] | null;
             proposal_set?: components["schemas"]["RowProposalSetView"] | null;
             newer_proposal_set?: components["schemas"]["RowProposalSetView"] | null;
+            /** Proposal Set Unrecorded */
+            proposal_set_unrecorded?: boolean;
             annotations_per_text?: components["schemas"]["AnnotationsPerTextView"] | null;
             consolidation_progress?: components["schemas"]["ConsolidationProgressView"] | null;
             /**
@@ -10428,6 +10471,8 @@ export interface components {
             /** Annotation Mode */
             annotation_mode?: ("proposals" | "scratch") | null;
             proposal_set?: components["schemas"]["RowProposalSetView"] | null;
+            /** Proposal Set Unrecorded */
+            proposal_set_unrecorded?: boolean;
             /**
              * Unreviewed Translation
              * @default false
@@ -13750,6 +13795,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlanRowResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_annotations_per_texts_api_v1_projects__key__texts_annotations_per_text_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnnotationsPerTextBulkSet"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnnotationsPerTextBulkResult"];
                 };
             };
             /** @description Validation Error */

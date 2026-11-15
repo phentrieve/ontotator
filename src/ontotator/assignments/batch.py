@@ -678,6 +678,20 @@ class BatchAssignmentService:
         ]
         skip_views: list[dict[str, Any]] = [
             {"case_id": case_id, "language": spec.language, "reason": skipped[case_id]}
+            | (
+                {
+                    "per_text": facts.per_text((case_id, spec.language)),
+                    "assigned": max(
+                        (
+                            rows.held.get(v.document_id, 0)
+                            for v in rows._newest((case_id, spec.language))
+                        ),
+                        default=0,
+                    ),
+                }
+                if task == "annotate" and skipped[case_id] == "already_assigned"
+                else {}
+            )
             for case_id in order
             if case_id in skipped
         ]

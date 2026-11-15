@@ -155,6 +155,8 @@ class WorkItemView(_View):
     # or the newest one for a task from proposals not started yet); None:
     # not recorded, from scratch or seed proposals.
     proposal_set: RowProposalSetView | None = None
+    # The task's round began before sets were recorded (migration 0037).
+    proposal_set_unrecorded: bool = Field(default_factory=lambda: False)
     # Spec 2026-10-25 §2: annotate work the lead confirmed before the
     # translation review was accepted (the History line).
     unreviewed_translation: bool = False
@@ -426,11 +428,14 @@ class DocumentRowView(_View):
     # consolidation round (shown rows only).
     proposal_count: int = 0
     annotation_mode: AnnotationModeView | None = None
-    # Issue 337: the proposal set most annotation tasks of the text work on
-    # (without tasks: the one a new task starts from) and a newer set of the
-    # current version, if there is one.
+    # Issue 337: the proposal set the text's annotation tasks work on and,
+    # while any task is on an older set than the newest of the current
+    # version, that newest set (then ``proposal_set`` is the older one).
+    # Without tasks: the set a new task starts from. ``unrecorded``: the
+    # tasks began before sets were recorded, so no set is named.
     proposal_set: RowProposalSetView | None = None
     newer_proposal_set: RowProposalSetView | None = None
+    proposal_set_unrecorded: bool = Field(default_factory=lambda: False)
     # Issue 422: the text's "Annotations per text" (None in older fixtures).
     annotations_per_text: AnnotationsPerTextView | None = None
     consolidation_progress: ConsolidationProgressView | None = None

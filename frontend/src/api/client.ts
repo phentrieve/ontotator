@@ -602,6 +602,10 @@ export class ApiClient {
   async setAnnotationsPerText(key: string, caseId: string, language: string, value: number | null, reason?: string): Promise<AnnotationsPerTextResult> {
     return this.request<AnnotationsPerTextResult>(`/api/v1/projects/${encodeURIComponent(key)}/texts/${encodeURIComponent(caseId)}/${encodeURIComponent(language)}/annotations-per-text`, { method: "PUT", body: JSON.stringify({ value, ...(reason ? { reason } : {}) }) });
   }
+  /** Issue 422: several texts at once, in one transaction (all or nothing); each text is compared with its own value. */
+  async setAnnotationsPerTexts(key: string, texts: readonly RowRefView[], value: number | null, reason?: string): Promise<{ texts: AnnotationsPerTextResult[] }> {
+    return this.request(`/api/v1/projects/${encodeURIComponent(key)}/texts/annotations-per-text`, { method: "PUT", body: JSON.stringify({ texts, value, ...(reason ? { reason } : {}) }) });
+  }
   async patchWorkPlan(key: string, caseId: string, language: string, body: PlanRowPatch): Promise<PlanRowResult> {
     return this.request<PlanRowResult>(`/api/v1/projects/${encodeURIComponent(key)}/work-plans/${encodeURIComponent(caseId)}/${encodeURIComponent(language)}`, { method: "PATCH", body: JSON.stringify(body) });
   }
