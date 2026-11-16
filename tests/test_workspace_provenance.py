@@ -427,7 +427,8 @@ def test_actual_reanchor_source_version_and_tool_metadata_are_inlined(tmp_path):
         and item["source_document_id"] == "case"
         and item["source_version"] == 1
     )
-    assert item["actors"][0]["actor_id"] == "ontotator-reanchor"
+    # The copy names the tool that produced the proposals (#417).
+    assert item["actors"][0]["actor_id"] == "phentrieve"
 
 
 def test_existing_foreign_project_sets_cannot_be_projected_or_publicly_read(

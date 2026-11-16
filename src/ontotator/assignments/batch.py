@@ -885,6 +885,11 @@ class BatchAssignmentService:
                                 )
                             )
                     except DomainError as error:
+                        reason = (
+                            error.details.get("reason")
+                            if isinstance(error.details, dict)
+                            else None
+                        )
                         refused.append(
                             {
                                 "case_id": target.case_id,
@@ -892,6 +897,9 @@ class BatchAssignmentService:
                                 "document_id": target.document_id,
                                 "username": username,
                                 "code": error.code,
+                                # ``details.reason`` as on the single
+                                # assignment, e.g. ``accepted_by_review``.
+                                "reason": reason if isinstance(reason, str) else None,
                             }
                         )
             if refused:

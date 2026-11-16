@@ -98,7 +98,7 @@ What for: pick another result after you already chose one.
 2. Click **Change final…** next to **Open result**.
 3. Click **Use as final** in the row of the result you want.
 
-A final result can only be replaced, never withdrawn. While a text has one, its annotation mode cannot be changed ([Change the annotation mode of one text](lead-documents.md#change-the-annotation-mode-of-one-text)).
+A final result can only be replaced, never withdrawn. While a text has one, its annotation mode cannot be changed: **Change mode…** is refused (error code `ANNOTATION_MODE_FINAL_SELECTED`) ([Change the annotation mode of one text](lead-documents.md#change-the-annotation-mode-of-one-text)).
 
 ## Translation and text-change decisions
 
