@@ -9,7 +9,7 @@ text changes and final results) and returns::
      language}], assignments: {name: assignment_id}, documents?, submissions?,
      bundle_path?}
 
-``S1`` to ``S16`` (``S7a`` and ``S7b`` separately) hold the facts of the
+``S1`` to ``S18`` (``S7a`` and ``S7b`` separately) hold the facts of the
 plan's "Scenario table"; ``WALKTHROUGH`` is the empty project of the spec's
 acceptance walkthrough with the bundle the lead imports in the browser.
 
@@ -940,6 +940,24 @@ def build_s13(app: FastAPI) -> dict[str, Any]:
     )
 
 
+def build_s18(app: FastAPI) -> dict[str, Any]:
+    """case-118 de: S13, then Carry to v2… → Ana (author): her carried task
+    on v2 is open; the v1 submission no longer counts (issue 420)."""
+    scenario, de = _accepted("S18", "case-118", app=app)
+    ana = assign_and_annotate(scenario, de, "ana", PRESETS["three"])
+    review = request_correction(scenario, de, "ana")
+    review_translation(scenario, review, "ana", "accepted_corrected")
+    v2 = newest(scenario, "case-118", "de")
+    carry_to_author(scenario, ana["submission_id"], v2)
+    return result(
+        scenario,
+        [("case-118", "de")],
+        {"ana": ana["assignment_id"], "ana_review": review},
+        documents={"v1": de, "v2": v2},
+        submissions={"ana": ana["submission_id"]},
+    )
+
+
 def build_s14(app: FastAPI) -> dict[str, Any]:
     """case-114 de: final Round 1 · Ana on v1; then correction v2 accepted
     (``SELECTED_TEXT_CORRECTED``)."""
@@ -1046,6 +1064,7 @@ BUILDERS: dict[str, Builder] = {
     "S15": build_s15,
     "S16": build_s16,
     "S17": build_s17,
+    "S18": build_s18,
     "WALKTHROUGH": build_walkthrough,
 }
 

@@ -12,6 +12,7 @@ from ontotator.domain.annotations import AnnotationSnapshot
 from ontotator.domain.workspace import Submission
 from ontotator.exchange.t1 import _proposal_ref
 from ontotator.storage.proposal_queries import ProposalSetRef
+from ontotator.storage.reanchor_credit import Credit, credited_actors
 from ontotator.storage.tables import (
     DocumentRow,
     EmptyProposalSetRow,
@@ -140,7 +141,9 @@ def proposal_sources(
     version of the proposal's actor in the imported set (proposals.csv).
 
     An actor without a name is named by its id; a seed proposal without a set
-    by the actor id of its provenance, with an empty version."""
+    by the actor id of its provenance, with an empty version. A proposal of a
+    set re-anchored before #417 is named by the tool of the set it was copied
+    from, not by the re-anchor job."""
     wanted = {
         (t.annotation_id, t.version)
         for s in submissions
@@ -148,12 +151,15 @@ def proposal_sources(
         for t in s.targets.targets
         if (t.annotation_id, t.version) in proposals
     }
-    actors: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    credits: dict[tuple[str, str], Credit] = {}
     if wanted:
         rows = conn.execute(
             select(
                 ProposalAnnotationRow.annotation_id,
                 ProposalAnnotationRow.version,
+                ProposalSetRow.id,
+                ProposalSetRow.origin,
+                ProposalSetRow.annotation_set_id,
                 ProposalSetRow.actors,
             )
             .outerjoin(
@@ -165,17 +171,23 @@ def proposal_sources(
                 ProposalAnnotationRow.annotation_id.in_({a for a, _ in wanted}),
             )
         )
-        actors = {
-            (r.annotation_id, r.version): list(r.actors or [])
-            for r in rows
-            if (r.annotation_id, r.version) in wanted
+        found = [r for r in rows if (r.annotation_id, r.version) in wanted]
+        by_set = credited_actors(
+            conn,
+            project_id,
+            [r._mapping for r in found if r.id is not None],
+        )
+        credits = {
+            (r.annotation_id, r.version): by_set[r.id]
+            if r.id is not None
+            else Credit([])
+            for r in found
         }
     sources = {}
     for key in sorted(wanted):
-        actor_id = proposals[key].annotation.provenance.actor.actor_id
-        actor = next(
-            (a for a in actors.get(key, []) if a.get("actor_id") == actor_id), {}
-        )
+        credit = credits.get(key, Credit([]))
+        actor_id = credit.actor_id(proposals[key].annotation.provenance.actor.actor_id)
+        actor = next((a for a in credit.actors if a.get("actor_id") == actor_id), {})
         sources[key] = (actor.get("name") or actor_id, actor.get("version") or "")
     return sources
 
@@ -217,6 +229,21 @@ def tool_chances(
     return chances
 
 
+def _credited_payload(payload: Mapping[str, Any], credit: Credit) -> Mapping[str, Any]:
+    """``payload`` with the proposal actors read as the credited tool."""
+    if not credit.alias:
+        return payload
+    annotations = []
+    for item in payload.get("annotations", []):
+        provenance = item.get("provenance", {})
+        actor = provenance.get("actor", {})
+        if actor.get("actor_id") in credit.alias:
+            actor = {**actor, "actor_id": credit.alias[actor["actor_id"]]}
+            item = {**item, "provenance": {**provenance, "actor": actor}}
+        annotations.append(item)
+    return {**payload, "annotations": annotations}
+
+
 def proposal_set_chances(
     conn: Connection, project_id: int | None, document_ids: Iterable[str]
 ) -> dict[tuple[str, str], dict[str, bool]]:
@@ -232,7 +259,12 @@ def proposal_set_chances(
         return {}
     rows = conn.execute(
         select(
-            ProposalSetRow.document_id, ProposalSetRow.actors, ProposalSetRow.payload
+            ProposalSetRow.id,
+            ProposalSetRow.origin,
+            ProposalSetRow.annotation_set_id,
+            ProposalSetRow.document_id,
+            ProposalSetRow.actors,
+            ProposalSetRow.payload,
         )
         .where(
             ProposalSetRow.project_id == project_id,
@@ -240,8 +272,15 @@ def proposal_set_chances(
         )
         .order_by(ProposalSetRow.id)
     )
+    stored = rows.all()
+    credits = credited_actors(conn, project_id, [r._mapping for r in stored])
     sets: list[tuple[str, Iterable[Mapping[str, Any]], Mapping[str, Any]]] = [
-        (r.document_id, r.actors or [], r.payload or {}) for r in rows
+        (
+            r.document_id,
+            credits[r.id].actors,
+            _credited_payload(r.payload or {}, credits[r.id]),
+        )
+        for r in stored
     ]
     corrected_from = {
         r.document_id: r.derived_from

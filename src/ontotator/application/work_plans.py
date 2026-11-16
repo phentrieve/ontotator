@@ -256,7 +256,13 @@ def enable_review_for_accepted(
     """D25: a new review of a lead/override-accepted newest version.
 
     Returns True when ``document_id`` qualifies; turns Review on for its row
-    (audited ``work_plan.update``, no consequences) if it was off.
+    (audited ``work_plan.update``, no consequences) if it was off. A newest
+    version whose newest acceptance record is not a lead's or an override's
+    (accepted only by a translation review, or marked reviewed in its import
+    package) is refused with reason ``accepted_by_review``: its new review is a
+    correction request (``translation-correction-assignment``), issue 409.
+    Only the acceptance record decides: a lead-accepted version stays
+    eligible after a later review accepted it as well.
     """
     document = conn.execute(
         select(
@@ -277,13 +283,11 @@ def enable_review_for_accepted(
         )
         .limit(1)
     ).first()
-    acceptance = store.acceptances(conn, project_id).get(document_id)
-    if (
-        newer is not None
-        or acceptance is None
-        or acceptance["source"] not in _REVIEWABLE_ACCEPTANCES
-    ):
+    if newer is not None:
         return False
+    acceptance = store.acceptances(conn, project_id).get(document_id)
+    if acceptance is None or acceptance["source"] not in _REVIEWABLE_ACCEPTANCES:
+        raise DomainError("NOT_A_TRANSLATION", {"reason": "accepted_by_review"})
     turn_review_on(conn, actor, project_id, RowKey(document.case_id, document.language))
     return True
 

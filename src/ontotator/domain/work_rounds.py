@@ -95,8 +95,10 @@ class RoundInputView(BaseModel):
     source_recorded_at: datetime | None = None
     source_language: str | None = None
     source_version: int | None = None
-    # API-only: the Unresolved note a check from proposals left on the source
-    # proposal, carried without counterpart (#414); the finding keeps it.
+    # The Unresolved note a check from proposals left on the source proposal,
+    # carried without counterpart (#414); the finding keeps it. Stored for
+    # rounds created since #418 (archived beside the inputs, as
+    # ``review_reason``); older rounds read it from their source.
     unresolved_note: str | None = None
 
     # Keys package archives leave out, so older readers (extra="forbid") still
@@ -187,6 +189,28 @@ class DraftSnapshotPayload(BaseModel):
 # needs-review input travels beside them as ``{input_id: reason}``, a key those
 # readers never look at. Packages without the map import with no reasons.
 ARCHIVED_REVIEW_REASONS = "review_reasons"
+# The same for the stored ``unresolved_note`` of an input (#418): an archived
+# round has no frozen draft to read it from. Packages without it import with
+# the notes their source submissions still give.
+ARCHIVED_UNRESOLVED_NOTES = "unresolved_notes"
+_ARCHIVED_SIDE_MAPS = (
+    ("review_reason", ARCHIVED_REVIEW_REASONS),
+    ("unresolved_note", ARCHIVED_UNRESOLVED_NOTES),
+)
+
+
+def unresolved_note(
+    source_ref: Mapping[str, Any], decisions: Iterable[Mapping[str, Any]]
+) -> str | None:
+    """The note of the Unresolved decision the source work left on the input's
+    proposal ``source_ref`` (carried without counterpart, #414); the last one
+    wins, None without a note."""
+    found: str | None = None
+    for decision in decisions:
+        note = (decision.get("note") or "").strip()
+        if decision["outcome"] == "uncertain" and decision["target"] == source_ref:
+            found = note or found
+    return found
 
 
 def archive_round(
@@ -196,10 +220,11 @@ def archive_round(
 ) -> dict[str, Any]:
     """The ``workflow_history`` entry of one round, read facts left out."""
     archived_inputs = []
-    reasons: dict[str, str] = {}
+    side: dict[str, dict[str, str]] = {key: {} for _, key in _ARCHIVED_SIDE_MAPS}
     for item in inputs:
-        if item.get("review_reason") is not None:
-            reasons[item["input_id"]] = item["review_reason"]
+        for field, key in _ARCHIVED_SIDE_MAPS:
+            if item.get(field) is not None:
+                side[key][item["input_id"]] = item[field]
         archived_inputs.append(
             {k: v for k, v in item.items() if k not in RoundInputView.NOT_ARCHIVED}
         )
@@ -208,20 +233,22 @@ def archive_round(
         "inputs": archived_inputs,
         "submission_ids": submission_ids,
     }
-    if reasons:
-        entry[ARCHIVED_REVIEW_REASONS] = reasons
+    entry.update({key: values for key, values in side.items() if values})
     return entry
 
 
 def archived_inputs(archived: dict[str, Any]) -> list[dict[str, Any]]:
-    """The inputs of an archived round with their stored review reasons."""
-    reasons = archived.get(ARCHIVED_REVIEW_REASONS) or {}
-    return [
-        dict(item) | {"review_reason": reasons[item["input_id"]]}
-        if item["input_id"] in reasons
-        else dict(item)
-        for item in archived["inputs"]
-    ]
+    """The inputs of an archived round with their stored review reasons and
+    Unresolved notes."""
+    maps = [(field, archived.get(key) or {}) for field, key in _ARCHIVED_SIDE_MAPS]
+    result = []
+    for item in archived["inputs"]:
+        restored = dict(item)
+        for field, values in maps:
+            if item["input_id"] in values:
+                restored[field] = values[item["input_id"]]
+        result.append(restored)
+    return result
 
 
 class WorkRoundView(BaseModel):

@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 
 import ontospan
 import pytest
-from t1_fixtures import HP_PATH, PIN, TEXT, annotation, hpo_profile, unit
+from t1_fixtures import HP_PATH, PIN, TEXT, TOOL, annotation, hpo_profile, unit
 
 from ontotator.api.variant_routes import ReanchorItem
 from ontotator.domain.documents import Document
@@ -68,11 +68,18 @@ def test_reconstruction_recomputes_real_target_snapshots_and_valid_t1_with_basis
         assert snap.annotation.provenance.source_refs == [
             previous.annotation.annotation_id
         ]
-        assert snap.annotation.provenance.actor.actor_id == "ontotator-reanchor"
+        # The copy keeps the producing tool and method (#417).
+        assert snap.annotation.provenance.actor.actor_id == "phentrieve"
+        assert snap.annotation.provenance.actor.kind == "tool"
+        assert (
+            snap.annotation.provenance.method == previous.annotation.provenance.method
+        )
         assert item.proposals.notes[snap.annotation.annotation_id] == ["score 0.91"]
         assert snap.evidence[0].version != previous.evidence[0].version
     aset = payload.annotation_set
-    assert aset.actors[0].name == "ontotator-reanchor"
+    assert [a.model_dump(exclude_none=True) for a in aset.actors] == [TOOL]
+    assert item.actors == [TOOL]
+    assert {a.provenance.actor.actor_id for a in aset.annotations} == {"phentrieve"}
     assert aset.annotations[0].axes["experiencer"].basis == "defaulted"
     assert aset.annotations[0].provenance.notes == ("score 0.91",)
     assert original.annotation_set.actors[0].model == "bge-m3"
@@ -93,6 +100,53 @@ def test_reconstruction_recomputes_real_target_snapshots_and_valid_t1_with_basis
     assert [s.model_dump() for s in rebuilt.annotations] == [
         s.model_dump() for s in item.proposals.annotations
     ]
+
+
+def test_a_legacy_reanchored_source_is_copied_as_its_credited_tool():
+    """Re-anchoring a set re-anchored before #417 credits the original tool."""
+    original, old, source = inputs()
+    legacy = {
+        "actor_id": "ontotator-reanchor",
+        "kind": "tool",
+        "name": "ontotator-reanchor",
+        "version": "0.10.1",
+    }
+    relabelled = tuple(
+        snap.model_copy(
+            update={
+                "annotation": snap.annotation.model_copy(
+                    update={
+                        "provenance": snap.annotation.provenance.model_copy(
+                            update={
+                                "actor": snap.annotation.provenance.actor.model_copy(
+                                    update={"actor_id": "ontotator-reanchor"}
+                                )
+                            }
+                        )
+                    }
+                )
+            }
+        )
+        for snap in source.annotations
+    )
+    payload = {**source.payload, "actors": [legacy]}
+    stored = ReanchorSource(
+        source.row_id,
+        source.annotation_set_id,
+        source.bundle_id,
+        payload,
+        relabelled,
+        source.notes,
+        (TOOL,),
+        {"ontotator-reanchor": "phentrieve"},
+    )
+    item, unit_payload = build(stored, old, "Prefix " + TEXT)
+    assert item.actors == [TOOL]
+    assert {
+        snap.annotation.provenance.actor.actor_id for snap in item.proposals.annotations
+    } == {"phentrieve"}
+    assert unit_payload.annotation_set.actors[0].actor_id == "phentrieve"
+    assert original.annotation_set.actors[0].actor_id == "phentrieve"
 
 
 def test_pending_payload_matches_actual_task4_dto_with_absolute_positions_and_cues():

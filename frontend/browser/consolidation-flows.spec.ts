@@ -200,10 +200,8 @@ test("Reopen all decisions… opens every decided group; the toast's Undo restor
   await expect(group(page, "Absent reflexes")).toHaveAccessibleName(/^Absent reflexes decided/);
 });
 
-// Bug: after "Reopen all", ConsolidationScreen.reopenAll selects the first open group of the view from before the
-// reopen (viewRef is not re-rendered yet when data.reopenAll() resolves), so "Reduced hearing" opens instead of the
-// first open group in text order, "muscular hypotonia".
-test.fixme("Reopen all decisions… selects the first reopened group in text order", async ({ page }) => {
+// Issue 375: the first open group of the refreshed view opens, not the first open group from before the reopen.
+test("Reopen all decisions… selects the first reopened group in text order", async ({ page }) => {
   const s = await scenario(page);
   await openTask(page, s);
   await take(page, "absent", "Assertion").click();
