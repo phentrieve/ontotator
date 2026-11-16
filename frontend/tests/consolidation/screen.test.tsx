@@ -117,6 +117,24 @@ describe("ConsolidationScreen", () => {
     expect(undo.mock.calls[0][1]).toMatchObject({ payload: { command: "consolidation_undo_reopen_all" } });
   });
 
+  it("Reopen all whose view read failed opens the first open group once the next view arrives (issue 375)", async () => {
+    // Before: only "Unsteady gait" is open. The read after the reopen fails; Reload brings the reopened view.
+    const before = withGroup(decidedView(), "g-gait", { state: "open" });
+    vi.spyOn(api, "getConsolidation").mockResolvedValueOnce(before).mockRejectedValueOnce(new Error("offline")).mockResolvedValue(exampleView());
+    vi.spyOn(api, "openWorkRound").mockResolvedValue({ workspace_id: "ws-c", view: workspaceView(), read_only: false });
+    vi.spyOn(api, "reopenAllConsolidationGroups").mockResolvedValue(draft(4));
+    await renderScreen();
+    await waitFor(() => expect(expandedTitle()).toBe("Unsteady gait"));
+    fireEvent.click(screen.getByRole("button", { name: "More task actions" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Reopen all decisions…" }));
+    fireEvent.click(within(await screen.findByRole("dialog", { name: "Reopen 3 decided groups?" })).getByRole("button", { name: "Reopen all" }));
+    await waitFor(() => expect(document.querySelector(".ui-toast-region .ui-toast")?.textContent).toContain("Reopened 3 decided groups."));
+    // The stale view is not used for a selection.
+    expect(expandedTitle()).toBe("Unsteady gait");
+    fireEvent.click(await screen.findByRole("button", { name: "Reload" }));
+    await waitFor(() => expect(expandedTitle()).toBe("muscular hypotonia"));
+  });
+
   it("a failed Undo keeps the inline Undo available (M-7g)", async () => {
     const after = withGroup(exampleView(), "g-hypo", { state: "choose", annotation_ids: ["cons-1"] });
     load(exampleView(), after);

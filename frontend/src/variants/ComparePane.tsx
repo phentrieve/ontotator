@@ -14,6 +14,7 @@ import { VersionSelect } from './VersionSelect';
 import { ShowSelect } from './ShowSelect';
 import { LayerFindings, layerTerms } from './LayerFindings';
 import { layerKey, layerRefs, refForLayer } from './useTextLayers';
+import { changeRanges, type TextChanges } from '../translation/textDiff';
 
 export interface ComparePaneProps {
   projectKey: string; username: string; caseDetail: CaseDetail; leftDocumentId: string;
@@ -23,7 +24,11 @@ export interface ComparePaneProps {
   initialRight?: { documentId: string; refKey: string };
   /** Text view: the server's layers, one language-and-version select, the Show select and the findings; keys are layer keys. */
   layers?: boolean;
+  /** Text view: receives the change marks of the current (left) text while Show changes is on, else null. */
+  onLeftChanges?: (changes: TextChanges | null) => void;
 }
+
+const passages = (count: number, what: string) => `${count} ${count === 1 ? 'passage' : 'passages'} ${what}`;
 
 /** Only traverse explicitly readable, same-case lineage. No ID or status inference. */
 function defaultComparison(detail: CaseDetail, documentId: string) {
@@ -42,8 +47,9 @@ function defaultComparison(detail: CaseDetail, documentId: string) {
   return { id: row ? documentId : null, source: !row };
 }
 
-export function ComparePane({ projectKey, username, caseDetail, leftDocumentId, leftText, leftElement, leftContext, suspended = false, editing = false, onClose, toolbarHost, initialRight, layers = false }: ComparePaneProps): JSX.Element {
+export function ComparePane({ projectKey, username, caseDetail, leftDocumentId, leftText, leftElement, leftContext, suspended = false, editing = false, onClose, toolbarHost, initialRight, layers = false, onLeftChanges }: ComparePaneProps): JSX.Element {
   const couplingNoteId = useId();
+  const changesNoteId = useId();
   // User choices outlive left annotation changes; requests must still reauthorize in each context.
   const choiceIdentity = useMemo(() => ({}), [projectKey, username, caseDetail.case_id, leftDocumentId, initialRight?.documentId, initialRight?.refKey]);
   const identity = useMemo(() => ({}), [choiceIdentity, caseDetail, leftContext]);
@@ -85,6 +91,30 @@ export function ComparePane({ projectKey, username, caseDetail, leftDocumentId, 
   const coupled = couplingRequested && pairing.available;
   const couplingUnavailable = editing ? 'Coupled scrolling is available in read-only views.'
     : !pairing.available ? 'Widen the window to at least 1100 px to couple scrolling in side-by-side panes.' : null;
+  // Show changes (issue 411): two different texts of one language; the older version is "before" (struck through
+  // removals), the newer "after" (underlined additions). Off by default; the choice outlives a new right version.
+  const leftVariant = caseDetail.variants.find(row => row.document_id === leftDocumentId);
+  const rightVariant = available ? caseDetail.variants.find(row => row.document_id === selectedId) : undefined;
+  const comparable = layers && !!leftVariant && !!rightVariant && leftVariant.language === rightVariant.language && leftVariant.document_id !== rightVariant.document_id;
+  const [requestedChanges, setRequestedChanges] = useState<object | null>(null);
+  const changesRequested = comparable && requestedChanges === choiceIdentity;
+  const rightText = current?.text?.text;
+  const changesOn = changesRequested && !suspended && rightText !== undefined;
+  const leftIsBefore = !leftVariant || !rightVariant || leftVariant.version <= rightVariant.version;
+  const changes = useMemo(() => {
+    if (!changesOn) return null;
+    const ranges = leftIsBefore ? changeRanges(leftText, rightText!) : changeRanges(rightText!, leftText);
+    // Too different to diff in time (textDiff DIFF_LIMITS): no marks, the line above the texts says why.
+    if (!ranges) return { left: null, right: null, removed: 0, added: 0, tooDifferent: true };
+    const { removed, added } = ranges;
+    const before: TextChanges = { op: 'delete', ranges: removed }, after: TextChanges = { op: 'insert', ranges: added };
+    return { left: leftIsBefore ? before : after, right: leftIsBefore ? after : before, removed: removed.length, added: added.length, tooDifferent: false };
+  }, [changesOn, leftIsBefore, leftText, rightText]);
+  useEffect(() => { onLeftChanges?.(changes?.left ?? null); }, [changes, onLeftChanges]);
+  useEffect(() => () => onLeftChanges?.(null), [onLeftChanges]);
+  const versionName = (row: typeof leftVariant) => row ? `${row.language}, version ${row.version}` : '';
+  const [beforeName, afterName] = leftIsBefore ? [`current text (${versionName(leftVariant)})`, `comparison text (${versionName(rightVariant)})`]
+    : [`comparison text (${versionName(rightVariant)})`, `current text (${versionName(leftVariant)})`];
 
   useEffect(() => {
     if (suspended || !available || !selectedId) return;
@@ -110,9 +140,16 @@ export function ComparePane({ projectKey, username, caseDetail, leftDocumentId, 
   const globalControls = <div className="comparison-global-controls">
     <div className="compare-toolbar density-compact" role="toolbar" aria-label="Comparison controls"><h2>Compare</h2>
       <label><input type="checkbox" checked={coupled} disabled={editing || suspended || !pairing.available} aria-describedby={couplingUnavailable ? couplingNoteId : undefined} onChange={event => setRequestedCoupling(event.target.checked ? couplingIdentity : null)} /> Couple scrolling</label>
+      {comparable && <label><input type="checkbox" checked={changesRequested} disabled={suspended} aria-describedby={changes ? changesNoteId : undefined}
+        onChange={event => setRequestedChanges(event.target.checked ? choiceIdentity : null)} /> Show changes</label>}
       <IconButton label="Close comparison" icon={<IconClose />} onClick={onClose} />
     </div>
     {couplingUnavailable && <p id={couplingNoteId}>{couplingUnavailable}</p>}
+    {changes?.tooDifferent && <p id={changesNoteId} className="text-changes-legend" role="status">The texts differ too much to show the changes.</p>}
+    {changes && !changes.tooDifferent && <p id={changesNoteId} className="text-changes-legend">
+      Changes from the {beforeName} to the {afterName}: <del>removed text is struck through</del>, <ins>added text is underlined</ins>.{' '}
+      <span role="status">{changes.added + changes.removed === 0 ? 'No changes between these texts.' : `${passages(changes.added, 'added')}, ${passages(changes.removed, 'removed')}.`}</span>
+    </p>}
     {coupled && <><p>Paragraphs are paired by position, not by meaning</p><p role="status" aria-label="Paragraph pairing">{pairing.pairs.map(pair => `${pair.paneId === 'left' ? 'Current text' : 'Comparison'} paragraph ${pair.paragraph + 1}`).join(' ↔ ')}</p></>}
     {current?.text && leftStarts.length !== rightStarts.length && <InlineMessage tone="info">Paragraphs differ ({leftStarts.length} / {rightStarts.length}); scrolling is approximate.</InlineMessage>}
   </div>;
@@ -122,10 +159,11 @@ export function ComparePane({ projectKey, username, caseDetail, leftDocumentId, 
     {toolbarHost === undefined && globalControls}
     <div role="group" aria-label="Comparison text identity" className="comparison-pane-identity">
     {toolbarHost !== undefined && <h2 className="comparison-pane-title">Comparison text</h2>}
+    {/* Same labelled selects as the current text's group, so both panes are symmetric (issue 412). */}
     {layers ? <div className="text-view-selects">
-      <VersionSelect caseDetail={caseDetail} value={selectedId ?? ''} onChange={select} />
-      <ShowSelect entries={current?.entries ?? []} value={selection} otherLabel={ref?.label}
-        onChange={key => { if (key === 'text' || find(key, refs ?? [])) setChoice({ identity: selectionIdentity, key }); }} />
+      <label className="text-view-field"><span>Language and version</span><VersionSelect caseDetail={caseDetail} value={selectedId ?? ''} onChange={select} /></label>
+      <label className="text-view-field"><span>Show</span><ShowSelect entries={current?.entries ?? []} value={selection} otherLabel={ref?.label}
+        onChange={key => { if (key === 'text' || find(key, refs ?? [])) setChoice({ identity: selectionIdentity, key }); }} /></label>
     </div> : <VariantSelectors caseDetail={caseDetail} currentDocumentId={selectedId ?? ''} annotationOptions={annotationOptions(refs ?? [], false)} selectedAnnotation={selection}
       onLanguage={language => { const id = pickVariant(caseDetail, language); if (id) select(id); }} onVersion={select}
       onAnnotation={key => { if (key === 'text' || find(key, refs ?? [])) setChoice({ identity: selectionIdentity, key }); }} />}
@@ -138,7 +176,7 @@ export function ComparePane({ projectKey, username, caseDetail, leftDocumentId, 
     {ref && !snapshot && !payloadError && <InlineMessage tone="info">Loading comparison annotations...</InlineMessage>}
     </div>
     {current?.text ? <ReadOnlyAnnotationView key={JSON.stringify([username, projectKey, caseDetail.case_id, selectedId, selection, retry, leftContext])}
-      text={current.text.text} annotations={snapshot?.annotations ?? []} evidence={snapshot?.evidence ?? []} labelFor={labelFor} onTextElement={setRightElement} proposalContext={ref?.kind === "proposals" && snapshot ? {projectKey,documentId:selectedId!,scope:JSON.stringify([username,projectKey,caseDetail.case_id,selectedId,selection,retry,leftContext]),setId:ref.id} : undefined} />
+      text={current.text.text} changes={changes?.right ?? null} annotations={snapshot?.annotations ?? []} evidence={snapshot?.evidence ?? []} labelFor={labelFor} onTextElement={setRightElement} proposalContext={ref?.kind === "proposals" && snapshot ? {projectKey,documentId:selectedId!,scope:JSON.stringify([username,projectKey,caseDetail.case_id,selectedId,selection,retry,leftContext]),setId:ref.id} : undefined} />
       : available && !suspended && !current?.textError ? <InlineMessage tone="info">Loading comparison text...</InlineMessage> : null}
     {layers && ref && snapshot && <LayerFindings key={selection} labelFor={labelFor} annotations={snapshot.annotations} text={current?.text?.text ?? ''}
       label={current?.entries?.find(entry => entry.ref && layerKey(entry.ref) === selection)?.label ?? ref.label} />}

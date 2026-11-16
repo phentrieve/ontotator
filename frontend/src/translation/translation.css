@@ -188,7 +188,20 @@
   .translation-texts .translation-column > .translation-editor { flex: 1; height: auto; min-height: 0; }
   .translation-review .translation-decision { min-height: 0; border-top: 0; border-left: 1px solid var(--border); }
   .translation-review .translation-decision-body { flex: 1; min-height: 0; overflow: auto; }
+  /* "Your review" (#410): its width follows the divider on its left edge (--review-panel-width, remembered per
+     user); collapsed it is a narrow strip and the pinned bar below keeps the decision and Submit. */
+  .translation-review .translation-workspace { grid-template-columns: minmax(0, 1fr) var(--review-panel-width, clamp(360px, 22vw, 440px)); }
+  .translation-review .translation-workspace--collapsed { grid-template-columns: minmax(0, 1fr) auto; }
+  .translation-review .translation-decision { position: relative; }
+  .translation-review .translation-decision > .sidebar-resizer { position: absolute; top: 0; bottom: 0; left: -8px; margin: 0; }
+  .translation-review .translation-decision-body[hidden] { display: none; }
 }
+.translation-decision-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: 28px; }
+.translation-decision--collapsed { width: 44px; align-items: stretch; }
+.translation-decision-expand { display: flex; flex: 1; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-3) 0; border: 0; background: none; color: var(--text); font: inherit; cursor: pointer; }
+.translation-decision-expand:hover { background: var(--surface-sunken); }
+.translation-decision-expand:focus-visible { outline: var(--focus-width) solid var(--focus-ring); outline-offset: calc(-1 * var(--focus-width)); }
+.translation-decision-strip-label { writing-mode: vertical-rl; font-size: var(--size-md); line-height: var(--leading-md); font-weight: var(--weight-strong); }
 @media (max-width: 1099px) {
   /* Keyboard focus scrolled into view is never hidden behind the pinned bar. */
   .translation-review { scroll-padding-bottom: calc(var(--review-bar, 60px) + var(--space-3)); }

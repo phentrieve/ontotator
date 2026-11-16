@@ -97,6 +97,8 @@ The **Documents** page lists every text of the project and what it needs next. O
 
 A task starts with the person's first saved change; opening it is not enough, and neither is ticking checked sentences in a translation review. Until then **Translation** and **Annotation** read *assigned, not started* with the person's name, in the table (*not started* without the name below 1600 px), its tooltip, the narrow cards and the text card, where the person's row shows **Not started**. After the first save they read *in review* or *In progress*. With several people or parallel versions the cell counts them, for example *1 of 2 started*.
 
+The counts in **Annotation**, for example *0 of 1 submitted*, count only work on the newest version of the text. After a text change, a submission on the old version no longer counts: neither when it was carried to the new version, nor when the new version was started fresh. Carried work counts once it is submitted on the new version.
+
 ### Use the Documents tabs
 
 What for: work through texts by what they need.
@@ -173,6 +175,7 @@ In the card:
 - **Other languages** switches to another language of the same case. Below 700 px width it shares a line with **Open text**.
 - Your steps stand where they act. An open problem report is a notice above the path with **Open** and **Decide on report…**. Other steps stand at the top of their part under *Next step*, for example **Resolve…** in **Translation** or **Carry to v2…** in **Annotation**. A part's other actions share its action row, for example **Open result**, **Change final…** and **Withdraw final…** in **Finalization**.
 - Every person's remove action is **Remove…**. Its dialog says what happens: an unsubmitted annotation is removed with its draft; other work is revoked and stays in the history.
+- In **Annotation**, a text with tool proposals names the proposal set its annotators work on, for example *Proposals set 2026-10-02 (phentrieve 1.4), 24 proposals*. When a newer set was imported for the text and a task still works on an older one, the line names the older set and *Newer set available: 2026-11-10* follows, with **How to use it** ([Work from new tool proposals](lead-change-course.md#work-from-new-tool-proposals)); it goes away once every task of the text is on the newest set. Tasks that started before sets were recorded show *set not recorded*. A person's row names the set only when it differs from the text's, for example *newest set*.
 - In **Finalization**, **Open consolidation** opens your own running consolidation as your task; a submitted one opens read-only.
 - In **Finalization**, when submissions differ, the agreement line is followed by the findings that differ in detail; a term and its parent or child on the same passage are named as *Related terms: …* (see [Accept a result or compare results](lead-results.md#accept-a-result-or-compare-results)).
 - ✕ or Esc closes the card.
@@ -193,7 +196,9 @@ What for: read a text with other people's findings or the final result, and comp
 1. Open the text view with **Open text** in the text card.
 2. Choose the language and version in **Language and version**.
 3. In **Show**, choose **Text only**, a proposal layer, someone's annotations or the result. Its findings are listed under **Findings**.
-4. Optional: click **Compare** to open a second pane with its own **Language and version** and **Show**. Tick **Couple scrolling** to scroll both together. Click **Close comparison** to close it.
+4. Optional: click **Compare** to open a second pane. Each pane has its own **Language and version** and **Show** directly above its text: **Current text** on the left, **Comparison text** on the right, so both texts start at the same height. Tick **Couple scrolling** to scroll both together. Click **Close comparison** to close it.
+   - When both panes show texts of the same language, for example v1 and its correction v2, tick **Show changes** to see what changed. The older version strikes through the removed passages, the newer version underlines the added ones; the line above the texts counts them. The marks do not change the texts, the findings or **Couple scrolling**. A change of spaces or line breaks only is not marked or counted. If the two texts have little in common, the line reads *The texts differ too much to show the changes* and nothing is marked.
+   - When **Show** has someone's annotations that were carried from an earlier version of the text (after **Carry to v2…** or **Handle text change…**), tick **Show changes since** v1 above the text: changed passages get a dashed frame, added text is underlined, and a **−** marker shows the earlier wording of removed text. **Next ›** and **‹ Previous** step through the passages. The annotator sees the same marks in their task. Not offered while **Compare** is open, which has its own **Show changes**.
 5. Optional: click **Submissions** to open the **Submission history**. Choose a row to show it, then click **Close**. Each finding names its author by pseudonym; leads always see them, also when the project hides annotator names from consolidators.
 
 **Open my task** goes to your own task on this text.
@@ -286,7 +291,7 @@ Once someone is assigned, started or submitted work, a line *Fixed: …* says wh
 - While the work is not submitted, remove the assignment ([Remove, reassign or reopen an assignment](#remove-reassign-or-reopen-an-assignment)), then choose.
 - To change it anyway, click **Change mode…** next to the line. The dialog names whose work is affected. Enter the **Reason**, then click **Change mode**, or **Discard work and change mode** if submitted work is discarded. Their assignments are removed. Discarded work is kept, not deleted: it no longer counts for progress, consolidation, the final result or exports.
 - The mode change always discards the work of the whole text, never of single people.
-- Once a final result is chosen, the mode stays: the dialog says *A final result was chosen for this text, so its annotation mode stays.* Withdraw the final result first ([Withdraw a final result](lead-results.md#withdraw-a-final-result)), then change the mode.
+- Once a final result is chosen, the mode is locked: **Change mode…** is refused and the dialog says *A final result was chosen for this text, so its annotation mode stays.* The API and the MCP server refuse it with the error code `ANNOTATION_MODE_FINAL_SELECTED`. Withdraw the final result first ([Withdraw a final result](lead-results.md#withdraw-a-final-result)), then change the mode.
 - **Restore…** in the text card brings the discarded work back while no new annotation has started.
 
 **History** in the text card shows the change and its reason.
@@ -340,7 +345,12 @@ What for: assign a single review or annotation.
 2. Tick the people. To annotate yourself without the Annotator role, click **Add me as annotator**.
 3. Click the assign button, for example *Assign 2 people*.
 
-To change the limit of annotators per text from here, click the info button (i) next to the limit, then **Change for all texts**.
+To change the limit of annotators per text from here, click the info button (i) next to the limit and enter the number:
+
+- **Only for the selected text** (with several texts: **Only for the selected texts**) gives these texts their own limit, for example 4 annotators on one text for a method comparison in a project with 1. Click the button that names the number of texts, for example *Change for 1 text*. The text keeps its own value for every version, also a corrected one; the project setting and the other texts stay as they are. Entering the project's number again returns the text to the project setting. The popover then explains *Sets the most annotators for this text only (project: 1)*, and for a text that already has its own value its title reads, for example, *Up to 4 annotators for this text (project: 1)*.
+- **For all texts** changes the project setting. Click **Change for all texts**. Texts with their own value keep it.
+
+The text card then shows *Annotators: 4 for this text (project: 1)* in **Annotation**. Lowering the number removes nobody: annotators already assigned stay, and the popover says so, for example *This text already has more; its assignments stay.* Several selected texts change together or not at all. When the selected texts have different limits, the dialog says *limits differ*, lets you tick as many people as the text with the highest limit takes, and each text gets only as many as it has places; entering the project's number then returns every selected text to the project setting. The audit trail records a text's own value as *Annotators per text changed for one text*.
 
 ### Distribute work evenly
 

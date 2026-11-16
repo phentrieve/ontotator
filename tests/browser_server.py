@@ -73,6 +73,8 @@ from tests.work_plan_support import plan_all  # noqa: E402
 ONTOLOGY = ROOT / "tests/fixtures/hp.json"
 MONDO_ONTOLOGY = ROOT / "tests/fixtures/mondo.json"
 PORT = int(os.environ.get("HPO_E2E_PORT", "18765"))
+# Idle keep-alive connections stay open this long (uvicorn's default is 5 s).
+BROWSER_KEEP_ALIVE_SECONDS = 600
 # The password of every user that ``/__test_user__`` sets up (frontend/browser/helpers.ts).
 TEST_PASSWORD = "browser test passphrase"
 
@@ -1504,4 +1506,15 @@ if __name__ == "__main__":
 
         register_t1_import_route(app, grant_all)
 
-        uvicorn.run(app, host="127.0.0.1", port=PORT, log_level="warning")
+        # Playwright's request contexts pool keep-alive sockets with no idle
+        # limit of their own; with uvicorn's 5 s default the server closes a
+        # socket just as a spec reuses it after a UI step, and the request
+        # fails with ECONNRESET (issue 380). 600 s outlives any idle gap in a
+        # test; a closed context closes its sockets.
+        uvicorn.run(
+            app,
+            host="127.0.0.1",
+            port=PORT,
+            log_level="warning",
+            timeout_keep_alive=BROWSER_KEEP_ALIVE_SECONDS,
+        )

@@ -98,6 +98,10 @@ export type PlanRowsSet = Defaulted<components["schemas"]["PlanRowsSet"], "undo"
 export type UndoView = components["schemas"]["UndoView"];
 export type CaseIdLookupResult = components["schemas"]["CaseIdLookupResult"];
 export type AnnotationTargetPreview = components["schemas"]["AnnotationTargetPreview"];
+/** A text's own "Annotations per text" (issue 422). */
+export type AnnotationsPerTextResult = components["schemas"]["AnnotationsPerTextResult"];
+/** An imported tool proposal set on one text version (issue 337). */
+export type RowProposalSetView = components["schemas"]["RowProposalSetView"];
 export type DiscardRequest = Defaulted<components["schemas"]["DiscardRequest"], "confirm">;
 export type DiscardResult = components["schemas"]["DiscardResult"];
 // Annotation-mode change after submissions, and its restore
@@ -171,6 +175,8 @@ export type OpenWorkspaceRequest = components["schemas"]["OpenWorkspaceRequest"]
 export type OpenWorkspaceResponse = components["schemas"]["OpenWorkspaceResponse"];
 export type WorkRoundView = components["schemas"]["WorkRoundView"];
 export type RoundInputView = components["schemas"]["RoundInputView"];
+/** The earlier text version a carried round came from ("Show changes since vN", issue 421). */
+export type RoundSourceText = components["schemas"]["RoundSourceText"];
 export type RoundSourceView = components["schemas"]["RoundSourceView"];
 // Consolidation view (acceptance fixes 2026-10-21, WP-E)
 export type ConsolidationView = components["schemas"]["ConsolidationView"];
@@ -295,6 +301,7 @@ export type TechnicalReportRequest = components["schemas"]["TechnicalReportReque
 export type TechnicalReportContext = components["schemas"]["TechnicalReportContext"];
 export type TechnicalReportReceipt = components["schemas"]["TechnicalReportReceipt"];
 export type TechnicalReportView = components["schemas"]["TechnicalReportView"];
+export type OwnTechnicalReportView = components["schemas"]["OwnTechnicalReportView"];
 export type TechnicalReportStatus = TechnicalReportView["status"];
 export type { LastApiError };
 export { lastApiError };
@@ -458,6 +465,8 @@ export interface ApiClientOptions {
  * throws, so `isNetworkError` (editor autosave) keeps recognising it.
  */
 const TECHNICAL_REPORTS = "/api/v1/technical-reports";
+/** Own technical reports per request; a full page means older ones may follow. */
+export const TECHNICAL_REPORTS_PAGE = 100;
 
 export class NetworkError extends TypeError {
   constructor(readonly cause: unknown) { super("Connection lost. Try again."); this.name = "NetworkError"; }
@@ -595,6 +604,14 @@ export class ApiClient {
     return this.request<UploadCreated>(`/api/v1/projects/${encodeURIComponent(key)}/uploads/${id}/commit`, { method: "POST", body: JSON.stringify({ plan_sha256: planSha256, ...(overrides === undefined ? {} : { status_overrides: overrides }), ...(plan ?? {}) }) });
   }
 
+  /** Issue 422: one text's own "Annotations per text" (target and limit); `null` follows the project value again. */
+  async setAnnotationsPerText(key: string, caseId: string, language: string, value: number | null, reason?: string): Promise<AnnotationsPerTextResult> {
+    return this.request<AnnotationsPerTextResult>(`/api/v1/projects/${encodeURIComponent(key)}/texts/${encodeURIComponent(caseId)}/${encodeURIComponent(language)}/annotations-per-text`, { method: "PUT", body: JSON.stringify({ value, ...(reason ? { reason } : {}) }) });
+  }
+  /** Issue 422: several texts at once, in one transaction (all or nothing); each text is compared with its own value. */
+  async setAnnotationsPerTexts(key: string, texts: readonly RowRefView[], value: number | null, reason?: string): Promise<{ texts: AnnotationsPerTextResult[] }> {
+    return this.request(`/api/v1/projects/${encodeURIComponent(key)}/texts/annotations-per-text`, { method: "PUT", body: JSON.stringify({ texts, value, ...(reason ? { reason } : {}) }) });
+  }
   async patchWorkPlan(key: string, caseId: string, language: string, body: PlanRowPatch): Promise<PlanRowResult> {
     return this.request<PlanRowResult>(`/api/v1/projects/${encodeURIComponent(key)}/work-plans/${encodeURIComponent(caseId)}/${encodeURIComponent(language)}`, { method: "PATCH", body: JSON.stringify(body) });
   }
@@ -721,6 +738,11 @@ export class ApiClient {
   /** Send a technical report to the administrators; the receipt names its reference (TR-12). */
   async sendTechnicalReport(body: TechnicalReportRequest): Promise<TechnicalReportReceipt> {
     return this.request<TechnicalReportReceipt>(TECHNICAL_REPORTS, { method: "POST", body: JSON.stringify(body) });
+  }
+
+  /** The caller's own technical reports, newest first (issue 269): reference, text and status only. */
+  async listMyTechnicalReports(offset = 0): Promise<OwnTechnicalReportView[]> {
+    return this.request<OwnTechnicalReportView[]>(`/api/v1/me/technical-reports?limit=${TECHNICAL_REPORTS_PAGE}&offset=${offset}`, { method: "GET" });
   }
 
   async adminListTechnicalReports(status?: TechnicalReportStatus): Promise<TechnicalReportView[]> {
@@ -1274,6 +1296,11 @@ export class ApiClient {
 
   async listRoundInputs(roundId: string): Promise<RoundInputView[]> {
     return this.request(`/api/v1/rounds/${encodeURIComponent(roundId)}/inputs`, { method: "GET" });
+  }
+
+  /** The text version the round's carried work came from; null unless it was carried from another version. */
+  async getRoundSourceText(roundId: string): Promise<RoundSourceText | null> {
+    return this.request(`/api/v1/rounds/${encodeURIComponent(roundId)}/source-text`, { method: "GET" });
   }
 
   /** Assign the consolidator and start the consolidation round in one step (lead only); choosing yourself grants the Consolidator role. */

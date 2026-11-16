@@ -221,6 +221,7 @@ class ValidatedPackage(BaseModel):
             return self
         from ontotator.domain.work_rounds import (
             ARCHIVED_REVIEW_REASONS,
+            ARCHIVED_UNRESOLVED_NOTES,
             RoundInputView,
             WorkRoundView,
         )
@@ -286,4 +287,11 @@ class ValidatedPackage(BaseModel):
                 or not all(isinstance(r, str) and r for r in reasons.values())
             ):
                 raise ValueError("Review reasons must name needs-review inputs")
+            notes = archived.get(ARCHIVED_UNRESOLVED_NOTES, {})
+            if (
+                not isinstance(notes, dict)
+                or not set(notes) <= seen
+                or not all(isinstance(n, str) and n.strip() for n in notes.values())
+            ):
+                raise ValueError("Unresolved notes must name round inputs")
         return self

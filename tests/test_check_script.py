@@ -88,7 +88,7 @@ def test_default_runs_every_required_phase_serially_with_bounded_workers(gate):
     assert result.returncode == 0, result.stderr
     assert any("test_admin_error_codes.py" in call for call in calls)
     assert any("pytest -q -n 4 --durations=20" in call for call in calls)
-    assert any("--maxWorkers=2 --minWorkers=1" in call for call in calls)
+    assert any("--maxWorkers=2" in call for call in calls)
     assert calls == [
         "docker info",
         "uv run ruff check .",
@@ -102,7 +102,7 @@ def test_default_runs_every_required_phase_serially_with_bounded_workers(gate):
         "npm --prefix frontend run lint",
         "npm --prefix frontend run api:check",
         "uv run python scripts/check_wheel.py --out-dir build/check-wheel",
-        "npm --prefix frontend test -- --maxWorkers=2 --minWorkers=1",
+        "npm --prefix frontend test -- --maxWorkers=2",
         "uv run pytest -q -n 4 --durations=20",
         "npm --prefix frontend run test:e2e -- --workers=3",
     ]
@@ -172,7 +172,7 @@ def test_worker_override_and_opt_in_container_stage_are_preserved(gate):
         CHECK_VITEST_WORKERS="4", CHECK_CONTAINERS="1", CHECK_IMAGE="local:test"
     )
     assert result.returncode == 0, result.stderr
-    assert any("--maxWorkers=4 --minWorkers=1" in call for call in calls)
+    assert any("--maxWorkers=4" in call for call in calls)
     assert calls[-1].endswith("container_check.py --smoke --image local:test")
 
 

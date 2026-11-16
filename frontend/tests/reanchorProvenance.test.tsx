@@ -15,6 +15,28 @@ it('uses only inline currently offered metadata without a forbidden ordinary pub
   mounted.rerender(<ProposalMetadataProvider scope="bob:doc" projectKey="p" proposals={[source]} metadata={[]} allowPublicFetch={false}><ProposalSource source={source}/></ProposalMetadataProvider>);
   expect(screen.queryByText('carried-set')).toBeNull(); expect(get).not.toHaveBeenCalled();
 });
+const tool = {actor_id:'phentrieve',kind:'tool',name:'phentrieve',version:'1.4.0',model:'bge-m3'};
+it('names the tool that produced a re-anchored proposal (#417)', () => {
+  const carried:EditorProposal = {...source, annotation:{...source.annotation, provenance:{actor:{actor_id:'phentrieve',kind:'tool'},method:'tool',source_refs:[]}}};
+  render(<ProposalMetadataProvider scope="a" projectKey="p" proposals={[carried]} metadata={[{...metadata,actors:[tool]}]} allowPublicFetch={false}><ProposalSource source={carried}/><AiBadge provenance={carried.annotation.provenance} source={carried}/></ProposalMetadataProvider>);
+  expect(screen.getByText('Carried over from version 7')).toBeTruthy();
+  expect(screen.getAllByText('phentrieve 1.4.0').length).toBeGreaterThan(0);
+  expect(screen.getByLabelText('AI-generated: phentrieve 1.4.0')).toBeTruthy();
+  expect(document.body.textContent).not.toContain('ontotator-reanchor');
+});
+it('credits a legacy re-anchored proposal to the tool its set metadata names', () => {
+  // Sets re-anchored before #417 name the job; the server resolves their metadata to the source tool.
+  render(<ProposalMetadataProvider scope="a" projectKey="p" proposals={[source]} metadata={[{...metadata,actors:[tool]}]} allowPublicFetch={false}><ProposalSource source={source}/><AiBadge provenance={source.annotation.provenance} source={source}/></ProposalMetadataProvider>);
+  expect(screen.getByLabelText('AI-generated: phentrieve 1.4.0')).toBeTruthy();
+  expect(screen.getAllByText('phentrieve 1.4.0').length).toBeGreaterThan(0);
+});
+it('does not borrow a tool for a legacy proposal of a set with several tools or of an import', () => {
+  const two = [tool, {...tool, actor_id:'other', name:'other'}];
+  const mounted = render(<ProposalMetadataProvider scope="a" projectKey="p" proposals={[source]} metadata={[{...metadata,actors:two}]} allowPublicFetch={false}><AiBadge provenance={source.annotation.provenance} source={source}/></ProposalMetadataProvider>);
+  expect(screen.getByLabelText('AI-generated: ontotator-reanchor, reanchor')).toBeTruthy();
+  mounted.rerender(<ProposalMetadataProvider scope="b" projectKey="p" proposals={[source]} metadata={[{...metadata,origin:'import',source_version:null,source_document_id:null,actors:[tool]}]} allowPublicFetch={false}><AiBadge provenance={source.annotation.provenance} source={source}/></ProposalMetadataProvider>);
+  expect(screen.getByLabelText('AI-generated: ontotator-reanchor, reanchor')).toBeTruthy();
+});
 it('never labels a human adopted annotation AI and does not borrow foreign/unoffered inline metadata', () => {
   const get=vi.spyOn(api,'getProposalSet');
   const human={actor:{actor_id:'alice',kind:'human' as const},method:'manual',source_refs:[`${source.annotation.annotation_id}:${source.version}`]};

@@ -72,6 +72,12 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
         "create_project": {"key": "p", "name": "P", "pins": [PIN], "template": "t"},
         "get_project_settings": {"project": "p"},
         "update_project_settings": {"project": "p", "changes": {"name": "Q"}},
+        "set_annotations_per_text": {
+            "project": "p",
+            "case_id": "c/1",
+            "language": "de",
+            "annotations_per_text": 4,
+        },
         "set_task_profile": {"project": "p", "profile_path": str(profile)},
         "set_ontology_pins": {"project": "p", "pins": [PIN], "confirm": True},
         "refresh_translations": {"project": "p"},

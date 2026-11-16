@@ -14,6 +14,10 @@ text and a plan override ``scratch`` on ``EN100031``. It returns::
 ``CHECKED`` has Tom and Mia submit their proposal checks of ``EN100024``, and
 ``CONSOLIDATING`` adds the lead's consolidation round, ``CONSOLIDATING_ALI``
 Ali's (adjudicator), started by the lead and not yet submitted.
+``NEWER_SET`` is ``CHECKED`` plus a newer tool set of ``EN100024`` (test-tool
+2, one proposal), the text's own limit of 3 annotators (issue 422) and Ali
+assigned from proposals, not started: the text card names the set of Tom and
+Mia, "Newer set available" and Ali's "newest set" (issue 337).
 """
 
 from __future__ import annotations
@@ -199,6 +203,59 @@ def check_and_submit(
         return submissions.submit(key, envelope(payload)).submission_id
 
 
+def import_newer_set(scenario: Scenario) -> None:
+    """A second tool set for ``WITH_PROPOSALS`` (another bundle, tool version 2)."""
+    import tempfile
+    from pathlib import Path
+
+    from browser_server import run_fixture_import
+    from t1_builders import native_unit
+    from t1_fixtures import bundle
+
+    base = native_unit(
+        WITH_PROPOSALS,
+        "en",
+        text_of(WITH_PROPOSALS),
+        case_id=WITH_PROPOSALS,
+        annotations=proposals(text_of(WITH_PROPOSALS))[:1],
+    )
+    actors = tuple(
+        actor.model_copy(update={"version": "2"}) if actor.kind == "tool" else actor
+        for actor in base.annotation_set.actors
+    )
+    aset = base.annotation_set.model_copy(
+        update={
+            "annotation_set_id": f"{base.annotation_set.annotation_set_id}-b",
+            "actors": actors,
+        }
+    )
+    with tempfile.TemporaryDirectory() as folder:
+        job = run_fixture_import(
+            scenario.app,
+            bundle(
+                Path(folder) / "newer.zip",
+                [base.model_copy(update={"annotation_set": aset})],
+                "newer",
+            ),
+            scenario.key,
+        )
+    if job.status != "succeeded":
+        raise HTTPException(500, job.error)
+
+
+def own_limit(scenario: Scenario, case: str, value: int) -> None:
+    """The text's own "Annotations per text" (issue 422)."""
+    from sqlalchemy import select
+
+    from ontotator.storage.text_settings import write_per_text
+
+    with scenario.db.transaction() as conn:
+        pid = conn.execute(
+            select(ProjectRow.id).where(ProjectRow.project_key == scenario.key)
+        ).scalar_one()
+        write_per_text(conn, pid, case, "en", value, reason=None, actor_id=None)
+
+
 def build(app: FastAPI, scenario_name: str) -> dict[str, Any]:
     scenario, cases = fresh(app, scenario_name == "CONSOLIDATING_ALI")
     assignments: dict[str, int] = {}
@@ -210,11 +267,17 @@ def build(app: FastAPI, scenario_name: str) -> dict[str, Any]:
             assignments[name] = batch_assign(
                 scenario, [WITH_PROPOSALS], "en", "annotate", [name]
             )[0].id
-    if scenario_name in {"CHECKED", "CONSOLIDATING", "CONSOLIDATING_ALI"}:
+    if scenario_name in {"CHECKED", "CONSOLIDATING", "CONSOLIDATING_ALI", "NEWER_SET"}:
         for name, outcomes in CHECKS.items():
             submissions[name] = check_and_submit(
                 scenario, assignments[name], name, outcomes
             )
+    if scenario_name == "NEWER_SET":
+        import_newer_set(scenario)
+        own_limit(scenario, WITH_PROPOSALS, 3)
+        assignments["ali"] = batch_assign(
+            scenario, [WITH_PROPOSALS], "en", "annotate", ["ali"]
+        )[0].id
     if scenario_name in {"CONSOLIDATING", "CONSOLIDATING_ALI"}:
         round_view = start_as_lead(
             scenario,
@@ -236,7 +299,14 @@ def build(app: FastAPI, scenario_name: str) -> dict[str, Any]:
     )
 
 
-SCENARIOS = ("FRESH", "ONE_ASSIGNED", "CHECKED", "CONSOLIDATING", "CONSOLIDATING_ALI")
+SCENARIOS = (
+    "FRESH",
+    "ONE_ASSIGNED",
+    "CHECKED",
+    "CONSOLIDATING",
+    "CONSOLIDATING_ALI",
+    "NEWER_SET",
+)
 
 
 def register_proposal_check_scenario_route(app: FastAPI) -> None:

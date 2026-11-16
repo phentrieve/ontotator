@@ -5,7 +5,15 @@
   line-height: var(--body-leading);
   color: var(--text);
   max-width: var(--measure-reading);
+  /* Never wider than its container, also as a flex or grid item: wide content scrolls in its own box (#410). */
+  min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.guideline-markdown pre,
+.guideline-table-scroll {
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .guideline-loading {
