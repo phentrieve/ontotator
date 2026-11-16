@@ -14,11 +14,14 @@ const markFills = (page: Page) =>
     });
   });
 
-/** The palette fill a mark is painted with: marks are a highlighter gradient, so the fill is in background-image. */
-const paintedFill = async (fills: string[], run: Locator) => {
-  const image = await run.evaluate((el) => window.getComputedStyle(el).backgroundImage);
-  return fills.find((fill) => image.includes(fill)) ?? image;
-};
+/**
+ * The mark is painted with one of the palette fills: marks are a highlighter gradient, so the fill is in
+ * background-image. The editor redraws the whole text (`replaceChildren` in vendor/spans.js) whenever marks or
+ * handles change, and the new run is painted at once. A single read can still land on the run of the previous
+ * drawing, which is no longer in the document and has no computed style (""): the assertion finds the run again.
+ */
+const expectPaletteFill = (fills: string[], run: Locator) =>
+  expect(run).toHaveCSS("background-image", new RegExp(fills.map((fill) => fill.replace(/[()]/g, "\\$&")).join("|")));
 
 test.describe("Evidence Spans Proof & Verification", () => {
   test("review mode: proposal evidence spans are precisely marked with DOM metadata and visual highlights", async ({ page }) => {
@@ -44,7 +47,7 @@ test.describe("Evidence Spans Proof & Verification", () => {
     // The mark is coloured from the palette: one of the six --mark-N-fill tokens.
     const fills = await markFills(page);
     expect(fills).toHaveLength(6);
-    expect(fills).toContain(await paintedFill(fills, hypRun));
+    await expectPaletteFill(fills, hypRun);
 
     // 2. Switch to second proposal (HP:0001250 Seizure, span [14:21])
     await page.locator(".doc-item").filter({ hasText: "HP:0001250" }).click();
@@ -59,7 +62,7 @@ test.describe("Evidence Spans Proof & Verification", () => {
     const seizureMentions = await seizureRun.getAttribute("data-mentions");
     expect(seizureMentions).toContain("ev-1");
 
-    expect(fills).toContain(await paintedFill(fills, seizureRun));
+    await expectPaletteFill(fills, seizureRun);
   });
 
   test("independent mode: selecting text creates marked evidence spans with active highlight and handles picking", async ({ page }) => {
@@ -88,7 +91,7 @@ test.describe("Evidence Spans Proof & Verification", () => {
 
     // The selected mark keeps its palette fill (the selection is a frame, not a colour).
     const allFills = await markFills(page);
-    expect(allFills).toContain(await paintedFill(allFills, markedSpan));
+    await expectPaletteFill(allFills, markedSpan);
 
     // The mention shows the quoted text; its exact offsets are in the tooltip
     await expect(mentionWithOffsets(page, "[0:9]")).toHaveText("“Hypotonia”");
