@@ -19,6 +19,11 @@ from sqlalchemy.exc import ArgumentError
 
 LOCK_TIMEOUT_MS = 20_000
 STATEMENT_TIMEOUT_MS = 60_000
+SETUP_CODE_HOURS_ENV = "ONTOTATOR_SETUP_CODE_HOURS"
+# A new person often opens the hand-over message days later; a week covers a
+# weekend and a short leave. Reset codes keep their fixed two hours.
+SETUP_CODE_HOURS = 168
+MAX_SETUP_CODE_HOURS = 720
 
 
 class SettingsError(ValueError):
@@ -38,6 +43,7 @@ class ServerSettings:
     database_url: URL = field(repr=False)
     lock_timeout_ms: int = LOCK_TIMEOUT_MS
     statement_timeout_ms: int = STATEMENT_TIMEOUT_MS
+    setup_code_hours: int = SETUP_CODE_HOURS
 
 
 def _milliseconds(name: str, default: int, env: Mapping[str, str]) -> int:
@@ -47,6 +53,31 @@ def _milliseconds(name: str, default: int, env: Mapping[str, str]) -> int:
         return default
     if not raw.isascii() or not raw.isdigit():
         raise SettingsError(f"{name} must be a whole number of milliseconds")
+    return int(raw)
+
+
+def setup_code_hours(env: Mapping[str, str] | None = None) -> int:
+    """How many hours a setup code of a new account is valid.
+
+    Read when a code is issued, so the server and the CLI honour it; the
+    server also checks it at start. A stored code keeps its expiry.
+
+    Raises:
+        SettingsError: unless it is a whole number from 1 to 720 (30 days).
+    """
+    env = os.environ if env is None else env
+    raw = env.get(SETUP_CODE_HOURS_ENV, "")
+    if not raw:
+        return SETUP_CODE_HOURS
+    if (
+        not raw.isascii()
+        or not raw.isdigit()
+        or not 1 <= int(raw) <= MAX_SETUP_CODE_HOURS
+    ):
+        raise SettingsError(
+            f"{SETUP_CODE_HOURS_ENV} must be a whole number of hours from 1 to"
+            f" {MAX_SETUP_CODE_HOURS}"
+        )
     return int(raw)
 
 
@@ -122,6 +153,7 @@ def server_settings(env: Mapping[str, str] | None = None) -> ServerSettings:
         statement_timeout_ms=_milliseconds(
             "ONTOTATOR_STATEMENT_TIMEOUT_MS", STATEMENT_TIMEOUT_MS, env
         ),
+        setup_code_hours=setup_code_hours(env),
     )
 
 

@@ -456,6 +456,8 @@ def _open_database(ctx: typer.Context) -> Iterator[Database]:
             yield db
         except DomainError as exc:
             _fail(exc.code, exc.details)
+        except settings.SettingsError as exc:
+            _fail("SETTINGS_INVALID", exc)
     except SQLAlchemyError as exc:
         _fail("DATABASE_ERROR", _database_error(exc))
     finally:
@@ -521,7 +523,8 @@ def users_create(
         ),
     ] = None,
 ) -> None:
-    """Create a user and print its single-use setup code (valid 24 hours)."""
+    """Create a user and print its single-use setup code (valid 7 days, or
+    ONTOTATOR_SETUP_CODE_HOURS)."""
     with _open_database(ctx) as db:
         issued = AccountService(db).create_user(
             Actor.cli(),
@@ -539,8 +542,10 @@ def users_create(
 
 @users_app.command("reset-code")
 def users_reset_code(ctx: typer.Context, username: UsernameArgument) -> None:
-    """Print a single-use reset code (valid 2 hours; a setup code valid 24 hours
-    if the user never set a password); older codes end."""
+    """Print a single-use reset code (valid 2 hours); older codes end.
+
+    A user who never set a password gets a setup code instead (valid 7 days,
+    or ONTOTATOR_SETUP_CODE_HOURS)."""
     with _open_database(ctx) as db:
         issued = AccountService(db).issue_reset_code(Actor.cli(), username)
     _print_code(issued)

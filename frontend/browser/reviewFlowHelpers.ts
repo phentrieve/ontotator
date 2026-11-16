@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { openTasksHome, TEST_PASSWORD } from "./helpers";
+import { openTasksHome, TEST_PASSWORD, routerReady } from "./helpers";
 import type { LeadPerson, LeadScenario } from "./leadWorkflowHelpers";
 
 /** Scenarios of ``POST /__test_review_flow__`` (tests/browser_review_flow_scenarios.py). */
@@ -47,4 +47,5 @@ export async function loginScenarioUser(page: Page, scenario: ReviewFlowScenario
   await form.getByLabel("Password", { exact: true }).fill(TEST_PASSWORD);
   await form.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(page.getByTestId("current-user")).toContainText(scenario.display_names[name]);
+  await routerReady(page);
 }

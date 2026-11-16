@@ -16,7 +16,7 @@ Check the spelling of your username. After 5 wrong passwords within 15 minutes, 
 
 ### My setup or reset code does not work
 
-Codes work once and expire: setup codes after 24 hours, reset codes after 2 hours. A newer code also cancels an older one. Ask an administrator for a new code. Capital letters, spaces and hyphens in the code do not matter.
+Codes work once and expire: setup codes after 7 days by default (the administrator can change this), reset codes after 2 hours. A newer code also cancels an older one. Ask an administrator for a new code. Capital letters, spaces and hyphens in the code do not matter.
 
 ### A login window appears while I am working
 

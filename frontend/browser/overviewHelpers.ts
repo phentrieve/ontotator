@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
-import { openTasksHome, TEST_PASSWORD } from "./helpers";
+import { openTasksHome, TEST_PASSWORD, routerReady } from "./helpers";
 
 /** Scenarios of ``POST /__test_overview__`` (tests/browser_overview_scenarios.py). */
 export type OverviewScenarioName =
@@ -101,6 +101,7 @@ export async function loginOverviewUser(page: Page, scenario: Pick<OverviewScena
   await form.getByLabel("Password", { exact: true }).fill(TEST_PASSWORD);
   await form.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(page.getByTestId("current-user")).toContainText(scenario.display_names[name]);
+  await routerReady(page);
 }
 
 /**
