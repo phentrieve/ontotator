@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, ApiError, type AssignmentView } from "../../src/api/client";
+import { api, ApiError, NetworkError, type AssignmentView } from "../../src/api/client";
 import { HandleTextChangeDialog } from "../../src/documents/HandleTextChangeDialog";
 import { openOnOldText, preview, V2 } from "./textChangeFixtures";
 
@@ -59,6 +59,77 @@ describe("HandleTextChangeDialog", () => {
     expect(await screen.findByText("1 of 3 decisions and findings could not be placed and need Tom Reis’s decision.")).toBeDefined();
     expect(within(dialog()).queryByRole("button", { name: "Retry" })).toBeNull();
     expect(document.activeElement).toBe(screen.getByRole("radio", { name: "Move to v2" }));
+  });
+
+  it("while Retry reloads the preview no choice is checked that was not checked before, and Retry keeps focus (issue 419)", async () => {
+    const noProposals = new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "no_target_proposals" });
+    let answer: (value: ReturnType<typeof preview>) => void = () => undefined;
+    let refuse: (error: unknown) => void = () => undefined;
+    vi.mocked(api.previewTextChange).mockRejectedValueOnce(noProposals)
+      .mockImplementationOnce(() => new Promise((_resolve, reject) => { refuse = reject; }))
+      .mockImplementationOnce(() => new Promise(resolve => { answer = resolve; }));
+    setup({ mode: "proposals" });
+    await within(dialog()).findByRole("alert");
+    const checked = () => within(dialog()).getAllByRole("radio").filter(radio => (radio as HTMLInputElement).checked).map(radio => radio.getAttribute("value"));
+    expect(checked()).toEqual([]);
+    const retry = within(dialog()).getByRole("button", { name: "Retry" });
+    retry.focus();
+    fireEvent.click(retry);
+    // Reloading: the reason, the disabled Move and Finish and the busy Retry stay; Move is not checked again.
+    await waitFor(() => expect(api.previewTextChange).toHaveBeenCalledTimes(2));
+    expect(checked()).toEqual([]);
+    expect((screen.getByRole("radio", { name: "Move to v2" }) as HTMLInputElement).disabled).toBe(true);
+    expect(retry.isConnected && retry.getAttribute("aria-busy")).toBe("true");
+    expect(document.activeElement).toBe(retry);
+    // Still no proposals: nothing checked, focus on Retry.
+    refuse(noProposals);
+    await waitFor(() => expect(within(dialog()).getByRole("button", { name: "Retry" }).getAttribute("aria-busy")).toBeNull());
+    expect(checked()).toEqual([]);
+    expect(dialog().contains(document.activeElement)).toBe(true);
+    // A chosen Withdraw stays checked through the next reload, which then finds the proposals.
+    fireEvent.click(screen.getByRole("radio", { name: "Withdraw" }));
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(api.previewTextChange).toHaveBeenCalledTimes(3));
+    expect(checked()).toEqual(["withdraw"]);
+    answer(preview({ findings: 3, placed: 2, unplaced: 1 }));
+    expect(await screen.findByText(/could not be placed/)).toBeDefined();
+    expect(checked()).toEqual(["withdraw"]);
+    expect((screen.getByRole("radio", { name: "Move to v2" }) as HTMLInputElement).disabled).toBe(false);
+    expect(within(dialog()).queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(dialog().contains(document.activeElement)).toBe(true);
+  });
+
+  it("a Retry that fails on the server or the network keeps the no-proposals reason, its Retry and the disabled Move (issue 419)", async () => {
+    vi.mocked(api.previewTextChange).mockRejectedValueOnce(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "no_target_proposals" }))
+      .mockRejectedValueOnce(new ApiError(503, "Service unavailable")).mockRejectedValueOnce(new NetworkError(new TypeError("Failed to fetch")));
+    setup({ mode: "proposals" });
+    await within(dialog()).findByRole("alert");
+    for (const calls of [2, 3]) {
+      fireEvent.click(within(dialog()).getByRole("button", { name: "Retry" }));
+      await waitFor(() => expect(api.previewTextChange).toHaveBeenCalledTimes(calls));
+      await waitFor(() => expect(within(dialog()).getByRole("button", { name: "Retry" }).getAttribute("aria-busy")).toBeNull());
+      expect(within(dialog()).getAllByText(/has no proposals yet/)).toHaveLength(1);
+      const move = screen.getByRole("radio", { name: "Move to v2" }) as HTMLInputElement;
+      expect([move.disabled, move.checked]).toEqual([true, false]);
+      expect(apply().getAttribute("aria-disabled")).toBe("true");
+    }
+  });
+
+  it("a correction that stops counting during the preview reload drops the busy Retry and the kept reason", async () => {
+    vi.mocked(api.previewTextChange).mockRejectedValueOnce(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "no_target_proposals" }))
+      .mockImplementationOnce(() => new Promise(() => undefined));
+    const { row, step } = openOnOldText({ mode: "proposals" });
+    const props = { onClose: vi.fn(), onDone: vi.fn(), onReload: vi.fn() };
+    const view = render(<HandleTextChangeDialog projectKey="demo" row={row} step={step} {...props} />);
+    await within(dialog()).findByRole("alert");
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(api.previewTextChange).toHaveBeenCalledTimes(2));
+    // The reloaded row: the target is no longer newer than the task's version, so only Withdraw is left.
+    const older = { ...row, versions: row.versions.map(version => version.document_id === step.document_id ? { ...version, version: 0 } : version) };
+    view.rerender(<HandleTextChangeDialog projectKey="demo" row={older} step={step} {...props} />);
+    await waitFor(() => expect(within(dialog()).getAllByRole("radio").map(radio => radio.getAttribute("value"))).toEqual(["withdraw"]));
+    expect(within(dialog()).queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(within(dialog()).queryByText(/has no proposals yet/)).toBeNull();
   });
 
   it("a move refused for missing proposals shows the reason once, with Retry, and disables Move", async () => {
