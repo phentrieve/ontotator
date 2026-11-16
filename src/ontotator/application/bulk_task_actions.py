@@ -1,4 +1,4 @@
-"""Bulk lead actions on the tasks of many texts (issue 336, step 1).
+"""Bulk lead actions on the tasks of many texts (issue 336, steps 1 and 3).
 
 The shared frame of "bulk action with preview" on Documents: a preview lists
 what the action changes, what it leaves as it is and why, and a
@@ -19,7 +19,17 @@ Step 1 has two actions:
   the first "annotators per text" annotations of each version and withdraws
   the open ones above the limit (issue 339 b).
 
-Undo is kept on the server: apply records one ``project.bulk_task_action``
+Step 3 adds ``start_round``: the submitted annotations of the selected texts
+get a new work round, as ``POST /assignments/{id}/rounds`` gives one task.
+``carry_forward`` continues from the task's submission, ``clean_restart``
+starts without the earlier findings (a task from tool proposals on the newest
+proposal set) and needs a reason. Only submitted tasks on the text's current
+version take a round here; texts with a final result or an open consolidation
+are skipped. Each round is audited as ``round.create`` with ``via``. A new
+round has no Undo: its draft and inputs are new rows, and the earlier round
+is closed.
+
+Undo (reopen and withdraw) is kept on the server: apply records one ``project.bulk_task_action``
 audit event with the action, the exact tasks it changed and a digest of the
 state it left, and returns only that event's id. The client cannot choose
 the action or the tasks of an Undo. ``undo`` works for the lead who applied
@@ -47,6 +57,7 @@ from sqlalchemy import (
 )
 
 from ontotator.application.people import person_refs
+from ontotator.application.work_plans import _chains, _live, _target
 from ontotator.application.workflow_warnings import state_digest
 from ontotator.assignments.eligibility import plan_for
 from ontotator.assignments.service import AssignmentService
@@ -68,11 +79,14 @@ from ontotator.storage.tables import (
     DraftRow,
     ProjectRow,
     TranslationReviewDraftRow,
+    UserRow,
 )
 from ontotator.storage.text_settings import per_text_overrides
 from ontotator.storage.workflow_tables import WorkRoundStateRow
 
-BulkAction = Literal["reopen", "withdraw"]
+BulkAction = Literal["reopen", "withdraw", "start_round"]
+# The rounds a lead starts for a submitted annotation (``WorkRoundService``).
+BulkRoundKind = Literal["carry_forward", "clean_restart"]
 TASKS: tuple[Task, ...] = ("annotate", "translation_review", "review")
 # How long an applied action can be undone.
 UNDO_MINUTES = 60
@@ -93,10 +107,17 @@ KEEP_REASONS: dict[str, str] = {
     "paused": "Paused by a problem report; decide the report first.",
     "within_limit": "Within the limit of annotators per text.",
     "lead_correction_task": "A lead correction; remove it in the text card.",
+    # Start a round
+    "not_current_version": "Not on the current version of the text; use the text card.",
+    "translation_not_accepted": "The translation is not accepted yet.",
+    "no_round": "No work round to restart (older or imported work); use Reopen….",
 }
 # Why a whole text is skipped.
 SKIP_REASONS: dict[str, str] = {
     "final_chosen": "Final result chosen: use Change final… first.",
+    # Start a round
+    "final_result": "Final result chosen: use Withdraw final… first.",
+    "consolidation_open": "A consolidation is open: finish or withdraw it first.",
 }
 
 
@@ -107,8 +128,11 @@ class Options:
     reason: str | None = None
     include_started: bool = False
     over_limit_only: bool = False
+    kind: BulkRoundKind | None = None
 
     def digest_view(self) -> dict[str, Any]:
+        if self.action == "start_round":
+            return {"action": self.action, "kind": self.kind}
         return {
             "action": self.action,
             "tasks": sorted(self.tasks),
@@ -122,6 +146,26 @@ def _rank(row: RowMapping) -> tuple[int, int]:
     first, then started work, then the oldest assignment."""
     order = {"submitted": 0, "reopened": 1, "in_progress": 1, "open": 2}
     return (order.get(str(row["status"]), 3), int(row["id"]))
+
+
+def _availability(conn: Connection, project: RowMapping) -> Any:
+    """Whether a task's person can still take it: one membership check per
+    person and task kind, however many tasks."""
+    may_take: dict[tuple[int, str], bool] = {}
+
+    def available(item: RowMapping) -> bool:
+        who = (int(item["user_id"]), str(item["task"]))
+        if who not in may_take:
+            try:
+                AssignmentService._require_target(
+                    conn, project, who[0], cast(Task, who[1])
+                )
+                may_take[who] = True
+            except DomainError:
+                may_take[who] = False
+        return may_take[who]
+
+    return available
 
 
 def _stale(reason: str) -> DomainError:
@@ -256,20 +300,7 @@ class BulkTaskActionService:
                     )
                 ).scalars()
             )
-        may_take: dict[tuple[int, str], bool] = {}
-
-        def available(item: RowMapping) -> bool:
-            who = (int(item["user_id"]), str(item["task"]))
-            if who not in may_take:
-                try:
-                    AssignmentService._require_target(
-                        conn, project, who[0], cast(Task, who[1])
-                    )
-                    may_take[who] = True
-                except DomainError:
-                    may_take[who] = False
-            return may_take[who]
-
+        available = _availability(conn, project)
         keeps: dict[int, str] = {}
         for item in items:
             if item["status"] != "submitted":
@@ -326,6 +357,10 @@ class BulkTaskActionService:
                     changes.append(item)
                 else:
                     kept.append((item, why))
+        elif o.action == "start_round":
+            changes, kept, skipped = self._round_plan(
+                conn, project, found, assignments, o
+            )
         else:
             keep_ids = (
                 self._within_limit(conn, project, assignments)
@@ -357,7 +392,16 @@ class BulkTaskActionService:
                 "options": o.digest_view(),
                 "rows": [[row.case_id, row.language] for row in found],
                 "changes": [
-                    [item["id"], item["status"], item["updated_at"].isoformat()]
+                    [
+                        item["id"],
+                        item["status"],
+                        item["updated_at"].isoformat(),
+                        *(
+                            [item["workflow_revision"], item["last_submission_id"]]
+                            if o.action == "start_round"
+                            else []
+                        ),
+                    ]
                     for item in changes
                 ],
                 "kept": [[item["id"], reason] for item, reason in kept],
@@ -366,6 +410,7 @@ class BulkTaskActionService:
         )
         result: dict[str, Any] = {
             "action": o.action,
+            "kind": o.kind,
             "texts": len(found),
             "change_count": len(changes),
             "kept_count": len(kept),
@@ -412,6 +457,129 @@ class BulkTaskActionService:
         ]
         return result
 
+    def _round_plan(
+        self,
+        conn: Connection,
+        project: RowMapping,
+        found: Sequence[RowKey],
+        assignments: Sequence[RowMapping],
+        o: Options,
+    ) -> tuple[
+        list[RowMapping], list[tuple[RowMapping, str]], list[tuple[RowKey, str]]
+    ]:
+        """Which annotations of ``found`` get a new round (``o.kind``).
+
+        Only a submitted annotation on the text's current version, whose
+        person can still take it. The rules a single round has
+        (``WorkRoundService.create_in``) hold as well: a paused task takes no
+        round, and a restart needs a round to restart. A text with a final
+        result or an open consolidation is skipped: the round would take the
+        submission away the result or the consolidation rests on.
+        """
+        pid = int(project["id"])
+        finals = self._finals(conn, pid, found)
+        consolidating = {
+            RowKey(item["case_id"], item["language"])
+            for item in assignments
+            if item["task"] == "review" and item["status"] != "submitted"
+        }
+        skipped = [
+            (row, "final_result" if row in finals else "consolidation_open")
+            for row in found
+            if row in finals or row in consolidating
+        ]
+        left_out = {row for row, _ in skipped}
+        current = _current_versions(conn, pid, found)
+        gate = bool(project["annotate_accepted_translations_only"])
+        available = _availability(conn, project)
+        changes: list[RowMapping] = []
+        kept: list[tuple[RowMapping, str]] = []
+        for item in assignments:
+            row = RowKey(item["case_id"], item["language"])
+            if item["task"] != "annotate" or row in left_out:
+                continue
+            if item["status"] != "submitted" or item["last_submission_id"] is None:
+                reason = "not_submitted"
+            elif item["held"]:
+                reason = "paused"
+            elif item["document_id"] not in current:
+                reason = "not_current_version"
+            elif gate and current[item["document_id"]] not in (None, "accepted"):
+                # ``require_annotation_gate``: the task waits for the review.
+                reason = "translation_not_accepted"
+            elif not available(item):
+                reason = "person_unavailable"
+            elif o.kind == "clean_restart" and item["active_round_id"] is None:
+                reason = "no_round"
+            else:
+                changes.append(item)
+                continue
+            kept.append((item, reason))
+        return changes, kept, skipped
+
+    def _start_rounds(
+        self,
+        conn: Connection,
+        key: str,
+        pid: int,
+        o: Options,
+        ids: Sequence[int],
+        locked: dict[int, RowMapping],
+        reason: str | None,
+        now: datetime,
+    ) -> None:
+        """One new round per task, created and audited like a single round
+        (``WorkRoundService.create``) with ``via``. A refusal the preview did
+        not foresee ends the whole action: nothing is changed."""
+        from ontotator.application.work_rounds import WorkRoundService
+
+        rounds = WorkRoundService(self.db)
+        owners = dict(
+            conn.execute(
+                select(UserRow.id, UserRow.pseudonym).where(
+                    UserRow.id.in_({int(locked[i]["user_id"]) for i in ids})
+                )
+            )
+            .tuples()
+            .all()
+        )
+        kind = cast(BulkRoundKind, o.kind)
+        for assignment_id in ids:
+            row = locked[assignment_id]
+            sources = (
+                [str(row["last_submission_id"])] if kind == "carry_forward" else []
+            )
+            created = rounds.create_in(
+                conn,
+                project=key,
+                pid=pid,
+                actor=self.actor,
+                assignment=row,
+                kind=kind,
+                sources=sources,
+                draft_sources=[],
+                reason=reason,
+                expected_workflow_revision=int(row["workflow_revision"]),
+                lead=True,
+                owner=owners[int(row["user_id"])],
+            )
+            record_audit(
+                conn,
+                self.actor,
+                "round.create",
+                target_type="work_round",
+                target_id=created.round_id,
+                project_id=pid,
+                details={
+                    "kind": kind,
+                    "assignment_id": assignment_id,
+                    "sources": sources,
+                    "reason": reason,
+                    "via": "bulk_start_round",
+                },
+                at=now,
+            )
+
     @staticmethod
     def _within_limit(
         conn: Connection, project: RowMapping, assignments: Iterable[RowMapping]
@@ -452,7 +620,8 @@ class BulkTaskActionService:
         that no longer matches is refused with ``PREVIEW_STALE`` and the
         fresh preview."""
         reason = (options.reason or "").strip() or None
-        if options.action == "reopen" and reason is None and not preview:
+        needs_reason = options.action == "reopen" or options.kind == "clean_restart"
+        if needs_reason and reason is None and not preview:
             raise DomainError("BULK_REASON_REQUIRED")
         with self.db.transaction() as conn:
             project = self._lock(conn, key, exclusive=not preview)
@@ -481,6 +650,10 @@ class BulkTaskActionService:
                 ).mappings()
             }
             via = f"bulk_{options.action}"
+            if options.action == "start_round":
+                self._start_rounds(conn, key, pid, options, ids, locked, reason, now)
+                # A new round has no Undo (module docstring).
+                return plan | {"applied": True, "undo": None}
             if options.action == "reopen":
                 for assignment_id in ids:
                     AssignmentService.reopen_locked(
@@ -723,6 +896,48 @@ class BulkTaskActionService:
                 except DomainError as refusal:
                     raise _stale("person_unavailable") from refusal
                 checked.add(who)
+
+
+def _current_versions(
+    conn: Connection, pid: int, rows: Sequence[RowKey]
+) -> dict[str, str | None]:
+    """The current version of each text of ``rows`` with its translation
+    status: the newest counted version, as
+    ``text_targets.text_target_document`` finds it for one text (no live
+    version: none). Two queries, however many texts."""
+    if not rows:
+        return {}
+    wanted = set(rows)
+    chains = {
+        row: found
+        for row, found in _chains(conn, pid, sorted({r.case_id for r in rows})).items()
+        if row in wanted
+    }
+    versions = [
+        v.document_id for found in chains.values() for c in found for v in c.versions
+    ]
+    discarded = set(
+        conn.execute(
+            select(DiscardedVariantRow.document_id).where(
+                DiscardedVariantRow.project_id == pid,
+                DiscardedVariantRow.document_id.in_(versions),
+            )
+        ).scalars()
+    )
+    current: dict[str, str | None] = {}
+    for found in chains.values():
+        live = _live(found, discarded)
+        if live:
+            latest = max(
+                live,
+                key=lambda c: (
+                    -1 if c.root.position is None else c.root.position,
+                    c.root_id,
+                ),
+            )
+            target = _target(latest)
+            current[target.document_id] = target.translation_status
+    return current
 
 
 def _after_state(conn: Connection, pid: int, assignment_ids: Sequence[int]) -> str:

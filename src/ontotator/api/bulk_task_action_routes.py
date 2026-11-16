@@ -16,6 +16,7 @@ from ontotator.api.work_plan_routes import (
 )
 from ontotator.application.bulk_task_actions import (
     BulkAction,
+    BulkRoundKind,
     BulkTaskActionService,
     Options,
 )
@@ -70,6 +71,29 @@ class BulkWithdrawRequest(_BulkRequest):
     over_limit_only: bool = Field(default_factory=lambda: False)
 
 
+class BulkStartRoundRequest(BaseModel):
+    """Start a new work round for the submitted annotations of the selected
+    texts. ``reason`` is required to apply a ``clean_restart``."""
+
+    model_config = ConfigDict(extra="forbid")
+    rows: list[RowRefView] = Field(min_length=1, max_length=MAX_SELECTED_ROWS)
+    # ``carry_forward``: the round continues from the task's submission.
+    # ``clean_restart``: it has none of the earlier findings; a task from
+    # tool proposals starts on the newest proposal set.
+    kind: BulkRoundKind
+    reason: str | None = Field(default=None, max_length=2000)
+    preview: bool = Field(default_factory=lambda: False)
+    summary_only: bool = Field(default_factory=lambda: False)
+    preview_token: str | None = Field(default=None, max_length=80)
+
+    @model_validator(mode="after")
+    def _token_to_apply(self) -> Self:
+        require_one_selection([], self.rows)
+        if not self.preview and self.preview_token is None:
+            raise ValueError("Send preview: true, or the preview_token to apply.")
+        return self
+
+
 class BulkTaskView(BaseModel):
     case_id: str
     language: str
@@ -84,7 +108,8 @@ class BulkTaskView(BaseModel):
 class BulkKeptTaskView(BulkTaskView):
     # not_submitted, lead_correction, discarded, lead_correction_open,
     # person_unavailable (reopen); submitted, started, paused, within_limit,
-    # lead_correction_task (withdraw).
+    # lead_correction_task (withdraw); not_submitted, paused, not_current_version,
+    # person_unavailable, translation_not_accepted, no_round (start-round).
     reason: str
     message: str
 
@@ -92,7 +117,8 @@ class BulkKeptTaskView(BulkTaskView):
 class BulkSkippedTextView(BaseModel):
     case_id: str
     language: str
-    reason: Literal["final_chosen"]
+    # final_chosen (reopen); final_result, consolidation_open (start-round).
+    reason: Literal["final_chosen", "final_result", "consolidation_open"]
     message: str
 
 
@@ -106,6 +132,8 @@ class BulkUndoView(BaseModel):
 
 class BulkTaskActionView(BaseModel):
     action: BulkAction
+    # ``start_round``: the kind of round asked for; else null.
+    kind: BulkRoundKind | None = None
     # False: a preview; True: every task in ``changes`` was changed.
     applied: bool
     # Selected texts found.
@@ -120,7 +148,8 @@ class BulkTaskActionView(BaseModel):
     skipped: list[BulkSkippedTextView]
     preview_token: str
     # After apply with changes: send its ``id`` to ``bulk-task-actions/undo``.
-    # None when nothing changed or a translation review was reopened.
+    # None when nothing changed, a translation review was reopened, or the
+    # action started rounds.
     undo: BulkUndoView | None = None
 
 
@@ -145,7 +174,7 @@ def _service(request: Request, key: str, principal: Any) -> BulkTaskActionServic
     )
 
 
-def _rows(body: _BulkRequest) -> list[RowKey]:
+def _rows(body: _BulkRequest | BulkStartRoundRequest) -> list[RowKey]:
     return [RowKey(row.case_id, row.language) for row in body.rows]
 
 
@@ -194,6 +223,35 @@ def bulk_withdraw(
             include_started=body.include_started,
             over_limit_only=body.over_limit_only,
         ),
+        preview=body.preview,
+        preview_token=body.preview_token,
+        summary_only=body.summary_only,
+    )
+
+
+@router.post("/bulk-task-actions/start-round", response_model=BulkTaskActionView)
+def bulk_start_round(
+    key: str, body: BulkStartRoundRequest, principal: PrincipalDep, request: Request
+) -> dict[str, Any]:
+    """Start a new work round for the submitted annotations of many texts
+    (issue 336, step 3).
+
+    What ``POST /assignments/{id}/rounds`` does for one task: ``kind``
+    ``carry_forward`` continues from the task's submission, ``clean_restart``
+    starts without the earlier findings (a task from tool proposals on the
+    newest proposal set) and needs a ``reason`` to apply. Either way the
+    earlier submission no longer counts as submitted and the person submits
+    the new round. Only submitted annotations on the text's current version
+    get a round: other tasks are kept with the reason, texts with a final
+    result or an open consolidation are skipped. Preview and apply as
+    ``bulk-task-actions/reopen``; each round is audited like a single one
+    (``round.create``, ``via: bulk_start_round``). There is no Undo
+    (``undo`` is null).
+    """
+    return _service(request, key, principal).run(
+        key,
+        _rows(body),
+        Options("start_round", ("annotate",), body.reason, kind=body.kind),
         preview=body.preview,
         preview_token=body.preview_token,
         summary_only=body.summary_only,

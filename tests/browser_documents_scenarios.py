@@ -677,6 +677,63 @@ def build_s336f(app: FastAPI) -> dict[str, Any]:
     return result(scenario, [(case, "en") for case in cases], documents=doc)
 
 
+def build_s336r(app: FastAPI) -> dict[str, Any]:
+    """Bulk Start a round… (issue 336 step 3): eight en texts EN100022 to
+    EN100029, two annotators per text. Tom Reis submitted 22 to 26 (22 with
+    a finding), R. Roe 23 and 25; R. Roe is assigned, not started, on 26 and
+    29. Tom Reis's submission is the final result of 27. Both submitted 28,
+    where the lead's consolidation is open."""
+    from browser_overview_scenarios import add_findings
+    from t1_builders import native_unit
+
+    scenario = new_project(app, "S336R")
+    cases = [f"EN1000{number}" for number in range(22, 30)]
+    docs = import_texts(
+        scenario,
+        [
+            native_unit(case, "en", f"{SYNTHETIC} {case}", case_id=case)
+            for case in cases
+        ],
+    )
+    doc = {case: docs[(case, "en", 1)] for case in cases}
+    with scenario.db.transaction() as conn:
+        conn.execute(
+            update(ProjectRow)
+            .where(ProjectRow.project_key == scenario.key)
+            .values(annotations_per_text=2)
+        )
+    add_user(scenario, "lead", ["lead", "adjudicator"])
+    for name, display in (("tom", "Tom Reis"), ("roe", "R. Roe")):
+        add_user(scenario, name, ["annotator"])
+        app.state.accounts.update_profile(
+            Actor.cli(), scenario.users[name], display_name=display
+        )
+    first = assign(scenario, doc["EN100022"], "tom", "annotate")
+    started = start_round(scenario, first, "tom")
+    add_findings(scenario, "tom", started.workspace_key, ["HP:0001250"])
+    finish_round(scenario, "tom", started.workspace_key)
+    for case in ("EN100023", "EN100024", "EN100025", "EN100026"):
+        submit(scenario, doc[case], "tom")
+    for case in ("EN100023", "EN100025"):
+        submit(scenario, doc[case], "roe")
+    for case in ("EN100026", "EN100029"):
+        assign(scenario, doc[case], "roe", "annotate")
+    final = submit(scenario, doc["EN100027"], "tom")
+    select(scenario, doc["EN100027"], final["submission_id"])
+    inputs = [
+        submit(scenario, doc["EN100028"], name)["submission_id"]
+        for name in ("tom", "roe")
+    ]
+    review = assign(scenario, doc["EN100028"], "lead", "review")
+    start_round(scenario, review, "lead", kind="consolidation", sources=inputs)
+    return result(
+        scenario,
+        [(case, "en") for case in cases],
+        documents=doc,
+        assignments={"first": first},
+    )
+
+
 BUILDERS: dict[str, Builder] = {
     "S0": build_s0,
     "S1": build_s1,
@@ -686,6 +743,7 @@ BUILDERS: dict[str, Builder] = {
     "S5": build_s5,
     "S336": build_s336,
     "S336F": build_s336f,
+    "S336R": build_s336r,
     # S8 is the S0 data at a 390 px viewport.
     "S8": build_s0,
 }

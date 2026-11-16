@@ -700,6 +700,47 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
             body["reason"] = reason
         return await _bulk(project, "withdraw", body, confirm, preview_token)
 
+    @register(server, scopes="project-admin", effect="destructive")
+    async def start_rounds(
+        project: Project,
+        texts: Texts,
+        kind: Annotated[
+            Literal["carry_forward", "clean_restart"],
+            Field(
+                description=(
+                    "carry_forward: the new round starts with what the person"
+                    " submitted. clean_restart: it has none of the earlier findings;"
+                    " a task from tool proposals starts on the newest proposals."
+                )
+            ),
+        ],
+        reason: Annotated[
+            str | None,
+            Field(max_length=2000, description="Required for clean_restart."),
+        ] = None,
+        confirm: Annotated[
+            bool, Field(description="False: dry run. True: start the listed rounds.")
+        ] = False,
+        preview_token: PreviewToken = None,
+    ) -> dict[str, Any]:
+        """Start a new work round for the submitted annotations of many texts,
+        after a dry run. THERE IS NO UNDO.
+
+        Each person gets the task back and must submit again; the earlier
+        submission no longer counts. Only submitted annotations on a text's
+        current version take a round; texts with a final result or an open
+        consolidation are skipped, other tasks are kept (the dry run says
+        why). Confirm with the dry run's preview_token: every listed task
+        gets its round, or none when anything changed since (a fresh dry
+        run, ``stale``).
+        """
+        if confirm and kind == "clean_restart" and not (reason or "").strip():
+            raise OntotatorError("A clean_restart needs a reason.")
+        body: dict[str, Any] = {"rows": texts, "kind": kind}
+        if reason:
+            body["reason"] = reason
+        return await _bulk(project, "start-round", body, confirm, preview_token)
+
     @register(server, scopes=("read", "project-admin"), effect="destructive")
     async def hand_over_open_tasks(
         project: Project,

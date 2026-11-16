@@ -6765,6 +6765,61 @@
         "x-ontotator-project-token": true
       }
     },
+    "/api/v1/projects/{key}/bulk-task-actions/start-round": {
+      "post": {
+        "tags": [
+          "bulk-task-actions"
+        ],
+        "summary": "Bulk Start Round",
+        "description": "Start a new work round for the submitted annotations of many texts\n(issue 336, step 3).\n\nWhat ``POST /assignments/{id}/rounds`` does for one task: ``kind``\n``carry_forward`` continues from the task's submission, ``clean_restart``\nstarts without the earlier findings (a task from tool proposals on the\nnewest proposal set) and needs a ``reason`` to apply. Either way the\nearlier submission no longer counts as submitted and the person submits\nthe new round. Only submitted annotations on the text's current version\nget a round: other tasks are kept with the reason, texts with a final\nresult or an open consolidation are skipped. Preview and apply as\n``bulk-task-actions/reopen``; each round is audited like a single one\n(``round.create``, ``via: bulk_start_round``). There is no Undo\n(``undo`` is null).",
+        "operationId": "bulk_start_round_api_v1_projects__key__bulk_task_actions_start_round_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkStartRoundRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkTaskActionView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
     "/api/v1/projects/{key}/bulk-task-actions/undo": {
       "post": {
         "tags": [
@@ -14719,7 +14774,11 @@
           },
           "reason": {
             "type": "string",
-            "const": "final_chosen",
+            "enum": [
+              "final_chosen",
+              "final_result",
+              "consolidation_open"
+            ],
             "title": "Reason"
           },
           "message": {
@@ -14735,6 +14794,67 @@
           "message"
         ],
         "title": "BulkSkippedTextView"
+      },
+      "BulkStartRoundRequest": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowRefView"
+            },
+            "type": "array",
+            "maxItems": 200000,
+            "minItems": 1,
+            "title": "Rows"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "carry_forward",
+              "clean_restart"
+            ],
+            "title": "Kind"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "preview": {
+            "type": "boolean",
+            "title": "Preview"
+          },
+          "summary_only": {
+            "type": "boolean",
+            "title": "Summary Only"
+          },
+          "preview_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Token"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rows",
+          "kind"
+        ],
+        "title": "BulkStartRoundRequest",
+        "description": "Start a new work round for the submitted annotations of the selected\ntexts. ``reason`` is required to apply a ``clean_restart``."
       },
       "BulkTargetView": {
         "properties": {
@@ -14772,9 +14892,25 @@
             "type": "string",
             "enum": [
               "reopen",
-              "withdraw"
+              "withdraw",
+              "start_round"
             ],
             "title": "Action"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "carry_forward",
+                  "clean_restart"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
           },
           "applied": {
             "type": "boolean",

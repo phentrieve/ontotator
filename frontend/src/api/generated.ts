@@ -1931,6 +1931,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{key}/bulk-task-actions/start-round": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk Start Round
+         * @description Start a new work round for the submitted annotations of many texts
+         *     (issue 336, step 3).
+         *
+         *     What ``POST /assignments/{id}/rounds`` does for one task: ``kind``
+         *     ``carry_forward`` continues from the task's submission, ``clean_restart``
+         *     starts without the earlier findings (a task from tool proposals on the
+         *     newest proposal set) and needs a ``reason`` to apply. Either way the
+         *     earlier submission no longer counts as submitted and the person submits
+         *     the new round. Only submitted annotations on the text's current version
+         *     get a round: other tasks are kept with the reason, texts with a final
+         *     result or an open consolidation are skipped. Preview and apply as
+         *     ``bulk-task-actions/reopen``; each round is audited like a single one
+         *     (``round.create``, ``via: bulk_start_round``). There is no Undo
+         *     (``undo`` is null).
+         */
+        post: operations["bulk_start_round_api_v1_projects__key__bulk_task_actions_start_round_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{key}/bulk-task-actions/undo": {
         parameters: {
             query?: never;
@@ -4816,11 +4849,33 @@ export interface components {
             language: string;
             /**
              * Reason
-             * @constant
+             * @enum {string}
              */
-            reason: "final_chosen";
+            reason: "final_chosen" | "final_result" | "consolidation_open";
             /** Message */
             message: string;
+        };
+        /**
+         * BulkStartRoundRequest
+         * @description Start a new work round for the submitted annotations of the selected
+         *     texts. ``reason`` is required to apply a ``clean_restart``.
+         */
+        BulkStartRoundRequest: {
+            /** Rows */
+            rows: components["schemas"]["RowRefView"][];
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "carry_forward" | "clean_restart";
+            /** Reason */
+            reason?: string | null;
+            /** Preview */
+            preview?: boolean;
+            /** Summary Only */
+            summary_only?: boolean;
+            /** Preview Token */
+            preview_token?: string | null;
         };
         /** BulkTargetView */
         BulkTargetView: {
@@ -4838,7 +4893,9 @@ export interface components {
              * Action
              * @enum {string}
              */
-            action: "reopen" | "withdraw";
+            action: "reopen" | "withdraw" | "start_round";
+            /** Kind */
+            kind?: ("carry_forward" | "clean_restart") | null;
             /** Applied */
             applied: boolean;
             /** Texts */
@@ -14984,6 +15041,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["BulkWithdrawRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkTaskActionView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_start_round_api_v1_projects__key__bulk_task_actions_start_round_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkStartRoundRequest"];
             };
         };
         responses: {

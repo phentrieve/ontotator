@@ -114,6 +114,7 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     ("POST", f"{P}/bulk-task-actions/reopen"): "project-admin",
     ("POST", f"{P}/bulk-task-actions/withdraw"): "project-admin",
     ("POST", f"{P}/bulk-task-actions/undo"): "project-admin",
+    ("POST", f"{P}/bulk-task-actions/start-round"): "project-admin",
     ("GET", f"{P}/document-rows/{{case_id:path}}/{{language}}/submissions"): "read",
     ("GET", f"{P}/document-rows/{{case_id:path}}/{{language}}/final-panel"): "read",
     ("GET", f"{P}/documents/summary"): "read",

@@ -43,6 +43,7 @@ beforeEach(() => {
   vi.spyOn(api, "bulkChangeFinal").mockResolvedValue(changePreview());
   vi.spyOn(api, "bulkReopen").mockResolvedValue(nothing);
   vi.spyOn(api, "bulkWithdraw").mockResolvedValue({ ...nothing, action: "withdraw" });
+  vi.spyOn(api, "bulkStartRound").mockResolvedValue({ ...nothing, action: "start_round", kind: "carry_forward" });
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
@@ -170,7 +171,7 @@ it("More actions lists the final actions, applies Accept agreeing results… and
   await waitFor(() => expect(api.acceptAgreeing).toHaveBeenCalledWith("p", { rows, preview: true }, expect.any(AbortSignal)));
   fireEvent.click(screen.getByRole("button", { name: "More actions" }));
   const items = within(screen.getByRole("menu", { name: "More actions" })).getAllByRole("menuitem");
-  expect(items.slice(2).map(item => item.textContent)).toEqual(["Accept agreeing results…", "Change final…The selected texts have no final result yet."]);
+  expect(items.slice(2, 4).map(item => item.textContent)).toEqual(["Accept agreeing results…", "Change final…The selected texts have no final result yet."]);
   expect(items[3].getAttribute("aria-disabled")).toBe("true");
   fireEvent.click(items[2]);
   const dialog = await screen.findByRole("dialog", { name: "Accept agreeing results: 8 texts" });

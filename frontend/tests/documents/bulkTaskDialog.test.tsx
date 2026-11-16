@@ -19,6 +19,23 @@ const reopenPreview = (overrides: Partial<BulkTaskActionView> = {}): BulkTaskAct
   skipped: [{ case_id: "EN100028", language: "de", reason: "final_chosen", message: "Final result chosen: use Change final… first." }],
   preview_token: "sha256:a", undo: null, ...overrides,
 });
+/** "Start a round…": five submitted tasks, a text with a final result, one with an open consolidation, kept tasks. */
+const roundPreview = (kind: "carry_forward" | "clean_restart" = "carry_forward", overrides: Partial<BulkTaskActionView> = {}): BulkTaskActionView => counted({
+  ...reopenPreview(), action: "start_round", kind,
+  kept: [
+    { ...task("EN100027", 6, roe, "open"), reason: "not_submitted", message: "Not submitted yet." },
+    { ...task("EN100027", 7, tom), reason: "paused", message: "Paused by a problem report; decide the report first." },
+    { ...task("EN100029", 8, tom), reason: "not_current_version", message: "Not on the current version of the text; use the text card." },
+    { ...task("EN100029", 9, roe), reason: "person_unavailable", message: "The person is no longer an active member with this role." },
+    { ...task("EN100029", 10, roe), reason: "translation_not_accepted", message: "The translation is not accepted yet." },
+    ...(kind === "clean_restart" ? [{ ...task("EN100026", 11, roe), reason: "no_round", message: "No work round to restart (older or imported work); use Reopen…." }] : []),
+  ],
+  skipped: [
+    { case_id: "EN100028", language: "de", reason: "final_result", message: "Final result chosen: use Withdraw final… first." },
+    { case_id: "EN100030", language: "de", reason: "consolidation_open", message: "A consolidation is open: finish or withdraw it first." },
+  ],
+  preview_token: `sha256:${kind}`, ...overrides,
+});
 /** The counts follow the lists, as the server sends them. */
 function counted(view: BulkTaskActionView): BulkTaskActionView {
   return { ...view, change_count: view.changes.length, kept_count: view.kept.length, skipped_count: view.skipped.length };
@@ -28,6 +45,7 @@ const rows = ["EN100022", "EN100023", "EN100025", "EN100026", "EN100027", "EN100
 beforeEach(() => {
   vi.spyOn(api, "bulkReopen").mockResolvedValue(reopenPreview());
   vi.spyOn(api, "bulkWithdraw").mockResolvedValue(reopenPreview({ action: "withdraw", changes: [], kept: [], skipped: [] }));
+  vi.spyOn(api, "bulkStartRound").mockImplementation(async (_key, body) => roundPreview(body.kind));
   // The final actions of the same menu (bulkFinalDialog.test.tsx) are not asked here.
   vi.spyOn(api, "acceptAgreeing").mockRejectedValue(new Error("not asked"));
   vi.spyOn(api, "bulkChangeFinal").mockRejectedValue(new Error("not asked"));
@@ -138,7 +156,7 @@ it("More actions lists Reopen… and Withdraw open tasks…, applies and offers 
   fireEvent.click(screen.getByRole("button", { name: "More actions" }));
   const menu = screen.getByRole("menu", { name: "More actions" });
   const items = within(menu).getAllByRole("menuitem");
-  expect(items.map(item => item.textContent)).toEqual(["Reopen…", "Withdraw open tasks…No open tasks in the selected texts.", "Accept agreeing results…", "Change final…"]);
+  expect(items.map(item => item.textContent)).toEqual(["Reopen…", "Withdraw open tasks…No open tasks in the selected texts.", "Accept agreeing results…", "Change final…", "Start a round…"]);
   expect(items[1].getAttribute("aria-disabled")).toBe("true");
   expect(items[0].getAttribute("aria-disabled")).toBeNull();
   fireEvent.click(items[0]);
@@ -155,4 +173,98 @@ it("More actions lists Reopen… and Withdraw open tasks…, applies and offers 
   fireEvent.click(screen.getByRole("button", { name: "Undo" }));
   await waitFor(() => expect(api.bulkUndo).toHaveBeenCalledWith("p", 41));
   expect(await screen.findByText("The reopened tasks are submitted again.")).toBeTruthy();
+});
+
+it("Start a round… groups the preview with every reason a task is kept or a text is skipped (issue 336 step 3)", () => {
+  const lines = (kind: "carry_forward" | "clean_restart") => previewGroups(roundPreview(kind)).map(group => `${group.title} · ${group.detail}`);
+  expect(lines("carry_forward")).toEqual([
+    "Continue 5 submitted tasks in a new round · Tom Reis 4, R. Roe 1",
+    "Skip 1 text · final result chosen: use Withdraw final… first",
+    "Skip 1 text · a consolidation is open: finish or withdraw it first",
+    "Keep 1 open task · not submitted yet",
+    "Keep 1 paused task · paused by a problem report: decide the report first",
+    "Keep 1 task · not on the current version of the text: use the text card",
+    "Keep 1 task · the person can no longer take it",
+    "Keep 1 task · the translation is not accepted yet",
+  ]);
+  expect(lines("clean_restart")[0]).toBe("Restart 5 submitted tasks in a new round · Tom Reis 4, R. Roe 1");
+  expect(lines("clean_restart").at(-1)).toBe("Keep 1 submitted task · no work round to restart (older or imported work): use Reopen…");
+  expect(willChangeText(roundPreview())).toBe("5 assignments in 4 texts");
+  expect(willChangeText(roundPreview("carry_forward", { changes: [] }))).toBe("No submitted annotation in the selected texts can start a round.");
+  expect(appliedText(roundPreview("carry_forward", { applied: true }))).toBe("Started 5 rounds in 4 texts.");
+  expect(unavailableReason("start_round", roundPreview())).toBeNull();
+  expect(unavailableReason("start_round", roundPreview("carry_forward", { changes: [], texts: 2 }))).toBe("The selected texts have a final result or an open consolidation.");
+  expect(unavailableReason("start_round", roundPreview("carry_forward", { changes: [], skipped: [] }))).toBe("No submitted annotations in the selected texts.");
+});
+
+it("Start a round… says plainly what is set aside and that it cannot be undone here", () => {
+  expect(consequenceLines(roundPreview("carry_forward"))).toEqual([
+    "2 people get 5 tasks back in My tasks, in a new round that starts with what they submitted.",
+    "The earlier submissions no longer count as submitted: each task must be submitted again. The earlier rounds stay readable under More › Work rounds.",
+    "This cannot be undone here. There is no way back for a single text either: the person submits the new round.",
+  ]);
+  expect(consequenceLines(roundPreview("clean_restart"))).toEqual([
+    "2 people get 5 tasks back in My tasks, in a new round without any of the earlier findings. Tasks from tool proposals start again from the newest proposals, all open.",
+    "The submitted work of these 5 tasks is set aside: it no longer counts as submitted and is not carried into the new round. The earlier rounds stay readable under More › Work rounds.",
+    "This cannot be undone here, and no action on a single text brings the set-aside work back into the task.",
+  ]);
+});
+
+it("Start a round… offers the two rounds, needs a reason only to restart, and applies with the preview's token", async () => {
+  const onApplied = vi.fn();
+  render(<BulkTaskDialog projectKey="p" action="start_round" rows={rows} onClose={vi.fn()} onApplied={onApplied} />);
+  const dialog = await screen.findByRole("dialog", { name: "Start a round: 7 texts" });
+  expect(await within(dialog).findByText("Continue 5 submitted tasks in a new round")).toBeTruthy();
+  expect(api.bulkStartRound).toHaveBeenCalledWith("p", { rows, kind: "carry_forward", preview: true }, expect.any(AbortSignal));
+  // Only the choices of the single action: no task kinds, no further options.
+  expect(within(dialog).getAllByRole("radio").map(radio => radio.getAttribute("aria-describedby") && (radio as HTMLInputElement).labels?.[0].textContent)).toEqual(["Continue from the submission", "Restart"]);
+  expect(within(dialog).queryAllByRole("checkbox")).toEqual([]);
+  expect(within(dialog).getByLabelText("Reason (optional)")).toBeTruthy();
+
+  fireEvent.click(within(dialog).getByLabelText("Restart"));
+  expect(await within(dialog).findByText("Restart 5 submitted tasks in a new round")).toBeTruthy();
+  const apply = within(dialog).getByRole("button", { name: "Start 5 rounds" });
+  expect(apply.getAttribute("aria-disabled")).toBe("true");
+  expect(within(dialog).getByText("Enter the reason first.")).toBeTruthy();
+  fireEvent.change(within(dialog).getByLabelText("Reason (required)"), { target: { value: "Tool set of 10 Nov" } });
+  fireEvent.click(apply);
+  expect(within(dialog).getByText("What happens")).toBeTruthy();
+  expect(within(dialog).getByText(/This cannot be undone here/)).toBeTruthy();
+  expect(within(dialog).queryByText(/^Skip 1 text/)).toBeNull();
+  expect(apply.getAttribute("aria-disabled")).toBe("true");
+  fireEvent.click(within(dialog).getByLabelText("I understand — restart without the earlier findings"));
+  vi.mocked(api.bulkStartRound).mockResolvedValueOnce(roundPreview("clean_restart", { applied: true }));
+  fireEvent.click(apply);
+  await waitFor(() => expect(onApplied).toHaveBeenCalledOnce());
+  expect(api.bulkStartRound).toHaveBeenLastCalledWith("p", { rows, kind: "clean_restart", preview_token: "sha256:clean_restart", reason: "Tool set of 10 Nov" }, undefined);
+});
+
+it("Start a round… shows the fresh preview when the texts changed since (PREVIEW_STALE)", async () => {
+  render(<BulkTaskDialog projectKey="p" action="start_round" rows={rows} onClose={vi.fn()} onApplied={vi.fn()} />);
+  const dialog = await screen.findByRole("dialog", { name: "Start a round: 7 texts" });
+  await within(dialog).findByText("Continue 5 submitted tasks in a new round");
+  fireEvent.click(within(dialog).getByRole("button", { name: "Start 5 rounds" }));
+  fireEvent.click(within(dialog).getByLabelText("I understand"));
+  const fresh = roundPreview("carry_forward", { changes: [task("EN100022", 1)], preview_token: "sha256:b" });
+  vi.mocked(api.bulkStartRound).mockRejectedValueOnce(new ApiError(409, "stale", "PREVIEW_STALE", { preview: fresh } as never));
+  fireEvent.click(within(dialog).getByRole("button", { name: "Start 5 rounds" }));
+  expect(await within(dialog).findByText("The texts changed since the preview. Check the new preview.")).toBeTruthy();
+  expect(within(dialog).getByText("Continue 1 submitted task in a new round")).toBeTruthy();
+  expect(within(dialog).getByRole("button", { name: "Start 1 round" })).toBeTruthy();
+});
+
+it("More actions starts rounds and shows a message without Undo", async () => {
+  vi.spyOn(api, "selectionSummary").mockResolvedValue(summary);
+  render(<Harness />);
+  await waitFor(() => expect(api.bulkStartRound).toHaveBeenCalledWith("p", { rows, kind: "carry_forward", preview: true, summary_only: true }, expect.any(AbortSignal)));
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+  fireEvent.click(within(screen.getByRole("menu", { name: "More actions" })).getByRole("menuitem", { name: "Start a round…" }));
+  const dialog = await screen.findByRole("dialog", { name: "Start a round: 7 texts" });
+  await within(dialog).findByText("Continue 5 submitted tasks in a new round");
+  fireEvent.click(within(dialog).getByRole("button", { name: "Start 5 rounds" }));
+  fireEvent.click(within(dialog).getByLabelText("I understand"));
+  vi.mocked(api.bulkStartRound).mockResolvedValueOnce(roundPreview("carry_forward", { applied: true }));
+  fireEvent.click(within(dialog).getByRole("button", { name: "Start 5 rounds" }));
+  expect(await screen.findByText("Started 5 rounds in 4 texts.")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
 });

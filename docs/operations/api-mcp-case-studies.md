@@ -78,6 +78,7 @@ In week six, 80 new letters arrive, one student leaves for a clinical rotation, 
 | Same with a project token | `POST /assignments/{id}/reassign` | `project-admin` (project token now allowed; another project's task gets `ASSIGNMENT_NOT_FOUND`, #351) | `reassign_task` | added in this PR (route rule and tool) |
 | Withdraw, remove or reopen a single task | `POST /assignments/{id}/revoke`, `/remove`, `/reopen` | `project-admin` | `withdraw_task`, `remove_task`, `reopen_task` | added in this PR |
 | Reopen or withdraw the tasks of many texts, with a preview | `POST P/bulk-task-actions/reopen`, `/withdraw`, `/undo` | `project-admin` | `reopen_texts`, `withdraw_open_tasks` | covered (#336) |
+| Start a new round for the submitted annotations of many texts (continue or restart), with a preview | `POST P/bulk-task-actions/start-round` | `project-admin` | `start_rounds` | covered (#336) |
 | Deactivate the account afterwards (sessions end, tokens revoked) | `PATCH /admin/users/{username}` | `admin` | `update_user` | added in this PR |
 | Add a consolidator | `PUT P/members/{username}` (`adjudicator`) | `read`, `project-admin` | `set_member_roles` | covered |
 | Consolidators must not have annotated the text | `PATCH P/settings` (`adjudicator_not_annotator`) | `project-admin` | `update_project_settings` | covered |
