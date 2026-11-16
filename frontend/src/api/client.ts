@@ -97,6 +97,10 @@ export type PlanRowsSet = Defaulted<components["schemas"]["PlanRowsSet"], "undo"
 export type UndoView = components["schemas"]["UndoView"];
 export type CaseIdLookupResult = components["schemas"]["CaseIdLookupResult"];
 export type AnnotationTargetPreview = components["schemas"]["AnnotationTargetPreview"];
+/** A text's own "Annotations per text" (issue 422). */
+export type AnnotationsPerTextResult = components["schemas"]["AnnotationsPerTextResult"];
+/** An imported tool proposal set on one text version (issue 337). */
+export type RowProposalSetView = components["schemas"]["RowProposalSetView"];
 export type DiscardRequest = Defaulted<components["schemas"]["DiscardRequest"], "confirm">;
 export type DiscardResult = components["schemas"]["DiscardResult"];
 // Annotation-mode change after submissions, and its restore
@@ -597,6 +601,14 @@ export class ApiClient {
     return this.request<UploadCreated>(`/api/v1/projects/${encodeURIComponent(key)}/uploads/${id}/commit`, { method: "POST", body: JSON.stringify({ plan_sha256: planSha256, ...(overrides === undefined ? {} : { status_overrides: overrides }), ...(plan ?? {}) }) });
   }
 
+  /** Issue 422: one text's own "Annotations per text" (target and limit); `null` follows the project value again. */
+  async setAnnotationsPerText(key: string, caseId: string, language: string, value: number | null, reason?: string): Promise<AnnotationsPerTextResult> {
+    return this.request<AnnotationsPerTextResult>(`/api/v1/projects/${encodeURIComponent(key)}/texts/${encodeURIComponent(caseId)}/${encodeURIComponent(language)}/annotations-per-text`, { method: "PUT", body: JSON.stringify({ value, ...(reason ? { reason } : {}) }) });
+  }
+  /** Issue 422: several texts at once, in one transaction (all or nothing); each text is compared with its own value. */
+  async setAnnotationsPerTexts(key: string, texts: readonly RowRefView[], value: number | null, reason?: string): Promise<{ texts: AnnotationsPerTextResult[] }> {
+    return this.request(`/api/v1/projects/${encodeURIComponent(key)}/texts/annotations-per-text`, { method: "PUT", body: JSON.stringify({ texts, value, ...(reason ? { reason } : {}) }) });
+  }
   async patchWorkPlan(key: string, caseId: string, language: string, body: PlanRowPatch): Promise<PlanRowResult> {
     return this.request<PlanRowResult>(`/api/v1/projects/${encodeURIComponent(key)}/work-plans/${encodeURIComponent(caseId)}/${encodeURIComponent(language)}`, { method: "PATCH", body: JSON.stringify(body) });
   }

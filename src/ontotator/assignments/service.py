@@ -75,6 +75,7 @@ from ontotator.storage.tables import (
     UserLanguageRow,
     UserRow,
 )
+from ontotator.storage.text_settings import effective_per_text
 
 TASK_FOR_MODE: dict[WorkspaceMode, Task] = {
     "independent": "annotate",
@@ -855,8 +856,11 @@ class AssignmentService:
         conn: Connection, project: RowMapping, document_id: str
     ) -> None:
         """A new annotate assignment needs a free "annotations per text" slot."""
-        # Per version on purpose (plan review R25).
-        limit = int(project["annotations_per_text"])
+        # Per version on purpose (plan review R25); the text's own limit
+        # when it has one (issue 422).
+        limit = effective_per_text(
+            conn, project["id"], document_id, int(project["annotations_per_text"])
+        )
         held = held_annotations(conn, project["id"], [document_id])[document_id]
         if held >= limit:
             raise DomainError(

@@ -14,6 +14,8 @@ export const HELP_SECTIONS = {
   consolidation: { chapter: "consolidator", section: "read-the-text-and-walk-the-groups" },
   consolidationReadOnly: { chapter: "lead-results", section: "read-a-submitted-consolidation" },
   documents: { chapter: "lead-documents", section: "the-documents-page" },
+  // Issue 337 (337-B): "Newer set available" in the text card.
+  newerProposals: { chapter: "lead-change-course", section: "work-from-new-tool-proposals" },
   taskProfiles: { chapter: "lead-settings", section: "task-profiles" },
 } as const satisfies Record<string, { chapter: string; section: string }>;
 

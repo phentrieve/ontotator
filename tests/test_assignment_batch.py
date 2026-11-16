@@ -264,6 +264,7 @@ def test_preview_targets_newest_version_per_root_and_skips_with_reasons(env, tmp
         "document_id": de(CASES[6]),
         "version": 1,
         "remaining": 1,
+        "per_text": 1,
         "usernames": [],
         "unreviewed_translation": False,
         "waiting_for_translation_review": False,

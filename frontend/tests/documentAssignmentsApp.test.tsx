@@ -17,10 +17,10 @@ const rowsPage = (z: DocumentRowView = zRow()) => page([group("z/doc", [z, zRow(
 /** Batch preview for the selection: one annotation per case; Alice reads en. */
 function batchPreview(body: BatchAssignRequest): BatchPreview {
   const usernames = body.usernames ?? [];
-  const targets = body.case_ids.map(caseId => ({ case_id: caseId, language: body.language, document_id: caseId, version: 1, remaining: 1, usernames: usernames.slice(0, 1), unreviewed_translation: false, waiting_for_translation_review: false }));
+  const targets = body.case_ids.map(caseId => ({ case_id: caseId, language: body.language, document_id: caseId, version: 1, remaining: 1, per_text: 1, usernames: usernames.slice(0, 1), unreviewed_translation: false, waiting_for_translation_review: false }));
   const gets = usernames.includes("alice") ? targets.length : 0;
   return {
-    task: body.task, language: body.language, versions: targets.length, targets, skipped: [], per_text: 1, digest: "digest-1",
+    task: body.task, language: body.language, versions: targets.length, targets, skipped: [], per_text: 1, project_per_text: 1, digest: "digest-1",
     people: [{ username: "alice", person: { pseudonym: "ann-0001", display_name: "Alice", is_me: false }, reads: ["en"], open_before: 0, open_after: gets, gets,
       first_case: targets[0]?.case_id ?? null, last_case: targets.at(-1)?.case_id ?? null, language_mismatch: false, unavailable: null, already_assigned: 0, system_admin: false }],
   };

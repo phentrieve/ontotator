@@ -179,7 +179,7 @@ What for: answer a report and let the work go on.
    - **Close report…** or **Close, keep paused…**: close it with an outcome for the reporter.
    - **Release pause…**: let paused tasks continue.
    - **Pause other tasks…**: pause other tasks on the same text or project.
-   - **Agree clean restart…**: restart the task with a new round, after agreeing with the reporter. The annotator's own findings are not carried over. A task from scratch starts empty; a task from proposals starts again on the newest proposal set of the text, all proposals open, so a newer tool set reaches the task this way.
+   - **Agree clean restart…**: restart the task with a new round, after agreeing with the reporter. The annotator's own findings are not carried over. A task from scratch starts empty; a task from proposals starts again on the newest proposal set of the text, all proposals open, so a newer tool set reaches the task this way. The text card's **Annotation** then names that set; *Newer set available* goes away once every task of the text works on it.
    - **Reopen report…**: open a closed report again.
 5. Confirm in the form that opens.
 6. Click **Back to Documents**, or go to the next decision.

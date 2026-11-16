@@ -360,6 +360,44 @@ async def test_assign_texts_names_the_correction_for_a_review_accepted_version(
     assert "rejected or queried translation." not in correction.splitlines()[0]
 
 
+async def test_a_text_gets_its_own_annotations_per_text(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    """Issue 422: one idempotent PUT per text; None follows the project again."""
+    template = f"{P}/texts/{{case_id}}/{{language}}/annotations-per-text"
+    for value in (4, None):
+        await call(
+            mcp_client,
+            "set_annotations_per_text",
+            {
+                "project": "p",
+                "case_id": "EN100022",
+                "language": "de",
+                "annotations_per_text": value,
+                "reason": "method comparison",
+            },
+        )
+    sent = fake.calls_to("PUT", template)
+    assert [c.json() for c in sent] == [
+        {"value": 4, "reason": "method comparison"},
+        {"value": None, "reason": "method comparison"},
+    ]
+    assert str(sent[0].request.url).endswith(
+        "/projects/p/texts/EN100022/de/annotations-per-text"
+    )
+    with pytest.raises(ToolFailed):
+        await call(
+            mcp_client,
+            "set_annotations_per_text",
+            {
+                "project": "p",
+                "case_id": "c",
+                "language": "de",
+                "annotations_per_text": 6,
+            },
+        )
+
+
 async def test_tool_texts_state_the_selection_limit(mcp_client: Client) -> None:
     tools = {tool.name: tool for tool in (await mcp_client.list_tools()).tools}
     for name in ("update_work_plan", "distribute_texts"):
