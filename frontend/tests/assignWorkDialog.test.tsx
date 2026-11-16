@@ -689,6 +689,12 @@ it("the (i) popover changes annotators per text for all texts; the dialog and it
   expect(within(popover).getByRole("button", { name: "Change for all texts" }).getAttribute("aria-disabled")).toBe("true");
   fireEvent.change(field, { target: { value: "0" } });
   expect(within(popover).getByRole("button", { name: "Change for all texts" }).getAttribute("aria-disabled")).toBe("true");
+  // Issue 447: up to 20 annotators per text; 21 is no value.
+  expect(field).toHaveProperty("max", "20");
+  fireEvent.change(field, { target: { value: "21" } });
+  expect(within(popover).getByRole("button", { name: "Change for all texts" }).getAttribute("aria-disabled")).toBe("true");
+  fireEvent.change(field, { target: { value: "20" } });
+  expect(within(popover).getByRole("button", { name: "Change for all texts" }).getAttribute("aria-disabled")).toBeNull();
   fireEvent.change(field, { target: { value: "2" } });
   fireEvent.click(within(popover).getByRole("button", { name: "Change for all texts" }));
   await waitFor(() => expect(update).toHaveBeenCalledWith("p/key", { annotations_per_text: 2 }));

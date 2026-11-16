@@ -812,7 +812,7 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
             int | None,
             Field(
                 ge=1,
-                le=5,
+                le=20,
                 description=(
                     "The text's own number of annotators (target and limit),"
                     " e.g. 4 for a method comparison; None returns the text to"

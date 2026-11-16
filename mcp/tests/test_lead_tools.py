@@ -448,7 +448,7 @@ async def test_a_text_gets_its_own_annotations_per_text(
 ) -> None:
     """Issue 422: one idempotent PUT per text; None follows the project again."""
     template = f"{P}/texts/{{case_id}}/{{language}}/annotations-per-text"
-    for value in (4, None):
+    for value in (4, 20, None):
         await call(
             mcp_client,
             "set_annotations_per_text",
@@ -463,6 +463,7 @@ async def test_a_text_gets_its_own_annotations_per_text(
     sent = fake.calls_to("PUT", template)
     assert [c.json() for c in sent] == [
         {"value": 4, "reason": "method comparison"},
+        {"value": 20, "reason": "method comparison"},
         {"value": None, "reason": "method comparison"},
     ]
     assert str(sent[0].request.url).endswith(
@@ -476,7 +477,7 @@ async def test_a_text_gets_its_own_annotations_per_text(
                 "project": "p",
                 "case_id": "c",
                 "language": "de",
-                "annotations_per_text": 6,
+                "annotations_per_text": 21,
             },
         )
 

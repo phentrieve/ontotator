@@ -5973,7 +5973,7 @@
             "required": true,
             "schema": {
               "type": "integer",
-              "maximum": 5,
+              "maximum": 20,
               "minimum": 1,
               "title": "Annotations Per Text"
             }
@@ -12620,7 +12620,7 @@
             "anyOf": [
               {
                 "type": "integer",
-                "maximum": 5.0,
+                "maximum": 20.0,
                 "minimum": 1.0
               },
               {
@@ -12701,7 +12701,7 @@
             "anyOf": [
               {
                 "type": "integer",
-                "maximum": 5.0,
+                "maximum": 20.0,
                 "minimum": 1.0
               },
               {
@@ -25708,7 +25708,7 @@
             "anyOf": [
               {
                 "type": "integer",
-                "maximum": 5.0,
+                "maximum": 20.0,
                 "minimum": 1.0
               },
               {

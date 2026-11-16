@@ -176,7 +176,7 @@ def test_refusals(tmp_path):
     env = proposal_env(tmp_path, per_text=1)
     unknown = _put(env, 2, case="nope")
     assert unknown.status_code == 404 and unknown.json()["code"] == "DOCUMENT_NOT_FOUND"
-    assert _put(env, 6).status_code == 422
+    assert _put(env, 21).status_code == 422  # issue 447: 1 to 20
     assert _put(env, 0).status_code == 422
     assert (
         env.lead.put(
