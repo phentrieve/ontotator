@@ -255,3 +255,196 @@ test.describe("the open tree follows the selection", () => {
     await expect(panel).toHaveCount(0);
   });
 });
+
+// A desktop and a phone window, each with its own users. No console error and no horizontal scroll at any step.
+// COPY_TREE_SHOTS=<directory> saves a screenshot of each changed screen.
+const SIZES = [
+  { name: "desktop", width: 1440, height: 900 },
+  { name: "phone", width: 390, height: 844 },
+] as const;
+
+function consoleErrors(page: Page): string[] {
+  const errors: string[] = [];
+  page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
+  page.on("pageerror", error => errors.push(error.message));
+  return errors;
+}
+
+async function expectNoSidewaysScroll(page: Page) {
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
+}
+
+async function shot(page: Page, name: string) {
+  await expectNoSidewaysScroll(page);
+  const directory = process.env.COPY_TREE_SHOTS;
+  if (directory) await page.screenshot({ path: `${directory}/${name}.png` });
+}
+
+for (const size of SIZES) {
+  const phone = size.name === "phone";
+  /** At phone width one pane shows at a time; a wide window has no pane tabs. */
+  const pane = async (page: Page, name: "Document" | "Findings" | "Details") => {
+    if (phone) await page.getByRole("navigation", { name: "Select view" }).getByRole("button", { name: name === "Findings" ? /^Findings/ : name }).click();
+  };
+
+  /** The first finding of the text; at phone width the term search opens from the "New finding" bar. */
+  const annotateHere = async (page: Page, start: number, end: number, query: string, termId: string) => {
+    await selectText(page, start, end);
+    if (phone) await page.getByRole("group", { name: "New finding", exact: true }).getByRole("button", { name: "Choose term", exact: true }).click();
+    await search(page).fill(query);
+    await page.locator(".candidate-card").filter({ hasText: termId }).click();
+    await expect(revision(page)).toHaveAttribute("title", "Revision 1");
+  };
+
+  test.describe(`${size.width} px: copy text and the tree that closes`, () => {
+    test.beforeEach(async ({ page, browserName }) => {
+      await allowClipboard(page, browserName);
+      await page.setViewportSize({ width: size.width, height: size.height });
+    });
+
+    test("'Copy text' and Ctrl+C copy the passage of a new finding and of a mention", async ({ page, browserName }) => {
+      const errors = consoleErrors(page);
+      await importPackage(page, "", FIXTURE, `copy-${size.name}`);
+      await openCase(page, { task: "annotate" });
+
+      await selectText(page, 14, 21);
+      if (phone) {
+        // The text stays in view; the "New finding" bar holds the button, as an icon.
+        const bar = page.getByRole("group", { name: "New finding", exact: true });
+        const icon = bar.getByRole("button", { name: "Copy text" });
+        // The workspace is as high as the window and starts under the header: the bar shows once the header scrolled away.
+        await bar.scrollIntoViewIfNeeded();
+        await expect(icon).toBeInViewport({ ratio: 1 });
+        await shot(page, `${size.name}-new-finding-bar`);
+        await resetClipboard(page);
+        await icon.click();
+        await expect.poll(() => clipboard(page)).toBe("seizure");
+        await shot(page, `${size.name}-new-finding-bar-copied`);
+        await bar.getByRole("button", { name: "Choose term" }).click();
+      }
+      await expect(search(page)).toBeVisible();
+      const panel = page.locator(".inspector-pane");
+      const button = panel.getByRole("button", { name: /^(Copy text|Copied)$/ });
+      await expect(button).toBeInViewport({ ratio: 1 });
+      await shot(page, `${size.name}-new-finding`);
+      await resetClipboard(page);
+      await button.click();
+      await expect(button).toHaveAccessibleName("Copied");
+      await expect.poll(() => clipboard(page)).toBe("seizure");
+      await shot(page, `${size.name}-new-finding-copied`);
+      await expect(button).toHaveAccessibleName("Copy text", { timeout: 4000 });
+
+      // Ctrl+C in the search field, nothing selected in it or on the page: the marked text, not the query.
+      await search(page).fill("Seiz");
+      await search(page).press("End");
+      await page.evaluate(() => window.getSelection()?.removeAllRanges());
+      expect(await page.evaluate(() => window.getSelection()?.toString())).toBe("");
+      await copyByKeyboard(page, browserName, "seizure");
+      // Text selected in the field is copied as usual.
+      await search(page).fill("Status epi");
+      await search(page).evaluate((field: HTMLInputElement) => field.setSelectionRange(0, 6));
+      await copyByKeyboard(page, browserName, "Status");
+
+      // The saved finding: the button at its mention card, and Ctrl+C with the focus in the list.
+      await search(page).fill("Seizure");
+      await page.locator(".candidate-card").filter({ hasText: SEIZURE }).click();
+      await expect(revision(page)).toHaveAttribute("title", "Revision 1");
+      await pane(page, "Details");
+      const card = page.locator(".mention-card").first();
+      await card.scrollIntoViewIfNeeded();
+      await expectCopyButton(page, card, "seizure");
+      await page.getByRole("button", { name: "Add segment", exact: true }).click();
+      await pane(page, "Document");
+      await selectText(page, 0, 9);
+      await expect(revision(page)).toHaveAttribute("title", "Revision 2");
+      await page.evaluate(() => window.getSelection()?.removeAllRanges());
+      // The finding is still selected: with the focus in the list and nothing selected on the page.
+      await pane(page, "Findings");
+      await ownAnnotations(page).first().focus();
+      await copyByKeyboard(page, browserName, "Hypotonia seizure");
+      await pane(page, "Details");
+      await card.scrollIntoViewIfNeeded();
+      await resetClipboard(page);
+      const mentionButton = card.getByRole("button", { name: /^(Copy text|Copied)$/ });
+      await mentionButton.click();
+      await expect(mentionButton).toHaveAccessibleName("Copied");
+      await expect.poll(() => clipboard(page)).toBe("Hypotonia seizure");
+      await shot(page, `${size.name}-mention-copied`);
+      // The other buttons of the card did not move for the longer or shorter label.
+      const before = await card.locator(".mention-card__actions").boundingBox();
+      await expect(mentionButton).toHaveAccessibleName("Copy text", { timeout: 4000 });
+      expect(await card.locator(".mention-card__actions").boundingBox()).toEqual(before);
+      await shot(page, `${size.name}-mention`);
+      expect(errors).toEqual([]);
+    });
+
+    test("the tree closes on a proposal and on no selection; 'Show in tree' opens it again", async ({ page }) => {
+      const errors = consoleErrors(page);
+      await importPackage(page, "", FIXTURE, `tree-${size.name}`, { proposals: true });
+      await openCase(page, { task: "annotate" });
+      await annotateHere(page, 30, 31, "Hearing", HEARING);
+      await pane(page, "Details");
+      await showInTree(page).click();
+      await expect(treeItem(page, HEARING)).toHaveAttribute("aria-current", "true");
+      await shot(page, `${size.name}-tree-open`);
+
+      await pane(page, "Findings");
+      await page.locator(".sidebar .doc-item").filter({ hasText: "HP:0001252" }).click();
+      await pane(page, "Details");
+      await expect(page.getByLabel(/Proposal details/i)).toBeVisible();
+      await expect(treePanel(page)).toHaveCount(0);
+      await expect(page.locator(".tree-host")).toHaveCount(0);
+      await shot(page, `${size.name}-tree-closed-proposal`);
+
+      await pane(page, "Findings");
+      await ownAnnotations(page).filter({ hasText: HEARING }).click();
+      await pane(page, "Details");
+      await expect(page.locator(".inspector-pane h2")).toContainText(HEARING);
+      await expect(treePanel(page)).toHaveCount(0);
+      await showInTree(page).click();
+      await expect(treeItem(page, HEARING)).toHaveAttribute("aria-current", "true");
+
+      await page.getByRole("button", { name: "Clear selection" }).click();
+      await expect(treePanel(page)).toHaveCount(0);
+      await expect(page.locator(".tree-host")).toHaveCount(0);
+      await shot(page, `${size.name}-tree-closed-no-selection`);
+
+      await pane(page, "Findings");
+      await ownAnnotations(page).filter({ hasText: HEARING }).click();
+      await pane(page, "Details");
+      await showInTree(page).click();
+      await expect(treePanel(page)).toBeVisible();
+      await expect(treeItem(page, HEARING)).toHaveAttribute("aria-current", "true");
+      expect(errors).toEqual([]);
+    });
+
+    test("the tree closes on a reference; 'Show in tree' opens it again", async ({ page }) => {
+      const errors = consoleErrors(page);
+      await loginAs(page, `tree-ref-${size.name}`, [SCENARIO_B], { proposals: true });
+      await page.goto(`/#/?project=${SCENARIO_B}`);
+      await openCase(page, { task: "annotate", projectKey: SCENARIO_B });
+      await annotateHere(page, 4, 11, "Seizure", SEIZURE);
+      await pane(page, "Details");
+      await showInTree(page).click();
+      await expect(treeItem(page, SEIZURE)).toHaveAttribute("aria-current", "true");
+
+      await pane(page, "Findings");
+      await page.getByRole("button", { name: /MONDO:0005027/ }).click();
+      await pane(page, "Details");
+      await expect(page.getByLabel(/Reference details/i)).toBeVisible();
+      await expect(treePanel(page)).toHaveCount(0);
+      await expect(page.locator(".tree-host")).toHaveCount(0);
+      await shot(page, `${size.name}-tree-closed-reference`);
+
+      await pane(page, "Findings");
+      await ownAnnotations(page).first().click();
+      await pane(page, "Details");
+      await expect(treePanel(page)).toHaveCount(0);
+      await showInTree(page).click();
+      await expect(treePanel(page)).toBeVisible();
+      await expect(treeItem(page, SEIZURE)).toHaveAttribute("aria-current", "true");
+      await expectNoSidewaysScroll(page);
+      expect(errors).toEqual([]);
+    });
+  });
+}
