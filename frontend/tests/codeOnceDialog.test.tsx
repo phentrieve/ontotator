@@ -2,7 +2,7 @@ import { StrictMode, useState } from "react";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CodeOnceDialog, handoverText, type CodeOnceDialogProps } from "../src/admin/CodeOnceDialog";
+import { CodeOnceDialog, handoverText, validityText, type CodeOnceDialogProps } from "../src/admin/CodeOnceDialog";
 import { formatDateTime } from "../src/app/labels";
 
 const props = { open: true, kind: "setup" as const, code: "single-use-code-123", expires_at: "2026-10-16T12:30:00Z" };
@@ -189,6 +189,26 @@ describe("one-time code dialog", () => {
     expect(text).toContain(`Code: ${props.code}`);
     expect(text).toContain(formatDateTime(props.expires_at));
     expect(screen.getByRole("button", { name: "Copy" })).toBeDefined();
+  });
+
+  it("states the real expiry of the server response instead of a fixed lifetime", () => {
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-11-16T13:05:00Z"));
+    const expires = "2026-11-23T13:05:00Z";
+    const view = render(<CodeOnceDialog {...props} expires_at={expires} onClose={vi.fn()} />);
+    const line = screen.getByRole("dialog").querySelector("time")!.parentElement!;
+    expect(line.textContent).toBe(`This code works once and expires in 7 days, on ${formatDateTime(expires)} (local time).`);
+    expect(screen.getByRole("dialog").textContent).not.toContain("24 hours");
+    view.unmount();
+    render(<CodeOnceDialog {...props} kind="reset" expires_at="2026-11-16T15:05:00Z" onClose={vi.fn()} />);
+    expect(screen.getByRole("dialog").querySelector("time")!.parentElement!.textContent).toContain("expires in 2 hours, on ");
+  });
+
+  it("words the remaining time in hours below two days and in days from then on", () => {
+    const now = Date.parse("2026-11-16T12:00:00Z");
+    const after = (hours: number) => validityText(new Date(now + hours * 3_600_000).toISOString(), now);
+    expect([0.2, 1, 2, 24, 47].map(after)).toEqual(["1 hour", "1 hour", "2 hours", "24 hours", "47 hours"]);
+    expect([48, 72, 168, 720].map(after)).toEqual(["2 days", "3 days", "7 days", "30 days"]);
+    expect(handoverText({ ...props, expires_at: new Date(now + 168 * 3_600_000).toISOString() }, "https://x.example/", now)).toContain("valid for about 7 days, until");
   });
 
   it("states the lifetime in hours", () => {

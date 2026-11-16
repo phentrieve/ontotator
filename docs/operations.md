@@ -138,7 +138,7 @@ Confirm sign-in still works, then remove `secrets/app/admin-password-hash` using
 
 ## Users, ontologies and projects
 
-Run administrative commands inside app; they inherit its application-role database configuration and `/data`. They act directly on the database and audit the CLI operator. No SMTP service is used. Setup/reset codes are printed once: give them to the user out of band. Setup codes last 24 hours; reset codes last 2 hours. Codes are groups of four letters and digits without look-alikes (no I, L, O, U); case, spaces and hyphens do not matter when typed.
+Run administrative commands inside app; they inherit its application-role database configuration and `/data`. They act directly on the database and audit the CLI operator. No SMTP service is used. Setup/reset codes are printed once: give them to the user out of band. Setup codes last 7 days by default (`ONTOTATOR_SETUP_CODE_HOURS`, see [Setup and reset codes](#setup-and-reset-codes)); reset codes last 2 hours. Codes are groups of four letters and digits without look-alikes (no I, L, O, U); case, spaces and hyphens do not matter when typed.
 
 ```bash
 docker compose exec ontotator_app ontotator admin users create alice --display-name 'Alice A.'
@@ -214,6 +214,18 @@ docker compose exec -T ontotator_app cat /tmp/edits.jsonl > ./edits.jsonl
 The server keeps the file of an export (annotation results, final results, Phenopackets, edit log, working time, translation reviews) for 24 hours after its job finished, as it keeps an archive (`ARCHIVE_RETENTION`), then deletes it at the next server start, export request, export download or archive request; the job stays in the project's job list without a download, its download answers 410 and its result records `file_deleted_at`. A file that a newer export within its 24 hours, an upload or an import also uses stays. `admin export`, `export-edit-log` and `export-translation-reviews` on the command line delete the server's copy once they have written the file.
 
 The worker runs queued jobs in order across all projects, so one person may have at most 3 queued jobs at a time (`MAX_QUEUED_JOBS_PER_USER`): uploads, upload commits, exports and project archive jobs. One more is refused with `JOB_QUEUE_LIMIT` (HTTP 429, `Retry-After: 30`) and nothing is stored; jobs that are already running do not count. Jobs started on the command line and the annotation carry-over jobs the server queues after an accepted upload or translation review are never refused.
+
+### Setup and reset codes
+
+| Setting | Default | Allowed | Meaning |
+| --- | --- | --- | --- |
+| `ONTOTATOR_SETUP_CODE_HOURS` | `168` (7 days) | whole number from `1` to `720` (30 days) | How long the setup code of a new account is valid, in hours. |
+
+The setting applies to every setup code issued after it is set: **New user…** and a new code for a person who never set a password on the Users page, the same calls of the API and the MCP server, and `ontotator admin users create` and `reset-code`. Set it in the environment of the app (`.env.docker` of the Compose stack, which the `ontotator` command inside the container inherits) and restart the app; it cannot be changed in the browser. The server does not start with a value outside the range, and the command line refuses with `SETTINGS_INVALID` and creates nothing. A code that was already issued keeps the expiry it was stored with, so a shorter value does not end codes handed out before. The dialog on the Users page, the hand-over text and the command line state the real expiry of each code.
+
+Reset codes always last 2 hours and have no setting: a reset code opens an existing account with its work.
+
+Security: a longer validity widens the time in which a setup code that leaked (a forwarded message, a shared mailbox, a screenshot) can be used to take over the new account. What limits this stays as it is: a code works once, a newer code for the same person cancels the older one, the server stores only a hash of it, and a setup code opens an account that holds no work yet. If a code may have leaked, issue a new one for the person on the Users page or with `reset-code`; if a person reports that their code is refused although it has not expired, someone else may have used it: look at the history of the account on the Users page and deactivate it when in doubt. Choose a shorter value when codes travel by channels you do not trust.
 
 ## Move a project to another server
 

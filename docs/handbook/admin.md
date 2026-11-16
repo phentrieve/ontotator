@@ -66,7 +66,7 @@ What for: let a person set their own password. Codes are shown only once.
 
 ![Setup code dialog with the hand-over text open and the confirmation box](images/admin-setup-code.png)
 
-You cannot close the dialog or leave the page until the box is ticked. Setup codes last 24 hours, reset codes 2 hours. The person then uses **I have a setup or reset code** on the login page, see [Getting started](getting-started.md#set-your-password-with-a-setup-or-reset-code).
+You cannot close the dialog or leave the page until the box is ticked. The dialog and the hand-over text say when the code expires: a setup code lasts 7 days by default (whoever runs the server can change this, see `ONTOTATOR_SETUP_CODE_HOURS` in docs/operations.md), a reset code always 2 hours. The person then uses **I have a setup or reset code** on the login page, see [Getting started](getting-started.md#set-your-password-with-a-setup-or-reset-code).
 
 ## Issue a new setup or reset code
 

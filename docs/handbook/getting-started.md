@@ -12,7 +12,7 @@ This chapter is for everyone. It shows how to log in, find your tasks and keep y
 
 What for: your first login, or a new password after an administrator reset it.
 
-Before you start: you need a setup or reset code from your administrator. A code works once. Setup codes expire after 24 hours, reset codes after 2 hours.
+Before you start: you need a setup or reset code from your administrator. A code works once. Setup codes expire after 7 days by default (your administrator can change this; the message with your code says when it expires), reset codes after 2 hours.
 
 1. Open the address of your Ontotator server in your browser. You see the login screen.
 2. Click **I have a setup or reset code**. The form **Set your password** opens.

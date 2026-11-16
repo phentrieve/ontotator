@@ -57,7 +57,7 @@ Thirty medical students join `nephro-2027` for three months. Dr. Weber gets a sp
 | Repeat the call after a network error without duplicates | (tool reads the user list first) | `admin` | `create_users` skips existing usernames | added in this PR |
 | One bad row does not stop the others | | | `create_users` reports `refused` per person | added in this PR |
 | Keep the 30 codes out of the conversation | | | `codes_path`: CSV, mode 0600, inside `ONTOTATOR_MCP_FILES_DIR` | added in this PR |
-| Renew codes that lapsed after 24 hours | `POST /admin/users/{username}/reset-code` | `admin` | `issue_setup_codes` (only for people who never set a password, unless asked) | added in this PR |
+| Renew setup codes that lapsed (after 7 days by default) | `POST /admin/users/{username}/reset-code` | `admin` | `issue_setup_codes` (only for people who never set a password, unless asked) | added in this PR |
 | Who has not activated the account yet | `GET /admin/users/` (`setup_pending`, `last_login_at`) | `admin` | `list_users` | covered |
 | Give existing accounts a role in the project | `PUT P/members/{username}` | `project-admin` | `set_member_roles`, one call per person | covered (no bulk route; remaining gap: minor) |
 | Share the 200 letters among the 30 | `POST P/assignments/batch` (`mode: split`) | `read`, `project-admin` | `distribute_texts` (at most 50 people per call) | covered |

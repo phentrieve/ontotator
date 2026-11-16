@@ -208,7 +208,8 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         Usernames the server already has are skipped and reported in
         ``existing``, so the call can be repeated safely; a failure of one
         person is reported in ``refused`` and the others go on. Each person
-        sets a password with the setup code (valid 24 hours) on the login
+        sets a password with the setup code (valid 7 days unless the
+        server sets another time; expires_at says until when) on the login
         page; issue_setup_codes renews lapsed ones. With codes_path the
         codes are WRITTEN TO A LOCAL CSV FILE (readable by the user only)
         inside the folders of ONTOTATOR_MCP_FILES_DIR instead of being

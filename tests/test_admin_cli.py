@@ -7,6 +7,7 @@ import json
 import os
 import re
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -66,6 +67,33 @@ def _recovery_file(tmp_path: Path, password_hash: str) -> Path:
     if os.name == "posix":
         path.chmod(0o600)
     return path
+
+
+def test_setup_codes_follow_the_validity_setting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def hours_left(result: Result) -> float:
+        match = re.search(r"valid until (\S+ \S+) UTC", result.output)
+        assert match is not None, result.output
+        until = datetime.strptime(match.group(1), "%Y-%m-%d %H:%M").replace(tzinfo=UTC)
+        return (until - datetime.now(UTC)).total_seconds() / 3600
+
+    default = _admin(tmp_path, "users", "create", "alice", "--display-name", "A")
+    assert 167.9 < hours_left(default) <= 168
+    monkeypatch.setenv("ONTOTATOR_SETUP_CODE_HOURS", "720")
+    created = _admin(tmp_path, "users", "create", "bob", "--display-name", "B")
+    assert 719.9 < hours_left(created) <= 720
+    monkeypatch.setenv("ONTOTATOR_SETUP_CODE_HOURS", "3")
+    reissued = _admin(tmp_path, "users", "reset-code", "bob")
+    assert _code(reissued, "Setup", "bob")
+    assert 2.9 < hours_left(reissued) <= 3
+
+    monkeypatch.setenv("ONTOTATOR_SETUP_CODE_HOURS", "a week")
+    refused = _admin(tmp_path, "users", "create", "carol", "--display-name", "C")
+    assert refused.exit_code == 1
+    assert "SETTINGS_INVALID: ONTOTATOR_SETUP_CODE_HOURS" in refused.output
+    accounts = AccountService(database_for(tmp_path / "editor.db"))
+    assert accounts.get_by_username("carol") is None
 
 
 def test_create_prints_the_pseudonym_and_a_single_use_code(tmp_path: Path) -> None:

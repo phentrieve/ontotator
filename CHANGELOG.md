@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Setup codes of new accounts are valid for 7 days instead of 24 hours, and the server setting `ONTOTATOR_SETUP_CODE_HOURS` (whole hours from 1 to 720, default 168) changes this for every setup code issued afterwards: **New user…** and a new code for a person who never set a password on the Users page, the API, the MCP server and `ontotator admin users create` and `reset-code`. Codes already issued keep their expiry; reset codes stay at 2 hours. The dialog that shows a code says *This code works once and expires in 7 days, on …* from the server's expiry, and the hand-over text gives longer validities in days. A longer validity widens the time in which a leaked setup code can be used; codes stay single-use and a newer code cancels an older one (docs/operations.md, *Setup and reset codes*).
+
 ## [0.10.2] - 2026-11-14
 
 ### Added
