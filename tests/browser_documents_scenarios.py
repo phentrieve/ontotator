@@ -630,8 +630,9 @@ def build_s336f(app: FastAPI) -> dict[str, Any]:
     """Bulk Change final… and Accept agreeing results… (issue 336 step 2):
     eight en texts EN100022 to EN100029, two annotators per text. Tom Reis's
     submission is the final result of 22 to 26; afterwards R. Roe submitted
-    22, 23 and 24 (the newest submission there) and is assigned, not started,
-    on 26. Both submitted 27 and 28 without findings (full agreement, no
+    22 and 23 (the newest submission there, agreeing with Tom Reis) and 24
+    with a finding Tom Reis does not have (the submissions differ), and is
+    assigned, not started, on 26. Both submitted 27 and 28 without findings (full agreement, no
     final result); only Tom Reis submitted 29."""
     from t1_builders import native_unit
 
@@ -660,8 +661,14 @@ def build_s336f(app: FastAPI) -> dict[str, Any]:
     for case in ("EN100022", "EN100023", "EN100024", "EN100025", "EN100026"):
         final = submit(scenario, doc[case], "tom")
         select(scenario, doc[case], final["submission_id"])
-    for case in ("EN100022", "EN100023", "EN100024"):
+    for case in ("EN100022", "EN100023"):
         submit(scenario, doc[case], "roe")
+    from browser_overview_scenarios import add_findings
+
+    differing = assign(scenario, doc["EN100024"], "roe", "annotate")
+    started = start_round(scenario, differing, "roe")
+    add_findings(scenario, "roe", started.workspace_key, ["HP:0001250"])
+    finish_round(scenario, "roe", started.workspace_key)
     assign(scenario, doc["EN100026"], "roe", "annotate")
     for case in ("EN100027", "EN100028"):
         submit(scenario, doc[case], "tom")

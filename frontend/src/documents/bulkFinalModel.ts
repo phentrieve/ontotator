@@ -36,6 +36,7 @@ const CHANGE_SKIPS: Readonly<Record<string, string>> = {
   already_newest: "the final result already is the newest submission",
   not_newer: "nothing was submitted since the final result was chosen",
   own_result: "the newest submission is your own: another lead must choose it",
+  differ: "submissions differ: compare or consolidate first",
 };
 
 function skipGroups(skipped: readonly { case_id: string; language: string; reason: string; message: string }[], words: Readonly<Record<string, string>>): PreviewGroup[] {
@@ -106,10 +107,8 @@ export function finalConsequences(preview: FinalPreview): string[] {
     "Each text is recorded in its history like a single Accept result.",
     "This cannot be undone here; use Withdraw final… or Change final… in a text card.",
   ];
-  const uncompared = preview.data.changes.filter(item => item.kind === "annotation" && item.eligible_submissions > 1).length;
   return [
     `${plural(count, "text")} ${count === 1 ? "gets" : "get"} the newest submission as final result. The earlier final result stays in each text's history.`,
-    ...(uncompared ? [`In ${plural(uncompared, "text")} the newest submission is one of several annotations; it becomes final without comparing them.`] : []),
     "Warnings acknowledged for the earlier final results do not carry over. Final exports already made stay as they are.",
     "This cannot be undone here; Change final… in a text card sets one text back.",
   ];

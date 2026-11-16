@@ -135,6 +135,7 @@ CHANGE_SKIPS = {
     "not_newer": "Nothing was submitted since the final result was chosen.",
     "own_result": "The newest submission is your own; in this project another"
     " lead must choose it.",
+    "differ": "The submissions differ: compare or consolidate first.",
 }
 
 
@@ -567,8 +568,12 @@ class FinalResultService:
         newest eligible submission (the submissions the final panel offers
         on the current version: the last one of each submitted annotation
         and of each submitted consolidation) is another one than the final,
-        was submitted after the final result was chosen, and is one the
-        caller may choose. A submission that was already there when a lead
+        was submitted after the final result was chosen, is one the caller
+        may choose, and is a consolidation, the text's only eligible
+        submission, or an annotation that agrees in full with the text's
+        other eligible submissions (the rule of ``accept_agreeing``: notes,
+        spans, modifiers and unresolved findings included). Submissions that
+        differ and were not consolidated never replace a final result. A submission that was already there when a lead
         chose the final result never replaces it: that choice was made
         knowing it. Every other selected text is skipped
         with the reason. ``rows`` the project does not have are left out
@@ -616,6 +621,20 @@ class FinalResultService:
                 )
             )
         }
+        # An annotation among several submissions replaces the final only
+        # when all of them agree in full; a consolidation compared them.
+        agreeing = document_row_panel.agreeing_rows(
+            conn,
+            pid,
+            ctx,
+            [
+                text
+                for text, pick in newest.items()
+                if pick is not None
+                and pick[1] > 1
+                and pick[0].consolidation_round is None
+            ],
+        )
         changes: list[dict[str, Any]] = []
         for (case_id, language), final in candidates:
             ref = {"case_id": case_id, "language": language}
@@ -632,6 +651,12 @@ class FinalResultService:
                 skipped.append(ref | {"reason": "not_newer"})
             elif facts.adjudicator_not_annotator and author == facts.viewer_pseudonym:
                 skipped.append(ref | {"reason": "own_result"})
+            elif (
+                candidate.consolidation_round is None
+                and eligible > 1
+                and (case_id, language) not in agreeing
+            ):
+                skipped.append(ref | {"reason": "differ"})
             else:
                 versions = {
                     v.document_id: v.version for v in ctx.by_row[(case_id, language)]

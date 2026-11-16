@@ -19,7 +19,7 @@ function changePreview(overrides: Partial<BulkChangeFinalView> = {}): BulkChange
   const view: BulkChangeFinalView = {
     project: "p", rule: "newest_submission", applied: false, texts: 8, change_count: 0, skipped_count: 0, skipped_by_reason: {},
     changes: [change("EN100022", "consolidation", roe, 3), change("EN100023"), change("EN100024", "annotation", tom, 2), change("EN100025", "annotation", roe), change("EN100026")],
-    skipped: [skip("EN100027", "already_newest"), skip("EN100028", "no_final"), skip("EN100029", "no_final")],
+    skipped: [skip("EN100027", "already_newest"), skip("EN100028", "no_final"), skip("EN100029", "no_final"), skip("EN100030", "differ")],
     preview_token: "sha256:c", ...overrides,
   };
   const reasons: Record<string, number> = {};
@@ -53,6 +53,7 @@ it("groups Change final… by the kind of the new result, with people, and the s
     "change: Use the newest annotation for 4 texts · Tom Reis 3, R. Roe 1",
     "skip: Skip 1 text · the final result already is the newest submission",
     "skip: Skip 2 texts · no final result yet: use Accept agreeing results… or the text card",
+    "skip: Skip 1 text · submissions differ: compare or consolidate first",
   ]);
   expect(groups[1].texts).toEqual(["EN100023 en", "EN100024 en", "EN100025 en", "EN100026 en"]);
   expect(finalSummaryText({ action: "change", data: changePreview() })).toBe("the final result of 5 texts");
@@ -75,12 +76,12 @@ it("groups Accept agreeing results…: accepted, skipped by reason, already fina
   expect(finalAppliedText({ action: "accept", data: acceptPreview() })).toBe("Accepted the results of 2 texts.");
 });
 
-it("the consequences say that there is no Undo and name uncompared annotations", () => {
+it("the consequences say that there is no Undo", () => {
   const lines = finalConsequences({ action: "change", data: changePreview() });
   expect(lines[0]).toBe("5 texts get the newest submission as final result. The earlier final result stays in each text's history.");
-  expect(lines[1]).toBe("In 1 text the newest submission is one of several annotations; it becomes final without comparing them.");
+  expect(lines).toHaveLength(3);
+  expect(lines.some(line => line.includes("without comparing"))).toBe(false);
   expect(lines.at(-1)).toBe("This cannot be undone here; Change final… in a text card sets one text back.");
-  expect(finalConsequences({ action: "change", data: changePreview({ changes: [change("a", "consolidation", roe, 3)] }) })).toHaveLength(3);
   expect(finalConsequences({ action: "accept", data: acceptPreview() }).at(-1)).toBe("This cannot be undone here; use Withdraw final… or Change final… in a text card.");
 });
 

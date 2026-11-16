@@ -235,14 +235,17 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
         a lead can choose on the text's current version (the last one of
         each submitted annotation and of each submitted consolidation), the
         newest becomes the final result when it was submitted after the
-        final result was chosen. The newest one is taken as it is:
-        with eligible_submissions above 1 and kind 'annotation' the other
-        annotations are not compared. Texts are skipped, with the reason,
+        final result was chosen and is a consolidation, the text's only
+        submission, or an annotation that agrees in full with the text's
+        other submissions (the rule of accept_agreeing_texts). Texts are
+        skipped, with the reason,
         when they have no final result, other work on them is open, nothing
         is submitted on the current version, the final result already is the
         newest submission, nothing was submitted since the final result was
-        chosen, or the newest is your own and the project forbids
-        choosing your own result. The dry run lists changes and skips and a
+        chosen, the newest is your own and the project forbids choosing
+        your own result, or the submissions differ and were not
+        consolidated (reason 'differ': compare them with set_final_result
+        or start_consolidation). The dry run lists changes and skips and a
         preview_token. Confirm with that token: every listed text changes,
         or none when anything changed since (then the answer is a fresh dry
         run, ``stale``). There is no undo: set_final_result changes one text

@@ -136,7 +136,8 @@ class BulkChangeFinalRequest(BaseModel):
     rows: list[RowRefView] = Field(min_length=1, max_length=MAX_SELECTED_ROWS)
     # The rule that picks each text's new final result. "newest_submission":
     # the newest submission the final panel offers on the current version,
-    # when it was submitted after the final result was chosen.
+    # when it was submitted after the final result was chosen and is a
+    # consolidation, the only submission, or agrees in full with the others.
     rule: Literal["newest_submission"] = "newest_submission"
     preview: bool = Field(default_factory=lambda: False)
     # With ``preview``: only the counts and the token, no lists.
@@ -168,7 +169,7 @@ class FinalChange(BaseModel):
     # Who submitted it.
     person: PersonRefView | None = None
     # Submissions the final panel offers on the text; above 1 for an
-    # annotation: the others are not compared.
+    # annotation: all of them agree in full.
     eligible_submissions: int
 
 
@@ -182,6 +183,7 @@ class FinalChangeSkip(BaseModel):
         "already_newest",
         "not_newer",
         "own_result",
+        "differ",
     ]
     message: str
 
@@ -416,11 +418,14 @@ def bulk_change_final(
     Rule ``newest_submission``: each selected text that has a final result
     gets its newest submission instead (of the submissions the final panel
     offers on the current version), when that one was submitted after the
-    final result was chosen. ``preview: true`` lists the texts that would
-    change, with the result each one gets, the texts skipped and why (no
-    final result, open work, nothing submitted, already the newest, nothing
-    submitted since the final was chosen, your own result where the project
-    forbids it) and a ``preview_token``.
+    final result was chosen and is a consolidation, the text's only
+    submission, or an annotation that agrees in full with the text's other
+    submissions (the rule of ``accept-agreeing``). ``preview: true`` lists
+    the texts that would change, with the result each one gets, the texts
+    skipped and why (no final result, open work, nothing submitted, already
+    the newest, nothing submitted since the final was chosen, your own
+    result where the project forbids it, submissions that differ) and a
+    ``preview_token``.
     Applying sends that token: every listed text changes, or none (409
     ``PREVIEW_STALE`` with a fresh ``preview`` in the details when anything
     changed, also a final result changed meanwhile). Each text is audited

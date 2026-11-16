@@ -1434,11 +1434,14 @@ export interface paths {
          *     Rule ``newest_submission``: each selected text that has a final result
          *     gets its newest submission instead (of the submissions the final panel
          *     offers on the current version), when that one was submitted after the
-         *     final result was chosen. ``preview: true`` lists the texts that would
-         *     change, with the result each one gets, the texts skipped and why (no
-         *     final result, open work, nothing submitted, already the newest, nothing
-         *     submitted since the final was chosen, your own result where the project
-         *     forbids it) and a ``preview_token``.
+         *     final result was chosen and is a consolidation, the text's only
+         *     submission, or an annotation that agrees in full with the text's other
+         *     submissions (the rule of ``accept-agreeing``). ``preview: true`` lists
+         *     the texts that would change, with the result each one gets, the texts
+         *     skipped and why (no final result, open work, nothing submitted, already
+         *     the newest, nothing submitted since the final was chosen, your own
+         *     result where the project forbids it, submissions that differ) and a
+         *     ``preview_token``.
          *     Applying sends that token: every listed text changes, or none (409
          *     ``PREVIEW_STALE`` with a fresh ``preview`` in the details when anything
          *     changed, also a final result changed meanwhile). Each text is audited
@@ -6191,7 +6194,7 @@ export interface components {
              * Reason
              * @enum {string}
              */
-            reason: "no_final" | "open_task" | "nothing_submitted" | "already_newest" | "not_newer" | "own_result";
+            reason: "no_final" | "open_task" | "nothing_submitted" | "already_newest" | "not_newer" | "own_result" | "differ";
             /** Message */
             message: string;
         };

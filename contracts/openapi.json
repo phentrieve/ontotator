@@ -4271,7 +4271,7 @@
           "final-results"
         ],
         "summary": "Bulk Change Final",
-        "description": "Change the final result of many texts by a rule (issue 336).\n\nRule ``newest_submission``: each selected text that has a final result\ngets its newest submission instead (of the submissions the final panel\noffers on the current version), when that one was submitted after the\nfinal result was chosen. ``preview: true`` lists the texts that would\nchange, with the result each one gets, the texts skipped and why (no\nfinal result, open work, nothing submitted, already the newest, nothing\nsubmitted since the final was chosen, your own result where the project\nforbids it) and a ``preview_token``.\nApplying sends that token: every listed text changes, or none (409\n``PREVIEW_STALE`` with a fresh ``preview`` in the details when anything\nchanged, also a final result changed meanwhile). Each text is audited\nlike a single change (``via: bulk_change_final``). There is no undo.",
+        "description": "Change the final result of many texts by a rule (issue 336).\n\nRule ``newest_submission``: each selected text that has a final result\ngets its newest submission instead (of the submissions the final panel\noffers on the current version), when that one was submitted after the\nfinal result was chosen and is a consolidation, the text's only\nsubmission, or an annotation that agrees in full with the text's other\nsubmissions (the rule of ``accept-agreeing``). ``preview: true`` lists\nthe texts that would change, with the result each one gets, the texts\nskipped and why (no final result, open work, nothing submitted, already\nthe newest, nothing submitted since the final was chosen, your own\nresult where the project forbids it, submissions that differ) and a\n``preview_token``.\nApplying sends that token: every listed text changes, or none (409\n``PREVIEW_STALE`` with a fresh ``preview`` in the details when anything\nchanged, also a final result changed meanwhile). Each text is audited\nlike a single change (``via: bulk_change_final``). There is no undo.",
         "operationId": "bulk_change_final_api_v1_projects__key__final_selections_bulk_change_post",
         "parameters": [
           {
@@ -18731,7 +18731,8 @@
               "nothing_submitted",
               "already_newest",
               "not_newer",
-              "own_result"
+              "own_result",
+              "differ"
             ],
             "title": "Reason"
           },

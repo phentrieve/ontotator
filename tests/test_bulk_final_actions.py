@@ -52,13 +52,8 @@ def _final(env: Any, case: str) -> None:
 
 def _newer(env: Any, case: str) -> None:
     """``case`` en: anno2 submits after the final was chosen."""
-    target = doc(case, "en")
-    seizure = span_of(env, target, "Neonatalzeit")
     submit_findings(
-        env,
-        assign(env, target, "anno2", "annotate"),
-        f"{case}-b",
-        [finding(f"{case}b1", SEIZURE, seizure)],
+        env, assign(env, doc(case, "en"), "anno2", "annotate"), f"{case}-b", []
     )
 
 
@@ -230,9 +225,45 @@ def test_a_submission_older_than_the_choice_does_not_replace_it(env):
     assert body["changes"] == []
     assert _skips(body) == [("c1", "en", "not_newer")]
     # A submission after the choice does replace it.
-    submit_findings(env, assign(env, doc("c1", "en"), "ana", "annotate"), "c1-c", [])
+    submit_findings(
+        env,
+        assign(env, doc("c1", "en"), "ana", "annotate"),
+        "c1-c",
+        [finding("c1c1", SEIZURE, span_of(env, doc("c1", "en"), "Neonatalzeit"))],
+    )
     [change] = preview(env, ("c1", "en"))["changes"]
     assert (change["submission_id"], change["eligible_submissions"]) == ("c1-c", 3)
+
+
+def test_differing_submissions_are_skipped_and_agreeing_ones_change(env):
+    """An annotation among several replaces the final only when all of the
+    text's submissions agree in full; differing ones are left to the lead."""
+    # c1: the newer annotation has a finding the final does not have.
+    _final(env, "c1")
+    target = doc("c1", "en")
+    submit_findings(
+        env,
+        assign(env, target, "anno2", "annotate"),
+        "c1-b",
+        [finding("c1b1", SEIZURE, span_of(env, target, "Neonatalzeit"))],
+    )
+    # c2: the newer annotation agrees with the final.
+    _final_then_newer(env, "c2")
+    body = preview(env, ("c1", "en"), ("c2", "en"))
+    assert [c["case_id"] for c in body["changes"]] == ["c2"]
+    assert _skips(body) == [("c1", "en", "differ")]
+    [skip] = body["skipped"]
+    assert skip["message"] == "The submissions differ: compare or consolidate first."
+    applied = env.lead.post(
+        CHANGE,
+        json={
+            "rows": rows(("c1", "en"), ("c2", "en")),
+            "preview_token": body["preview_token"],
+        },
+    )
+    assert applied.status_code == 200, applied.text
+    finals = _finals(env)
+    assert (finals[("c1", "en")], finals[("c2", "en")]) == (("c1-a", 1), ("c2-b", 2))
 
 
 def test_own_result_is_skipped_where_the_project_forbids_it(env):

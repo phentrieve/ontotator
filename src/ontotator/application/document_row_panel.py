@@ -79,6 +79,7 @@ __all__ = [
     "NOT_ELIGIBLE",
     "Candidate",
     "agreeing_choices",
+    "agreeing_rows",
     "fill_agreement",
     "final_panel",
     "finding_of",
@@ -648,6 +649,41 @@ def agreeing_choices(
             },
         )
     return result
+
+
+def agreeing_rows(
+    conn: Connection,
+    pid: int,
+    ctx: _Context,
+    keys: Sequence[tuple[str, str]],
+) -> set[tuple[str, str]]:
+    """The rows of ``keys`` whose eligible submissions agree in full: all of
+    them are on the compared version, none is a consolidation, and every
+    consolidation group is ``match`` (the final panel's ``all_match`` and
+    ``agreeing_choices``, without asking who may accept). Bulk Change final…
+    (issue 336) asks this before an annotation replaces a final result. The
+    submissions of all rows are read in a fixed number of statements."""
+    comparisons = {key: row_comparison(ctx, *key) for key in keys}
+    compared = [
+        key
+        for key, item in comparisons.items()
+        if len(item.comparable) >= 2 and len(item.comparable) == len(item.eligible)
+    ]
+    if not compared:
+        return set()
+    wanted = [c.submission_id for key in compared for c in comparisons[key].comparable]
+    recorded_at = _recorded_at(conn, pid, wanted)
+    payloads = _payloads(conn, pid, wanted, strict=False)
+    profile, defaults = project_profile(conn, pid)
+    roles = project_roles(conn, pid, profile)
+    return {
+        key
+        for key in compared
+        if _full_agreement(
+            comparisons[key].comparable, recorded_at, payloads, profile, defaults, roles
+        )
+        is not None
+    }
 
 
 def newest_choices(

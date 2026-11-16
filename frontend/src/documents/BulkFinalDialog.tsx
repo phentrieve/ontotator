@@ -99,7 +99,7 @@ export function BulkFinalDialog({ projectKey, action, rows, onClose, onApplied }
       {notice && <InlineMessage tone="info">{notice}</InlineMessage>}
       {!confirming && (action === "accept"
         ? <p className="bulk-rule"><strong>Rule:</strong> a text without a final result gets one when at least two annotations are submitted, nothing else is open on it and all findings agree in full.</p>
-        : <p className="bulk-rule"><strong>Rule:</strong> a text&apos;s final result is replaced by its newest submission (an annotation or a consolidation on the current version) when that was submitted after the final result was chosen.</p>)}
+        : <p className="bulk-rule"><strong>Rule:</strong> a text&apos;s final result is replaced by its newest submission on the current version when that was submitted after the final result was chosen and is a consolidation, the only submission, or an annotation that agrees in full with the others.</p>)}
       {!preview && previewError === undefined && <p className="field-hint">{CHECKING}</p>}
       {previewError !== undefined && <><ErrorNotice error={previewError} /><Button size="sm" onClick={() => setReload(value => value + 1)}>Retry</Button></>}
       {preview && groups.length > 0 && <ul className="bulk-groups" aria-label="Preview">

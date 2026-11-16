@@ -42,25 +42,27 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
     expect(await noHorizontalScroll(page)).toBe(true);
     await shot(page, `336-final-menu-after${suffix}`);
 
-    // Change final…: the newest submission replaces the final result of three texts.
+    // Change final…: the newest submission replaces the final result of two texts; differing submissions are skipped.
     await menu.getByRole("menuitem", { name: "Change final…" }).click();
     const dialog = page.getByRole("dialog", { name: "Change final: 8 texts" });
     await expect(dialog.getByText("Rule:")).toBeVisible();
     const groups = dialog.getByRole("list", { name: "Preview" }).getByRole("listitem");
-    await expect(groups).toHaveCount(4);
-    await expect(groups.nth(0)).toContainText("Use the newest annotation for 3 texts · R. Roe 3");
-    await expect(groups.nth(0)).toContainText("EN100022 en, EN100023 en, EN100024 en");
-    await expect(groups.nth(1)).toContainText("Skip 1 text · the final result already is the newest submission");
-    await expect(groups.nth(2)).toContainText("Skip 1 text · other work on the text is still open");
-    await expect(groups.nth(3)).toContainText("Skip 3 texts · no final result yet: use Accept agreeing results… or the text card");
-    await expect(dialog.locator(".work-plan-summary")).toHaveText("Will change: the final result of 3 texts");
+    await expect(groups).toHaveCount(5);
+    await expect(groups.nth(0)).toContainText("Use the newest annotation for 2 texts · R. Roe 2");
+    await expect(groups.nth(0)).toContainText("EN100022 en, EN100023 en");
+    await expect(groups.nth(1)).toContainText("Skip 1 text · submissions differ: compare or consolidate first");
+    await expect(groups.nth(1)).toContainText("EN100024 en");
+    await expect(groups.nth(2)).toContainText("Skip 1 text · the final result already is the newest submission");
+    await expect(groups.nth(3)).toContainText("Skip 1 text · other work on the text is still open");
+    await expect(groups.nth(4)).toContainText("Skip 3 texts · no final result yet: use Accept agreeing results… or the text card");
+    await expect(dialog.locator(".work-plan-summary")).toHaveText("Will change: the final result of 2 texts");
     expect(await noHorizontalScroll(page)).toBe(true);
     await shot(page, `336-change-final-dialog-after${suffix}`);
 
-    const apply = dialog.getByRole("button", { name: "Change 3 final results" });
+    const apply = dialog.getByRole("button", { name: "Change 2 final results" });
     await apply.click();
     await expect(dialog.getByText("What happens")).toBeVisible();
-    await expect(dialog.getByText("In 3 texts the newest submission is one of several annotations; it becomes final without comparing them.")).toBeVisible();
+    await expect(dialog.getByText("without comparing")).toHaveCount(0);
     await expect(dialog.getByText("This cannot be undone here; Change final… in a text card sets one text back.")).toBeVisible();
     await expect(apply).toHaveAttribute("aria-disabled", "true");
     await dialog.getByLabel("I understand").check();
@@ -70,7 +72,7 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
     await apply.click();
     await expect(dialog).toBeHidden();
     const toast = page.locator(".ui-toast");
-    await expect(toast).toContainText("Changed the final result of 3 texts.");
+    await expect(toast).toContainText("Changed the final result of 2 texts.");
     await expect(toast.getByRole("button", { name: "Undo" })).toHaveCount(0);
     await expect(bar).toContainText("8 texts in 8 cases selected");
     expect(await noHorizontalScroll(page)).toBe(true);
