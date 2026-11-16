@@ -90,3 +90,4 @@
 .assign-step { font-weight: var(--weight-regular, 400); }
 .assign-step--done { color: var(--text-muted); }
 .assign-step--current { font-weight: var(--weight-strong); }
+.assign-limit-scope { display: grid; gap: var(--space-1); }

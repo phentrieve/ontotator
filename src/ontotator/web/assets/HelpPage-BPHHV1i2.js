@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-B9daEWh6.js";import{n as a,t as o}from"./lib-CBLPLp3Q.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-D1j0-TF3.js";import{n as a,t as o}from"./lib-boWUId0i.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -223,7 +223,7 @@ You cannot deactivate your own account. In project member lists the person shows
 What for: check what was changed on an account and by whom.
 
 1. On **Users**, click **More…** in the row and choose **History**. For anonymised accounts, click the **History** button in the row.
-2. Read the table: **When**, **By**, **What**, **Whom**, **Project**, **Details**. **What** names the change in plain words, for example *Project settings changed*, *Final export created* or *Phenopackets created*. Research exports are listed too, for example *Edit log exported* or *Working time exported*.
+2. Read the table: **When**, **By**, **What**, **Whom**, **Project**, **Details**. **What** names the change in plain words, for example *Project settings changed*, *Final export created* or *Phenopackets created*. Research exports are listed too, for example *Edit log exported* or *Working time exported*. A text given its own number of annotators reads *Annotators per text changed for one text*, with the text, the old and new value and the project value under **Details**.
 3. Changes made with an API token name it under **Details** (*Via API token*); the single requests a token made are left out here. The dialog shows the newest 200 entries. For the whole trail, use the command \`ontotator admin audit\`, see [Server operations](../operations.md#users-ontologies-and-projects).
 
 ## Anonymise a deactivated account
@@ -248,7 +248,7 @@ What for: read what users report about error messages, pages that do not load, c
 3. Read a report. It shows its reference (for example *TR-12*), the user's text, who sent it and when. Below are the details Ontotator added: app version, the task if it was sent from one (its kind, for example *Annotation, from proposals*, the project and the text; for a practice task only *A practice task*, as practice projects are private), screen, browser, window size, the last error the app received and, from the crash message, the error.
 4. Click **Mark as done** when the report is handled. Click **Reopen** to open it again.
 
-Users send reports with **Technical problem…** in the sidebar or **Report a technical problem…** in the editor; see [Report a technical problem](getting-started.md#report-a-technical-problem). Their task is not paused, and project leads do not see these reports. A user can send at most 20 reports per hour.
+Users send reports with **Technical problem…** in the sidebar or **Report a technical problem…** in the editor; see [Report a technical problem](getting-started.md#report-a-technical-problem). Their task is not paused, and project leads do not see these reports. Each user sees their own reports and their status (*Open* or *Done*) under **Profile** › **My technical reports**, but not your name or the added details. A user can send at most 20 reports per hour.
 
 Reports stay inside Ontotator. Nothing goes out by e-mail or to GitHub. To open an issue, click **Copy report** and paste the text by hand. Remove clinical content and patient details first.
 
@@ -463,7 +463,7 @@ If the text was changed elsewhere, a **Revision conflict** notice appears; click
 | Diagonal hatching | A finding with the value **Absent**. |
 | Thicker underline | Overlapping findings. |
 | Frame | The finding you point at or selected. |
-| **AI** | Proposed by a tool. Point at the badge to see which tool. |
+| **AI** | Proposed by a tool. Point at the badge to see which tool. A proposal carried over to a corrected text version names the tool that proposed it. |
 | **Pending** | A proposal you have not decided yet. Decided proposals show **Confirmed**, **Rejected**, **Replaced** or **Unresolved**. |
 | **Being replaced** | A proposal with your copy from **Edit & Replace** that has no changes yet. |
 | **Defaults to confirm** | The finding still has prefilled values you have not confirmed. |
@@ -1454,7 +1454,7 @@ The header is the same on every page:
 - **Ontotator** on the left takes you to the start page.
 - The breadcrumb shows where you are, for example **My tasks** or **Documents**.
 - On the right are your display name, your pseudonym, your roles and **Log out**.
-- **Handbook** in the header opens this handbook inside the app. On the Documents, consolidation and translation review screens, **Help** opens the handbook section about that screen; in the editor it is **More** > **Help for this screen**. On the project forms, a link next to the task profile opens the section that explains it. Click a screenshot in the handbook to open it at full size in a new tab.
+- **Handbook** in the header opens this handbook inside the app. On the Documents, consolidation and translation review screens, **Help** opens the handbook section about that screen; in the editor it is **More** > **Help for this screen**. On the project forms, a link next to the task profile opens the section that explains it. In the text card, **How to use it** next to *Newer set available* opens the section on new tool proposals. Click a screenshot in the handbook to open it at full size in a new tab.
 - Below the chapter list, the handbook shows the app's version and commit, for example \`Ontotator 0.3.0 · commit cc65cea\`. Quote it when you report a problem.
 
 The sidebar lists **My tasks**, **Projects**, **Profile** and **Technical problem…** (see [Report a technical problem](#report-a-technical-problem)). The number after **My tasks** counts your open tasks, the same tasks as the **To do** tab; it updates as soon as you submit a text. Clicking **My tasks** or **Projects** loads your projects and the count again, so a project you were just added to shows up without reloading the page. Leads also see their project's pages (**Documents**, **Progress**, **Settings**, **Export**). System administrators also see **Administration** with **Users**, **Ontologies**, **Technical reports**, **New project** and **Server settings** (see [Administration](admin.md)). In the editor, the sidebar folds into **Sections**; click it to open it.
@@ -1466,13 +1466,24 @@ What for: tell the system administrators about an error message, a page that doe
 1. Click **Technical problem…** in the sidebar. In the editor, open **More** and choose **Report a technical problem…**. If a text cannot be displayed, the message *Something went wrong while displaying this text.* offers **Report a technical problem…** too, and so does *Something went wrong while displaying this page.* when another screen, such as My tasks or Documents, cannot be displayed.
 2. Under **What happened?**, write what you did and what you saw.
 3. Click **Send report**.
-4. The dialog shows a reference, for example *TR-12*. Quote it if you ask an administrator about your report.
+4. The dialog shows *Sent as TR-12.* (your reference). Quote it if you ask an administrator about your report. Click **See my reports** to open the list of your reports.
 
 The report goes to the system administrators, not to your project lead. Your task is not paused.
 
 Ontotator adds what the administrators need to find the cause: the app version, the task if you send it from one (its kind, the project and the text), the screen, your browser, the window size and the last error the app received. From the crash message it also adds the error. Open **Added automatically** to see it before you send.
 
 The report stays inside Ontotator; nothing is sent by e-mail or elsewhere. Do not write patient details beyond what is needed to describe the problem.
+
+### See your technical reports
+
+What for: look up a report you sent and whether it was handled.
+
+1. Click **Profile** in the sidebar and scroll to **My technical reports**. From the report dialog, click **My reports** (before sending) or **See my reports** (after sending).
+2. The table shows each report you sent, newest first: **Ref.** (for example *TR-12*), **Sent**, **What happened** (your text; open a long text to read all of it) and **Status**. If you sent 100 reports or more, the newest 100 are shown; click **Show older reports** below the table for the rest.
+
+**Open** means the administrators have not handled the report yet; **Done** means an administrator marked it as handled. Only you and the system administrators see your reports. Administrators do not answer in Ontotator; if you need an answer, contact an administrator and quote the reference.
+
+If you have typed text in the dialog, **My reports** does not close it: send or cancel the report first. The crash screens do not show these links.
 
 ## Switch project
 
@@ -1703,16 +1714,19 @@ An empty start is possible only before the first submission (**Start empty round
 
 A proposal set you import later is used only by annotation rounds that start after the import, for example for a new assignment of a text planned **Annotate from proposals**. A task keeps the proposals its round started with, also after **Reopen…** or a new round from a submission. Only a restart agreed on a problem report (**Agree clean restart…**) starts it again on the newest proposals.
 
+The text card shows which set a text's tasks work on: **Annotation** names it, for example *Proposals set 2026-10-02 (phentrieve 1.4), 24 proposals*, and adds *Newer set available: 2026-11-10* once a newer set of the text is imported. The note stays until every task of the text works on the newest set; until then the line names the older set still in use, and a person who is already on the newest set, or will start on it, has *newest set* in their row. Tasks that started before Ontotator recorded sets show *set not recorded*. The card offers no restart button yet.
+
 1. Import the new proposals in an Ontospan bundle ([Upload texts](lead-documents.md#upload-texts)). Only sets of kind \`tool_output\`, made entirely by tools, can be imported.
 2. For a text without assignments, assign it: it starts from the newest proposals.
 3. For one task already under way, its annotator can [report a text problem](annotator.md#report-a-text-problem) and you choose **Agree clean restart…** ([Decide on a problem report](lead-results.md#decide-on-a-problem-report)). The task starts a new round on the newest proposals; the earlier rounds stay in the history. Other people's tasks on the text keep their proposals.
+   Without a report, restart the task through the API or the MCP server: \`POST /api/v1/assignments/{id}/rounds\` with \`kind\` \`clean_restart\` and a \`reason\` (scope \`project-admin\`), or the MCP tool \`start_new_round\` with \`kind\` \`clean_restart\`, a \`reason\` and, after its dry run, \`confirm\`. The task ID is in the text card's **Details**. The current round and its draft are dropped; submitted work stays in the history. Afterwards the card names the newest set and *Newer set available* is gone once every task of the text is on it.
 4. To restart the whole text instead: open the text card, click **Annotation** and click **Change mode…**. Enter the **Reason** and click **Discard work and change mode** (or **Change mode**). The text is now from scratch, and the work on the whole text is discarded, submitted work included; the assignments are removed ([Change the annotation mode of one text](lead-documents.md#change-the-annotation-mode-of-one-text)). Then choose **From proposals** under **Annotation** and assign the text again.
 
-For a text with a final result this is not possible: **Change mode…** is refused with *A final result was chosen for this text, so its annotation mode stays.*
+For a text with a final result this is not possible: **Change mode…** is refused with *A final result was chosen for this text, so its annotation mode stays.* (error code \`ANNOTATION_MODE_FINAL_SELECTED\`). A final result cannot be withdrawn; to annotate such a text again, add annotators as in [More annotators on finished texts](#more-annotators-on-finished-texts).
 
 ### More annotators on finished texts
 
-1. Raise the limit: **Settings**, tab **Workflow**, **Annotators per text** ([Set annotators per text and the consolidation rules](lead-settings.md#set-annotators-per-text-and-the-consolidation-rules)).
+1. Raise the limit: **Settings**, tab **Workflow**, **Annotators per text** ([Set annotators per text and the consolidation rules](lead-settings.md#set-annotators-per-text-and-the-consolidation-rules)). For a few texts only, give them their own limit in the assign dialog instead: the info button (i), **Only for the selected text** ([Assign work for one text](lead-documents.md#assign-work-for-one-text)); the API and MCP do the same (\`PUT /api/v1/projects/{key}/texts/{case}/{language}/annotations-per-text\`, MCP \`set_annotations_per_text\`).
 2. For texts without a final result, assign as usual: select them and click **Assign annotation…**.
 3. Texts with a final result are left out of the assign dialog, for one text as for many: it says *This text is at another step of the plan.* Only the command line or the API add an annotator to such a text ([On the command line](#on-the-command-line)).
 4. When their submissions arrive, the row asks you to confirm the final result. To use another result, click **Change final…** and **Use as final** ([Change a final result](lead-results.md#change-a-final-result)), or start a consolidation.
@@ -1845,6 +1859,8 @@ The **Documents** page lists every text of the project and what it needs next. O
 
 A task starts with the person's first saved change; opening it is not enough, and neither is ticking checked sentences in a translation review. Until then **Translation** and **Annotation** read *assigned, not started* with the person's name, in the table (*not started* without the name below 1600 px), its tooltip, the narrow cards and the text card, where the person's row shows **Not started**. After the first save they read *in review* or *In progress*. With several people or parallel versions the cell counts them, for example *1 of 2 started*.
 
+The counts in **Annotation**, for example *0 of 1 submitted*, count only work on the newest version of the text. After a text change, a submission on the old version no longer counts: neither when it was carried to the new version, nor when the new version was started fresh. Carried work counts once it is submitted on the new version.
+
 ### Use the Documents tabs
 
 What for: work through texts by what they need.
@@ -1921,6 +1937,7 @@ In the card:
 - **Other languages** switches to another language of the same case. Below 700 px width it shares a line with **Open text**.
 - Your steps stand where they act. An open problem report is a notice above the path with **Open** and **Decide on report…**. Other steps stand at the top of their part under *Next step*, for example **Resolve…** in **Translation** or **Carry to v2…** in **Annotation**. A part's other actions share its action row, for example **Open result** and **Change final…** in **Finalization**.
 - Every person's remove action is **Remove…**. Its dialog says what happens: an unsubmitted annotation is removed with its draft; other work is revoked and stays in the history.
+- In **Annotation**, a text with tool proposals names the proposal set its annotators work on, for example *Proposals set 2026-10-02 (phentrieve 1.4), 24 proposals*. When a newer set was imported for the text and a task still works on an older one, the line names the older set and *Newer set available: 2026-11-10* follows, with **How to use it** ([Work from new tool proposals](lead-change-course.md#work-from-new-tool-proposals)); it goes away once every task of the text is on the newest set. Tasks that started before sets were recorded show *set not recorded*. A person's row names the set only when it differs from the text's, for example *newest set*.
 - In **Finalization**, **Open consolidation** opens your own running consolidation as your task; a submitted one opens read-only.
 - In **Finalization**, when submissions differ, the agreement line is followed by the findings that differ in detail; a term and its parent or child on the same passage are named as *Related terms: …* (see [Accept a result or compare results](lead-results.md#accept-a-result-or-compare-results)).
 - ✕ or Esc closes the card.
@@ -2036,7 +2053,7 @@ Once someone is assigned, started or submitted work, a line *Fixed: …* says wh
 - While the work is not submitted, remove the assignment ([Remove, reassign or reopen an assignment](#remove-reassign-or-reopen-an-assignment)), then choose.
 - To change it anyway, click **Change mode…** next to the line. The dialog names whose work is affected. Enter the **Reason**, then click **Change mode**, or **Discard work and change mode** if submitted work is discarded. Their assignments are removed. Discarded work is kept, not deleted: it no longer counts for progress, consolidation, the final result or exports.
 - The mode change always discards the work of the whole text, never of single people.
-- Once a final result is chosen, the mode stays: the dialog says *A final result was chosen for this text, so its annotation mode stays.* A final result can be changed but not withdrawn ([Change a final result](lead-results.md#change-a-final-result)).
+- Once a final result is chosen, the mode is locked: **Change mode…** is refused and the dialog says *A final result was chosen for this text, so its annotation mode stays.* The API and the MCP server refuse it with the error code \`ANNOTATION_MODE_FINAL_SELECTED\`. A final result can only be replaced with **Change final…**, never withdrawn, so the lock stays as long as the text has a final result ([Change a final result](lead-results.md#change-a-final-result)).
 - **Restore…** in the text card brings the discarded work back while no new annotation has started.
 
 **History** in the text card shows the change and its reason.
@@ -2090,7 +2107,12 @@ What for: assign a single review or annotation.
 2. Tick the people. To annotate yourself without the Annotator role, click **Add me as annotator**.
 3. Click the assign button, for example *Assign 2 people*.
 
-To change the limit of annotators per text from here, click the info button (i) next to the limit, then **Change for all texts**.
+To change the limit of annotators per text from here, click the info button (i) next to the limit and enter the number:
+
+- **Only for the selected text** (with several texts: **Only for the selected texts**) gives these texts their own limit, for example 4 annotators on one text for a method comparison in a project with 1. Click the button that names the number of texts, for example *Change for 1 text*. The text keeps its own value for every version, also a corrected one; the project setting and the other texts stay as they are. Entering the project's number again returns the text to the project setting. The popover then explains *Sets the most annotators for this text only (project: 1)*, and for a text that already has its own value its title reads, for example, *Up to 4 annotators for this text (project: 1)*.
+- **For all texts** changes the project setting. Click **Change for all texts**. Texts with their own value keep it.
+
+The text card then shows *Annotators: 4 for this text (project: 1)* in **Annotation**. Lowering the number removes nobody: annotators already assigned stay, and the popover says so, for example *This text already has more; its assignments stay.* Several selected texts change together or not at all. When the selected texts have different limits, the dialog says *limits differ*, lets you tick as many people as the text with the highest limit takes, and each text gets only as many as it has places; entering the project's number then returns every selected text to the project setting. The audit trail records a text's own value as *Annotators per text changed for one text*.
 
 ### Distribute work evenly
 
@@ -2236,7 +2258,7 @@ What for: pick another result after you already chose one.
 2. Click **Change final…** next to **Open result**.
 3. Click **Use as final** in the row of the result you want.
 
-A final result can only be replaced, never withdrawn. While a text has one, its annotation mode cannot be changed ([Change the annotation mode of one text](lead-documents.md#change-the-annotation-mode-of-one-text)).
+A final result can only be replaced, never withdrawn. While a text has one, its annotation mode cannot be changed: **Change mode…** is refused (error code \`ANNOTATION_MODE_FINAL_SELECTED\`) ([Change the annotation mode of one text](lead-documents.md#change-the-annotation-mode-of-one-text)).
 
 ## Translation and text-change decisions
 
@@ -2319,7 +2341,7 @@ What for: answer a report and let the work go on.
    - **Close report…** or **Close, keep paused…**: close it with an outcome for the reporter.
    - **Release pause…**: let paused tasks continue.
    - **Pause other tasks…**: pause other tasks on the same text or project.
-   - **Agree clean restart…**: restart the task with a new round, after agreeing with the reporter. The annotator's own findings are not carried over. A task from scratch starts empty; a task from proposals starts again on the newest proposal set of the text, all proposals open, so a newer tool set reaches the task this way.
+   - **Agree clean restart…**: restart the task with a new round, after agreeing with the reporter. The annotator's own findings are not carried over. A task from scratch starts empty; a task from proposals starts again on the newest proposal set of the text, all proposals open, so a newer tool set reaches the task this way. The text card's **Annotation** then names that set; *Newer set available* goes away once every task of the text works on it.
    - **Reopen report…**: open a closed report again.
 5. Confirm in the form that opens.
 6. Click **Back to Documents**, or go to the next decision.
@@ -2638,7 +2660,7 @@ What for: decide how many people annotate each text and who may consolidate.
 5. Tick **Hide annotator names during consolidation** if consolidators should decide without knowing who marked what. Off by default.
 6. Click **Save changes**.
 
-Lowering the number removes nobody; existing assignments stay.
+Lowering the number removes nobody; existing assignments stay. A text can have its own number instead, set in the assign dialog ([Assign work for one text](lead-documents.md#assign-work-for-one-text)); it keeps it when you change the project setting.
 
 With hidden names, a consolidator sees the annotators of a text as *Annotator A*, *Annotator B* and so on, in the order they submitted, instead of names or pseudonyms; the same letters are used in the consolidation, the full editor and the submitted work they read for it. A person keeps their letter in later consolidation rounds of the same task. The technical ids and checksums the consolidator's browser receives are scrambled too, so they cannot be used to work out who wrote a finding. Tool proposals keep their robot icon. You and other leads still see every name, and exports are unchanged. The change applies to every consolidation the next time it opens, also to one already started. The audit trail records the change as *Project settings changed*, with the setting named.
 

@@ -2244,6 +2244,68 @@
         "x-ontotator-scope": "session"
       }
     },
+    "/api/v1/me/technical-reports": {
+      "get": {
+        "tags": [
+          "technical-reports"
+        ],
+        "summary": "List Own Reports",
+        "description": "The caller's own reports, newest first: reference, text and status.",
+        "operationId": "list_own_reports_api_v1_me_technical_reports_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OwnTechnicalReportView"
+                  },
+                  "title": "Response List Own Reports Api V1 Me Technical Reports Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "session"
+      }
+    },
     "/api/v1/admin/technical-reports": {
       "get": {
         "tags": [
@@ -5987,6 +6049,134 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PlanRowResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/texts/annotations-per-text": {
+      "put": {
+        "tags": [
+          "work-plans"
+        ],
+        "summary": "Set Annotations Per Texts",
+        "description": "Several texts' own \"Annotations per text\" at once (issue 422).\n\nAll or nothing: one unknown text refuses the request. Each text is\ncompared with its own value; texts that already have it are unchanged.",
+        "operationId": "set_annotations_per_texts_api_v1_projects__key__texts_annotations_per_text_put",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationsPerTextBulkSet"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationsPerTextBulkResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/texts/{case_id}/{language}/annotations-per-text": {
+      "put": {
+        "tags": [
+          "work-plans"
+        ],
+        "summary": "Set Annotations Per Text",
+        "description": "One text's own \"Annotations per text\", target and limit (issue 422).\n\nIdempotent; ``value: null`` returns the text to the project value.\nAssignments above a lowered value stay.",
+        "operationId": "set_annotations_per_text_api_v1_projects__key__texts__case_id___language__annotations_per_text_put",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "language",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Language"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationsPerTextSet"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationsPerTextResult"
                 }
               }
             }
@@ -11476,6 +11666,178 @@
         ],
         "title": "AnnotationVersion"
       },
+      "AnnotationsPerTextBulkResult": {
+        "properties": {
+          "texts": {
+            "items": {
+              "$ref": "#/components/schemas/AnnotationsPerTextResult"
+            },
+            "type": "array",
+            "title": "Texts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "texts"
+        ],
+        "title": "AnnotationsPerTextBulkResult"
+      },
+      "AnnotationsPerTextBulkSet": {
+        "properties": {
+          "texts": {
+            "items": {
+              "$ref": "#/components/schemas/RowRefView"
+            },
+            "type": "array",
+            "maxItems": 200000,
+            "minItems": 1,
+            "title": "Texts"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 5.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "texts",
+          "value"
+        ],
+        "title": "AnnotationsPerTextBulkSet"
+      },
+      "AnnotationsPerTextResult": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "override": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Override"
+          },
+          "project_value": {
+            "type": "integer",
+            "title": "Project Value"
+          },
+          "effective": {
+            "type": "integer",
+            "title": "Effective"
+          },
+          "changed": {
+            "type": "boolean",
+            "title": "Changed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "override",
+          "project_value",
+          "effective",
+          "changed"
+        ],
+        "title": "AnnotationsPerTextResult"
+      },
+      "AnnotationsPerTextSet": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 5.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "title": "AnnotationsPerTextSet"
+      },
+      "AnnotationsPerTextView": {
+        "properties": {
+          "effective": {
+            "type": "integer",
+            "title": "Effective"
+          },
+          "project": {
+            "type": "integer",
+            "title": "Project"
+          },
+          "override": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Override"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "effective",
+          "project"
+        ],
+        "title": "AnnotationsPerTextView",
+        "description": "The text's \"Annotations per text\" (issue 422)."
+      },
       "AnnotatorPairAgreement": {
         "properties": {
           "macro_mean": {
@@ -12784,6 +13146,10 @@
             "type": "integer",
             "title": "Per Text"
           },
+          "project_per_text": {
+            "type": "integer",
+            "title": "Project Per Text"
+          },
           "digest": {
             "type": "string",
             "title": "Digest"
@@ -12809,6 +13175,7 @@
           "skipped",
           "people",
           "per_text",
+          "project_per_text",
           "digest"
         ],
         "title": "BatchPreview"
@@ -12846,6 +13213,28 @@
               }
             ],
             "title": "Document Id"
+          },
+          "assigned": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned"
+          },
+          "per_text": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Text"
           }
         },
         "type": "object",
@@ -12878,6 +13267,10 @@
             "type": "integer",
             "title": "Remaining"
           },
+          "per_text": {
+            "type": "integer",
+            "title": "Per Text"
+          },
           "usernames": {
             "items": {
               "type": "string"
@@ -12903,6 +13296,7 @@
           "document_id",
           "version",
           "remaining",
+          "per_text",
           "usernames"
         ],
         "title": "BatchTargetView"
@@ -16125,6 +16519,40 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/AnnotationModeView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proposal_set": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RowProposalSetView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "newer_proposal_set": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RowProposalSetView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proposal_set_unrecorded": {
+            "type": "boolean",
+            "title": "Proposal Set Unrecorded"
+          },
+          "annotations_per_text": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnnotationsPerTextView"
               },
               {
                 "type": "null"
@@ -20270,6 +20698,45 @@
         ],
         "title": "OtherActiveHold"
       },
+      "OwnTechnicalReportView": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "reference": {
+            "type": "string",
+            "title": "Reference"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "done"
+            ],
+            "title": "Status"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "reference",
+          "status",
+          "description",
+          "created_at"
+        ],
+        "title": "OwnTechnicalReportView",
+        "description": "One report as its reporter reads it (issue 269): what they wrote and\nwhether it is handled. No context, no administrator names."
+      },
       "PairAgreement": {
         "properties": {
           "annotation_strict_f1": {
@@ -23883,6 +24350,17 @@
           "code": {
             "type": "string",
             "title": "Code"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
           }
         },
         "additionalProperties": false,
@@ -25199,6 +25677,59 @@
           "active_hold_count"
         ],
         "title": "RowProblemReport"
+      },
+      "RowProposalSetView": {
+        "properties": {
+          "set_id": {
+            "type": "integer",
+            "title": "Set Id"
+          },
+          "imported_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Imported At"
+          },
+          "tool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool"
+          },
+          "tool_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Version"
+          },
+          "proposal_count": {
+            "type": "integer",
+            "title": "Proposal Count"
+          },
+          "newest": {
+            "type": "boolean",
+            "title": "Newest"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "set_id",
+          "imported_at",
+          "proposal_count",
+          "newest"
+        ],
+        "title": "RowProposalSetView",
+        "description": "An imported tool proposal set on one text version (issue 337)."
       },
       "RowRefView": {
         "properties": {
@@ -30396,6 +30927,20 @@
               }
             ],
             "title": "Annotation Mode"
+          },
+          "proposal_set": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RowProposalSetView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proposal_set_unrecorded": {
+            "type": "boolean",
+            "title": "Proposal Set Unrecorded"
           },
           "unreviewed_translation": {
             "type": "boolean",

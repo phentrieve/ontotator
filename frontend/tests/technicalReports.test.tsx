@@ -1,13 +1,14 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, type CurrentUser, type TechnicalReportView } from "../src/api/client";
+import { api, type CurrentUser, type OwnTechnicalReportView, type TechnicalReportView } from "../src/api/client";
 import { lastApiError, resetLastApiError } from "../src/api/lastError";
 import { CaseErrorBoundary } from "../src/app/ErrorBoundary";
 import { Shell } from "../src/app/Shell";
 import { TechnicalReportDialog } from "../src/reports/TechnicalReportDialog";
 import { reportFacts, reportText, TechnicalReportsPage } from "../src/reports/TechnicalReportsPage";
-import { reportContext } from "../src/reports/technicalReport";
+import { reportContext, TECHNICAL_REPORT_SENT } from "../src/reports/technicalReport";
+import { TechnicalReportsSection } from "../src/me/TechnicalReportsSection";
 
 const receipt = { id: 12, reference: "TR-12", created_at: "2026-11-01T10:00:00Z" };
 const jsonResponse = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -62,7 +63,9 @@ describe("Report a technical problem", () => {
     expect(send).not.toHaveBeenCalled();
     await input.type(screen.getByLabelText("What happened?"), "  The list does not load. ");
     await input.click(screen.getByRole("button", { name: "Send report" }));
-    expect(await screen.findByText("Sent to the administrators. Reference: TR-12.")).toBeDefined();
+    expect(await screen.findByText("Sent as TR-12.")).toBeDefined();
+    // Issue 269: the receipt links to Profile › My technical reports.
+    expect(screen.getByRole("link", { name: "See my reports" }).getAttribute("href")).toBe("#/me?section=technical-reports");
     const body = send.mock.calls[0][0];
     expect(body.description).toBe("The list does not load.");
     expect(body.context?.route).toBe("#/projects/p/documents");
@@ -94,9 +97,92 @@ describe("Report a technical problem", () => {
     expect((within(dialog).getByLabelText("What happened?") as HTMLTextAreaElement).value).toBe("");
     await input.type(within(dialog).getByLabelText("What happened?"), "Opened a task");
     await input.click(within(dialog).getByRole("button", { name: "Send report" }));
-    await screen.findByText(/Reference: TR-12/);
+    await screen.findByText("Sent as TR-12.");
+    // The app around the crash screen is broken: no link into it.
+    expect(screen.queryByRole("link", { name: "See my reports" })).toBeNull();
     expect(send.mock.calls[0][0].context?.crash_message).toBe("TypeError: Cannot read properties of undefined");
     expect(send.mock.calls[0][0].description).toBe("Opened a task");
+  });
+});
+
+describe("My reports link in the dialog (issue 269)", () => {
+  it("closes the dialog on the way to Profile, but not over typed text", async () => {
+    const close = vi.fn();
+    render(<TechnicalReportDialog onClose={close} />);
+    const input = userEvent.setup();
+    const link = screen.getByRole("link", { name: "My reports" });
+    expect(link.getAttribute("href")).toBe("#/me?section=technical-reports");
+    await input.type(screen.getByLabelText("What happened?"), "Half a sentence");
+    await input.click(link);
+    expect(close).not.toHaveBeenCalled();
+    expect(screen.getByText("Send or cancel this report first.")).toBeDefined();
+    expect(window.location.hash).toBe("#/projects/p/documents?q=secret");
+    await input.clear(screen.getByLabelText("What happened?"));
+    await input.click(link);
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(window.location.hash).toBe("#/me?section=technical-reports");
+  });
+});
+
+describe("Profile › My technical reports (issue 269)", () => {
+  const own = (extra: Partial<OwnTechnicalReportView> = {}): OwnTechnicalReportView => ({
+    id: 12, reference: "TR-12", status: "open", description: "Export hangs at 90 %", created_at: "2026-11-12T10:00:00Z", ...extra,
+  });
+
+  it("lists the own reports with their status and reloads after a report was sent", async () => {
+    const list = vi.spyOn(api, "listMyTechnicalReports").mockResolvedValue([
+      own(), own({ id: 7, reference: "TR-7", status: "done", description: "Tree does not load", created_at: "2026-11-02T10:00:00Z" }),
+    ]);
+    render(<TechnicalReportsSection />);
+    const table = await screen.findByRole("table", { name: "My technical reports" });
+    const rows = within(table).getAllByRole("row");
+    expect(within(rows[0]).getAllByRole("columnheader").map(cell => cell.textContent)).toEqual(["Ref.", "Sent", "What happened", "Status"]);
+    expect(rows[1].textContent).toContain("TR-12");
+    expect(rows[1].textContent).toContain("Export hangs at 90 %");
+    expect(within(rows[1]).getByText("Open")).toBeDefined();
+    expect(within(rows[2]).getByText("Done")).toBeDefined();
+    act(() => { window.dispatchEvent(new Event(TECHNICAL_REPORT_SENT)); });
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
+  });
+
+  it("offers older reports when the page is full and appends them without duplicates", async () => {
+    const page = Array.from({ length: 100 }, (_, index) => own({ id: 200 - index, reference: `TR-${200 - index}` }));
+    const list = vi.spyOn(api, "listMyTechnicalReports").mockResolvedValueOnce(page)
+      .mockResolvedValueOnce([own({ id: 101, reference: "TR-101" }), own({ id: 100, reference: "TR-100" }), own({ id: 99, reference: "TR-99" })]);
+    render(<TechnicalReportsSection />);
+    expect(await screen.findByText("Showing your newest 100 reports.")).toBeDefined();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Show older reports" }));
+    await screen.findByText("TR-99");
+    expect(list).toHaveBeenLastCalledWith(100);
+    expect(screen.getAllByText("TR-101")).toHaveLength(1);
+    expect(within(screen.getByRole("table", { name: "My technical reports" })).getAllByRole("row")).toHaveLength(103);
+    expect(screen.queryByRole("button", { name: "Show older reports" })).toBeNull();
+  });
+
+  it("requests one page and scrolls into view when the dialog's link is followed on the same address", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => jsonResponse(200, []));
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    try {
+      render(<><TechnicalReportsSection /><TechnicalReportDialog onClose={vi.fn()} /></>);
+      await screen.findByText("You have not reported a technical problem.");
+      expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/v1/me/technical-reports?limit=100&offset=0");
+      expect(scroll).not.toHaveBeenCalled();
+      await userEvent.setup().click(screen.getByRole("link", { name: "My reports" }));
+      expect(scroll).toHaveBeenCalledWith({ block: "start" });
+      expect(scroll.mock.contexts[0]).toBe(screen.getByRole("region", { name: "My technical reports" }));
+    } finally { delete (Element.prototype as Partial<Element>).scrollIntoView; }
+  });
+
+  it("folds a long text behind its first line and says when there is nothing", async () => {
+    vi.spyOn(api, "listMyTechnicalReports").mockResolvedValueOnce([own({ description: "First line\nSecond line" })]);
+    render(<TechnicalReportsSection />);
+    const summary = await screen.findByText("First line");
+    expect(summary.tagName).toBe("SUMMARY");
+    cleanup();
+    vi.spyOn(api, "listMyTechnicalReports").mockResolvedValueOnce([]);
+    render(<TechnicalReportsSection />);
+    expect(await screen.findByText("You have not reported a technical problem.")).toBeDefined();
   });
 });
 

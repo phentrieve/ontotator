@@ -378,12 +378,16 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
         reason: Annotated[str, Field(min_length=1)],
         confirm_language: bool = False,
     ) -> dict[str, Any]:
-        """Ask a translation reviewer to correct a rejected or queried translation.
+        """Ask for a new translation review of an accepted translation version.
 
-        Gives the person a translation review task on this version; an
-        earlier submitted review of theirs is reopened with the current
-        text (the submitted review stays). The correction itself is done
-        in the web interface.
+        For a correction or a second opinion of a version that is accepted,
+        however it was accepted (by a translation review, by a lead, or on
+        import); any translation reviewer, with a reason. A version that is
+        not accepted is refused (TRANSLATION_NOT_ACCEPTED). Gives the person a
+        translation review task on this version; an earlier submitted review
+        of theirs is reopened with the current text (the submitted review
+        stays). The review itself is done in the web interface. For a
+        rejected or queried translation, use start_lead_correction.
         """
         variant = await _variant(project, document_id)
         task: dict[str, Any] = await api.post(
@@ -536,6 +540,43 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
             annotations_per_text=annotations_per_text,
         )
         return preview
+
+    @register(server, scopes="project-admin", effect="changes", idempotent=True)
+    async def set_annotations_per_text(
+        project: Project,
+        case_id: str,
+        language: str,
+        annotations_per_text: Annotated[
+            int | None,
+            Field(
+                ge=1,
+                le=5,
+                description=(
+                    "The text's own number of annotators (target and limit),"
+                    " e.g. 4 for a method comparison; None returns the text to"
+                    " the project's annotations_per_text."
+                ),
+            ),
+        ],
+        reason: Annotated[str | None, Field(max_length=2000)] = None,
+    ) -> dict[str, Any]:
+        """Give one text (case + language) its own annotations per text.
+
+        It replaces the project value for that text, for every version, as
+        target and as limit; other texts keep the project value. Lowering
+        it removes nobody. Assign afterwards with assign_texts.
+        """
+        result: dict[str, Any] = await api.put(
+            project_path(
+                project,
+                "texts",
+                seg(case_id),
+                seg(language),
+                "annotations-per-text",
+            ),
+            {"value": annotations_per_text, "reason": reason},
+        )
+        return result
 
     @register(server, scopes=("read", "project-admin"), effect="destructive")
     async def move_task_to_version(

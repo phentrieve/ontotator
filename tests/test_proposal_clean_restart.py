@@ -125,3 +125,57 @@ def test_a_scratch_round_records_no_proposal_set(checker):
     )
     assert first.mode == "independent"
     assert _set_of(checker.db, first.round_id) is None
+
+
+def _row(client) -> dict:  # type: ignore[no-untyped-def,type-arg]
+    rows = client.get(
+        "/api/v1/projects/proj/document-rows", params={"case": "EN100017"}
+    ).json()
+    (row,) = [r for g in rows["groups"] for r in g["rows"] if r["work"]]
+    return row  # type: ignore[no-any-return]
+
+
+def test_the_text_card_names_the_set_and_a_newer_one(checker, tmp_path: Path):
+    """Issue 337 (337-A): the row names the set its task works on and, once a
+    newer set is imported, that one; the restart moves it onto the newest."""
+    from_proposals(checker.db)
+    assignment_id = _assignment(checker.db)
+    first = _round(
+        checker.client, assignment_id, request_id="first", expected_workflow_revision=0
+    )
+    lead = logged_in(checker.app, "lead", projects={"proj": ["lead"]}, assignments=[])
+    row = _row(lead)
+    assert row["proposal_set"]["newest"] is True
+    assert row["newer_proposal_set"] is None
+    old_set = row["proposal_set"]["set_id"]
+    assert row["proposal_set"]["proposal_count"] == row["proposal_count"]
+    assert (row["proposal_set"]["tool"], row["proposal_set"]["tool_version"]) == (
+        "phentrieve",
+        "1.4.0",
+    )
+    (item,) = [w for w in row["work"] if w["task"] == "annotate"]
+    assert item["proposal_set"]["set_id"] == old_set
+
+    later = unit("EN100017", set_id="set-b", annotations=[annotation("p3", (63, 76))])
+    assert (
+        run_import(checker.db, bundle(tmp_path / "b.zip", [later], "b-2")).status
+        == "succeeded"
+    )
+    row = _row(lead)
+    assert row["proposal_set"]["set_id"] == old_set
+    assert row["proposal_set"]["newest"] is False
+    newer = row["newer_proposal_set"]
+    assert newer is not None and newer["set_id"] > old_set and newer["newest"]
+    assert newer["proposal_count"] == 1
+
+    _round(
+        lead,
+        assignment_id,
+        request_id="restart",
+        expected_workflow_revision=first.workflow_revision,
+        kind="clean_restart",
+        reason="A newer tool set",
+    )
+    row = _row(lead)
+    assert row["proposal_set"]["set_id"] == newer["set_id"]
+    assert row["newer_proposal_set"] is None

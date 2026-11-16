@@ -24,6 +24,7 @@ from ontotator.domain.work_rounds import (
     RoundInputView,
     RoundSourceText,
     WorkRoundView,
+    unresolved_note,
 )
 from ontotator.storage.repository import Repository
 from ontotator.storage.tables import SubmissionRow
@@ -299,7 +300,8 @@ def enrich_inputs(
                     "source_recorded_at": row.recorded_at if row is not None else None,
                     "source_language": variant.language if variant else None,
                     "source_version": version,
-                    "unresolved_note": notes.get(view.input_id),
+                    # Stored with the input (#418), else read from its source.
+                    "unresolved_note": view.unresolved_note or notes.get(view.input_id),
                 }
             )
         )
@@ -314,7 +316,10 @@ def _unresolved_notes(
     from ontotator.storage.overview_tables import DraftSnapshotRow
 
     tool = [
-        v for v in views if v.source_snapshot.annotation.provenance.actor.kind == "tool"
+        v
+        for v in views
+        if v.source_snapshot.annotation.provenance.actor.kind == "tool"
+        and v.unresolved_note is None
     ]
     sids = {v.source_submission_id for v in tool if v.source_submission_id}
     dids = {
@@ -344,14 +349,11 @@ def _unresolved_notes(
     notes: dict[str, str] = {}
     for view in tool:
         source = view.source_submission_id or view.source_draft_snapshot_id
-        target = view.source_ref.model_dump()
-        for decision in decisions.get(source or "", []):
-            if (
-                decision["outcome"] == "uncertain"
-                and decision["target"] == target
-                and (decision.get("note") or "").strip()
-            ):
-                notes[view.input_id] = decision["note"].strip()
+        note = unresolved_note(
+            view.source_ref.model_dump(), decisions.get(source or "", [])
+        )
+        if note is not None:
+            notes[view.input_id] = note
     return notes
 
 

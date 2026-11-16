@@ -182,7 +182,8 @@ test("switching a text with proposals to From scratch keeps the muted icon and U
   const undo = page.locator(".ui-toast").getByRole("button", { name: "Undo", exact: true });
   await expect(undo).toBeVisible();
   await expect(robotIcon(row, 3, true)).toBeVisible();
-  await expect(card.getByText("3 tool proposals", { exact: true })).toBeVisible();
+  // Issue 337: the line names the set; from scratch it offers no newer set.
+  await expect(card.locator(".text-card-proposal-set")).toHaveText(/^Proposals set \d{4}-\d{2}-\d{2} \(test-tool 1\), 3 proposals$/);
   await undo.click();
   await expect(robotIcon(row, 3)).toBeVisible();
   await expect(plan.getByRole("radio", { name: "From proposals" })).toBeChecked();
