@@ -182,6 +182,11 @@ def validate_completion(
                 raise DomainError(
                     "REVIEW_NOTE_REQUIRED", {"target": decision.target.model_dump()}
                 )
+        # Integrity guard (#418): the editor API cannot leave an adopted copy
+        # without its changed decision (deciding the target otherwise
+        # discards the copy, and completeness above refuses first), but a
+        # draft written outside it (an older draft, an imported archive) can;
+        # tests/test_scientific_review_integrity.py reaches it that way.
         for snap in draft.annotations:
             linked_targets = [
                 t

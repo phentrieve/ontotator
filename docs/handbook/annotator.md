@@ -65,7 +65,7 @@ If the text was changed elsewhere, a **Revision conflict** notice appears; click
 | Diagonal hatching | A finding with the value **Absent**. |
 | Thicker underline | Overlapping findings. |
 | Frame | The finding you point at or selected. |
-| **AI** | Proposed by a tool. Point at the badge to see which tool. |
+| **AI** | Proposed by a tool. Point at the badge to see which tool. A proposal carried over to a corrected text version names the tool that proposed it. |
 | **Pending** | A proposal you have not decided yet. Decided proposals show **Confirmed**, **Rejected**, **Replaced** or **Unresolved**. |
 | **Being replaced** | A proposal with your copy from **Edit & Replace** that has no changes yet. |
 | **Defaults to confirm** | The finding still has prefilled values you have not confirmed. |

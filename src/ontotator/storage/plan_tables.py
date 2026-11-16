@@ -124,3 +124,32 @@ class DiscardedVariantRow(Base):
         BigInteger, ForeignKey(f"{SCHEMA}.users.id")
     )
     discarded_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class TextSettingRow(Base):
+    """Per-text settings of a language version (issue 422).
+
+    ``annotations_per_text`` replaces the project value for this text, as
+    target and as limit; NULL follows the project value. Not tied to a text
+    version: a corrected version keeps it.
+    """
+
+    __tablename__ = "text_settings"
+    __table_args__ = (
+        UniqueConstraint("project_id", "case_id", "language"),
+        CheckConstraint(
+            "annotations_per_text BETWEEN 1 AND 5", name="annotations_per_text"
+        ),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.projects.id")
+    )
+    case_id: Mapped[str]
+    language: Mapped[str]
+    annotations_per_text: Mapped[int | None]
+    reason: Mapped[str | None]
+    updated_by: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.users.id")
+    )
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now())

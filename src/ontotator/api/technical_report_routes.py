@@ -13,6 +13,7 @@ from ontotator.application.technical_reports import (
     MAX_CRASH_MESSAGE_LENGTH,
     MAX_DESCRIPTION_LENGTH,
     MAX_ROUTE_LENGTH,
+    OwnTechnicalReportView,
     ReportContext,
     TechnicalReportReceipt,
     TechnicalReportService,
@@ -83,6 +84,17 @@ def create_report(
             crash_message=body.context.crash_message,
         ),
     )
+
+
+@router.get("/me/technical-reports")
+def list_own_reports(
+    request: Request,
+    principal: PrincipalDep,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> list[OwnTechnicalReportView]:
+    """The caller's own reports, newest first: reference, text and status."""
+    return _service(request).list_own(principal.user_id, limit=limit, offset=offset)
 
 
 @router.get("/admin/technical-reports")
