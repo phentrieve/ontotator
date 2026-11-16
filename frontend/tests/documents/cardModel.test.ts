@@ -1,7 +1,7 @@
 // @vitest-environment node
 /** The text card's path states (U3, state table). */
 import { describe, expect, it } from "vitest";
-import { annotationState, cardSegments, defaultSegment, finalizationState, translationState } from "../../src/documents/textCard/cardModel";
+import { annotationState, cardSegments, defaultSegment, finalizationState, personVersion, translationState } from "../../src/documents/textCard/cardModel";
 import { annotateItem, cardRow } from "./cardFixtures";
 import { final, version, work } from "./fixtures";
 import { ana, cell, tom } from "./tableFixtures";
@@ -169,5 +169,20 @@ describe("segments", () => {
 describe("a text outside the plan", () => {
   it("opens on Annotation, not on a Finalization that cannot start", () => {
     expect(defaultSegment([{ id: "translation", title: "Translation", state: "source text", tone: "done" }, { id: "annotation", title: "Annotation", state: "not planned", tone: "optional" }, { id: "finalization", title: "Finalization", state: "—", tone: "optional" }])).toBe("annotation");
+  });
+});
+
+describe("the version of a person's task (issue 445)", () => {
+  const v1 = version({ document_id: "d1", chain_name: "DeepL", is_newest_in_chain: false });
+  const v2 = version({ document_id: "d2", version: 2, origin: "correction", derived_from: "d1", chain_id: "d1", chain_name: "DeepL" });
+  it("is not named while the text has one version", () => {
+    expect(personVersion({ versions: [v1], parallel_roots: false }, { document_id: "d1", version: 1 })).toBeNull();
+  });
+  it("is v{n} with several versions, with the chain name for parallel roots", () => {
+    expect(personVersion({ versions: [v1, v2], parallel_roots: false }, { document_id: "d1", version: 1 })).toBe("v1");
+    expect(personVersion({ versions: [v1, v2], parallel_roots: false }, { document_id: "d2", version: 2 })).toBe("v2");
+    expect(personVersion({ versions: [v1, v2], parallel_roots: true }, { document_id: "d2", version: 2 })).toBe("DeepL v2");
+    // A version the row does not list (never expected) still reads "v3".
+    expect(personVersion({ versions: [v1, v2], parallel_roots: true }, { document_id: "gone", version: 3 })).toBe("v3");
   });
 });

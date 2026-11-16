@@ -3,6 +3,7 @@ import type { DocumentRowView, NextStepView } from "../../api/client";
 import type { ProjectDocumentsQuery, Route } from "../../app/router";
 import type { PathSegment, PathTone } from "../../ui/StagePath";
 import { earlyFinal } from "../finalPanelText";
+import { submissionVersion } from "../SubmissionsTable";
 import { annotatorCount, shortName, stageText, startedOf, startedPart, submittedOf } from "../stageLabels";
 
 export type SegmentId = "translation" | "annotation" | "finalization";
@@ -107,6 +108,17 @@ export function annotationState(row: DocumentRowView): State {
     case "none": return { state: "—", tone: "later" };
     default: return { state: cellLabel(row, "annotation"), tone: "now" };
   }
+}
+
+/**
+ * The version a person's task or submission sits on, for their row of the card (issue 445): "v2", or "{chain name} v1"
+ * with parallel roots (as `submissionVersion`). Null while the text has one version, as in the history lines.
+ */
+export function personVersion(row: Pick<DocumentRowView, "versions" | "parallel_roots">, item: { document_id: string; version: number }): string | null {
+  const versions = row.versions ?? [];
+  if (versions.length <= 1) return null;
+  const chainName = versions.find(entry => entry.document_id === item.document_id)?.chain_name ?? null;
+  return submissionVersion(item.version, chainName, row.parallel_roots);
 }
 
 /** "18 Oct" of an ISO time; null when there is none. */
