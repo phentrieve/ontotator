@@ -185,6 +185,73 @@ describe("annotation part", () => {
     expect(within(part()).queryByText(/tool proposals?$/)).toBeNull();
   });
 
+  it("names the proposal set, a newer set with its help link, and a person on another set (issue 337)", () => {
+    const set = (set_id: number, imported_at: string, newest: boolean, proposal_count = 17) =>
+      ({ set_id, imported_at, tool: "phentrieve", tool_version: "1.4", proposal_count, newest });
+    const part = () => within(card()).getByRole("region", { name: "Annotation" });
+    const older = set(1, "2026-10-02T09:00:00", false);
+    const newer = set(2, "2026-11-10T09:00:00", true, 24);
+    renderCard({ row: assignRow({
+      proposal_set: older, newer_proposal_set: newer,
+      work: [
+        annotateItem({ assignment_id: 1, person: tom, author_label: "ann-0004", assigned_at: "2026-10-20T16:44:00", proposal_set: older }),
+        annotateItem({ assignment_id: 2, person: luc, author_label: "ann-0005", assigned_at: "2026-10-20T16:44:00", proposal_set: newer }),
+        annotateItem({ assignment_id: 3, person: ana, author_label: "ann-0003", assigned_at: "2026-10-20T16:44:00", proposal_set: older }),
+      ],
+    }) });
+    const line = within(part()).getByText("Proposals").closest("p")!;
+    expect(line.textContent).toBe("Proposals set 2026-10-02 (phentrieve 1.4), 17 proposals Newer set available: 2026-11-10 How to use it");
+    expect(within(part()).queryByText("17 tool proposals")).toBeNull();
+    expect(within(line).getByRole("link", { name: "How to use it" }).getAttribute("href")).toContain("work-from-new-tool-proposals");
+    const people = within(part()).getByRole("list", { name: "Annotators" });
+    expect(within(people).getByText("Luc Martin").closest("li")!.textContent).toContain("newest set");
+    expect(within(people).getByText("Tom Reis").closest("li")!.textContent).not.toContain("set");
+    cleanup();
+    // On the newest set: no pill; from scratch: no pill either.
+    renderCard({ row: assignRow({ proposal_set: newer, newer_proposal_set: null }) });
+    expect(within(part()).getByText("Proposals").closest("p")!.textContent).toBe("Proposals set 2026-11-10 (phentrieve 1.4), 24 proposals");
+    cleanup();
+    renderCard({ row: assignRow({ proposal_set: older, newer_proposal_set: newer, annotation_mode: { mode: "scratch", source: "project", locked: false, override: null, proposal_count: 17 } }) });
+    expect(within(part()).queryByText(/Newer set available/)).toBeNull();
+  });
+
+  it("names the older set while any task is on it, and says when a set was not recorded (issue 337)", () => {
+    const set = (set_id: number, imported_at: string, newest: boolean) => ({ set_id, imported_at, tool: "phentrieve", tool_version: "1.4", proposal_count: 24, newest });
+    const part = () => within(card()).getByRole("region", { name: "Annotation" });
+    const older = set(1, "2026-10-02T09:00:00", false), newer = set(2, "2026-11-10T09:00:00", true);
+    // The mockup: Tom submitted on the old set, Luc is assigned and will start on the newest.
+    renderCard({ row: assignRow({ proposal_set: older, newer_proposal_set: newer, work: [
+      annotateItem({ assignment_id: 1, person: tom, author_label: "ann-0004", assigned_at: "2026-10-20T16:44:00", status: "submitted", proposal_set: older }),
+      annotateItem({ assignment_id: 2, person: luc, author_label: "ann-0005", assigned_at: "2026-10-20T16:44:00", proposal_set: newer }),
+    ] }) });
+    expect(within(part()).getByText("Proposals").closest("p")!.textContent).toBe("Proposals set 2026-10-02 (phentrieve 1.4), 24 proposals Newer set available: 2026-11-10 How to use it");
+    expect(within(part()).getByText("Luc Martin").closest("li")!.textContent).toContain("newest set");
+    cleanup();
+    // Every task began before sets were recorded: no set is claimed, no pill.
+    renderCard({ row: assignRow({ proposal_set: null, newer_proposal_set: null, proposal_set_unrecorded: true, work: [
+      annotateItem({ assignment_id: 1, person: tom, author_label: "ann-0004", assigned_at: "2026-10-20T16:44:00", proposal_set_unrecorded: true }),
+    ] }) });
+    expect(within(part()).getByText("Proposals").closest("p")!.textContent).toBe("Proposals set not recorded (the tasks started before sets were recorded)");
+    expect(within(part()).queryByText(/Newer set available/)).toBeNull();
+    expect(within(part()).getByText("Tom Reis").closest("li")!.textContent).not.toContain("set not recorded");
+    cleanup();
+    // One person without a recorded set beside a known one: said in their row.
+    renderCard({ row: assignRow({ proposal_set: older, newer_proposal_set: newer, work: [
+      annotateItem({ assignment_id: 1, person: tom, author_label: "ann-0004", assigned_at: "2026-10-20T16:44:00", proposal_set: older }),
+      annotateItem({ assignment_id: 2, person: luc, author_label: "ann-0005", assigned_at: "2026-10-20T16:44:00", proposal_set_unrecorded: true }),
+    ] }) });
+    expect(within(part()).getByText("Luc Martin").closest("li")!.textContent).toContain("set not recorded");
+  });
+
+  it("names a text's own annotator limit beside the project's (issue 422)", () => {
+    const part = () => within(card()).getByRole("region", { name: "Annotation" });
+    renderCard({ row: assignRow({ annotations_per_text: { effective: 4, project: 1, override: 4 } }) });
+    expect(within(part()).getByText("Annotators: 4 for this text (project: 1)")).toBeTruthy();
+    cleanup();
+    renderCard({ row: assignRow({ annotations_per_text: { effective: 1, project: 1, override: null } }) });
+    expect(within(part()).queryByText(/for this text/)).toBeNull();
+  });
+
   it("shows Translation not reviewed yet only for a flagged row", () => {
     const part = () => within(card()).getByRole("region", { name: "Annotation" });
     renderCard({ row: assignRow({ unreviewed_translation: true }) });
@@ -387,6 +454,30 @@ describe("translation part", () => {
     fireEvent.click(within(part).getByRole("button", { name: "Request correction…" }));
     expect(onRequestCorrection).toHaveBeenCalledWith(row, variant);
     expect(within(part).queryByRole("button", { name: "Request translation correction" })).toBeNull();
+  });
+
+  it("issue 341: Correct the translation… on the accepted newest version, Accept this version… on the one not reviewed", () => {
+    const versions = [
+      version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "reviewed", chain_name: "m1", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "m1", translation_status: "accepted" }),
+      version({ document_id: "case-200-mt", origin: "machine_translation", derived_from: "case-200-en", chain_name: "mt", translation_status: "ready_for_review" }),
+    ];
+    const onCorrectTranslation = vi.fn(), onAcceptVersion = vi.fn();
+    const textVersionTools = { username: "lead", members: [], assignments: [], variants: new Map(), requiredLanguages: () => ["de"],
+      onAssignmentsChanged: vi.fn(), onRequestCorrection: vi.fn(), onCorrectTranslation, onAcceptVersion };
+    const row = assignRow({ versions, parallel_roots: true, work: [] });
+    renderCard({ row, initialSegment: "translation", textVersionTools });
+    const part = within(card()).getByRole("heading", { name: "Translation" }).closest("section")!;
+    const correct = within(part).getAllByText("Correct the translation…");
+    expect(correct).toHaveLength(1);
+    expect(correct[0].getAttribute("aria-label")).toBe("Correct the translation m1 v2 of case-200 de…");
+    fireEvent.click(correct[0]);
+    expect(onCorrectTranslation).toHaveBeenCalledWith(row, versions[1]);
+    const accept = within(part).getAllByText("Accept this version…");
+    expect(accept).toHaveLength(1);
+    expect(accept[0].getAttribute("aria-label")).toBe("Accept mt v1 of case-200 de…");
+    fireEvent.click(accept[0]);
+    expect(onAcceptVersion).toHaveBeenCalledWith(row, versions[2]);
   });
 
   it("calls a native text the source text and a failed check failed", () => {

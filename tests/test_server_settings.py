@@ -147,6 +147,28 @@ def test_database_limits_have_defaults_and_can_be_set(tmp_path: Path) -> None:
     assert (result.lock_timeout_ms, result.statement_timeout_ms) == (500, 0)
 
 
+def test_setup_code_validity_defaults_to_a_week_and_can_be_set(
+    tmp_path: Path,
+) -> None:
+    env = production_env(tmp_path)
+    assert settings.server_settings(env).setup_code_hours == 168
+    assert settings.setup_code_hours({}) == 168
+    for hours in ("1", "24", "720"):
+        env["ONTOTATOR_SETUP_CODE_HOURS"] = hours
+        assert settings.server_settings(env).setup_code_hours == int(hours)
+        assert settings.setup_code_hours(env) == int(hours)
+
+
+@pytest.mark.parametrize("hours", ["0", "721", "-1", "7d", "1.5", " 24", "٢٤"])
+def test_setup_code_validity_is_bounded(tmp_path: Path, hours: str) -> None:
+    env = production_env(tmp_path)
+    env["ONTOTATOR_SETUP_CODE_HOURS"] = hours
+    with pytest.raises(settings.SettingsError, match="ONTOTATOR_SETUP_CODE_HOURS"):
+        settings.server_settings(env)
+    with pytest.raises(settings.SettingsError, match="from 1 to 720"):
+        settings.setup_code_hours(env)
+
+
 def test_a_database_limit_must_be_a_whole_number(tmp_path: Path) -> None:
     env = production_env(tmp_path)
     env["ONTOTATOR_LOCK_TIMEOUT_MS"] = "20s"

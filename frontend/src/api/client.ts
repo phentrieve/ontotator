@@ -53,6 +53,7 @@ export interface RemoveModifierPayload { command: "remove_modifier"; annotation_
 export interface ConvertToModifierPayload { command: "convert_to_modifier"; annotation_id: string; target_annotation_id: string; link_span?: boolean }
 export type FinalPreflight = components["schemas"]["FinalPreflight"];
 export type FinalSelectionView = components["schemas"]["FinalSelectionView"];
+export type FinalWithdrawalView = components["schemas"]["FinalWithdrawalView"];
 export type FinalExportRequest = components["schemas"]["FinalExportRequest"];
 export type DocumentRowsPage = components["schemas"]["DocumentRowsPage"];
 export type DocumentRowView = components["schemas"]["DocumentRowView"];
@@ -97,13 +98,21 @@ export type PlanRowsSet = Defaulted<components["schemas"]["PlanRowsSet"], "undo"
 export type UndoView = components["schemas"]["UndoView"];
 export type CaseIdLookupResult = components["schemas"]["CaseIdLookupResult"];
 export type AnnotationTargetPreview = components["schemas"]["AnnotationTargetPreview"];
+/** A text's own "Annotations per text" (issue 422). */
+export type AnnotationsPerTextResult = components["schemas"]["AnnotationsPerTextResult"];
+/** An imported tool proposal set on one text version (issue 337). */
+export type RowProposalSetView = components["schemas"]["RowProposalSetView"];
 export type DiscardRequest = Defaulted<components["schemas"]["DiscardRequest"], "confirm">;
 export type DiscardResult = components["schemas"]["DiscardResult"];
+export type AcceptVersionRequest = components["schemas"]["AcceptVersionRequest"];
+export type AcceptVersionResult = components["schemas"]["AcceptVersionResult"];
 // Annotation-mode change after submissions, and its restore
 export type RowChangeView = components["schemas"]["RowChangeView"];
 export type ModeChangeTarget = components["schemas"]["ModeChangeTarget"];
 export type ModeChangeRequest = components["schemas"]["ModeChangeRequest"];
 export type ModeChangePreview = components["schemas"]["ModeChangePreview"];
+export type BulkModeChangeRequest = components["schemas"]["BulkModeChangeRequest"];
+export type BulkModeChangeView = components["schemas"]["BulkModeChangeView"];
 export type ModeChangeView = components["schemas"]["ModeChangeView"];
 export type ModeChangeList = components["schemas"]["ModeChangeList"];
 export type ModeChangeResult = components["schemas"]["ModeChangeResult"];
@@ -127,6 +136,16 @@ export type RowRefView = components["schemas"]["RowRefView"];
 export type RowSelection = readonly string[] | { readonly rows: readonly RowRefView[] };
 export type DocumentRowKeysRequest = Defaulted<components["schemas"]["DocumentRowKeysRequest"], "sort" | "exclude" | "active_only">;
 export type MoveToFrontResult = components["schemas"]["MoveToFrontResult"];
+export type BulkReopenRequest = components["schemas"]["BulkReopenRequest"];
+export type BulkWithdrawRequest = components["schemas"]["BulkWithdrawRequest"];
+export type BulkStartRoundRequest = components["schemas"]["BulkStartRoundRequest"];
+export type BulkTaskActionView = components["schemas"]["BulkTaskActionView"];
+export type BulkUndoView = components["schemas"]["BulkUndoView"];
+export type BulkUndoResult = components["schemas"]["BulkUndoResult"];
+export type AcceptAgreeingRequest = Defaulted<components["schemas"]["AcceptAgreeingRequest"], "preview">;
+export type AcceptAgreeingView = components["schemas"]["AcceptAgreeingView"];
+export type BulkChangeFinalRequest = Defaulted<components["schemas"]["BulkChangeFinalRequest"], "rule">;
+export type BulkChangeFinalView = components["schemas"]["BulkChangeFinalView"];
 export type DocumentRowKeys = components["schemas"]["DocumentRowKeys"];
 export type DocumentsVisitView = components["schemas"]["DocumentsVisitView"];
 export type DocumentsSummaryView = components["schemas"]["DocumentsSummaryView"];
@@ -170,6 +189,8 @@ export type OpenWorkspaceRequest = components["schemas"]["OpenWorkspaceRequest"]
 export type OpenWorkspaceResponse = components["schemas"]["OpenWorkspaceResponse"];
 export type WorkRoundView = components["schemas"]["WorkRoundView"];
 export type RoundInputView = components["schemas"]["RoundInputView"];
+/** The earlier text version a carried round came from ("Show changes since vN", issue 421). */
+export type RoundSourceText = components["schemas"]["RoundSourceText"];
 export type RoundSourceView = components["schemas"]["RoundSourceView"];
 // Consolidation view (acceptance fixes 2026-10-21, WP-E)
 export type ConsolidationView = components["schemas"]["ConsolidationView"];
@@ -210,6 +231,7 @@ export type AssignmentSubmissionView = components["schemas"]["AssignmentSubmissi
 export type SourceObligationView = components["schemas"]["SourceObligationView"];
 export type CorrectionAssignmentRequest = components["schemas"]["CorrectionAssignmentRequest"];
 export type LeadCorrectionRequest = components["schemas"]["LeadCorrectionRequest"];
+export type LeadCorrectionPreview = components["schemas"]["LeadCorrectionPreview"];
 export type ResolveSourceObligationRequest = components["schemas"]["ResolveSourceObligationRequest"];
 export type ProblemReportRequest = components["schemas"]["ProblemReportRequest"];
 export type ProblemActionRequest = components["schemas"]["ProblemActionRequest"];
@@ -294,6 +316,7 @@ export type TechnicalReportRequest = components["schemas"]["TechnicalReportReque
 export type TechnicalReportContext = components["schemas"]["TechnicalReportContext"];
 export type TechnicalReportReceipt = components["schemas"]["TechnicalReportReceipt"];
 export type TechnicalReportView = components["schemas"]["TechnicalReportView"];
+export type OwnTechnicalReportView = components["schemas"]["OwnTechnicalReportView"];
 export type TechnicalReportStatus = TechnicalReportView["status"];
 export type { LastApiError };
 export { lastApiError };
@@ -457,6 +480,8 @@ export interface ApiClientOptions {
  * throws, so `isNetworkError` (editor autosave) keeps recognising it.
  */
 const TECHNICAL_REPORTS = "/api/v1/technical-reports";
+/** Own technical reports per request; a full page means older ones may follow. */
+export const TECHNICAL_REPORTS_PAGE = 100;
 
 export class NetworkError extends TypeError {
   constructor(readonly cause: unknown) { super("Connection lost. Try again."); this.name = "NetworkError"; }
@@ -490,6 +515,18 @@ export class ApiClient {
   async documentRowKeys(key: string, body: DocumentRowKeysRequest = {}): Promise<DocumentRowKeys> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/document-rows/keys`, { method: "POST", body: JSON.stringify(body) }); }
   /** Moves the texts to the front of the project's order, so first in My tasks (lead only, issue 339). */
   async moveToFront(key: string, rows: readonly RowRefView[]): Promise<MoveToFrontResult> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/document-rows/move-to-front`, { method: "POST", body: JSON.stringify({ rows }) }); }
+  /** Bulk Reopen of the selected texts' submitted tasks: preview, or apply with the preview's token (lead only, issue 336). */
+  async bulkReopen(key: string, body: BulkReopenRequest, signal?: AbortSignal): Promise<BulkTaskActionView> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/bulk-task-actions/reopen`, { method: "POST", body: JSON.stringify(body), signal }); }
+  /** Bulk withdrawal of the selected texts' open tasks: preview, or apply with the preview's token (lead only, issues 336, 339). */
+  async bulkWithdraw(key: string, body: BulkWithdrawRequest, signal?: AbortSignal): Promise<BulkTaskActionView> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/bulk-task-actions/withdraw`, { method: "POST", body: JSON.stringify(body), signal }); }
+  /** Bulk "Start a round…" for the selected texts' submitted annotations: preview, or apply with the preview's token (lead only, issue 336). */
+  async bulkStartRound(key: string, body: BulkStartRoundRequest, signal?: AbortSignal): Promise<BulkTaskActionView> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/bulk-task-actions/start-round`, { method: "POST", body: JSON.stringify(body), signal }); }
+  /** Accept every agreeing text without a final result, of the project or of the selected `rows`: preview, or apply with the preview's token (lead only, issues 354, 336). */
+  async acceptAgreeing(key: string, body: AcceptAgreeingRequest, signal?: AbortSignal): Promise<AcceptAgreeingView> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/final-selections/accept-agreeing`, { method: "POST", body: JSON.stringify(body), signal }); }
+  /** Bulk Change final… of the selected texts by a rule (newest submission): preview, or apply with the preview's token (lead only, issue 336). */
+  async bulkChangeFinal(key: string, body: BulkChangeFinalRequest, signal?: AbortSignal): Promise<BulkChangeFinalView> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/final-selections/bulk-change`, { method: "POST", body: JSON.stringify(body), signal }); }
+  /** Undo of an applied bulk action by the id of the server's record of it, while its texts are unchanged (409 BULK_UNDO_STALE otherwise). */
+  async bulkUndo(key: string, undoId: number): Promise<BulkUndoResult> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/bulk-task-actions/undo`, { method: "POST", body: JSON.stringify({ undo_id: undoId }) }); }
   /** Record an opening of Documents (lead only); returns the NEW baseline (start of the previous visit). */
   async recordDocumentsVisit(key: string): Promise<DocumentsVisitView> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/documents/visit`, { method: "POST" }); }
   /** Navigation counter: rows needing the lead's decision, undecided rows included (lead only). */
@@ -594,6 +631,14 @@ export class ApiClient {
     return this.request<UploadCreated>(`/api/v1/projects/${encodeURIComponent(key)}/uploads/${id}/commit`, { method: "POST", body: JSON.stringify({ plan_sha256: planSha256, ...(overrides === undefined ? {} : { status_overrides: overrides }), ...(plan ?? {}) }) });
   }
 
+  /** Issue 422: one text's own "Annotations per text" (target and limit); `null` follows the project value again. */
+  async setAnnotationsPerText(key: string, caseId: string, language: string, value: number | null, reason?: string): Promise<AnnotationsPerTextResult> {
+    return this.request<AnnotationsPerTextResult>(`/api/v1/projects/${encodeURIComponent(key)}/texts/${encodeURIComponent(caseId)}/${encodeURIComponent(language)}/annotations-per-text`, { method: "PUT", body: JSON.stringify({ value, ...(reason ? { reason } : {}) }) });
+  }
+  /** Issue 422: several texts at once, in one transaction (all or nothing); each text is compared with its own value. */
+  async setAnnotationsPerTexts(key: string, texts: readonly RowRefView[], value: number | null, reason?: string): Promise<{ texts: AnnotationsPerTextResult[] }> {
+    return this.request(`/api/v1/projects/${encodeURIComponent(key)}/texts/annotations-per-text`, { method: "PUT", body: JSON.stringify({ texts, value, ...(reason ? { reason } : {}) }) });
+  }
   async patchWorkPlan(key: string, caseId: string, language: string, body: PlanRowPatch): Promise<PlanRowResult> {
     return this.request<PlanRowResult>(`/api/v1/projects/${encodeURIComponent(key)}/work-plans/${encodeURIComponent(caseId)}/${encodeURIComponent(language)}`, { method: "PATCH", body: JSON.stringify(body) });
   }
@@ -619,11 +664,18 @@ export class ApiClient {
     return this.request<CaseIdLookupResult>(`/api/v1/projects/${encodeURIComponent(key)}/case-ids/lookup`, { method: "POST", body: JSON.stringify({ ids }) });
   }
 
+  /** Issue 341 d: accept exactly one version as reviewed outside Ontotator. */
+  async acceptVersion(key: string, documentId: string, body: AcceptVersionRequest): Promise<AcceptVersionResult> {
+    return this.request<AcceptVersionResult>(`/api/v1/projects/${encodeURIComponent(key)}/variants/${encodeURIComponent(documentId)}/accept`, { method: "POST", body: JSON.stringify(body) });
+  }
+
   async discardVariant(key: string, documentId: string, body: DiscardRequest): Promise<DiscardResult> {
     return this.request<DiscardResult>(`/api/v1/projects/${encodeURIComponent(key)}/variants/${encodeURIComponent(documentId)}/discard`, { method: "POST", body: JSON.stringify(body) });
   }
 
   /** What changing a locked text's annotation mode discards and revokes (lead only, no write). */
+  /** Bulk "Change mode…" of the selected texts: preview, or apply with the preview's token and a reason (lead only, issue 336). */
+  async bulkChangeMode(key: string, body: BulkModeChangeRequest, signal?: AbortSignal): Promise<BulkModeChangeView> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/annotation-mode-changes/bulk`, { method: "POST", body: JSON.stringify(body), signal }); }
   async previewModeChange(key: string, body: ModeChangeTarget): Promise<ModeChangePreview> {
     return this.request<ModeChangePreview>(`/api/v1/projects/${encodeURIComponent(key)}/annotation-mode-changes/preview`, { method: "POST", body: JSON.stringify(body) });
   }
@@ -720,6 +772,11 @@ export class ApiClient {
   /** Send a technical report to the administrators; the receipt names its reference (TR-12). */
   async sendTechnicalReport(body: TechnicalReportRequest): Promise<TechnicalReportReceipt> {
     return this.request<TechnicalReportReceipt>(TECHNICAL_REPORTS, { method: "POST", body: JSON.stringify(body) });
+  }
+
+  /** The caller's own technical reports, newest first (issue 269): reference, text and status only. */
+  async listMyTechnicalReports(offset = 0): Promise<OwnTechnicalReportView[]> {
+    return this.request<OwnTechnicalReportView[]>(`/api/v1/me/technical-reports?limit=${TECHNICAL_REPORTS_PAGE}&offset=${offset}`, { method: "GET" });
   }
 
   async adminListTechnicalReports(status?: TechnicalReportStatus): Promise<TechnicalReportView[]> {
@@ -879,6 +936,10 @@ export class ApiClient {
   }
   async selectFinalResult(projectKey: string, payload: components["schemas"]["FinalSelectionRequest"]): Promise<FinalSelectionView> {
     return this.request<FinalSelectionView>(`/api/v1/projects/${encodeURIComponent(projectKey)}/final-selections`, { method: "PUT", body: JSON.stringify(payload) });
+  }
+  /** Withdraw a text's final result, with a reason (issue 343). */
+  async withdrawFinalResult(projectKey: string, payload: components["schemas"]["FinalWithdrawalRequest"]): Promise<FinalWithdrawalView> {
+    return this.request<FinalWithdrawalView>(`/api/v1/projects/${encodeURIComponent(projectKey)}/final-selections/withdraw`, { method: "POST", body: JSON.stringify(payload) });
   }
   async startFinalExport(projectKey: string, payload: FinalExportRequest): Promise<{ job_id: number }> {
     return this.request<{ job_id: number }>(`/api/v1/projects/${encodeURIComponent(projectKey)}/exports/final`, { method: "POST", body: JSON.stringify(payload) });
@@ -1271,6 +1332,11 @@ export class ApiClient {
     return this.request(`/api/v1/rounds/${encodeURIComponent(roundId)}/inputs`, { method: "GET" });
   }
 
+  /** The text version the round's carried work came from; null unless it was carried from another version. */
+  async getRoundSourceText(roundId: string): Promise<RoundSourceText | null> {
+    return this.request(`/api/v1/rounds/${encodeURIComponent(roundId)}/source-text`, { method: "GET" });
+  }
+
   /** Assign the consolidator and start the consolidation round in one step (lead only); choosing yourself grants the Consolidator role. */
   async startConsolidation(key: string, body: StartConsolidationRequest): Promise<StartConsolidationResponse> {
     return this.request(`/api/v1/projects/${encodeURIComponent(key)}/consolidations`, { method: "POST", body: JSON.stringify(body) });
@@ -1320,7 +1386,12 @@ export class ApiClient {
     return this.request(`/api/v1/projects/${encodeURIComponent(projectKey)}/documents/${encodeURIComponent(documentId)}/translation-correction-assignment`, { method: "POST", body: JSON.stringify(body) });
   }
 
-  /** F1: the lead reviews a rejected or queried version themselves. */
+  /** Issue 341 b: whether a lead correction is available and the annotation work that stays on the version. */
+  async getLeadCorrectionPreview(projectKey: string, documentId: string): Promise<LeadCorrectionPreview> {
+    return this.request(`/api/v1/projects/${encodeURIComponent(projectKey)}/documents/${encodeURIComponent(documentId)}/lead-correction`, { method: "GET" });
+  }
+
+  /** F1: the lead reviews a rejected, queried or accepted version themselves. */
   async startLeadCorrection(projectKey: string, documentId: string, body: LeadCorrectionRequest): Promise<AssignmentView> {
     return this.request(`/api/v1/projects/${encodeURIComponent(projectKey)}/documents/${encodeURIComponent(documentId)}/lead-correction`, { method: "POST", body: JSON.stringify(body) });
   }

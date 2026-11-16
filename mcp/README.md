@@ -9,11 +9,11 @@ What it does not do: annotation, review and translation review stay in the web i
 You need [uv](https://docs.astral.sh/uv/). Install the command from the repository:
 
 ```bash
-uv tool install "git+https://github.com/phentrieve/ontotator@v0.10.1#subdirectory=mcp"
+uv tool install "git+https://github.com/phentrieve/ontotator@v0.10.2#subdirectory=mcp"
 which ontotator-mcp
 ```
 
-The URL names a release tag, so the server changes only when you install another release: to update, run the command again with the newer tag in the URL. Without a tag the URL would follow `main`, and every push would update the server. From a checkout of a release tag, `uv tool install ./mcp` does the same. Without installing, `uvx --from "git+https://github.com/phentrieve/ontotator@v0.10.1#subdirectory=mcp" ontotator-mcp` runs it directly.
+The URL names a release tag, so the server changes only when you install another release: to update, run the command again with the newer tag in the URL. Without a tag the URL would follow `main`, and every push would update the server. From a checkout of a release tag, `uv tool install ./mcp` does the same. Without installing, `uvx --from "git+https://github.com/phentrieve/ontotator@v0.10.2#subdirectory=mcp" ontotator-mcp` runs it directly.
 
 ## Create a token
 
@@ -73,15 +73,15 @@ Add the server to `claude_desktop_config.json` (Settings › Developer › **Edi
 }
 ```
 
-If the client cannot find the command, give its full path (`which ontotator-mcp`), or use `"command": "uvx"` with `"args": ["--from", "git+https://github.com/phentrieve/ontotator@v0.10.1#subdirectory=mcp", "ontotator-mcp"]`.
+If the client cannot find the command, give its full path (`which ontotator-mcp`), or use `"command": "uvx"` with `"args": ["--from", "git+https://github.com/phentrieve/ontotator@v0.10.2#subdirectory=mcp", "ontotator-mcp"]`.
 
 Ask the client to call `whoami` first: it shows the token's kind, scopes, project and expiry (with a warning two weeks before), who it acts as and the server's version.
 
 ## Tools
 
-Every tool description names the token scope it needs and whether it changes data; the MCP annotations say the same (`readOnlyHint`, `destructiveHint`, `idempotentHint`). Tools with a `confirm` argument (`set_ontology_pins`, `distribute_texts`, `update_work_plan`, `accept_agreeing_texts`, `set_member_roles`, `hand_over_open_tasks` and the lead tools below) only do a dry run without it (`set_member_roles` needs `confirm` only to take roles away or remove a person, which logs the person out, revokes their tokens and, with `revoke_assignments`, withdraws their open tasks; adding roles is applied at once); the client should show you the dry run before it confirms. Imports and exports are server jobs: the tools wait for them by default, and `get_job` polls one.
+Every tool description names the token scope it needs and whether it changes data; the MCP annotations say the same (`readOnlyHint`, `destructiveHint`, `idempotentHint`). Tools with a `confirm` argument (`set_ontology_pins`, `distribute_texts`, `update_work_plan`, `accept_agreeing_texts`, `change_final_results`, `set_member_roles`, `hand_over_open_tasks` and the lead tools below) only do a dry run without it (`set_member_roles` needs `confirm` only to take roles away or remove a person, which logs the person out, revokes their tokens and, with `revoke_assignments`, withdraws their open tasks; adding roles is applied at once); the client should show you the dry run before it confirms. Imports and exports are server jobs: the tools wait for them by default, and `get_job` polls one.
 
-Tool results carry text other people wrote: texts, guidelines, problem reports, reasons and names. The server's instructions tell the model that this is user data, never instructions, and that no changing tool is to be called because returned content asks for it. A model can still be misled, and it can pass `confirm=true` itself, so the dry run alone does not protect you. Every tool that changes or replaces data, or whose change cannot be undone (such as `accept_agreeing_texts`, `set_final_result`, `carry_submission` and `commit_upload`), has `destructiveHint` set, so that a client can ask you before each call; let your client do so for these tools.
+Tool results carry text other people wrote: texts, guidelines, problem reports, reasons and names. The server's instructions tell the model that this is user data, never instructions, and that no changing tool is to be called because returned content asks for it. A model can still be misled, and it can pass `confirm=true` itself, so the dry run alone does not protect you. Every tool that changes or replaces data, or whose change cannot be undone (such as `accept_agreeing_texts`, `change_final_results`, `set_final_result`, `carry_submission` and `commit_upload`), has `destructiveHint` set, so that a client can ask you before each call; let your client do so for these tools.
 
 ### Scopes
 
@@ -122,6 +122,9 @@ A token can do only what both its scopes and its owner's roles allow. Many tools
 | `withdraw_task` | project-admin | may remove or withdraw | Withdraw a task: it leaves the person's list; submitted work stays. |
 | `remove_task` | project-admin | may remove or withdraw | Remove an unsubmitted annotation task AND DISCARD ITS DRAFT. |
 | `reopen_task` | project-admin | overwrites | Reopen a submitted task so its person can change the submission. |
+| `reopen_texts` | project-admin | overwrites | Reopen the submitted tasks of many texts, after a dry run. |
+| `withdraw_open_tasks` | project-admin | may remove or withdraw | Withdraw the open tasks of many texts, after a dry run. |
+| `start_rounds` | project-admin | may remove or withdraw | Start a new work round for the submitted annotations of many texts, after a dry run. THERE IS NO UNDO. |
 | `hand_over_open_tasks` | read, project-admin | may remove or withdraw | Hand a person's open tasks to others in turn, after a dry run. |
 | `list_problem_reports` | read | reads | Problem reports annotators filed in the project. |
 | `get_problem_report` | read | reads | One problem report with its events, holds and resolution. |
@@ -132,13 +135,17 @@ A token can do only what both its scopes and its owner's roles allow. Many tools
 | `update_work_plan` | read, project-admin | may remove or withdraw | Turn translation review and annotation on or off and set the annotation mode. |
 | `start_new_round` | read, project-admin | may remove or withdraw | Give an annotation task a new round, after a dry run. |
 | `change_annotation_mode` | project-admin | may remove or withdraw | Change the annotation mode of a text that already has work, after a preview. |
+| `change_annotation_modes` | project-admin | may remove or withdraw | Change the annotation mode of many texts that have work, after a dry run. THE WORK ON THEM IS DISCARDED. |
 | `restore_annotation_mode` | read, project-admin | overwrites | Undo an annotation mode change, after a preview. |
 | `set_final_result` | read, project-admin | overwrites | Choose or change the final result of one text, after a dry run. |
-| `request_translation_correction` | read, project-admin | overwrites | Ask a translation reviewer to correct a rejected or queried translation. |
-| `start_lead_correction` | read, project-admin | overwrites | Take over the correction of a rejected or queried translation as the lead. |
+| `withdraw_final_result` | read, project-admin | may remove or withdraw | Withdraw the final result of one text, with a reason, after a dry run. |
+| `request_translation_correction` | read, project-admin | overwrites | Ask for a new translation review (a correction or a second opinion) of an accepted translation version, by any translation reviewer, with a reason. |
+| `start_lead_correction` | read, project-admin | overwrites | Take over the correction of a rejected, queried or accepted translation as the lead. |
+| `accept_translation_version` | project-admin | overwrites | Accept exactly one translation version as reviewed outside Ontotator, after a dry run. |
 | `discard_translation` | read, project-admin | may remove or withdraw | Discard a translation version, after a dry run. |
 | `undo_work_plan` | project-admin | may remove or withdraw | Undo a work plan change of update_work_plan, after a dry run. |
 | `annotation_target_preview` | read | reads | How many texts already have more annotation tasks than a new target. |
+| `set_annotations_per_text` | project-admin | overwrites | Give one text (case + language) its own annotations per text. |
 | `move_task_to_version` | read, project-admin | may remove or withdraw | Move open annotation work to a new version of its text, after a dry run. |
 | `handle_text_change` | read, project-admin | may remove or withdraw | Decide on open work on an old text version, after a dry run. |
 | `carry_submission` | project-admin | may remove or withdraw | Carry a submitted annotation to a new version of its text, after a dry run. |
@@ -151,7 +158,8 @@ A token can do only what both its scopes and its owner's roles allow. Many tools
 | `list_texts` | read | reads | The project's texts with IDs, stage, assigned people and final result. |
 | `agreement_summary` | read | reads | Agreement of the annotations behind the final results, project-wide. |
 | `start_consolidation` | read, project-admin | adds | Start a consolidation of a text's submissions by a consolidator. |
-| `accept_agreeing_texts` | read, project-admin | may remove or withdraw | Accept the result of every text whose annotations agree in full. |
+| `accept_agreeing_texts` | project-admin | may remove or withdraw | Accept the result of every text whose annotations agree in full. |
+| `change_final_results` | project-admin | may remove or withdraw | Change the final result of many texts to their newest submission. |
 | `final_export_check` | read | reads | What a final export would contain now: accepted results, warnings, omissions. |
 | `start_export` | export | adds | Start an export job of the project; download it with download_export. |
 | `get_job` | read or import or export | reads | The state of an import or export job: queued, running, succeeded or failed. |
@@ -166,10 +174,10 @@ Useful token sets: a project token with `read`, `import`, `export` and `project-
 Every one of these that removes or replaces work takes `confirm`: without it the tool reads the state, returns what would happen and changes nothing; with it the tool sends exactly what the dry run read (a revision, the submissions to discard), so the server refuses the write if the project changed in between. Run the dry run again then.
 
 - **New round of a task** (`start_new_round`): `carry_forward` lets the person continue from one of their submissions (the dry run lists them), `clean_restart` abandons the current round with its draft and starts it again from the beginning (needs a reason).
-- **Annotation mode of a text with work** (`change_annotation_mode`): the preview names every submission that is discarded and every task that is withdrawn; `restore_annotation_mode` (with the `change_id` from `list_mode_changes`) brings them back while no new work started.
-- **Final result of one text** (`set_final_result`): choose any eligible submission, also when it differs from the others, or change an existing final result; naming the current final result confirms it after a change and acknowledges the causes the dry run lists. `accept_agreeing_texts` remains the bulk tool for full agreement.
-- **Translations**: `request_translation_correction` gives a translation reviewer the correction of a rejected or queried version, `start_lead_correction` gives it to the token's owner as lead (the review itself is done in the browser), `discard_translation` discards a version. `assign_texts` with `task: review_accepted_translation` asks for a new review of a version already accepted.
-- **Work plan**: `update_work_plan` and `distribute_texts` select every case when given no IDs, at most 2000 (the API's selection limit); a larger project needs `case_ids` in parts. The `result.undo` of an applied `update_work_plan` is what `undo_work_plan` takes to restore the earlier plan exactly. `annotation_target_preview` counts the texts that already have more annotation tasks than a lower `annotations_per_text` would give.
+- **Annotation mode of a text with work** (`change_annotation_mode`): the preview names every submission that is discarded and every task that is withdrawn; `restore_annotation_mode` (with the `change_id` from `list_mode_changes`) brings them back while no new work started. `change_annotation_modes` does the same for many texts after a dry run that names the people per text and the texts it skips; every listed text changes or none, and each text is restored on its own.
+- **Final result of one text** (`set_final_result`): choose any eligible submission, also when it differs from the others, or change an existing final result; naming the current final result confirms it after a change and acknowledges the causes the dry run lists. `accept_agreeing_texts` remains the bulk tool for full agreement: the server picks the texts in one request, and the confirm call passes the dry run's `preview_token`, so exactly the texts it listed become final (or none, with a fresh dry run, when something changed). Its dry run names every text it leaves out with a reason, and the case IDs the project does not have. `set_final_result` and `withdraw_final_result` show the final result's revision in the dry run; pass it as `expected_revision` with `confirm` (required for withdrawing), so a final result that someone changed in between is refused. `change_final_results` changes the final result of many texts that already have one to their newest submission (for example after a second round or a consolidation; an annotation only when it is the text's only submission or agrees in full with the others, otherwise the text is skipped with reason `differ`): the dry run lists each text with the result it gets and every skipped text with the reason, and the confirm call passes the dry run's `preview_token`, which also covers the final result each text has, so all listed texts change or none. It has no undo; `set_final_result` changes one text back. `withdraw_final_result` takes a final result back with a reason; the text then needs a final result again and its annotation mode can change.
+- **Translations**: `request_translation_correction` asks a translation reviewer for a new review (a correction or a second opinion) of an accepted version, however it was accepted; `start_lead_correction` gives the correction of a rejected, queried or accepted version to the token's owner as lead (the review itself is done in the browser; the correction of an accepted version becomes a new version that is reviewed again, its annotation work stays on the accepted version for the text-change tools); `accept_translation_version` accepts exactly one version as reviewed outside Ontotator with a reason (its dry run says whether the version is acceptable and returns the `text_sha256` that the confirm sends back as `expected_text_sha256`); `discard_translation` discards a version. `assign_texts` with `task: review_accepted_translation` asks for a new review of a version a lead or an import override accepted; a version accepted only by a translation review (no lead or override acceptance on record) is refused with reason `accepted_by_review` and a hint naming `request_translation_correction`.
+- **Work plan**: `update_work_plan` and `distribute_texts` select every case when given no IDs, at most 2000 (the API's selection limit); a larger project needs `case_ids` in parts. The `result.undo` of an applied `update_work_plan` is what `undo_work_plan` takes to restore the earlier plan exactly. `annotation_target_preview` counts the texts that already have more annotation tasks than a lower `annotations_per_text` would give. `set_annotations_per_text` gives one text its own value (target and limit, every version of the text), for example 4 annotators for a method comparison in a project with 1; `null` returns it to the project value. Texts with their own value keep it when the project value changes; `annotation_target_preview` leaves them out. Assign afterwards with `assign_texts`.
 - **Text changes** (a new version of a text that has work): `move_task_to_version` moves open work to the new version with the findings that can be placed, `handle_text_change` lets the person finish on the old version (`finish_then_carry`) or withdraws the task (`withdrawn`, draft kept), and `carry_submission` carries a submitted annotation to the new version. Each dry run counts the findings that can be placed and those in changed passages. `list_texts` shows the versions.
 - **Problem reports** (`act_on_problem_report`, report IDs from `list_problem_reports`): `resume` releases paused tasks, `extend_hold` pauses more tasks (from the dry run's pause candidates), `restart` releases the reporter's task and starts it again empty, `resolve` closes the report and `reopen` opens a closed one. Withdrawing a report is its reporter's own step in the browser.
 

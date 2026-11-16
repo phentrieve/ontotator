@@ -39,9 +39,9 @@ const esc = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 export const documentsTabs = (page: Page): Locator => page.getByRole("tablist", { name: "Documents views", exact: true });
 
 /** Wait until Documents shows its tabs (the page has loaded its first rows page). */
-export async function documentsReady(page: Page): Promise<void> {
+export async function documentsReady(page: Page, timeout = 30_000): Promise<void> {
   // A project without texts shows no tabs, only "No texts yet" (#46).
-  await expect(documentsTabs(page).or(page.getByRole("heading", { name: "No texts yet", exact: true }))).toBeVisible({ timeout: 30_000 });
+  await expect(documentsTabs(page).or(page.getByRole("heading", { name: "No texts yet", exact: true }))).toBeVisible({ timeout });
 }
 
 /** One tab: with ``count`` the exact name "{label}, {count}", else any count. */

@@ -111,8 +111,14 @@ test("a task from proposals after a correction waits for the lead, who withdraws
   await lead.goto(`/#/projects/${encodeURIComponent(s.project)}/documents`);
   await rowAction(lead, "Handle text change…", s.case_id, "de").click();
   const dialog = lead.getByRole("dialog", { name: /^Handle text change/ });
-  await expect(dialog.getByRole("radio", { name: "Withdraw", exact: true })).toBeChecked();
-  await expect(dialog.getByRole("radio")).toHaveCount(1);
+  // The corrected version has no proposals (issue 414): Move and Finish are disabled, nothing is preselected.
+  await expect(dialog.getByRole("alert")).toContainText("has no proposals yet");
+  await expect(dialog.getByRole("radio", { name: /^Move to v/ })).toBeDisabled();
+  await expect(dialog.getByRole("radio", { name: /^Let .+ finish on v/ })).toBeDisabled();
+  const withdraw = dialog.getByRole("radio", { name: "Withdraw", exact: true });
+  await expect(withdraw).not.toBeChecked();
+  await expect(dialog.getByRole("button", { name: "Apply", exact: true })).toBeDisabled();
+  await withdraw.check();
   await shot(lead, "8-lead-dialog-withdraw");
   await dialog.getByRole("button", { name: "Apply", exact: true }).click();
   await expect(dialog).toBeHidden();

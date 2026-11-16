@@ -578,6 +578,226 @@ def build_s5(app: FastAPI) -> dict[str, Any]:
     )
 
 
+def build_s336(app: FastAPI) -> dict[str, Any]:
+    """Bulk Reopen and Withdraw open tasks (issue 336) and the over-limit filter
+    (issue 339 b): eight en texts EN100022 to EN100029. Tom Reis submitted
+    22 to 26 and 28 (final chosen on 28); R. Roe submitted 23, 25, 27 and is
+    assigned, not started, on 24 and 29. With the limit lowered to 1, texts
+    23, 24 and 25 have more annotators than the limit."""
+    from t1_builders import native_unit
+
+    scenario = new_project(app, "S336")
+    cases = [f"EN1000{number}" for number in range(22, 30)]
+    docs = import_texts(
+        scenario,
+        [
+            native_unit(case, "en", f"{SYNTHETIC} {case}", case_id=case)
+            for case in cases
+        ],
+    )
+    doc = {case: docs[(case, "en", 1)] for case in cases}
+    with scenario.db.transaction() as conn:
+        conn.execute(
+            update(ProjectRow)
+            .where(ProjectRow.project_key == scenario.key)
+            .values(annotations_per_text=2)
+        )
+    add_user(scenario, "lead", ["lead"])
+    for name, display in (("tom", "Tom Reis"), ("roe", "R. Roe")):
+        add_user(scenario, name, ["annotator"])
+        app.state.accounts.update_profile(
+            Actor.cli(), scenario.users[name], display_name=display
+        )
+    submitted = {}
+    for case in ("EN100022", "EN100023", "EN100024", "EN100025", "EN100026"):
+        submitted[case] = submit(scenario, doc[case], "tom")
+    for case in ("EN100023", "EN100025", "EN100027"):
+        submit(scenario, doc[case], "roe")
+    final = submit(scenario, doc["EN100028"], "tom")
+    select(scenario, doc["EN100028"], final["submission_id"])
+    for case in ("EN100024", "EN100029"):
+        assign(scenario, doc[case], "roe", "annotate")
+    with scenario.db.transaction() as conn:
+        conn.execute(
+            update(ProjectRow)
+            .where(ProjectRow.project_key == scenario.key)
+            .values(annotations_per_text=1)
+        )
+    return result(scenario, [(case, "en") for case in cases], documents=doc)
+
+
+def build_s336f(app: FastAPI) -> dict[str, Any]:
+    """Bulk Change final… and Accept agreeing results… (issue 336 step 2):
+    eight en texts EN100022 to EN100029, two annotators per text. Tom Reis's
+    submission is the final result of 22 to 26; afterwards R. Roe submitted
+    22 and 23 (the newest submission there, agreeing with Tom Reis) and 24
+    with a finding Tom Reis does not have (the submissions differ), and is
+    assigned, not started, on 26. Both submitted 27 and 28 without findings (full agreement, no
+    final result); only Tom Reis submitted 29."""
+    from t1_builders import native_unit
+
+    scenario = new_project(app, "S336F")
+    cases = [f"EN1000{number}" for number in range(22, 30)]
+    docs = import_texts(
+        scenario,
+        [
+            native_unit(case, "en", f"{SYNTHETIC} {case}", case_id=case)
+            for case in cases
+        ],
+    )
+    doc = {case: docs[(case, "en", 1)] for case in cases}
+    with scenario.db.transaction() as conn:
+        conn.execute(
+            update(ProjectRow)
+            .where(ProjectRow.project_key == scenario.key)
+            .values(annotations_per_text=2)
+        )
+    add_user(scenario, "lead", ["lead"])
+    for name, display in (("tom", "Tom Reis"), ("roe", "R. Roe")):
+        add_user(scenario, name, ["annotator"])
+        app.state.accounts.update_profile(
+            Actor.cli(), scenario.users[name], display_name=display
+        )
+    for case in ("EN100022", "EN100023", "EN100024", "EN100025", "EN100026"):
+        final = submit(scenario, doc[case], "tom")
+        select(scenario, doc[case], final["submission_id"])
+    for case in ("EN100022", "EN100023"):
+        submit(scenario, doc[case], "roe")
+    from browser_overview_scenarios import add_findings
+
+    differing = assign(scenario, doc["EN100024"], "roe", "annotate")
+    started = start_round(scenario, differing, "roe")
+    add_findings(scenario, "roe", started.workspace_key, ["HP:0001250"])
+    finish_round(scenario, "roe", started.workspace_key)
+    assign(scenario, doc["EN100026"], "roe", "annotate")
+    for case in ("EN100027", "EN100028"):
+        submit(scenario, doc[case], "tom")
+        submit(scenario, doc[case], "roe")
+    submit(scenario, doc["EN100029"], "tom")
+    return result(scenario, [(case, "en") for case in cases], documents=doc)
+
+
+def build_s336r(app: FastAPI) -> dict[str, Any]:
+    """Bulk Start a round… (issue 336 step 3): eight en texts EN100022 to
+    EN100029, two annotators per text. Tom Reis submitted 22 to 26 (22 with
+    a finding), R. Roe 23 and 25; R. Roe is assigned, not started, on 26 and
+    29. Tom Reis's submission is the final result of 27. Both submitted 28,
+    where the lead's consolidation is open."""
+    from browser_overview_scenarios import add_findings
+    from t1_builders import native_unit
+
+    scenario = new_project(app, "S336R")
+    cases = [f"EN1000{number}" for number in range(22, 30)]
+    docs = import_texts(
+        scenario,
+        [
+            native_unit(case, "en", f"{SYNTHETIC} {case}", case_id=case)
+            for case in cases
+        ],
+    )
+    doc = {case: docs[(case, "en", 1)] for case in cases}
+    with scenario.db.transaction() as conn:
+        conn.execute(
+            update(ProjectRow)
+            .where(ProjectRow.project_key == scenario.key)
+            .values(annotations_per_text=2)
+        )
+    add_user(scenario, "lead", ["lead", "adjudicator"])
+    for name, display in (("tom", "Tom Reis"), ("roe", "R. Roe")):
+        add_user(scenario, name, ["annotator"])
+        app.state.accounts.update_profile(
+            Actor.cli(), scenario.users[name], display_name=display
+        )
+    first = assign(scenario, doc["EN100022"], "tom", "annotate")
+    started = start_round(scenario, first, "tom")
+    add_findings(scenario, "tom", started.workspace_key, ["HP:0001250"])
+    finish_round(scenario, "tom", started.workspace_key)
+    for case in ("EN100023", "EN100024", "EN100025", "EN100026"):
+        submit(scenario, doc[case], "tom")
+    for case in ("EN100023", "EN100025"):
+        submit(scenario, doc[case], "roe")
+    for case in ("EN100026", "EN100029"):
+        assign(scenario, doc[case], "roe", "annotate")
+    final = submit(scenario, doc["EN100027"], "tom")
+    select(scenario, doc["EN100027"], final["submission_id"])
+    inputs = [
+        submit(scenario, doc["EN100028"], name)["submission_id"]
+        for name in ("tom", "roe")
+    ]
+    review = assign(scenario, doc["EN100028"], "lead", "review")
+    start_round(scenario, review, "lead", kind="consolidation", sources=inputs)
+    return result(
+        scenario,
+        [(case, "en") for case in cases],
+        documents=doc,
+        assignments={"first": first},
+    )
+
+
+def build_s336m(app: FastAPI) -> dict[str, Any]:
+    """Bulk Change mode… (issue 336 step 4): eight en texts EN100022 to
+    EN100029 in a project that annotates from scratch; all but 28 have three
+    tool proposals. Tom Reis submitted 22 to 26 and 28, R. Roe 22 and 25;
+    R. Roe is assigned, not started, on 23. Carla Diaz (the lead) has an
+    open consolidation of 25. Tom Reis's submission is the final result of
+    26. Nobody works on 27 and 29."""
+    from browser_proposal_check_scenarios import proposals, text_of
+    from t1_builders import native_unit
+
+    scenario = new_project(app, "S336M")
+    cases = [f"EN1000{number}" for number in range(22, 30)]
+    texts = {case: text_of(case) for case in cases}
+    docs = import_texts(
+        scenario,
+        [
+            native_unit(
+                case,
+                "en",
+                texts[case],
+                case_id=case,
+                annotations=[] if case == "EN100028" else proposals(texts[case]),
+            )
+            for case in cases
+        ],
+    )
+    doc = {case: docs[(case, "en", 1)] for case in cases}
+    with scenario.db.transaction() as conn:
+        conn.execute(
+            update(ProjectRow)
+            .where(ProjectRow.project_key == scenario.key)
+            .values(annotations_per_text=2, tool_proposal_mode="scratch")
+        )
+    add_user(scenario, "lead", ["lead", "adjudicator"])
+    for name, display in (
+        ("lead", "Carla Diaz"),
+        ("tom", "Tom Reis"),
+        ("roe", "R. Roe"),
+    ):
+        if name != "lead":
+            add_user(scenario, name, ["annotator"])
+        app.state.accounts.update_profile(
+            Actor.cli(), scenario.users[name], display_name=display
+        )
+    by_tom = {
+        case: submit(scenario, doc[case], "tom")["submission_id"]
+        for case in ("EN100022", "EN100023", "EN100024", "EN100025", "EN100026")
+    }
+    submit(scenario, doc["EN100028"], "tom")
+    submit(scenario, doc["EN100022"], "roe")
+    by_roe = submit(scenario, doc["EN100025"], "roe")["submission_id"]
+    assign(scenario, doc["EN100023"], "roe", "annotate")
+    review = assign(scenario, doc["EN100025"], "lead", "review")
+    start_round(
+        scenario,
+        review,
+        "lead",
+        kind="consolidation",
+        sources=[by_tom["EN100025"], by_roe],
+    )
+    select(scenario, doc["EN100026"], by_tom["EN100026"])
+    return result(scenario, [(case, "en") for case in cases], documents=doc)
+
+
 BUILDERS: dict[str, Builder] = {
     "S0": build_s0,
     "S1": build_s1,
@@ -585,6 +805,10 @@ BUILDERS: dict[str, Builder] = {
     "S3": build_s3,
     "S4": build_s4,
     "S5": build_s5,
+    "S336": build_s336,
+    "S336F": build_s336f,
+    "S336R": build_s336r,
+    "S336M": build_s336m,
     # S8 is the S0 data at a 390 px viewport.
     "S8": build_s0,
 }

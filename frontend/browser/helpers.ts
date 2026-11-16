@@ -15,6 +15,16 @@ export async function openTasksHome(page: Page) {
   await page.evaluate(home => window.history.replaceState(null, "", home), TASKS_HOME.slice(1));
 }
 
+/**
+ * The app shell follows the address only once its effects have run: they stamp the history entry with
+ * `ontotatorRouteIndex` (src/App.tsx) and start listening to `hashchange`. The shell is visible a moment
+ * earlier. A `goto("/#/…")` in that moment is lost, because the stamp writes the address the shell was
+ * rendered with back over it: the page stays on My tasks. Nobody types an address that fast; a test does.
+ */
+export async function routerReady(page: Page) {
+  await page.waitForFunction(() => typeof window.history.state?.ontotatorRouteIndex === "number");
+}
+
 /** The password ``tests/browser_server.py`` sets for every test user. */
 export const TEST_PASSWORD = "browser test passphrase";
 
@@ -36,6 +46,7 @@ export async function loginExisting(page: Page, username: string) {
   const identity = await me.json() as { username: string; pseudonym: string };
   expect(identity.username).toBe(username);
   await expect(page.getByTestId("current-user")).toContainText(identity.pseudonym);
+  await routerReady(page);
 }
 
 /** Current page cookies and freshly read CSRF token; never a second actor context. */
@@ -66,6 +77,7 @@ export async function loginAs(page: Page, pseudonym: string, projects: string[] 
   await form.getByLabel("Password").fill(TEST_PASSWORD);
   await form.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(page.getByTestId("current-user")).toContainText(pseudonym);
+  await routerReady(page);
 }
 
 /** Open an actual assigned task, retaining the server's row order. */

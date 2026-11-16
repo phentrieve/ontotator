@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, ApiError, type AssignmentView } from "../../src/api/client";
+import { api, ApiError, NetworkError, type AssignmentView } from "../../src/api/client";
 import { HandleTextChangeDialog } from "../../src/documents/HandleTextChangeDialog";
 import { openOnOldText, preview, V2 } from "./textChangeFixtures";
 
@@ -32,15 +32,126 @@ describe("HandleTextChangeDialog", () => {
     await screen.findByText(/could not be placed/);
   });
 
-  it("work from proposals offers only Withdraw, preselected, and asks no preview", async () => {
+  it("work from proposals can move: its decisions on the proposals are carried", async () => {
+    setup({ mode: "proposals" });
+    const move = screen.getByRole("radio", { name: "Move to v2" }) as HTMLInputElement;
+    expect(move.checked).toBe(true);
+    expect(document.getElementById(move.getAttribute("aria-describedby")!.split(" ")[0])?.textContent)
+      .toBe("Tom Reis continues on the corrected text. Their decisions on the proposals are carried; only items in changed passages are marked Check needed.");
+    expect(screen.getByRole("radio", { name: "Let Tom Reis finish on v1" })).toBeDefined();
+    await screen.findByText(/could not be placed/);
+  });
+
+  it("no proposals on v2 yet: Move and Finish are disabled with the reason, nothing is chosen, and Retry checks again with focus kept", async () => {
+    vi.mocked(api.previewTextChange).mockRejectedValueOnce(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "no_target_proposals" }));
+    setup({ mode: "proposals" });
+    const line = await within(dialog()).findByRole("alert");
+    expect(line.textContent).toBe("v2 has no proposals yet: their automatic transfer may still be running, or they must be imported. Wait for or import the proposals for v2, then try again.");
+    const move = screen.getByRole("radio", { name: "Move to v2" }) as HTMLInputElement;
+    const finish = screen.getByRole("radio", { name: "Let Tom Reis finish on v1" }) as HTMLInputElement;
+    expect([move.disabled, move.checked, finish.disabled, finish.checked]).toEqual([true, false, true, false]);
+    expect(move.getAttribute("aria-describedby")!.split(" ").map(id => document.getElementById(id)?.textContent)).toContain("Not possible until v2 has proposals.");
+    expect((screen.getByRole("radio", { name: "Withdraw" }) as HTMLInputElement).checked).toBe(false);
+    expect(apply().getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(screen.getByRole("radio", { name: "Withdraw" }));
+    expect(apply().getAttribute("aria-disabled")).toBeNull();
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("1 of 3 decisions and findings could not be placed and need Tom Reis’s decision.")).toBeDefined();
+    expect(within(dialog()).queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("radio", { name: "Move to v2" }));
+  });
+
+  it("while Retry reloads the preview no choice is checked that was not checked before, and Retry keeps focus (issue 419)", async () => {
+    const noProposals = new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "no_target_proposals" });
+    let answer: (value: ReturnType<typeof preview>) => void = () => undefined;
+    let refuse: (error: unknown) => void = () => undefined;
+    vi.mocked(api.previewTextChange).mockRejectedValueOnce(noProposals)
+      .mockImplementationOnce(() => new Promise((_resolve, reject) => { refuse = reject; }))
+      .mockImplementationOnce(() => new Promise(resolve => { answer = resolve; }));
+    setup({ mode: "proposals" });
+    await within(dialog()).findByRole("alert");
+    const checked = () => within(dialog()).getAllByRole("radio").filter(radio => (radio as HTMLInputElement).checked).map(radio => radio.getAttribute("value"));
+    expect(checked()).toEqual([]);
+    const retry = within(dialog()).getByRole("button", { name: "Retry" });
+    retry.focus();
+    fireEvent.click(retry);
+    // Reloading: the reason, the disabled Move and Finish and the busy Retry stay; Move is not checked again.
+    await waitFor(() => expect(api.previewTextChange).toHaveBeenCalledTimes(2));
+    expect(checked()).toEqual([]);
+    expect((screen.getByRole("radio", { name: "Move to v2" }) as HTMLInputElement).disabled).toBe(true);
+    expect(retry.isConnected && retry.getAttribute("aria-busy")).toBe("true");
+    expect(document.activeElement).toBe(retry);
+    // Still no proposals: nothing checked, focus on Retry.
+    refuse(noProposals);
+    await waitFor(() => expect(within(dialog()).getByRole("button", { name: "Retry" }).getAttribute("aria-busy")).toBeNull());
+    expect(checked()).toEqual([]);
+    expect(dialog().contains(document.activeElement)).toBe(true);
+    // A chosen Withdraw stays checked through the next reload, which then finds the proposals.
+    fireEvent.click(screen.getByRole("radio", { name: "Withdraw" }));
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(api.previewTextChange).toHaveBeenCalledTimes(3));
+    expect(checked()).toEqual(["withdraw"]);
+    answer(preview({ findings: 3, placed: 2, unplaced: 1 }));
+    expect(await screen.findByText(/could not be placed/)).toBeDefined();
+    expect(checked()).toEqual(["withdraw"]);
+    expect((screen.getByRole("radio", { name: "Move to v2" }) as HTMLInputElement).disabled).toBe(false);
+    expect(within(dialog()).queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(dialog().contains(document.activeElement)).toBe(true);
+  });
+
+  it("a Retry that fails on the server or the network keeps the no-proposals reason, its Retry and the disabled Move (issue 419)", async () => {
+    vi.mocked(api.previewTextChange).mockRejectedValueOnce(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "no_target_proposals" }))
+      .mockRejectedValueOnce(new ApiError(503, "Service unavailable")).mockRejectedValueOnce(new NetworkError(new TypeError("Failed to fetch")));
+    setup({ mode: "proposals" });
+    await within(dialog()).findByRole("alert");
+    for (const calls of [2, 3]) {
+      fireEvent.click(within(dialog()).getByRole("button", { name: "Retry" }));
+      await waitFor(() => expect(api.previewTextChange).toHaveBeenCalledTimes(calls));
+      await waitFor(() => expect(within(dialog()).getByRole("button", { name: "Retry" }).getAttribute("aria-busy")).toBeNull());
+      expect(within(dialog()).getAllByText(/has no proposals yet/)).toHaveLength(1);
+      const move = screen.getByRole("radio", { name: "Move to v2" }) as HTMLInputElement;
+      expect([move.disabled, move.checked]).toEqual([true, false]);
+      expect(apply().getAttribute("aria-disabled")).toBe("true");
+    }
+  });
+
+  it("a correction that stops counting during the preview reload drops the busy Retry and the kept reason", async () => {
+    vi.mocked(api.previewTextChange).mockRejectedValueOnce(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "no_target_proposals" }))
+      .mockImplementationOnce(() => new Promise(() => undefined));
+    const { row, step } = openOnOldText({ mode: "proposals" });
+    const props = { onClose: vi.fn(), onDone: vi.fn(), onReload: vi.fn() };
+    const view = render(<HandleTextChangeDialog projectKey="demo" row={row} step={step} {...props} />);
+    await within(dialog()).findByRole("alert");
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(api.previewTextChange).toHaveBeenCalledTimes(2));
+    // The reloaded row: the target is no longer newer than the task's version, so only Withdraw is left.
+    const older = { ...row, versions: row.versions.map(version => version.document_id === step.document_id ? { ...version, version: 0 } : version) };
+    view.rerender(<HandleTextChangeDialog projectKey="demo" row={older} step={step} {...props} />);
+    await waitFor(() => expect(within(dialog()).getAllByRole("radio").map(radio => radio.getAttribute("value"))).toEqual(["withdraw"]));
+    expect(within(dialog()).queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(within(dialog()).queryByText(/has no proposals yet/)).toBeNull();
+  });
+
+  it("a move refused for missing proposals shows the reason once, with Retry, and disables Move", async () => {
+    vi.spyOn(api, "moveToVersion").mockRejectedValue(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "no_target_proposals" }));
+    setup({ mode: "proposals" });
+    await screen.findByText(/could not be placed/);
+    fireEvent.click(apply());
+    expect(await within(dialog()).findByRole("button", { name: "Retry" })).toBeDefined();
+    expect(within(dialog()).getAllByText(/has no proposals yet/)).toHaveLength(1);
+    expect((screen.getByRole("radio", { name: "Move to v2" }) as HTMLInputElement).disabled).toBe(true);
+  });
+
+  it("another refused preview offers only Withdraw, preselected, with the reason and without Retry", async () => {
+    vi.mocked(api.previewTextChange).mockRejectedValue(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "not_open" }));
     const resolve = vi.spyOn(api, "resolveTextChange").mockResolvedValue({} as AssignmentView);
     const props = setup({ mode: "proposals" });
+    expect(await within(dialog()).findByText(/That is why Withdraw is the only choice\./)).toBeDefined();
+    expect(within(dialog()).queryByRole("button", { name: "Retry" })).toBeNull();
     expect((screen.getByRole("radio", { name: "Withdraw" }) as HTMLInputElement).checked).toBe(true);
     expect(screen.queryByRole("radio", { name: "Move to v2" })).toBeNull();
     expect(screen.queryByRole("radio", { name: "Let Tom Reis finish on v1" })).toBeNull();
-    expect(within(dialog()).getByText("Tom Reis checks tool proposals that were made for the text of v1. The proposals mark places in that text, so they cannot be moved to v2, and the task cannot either. That is why Withdraw is the only choice.")).toBeDefined();
     expect(within(dialog()).getByText("Next: click Apply to withdraw the task, then assign an annotation of v2.")).toBeDefined();
-    expect(api.previewTextChange).not.toHaveBeenCalled();
     fireEvent.click(apply());
     await waitFor(() => expect(resolve).toHaveBeenCalledWith(41, { resolution: "withdrawn", target_document_id: V2, expected_workflow_revision: 7 }));
     expect(props.onDone).toHaveBeenCalledWith("Tom Reis’s task is withdrawn. v2 needs a new annotation.");
@@ -128,7 +239,7 @@ describe("HandleTextChangeDialog", () => {
     setup();
     const move = screen.getByRole("radio", { name: "Move to v2" });
     const described = (move.getAttribute("aria-describedby") ?? "").split(" ").map(id => document.getElementById(id)?.textContent).join(" ");
-    expect(described).toContain("Tom Reis continues on the corrected text. Their draft findings are carried and marked “check after text change”.");
+    expect(described).toContain("Tom Reis continues on the corrected text. Their draft findings are carried and marked Check needed.");
     const withdraw = screen.getByRole("radio", { name: "Withdraw" });
     expect(document.getElementById(withdraw.getAttribute("aria-describedby")!)?.textContent).toBe("Tom Reis’s task ends. Nothing of the draft is carried to v2; v2 needs a new annotation.");
     fireEvent.click(withdraw);

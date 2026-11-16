@@ -286,6 +286,35 @@ class DiscardResult(BaseModel):
     withdrawn: list[WithdrawnTaskView]
 
 
+class AcceptVersionRequest(BaseModel):
+    """Issue 341 d: accept exactly one version as reviewed outside Ontotator."""
+
+    model_config = ConfigDict(extra="forbid")
+    reason: str = Field(min_length=1, max_length=2000)
+    expected_text_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+class AcceptVersionResult(BaseModel):
+    case_id: str
+    language: str
+    document_id: str
+    version: int
+    translation_status: Literal["accepted"]
+
+
+class AcceptVersionPreview(BaseModel):
+    """Whether "Accept this version…" would accept it, and the text hash to send."""
+
+    case_id: str
+    language: str
+    document_id: str
+    version: int
+    translation_status: str | None
+    acceptable: bool
+    reason: str | None
+    text_sha256: str
+
+
 def _service(request: Request, key: str, principal: Any) -> WorkPlanService:
     access = get_access(request)
     if not can(access, Action.VIEW_PROJECT, key):
@@ -346,6 +375,80 @@ def patch_work_plan(
     return _service(request, key, principal).patch_row(key, case_id, language, body)
 
 
+class AnnotationsPerTextSet(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # The text's own "Annotations per text"; None follows the project value.
+    value: int | None = Field(ge=1, le=5)
+    reason: str | None = Field(default=None, max_length=2000)
+
+
+class AnnotationsPerTextResult(BaseModel):
+    case_id: str
+    language: str
+    # The text's own value; None: it follows the project value.
+    override: int | None
+    project_value: int
+    # What the text gets: ``override`` if set, else ``project_value``.
+    effective: int
+    # False when the text already had this value (nothing written).
+    changed: bool
+
+
+class AnnotationsPerTextBulkSet(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    texts: list[RowRefView] = Field(min_length=1, max_length=MAX_SELECTED_ROWS)
+    # The texts' own "Annotations per text"; None follows the project value.
+    value: int | None = Field(ge=1, le=5)
+    reason: str | None = Field(default=None, max_length=2000)
+
+
+class AnnotationsPerTextBulkResult(BaseModel):
+    texts: list[AnnotationsPerTextResult]
+
+
+# Before the single-text route: its case ID is a path.
+@router.put("/texts/annotations-per-text", response_model=AnnotationsPerTextBulkResult)
+def set_annotations_per_texts(
+    key: str,
+    body: AnnotationsPerTextBulkSet,
+    principal: PrincipalDep,
+    request: Request,
+) -> dict[str, Any]:
+    """Several texts' own "Annotations per text" at once (issue 422).
+
+    All or nothing: one unknown text refuses the request. Each text is
+    compared with its own value; texts that already have it are unchanged.
+    """
+    return _service(request, key, principal).set_annotations_per_texts(
+        key,
+        [RowKey(row.case_id, row.language) for row in body.texts],
+        body.value,
+        body.reason,
+    )
+
+
+@router.put(
+    "/texts/{case_id:path}/{language}/annotations-per-text",
+    response_model=AnnotationsPerTextResult,
+)
+def set_annotations_per_text(
+    key: str,
+    case_id: str,
+    language: str,
+    body: AnnotationsPerTextSet,
+    principal: PrincipalDep,
+    request: Request,
+) -> dict[str, Any]:
+    """One text's own "Annotations per text", target and limit (issue 422).
+
+    Idempotent; ``value: null`` returns the text to the project value.
+    Assignments above a lowered value stay.
+    """
+    return _service(request, key, principal).set_annotations_per_text(
+        key, case_id, language, body.value, body.reason
+    )
+
+
 @router.post("/document-rows/move-to-front", response_model=MoveToFrontResult)
 def move_to_front(
     key: str, body: MoveToFrontRequest, principal: PrincipalDep, request: Request
@@ -374,3 +477,25 @@ def discard_variant(
     return _service(request, key, principal).discard(
         key, document_id, body.reason, body.confirm
     )
+
+
+@router.post("/variants/{document_id:path}/accept", response_model=AcceptVersionResult)
+def accept_version(
+    key: str,
+    document_id: str,
+    body: AcceptVersionRequest,
+    principal: PrincipalDep,
+    request: Request,
+) -> dict[str, Any]:
+    """Accept this one version, audited with the reason (issue 341 d)."""
+    return _service(request, key, principal).accept_version(
+        key, document_id, body.reason, body.expected_text_sha256
+    )
+
+
+@router.get("/variants/{document_id:path}/accept", response_model=AcceptVersionPreview)
+def preview_accept_version(
+    key: str, document_id: str, principal: PrincipalDep, request: Request
+) -> dict[str, Any]:
+    """Read only: whether this version can be accepted, and why not."""
+    return _service(request, key, principal).accept_version_preview(key, document_id)

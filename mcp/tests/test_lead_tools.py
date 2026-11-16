@@ -157,7 +157,16 @@ async def test_set_final_result_replaces_or_confirms_with_the_revision(
     dry = await call(mcp_client, "set_final_result", args)
     assert dry["applied"] is False
     assert dry["plan"]["replaces_final"] is True
+    assert dry["plan"]["revision"] == 3
     assert dry["plan"]["acknowledges"] == []
+    assert _writes(fake) == []
+    # The final result changed since a dry run that showed revision 2.
+    with pytest.raises(ToolFailed, match="changed since the dry run"):
+        await call(
+            mcp_client,
+            "set_final_result",
+            args | {"confirm": True, "expected_revision": 2},
+        )
     assert _writes(fake) == []
     await call(mcp_client, "set_final_result", args | {"confirm": True})
     [replaced] = fake.calls_to("PUT", f"{P}/final-selections")
@@ -174,6 +183,46 @@ async def test_set_final_result_replaces_or_confirms_with_the_revision(
     assert confirmed.json()["acknowledged_cause_ids"] == ["k1"]
     with pytest.raises(ToolFailed, match="is not a submission"):
         await call(mcp_client, "set_final_result", args | {"submission_id": "zz"})
+
+
+async def test_withdraw_final_result_sends_the_finals_revision(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    fake.on("GET", f"{P}/document-rows", page([row("c", final=_final("s1", 4))]))
+    args = {"project": "p", "case_id": "c", "language": "en", "reason": "Redo"}
+    dry = await call(mcp_client, "withdraw_final_result", args)
+    assert dry["applied"] is False
+    assert dry["plan"]["current_final"]["submission_id"] == "s1"
+    assert dry["plan"]["revision"] == 4
+    assert _writes(fake) == []
+    with pytest.raises(ToolFailed, match="expected_revision"):
+        await call(mcp_client, "withdraw_final_result", args | {"confirm": True})
+    assert _writes(fake) == []
+    args["expected_revision"] = 4
+    await call(mcp_client, "withdraw_final_result", args | {"confirm": True})
+    [withdrawn] = fake.calls_to("POST", f"{P}/final-selections/withdraw")
+    assert withdrawn.json() == {
+        "case_id": "c",
+        "language": "en",
+        "expected_revision": 4,
+        "reason": "Redo",
+    }
+    # Another lead changed the final result after the dry run: the revision
+    # of the dry run is sent, and the server's refusal is passed on.
+    fake.calls.clear()
+    fake.on("GET", f"{P}/document-rows", page([row("c", final=_final("s2", 5))]))
+    fake.on(
+        "POST",
+        f"{P}/final-selections/withdraw",
+        refusal(409, "REVISION_CONFLICT", {"current_revision": 5}),
+    )
+    with pytest.raises(ToolFailed, match="REVISION_CONFLICT"):
+        await call(mcp_client, "withdraw_final_result", args | {"confirm": True})
+    [stale] = fake.calls_to("POST", f"{P}/final-selections/withdraw")
+    assert stale.json()["expected_revision"] == 4
+    fake.on("GET", f"{P}/document-rows", page([row("c")]))
+    with pytest.raises(ToolFailed, match="has no final result"):
+        await call(mcp_client, "withdraw_final_result", args | {"confirm": True})
 
 
 async def test_undo_and_discard_return_the_work_they_would_withdraw(
@@ -301,6 +350,40 @@ async def test_translation_tools_send_the_versions_text_hash(
     assert lead.json() == {"expected_text_sha256": "a" * 64, "confirm_language": False}
 
 
+async def test_accept_translation_version_confirms_with_the_dry_runs_text_hash(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    accept = f"{P}/variants/{{document_id}}/accept"
+    preview = build(
+        "AcceptVersionPreview",
+        document_id="d",
+        acceptable=False,
+        reason="review_open",
+        text_sha256="b" * 64,
+    )
+    fake.on("GET", accept, preview)
+    args = {"project": "p", "document_id": "d", "reason": "Checked"}
+    dry = await call(mcp_client, "accept_translation_version", args)
+    assert dry["applied"] is False
+    assert dry["plan"]["acceptable"] is False
+    assert dry["plan"]["reason"] == "review_open"
+    assert dry["plan"]["text_sha256"] == "b" * 64
+    assert not fake.calls_to("POST", accept)
+    with pytest.raises(ToolFailed, match="expected_text_sha256"):
+        await call(mcp_client, "accept_translation_version", args | {"confirm": True})
+    assert not fake.calls_to("POST", accept)
+    done = await call(
+        mcp_client,
+        "accept_translation_version",
+        args | {"confirm": True, "expected_text_sha256": "b" * 64},
+    )
+    assert done["applied"] is True
+    # The hash is the dry run's, not re-read at confirm.
+    assert len(fake.calls_to("GET", accept)) == 1
+    [sent] = fake.calls_to("POST", accept)
+    assert sent.json() == {"reason": "Checked", "expected_text_sha256": "b" * 64}
+
+
 async def test_assign_texts_asks_for_a_review_of_an_accepted_translation(
     fake: FakeApi, mcp_client: Client
 ) -> None:
@@ -318,7 +401,172 @@ async def test_assign_texts_asks_for_a_review_of_an_accepted_translation(
     assert sent.json()["review_accepted_translation"] is True
 
 
+async def test_assign_texts_names_the_correction_for_a_review_accepted_version(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    def refused(document_id: str, reason: str | None) -> dict[str, Any]:
+        return {
+            "document_id": document_id,
+            "username": "u",
+            "code": "NOT_A_TRANSLATION",
+            "reason": reason,
+        }
+
+    fake.on(
+        "POST",
+        f"{P}/assignments",
+        {
+            "created": [],
+            "refused": [refused("d", "accepted_by_review"), refused("n", None)],
+        },
+    )
+    result = await call(
+        mcp_client,
+        "assign_texts",
+        {
+            "project": "p",
+            "assignments": [
+                {"document_id": "d", "username": "u"},
+                {"document_id": "n", "username": "u"},
+            ],
+            "task": "review_accepted_translation",
+        },
+    )
+    by_review, other = result["refused"]
+    assert "request_translation_correction" in by_review["hint"]
+    assert "hint" not in other
+    tools = {tool.name: tool for tool in (await mcp_client.list_tools()).tools}
+    schema = tools["assign_texts"].input_schema["properties"]["task"]
+    assert "request_translation_correction" in schema["description"]
+    correction = tools["request_translation_correction"].description or ""
+    assert "accepted" in correction.splitlines()[0]
+    assert "rejected or queried translation." not in correction.splitlines()[0]
+
+
+async def test_a_text_gets_its_own_annotations_per_text(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    """Issue 422: one idempotent PUT per text; None follows the project again."""
+    template = f"{P}/texts/{{case_id}}/{{language}}/annotations-per-text"
+    for value in (4, None):
+        await call(
+            mcp_client,
+            "set_annotations_per_text",
+            {
+                "project": "p",
+                "case_id": "EN100022",
+                "language": "de",
+                "annotations_per_text": value,
+                "reason": "method comparison",
+            },
+        )
+    sent = fake.calls_to("PUT", template)
+    assert [c.json() for c in sent] == [
+        {"value": 4, "reason": "method comparison"},
+        {"value": None, "reason": "method comparison"},
+    ]
+    assert str(sent[0].request.url).endswith(
+        "/projects/p/texts/EN100022/de/annotations-per-text"
+    )
+    with pytest.raises(ToolFailed):
+        await call(
+            mcp_client,
+            "set_annotations_per_text",
+            {
+                "project": "p",
+                "case_id": "c",
+                "language": "de",
+                "annotations_per_text": 6,
+            },
+        )
+
+
 async def test_tool_texts_state_the_selection_limit(mcp_client: Client) -> None:
     tools = {tool.name: tool for tool in (await mcp_client.list_tools()).tools}
     for name in ("update_work_plan", "distribute_texts"):
         assert "at most 2000" in (tools[name].description or ""), name
+
+
+async def test_change_annotation_modes_dry_run_confirm_and_stale_token(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    bulk = f"{P}/annotation-mode-changes/bulk"
+    texts = [{"case_id": "c", "language": "en"}, {"case_id": "d", "language": "en"}]
+    tom = {"pseudonym": "ann-1", "display_name": "Tom Reis", "is_me": False}
+    roe = {"pseudonym": "ann-2", "display_name": None, "is_me": False}
+
+    def preview(token: str, **fields: Any) -> dict[str, Any]:
+        change = build(
+            "ModeChangePreview",
+            case_id="c",
+            language="en",
+            from_mode="proposals",
+            to_mode="scratch",
+            submissions=[
+                build("DiscardedSubmissionView", submission_id="s1", author=tom)
+            ],
+            assignments=[
+                build("RevokedAssignmentView", status="submitted", person=tom),
+                build("RevokedAssignmentView", status="open", person=roe),
+            ],
+        )
+        skipped = build(
+            "BulkModeSkippedView",
+            case_id="d",
+            language="en",
+            reason="final_result",
+            message="Final result chosen: use Withdraw final… first.",
+        )
+        return (
+            build(
+                "BulkModeChangeView",
+                mode="scratch",
+                applied=False,
+                texts=2,
+                change_count=1,
+                skipped_count=1,
+                skipped_by_reason={"final_result": 1},
+                submission_count=1,
+                assignment_count=2,
+                changes=[change],
+                skipped=[skipped],
+                preview_token=token,
+            )
+            | fields
+        )
+
+    fake.on("POST", bulk, preview("sha256:a"))
+    args = {"project": "p", "texts": texts, "mode": "scratch", "reason": "Wrong model"}
+    dry = await call(mcp_client, "change_annotation_modes", args)
+    assert dry["applied"] is False and dry["preview_token"] == "sha256:a"
+    assert dry["would_change"] == [
+        {
+            "case_id": "c",
+            "language": "en",
+            "from_mode": "proposals",
+            "discarded_submissions": 1,
+            "authors": ["Tom Reis"],
+            "withdrawn_unsubmitted_tasks": ["ann-2"],
+        }
+    ]
+    assert dry["skipped_texts"][0]["message"].startswith("Final result chosen")
+    [post] = fake.calls_to("POST", bulk)
+    assert post.json() == {"rows": texts, "mode": "scratch", "preview": True}
+    with pytest.raises(ToolFailed):
+        await call(mcp_client, "change_annotation_modes", args | {"confirm": True})
+    assert len(fake.calls_to("POST", bulk)) == 1
+    confirmed = args | {"confirm": True, "preview_token": "sha256:a"}
+    fake.on("POST", bulk, preview("sha256:a", applied=True))
+    done = await call(mcp_client, "change_annotation_modes", confirmed)
+    assert done["applied"] is True and done["change_count"] == 1
+    assert fake.calls_to("POST", bulk)[-1].json() == {
+        "rows": texts,
+        "mode": "scratch",
+        "preview_token": "sha256:a",
+        "reason": "Wrong model",
+    }
+    fake.on(
+        "POST", bulk, refusal(409, "PREVIEW_STALE", {"preview": preview("sha256:b")})
+    )
+    stale = await call(mcp_client, "change_annotation_modes", confirmed)
+    assert stale["stale"] is True and stale["preview_token"] == "sha256:b"

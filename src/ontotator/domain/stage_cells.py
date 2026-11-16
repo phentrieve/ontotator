@@ -99,6 +99,7 @@ CellNote = Literal[
     "not_exported",
     "carried_on_submit",
     "v2_not_annotated",
+    "no_target_proposals",  # old_text_submitted: the target has no proposals yet
     # Review re_review: why the translation is reviewed again.
     "correction",
     "new_review",
@@ -481,7 +482,9 @@ def _annotation(facts: StageFacts, codes: frozenset[str]) -> StageCell:
                 people=_people(step.old_submitted),
                 from_version=step.old_submitted[0].from_version,
                 version=newest,
-                note="v2_not_annotated",
+                note="no_target_proposals"
+                if all(item.blocked for item in step.old_submitted)
+                else "v2_not_annotated",
             )
     per_text = step.per_text
     counted = per_text > 1

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Ontotator Local API",
-    "version": "0.10.1"
+    "version": "0.10.2"
   },
   "paths": {
     "/api/v1/me/tasks": {
@@ -930,6 +930,59 @@
                     "$ref": "#/components/schemas/RoundInputView"
                   },
                   "title": "Response Round Inputs Api V1 Rounds  Round Id  Inputs Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "read",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/rounds/{round_id}/source-text": {
+      "get": {
+        "tags": [
+          "work-rounds"
+        ],
+        "summary": "Round Source",
+        "description": "The earlier text version a carried round's work came from, for \"Show\nchanges since vN\" (issue 421); null when the round was not carried from\nanother version. Everyone who may see the round may read it.",
+        "operationId": "round_source_api_v1_rounds__round_id__source_text_get",
+        "parameters": [
+          {
+            "name": "round_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Round Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/RoundSourceText"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Round Source Api V1 Rounds  Round Id  Source Text Get"
                 }
               }
             }
@@ -2173,6 +2226,68 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TechnicalReportReceipt"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "session"
+      }
+    },
+    "/api/v1/me/technical-reports": {
+      "get": {
+        "tags": [
+          "technical-reports"
+        ],
+        "summary": "List Own Reports",
+        "description": "The caller's own reports, newest first: reference, text and status.",
+        "operationId": "list_own_reports_api_v1_me_technical_reports_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OwnTechnicalReportView"
+                  },
+                  "title": "Response List Own Reports Api V1 Me Technical Reports Get"
                 }
               }
             }
@@ -4040,6 +4155,171 @@
         "x-ontotator-project-token": true
       }
     },
+    "/api/v1/projects/{key}/final-selections/withdraw": {
+      "post": {
+        "tags": [
+          "final-results"
+        ],
+        "summary": "Withdraw Final",
+        "description": "Withdraw a text's final result, with a reason (#343).\n\nThe text has no final result until a lead chooses one again; submissions,\nconsolidations and final exports already made stay. 409\n``REVISION_CONFLICT`` when the final changed since ``expected_revision``.",
+        "operationId": "withdraw_final_api_v1_projects__key__final_selections_withdraw_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinalWithdrawalRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinalWithdrawalView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/final-selections/accept-agreeing": {
+      "post": {
+        "tags": [
+          "final-results"
+        ],
+        "summary": "Accept Agreeing",
+        "description": "Accept the result of every text whose annotations agree in full (#354).\n\n``preview: true`` lists the texts that would become final, every other\ntext without a final result with the reason it is left out, and a\n``preview_token``; unknown ``case_ids`` are named. Applying sends that token: all\nlisted texts become final, or none (409 ``PREVIEW_STALE`` with a fresh\n``preview`` in the details when anything changed). Texts that already\nhave a final result are only counted.",
+        "operationId": "accept_agreeing_api_v1_projects__key__final_selections_accept_agreeing_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptAgreeingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptAgreeingView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/final-selections/bulk-change": {
+      "post": {
+        "tags": [
+          "final-results"
+        ],
+        "summary": "Bulk Change Final",
+        "description": "Change the final result of many texts by a rule (issue 336).\n\nRule ``newest_submission``: each selected text that has a final result\ngets its newest submission instead (of the submissions the final panel\noffers on the current version), when that one was submitted after the\nfinal result was chosen and is a consolidation, the text's only\nsubmission, or an annotation that agrees in full with the text's other\nsubmissions (the rule of ``accept-agreeing``). ``preview: true`` lists\nthe texts that would change, with the result each one gets, the texts\nskipped and why (no final result, open work, nothing submitted, already\nthe newest, nothing submitted since the final was chosen, your own\nresult where the project forbids it, submissions that differ) and a\n``preview_token``.\nApplying sends that token: every listed text changes, or none (409\n``PREVIEW_STALE`` with a fresh ``preview`` in the details when anything\nchanged, also a final result changed meanwhile). Each text is audited\nlike a single change (``via: bulk_change_final``). There is no undo.",
+        "operationId": "bulk_change_final_api_v1_projects__key__final_selections_bulk_change_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkChangeFinalRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkChangeFinalView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
     "/api/v1/projects/{key}/exports/final/preflight": {
       "post": {
         "tags": [
@@ -4736,7 +5016,10 @@
                 {
                   "type": "array",
                   "items": {
-                    "const": "guidelines_unclear",
+                    "enum": [
+                      "guidelines_unclear",
+                      "over_limit"
+                    ],
                     "type": "string"
                   }
                 },
@@ -5333,7 +5616,10 @@
                 {
                   "type": "array",
                   "items": {
-                    "const": "guidelines_unclear",
+                    "enum": [
+                      "guidelines_unclear",
+                      "over_limit"
+                    ],
                     "type": "string"
                   }
                 },
@@ -5953,6 +6239,134 @@
         "x-ontotator-project-token": true
       }
     },
+    "/api/v1/projects/{key}/texts/annotations-per-text": {
+      "put": {
+        "tags": [
+          "work-plans"
+        ],
+        "summary": "Set Annotations Per Texts",
+        "description": "Several texts' own \"Annotations per text\" at once (issue 422).\n\nAll or nothing: one unknown text refuses the request. Each text is\ncompared with its own value; texts that already have it are unchanged.",
+        "operationId": "set_annotations_per_texts_api_v1_projects__key__texts_annotations_per_text_put",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationsPerTextBulkSet"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationsPerTextBulkResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/texts/{case_id}/{language}/annotations-per-text": {
+      "put": {
+        "tags": [
+          "work-plans"
+        ],
+        "summary": "Set Annotations Per Text",
+        "description": "One text's own \"Annotations per text\", target and limit (issue 422).\n\nIdempotent; ``value: null`` returns the text to the project value.\nAssignments above a lowered value stay.",
+        "operationId": "set_annotations_per_text_api_v1_projects__key__texts__case_id___language__annotations_per_text_put",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "language",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Language"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationsPerTextSet"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationsPerTextResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
     "/api/v1/projects/{key}/document-rows/move-to-front": {
       "post": {
         "tags": [
@@ -6106,6 +6520,342 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DiscardResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/variants/{document_id}/accept": {
+      "post": {
+        "tags": [
+          "work-plans"
+        ],
+        "summary": "Accept Version",
+        "description": "Accept this one version, audited with the reason (issue 341 d).",
+        "operationId": "accept_version_api_v1_projects__key__variants__document_id__accept_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptVersionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptVersionResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      },
+      "get": {
+        "tags": [
+          "work-plans"
+        ],
+        "summary": "Preview Accept Version",
+        "description": "Read only: whether this version can be accepted, and why not.",
+        "operationId": "preview_accept_version_api_v1_projects__key__variants__document_id__accept_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptVersionPreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/bulk-task-actions/reopen": {
+      "post": {
+        "tags": [
+          "bulk-task-actions"
+        ],
+        "summary": "Bulk Reopen",
+        "description": "Reopen the submitted tasks of many texts (issue 336).\n\n``preview: true`` lists the tasks that would be reopened, the tasks kept\nand why, the texts skipped (a final result is chosen) and a\n``preview_token``. Applying sends that token and a ``reason``: every\nlisted task is reopened, or none (409 ``PREVIEW_STALE`` with a fresh\n``preview`` in the details when anything changed). Each task is audited\nlike a single reopen (``via: bulk_reopen``).",
+        "operationId": "bulk_reopen_api_v1_projects__key__bulk_task_actions_reopen_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkReopenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkTaskActionView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/bulk-task-actions/withdraw": {
+      "post": {
+        "tags": [
+          "bulk-task-actions"
+        ],
+        "summary": "Bulk Withdraw",
+        "description": "Withdraw the open tasks of many texts (issues 336, 339).\n\nLike a single withdrawal the drafts stay. Started tasks only with\n``include_started``; ``over_limit_only`` withdraws only annotations above\n\"annotators per text\" of their version (submitted, then started, then the\noldest stay). Preview and apply as ``bulk-task-actions/reopen``; each\ntask is audited like a single withdrawal (``via: bulk_withdraw``).",
+        "operationId": "bulk_withdraw_api_v1_projects__key__bulk_task_actions_withdraw_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkWithdrawRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkTaskActionView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/bulk-task-actions/start-round": {
+      "post": {
+        "tags": [
+          "bulk-task-actions"
+        ],
+        "summary": "Bulk Start Round",
+        "description": "Start a new work round for the submitted annotations of many texts\n(issue 336, step 3).\n\nWhat ``POST /assignments/{id}/rounds`` does for one task: ``kind``\n``carry_forward`` continues from the task's submission, ``clean_restart``\nstarts without the earlier findings (a task from tool proposals on the\nnewest proposal set) and needs a ``reason`` to apply. Either way the\nearlier submission no longer counts as submitted and the person submits\nthe new round. Only submitted annotations on the text's current version\nget a round: other tasks are kept with the reason, texts with a final\nresult or an open consolidation are skipped. Preview and apply as\n``bulk-task-actions/reopen``; each round is audited like a single one\n(``round.create``, ``via: bulk_start_round``). There is no Undo\n(``undo`` is null).",
+        "operationId": "bulk_start_round_api_v1_projects__key__bulk_task_actions_start_round_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkStartRoundRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkTaskActionView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/bulk-task-actions/undo": {
+      "post": {
+        "tags": [
+          "bulk-task-actions"
+        ],
+        "summary": "Bulk Undo",
+        "description": "Undo a bulk reopen or withdrawal by the ``undo.id`` of its apply.\n\nThe server keeps what the action changed; the request names only that\nrecord. It works once, for the lead who applied the action, before\n``undo.expires_at``, and only while the texts are exactly as the action\nleft them (tasks, drafts, review drafts, rounds, final results, plan,\nversions); otherwise 409 ``BULK_UNDO_STALE`` and nothing is undone.\nReopened tasks are submitted again; withdrawn tasks come back with their\ndrafts. An action that reopened a translation review has no Undo.",
+        "operationId": "bulk_undo_api_v1_projects__key__bulk_task_actions_undo_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkUndoRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkUndoResult"
                 }
               }
             }
@@ -6375,6 +7125,61 @@
         "x-ontotator-project-token": true
       }
     },
+    "/api/v1/projects/{key}/annotation-mode-changes/bulk": {
+      "post": {
+        "tags": [
+          "annotation-mode-changes"
+        ],
+        "summary": "Bulk Change Mode",
+        "description": "Change the annotation mode of many texts (issue 336, step 4).\n\nEach text is changed as ``POST annotation-mode-changes`` changes one: its\nlive submissions are marked discarded, its live annotate and review\nassignments are revoked and the mode is stored. ``preview: true`` lists,\nper text, the submissions and assignments with their people, the texts\nleft as they are with the reason (the single change's refusals; a text\nwith a final result: withdraw it first) and a ``preview_token``. Applying\nsends that token and a ``reason``: every listed text changes, or none\n(409 ``PREVIEW_STALE`` with a fresh ``preview`` in the details when\nanything changed). Each text is audited like a single change\n(``annotation_mode.change``, ``via: bulk_change_mode``) and can be\nrestored on its own (``.../{change_id}/restore``); there is no bulk undo.",
+        "operationId": "bulk_change_mode_api_v1_projects__key__annotation_mode_changes_bulk_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkModeChangeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkModeChangeView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
     "/api/v1/projects/{key}/documents/{doc}/translation-correction-assignment": {
       "post": {
         "tags": [
@@ -6444,7 +7249,7 @@
           "translation-workflow"
         ],
         "summary": "Start Lead Correction",
-        "description": "F1: the lead reviews a rejected or queried version themselves.",
+        "description": "F1: the lead reviews a rejected, queried or accepted version themselves.",
         "operationId": "start_lead_correction_api_v1_projects__key__documents__doc__lead_correction_post",
         "parameters": [
           {
@@ -6499,6 +7304,58 @@
           }
         },
         "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      },
+      "get": {
+        "tags": [
+          "translation-workflow"
+        ],
+        "summary": "Preview Lead Correction",
+        "description": "Issue 341 b: availability and the annotation work that stays on the version.",
+        "operationId": "preview_lead_correction_api_v1_projects__key__documents__doc__lead_correction_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "doc",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Doc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeadCorrectionPreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "read",
         "x-ontotator-project-token": true
       }
     },
@@ -10391,6 +11248,120 @@
         "title": "About",
         "description": "What a user quotes when reporting a problem."
       },
+      "AcceptAgreeingRequest": {
+        "properties": {
+          "preview": {
+            "type": "boolean",
+            "title": "Preview",
+            "default": false
+          },
+          "preview_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Token"
+          },
+          "case_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Ids"
+          },
+          "rows": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RowRefView"
+                },
+                "type": "array",
+                "maxItems": 200000,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rows"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AcceptAgreeingRequest",
+        "description": "Preview (``preview``) or apply (``preview_token``) accepting every\nagreeing text (#354)."
+      },
+      "AcceptAgreeingView": {
+        "properties": {
+          "project": {
+            "type": "string",
+            "title": "Project"
+          },
+          "applied": {
+            "type": "boolean",
+            "title": "Applied"
+          },
+          "texts": {
+            "items": {
+              "$ref": "#/components/schemas/AgreeingText"
+            },
+            "type": "array",
+            "title": "Texts"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/AgreeingSkip"
+            },
+            "type": "array",
+            "title": "Skipped"
+          },
+          "already_final": {
+            "type": "integer",
+            "title": "Already Final"
+          },
+          "already_final_rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowRefView"
+            },
+            "type": "array",
+            "title": "Already Final Rows"
+          },
+          "unknown_case_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unknown Case Ids"
+          },
+          "preview_token": {
+            "type": "string",
+            "title": "Preview Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project",
+          "applied",
+          "texts",
+          "skipped",
+          "already_final",
+          "preview_token"
+        ],
+        "title": "AcceptAgreeingView"
+      },
       "AcceptExternalReview": {
         "properties": {
           "reason": {
@@ -10406,6 +11377,126 @@
           "reason"
         ],
         "title": "AcceptExternalReview"
+      },
+      "AcceptVersionPreview": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "translation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translation Status"
+          },
+          "acceptable": {
+            "type": "boolean",
+            "title": "Acceptable"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "text_sha256": {
+            "type": "string",
+            "title": "Text Sha256"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "document_id",
+          "version",
+          "translation_status",
+          "acceptable",
+          "reason",
+          "text_sha256"
+        ],
+        "title": "AcceptVersionPreview",
+        "description": "Whether \"Accept this version\u2026\" would accept it, and the text hash to send."
+      },
+      "AcceptVersionRequest": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Reason"
+          },
+          "expected_text_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Text Sha256"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason",
+          "expected_text_sha256"
+        ],
+        "title": "AcceptVersionRequest",
+        "description": "Issue 341 d: accept exactly one version as reviewed outside Ontotator."
+      },
+      "AcceptVersionResult": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "translation_status": {
+            "type": "string",
+            "const": "accepted",
+            "title": "Translation Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "document_id",
+          "version",
+          "translation_status"
+        ],
+        "title": "AcceptVersionResult"
       },
       "ActiveHoldView": {
         "properties": {
@@ -10731,6 +11822,81 @@
           "task"
         ],
         "title": "AffectedTask"
+      },
+      "AgreeingSkip": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "open_task",
+              "not_ready",
+              "not_in_plan",
+              "fewer_than_two",
+              "consolidation",
+              "differ"
+            ],
+            "title": "Reason"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "reason",
+          "message"
+        ],
+        "title": "AgreeingSkip"
+      },
+      "AgreeingText": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "submission_id": {
+            "type": "string",
+            "title": "Submission Id"
+          },
+          "findings": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Findings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "document_id",
+          "submission_id"
+        ],
+        "title": "AgreeingText"
       },
       "AgreementDetailView": {
         "properties": {
@@ -11422,6 +12588,178 @@
           "evidence"
         ],
         "title": "AnnotationVersion"
+      },
+      "AnnotationsPerTextBulkResult": {
+        "properties": {
+          "texts": {
+            "items": {
+              "$ref": "#/components/schemas/AnnotationsPerTextResult"
+            },
+            "type": "array",
+            "title": "Texts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "texts"
+        ],
+        "title": "AnnotationsPerTextBulkResult"
+      },
+      "AnnotationsPerTextBulkSet": {
+        "properties": {
+          "texts": {
+            "items": {
+              "$ref": "#/components/schemas/RowRefView"
+            },
+            "type": "array",
+            "maxItems": 200000,
+            "minItems": 1,
+            "title": "Texts"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 5.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "texts",
+          "value"
+        ],
+        "title": "AnnotationsPerTextBulkSet"
+      },
+      "AnnotationsPerTextResult": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "override": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Override"
+          },
+          "project_value": {
+            "type": "integer",
+            "title": "Project Value"
+          },
+          "effective": {
+            "type": "integer",
+            "title": "Effective"
+          },
+          "changed": {
+            "type": "boolean",
+            "title": "Changed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "override",
+          "project_value",
+          "effective",
+          "changed"
+        ],
+        "title": "AnnotationsPerTextResult"
+      },
+      "AnnotationsPerTextSet": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 5.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "title": "AnnotationsPerTextSet"
+      },
+      "AnnotationsPerTextView": {
+        "properties": {
+          "effective": {
+            "type": "integer",
+            "title": "Effective"
+          },
+          "project": {
+            "type": "integer",
+            "title": "Project"
+          },
+          "override": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Override"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "effective",
+          "project"
+        ],
+        "title": "AnnotationsPerTextView",
+        "description": "The text's \"Annotations per text\" (issue 422)."
       },
       "AnnotatorPairAgreement": {
         "properties": {
@@ -12731,6 +14069,10 @@
             "type": "integer",
             "title": "Per Text"
           },
+          "project_per_text": {
+            "type": "integer",
+            "title": "Project Per Text"
+          },
           "digest": {
             "type": "string",
             "title": "Digest"
@@ -12756,6 +14098,7 @@
           "skipped",
           "people",
           "per_text",
+          "project_per_text",
           "digest"
         ],
         "title": "BatchPreview"
@@ -12793,6 +14136,28 @@
               }
             ],
             "title": "Document Id"
+          },
+          "assigned": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned"
+          },
+          "per_text": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Text"
           }
         },
         "type": "object",
@@ -12825,6 +14190,10 @@
             "type": "integer",
             "title": "Remaining"
           },
+          "per_text": {
+            "type": "integer",
+            "title": "Per Text"
+          },
           "usernames": {
             "items": {
               "type": "string"
@@ -12850,6 +14219,7 @@
           "document_id",
           "version",
           "remaining",
+          "per_text",
           "usernames"
         ],
         "title": "BatchTargetView"
@@ -12993,6 +14363,360 @@
           "reason"
         ],
         "title": "BulkAcceptance"
+      },
+      "BulkChangeFinalRequest": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowRefView"
+            },
+            "type": "array",
+            "maxItems": 200000,
+            "minItems": 1,
+            "title": "Rows"
+          },
+          "rule": {
+            "type": "string",
+            "const": "newest_submission",
+            "title": "Rule",
+            "default": "newest_submission"
+          },
+          "preview": {
+            "type": "boolean",
+            "title": "Preview"
+          },
+          "summary_only": {
+            "type": "boolean",
+            "title": "Summary Only"
+          },
+          "preview_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Token"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rows"
+        ],
+        "title": "BulkChangeFinalRequest",
+        "description": "Preview (``preview``) or apply (``preview_token``) bulk Change final\u2026\nfor the selected texts (issue 336)."
+      },
+      "BulkChangeFinalView": {
+        "properties": {
+          "project": {
+            "type": "string",
+            "title": "Project"
+          },
+          "rule": {
+            "type": "string",
+            "const": "newest_submission",
+            "title": "Rule"
+          },
+          "applied": {
+            "type": "boolean",
+            "title": "Applied"
+          },
+          "texts": {
+            "type": "integer",
+            "title": "Texts"
+          },
+          "change_count": {
+            "type": "integer",
+            "title": "Change Count"
+          },
+          "skipped_count": {
+            "type": "integer",
+            "title": "Skipped Count"
+          },
+          "skipped_by_reason": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Skipped By Reason"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/FinalChange"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/FinalChangeSkip"
+            },
+            "type": "array",
+            "title": "Skipped"
+          },
+          "preview_token": {
+            "type": "string",
+            "title": "Preview Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project",
+          "rule",
+          "applied",
+          "texts",
+          "change_count",
+          "skipped_count",
+          "skipped_by_reason",
+          "changes",
+          "skipped",
+          "preview_token"
+        ],
+        "title": "BulkChangeFinalView"
+      },
+      "BulkKeptTaskView": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "assignment_id": {
+            "type": "integer",
+            "title": "Assignment Id"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "task": {
+            "type": "string",
+            "enum": [
+              "annotate",
+              "review",
+              "translation_review"
+            ],
+            "title": "Task"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "in_progress",
+              "submitted",
+              "reopened"
+            ],
+            "title": "Status"
+          },
+          "person": {
+            "$ref": "#/components/schemas/PersonRefView"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "assignment_id",
+          "document_id",
+          "version",
+          "task",
+          "status",
+          "person",
+          "reason",
+          "message"
+        ],
+        "title": "BulkKeptTaskView"
+      },
+      "BulkModeChangeRequest": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowRefView"
+            },
+            "type": "array",
+            "maxItems": 200000,
+            "minItems": 1,
+            "title": "Rows"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "proposals",
+              "scratch"
+            ],
+            "title": "Mode"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "preview": {
+            "type": "boolean",
+            "title": "Preview"
+          },
+          "summary_only": {
+            "type": "boolean",
+            "title": "Summary Only"
+          },
+          "preview_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Token"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rows",
+          "mode"
+        ],
+        "title": "BulkModeChangeRequest",
+        "description": "Change the annotation mode of the selected texts. ``reason`` is\nrequired to apply."
+      },
+      "BulkModeChangeView": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "proposals",
+              "scratch"
+            ],
+            "title": "Mode"
+          },
+          "applied": {
+            "type": "boolean",
+            "title": "Applied"
+          },
+          "texts": {
+            "type": "integer",
+            "title": "Texts"
+          },
+          "change_count": {
+            "type": "integer",
+            "title": "Change Count"
+          },
+          "skipped_count": {
+            "type": "integer",
+            "title": "Skipped Count"
+          },
+          "skipped_by_reason": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Skipped By Reason"
+          },
+          "submission_count": {
+            "type": "integer",
+            "title": "Submission Count"
+          },
+          "assignment_count": {
+            "type": "integer",
+            "title": "Assignment Count"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ModeChangePreview"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/BulkModeSkippedView"
+            },
+            "type": "array",
+            "title": "Skipped"
+          },
+          "preview_token": {
+            "type": "string",
+            "title": "Preview Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode",
+          "applied",
+          "texts",
+          "change_count",
+          "skipped_count",
+          "skipped_by_reason",
+          "submission_count",
+          "assignment_count",
+          "changes",
+          "skipped",
+          "preview_token"
+        ],
+        "title": "BulkModeChangeView"
+      },
+      "BulkModeSkippedView": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "no_current_version",
+              "not_locked",
+              "unchanged",
+              "no_proposals",
+              "final_result"
+            ],
+            "title": "Reason"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "reason",
+          "message"
+        ],
+        "title": "BulkModeSkippedView"
       },
       "BulkPlanRequest": {
         "properties": {
@@ -13146,6 +14870,71 @@
         ],
         "title": "BulkPreview"
       },
+      "BulkReopenRequest": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowRefView"
+            },
+            "type": "array",
+            "maxItems": 200000,
+            "minItems": 1,
+            "title": "Rows"
+          },
+          "tasks": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "annotate",
+                "review",
+                "translation_review"
+              ]
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Tasks"
+          },
+          "preview": {
+            "type": "boolean",
+            "title": "Preview"
+          },
+          "summary_only": {
+            "type": "boolean",
+            "title": "Summary Only"
+          },
+          "preview_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Token"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rows"
+        ],
+        "title": "BulkReopenRequest",
+        "description": "Reopen the submitted tasks of the selected texts. ``reason`` is\nrequired to apply; the people see it in My tasks."
+      },
       "BulkResult": {
         "properties": {
           "changed_rows": {
@@ -13200,6 +14989,100 @@
         ],
         "title": "BulkResult"
       },
+      "BulkSkippedTextView": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "final_chosen",
+              "final_result",
+              "consolidation_open"
+            ],
+            "title": "Reason"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "reason",
+          "message"
+        ],
+        "title": "BulkSkippedTextView"
+      },
+      "BulkStartRoundRequest": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowRefView"
+            },
+            "type": "array",
+            "maxItems": 200000,
+            "minItems": 1,
+            "title": "Rows"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "carry_forward",
+              "clean_restart"
+            ],
+            "title": "Kind"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "preview": {
+            "type": "boolean",
+            "title": "Preview"
+          },
+          "summary_only": {
+            "type": "boolean",
+            "title": "Summary Only"
+          },
+          "preview_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Token"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rows",
+          "kind"
+        ],
+        "title": "BulkStartRoundRequest",
+        "description": "Start a new work round for the submitted annotations of the selected\ntexts. ``reason`` is required to apply a ``clean_restart``."
+      },
       "BulkTargetView": {
         "properties": {
           "document_id": {
@@ -13229,6 +15112,282 @@
           "mode"
         ],
         "title": "BulkTargetView"
+      },
+      "BulkTaskActionView": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "reopen",
+              "withdraw",
+              "start_round"
+            ],
+            "title": "Action"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "carry_forward",
+                  "clean_restart"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "applied": {
+            "type": "boolean",
+            "title": "Applied"
+          },
+          "texts": {
+            "type": "integer",
+            "title": "Texts"
+          },
+          "change_count": {
+            "type": "integer",
+            "title": "Change Count"
+          },
+          "kept_count": {
+            "type": "integer",
+            "title": "Kept Count"
+          },
+          "skipped_count": {
+            "type": "integer",
+            "title": "Skipped Count"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/BulkTaskView"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "kept": {
+            "items": {
+              "$ref": "#/components/schemas/BulkKeptTaskView"
+            },
+            "type": "array",
+            "title": "Kept"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/BulkSkippedTextView"
+            },
+            "type": "array",
+            "title": "Skipped"
+          },
+          "preview_token": {
+            "type": "string",
+            "title": "Preview Token"
+          },
+          "undo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BulkUndoView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "action",
+          "applied",
+          "texts",
+          "change_count",
+          "kept_count",
+          "skipped_count",
+          "changes",
+          "kept",
+          "skipped",
+          "preview_token"
+        ],
+        "title": "BulkTaskActionView"
+      },
+      "BulkTaskView": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "assignment_id": {
+            "type": "integer",
+            "title": "Assignment Id"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "task": {
+            "type": "string",
+            "enum": [
+              "annotate",
+              "review",
+              "translation_review"
+            ],
+            "title": "Task"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "in_progress",
+              "submitted",
+              "reopened"
+            ],
+            "title": "Status"
+          },
+          "person": {
+            "$ref": "#/components/schemas/PersonRefView"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "assignment_id",
+          "document_id",
+          "version",
+          "task",
+          "status",
+          "person"
+        ],
+        "title": "BulkTaskView"
+      },
+      "BulkUndoRequest": {
+        "properties": {
+          "undo_id": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Undo Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "undo_id"
+        ],
+        "title": "BulkUndoRequest"
+      },
+      "BulkUndoResult": {
+        "properties": {
+          "undone": {
+            "type": "integer",
+            "title": "Undone"
+          }
+        },
+        "type": "object",
+        "required": [
+          "undone"
+        ],
+        "title": "BulkUndoResult"
+      },
+      "BulkUndoView": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "expires_at"
+        ],
+        "title": "BulkUndoView",
+        "description": "The server's record of an applied action; ``id`` undoes it once,\nbefore ``expires_at``, for the lead who applied it."
+      },
+      "BulkWithdrawRequest": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowRefView"
+            },
+            "type": "array",
+            "maxItems": 200000,
+            "minItems": 1,
+            "title": "Rows"
+          },
+          "tasks": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "annotate",
+                "review",
+                "translation_review"
+              ]
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Tasks"
+          },
+          "preview": {
+            "type": "boolean",
+            "title": "Preview"
+          },
+          "summary_only": {
+            "type": "boolean",
+            "title": "Summary Only"
+          },
+          "preview_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Token"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "include_started": {
+            "type": "boolean",
+            "title": "Include Started"
+          },
+          "over_limit_only": {
+            "type": "boolean",
+            "title": "Over Limit Only"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rows"
+        ],
+        "title": "BulkWithdrawRequest",
+        "description": "Withdraw the open tasks of the selected texts; drafts stay."
       },
       "CarryPerson": {
         "properties": {
@@ -15710,12 +17869,18 @@
             "anyOf": [
               {
                 "type": "string",
-                "const": "guidelines_unclear"
+                "enum": [
+                  "guidelines_unclear",
+                  "over_limit"
+                ]
               },
               {
                 "items": {
                   "type": "string",
-                  "const": "guidelines_unclear"
+                  "enum": [
+                    "guidelines_unclear",
+                    "over_limit"
+                  ]
                 },
                 "type": "array"
               },
@@ -16063,6 +18228,10 @@
             ],
             "title": "Flagged Round Id"
           },
+          "over_limit": {
+            "type": "boolean",
+            "title": "Over Limit"
+          },
           "proposal_count": {
             "type": "integer",
             "title": "Proposal Count",
@@ -16072,6 +18241,40 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/AnnotationModeView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proposal_set": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RowProposalSetView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "newer_proposal_set": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RowProposalSetView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proposal_set_unrecorded": {
+            "type": "boolean",
+            "title": "Proposal Set Unrecorded"
+          },
+          "annotations_per_text": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnnotationsPerTextView"
               },
               {
                 "type": "null"
@@ -16789,6 +18992,126 @@
           "kind"
         ],
         "title": "ExportRequest"
+      },
+      "FinalChange": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "expected_revision": {
+            "type": "integer",
+            "title": "Expected Revision"
+          },
+          "from_document_id": {
+            "type": "string",
+            "title": "From Document Id"
+          },
+          "from_submission_id": {
+            "type": "string",
+            "title": "From Submission Id"
+          },
+          "from_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Version"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "submission_id": {
+            "type": "string",
+            "title": "Submission Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "annotation",
+              "consolidation"
+            ],
+            "title": "Kind"
+          },
+          "person": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonRefView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "eligible_submissions": {
+            "type": "integer",
+            "title": "Eligible Submissions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "expected_revision",
+          "from_document_id",
+          "from_submission_id",
+          "document_id",
+          "submission_id",
+          "version",
+          "kind",
+          "eligible_submissions"
+        ],
+        "title": "FinalChange"
+      },
+      "FinalChangeSkip": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "no_final",
+              "open_task",
+              "nothing_submitted",
+              "already_newest",
+              "not_newer",
+              "own_result",
+              "differ"
+            ],
+            "title": "Reason"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "reason",
+          "message"
+        ],
+        "title": "FinalChangeSkip"
       },
       "FinalExportRequest": {
         "properties": {
@@ -17556,6 +19879,72 @@
           "destination"
         ],
         "title": "FinalWarning"
+      },
+      "FinalWithdrawalRequest": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Revision"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "expected_revision",
+          "reason"
+        ],
+        "title": "FinalWithdrawalRequest",
+        "description": "Withdraw the final result of one text (#343)."
+      },
+      "FinalWithdrawalView": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "submission_id": {
+            "type": "string",
+            "title": "Submission Id"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "document_id",
+          "submission_id",
+          "revision"
+        ],
+        "title": "FinalWithdrawalView"
       },
       "FrozenTranslation": {
         "properties": {
@@ -18754,6 +21143,106 @@
         "title": "LayerDefinition",
         "description": "Definition of an annotation layer binding an ontology and types."
       },
+      "LeadCorrectionAnnotationsView": {
+        "properties": {
+          "submitted": {
+            "type": "integer",
+            "title": "Submitted"
+          },
+          "open": {
+            "type": "integer",
+            "title": "Open"
+          }
+        },
+        "type": "object",
+        "required": [
+          "submitted",
+          "open"
+        ],
+        "title": "LeadCorrectionAnnotationsView"
+      },
+      "LeadCorrectionPreview": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "next_version": {
+            "type": "integer",
+            "title": "Next Version"
+          },
+          "translation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translation Status"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "reviewed_again": {
+            "type": "boolean",
+            "title": "Reviewed Again"
+          },
+          "review_on": {
+            "type": "boolean",
+            "title": "Review On"
+          },
+          "annotate_accepted_only": {
+            "type": "boolean",
+            "title": "Annotate Accepted Only"
+          },
+          "annotations": {
+            "$ref": "#/components/schemas/LeadCorrectionAnnotationsView"
+          },
+          "open_consolidations": {
+            "type": "integer",
+            "title": "Open Consolidations"
+          },
+          "final_result": {
+            "type": "boolean",
+            "title": "Final Result"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "version",
+          "next_version",
+          "translation_status",
+          "available",
+          "reason",
+          "reviewed_again",
+          "review_on",
+          "annotate_accepted_only",
+          "annotations",
+          "open_consolidations",
+          "final_result"
+        ],
+        "title": "LeadCorrectionPreview",
+        "description": "What \"Correct the translation\u2026\" would start (issue 341 b)."
+      },
       "LeadCorrectionRequest": {
         "properties": {
           "expected_text_sha256": {
@@ -19672,6 +22161,18 @@
               }
             ],
             "title": "Document Id"
+          },
+          "blocked": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "no_target_proposals"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked"
           }
         },
         "additionalProperties": false,
@@ -20204,6 +22705,45 @@
           "report_id"
         ],
         "title": "OtherActiveHold"
+      },
+      "OwnTechnicalReportView": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "reference": {
+            "type": "string",
+            "title": "Reference"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "done"
+            ],
+            "title": "Status"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "reference",
+          "status",
+          "description",
+          "created_at"
+        ],
+        "title": "OwnTechnicalReportView",
+        "description": "One report as its reporter reads it (issue 269): what they wrote and\nwhether it is handled. No context, no administrator names."
       },
       "PairAgreement": {
         "properties": {
@@ -23818,6 +26358,17 @@
           "code": {
             "type": "string",
             "title": "Code"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
           }
         },
         "additionalProperties": false,
@@ -24531,6 +27082,11 @@
             "title": "Lead Correction",
             "default": false
           },
+          "reviewed_again": {
+            "type": "boolean",
+            "title": "Reviewed Again",
+            "default": false
+          },
           "checked_sentences": {
             "$ref": "#/components/schemas/CheckedSentences"
           }
@@ -24739,6 +27295,17 @@
               }
             ],
             "title": "Source Version"
+          },
+          "unresolved_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unresolved Note"
           }
         },
         "additionalProperties": false,
@@ -24751,6 +27318,36 @@
           "mapping_status"
         ],
         "title": "RoundInputView"
+      },
+      "RoundSourceText": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "document_id",
+          "language",
+          "version",
+          "text"
+        ],
+        "title": "RoundSourceText",
+        "description": "The earlier text version a carried round's work came from (read-only).\n\nThe same ``(old, new)`` pair the carry re-anchored with ``text_map``: the\ndocument of the source submission, or of the frozen draft of a text\nchange. Only for rounds whose source is another version of the text."
       },
       "RoundSourceView": {
         "properties": {
@@ -24831,7 +27428,8 @@
             "enum": [
               "reassigned",
               "mode_changed",
-              "mode_restored"
+              "mode_restored",
+              "final_withdrawn"
             ],
             "title": "Kind"
           },
@@ -24912,7 +27510,7 @@
           "at"
         ],
         "title": "RowChangeView",
-        "description": "A change of who works on a row, or how: its History line."
+        "description": "A change of who works on a row, or how: its History line. A withdrawn\nfinal result (#343) names the lead in ``from_person``."
       },
       "RowItemView": {
         "properties": {
@@ -25093,6 +27691,59 @@
           "active_hold_count"
         ],
         "title": "RowProblemReport"
+      },
+      "RowProposalSetView": {
+        "properties": {
+          "set_id": {
+            "type": "integer",
+            "title": "Set Id"
+          },
+          "imported_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Imported At"
+          },
+          "tool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool"
+          },
+          "tool_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Version"
+          },
+          "proposal_count": {
+            "type": "integer",
+            "title": "Proposal Count"
+          },
+          "newest": {
+            "type": "boolean",
+            "title": "Newest"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "set_id",
+          "imported_at",
+          "proposal_count",
+          "newest"
+        ],
+        "title": "RowProposalSetView",
+        "description": "An imported tool proposal set on one text version (issue 337)."
       },
       "RowRefView": {
         "properties": {
@@ -26283,6 +28934,7 @@
                   "not_exported",
                   "carried_on_submit",
                   "v2_not_annotated",
+                  "no_target_proposals",
                   "correction",
                   "new_review",
                   "source_changed",
@@ -26882,6 +29534,16 @@
             "type": "array",
             "title": "Round Input Resolutions",
             "default": []
+          },
+          "carried_from": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoundSourceText"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -30279,6 +32941,20 @@
               }
             ],
             "title": "Annotation Mode"
+          },
+          "proposal_set": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RowProposalSetView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proposal_set_unrecorded": {
+            "type": "boolean",
+            "title": "Proposal Set Unrecorded"
           },
           "unreviewed_translation": {
             "type": "boolean",

@@ -22,5 +22,5 @@ export function reviewWorkspace(changes: Partial<ReviewWorkspace> = {}): ReviewW
     source: { variant: { ...variant, document_id: "source", external_id: "source", language: "en", origin: "native", version: 1 }, text: "Source 😀\n\nSecond paragraph." },
     comparisons: [], failed_checks: [{ code: "units_added", passed: false, detail: "A unit changed" }],
     draft: { text: "Übersetzt.", form: {}, revision: 6 }, qualification: "Reviewer",
-    previous_reviews: [], read_only: false, submitted_record: null, lead_correction: false, ...changes };
+    previous_reviews: [], read_only: false, submitted_record: null, lead_correction: false, reviewed_again: false, ...changes };
 }

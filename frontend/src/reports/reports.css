@@ -55,3 +55,9 @@ button.shell-nav-link {
   text-align: start;
   cursor: pointer;
 }
+
+/* Profile › My technical reports (issue 269): the reference stays on one line on a phone. */
+.own-technical-report-nowrap { white-space: nowrap; }
+.own-technical-report-text, .own-technical-report-more { overflow-wrap: anywhere; }
+.own-technical-report-more summary { cursor: pointer; }
+.own-technical-report-more .technical-report-description { margin: var(--space-2) 0 0; }

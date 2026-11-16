@@ -6,7 +6,7 @@ shared project lock. ``document_row_page`` and ``document_row_submissions``
 build the responses from these facts.
 """
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Literal
@@ -42,7 +42,9 @@ from ontotator.authz.scoped import ScopedRepository
 from ontotator.domain import document_rows as rules
 from ontotator.domain.annotation_modes import AnnotationMode
 from ontotator.domain.next_steps import Stage, StepCode
+from ontotator.domain.profiles import TaskProfile
 from ontotator.domain.review import ReviewDecision
+from ontotator.domain.scopes import build_scope
 from ontotator.domain.work_plans import PlanFlags, RowKey
 from ontotator.domain.workspace import WorkspaceKey
 from ontotator.storage import work_plan_store
@@ -55,17 +57,21 @@ from ontotator.storage.plan_tables import WorkPlanFlagsRow
 from ontotator.storage.proposal_queries import newest_proposal_counts
 from ontotator.storage.repository import Repository, _key_str
 from ontotator.storage.tables import (
+    AnnotationSnapshotRow,
     AssignmentRow,
     AuditEventRow,
     DocumentRow,
     DraftRow,
     ProjectRow,
+    ProposalAnnotationRow,
+    ProposalSetRow,
     ReviewDecisionRow,
     SubmissionRow,
     TranslationReviewDraftRow,
     TranslationReviewRow,
     UserRow,
 )
+from ontotator.storage.text_settings import per_text_overrides
 from ontotator.storage.workflow_tables import (
     ProblemReportEventRow,
     ProblemReportRow,
@@ -197,6 +203,21 @@ class RoundFact:
     state: str
     latest_submission_id: str | None
     author_pseudonym: str
+    # Issue 337: the proposal set the round started from (None: not recorded,
+    # a round from scratch or on seed proposals).
+    proposal_set_id: int | None = None
+
+
+@dataclass(frozen=True)
+class ProposalSetFact:
+    """An imported tool proposal set on one document (issue 337)."""
+
+    set_id: int
+    document_id: str
+    imported_at: datetime
+    tool: str | None
+    tool_version: str | None
+    proposal_count: int
 
 
 @dataclass(frozen=True)
@@ -324,6 +345,9 @@ class RowFacts:
     # overrides per row; annotation submissions per document as
     # (recorded_at, annotation mode), oldest first.
     proposal_counts: dict[str, int] = field(default_factory=dict)
+    # The same on the editable layers: the targets a carry of work from
+    # proposals needs (``work_rounds.target_proposals``, #414).
+    carry_proposal_counts: dict[str, int] = field(default_factory=dict)
     project_mode: AnnotationMode = "proposals"
     mode_overrides: dict[RowKey, AnnotationMode] = field(default_factory=dict)
     annotation_submissions: dict[str, list[tuple[datetime, AnnotationMode]]] = field(
@@ -331,6 +355,16 @@ class RowFacts:
     )
     # Submissions discarded by an annotation-mode change, per document (#109).
     discarded_counts: dict[str, int] = field(default_factory=dict)
+    # Issue 422: texts whose "Annotations per text" overrides the project's.
+    per_text_overrides: dict[tuple[str, str], int] = field(default_factory=dict)
+    # Issue 337: the newest imported proposal set per document and the facts
+    # of these sets and of the sets the rounds started from.
+    newest_sets: dict[str, int] = field(default_factory=dict)
+    proposal_sets: dict[int, ProposalSetFact] = field(default_factory=dict)
+
+    def per_text(self, key: tuple[str, str]) -> int:
+        """The effective "Annotations per text" of the text ``key`` (issue 422)."""
+        return self.per_text_overrides.get(key, self.annotations_per_text)
 
 
 def load_last_activity(
@@ -652,9 +686,11 @@ def _rounds(conn: Connection, pid: int) -> list[RoundFact]:
             state=row.state,
             latest_submission_id=row.latest_submission_id,
             author_pseudonym=row.annotator_id,
+            proposal_set_id=row.proposal_set_id,
         )
         for row in conn.execute(
             select(
+                WorkRoundRow.proposal_set_id,
                 WorkRoundRow.round_id,
                 WorkRoundRow.assignment_id,
                 WorkRoundRow.predecessor_round_id,
@@ -672,6 +708,88 @@ def _rounds(conn: Connection, pid: int) -> list[RoundFact]:
             .order_by(WorkRoundRow.created_at, WorkRoundRow.round_id)
         )
     ]
+
+
+def _tool(actors: Sequence[Any]) -> tuple[str | None, str | None]:
+    """Name and version of the set's first tool actor."""
+    for actor in actors:
+        if isinstance(actor, dict) and actor.get("kind") == "tool":
+            return actor.get("name"), actor.get("version")
+    return None, None
+
+
+def _proposal_set_facts(conn: Connection, pid: int, *, summary: bool) -> dict[str, Any]:
+    """``newest_sets`` and ``proposal_sets`` of ``RowFacts`` (issue 337).
+
+    The newest set of a document is the one its proposals rank first
+    (``proposal_queries``): the highest set id; seed proposals have none.
+    """
+    if summary:
+        return {}
+    newest = {
+        row.document_id: row.set_id
+        for row in conn.execute(
+            select(
+                AnnotationSnapshotRow.document_id,
+                func.max(ProposalAnnotationRow.proposal_set_id).label("set_id"),
+            )
+            .join(
+                AnnotationSnapshotRow,
+                and_(
+                    ProposalAnnotationRow.project_id
+                    == AnnotationSnapshotRow.project_id,
+                    ProposalAnnotationRow.annotation_id
+                    == AnnotationSnapshotRow.annotation_id,
+                    ProposalAnnotationRow.version == AnnotationSnapshotRow.version,
+                ),
+            )
+            .where(ProposalAnnotationRow.project_id == pid)
+            .group_by(AnnotationSnapshotRow.document_id)
+        )
+        if row.set_id is not None
+    }
+    used = conn.execute(
+        select(WorkRoundRow.proposal_set_id)
+        .where(
+            WorkRoundRow.project_id == pid,
+            WorkRoundRow.proposal_set_id.is_not(None),
+        )
+        .distinct()
+    ).scalars()
+    ids = sorted({*newest.values(), *used})
+    if not ids:
+        return {"newest_sets": newest}
+    counts = dict(
+        conn.execute(
+            select(ProposalAnnotationRow.proposal_set_id, func.count())
+            .where(
+                ProposalAnnotationRow.project_id == pid,
+                ProposalAnnotationRow.proposal_set_id.in_(ids),
+            )
+            .group_by(ProposalAnnotationRow.proposal_set_id)
+        )
+        .tuples()
+        .all()
+    )
+    sets = {}
+    for row in conn.execute(
+        select(
+            ProposalSetRow.id,
+            ProposalSetRow.document_id,
+            ProposalSetRow.imported_at,
+            ProposalSetRow.actors,
+        ).where(ProposalSetRow.project_id == pid, ProposalSetRow.id.in_(ids))
+    ):
+        tool, version = _tool(row.actors)
+        sets[row.id] = ProposalSetFact(
+            set_id=row.id,
+            document_id=row.document_id,
+            imported_at=row.imported_at,
+            tool=tool,
+            tool_version=version,
+            proposal_count=counts.get(row.id, 0),
+        )
+    return {"newest_sets": newest, "proposal_sets": sets}
 
 
 def _submission_counts(conn: Connection, pid: int) -> dict[str, int]:
@@ -1104,6 +1222,7 @@ def load_facts(
             ProjectRow.annotate_accepted_translations_only,
             ProjectRow.annotations_per_text,
             ProjectRow.tool_proposal_mode,
+            ProjectRow.task_profile,
         ).where(ProjectRow.id == pid)
     ).one()
     viewer = conn.execute(
@@ -1203,10 +1322,19 @@ def load_facts(
         source_obligations=_source_obligations(causes),
         consolidation_flags={} if lean else load_consolidation_flags(conn, pid),
         proposal_counts=newest_proposal_counts(conn, pid),
+        carry_proposal_counts=newest_proposal_counts(
+            conn,
+            pid,
+            build_scope(
+                TaskProfile.model_validate(project.task_profile), "proposal_check"
+            ).editable_layer_ids,
+        ),
         project_mode=project.tool_proposal_mode,
         mode_overrides=_mode_overrides(conn, pid),
         annotation_submissions=_annotation_submissions(conn, pid),
         discarded_counts=_discarded_counts(conn, pid),
+        per_text_overrides=per_text_overrides(conn, pid),
+        **_proposal_set_facts(conn, pid, summary=summary),
     )
 
 

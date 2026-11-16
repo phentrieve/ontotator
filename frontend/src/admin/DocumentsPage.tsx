@@ -6,6 +6,7 @@ import {
   type CaseSummary,
   type CurrentUser,
   type DocumentRowView,
+  type DocumentVersionView,
   type DocumentRowsPage,
   type DocumentRowsQuery,
   type DocumentRowsRequest,
@@ -29,10 +30,11 @@ import { FilterPopover } from "../documents/FilterPopover";
 import { DocumentCards } from "../documents/DocumentCards";
 import { DocumentsTable, tableRows, type ColumnSort, type HeaderSort, type TableSelection } from "../documents/DocumentsTable";
 import { consolidationStartedToast, panelStep } from "../documents/finalPanelText";
-import { leadSteps, rowActionLabel } from "../documents/nextStepLabels";
+import { leadSteps, rowActionLabel, stepBlockedReason } from "../documents/nextStepLabels";
 import { TranslationCorrectionAction } from "../variants/TranslationCorrectionAction";
 import { DecisionBlock } from "../documents/FinalPanel";
 import { StageActions, type StageActionsProps } from "../documents/StageActions";
+import { WithdrawFinalDialog } from "../documents/WithdrawFinalDialog";
 import { TextCard, type CardStep } from "../documents/textCard/TextCard";
 import type { CardView, SegmentId } from "../documents/textCard/cardModel";
 import { CardPlanSelect, TextPlanDialog } from "../documents/PlanSteps";
@@ -46,6 +48,7 @@ import { SelectByIdsDialog } from "../documents/SelectByIdsDialog";
 import { SelectionBar } from "../documents/SelectionBar";
 import { documentsGroupId, documentsRowId, isPlainClick, type DocumentsRowPart, type OpenTextCard, RouteLink, rowKeyOf, rowName } from "../documents/RowCells";
 import type { TextVersionsTools } from "../documents/TextVersions";
+import { AcceptVersionDialog, CorrectVersionDialog } from "../documents/VersionDialogs";
 import { workText } from "../documents/labels";
 import { isActiveRow } from "../documents/stageLabels";
 import { caseOfTextKey, languageOfTextKey, MAX_SELECTION_CASES as MAX_SELECTION, rowRefOf, textKeyOf, useTextSelection } from "../documents/useTextSelection";
@@ -369,6 +372,8 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
       me: assignMe,
       consolidatorRule: page?.adjudicator_not_annotator ?? false,
       onClose: () => setAssignDialog(null),
+      // Issue 422: a changed limit shows in the row and the text card at once.
+      onLimitChanged: () => { void refreshAll(); },
       // The toast region announces the message; a second live region would say it twice (#47 A-25).
       // Issue 248: the toast follows the refreshed rows, so it never announces work the row does not show yet.
       onAssigned: message => { setAssignDialog(null); void refreshAll().then(() => showToast({ message })); },
@@ -379,6 +384,12 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
   const [reviewDocument, setReviewDocument] = useState<string | null>(null);
 
   const [correctionFor, setCorrectionFor] = useState<{ row: DocumentRowView; variant: VariantSummary } | null>(null);
+  /** "Withdraw final…" (issue 343): the row whose final result the dialog takes back. */
+  const [withdrawFor, setWithdrawFor] = useState<DocumentRowView | null>(null);
+  /** The row as the page shows it now (after a refused withdrawal the reload brings the new revision). */
+  const withdrawRow = withdrawFor ? pageRows.find(entry => rowKeyOf(entry) === rowKeyOf(withdrawFor)) ?? withdrawFor : null;
+  // Issue 341: the lead's actions on one version row (Correct the translation…, Accept this version…).
+  const [versionAction, setVersionAction] = useState<{ kind: "correct" | "accept"; row: DocumentRowView; version: DocumentVersionView } | null>(null);
   const textVersionTools = useMemo<TextVersionsTools | undefined>(() => {
     if (!inventory) return undefined;
     const variants = new Map<string, VariantSummary>(inventory.cases.flatMap(item => item.variants).map(variant => [variant.document_id, variant]));
@@ -391,9 +402,13 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
       onAssignmentsChanged: refreshAll,
       onShowTranslationReviews: setReviewDocument,
       onRequestCorrection: (row, variant) => setCorrectionFor({ row, variant }),
+      ...(canOverrideTranslationStatus ? {
+        onCorrectTranslation: (row: DocumentRowView, version: DocumentVersionView) => setVersionAction({ kind: "correct", row, version }),
+        onAcceptVersion: (row: DocumentRowView, version: DocumentVersionView) => setVersionAction({ kind: "accept", row, version }),
+      } : {}),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refreshAll only uses rows.reload and state setters
-  }, [inventory, currentUser?.username, rows.reload]);
+  }, [inventory, currentUser?.username, rows.reload, canOverrideTranslationStatus]);
 
   // Deep link: focus the named row header (or the group header) once its data is shown.
   const focusedDeepLink = useRef<string | null>(null);
@@ -555,6 +570,7 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
     setAssignDialog({
       mode: "cases", projectKey, caseIds, sort: batchSort(request.sort), filters, me: assignMe,
       onClose: () => setAssignDialog(null),
+      onLimitChanged: () => { void refreshAll(); },
       onAssigned: (message, skipped) => {
         // The planned work is done for this selection; the skipped cases stay one click away.
         setAssignDialog(null);
@@ -732,6 +748,7 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
     canRequestCorrection: row => correctionVariant(row) != null,
     onChangeFinal: row => openCard({ key: rowKeyOf(row), stage: panelStage, tab: panelTab }, { changeFinal: true, focus: true }),
     canChangeFinal: row => row.final != null && !panelStep(row) && decisionKey.current !== rowKeyOf(row),
+    onWithdrawFinal: row => setWithdrawFor(row),
   };
   // Escape inside the options closes them; a discard confirmation inside handles its own Escape first (registered later).
   useShortcut("Escape", event => {
@@ -768,7 +785,13 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
   // The row shows one next-step button; the card offers every other lead step its parts do not cover.
   // The card places each step where it acts (the report banner, its part; issue 332).
   const cardSteps = (row: DocumentRowView): CardStep[] => (isActiveRow(row) ? leadSteps(row).filter(step => !CARD_PART_ACTIONS.has(step.action ?? "")) : [])
-    .map(step => ({ step, button: <Button size="sm" onClick={() => { closeCard(); onAction(row, step); }}>{rowActionLabel(step, row)}</Button> }));
+    .map(step => {
+      const blocked = stepBlockedReason(step, row);
+      return { step, button: blocked
+        ? <><Button size="sm" aria-disabled title={blocked} aria-describedby={`card-step-reason-${step.submission_id}`}>{rowActionLabel(step, row)}</Button>
+          {" "}<span id={`card-step-reason-${step.submission_id}`} className="action-reason">{blocked}</span></>
+        : <Button size="sm" onClick={() => { closeCard(); onAction(row, step); }}>{rowActionLabel(step, row)}</Button> };
+    });
   // U-4: the Translation column and filter group show once a translation exists or a language beyond the sources is set up.
   const translations = !inventory || inventory.cases.some(item => item.variants.some(variant => variant.origin !== "native")) || !settings
     || (settings.languages ?? []).some(language => !inventory.cases.some(item => item.variants.some(variant => variant.language === language)));
@@ -942,6 +965,19 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
       <TranslationCorrectionAction projectKey={projectKey} variant={correctionFor.variant} username={textVersionTools.username}
         requiredLanguages={textVersionTools.requiredLanguages(correctionFor.variant.document_id)} defaultOpen inDialog />
     </Dialog>}
+    {withdrawFor && withdrawRow && <WithdrawFinalDialog projectKey={projectKey} row={withdrawRow} onCancel={() => setWithdrawFor(null)}
+      onStale={reloadAfterAction}
+      onWithdrawn={() => {
+        setWithdrawFor(null);
+        notifyFinalSelectionChanged(projectKey);
+        showToast({ message: `Final result of ${rowName(withdrawFor)} withdrawn.` });
+        reloadAfterAction();
+      }} />}
+    {versionAction?.kind === "correct" && <CorrectVersionDialog row={versionAction.row} version={versionAction.version} projectKey={projectKey}
+      onNavigate={route => onNavigate(route)} onClose={() => setVersionAction(null)} />}
+    {versionAction?.kind === "accept" && <AcceptVersionDialog row={versionAction.row} version={versionAction.version} projectKey={projectKey}
+      onClose={() => setVersionAction(null)}
+      onAccepted={message => { setVersionAction(null); void refreshAll().then(() => showToast({ message })); }} />}
     {idsDialogOpen && <SelectByIdsDialog projectKey={projectKey} current={selection.cases} filters={filters} sort={request.sort ?? "case"} activeOnly={!notInPlanShown} onClose={() => setIdsDialogOpen(false)} onSelect={selectByIds} />}
   </section>;
 }

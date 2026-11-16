@@ -1,16 +1,23 @@
 """Lead-selected immutable results and transactional final export preflight."""
 
+from collections import Counter
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import Connection, insert, select, update
+from sqlalchemy import Connection, delete, func, insert, select, update
 
+from ontotator.application import document_row_panel
+from ontotator.application.document_row_page import build_row, page_context
+from ontotator.application.document_row_panel import row_comparison
+from ontotator.application.document_rows import load_facts
 from ontotator.application.final_causes import (
     ACKNOWLEDGEABLE_CODES,
     authorize_final_results,
     derive_final_state,
 )
+from ontotator.application.people import person_refs
 from ontotator.application.translation_reviews import TranslationReviewRecord
 from ontotator.application.workflow_warnings import state_digest
 from ontotator.auth.audit import Actor, record_audit
@@ -70,6 +77,68 @@ def _conflict(conn: Connection, old: Any) -> dict[str, Any]:
     }
 
 
+def _withdrawn_revisions(
+    conn: Connection, pid: int, doc: Any = None
+) -> dict[tuple[str, str], int]:
+    """(case, language) -> the highest revision in the text's final-selection
+    events (#343); of one text with ``doc``, else of the whole project.
+
+    The events keep every selection and withdrawal with its revision. After a
+    withdrawal the slot has no row, and the next choice continues from here.
+    """
+    payload = FinalSelectionEventRow.payload
+    case_id, language = payload["case_id"].astext, payload["language"].astext
+    query = (
+        select(case_id, language, func.max(payload["revision"].as_integer()))
+        .where(FinalSelectionEventRow.project_id == pid)
+        .group_by(case_id, language)
+    )
+    if doc is not None:
+        query = query.where(case_id == doc.case_id, language == doc.language)
+    return {(row[0], row[1]): int(row[2] or 0) for row in conn.execute(query)}
+
+
+@dataclass(frozen=True)
+class _Bulk:
+    """What every selection of one bulk action shares, read once (#354)."""
+
+    via: str
+    rule: bool
+    selected_by: str | None
+    withdrawn: dict[tuple[str, str], int]
+
+
+# Why accept_agreeing leaves a text out (#354), with the words the MCP tool
+# and a later Documents dialog show.
+AGREEING_SKIPS = {
+    "open_task": "Other work on the text is still open.",
+    "not_ready": "The text is not ready for a final result: nothing is"
+    " submitted on its current version, or an earlier step is open.",
+    "not_in_plan": "Annotation is off for this text in the work plan.",
+    "fewer_than_two": "Fewer than two submissions to compare.",
+    "consolidation": "The text has a consolidation; accept it on Documents.",
+    # Also when only the caller's own submission would match and the project
+    # does not let them accept their own work.
+    "differ": "No result you may accept agrees in full; consolidate or choose"
+    " on Documents.",
+}
+
+
+# Why bulk Change final… leaves a text as it is (issue 336, step 2), with the
+# words the dialog and the MCP tool show.
+CHANGE_SKIPS = {
+    "no_final": "No final result yet: use Accept agreeing results… or choose"
+    " one in the text card.",
+    "open_task": "Other work on the text is still open.",
+    "nothing_submitted": "Nothing is submitted on the current version of the text.",
+    "already_newest": "The final result is already the newest submission.",
+    "not_newer": "Nothing was submitted since the final result was chosen.",
+    "own_result": "The newest submission is your own; in this project another"
+    " lead must choose it.",
+    "differ": "The submissions differ: compare or consolidate first.",
+}
+
+
 class FinalResultService:
     def __init__(self, db: Database, actor: Actor, access: Access):
         self.db, self.actor, self.access = db, actor, access
@@ -95,114 +164,224 @@ class FinalResultService:
             )
         with self.db.transaction() as conn:
             pid = self._authorize(conn, key, exclusive=True)
-            doc = conn.execute(
-                select(DocumentRow.case_id, DocumentRow.language).where(
-                    DocumentRow.project_id == pid, DocumentRow.document_id == document
-                )
-            ).one_or_none()
-            exact = conn.execute(
-                select(SubmissionRow.submission_id, SubmissionRow.annotator_id).where(
-                    SubmissionRow.project_id == pid,
-                    SubmissionRow.document_id == document,
-                    SubmissionRow.submission_id == submission,
-                    # A discarded submission (mode change, #109) is no result.
-                    live_submission(),
-                )
-            ).first()
-            if doc is None or exact is None:
-                raise DomainError("VERSION_NOT_FOUND")
-            rule = conn.execute(
+            return self._select(
+                conn,
+                key,
+                pid,
+                document,
+                submission,
+                expected_revision,
+                acknowledged_cause_ids,
+            )
+
+    def _select(
+        self,
+        conn: Connection,
+        key: str,
+        pid: int,
+        document: str,
+        submission: str,
+        expected_revision: int,
+        acknowledged_cause_ids: list[str],
+        *,
+        bulk: _Bulk | None = None,
+    ) -> dict[str, Any]:
+        """``select`` on ``conn``, which holds the exclusive project lock.
+        ``bulk`` carries what a bulk action read once for all its texts and
+        names it in the audit entry."""
+        doc = conn.execute(
+            select(DocumentRow.case_id, DocumentRow.language).where(
+                DocumentRow.project_id == pid, DocumentRow.document_id == document
+            )
+        ).one_or_none()
+        exact = conn.execute(
+            select(SubmissionRow.submission_id, SubmissionRow.annotator_id).where(
+                SubmissionRow.project_id == pid,
+                SubmissionRow.document_id == document,
+                SubmissionRow.submission_id == submission,
+                # A discarded submission (mode change, #109) is no result.
+                live_submission(),
+            )
+        ).first()
+        if doc is None or exact is None:
+            raise DomainError("VERSION_NOT_FOUND")
+        rule = (
+            bulk.rule
+            if bulk is not None
+            else conn.execute(
                 select(ProjectRow.adjudicator_not_annotator).where(ProjectRow.id == pid)
             ).scalar_one()
+        )
+        slot = (
+            FinalSelectionRow.project_id == pid,
+            FinalSelectionRow.case_id == doc.case_id,
+            FinalSelectionRow.language == doc.language,
+        )
+        old = (
+            conn.execute(select(FinalSelectionRow).where(*slot).with_for_update())
+            .mappings()
+            .first()
+        )
+        if expected_revision != (old["revision"] if old else 0):
+            raise RevisionConflict(_conflict(conn, old))
+        # After the revision check: a stale request learns of the newer
+        # selection first instead of the rule refusal.
+        selected_by = (
+            bulk.selected_by
+            if bulk is not None
+            else _pseudonym(conn, self.actor.user_id)
+        )
+        if rule and exact.annotator_id == selected_by:
+            raise DomainError(
+                "OWN_RESULT_NOT_SELECTABLE",
+                "In this project the consolidator of a text may not be one of "
+                "its annotators. Another lead must choose this result.",
+            )
+        same = bool(
+            old
+            and old["document_id"] == document
+            and old["submission_id"] == submission
+        )
+        if acknowledged_cause_ids:
+            if not old or not same:
+                raise DomainError(
+                    "INVALID_FINAL_SELECTION",
+                    "New selections cannot pre-acknowledge future causes.",
+                )
+            # The client sends the complete set it showed; any addition,
+            # removal or status change since then is a conflict.
+            available = {
+                warning.get("cause_id")
+                for warning in self._projection(conn, key, pid)["warnings"]
+                if warning["code"] in ACKNOWLEDGEABLE_CODES
+                and warning["case_id"] == doc.case_id
+                and warning["language"] == doc.language
+            }
+            if set(acknowledged_cause_ids) != available:
+                raise RevisionConflict(
+                    _conflict(conn, old) | {"reason": "warnings_changed"}
+                )
+        if old and same:
+            acknowledged_cause_ids = sorted(
+                set(acknowledged_cause_ids) | set(old["acknowledged_cause_ids"])
+            )
+        # After a withdrawal (#343) the slot has no row; its next revision
+        # continues the withdrawn one, so a client that still holds the
+        # withdrawn final's revision cannot overwrite the new choice.
+        withdrawn = (
+            {}
+            if old
+            else bulk.withdrawn
+            if bulk is not None
+            else _withdrawn_revisions(conn, pid, doc)
+        )
+        base = old["revision"] if old else withdrawn.get((doc.case_id, doc.language), 0)
+        now = datetime.now(UTC)
+        values = {
+            "project_id": pid,
+            "case_id": doc.case_id,
+            "language": doc.language,
+            "document_id": document,
+            "submission_id": submission,
+            "revision": base + 1,
+            "actor_id": self.actor.user_id,
+            "acknowledged_cause_ids": sorted(set(acknowledged_cause_ids)),
+            "updated_at": now,
+            "selected_at": old["selected_at"] if old and same else now,
+            "adjudicator_not_annotator": rule,
+        }
+        if old:
+            conn.execute(update(FinalSelectionRow).where(*slot).values(**values))
+        else:
+            conn.execute(insert(FinalSelectionRow).values(**values))
+        if not same:
+            # PLAN_RESTORED was about the earlier final; a new choice
+            # settles it (the plan revision stays).
+            work_plan_store.clear_restored(conn, pid, RowKey(doc.case_id, doc.language))
+        result = {
+            name: values[name]
+            for name in (
+                "case_id",
+                "language",
+                "document_id",
+                "submission_id",
+                "revision",
+                "adjudicator_not_annotator",
+            )
+        }
+        event = {
+            **result,
+            "actor_id": self.actor.user_id,
+            "acknowledged_cause_ids": values["acknowledged_cause_ids"],
+            "selected_at": values["selected_at"].isoformat(),
+        }
+        conn.execute(
+            insert(FinalSelectionEventRow).values(project_id=pid, payload=event)
+        )
+        record_audit(
+            conn,
+            self.actor,
+            "project.final_selection",
+            target_type="project",
+            target_id=key,
+            project_id=pid,
+            details=event if bulk is None else {**event, "via": bulk.via},
+        )
+        return result | {
+            "selected_at": values["selected_at"],
+            "updated_at": values["updated_at"],
+            "selected_by": selected_by,
+        }
+
+    def withdraw(
+        self,
+        key: str,
+        case_id: str,
+        language: str,
+        expected_revision: int,
+        reason: str,
+    ) -> dict[str, Any]:
+        """Withdraw the final result of one text (#343).
+
+        The text then has no final result until a lead chooses one again; its
+        submissions and consolidations stay, final exports already made stay
+        as they are, and Change mode… is possible again. Compare-and-set on
+        the selection's revision; the event and the audit name the withdrawn
+        result and the reason.
+        """
+        reason = reason.strip()
+        if not reason:
+            raise DomainError("WITHDRAW_REASON_REQUIRED")
+        if self.actor.user_id is None:
+            raise AccessDenied(
+                "NOT_ALLOWED", "Only a signed-in lead can withdraw a final result."
+            )
+        with self.db.transaction() as conn:
+            pid = self._authorize(conn, key, exclusive=True)
             slot = (
                 FinalSelectionRow.project_id == pid,
-                FinalSelectionRow.case_id == doc.case_id,
-                FinalSelectionRow.language == doc.language,
+                FinalSelectionRow.case_id == case_id,
+                FinalSelectionRow.language == language,
             )
             old = (
                 conn.execute(select(FinalSelectionRow).where(*slot).with_for_update())
                 .mappings()
                 .first()
             )
-            if expected_revision != (old["revision"] if old else 0):
+            if old is None or expected_revision != old["revision"]:
                 raise RevisionConflict(_conflict(conn, old))
-            # After the revision check: a stale request learns of the newer
-            # selection first instead of the rule refusal.
-            selected_by = _pseudonym(conn, self.actor.user_id)
-            if rule and exact.annotator_id == selected_by:
-                raise DomainError(
-                    "OWN_RESULT_NOT_SELECTABLE",
-                    "In this project the consolidator of a text may not be one of "
-                    "its annotators. Another lead must choose this result.",
-                )
-            same = bool(
-                old
-                and old["document_id"] == document
-                and old["submission_id"] == submission
-            )
-            if acknowledged_cause_ids:
-                if not old or not same:
-                    raise DomainError(
-                        "INVALID_FINAL_SELECTION",
-                        "New selections cannot pre-acknowledge future causes.",
-                    )
-                # The client sends the complete set it showed; any addition,
-                # removal or status change since then is a conflict.
-                available = {
-                    warning.get("cause_id")
-                    for warning in self._projection(conn, key, pid)["warnings"]
-                    if warning["code"] in ACKNOWLEDGEABLE_CODES
-                    and warning["case_id"] == doc.case_id
-                    and warning["language"] == doc.language
-                }
-                if set(acknowledged_cause_ids) != available:
-                    raise RevisionConflict(
-                        _conflict(conn, old) | {"reason": "warnings_changed"}
-                    )
-            if old and same:
-                acknowledged_cause_ids = sorted(
-                    set(acknowledged_cause_ids) | set(old["acknowledged_cause_ids"])
-                )
-            now = datetime.now(UTC)
-            values = {
-                "project_id": pid,
-                "case_id": doc.case_id,
-                "language": doc.language,
-                "document_id": document,
-                "submission_id": submission,
-                "revision": expected_revision + 1,
-                "actor_id": self.actor.user_id,
-                "acknowledged_cause_ids": sorted(set(acknowledged_cause_ids)),
-                "updated_at": now,
-                "selected_at": old["selected_at"] if old and same else now,
-                "adjudicator_not_annotator": rule,
-            }
-            if old:
-                conn.execute(update(FinalSelectionRow).where(*slot).values(**values))
-            else:
-                conn.execute(insert(FinalSelectionRow).values(**values))
-            if not same:
-                # PLAN_RESTORED was about the earlier final; a new choice
-                # settles it (the plan revision stays).
-                work_plan_store.clear_restored(
-                    conn, pid, RowKey(doc.case_id, doc.language)
-                )
-            result = {
-                name: values[name]
-                for name in (
-                    "case_id",
-                    "language",
-                    "document_id",
-                    "submission_id",
-                    "revision",
-                    "adjudicator_not_annotator",
-                )
-            }
+            conn.execute(delete(FinalSelectionRow).where(*slot))
             event = {
-                **result,
+                "case_id": case_id,
+                "language": language,
+                "document_id": old["document_id"],
+                "submission_id": old["submission_id"],
+                # The withdrawal is a revision of its own: the next choice
+                # continues from it (``_withdrawn_revisions``).
+                "revision": old["revision"] + 1,
+                "withdrawn": True,
+                "reason": reason,
                 "actor_id": self.actor.user_id,
-                "acknowledged_cause_ids": values["acknowledged_cause_ids"],
-                "selected_at": values["selected_at"].isoformat(),
             }
             conn.execute(
                 insert(FinalSelectionEventRow).values(project_id=pid, payload=event)
@@ -210,17 +389,394 @@ class FinalResultService:
             record_audit(
                 conn,
                 self.actor,
-                "project.final_selection",
+                "project.final_withdrawn",
                 target_type="project",
                 target_id=key,
                 project_id=pid,
                 details=event,
             )
-            return result | {
-                "selected_at": values["selected_at"],
-                "updated_at": values["updated_at"],
-                "selected_by": selected_by,
+            return {
+                "case_id": case_id,
+                "language": language,
+                "document_id": old["document_id"],
+                "submission_id": old["submission_id"],
+                "revision": event["revision"],
             }
+
+    def _agreeing(
+        self,
+        conn: Connection,
+        key: str,
+        pid: int,
+        case_ids: list[str] | None,
+        rows: list[RowKey] | None = None,
+    ) -> dict[str, Any]:
+        """Which texts accept_agreeing would make final now (#354).
+
+        A text qualifies when it has no final result, no open work, at least
+        two submissions to compare, no consolidation among its eligible
+        submissions, and all findings match in full (the final panel's
+        ``all_match``, notes and modifier spans included) with a submission
+        the caller may accept. Every text of the scope is in exactly one of
+        ``texts``, ``skipped`` (with the reason) and ``already_final`` (only
+        counted: Change final… changes them); ``case_ids`` the project does
+        not have are named in ``unknown_case_ids``. ``rows`` instead limits
+        the scope to exactly these texts (the Documents selection, issue
+        336) and names the ones that already have a final result in
+        ``already_final_rows``. The submissions are read in a fixed number
+        of statements, whatever the number of texts.
+        """
+        assert self.actor.user_id is not None
+        facts = load_facts(conn, self.repo, key, pid, self.actor.user_id, scope="panel")
+        ctx = page_context(facts)
+        wanted = None if case_ids is None else set(case_ids)
+        unknown = (
+            []
+            if wanted is None
+            else sorted(wanted - {case_id for case_id, _ in ctx.by_row})
+        )
+        selected = None if rows is None else {(r.case_id, r.language) for r in rows}
+        skipped: list[dict[str, Any]] = []
+        candidates: list[tuple[str, str]] = []
+        already_final = 0
+        final_rows: list[dict[str, str]] = []
+        for case_id, language in sorted(ctx.by_row):
+            if wanted is not None and case_id not in wanted:
+                continue
+            if selected is not None and (case_id, language) not in selected:
+                continue
+            row = build_row(facts, case_id, language, ctx=ctx)
+            ref = {"case_id": case_id, "language": language}
+            if row["final"] is not None:
+                already_final += 1
+                if selected is not None:
+                    final_rows.append(ref)
+                continue
+            open_work = any(
+                item["status"] != "submitted" and item.get("moved_to_version") is None
+                for item in row["work"]
+            )
+            if open_work and row_comparison(ctx, case_id, language).eligible:
+                skipped.append(ref | {"reason": "open_task"})
+            elif any(step["code"] == "choose_final" for step in row["steps"]):
+                candidates.append((case_id, language))
+            elif not row["plan_row"]["annotate"]:
+                skipped.append(ref | {"reason": "not_in_plan"})
+            else:
+                skipped.append(ref | {"reason": "not_ready"})
+        texts: list[dict[str, Any]] = []
+        choices = document_row_panel.agreeing_choices(conn, pid, ctx, candidates)
+        for case_id, language in candidates:
+            ref = {"case_id": case_id, "language": language}
+            reason, chosen = choices[(case_id, language)]
+            if chosen is None:
+                skipped.append(ref | {"reason": reason})
+            else:
+                texts.append(ref | chosen)
+        skipped.sort(key=lambda item: (item["case_id"], item["language"]))
+        for item in skipped:
+            item["message"] = AGREEING_SKIPS[item["reason"]]
+        digest = state_digest(
+            {
+                "texts": texts,
+                "skipped": skipped,
+                "already_final": already_final,
+                "case_ids": None if case_ids is None else sorted(set(case_ids)),
+            }
+            # Without a selection the digest is the one of issue 354.
+            | ({} if selected is None else {"rows": sorted(selected)})
+        )
+        return {
+            "project": key,
+            "texts": texts,
+            "skipped": skipped,
+            "already_final": already_final,
+            "already_final_rows": final_rows,
+            "unknown_case_ids": unknown,
+            "preview_token": f"sha256:{digest}",
+        }
+
+    def accept_agreeing(
+        self,
+        key: str,
+        *,
+        preview: bool,
+        preview_token: str | None,
+        case_ids: list[str] | None,
+        rows: list[RowKey] | None = None,
+    ) -> dict[str, Any]:
+        """Preview, or apply all or nothing, the acceptance of every agreeing
+        text (#354), of ``case_ids`` or of the selected ``rows``. Apply recomputes the preview under the exclusive project
+        lock; a token that no longer matches is refused with
+        ``PREVIEW_STALE`` and the fresh preview, so preview and apply give
+        the same set. Each text is selected and audited like the single PUT
+        (``via``: "accept_agreeing")."""
+        if self.actor.user_id is None:
+            raise AccessDenied(
+                "NOT_ALLOWED", "Only a signed-in lead can choose final results."
+            )
+        with self.db.transaction() as conn:
+            pid = self._authorize(conn, key, exclusive=not preview)
+            found = self._agreeing(conn, key, pid, case_ids, rows)
+            if preview:
+                return found | {"applied": False}
+            if preview_token != found["preview_token"]:
+                raise DomainError(
+                    "PREVIEW_STALE", {"preview": found | {"applied": False}}
+                )
+            bulk = self._bulk(conn, pid, "accept_agreeing")
+            for item in found["texts"]:
+                self._select(
+                    conn,
+                    key,
+                    pid,
+                    item["document_id"],
+                    item["submission_id"],
+                    0,
+                    [],
+                    bulk=bulk,
+                )
+            return found | {"applied": True}
+
+    def _bulk(self, conn: Connection, pid: int, via: str) -> _Bulk:
+        return _Bulk(
+            via=via,
+            rule=bool(
+                conn.execute(
+                    select(ProjectRow.adjudicator_not_annotator).where(
+                        ProjectRow.id == pid
+                    )
+                ).scalar_one()
+            ),
+            selected_by=_pseudonym(conn, self.actor.user_id),
+            withdrawn=_withdrawn_revisions(conn, pid),
+        )
+
+    def _newest(
+        self,
+        conn: Connection,
+        key: str,
+        pid: int,
+        rows: list[RowKey],
+        *,
+        summary_only: bool,
+    ) -> dict[str, Any]:
+        """What bulk Change final… with the rule "newest submission" would do
+        to ``rows`` now (issue 336, step 2).
+
+        A text changes when it has a final result, no open work, and its
+        newest eligible submission (the submissions the final panel offers
+        on the current version: the last one of each submitted annotation
+        and of each submitted consolidation) is another one than the final,
+        was submitted after the final result was chosen, is one the caller
+        may choose, and is a consolidation, the text's only eligible
+        submission, or an annotation that agrees in full with the text's
+        other eligible submissions (the rule of ``accept_agreeing``: notes,
+        spans, modifiers and unresolved findings included). Submissions that
+        differ and were not consolidated never replace a final result. A submission that was already there when a lead
+        chose the final result never replaces it: that choice was made
+        knowing it. Every other selected text is skipped
+        with the reason. ``rows`` the project does not have are left out
+        (``texts`` counts the ones found). The number of statements does not
+        grow with the number of texts.
+        """
+        assert self.actor.user_id is not None
+        facts = load_facts(conn, self.repo, key, pid, self.actor.user_id, scope="panel")
+        ctx = page_context(facts)
+        found = [
+            (row.case_id, row.language)
+            for row in dict.fromkeys(rows)
+            if (row.case_id, row.language) in ctx.by_row
+        ]
+        skipped: list[dict[str, Any]] = []
+        candidates: list[tuple[tuple[str, str], dict[str, Any]]] = []
+        for case_id, language in found:
+            row = build_row(facts, case_id, language, ctx=ctx)
+            ref = {"case_id": case_id, "language": language}
+            if row["final"] is None:
+                skipped.append(ref | {"reason": "no_final"})
+            elif any(
+                item["status"] != "submitted" and item.get("moved_to_version") is None
+                for item in row["work"]
+            ):
+                skipped.append(ref | {"reason": "open_task"})
+            else:
+                candidates.append(((case_id, language), row["final"]))
+        newest = document_row_panel.newest_choices(
+            conn, pid, ctx, [text for text, _ in candidates]
+        )
+        chosen = sorted(
+            found[0].submission_id for found in newest.values() if found is not None
+        )
+        authors: dict[str, tuple[str, int | None]] = {
+            row.submission_id: (row.annotator_id, row.id)
+            for row in conn.execute(
+                select(
+                    SubmissionRow.submission_id, SubmissionRow.annotator_id, UserRow.id
+                )
+                .outerjoin(UserRow, UserRow.pseudonym == SubmissionRow.annotator_id)
+                .where(
+                    SubmissionRow.project_id == pid,
+                    SubmissionRow.submission_id.in_(chosen),
+                )
+            )
+        }
+        # An annotation among several submissions replaces the final only
+        # when all of them agree in full; a consolidation compared them.
+        agreeing = document_row_panel.agreeing_rows(
+            conn,
+            pid,
+            ctx,
+            [
+                text
+                for text, pick in newest.items()
+                if pick is not None
+                and pick[1] > 1
+                and pick[0].consolidation_round is None
+            ],
+        )
+        changes: list[dict[str, Any]] = []
+        for (case_id, language), final in candidates:
+            ref = {"case_id": case_id, "language": language}
+            pick = newest[(case_id, language)]
+            if pick is None:
+                skipped.append(ref | {"reason": "nothing_submitted"})
+                continue
+            candidate, eligible, recorded_at = pick
+            author, author_id = authors[candidate.submission_id]
+            if candidate.submission_id == final["submission_id"]:
+                skipped.append(ref | {"reason": "already_newest"})
+            elif recorded_at <= final["selected_at"]:
+                # The lead chose the final with this submission already there.
+                skipped.append(ref | {"reason": "not_newer"})
+            elif facts.adjudicator_not_annotator and author == facts.viewer_pseudonym:
+                skipped.append(ref | {"reason": "own_result"})
+            elif (
+                candidate.consolidation_round is None
+                and eligible > 1
+                and (case_id, language) not in agreeing
+            ):
+                skipped.append(ref | {"reason": "differ"})
+            else:
+                versions = {
+                    v.document_id: v.version for v in ctx.by_row[(case_id, language)]
+                }
+                changes.append(
+                    ref
+                    | {
+                        "expected_revision": final["revision"],
+                        "from_document_id": final["document_id"],
+                        "from_submission_id": final["submission_id"],
+                        "from_version": versions.get(final["document_id"]),
+                        "document_id": candidate.document_id,
+                        "submission_id": candidate.submission_id,
+                        "version": versions[candidate.document_id],
+                        "kind": "annotation"
+                        if candidate.consolidation_round is None
+                        else "consolidation",
+                        "author_id": author_id,
+                        "eligible_submissions": eligible,
+                    }
+                )
+        order = {text: index for index, text in enumerate(found)}
+        skipped.sort(key=lambda item: order[(item["case_id"], item["language"])])
+        digest = state_digest(
+            {
+                "rule": "newest_submission",
+                "rows": [list(text) for text in found],
+                "changes": [
+                    [
+                        item["case_id"],
+                        item["language"],
+                        item["expected_revision"],
+                        item["from_submission_id"],
+                        item["document_id"],
+                        item["submission_id"],
+                    ]
+                    for item in changes
+                ],
+                "skipped": [
+                    [item["case_id"], item["language"], item["reason"]]
+                    for item in skipped
+                ],
+            }
+        )
+        result: dict[str, Any] = {
+            "project": key,
+            "rule": "newest_submission",
+            "texts": len(found),
+            "change_count": len(changes),
+            "skipped_count": len(skipped),
+            "skipped_by_reason": dict(
+                sorted(Counter(item["reason"] for item in skipped).items())
+            ),
+            "changes": [],
+            "skipped": [],
+            "preview_token": f"sha256:{digest}",
+        }
+        if summary_only:
+            return result
+        people = person_refs(
+            conn,
+            {item["author_id"] for item in changes if item["author_id"] is not None},
+            viewer_id=self.actor.user_id,
+            viewer_is_lead=True,
+        )
+        for item in changes:
+            person = people.get(item.pop("author_id"))
+            item["person"] = None if person is None else person.model_dump()
+        for item in skipped:
+            item["message"] = CHANGE_SKIPS[item["reason"]]
+        return result | {"changes": changes, "skipped": skipped}
+
+    def change_finals(
+        self,
+        key: str,
+        rows: list[RowKey],
+        *,
+        preview: bool,
+        preview_token: str | None,
+        summary_only: bool = False,
+    ) -> dict[str, Any]:
+        """Preview, or apply all or nothing, bulk Change final… with the rule
+        "newest submission" for the selected texts (issue 336, step 2).
+
+        Apply recomputes the preview under the exclusive project lock; a
+        token that no longer matches is refused with ``PREVIEW_STALE`` and
+        the fresh preview. The token covers the texts, the final each one
+        has (its revision and submission) and the result it gets, so a final
+        changed meanwhile refuses the whole action. Each text is selected
+        and audited like the single PUT (``via``: "bulk_change_final"), with
+        the revision of the final it replaces.
+        """
+        if self.actor.user_id is None:
+            raise AccessDenied(
+                "NOT_ALLOWED", "Only a signed-in lead can choose final results."
+            )
+        with self.db.transaction() as conn:
+            pid = self._authorize(conn, key, exclusive=not preview)
+            found = self._newest(
+                conn, key, pid, rows, summary_only=preview and summary_only
+            )
+            if preview:
+                return found | {"applied": False}
+            if preview_token != found["preview_token"]:
+                raise DomainError(
+                    "PREVIEW_STALE", {"preview": found | {"applied": False}}
+                )
+            bulk = self._bulk(conn, pid, "bulk_change_final")
+            for item in found["changes"]:
+                self._select(
+                    conn,
+                    key,
+                    pid,
+                    item["document_id"],
+                    item["submission_id"],
+                    item["expected_revision"],
+                    [],
+                    bulk=bulk,
+                )
+            return found | {"applied": True}
 
     def _projection(self, conn: Connection, key: str, pid: int) -> dict[str, Any]:
         return derive_final_state(conn, self.repo, key, pid)

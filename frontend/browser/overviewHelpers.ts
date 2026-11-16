@@ -1,10 +1,10 @@
 import { expect, type Locator, type Page } from "@playwright/test";
-import { openTasksHome, TEST_PASSWORD } from "./helpers";
+import { openTasksHome, TEST_PASSWORD, routerReady } from "./helpers";
 
 /** Scenarios of ``POST /__test_overview__`` (tests/browser_overview_scenarios.py). */
 export type OverviewScenarioName =
   | "S1" | "S2" | "S3" | "S4" | "S5" | "S6" | "S7a" | "S7b" | "S8"
-  | "S9" | "S10" | "S11" | "S12" | "S13" | "S14" | "S15" | "S16" | "S17"
+  | "S9" | "S10" | "S11" | "S12" | "S13" | "S14" | "S15" | "S16" | "S17" | "S18"
   | "WALKTHROUGH";
 
 /** The people of every overview scenario: Mia Kühn (lead), Ana Weber, Tom Reis, Luc Martin. */
@@ -27,7 +27,7 @@ export interface OverviewScenario {
   rows: OverviewRow[];
   /** Assignment ids by name ("ana", "tom", "ana_review", "luc_review", …). */
   assignments: Record<string, number>;
-  /** S12-S14: the de document ids "v1" and "v2". */
+  /** S12-S14, S18: the de document ids "v1" and "v2". */
   documents?: Record<string, string>;
   /** Submission ids by name ("ana", "final", "de_final", "fr_final", …). */
   submissions?: Record<string, string>;
@@ -101,6 +101,7 @@ export async function loginOverviewUser(page: Page, scenario: Pick<OverviewScena
   await form.getByLabel("Password", { exact: true }).fill(TEST_PASSWORD);
   await form.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(page.getByTestId("current-user")).toContainText(scenario.display_names[name]);
+  await routerReady(page);
 }
 
 /**

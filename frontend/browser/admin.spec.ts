@@ -48,6 +48,12 @@ async function createUser(page: Page, username: string): Promise<Actor> {
   await expect(dialog).toBeVisible();
   const code = await dialog.locator("code").innerText();
   expect(code.length).toBeGreaterThan(0);
+  // The expiry comes from the server: 7 days by default (ONTOTATOR_SETUP_CODE_HOURS), not a fixed 24 hours.
+  await expect(dialog.getByText(/^This code works once and expires in 7 days, on \d{1,2} \w{3} \d{4}, \d{2}:\d{2} \(local time\)\.$/)).toBeVisible();
+  const expires = Date.parse(await dialog.locator("time").getAttribute("datetime") ?? "");
+  expect(Math.abs(expires - Date.now() - 7 * 86_400_000)).toBeLessThan(120_000);
+  await dialog.locator("summary").click();
+  await expect(dialog.locator(".handover-text")).toContainText("valid for about 7 days, until");
   // The header close is hidden until acknowledgement; the footer Close is the acknowledgement-gated action.
   const close = dialog.locator(".modal-actions").getByRole("button", { name: "Close", exact: true });
   await expect(close).toBeDisabled();

@@ -49,5 +49,7 @@ describe("a carry to a new text version", () => {
     expect(roundBadge(carried)).toBe("Round 1, continued from Round 1 of an earlier version");
     expect(roundStartingPoint({ ...carried, input_submission_ids: [] })).toBe("from Round 1 of an earlier version submission");
     expect(roundBadge({ ...carried, round_ordinal: 2 })).toBe("Round 2, continued from Round 1");
+    // A round moved to a corrected text reads as continued (the toolbar uses it when nothing needs a check).
+    expect(roundBadge({ kind: "text_change", round_ordinal: 1, source_round_ordinal: null })).toBe("Round 1, continued from an earlier version");
   });
 });

@@ -77,6 +77,13 @@ export function rowActionLabel(step: NextStepView, row: Pick<DocumentRowView, "s
   return step.action ? actionLabel(step.action) : "";
 }
 
+/** Why a step cannot run yet (issue 414: a carry of proposals work waits for the new version's proposals); null when it can. */
+export function stepBlockedReason(step: NextStepView, row: Partial<Pick<DocumentRowView, "versions">>): string | null {
+  if (step.blocked !== "no_target_proposals") return null;
+  const target = row.versions?.find(version => version.document_id === step.document_id);
+  return `Import proposals for ${target ? `v${target.version}` : "the new version"}`;
+}
+
 /** Annotate work of the current versions partly submitted, partly open: the card's partial agreement (`earlyFinal`). */
 function annotationsOpen(row: Partial<Pick<DocumentRowView, "work" | "stages">>): boolean {
   if (row.stages?.annotation.state === "consolidating") return false;

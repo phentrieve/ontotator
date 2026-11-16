@@ -35,7 +35,7 @@ The toolbar shows the text name, its language and the mode:
 | **Annotate from scratch** | You see neither tool proposals nor other people's work. |
 | **Annotate from proposals** | You see a tool's proposals, never other people's work. See [Review tool proposals](#review-tool-proposals). |
 | **Review carried findings**, or the round name such as *Round 2, continued from Round 1* | Findings were carried over from earlier work. See [Review carried findings](#review-carried-findings). |
-| **Check after text change** | The text was corrected. See [Re-create findings after a text correction](#re-create-findings-after-a-text-correction). |
+| **Check after text change** | The text was corrected and some findings are marked **Check needed**. See [Re-create findings after a text correction](#re-create-findings-after-a-text-correction). If nothing needs a check, the toolbar shows the round instead, such as *Round 1, continued from an earlier version*. |
 
 Next to the mode, the save status tells you whether your work is stored: **Saved**, **Saving...** or **Unsaved changes**. Work is saved automatically; there is no save button. If it reads **Offline** or shows an error, click **Retry**.
 
@@ -65,7 +65,7 @@ If the text was changed elsewhere, a **Revision conflict** notice appears; click
 | Diagonal hatching | A finding with the value **Absent**. |
 | Thicker underline | Overlapping findings. |
 | Frame | The finding you point at or selected. |
-| **AI** | Proposed by a tool. Point at the badge to see which tool. |
+| **AI** | Proposed by a tool. Point at the badge to see which tool. A proposal carried over to a corrected text version names the tool that proposed it. |
 | **Pending** | A proposal you have not decided yet. Decided proposals show **Confirmed**, **Rejected**, **Replaced** or **Unresolved**. |
 | **Being replaced** | A proposal with your copy from **Edit & Replace** that has no changes yet. |
 | **Defaults to confirm** | The finding still has prefilled values you have not confirmed. |
@@ -273,13 +273,25 @@ What for: check findings that were carried over from an earlier round, for examp
 
 If you change a finding after checking it, it needs a new check.
 
+In a task from proposals, your decisions on the proposals are carried to the new version: accepted, edited and added findings come along, and only those in a changed passage, or without a matching proposal in the new version, are marked **Check needed**. A proposal you rejected that has no counterpart in the new version is dropped. One you left **Unresolved** keeps its note.
+
 A row **Not on this text** means the finding could not be placed in this text. Select it and choose one: **Mark in text**, **Link to an existing finding**, or **Dismiss with reason…**. A finding re-created with **Mark in text** keeps the original's term, values and note.
+
+### See what changed since the earlier version
+
+When the carried work comes from an earlier version of the text, for example after **Carry to v2…** or **Handle text change…**, the line above the text offers **Show changes since** v1 (with the number of that version). It is off by default.
+
+1. Tick **Show changes since** v1 (or press `Space` on it). Each changed passage gets a dashed frame, and added text is underlined. The line next to it counts the passages, for example *1 passage changed*.
+2. Click **Next ›** or **‹ Previous** to scroll to the next or previous passage; it gets a solid frame and the line reads, for example, *1 passage changed · 1 of 1*.
+3. Where text was removed, a small **−** marker stands in the text. Point at it or move to it with `Tab` to see the earlier wording, with the removed words struck through. `Esc` closes it.
+
+The marks are only shown over the text: the text stays exactly this version, so you can mark text, add or re-create findings and check carried findings as usual while they are on. A changed sentence the tool did not propose a finding for may need a new finding. The marks compare the two versions word by word, while **Check needed** is decided from the exact characters under each finding, so a finding inside a marked passage is not always marked **Check needed**, and the other way round. Untick the box to hide the marks.
 
 ![A carried finding with What to check and the Mark as checked button](images/annotator-carried-finding.png)
 
 ## Re-create findings after a text correction
 
-What for: move your findings to the corrected text after the text got a new version, for example from a translation review, a lead's correction or an upload, and your task moved to it. The toolbar reads **Check after text change**.
+What for: move your findings to the corrected text after the text got a new version, for example from a translation review, a lead's correction or an upload, and your task moved to it. The toolbar reads **Check after text change** while findings are marked **Check needed**. This works the same in a task from proposals: only findings in changed passages need you; your other decisions on the proposals are already carried.
 
 1. The panel **Needs review after the text change** lists the findings to place again.
 2. For each item, click **Re-create here** and mark the supporting text in the corrected version.
@@ -287,6 +299,8 @@ What for: move your findings to the corrected text after the text got a new vers
 4. Check the text span and the values of the saved finding, then click **Complete text-change review**. A later change to the finding needs this again.
 
 If the finding no longer fits, click **Dismiss with reason**, fill in **Reason for dismissal** and click **Save dismissal**.
+
+To see which passages the correction changed, tick **Show changes since** v1 above the text ([See what changed since the earlier version](#see-what-changed-since-the-earlier-version)).
 
 ## Submit the text
 
@@ -410,6 +424,10 @@ Steps:
    - **Accepted unchanged** after a failed automatic check: say in the **Rationale** why the flagged difference is correct.
 7. Click **Submit review…** (or press `Ctrl+Enter`), read what will happen, then click **Submit review**.
 8. A message confirms the review, with **View result**. Your next open task opens on its own, another translation review first, or **My tasks** if none is left. If you also annotate this text and your review finished its translation, your annotation of the text opens instead and the message adds *Annotate this text now*. Finished means: the translation is accepted (with corrections, on the corrected version), every other translation of the text is accepted too, and no further review or decision of the lead is pending. After **Query** or **Rejected** it does not come first.
+
+On a wide screen, **Your review** is a column on the right. To give the texts more room, drag its left edge (**Resize review panel**), or focus the edge and press `←` or `→`; `Enter` restores the default width. **Collapse review panel** folds it to a narrow strip: the bar at the bottom then shows the decision and **Submit review…**, and **Expand review panel** or **Change ↓** opens it again. Width and folding are remembered in this browser.
+
+A project lead who corrects a translation themselves sees only **Accepted with corrections**. When the lead corrects a translation that was already accepted, the corrected version is reviewed again: it then appears as a new translation review task, usually for you ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
 
 If the source text was updated, **Source updates to review** appears. Open it, compare **Original source** and **Updated source**, and click **Submit review and resolve source update**.
 

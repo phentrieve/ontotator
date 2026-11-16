@@ -10,7 +10,7 @@ The gate runs its phases one after another. Backend tests run in four pytest-xdi
 
 The PostgreSQL test container runs with `fsync`, `synchronous_commit` and `full_page_writes` switched off. These settings are for throwaway test servers only: a crash loses data. Never copy them to a deployment.
 
-Frontend unit tests default to at most two workers, with a minimum of one, to leave RAM available for other work. A dedicated machine can opt into four:
+Frontend unit tests default to at most two workers to leave RAM available for other work. A dedicated machine can opt into four:
 
 ```bash
 CHECK_VITEST_WORKERS=4 bash scripts/check.sh

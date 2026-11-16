@@ -35,7 +35,9 @@ FACET_GROUPS: tuple[FacetGroup, ...] = (
 )
 # Facet "Flagged: guidelines unclear" (acceptance fixes X5): rows whose
 # submitted consolidation of the current version has a flagged finding.
-FlagFilter = Literal["guidelines_unclear"]
+# "More annotators than the limit" (issue 339 b): a current version of the
+# row has more unrevoked annotate tasks than "annotators per text".
+FlagFilter = Literal["guidelines_unclear", "over_limit"]
 # Facet "Tool proposals" (spec 2026-10-23 §2b).
 ProposalValue = Literal["with", "without"]
 Key = TypeVar("Key")
@@ -51,6 +53,14 @@ _STAGE_GROUPS: Mapping[str, str] = {
 def proposal_value(row: Mapping[str, Any]) -> ProposalValue:
     """ "with" when the row's target document has tool proposals."""
     return "with" if row["proposal_count"] > 0 else "without"
+
+
+def flag_values(row: Mapping[str, Any]) -> tuple[str, ...]:
+    """The row's values of the Flags group (filter ``flags``)."""
+    return (
+        *(("guidelines_unclear",) if row.get("flagged_unclear") else ()),
+        *(("over_limit",) if row.get("over_limit") else ()),
+    )
 
 
 def facet_values(
@@ -74,7 +84,7 @@ def facet_values(
     if group in _STAGE_GROUPS:
         return (row["stages"][_STAGE_GROUPS[group]]["state"],)
     if group == "flags":
-        return ("guidelines_unclear",) if row.get("flagged_unclear") else ()
+        return flag_values(row)
     if group == "proposals":
         return (proposal_value(row),)
     source = {"origin": origins, "plan": plan, "waiting_on": waiting_on}[group]

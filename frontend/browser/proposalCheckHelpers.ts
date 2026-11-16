@@ -1,8 +1,8 @@
 import { expect, type Locator, type Page } from "@playwright/test";
-import { openTasksHome, TEST_PASSWORD } from "./helpers";
+import { openTasksHome, TEST_PASSWORD, routerReady } from "./helpers";
 
 /** Scenarios of ``POST /__test_proposal_check__`` (tests/browser_proposal_check_scenarios.py). */
-export type ProposalCheckScenarioName = "FRESH" | "ONE_ASSIGNED" | "CHECKED" | "CONSOLIDATING" | "CONSOLIDATING_ALI";
+export type ProposalCheckScenarioName = "FRESH" | "ONE_ASSIGNED" | "CHECKED" | "CONSOLIDATING" | "CONSOLIDATING_ALI" | "NEWER_SET";
 
 /** The people of every proposal-check scenario: the lead, Tom Reis, Mia Berg, Ali Kaya (annotators). */
 export type ProposalCheckPerson = "lead" | "tom" | "mia" | "ali";
@@ -39,6 +39,7 @@ export async function loginScenarioUser(page: Page, scenario: Pick<ProposalCheck
   await form.getByLabel("Password", { exact: true }).fill(TEST_PASSWORD);
   await form.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(page.getByTestId("current-user")).toContainText(scenario.display_names[name]);
+  await routerReady(page);
 }
 
 /** The text card dialog of one text. */

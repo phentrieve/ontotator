@@ -362,6 +362,35 @@ SCENARIOS: list[tuple[str, StageFacts, tuple[str, ...], dict[str, dict[str, Any]
         },
     ),
     (
+        "13b-old-work-waits-for-proposals",
+        facts(
+            accepted_how="corrected",
+            accepted_from_version=1,
+            newest_version=2,
+            newest_origin="correction",
+            review_decided_by=ANA,
+            old_submitted=(
+                OldItem(ANA, 1, submission_id="s13", blocked="no_target_proposals"),
+            ),
+        ),
+        (
+            "accepted",
+            "done",
+            "old_text_submitted",
+            "decision",
+            "after_annotation",
+            "waiting",
+        ),
+        {
+            "annotation": {
+                "people": (ANA,),
+                "from_version": 1,
+                "version": 2,
+                "note": "no_target_proposals",
+            },
+        },
+    ),
+    (
         "14-final-on-old-text",
         facts(
             accepted_how="corrected",

@@ -50,6 +50,7 @@ const auditActions: Readonly<Record<string, string>> = {
   "project.final_export_requested": "Final export requested",
   "project.final_phenopacket_export": "Phenopackets created",
   "project.final_selection": "Final selection changed",
+  "project.final_withdrawn": "Final result withdrawn",
   "project.translation_review_export": "Translation reviews exported",
   "api_token.create": "API token created",
   "api_token.revoke": "API token revoked",
@@ -88,6 +89,7 @@ const auditActions: Readonly<Record<string, string>> = {
   "variant.status_override": "Variant status overridden",
   "work_plan.import": "Work plan imported",
   "work_plan.update": "Work plan changed",
+  "text.annotations_per_text": "Annotators per text changed for one text",
 };
 const isBlank = (value: unknown): boolean =>
   value === null || value === undefined || value === "" || (Array.isArray(value) ? value.length === 0 : typeof value === "object" && Object.keys(value).length === 0);

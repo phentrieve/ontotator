@@ -35,6 +35,12 @@ beforeEach(() => {
   vi.spyOn(api, "saveWorkPlans").mockResolvedValue(result);
   vi.spyOn(api, "previewWorkPlans").mockResolvedValue(preview());
   vi.spyOn(api, "setWorkPlanRows").mockResolvedValue({ ...result, revisions: { "case-0101": 3 } });
+  // "More actions" checks which bulk actions can act on the selection (issue 336).
+  const nothing = { applied: false, texts: 20, change_count: 0, kept_count: 0, skipped_count: 0, changes: [], kept: [], skipped: [], preview_token: "sha256:x", undo: null };
+  vi.spyOn(api, "bulkReopen").mockResolvedValue({ action: "reopen", ...nothing });
+  vi.spyOn(api, "bulkWithdraw").mockResolvedValue({ action: "withdraw", ...nothing });
+  vi.spyOn(api, "bulkStartRound").mockResolvedValue({ action: "start_round", kind: "carry_forward", ...nothing });
+  vi.spyOn(api, "bulkChangeMode").mockResolvedValue({ mode: "scratch", applied: false, texts: 0, change_count: 0, skipped_count: 0, skipped_by_reason: {}, submission_count: 0, assignment_count: 0, changes: [], skipped: [], preview_token: "sha256:m" });
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
@@ -87,9 +93,9 @@ it("shown with one selected text (R-3)", () => {
   expect(within(bar()).getByRole("button", { name: "Assign…" })).toBeTruthy();
 });
 
-it("keeps five stable actions; the plan presets live in Plan… (M-1)", () => {
+it("keeps six stable actions; the plan presets live in Plan… (M-1), bulk task actions in More actions (issue 336)", () => {
   render(<Harness initial={["case-0101:de", "case-0102:de"]} />);
-  expect(within(bar()).getAllByRole("button").map(button => button.textContent)).toEqual(["Assign…", "Plan…", "Move to front", "Show selected", "Clear selection"]);
+  expect(within(bar()).getAllByRole("button").map(button => button.textContent)).toEqual(["Assign…", "Plan…", "More actions", "Move to front", "Show selected", "Clear selection"]);
   expect(bar().textContent).not.toMatch(/\bReview\b|Annotation review|Independent annotation|Translation review and annotation/);
 });
 
@@ -211,7 +217,7 @@ it("has Assign… as the page's only primary button", async () => {
   render(<Harness onAssign={onAssign} />);
   const primary = [...bar().querySelectorAll(".btn-primary")].map(button => button.textContent);
   expect(primary).toEqual(["Assign…"]);
-  expect(within(bar()).getAllByRole("button").map(button => button.textContent)).toEqual(["Assign…", "Plan…", "Move to front", "Show selected", "Clear selection"]);
+  expect(within(bar()).getAllByRole("button").map(button => button.textContent)).toEqual(["Assign…", "Plan…", "More actions", "Move to front", "Show selected", "Clear selection"]);
   fireEvent.click(within(bar()).getByRole("button", { name: "Assign…" }));
   expect(onAssign).toHaveBeenCalledOnce();
 });

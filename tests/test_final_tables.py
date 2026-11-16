@@ -25,6 +25,7 @@ from ontotator.exchange.final_tables import (
     Proposal,
     SubmissionFacts,
     agreement_summary,
+    build_agreement_csv,
     build_proposals_csv,
     finding_origin,
 )
@@ -34,6 +35,15 @@ from ontotator.exchange.proposal_checks import tool_chances
 def rows(data: bytes) -> list[dict[str, str]]:
     assert data.startswith(b"\xef\xbb\xbf")
     return list(csv.DictReader(io.StringIO(data.decode("utf-8-sig"), newline="")))
+
+
+def all_pairs_summary(archive: zipfile.ZipFile) -> dict[str, dict[str, str]]:
+    """The agreement-summary.csv rows of every pair (``modes`` "all"), by scope."""
+    return {
+        r["scope"]: r
+        for r in rows(archive.read("agreement-summary.csv"))
+        if r["modes"] == "all"
+    }
 
 
 def final_archive(env: Any, request_id: str) -> zipfile.ZipFile:
@@ -125,7 +135,7 @@ def test_agreement_compares_the_two_annotations_behind_the_result(consolidated):
     # Status epilepticus and Dialeptic seizure are siblings, not related (#303).
     assert pair["related_term_conflicts"] == "0"
     assert pair["annotation_strict_f1"] == f"{2 / 7:.4f}"
-    summary = {row["scope"]: row for row in rows(archive.read("agreement-summary.csv"))}
+    summary = all_pairs_summary(archive)
     assert set(summary) == {"macro_mean", "pooled"}
     assert summary["pooled"]["texts"] == summary["pooled"]["pairs"] == "1"
     assert summary["pooled"]["annotation_strict_f1"] == f"{2 / 7:.4f}"
@@ -306,7 +316,7 @@ def test_agreement_covers_consolidated_and_directly_accepted_texts(tmp_path):
         "sub-c2-ben",
     }
     assert (direct["equal"], direct["annotation_strict_f1"]) == ("1", f"{2 / 3:.4f}")
-    summary = {r["scope"]: r for r in rows(archive.read("agreement-summary.csv"))}
+    summary = all_pairs_summary(archive)
     assert (summary["pooled"]["texts"], summary["pooled"]["pairs"]) == ("2", "2")
     # c1: 1 equal of 3 + 4 findings; c2: 1 equal of 1 + 2.
     assert summary["pooled"]["annotation_strict_f1"] == f"{2 * 2 / 10:.4f}"
@@ -369,7 +379,7 @@ def test_one_annotator_has_no_pair_and_empty_summary(tmp_path):
     archive = final_archive(env, "tables-one")
 
     assert rows(archive.read("agreement.csv")) == []
-    summary = {r["scope"]: r for r in rows(archive.read("agreement-summary.csv"))}
+    summary = all_pairs_summary(archive)
     for scope in ("macro_mean", "pooled"):
         assert (summary[scope]["texts"], summary[scope]["pairs"]) == ("0", "0")
         assert all(summary[scope][name] == "" for name in F1_COLUMNS), scope
@@ -447,6 +457,66 @@ def _proposal(sid: str, annotation_id: str, tool: str = "tagger") -> Proposal:
             ),
         ),
     )
+
+
+def test_agreement_separates_the_annotation_modes():
+    """Two from-scratch submissions and one proposal check on a text: each pair
+    names both modes, and the summary has rows per mode pair (#389)."""
+    from t1_fixtures import annotation, unit
+
+    def scratch(sid: str, author: str) -> dict[str, Any]:
+        sub = _check(sid, author, [], [])
+        sub["origin_key"]["mode"] = "independent"
+        return sub
+
+    payload = _payload(
+        [
+            scratch("s1", "ana"),
+            scratch("s2", "ben"),
+            _check("s3", "cleo", [], ["p1", "p2"]),
+        ]
+    )
+    two = unit("d1")
+    one = unit("d1", annotations=[annotation("p1", (6, 19))])
+    units = [
+        ExportedUnit(sid, "provenance", "p.zip", f"documents/{n:05d}.json", item)
+        for n, (sid, item) in enumerate([("s1", two), ("s2", one), ("s3", two)])
+    ]
+    tables = build_agreement_csv(payload, units)
+    pairs = rows(tables["agreement.csv"])
+    assert list(pairs[0])[5:11] == [
+        "submission_a",
+        "pseudonym_a",
+        "mode_a",
+        "submission_b",
+        "pseudonym_b",
+        "mode_b",
+    ]
+    assert [
+        (p["pseudonym_a"], p["mode_a"], p["pseudonym_b"], p["mode_b"]) for p in pairs
+    ] == [
+        ("ana", "scratch", "ben", "scratch"),
+        ("ana", "scratch", "cleo", "proposals"),
+        ("ben", "scratch", "cleo", "proposals"),
+    ]
+    summary = rows(tables["agreement-summary.csv"])
+    assert list(summary[0])[:4] == ["scope", "modes", "texts", "pairs"]
+    assert [(r["modes"], r["scope"], r["pairs"]) for r in summary] == [
+        ("all", "macro_mean", "3"),
+        ("all", "pooled", "3"),
+        ("scratch-scratch", "macro_mean", "1"),
+        ("scratch-scratch", "pooled", "1"),
+        ("proposals-proposals", "macro_mean", "0"),
+        ("proposals-proposals", "pooled", "0"),
+        ("mixed", "macro_mean", "2"),
+        ("mixed", "pooled", "2"),
+    ]
+    by = {(r["modes"], r["scope"]): r for r in summary}
+    # ana and ben share one of two findings; ana and cleo agree fully.
+    assert by["scratch-scratch", "pooled"]["annotation_strict_f1"] == f"{2 / 3:.4f}"
+    assert by["mixed", "pooled"]["equal"] == "3"
+    assert all(by["proposals-proposals", "pooled"][n] == "" for n in F1_COLUMNS)
+    assert by["all", "pooled"]["equal"] == "4"
 
 
 def test_changed_and_added_findings_are_counted_per_person():

@@ -118,6 +118,8 @@ ARCHIVED: tuple[ArchivedTable, ...] = (
     ArchivedTable("draft_snapshots"),
     ArchivedTable("work_plans"),
     ArchivedTable("work_plan_rows"),
+    # Per-text "Annotations per text" (issue 422).
+    ArchivedTable("text_settings"),
     ArchivedTable("translation_acceptances"),
     ArchivedTable("discarded_variants"),
     ArchivedTable("final_selections"),

@@ -255,6 +255,7 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   WORK_PLAN_INVALID: "Annotation needs an accepted translation.",
   NOT_IN_WORK_PLAN: "This language version is not planned for this task.",
   LEAD_CORRECTION_NOT_AVAILABLE: "This translation can no longer be corrected here. Reload the row to see its current state.",
+  VERSION_NOT_ACCEPTABLE: "This version can no longer be accepted here. Reload the row to see its current state.",
   CASE_IDS_TOO_MANY: "Paste at most 5000 case IDs.",
   VARIANT_ALREADY_DISCARDED: "This translation was already discarded.",
   ASSIGNMENT_BATCH_STALE: "The cases or people changed. Check the new preview.",
@@ -266,7 +267,11 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   NO_TOOL_PROPOSALS: "This text has no tool proposals, so it is annotated from scratch.",
   ANNOTATION_MODE_NOT_LOCKED: "No work fixes this text's mode yet. Choose the mode in the annotation plan.",
   ANNOTATION_MODE_UNCHANGED: "The text is already annotated this way.",
-  ANNOTATION_MODE_FINAL_SELECTED: "A final result was chosen for this text, so its annotation mode stays.",
+  ANNOTATION_MODE_FINAL_SELECTED: "A final result was chosen for this text, so its annotation mode stays. To change it, first use Withdraw final… under Finalization.",
+  WITHDRAW_REASON_REQUIRED: "Withdrawing a final result requires a reason.",
+  PREVIEW_STALE: "The texts changed since the preview. Check the new preview.",
+  BULK_UNDO_STALE: "Undo is no longer possible: the texts changed since.",
+  BULK_REASON_REQUIRED: "Reopening tasks requires a reason.",
   MODE_CHANGE_STALE: "The work on this text changed. Check the new list before you change the mode.",
   MODE_CHANGE_REASON_REQUIRED: "Changing the mode requires a reason.",
   MODE_CHANGE_NOT_FOUND: "This mode change no longer exists. Reload the text.",
@@ -293,10 +298,8 @@ export function errorMessage(error: unknown): string {
     const max = error.details.max;
     if (typeof max === "number" && Number.isSafeInteger(max) && max > 0) return `You already have ${max} jobs waiting. Try again when one of them has started.`;
   }
-  if (error instanceof ApiError && error.code === "TEXT_CHANGE_NOT_APPLICABLE" && typeof error.details === "object" && error.details !== null && error.details.reason === "from_proposals") {
-    return error.details.step === "carry"
-      ? "Annotation from proposals is not carried to a new version. Assign the new version; it is annotated from its own proposals."
-      : "Annotation from proposals stays on its version. Remove the assignment and assign the new version; its draft is discarded.";
+  if (error instanceof ApiError && error.code === "TEXT_CHANGE_NOT_APPLICABLE" && typeof error.details === "object" && error.details !== null && error.details.reason === "no_target_proposals") {
+    return "The new version has no proposals yet: their automatic transfer may still be running, or they must be imported. Wait for or import the proposals for the new version, then try again.";
   }
   // Practice (issue 266): the server says why it is not available.
   if (error instanceof ApiError && error.code === "PRACTICE_UNAVAILABLE" && typeof error.details === "object" && error.details !== null

@@ -452,6 +452,34 @@ def rejected_translation_for_lead(app: FastAPI) -> dict[str, Any]:
     )
 
 
+ACCEPTED_FOR_LEAD_CASES = {"accepted": "case-0101", "unreviewed": "case-0102"}
+
+
+def accepted_translation_for_lead(app: FastAPI) -> dict[str, Any]:
+    """Issue 341: rule on, 2 cases with de review + annotate. Ana accepted the
+    de translation of case-0101 unchanged; the annotator submitted an
+    annotation of it and Ben started one (open), so a lead correction leaves
+    annotation work on v1. case-0102 de waits for its review (no review
+    assigned): "Accept this version…" accepts it alone."""
+    scenario = lead_project(app, "ACCEPTED_TRANSLATION_FOR_LEAD")
+    scenario.app.state.accounts.update_profile(
+        Actor.cli(), scenario.users["lead"], qualification="Physician"
+    )
+    case_ids = cases(101, 2)
+    docs = import_units(scenario, case_units(case_ids, ("de",)))
+    plan(scenario, case_ids, {"de": REVIEW_AND_ANNOTATE})
+    accepted = docs[(ACCEPTED_FOR_LEAD_CASES["accepted"], "de")]
+    review_translation(scenario, accepted, "ana", "accepted_unchanged")
+    submit(scenario, accepted, "annotator")
+    in_progress(scenario, accepted, "ben")
+    return result(
+        scenario,
+        all_rows(case_ids, ("de",)),
+        case_ids={"de": list(case_ids)},
+        cases=dict(ACCEPTED_FOR_LEAD_CASES),
+    )
+
+
 UPLOAD_DIALOG_CASES = cases(301, 62)
 
 
@@ -529,6 +557,7 @@ BUILDERS: dict[str, Builder] = {
     "ACCEPTANCE": build_acceptance,
     "ROWS": build_rows,
     "REJECTED_TRANSLATION_FOR_LEAD": rejected_translation_for_lead,
+    "ACCEPTED_TRANSLATION_FOR_LEAD": accepted_translation_for_lead,
     "UPLOAD_DIALOG": build_upload_dialog,
 }
 

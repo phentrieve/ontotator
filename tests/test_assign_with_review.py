@@ -629,6 +629,8 @@ def test_a_review_of_one_root_lets_only_that_root_wait(env):
             "language": "de",
             "reason": "waiting_for_review",
             "document_id": OTHER_ROOT,
+            "assigned": None,
+            "per_text": None,
         }
     ]
     assert_closed(env, assigned(env, "annotate")["id"])
@@ -751,6 +753,51 @@ def test_a_second_open_review_keeps_the_translation_unfinished(env):
     )
     assert revoked.is_success, revoked.text
     assert finished(env, task) is True
+
+
+def test_a_new_review_of_a_review_accepted_version_names_the_correction(env):
+    """Issue 409: ``review_accepted_translation`` covers lead and override
+    acceptances only; a version a review accepted is refused with a reason
+    that leads to ``translation-correction-assignment`` (tested above)."""
+    review, _ = with_open_review(env)
+    decide(env, review, "accepted_unchanged")
+    audits_before = audit_count(env, "work_plan.update")
+    response = env.lead.post(
+        f"{BASE}/assignments",
+        json={
+            "rows": [{"document_id": TARGET, "username": "bob"}],
+            "task": "translation_review",
+            "confirm_language": True,
+            "review_accepted_translation": True,
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "created": [],
+        "refused": [
+            {
+                "document_id": TARGET,
+                "username": "bob",
+                "code": "NOT_A_TRANSLATION",
+                "reason": "accepted_by_review",
+            }
+        ],
+    }
+    assert audit_count(env, "work_plan.update") == audits_before
+    # Without the flag, the ordinary refusal of an accepted translation.
+    plain = assign(env, "translation_review", "bob")["refused"]
+    assert [(r["code"], r["reason"]) for r in plain] == [
+        ("NOT_A_TRANSLATION", "translation_already_accepted")
+    ]
+
+
+def audit_count(env, action):
+    with env.db.transaction() as conn:
+        return len(
+            conn.execute(
+                select(AuditEventRow.id).where(AuditEventRow.action == action)
+            ).all()
+        )
 
 
 def test_a_parallel_translation_not_yet_accepted_keeps_the_text_unfinished(env):

@@ -75,6 +75,7 @@ from ontotator.storage.tables import (
     UserLanguageRow,
     UserRow,
 )
+from ontotator.storage.text_settings import effective_per_text
 
 TASK_FOR_MODE: dict[WorkspaceMode, Task] = {
     "independent": "annotate",
@@ -855,8 +856,11 @@ class AssignmentService:
         conn: Connection, project: RowMapping, document_id: str
     ) -> None:
         """A new annotate assignment needs a free "annotations per text" slot."""
-        # Per version on purpose (plan review R25).
-        limit = int(project["annotations_per_text"])
+        # Per version on purpose (plan review R25); the text's own limit
+        # when it has one (issue 422).
+        limit = effective_per_text(
+            conn, project["id"], document_id, int(project["annotations_per_text"])
+        )
         held = held_annotations(conn, project["id"], [document_id])[document_id]
         if held >= limit:
             raise DomainError(
@@ -1011,61 +1015,97 @@ class AssignmentService:
             ).scalar_one()
             project = self._prepare(conn, actor, key, target)
             old = self._locked(conn, assignment_id)
-            if old["status"] != "submitted":
-                raise DomainError("ASSIGNMENT_NOT_SUBMITTED")
-            # A discarded version takes no work, reopened work included.
-            if (
-                conn.execute(
-                    select(DiscardedVariantRow.document_id).where(
-                        DiscardedVariantRow.project_id == project["id"],
-                        DiscardedVariantRow.document_id == old["document_id"],
-                    )
-                ).first()
-                is not None
-            ):
-                raise DomainError("NOT_IN_WORK_PLAN")
-            if old["lead_correction"]:
-                # A submitted correction made a newer version (FD3, FD4).
-                raise DomainError(
-                    "LEAD_CORRECTION_NOT_AVAILABLE", {"reason": "not_newest"}
+            refusal = self.reopen_refusal(conn, project, old)
+            if refusal is not None:
+                raise refusal
+            self.reopen_locked(conn, actor, project, old, reason, self._now())
+            return self._get(conn, assignment_id)
+
+    @classmethod
+    def reopen_refusal(
+        cls, conn: Connection, project: RowMapping, old: RowMapping
+    ) -> DomainError | None:
+        """Why ``old`` (locked, not revoked) cannot be reopened, else None.
+
+        Shared with the bulk Reopen of Documents (issue 336), whose preview
+        lists the refused tasks instead of failing.
+        """
+        if old["status"] != "submitted":
+            return DomainError("ASSIGNMENT_NOT_SUBMITTED")
+        # A discarded version takes no work, reopened work included.
+        if (
+            conn.execute(
+                select(DiscardedVariantRow.document_id).where(
+                    DiscardedVariantRow.project_id == project["id"],
+                    DiscardedVariantRow.document_id == old["document_id"],
                 )
-            self._require_target(conn, project, target, cast(Task, old["task"]))
+            ).first()
+            is not None
+        ):
+            return DomainError("NOT_IN_WORK_PLAN")
+        if old["lead_correction"]:
+            # A submitted correction made a newer version (FD3, FD4).
+            return DomainError(
+                "LEAD_CORRECTION_NOT_AVAILABLE", {"reason": "not_newest"}
+            )
+        try:
+            cls._require_target(conn, project, old["user_id"], cast(Task, old["task"]))
             if old["task"] == "translation_review":
-                self._require_no_open_lead_correction(
+                cls._require_no_open_lead_correction(
                     conn, project["id"], old["document_id"]
                 )
-            now = self._now()
+        except DomainError as refusal:
+            return refusal
+        return None
+
+    @classmethod
+    def reopen_locked(
+        cls,
+        conn: Connection,
+        actor: Actor,
+        project: RowMapping,
+        old: RowMapping,
+        reason: str | None,
+        now: datetime,
+        *,
+        via: str | None = None,
+    ) -> None:
+        """Reopen ``old`` after ``reopen_refusal`` passed, under the project
+        lock. ``via`` names a bulk action in the audit entry."""
+        assignment_id = old["id"]
+        conn.execute(
+            update(AssignmentRow)
+            .where(AssignmentRow.id == assignment_id)
+            .values(status="reopened", updated_at=now)
+        )
+        if old["task"] == "translation_review":
+            cls._restart_review_draft(conn, project["id"], old, now)
+        if old["active_round_id"] is not None:
+            from ontotator.storage.workflow_tables import WorkRoundStateRow
+
+            conn.execute(
+                update(WorkRoundStateRow)
+                .where(WorkRoundStateRow.round_id == old["active_round_id"])
+                .values(state="editable", revision=WorkRoundStateRow.revision + 1)
+            )
             conn.execute(
                 update(AssignmentRow)
                 .where(AssignmentRow.id == assignment_id)
-                .values(status="reopened", updated_at=now)
+                .values(workflow_revision=AssignmentRow.workflow_revision + 1)
             )
-            if old["task"] == "translation_review":
-                self._restart_review_draft(conn, project["id"], old, now)
-            if old["active_round_id"] is not None:
-                from ontotator.storage.workflow_tables import WorkRoundStateRow
-
-                conn.execute(
-                    update(WorkRoundStateRow)
-                    .where(WorkRoundStateRow.round_id == old["active_round_id"])
-                    .values(state="editable", revision=WorkRoundStateRow.revision + 1)
-                )
-                conn.execute(
-                    update(AssignmentRow)
-                    .where(AssignmentRow.id == assignment_id)
-                    .values(workflow_revision=AssignmentRow.workflow_revision + 1)
-                )
-            record_audit(
-                conn,
-                actor,
-                "assignment.reopen",
-                target_type="assignment",
-                target_id=assignment_id,
-                project_id=project["id"],
-                details={"reason": reason},
-                at=now,
-            )
-            return self._get(conn, assignment_id)
+        details: dict[str, Any] = {"reason": reason}
+        if via is not None:
+            details["via"] = via
+        record_audit(
+            conn,
+            actor,
+            "assignment.reopen",
+            target_type="assignment",
+            target_id=assignment_id,
+            project_id=project["id"],
+            details=details,
+            at=now,
+        )
 
     @staticmethod
     def _restart_review_draft(

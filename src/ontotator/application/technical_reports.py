@@ -138,6 +138,17 @@ class TechnicalReportSummary(BaseModel):
     open: int
 
 
+class OwnTechnicalReportView(BaseModel):
+    """One report as its reporter reads it (issue 269): what they wrote and
+    whether it is handled. No context, no administrator names."""
+
+    id: int
+    reference: str
+    status: TechnicalReportStatus
+    description: str
+    created_at: datetime
+
+
 def _assignment_id(route: str | None) -> int | None:
     match = _TASK_ROUTE.fullmatch(route or "")
     return int(match[1]) if match else None
@@ -341,6 +352,36 @@ class TechnicalReportService:
                 )
             )
         return views
+
+    def list_own(
+        self, reporter_id: int, *, limit: int = 100, offset: int = 0
+    ) -> list[OwnTechnicalReportView]:
+        """The reports ``reporter_id`` sent, newest first; never anyone else's."""
+        with self.db.transaction() as conn:
+            rows = conn.execute(
+                select(
+                    TechnicalReportRow.id,
+                    TechnicalReportRow.status,
+                    TechnicalReportRow.description,
+                    TechnicalReportRow.created_at,
+                )
+                .where(TechnicalReportRow.reporter_id == reporter_id)
+                .order_by(
+                    TechnicalReportRow.created_at.desc(), TechnicalReportRow.id.desc()
+                )
+                .limit(limit)
+                .offset(offset)
+            ).all()
+        return [
+            OwnTechnicalReportView(
+                id=row.id,
+                reference=reference(row.id),
+                status=row.status,
+                description=row.description,
+                created_at=row.created_at,
+            )
+            for row in rows
+        ]
 
     def list(
         self,

@@ -35,7 +35,9 @@ from ontotator.domain.translation_review import (
     next_status,
 )
 from ontotator.domain.variants import (
+    TranslationStatus,
     VariantInfo,
+    descends_from_accepted,
     resolve_translation_lineage,
     translation_review_comparisons,
     variant_document_id,
@@ -216,6 +218,9 @@ class ReviewWorkspace:
     submitted_record: TranslationReviewRecord | None
     # FD1: the lead reviews this version themselves (accepted_corrected only).
     lead_correction: bool = False
+    # Issue 341 b: the lead correction's new version is reviewed again (this
+    # version or one it was corrected from is accepted).
+    reviewed_again: bool = False
     # The reviewer's own checked-sentence marks (issue 256); empty once submitted.
     checked_sentences: CheckedSentences = field(default_factory=CheckedSentences)
 
@@ -527,6 +532,8 @@ class TranslationReviewService:
                 assignment.status == "submitted" or assignment.held,
                 submitted,
                 assignment.lead_correction,
+                assignment.lead_correction
+                and descends_from_accepted(variant, variants.get),
                 marks,
             )
 
@@ -657,6 +664,18 @@ class TranslationReviewService:
             before = variant.translation_status
             assert before is not None
             after, child_status = next_status(form.decision)
+            corrected_status: TranslationStatus | None = child_status
+            if assignment.lead_correction and descends_from_accepted(
+                variant, variants.get
+            ):
+                # Issue 341 b: the lead's correction of an accepted version is
+                # a new text that is reviewed again; the accepted version and
+                # the annotation work on it stay (text-change steps follow).
+                # So is a further lead correction after that new text was
+                # rejected or queried: it never counts as accepted unreviewed.
+                corrected_status = "ready_for_review"
+                if before == "accepted":
+                    after = "accepted"
             child = None
             if child_status:
                 latest = max(
@@ -676,7 +695,7 @@ class TranslationReviewService:
                     origin="correction",
                     derived_from=variant.document_id,
                     translation=None,
-                    translation_status=child_status,
+                    translation_status=corrected_status,
                 )
             proposed = canonical_text(draft.text)
             sha = hashlib.sha256(proposed.encode("utf-8")).hexdigest()

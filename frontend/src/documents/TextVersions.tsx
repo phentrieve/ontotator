@@ -27,6 +27,21 @@ export interface TextVersionsTools {
   onShowTranslationReviews?: (documentId: string) => void;
   /** Opens the page's "Request translation correction" dialog for an accepted version (else the inline form). */
   onRequestCorrection?: (row: DocumentRowView, variant: VariantSummary) => void;
+  /** The lead: "Correct the translation…" on the newest accepted version (issue 341 b). */
+  onCorrectTranslation?: (row: DocumentRowView, version: DocumentVersionView) => void;
+  /** The lead: "Accept this version…" on the newest version that is not reviewed or accepted (issue 341 d). */
+  onAcceptVersion?: (row: DocumentRowView, version: DocumentVersionView) => void;
+}
+
+/** Issue 341 d: a newest translation version that is neither reviewed nor accepted, not discarded. */
+export function acceptableVersion(row: Pick<DocumentRowView, "plan_row">, version: DocumentVersionView): boolean {
+  return version.is_newest_in_chain && version.translation_status != null && !["accepted", "reviewed"].includes(version.translation_status)
+    && !isDiscarded(row, version);
+}
+
+/** Issue 341 b: the newest accepted translation version the lead may correct, not discarded. */
+export function correctableVersion(row: Pick<DocumentRowView, "plan_row">, version: DocumentVersionView): boolean {
+  return version.is_newest_in_chain && version.translation_status === "accepted" && !isDiscarded(row, version);
 }
 
 /** Acceptance record of a translation version (spec "Annotate without review: acceptance record"). */
@@ -162,6 +177,10 @@ export const TextVersions = forwardRef<HTMLUListElement, TextVersionsProps>(func
           {variant && (tools.onRequestCorrection
             ? variant.translation_status === "accepted" && <Button size="sm" onClick={() => tools.onRequestCorrection?.(row, variant)}>Request correction…</Button>
             : <TranslationCorrectionAction projectKey={projectKey} variant={variant} username={tools.username} requiredLanguages={tools.requiredLanguages(version.document_id)} />)}
+          {tools.onCorrectTranslation && correctableVersion(row, version) && <Button size="sm" aria-label={`Correct the translation ${fullName}…`}
+            onClick={() => tools.onCorrectTranslation?.(row, version)}>Correct the translation…</Button>}
+          {tools.onAcceptVersion && acceptableVersion(row, version) && <Button size="sm" aria-label={`Accept ${fullName}…`}
+            onClick={() => tools.onAcceptVersion?.(row, version)}>Accept this version…</Button>}
           {version.translation_status != null && tools.onShowTranslationReviews && <Button size="sm" aria-label={`Translation reviews for ${name}`} onClick={() => tools.onShowTranslationReviews?.(version.document_id)}>Translation reviews</Button>}
         </>;
       }

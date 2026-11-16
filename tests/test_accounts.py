@@ -14,11 +14,12 @@ import pytest
 from pg_harness import column_values, database_for
 from sqlalchemy import insert, select, text, update
 
-from ontotator.auth.accounts import CODE_LIFETIME, AccountService
+from ontotator.auth.accounts import AccountService, code_lifetime
 from ontotator.auth.audit import Actor
 from ontotator.auth.passwords import hash_password
 from ontotator.auth.sessions import SessionService
 from ontotator.domain.errors import DomainError, LoginFailed
+from ontotator.settings import SettingsError
 from ontotator.storage.tables import (
     AnnotationSnapshotRow,
     AuditEventRow,
@@ -83,8 +84,8 @@ def test_a_new_user_gets_a_pseudonym_and_a_setup_code(services: Services) -> Non
     assert first.user.pseudonym == "ann-0001"
     assert second.user.pseudonym == "ann-0002"
     assert first.purpose == "setup"
-    assert first.expires_at == services.clock() + timedelta(hours=24)
-    assert CODE_LIFETIME["setup"] == timedelta(hours=24)
+    assert first.expires_at == services.clock() + timedelta(days=7)
+    assert code_lifetime("setup") == timedelta(days=7)
     assert len(first.code.replace("-", "")) == 26  # 130 bits
     stored = services.accounts.get_by_username("alice")
     assert stored is not None
@@ -133,7 +134,7 @@ def test_an_expired_or_foreign_code_is_refused(services: Services) -> None:
         services.accounts.redeem_code("alice", bob.code, PASSWORD)
     with pytest.raises(DomainError) as unknown:
         services.accounts.redeem_code("alice", "not-a-code", PASSWORD)
-    services.clock.advance(hours=24, seconds=1)
+    services.clock.advance(days=7, seconds=1)
     with pytest.raises(DomainError) as expired:
         services.accounts.redeem_code("alice", alice.code, PASSWORD)
 
@@ -182,6 +183,53 @@ def test_a_reset_code_lives_two_hours_and_replaces_older_code(
     )
 
 
+def test_the_setup_code_validity_is_a_server_setting(
+    services: Services, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ONTOTATOR_SETUP_CODE_HOURS", "48")
+    created = services.accounts.create_user(ADMIN, "alice", "Alice")
+    assert created.expires_at == services.clock() + timedelta(hours=48)
+    services.clock.advance(hours=1)
+    reissued = services.accounts.issue_reset_code(ADMIN, "alice")
+    assert reissued.purpose == "setup"
+    assert reissued.expires_at == services.clock() + timedelta(hours=48)
+
+    # A stored code keeps its expiry when the setting changes afterwards.
+    monkeypatch.setenv("ONTOTATOR_SETUP_CODE_HOURS", "1")
+    services.clock.advance(hours=47)
+    assert services.accounts.redeem_code("alice", reissued.code, PASSWORD).username == (
+        "alice"
+    )
+    late = services.accounts.create_user(ADMIN, "bob", "Bob")
+    services.clock.advance(hours=1, seconds=1)
+    with pytest.raises(DomainError) as expired:
+        services.accounts.redeem_code("bob", late.code, PASSWORD)
+    assert _code(expired) == "CODE_INVALID"
+
+    # A reset code protects an existing account: always two hours.
+    monkeypatch.setenv("ONTOTATOR_SETUP_CODE_HOURS", "720")
+    reset = services.accounts.issue_reset_code(ADMIN, "alice")
+    assert reset.purpose == "reset"
+    assert reset.expires_at == services.clock() + timedelta(hours=2)
+    actions = column_values(services.accounts, "audit_events", "action")
+    assert sorted(actions) == [
+        "user.create",
+        "user.create",
+        "user.password_set",
+        "user.reset_code",
+        "user.reset_code",
+    ]
+
+
+def test_an_invalid_setup_code_validity_issues_no_code(
+    services: Services, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ONTOTATOR_SETUP_CODE_HOURS", "721")
+    with pytest.raises(SettingsError, match="ONTOTATOR_SETUP_CODE_HOURS"):
+        services.accounts.create_user(ADMIN, "alice", "Alice")
+    assert services.accounts.get_by_username("alice") is None
+
+
 def test_a_new_code_for_a_pending_user_is_a_fresh_setup_code(
     services: Services,
 ) -> None:
@@ -190,11 +238,11 @@ def test_a_new_code_for_a_pending_user_is_a_fresh_setup_code(
     fresh = services.accounts.issue_reset_code(ADMIN, "alice")
 
     assert fresh.purpose == "setup"
-    assert fresh.expires_at == services.clock() + timedelta(hours=24)
+    assert fresh.expires_at == services.clock() + timedelta(days=7)
     with pytest.raises(DomainError) as old:
         services.accounts.redeem_code("alice", setup.code, PASSWORD)
     assert _code(old) == "CODE_INVALID"
-    services.clock.advance(hours=23)
+    services.clock.advance(days=6, hours=23)
     assert services.accounts.redeem_code("alice", fresh.code, PASSWORD).username == (
         "alice"
     )
