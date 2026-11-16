@@ -2191,6 +2191,68 @@
         "x-ontotator-scope": "session"
       }
     },
+    "/api/v1/me/technical-reports": {
+      "get": {
+        "tags": [
+          "technical-reports"
+        ],
+        "summary": "List Own Reports",
+        "description": "The caller's own reports, newest first: reference, text and status.",
+        "operationId": "list_own_reports_api_v1_me_technical_reports_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OwnTechnicalReportView"
+                  },
+                  "title": "Response List Own Reports Api V1 Me Technical Reports Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "session"
+      }
+    },
     "/api/v1/admin/technical-reports": {
       "get": {
         "tags": [
@@ -20216,6 +20278,45 @@
           "report_id"
         ],
         "title": "OtherActiveHold"
+      },
+      "OwnTechnicalReportView": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "reference": {
+            "type": "string",
+            "title": "Reference"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "done"
+            ],
+            "title": "Status"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "reference",
+          "status",
+          "description",
+          "created_at"
+        ],
+        "title": "OwnTechnicalReportView",
+        "description": "One report as its reporter reads it (issue 269): what they wrote and\nwhether it is handled. No context, no administrator names."
       },
       "PairAgreement": {
         "properties": {

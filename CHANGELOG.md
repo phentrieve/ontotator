@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Technical reports: **Profile** › **My technical reports** lists the reports a user sent (reference, date, text, *Open* or *Done*), linked from the report dialog (**My reports**) and after sending (*Sent as TR-12.* **See my reports**). The new endpoint `GET /api/v1/me/technical-reports` returns only the caller's own reports and none of the administrators' details (#269).
+
 ### Changed
 
 - Final export: agreement.csv names the annotation mode of both submissions of a pair (new columns `mode_a`, `mode_b`: `scratch` or `proposals`), and agreement-summary.csv has a new column `modes` with the rows of all pairs (`all`, as before) followed by the same two rows for `scratch-scratch`, `proposals-proposals` and `mixed` pairs. Two proposal checks start from the same proposals, so pooling them with work from scratch reported an agreement that was neither. The README of the export and the scientific workflow guide explain the columns. The project agreement route (`GET /api/v1/projects/{key}/agreement`) is unchanged (#389).

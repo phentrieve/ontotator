@@ -1,4 +1,4 @@
-import{r as i,a as m,j as a,b as h}from"./index-DktusQBY.js";import{M as f,r as g}from"./index-NqQkDSBk.js";function w(){const[e,t]=i.useState(null);return i.useEffect(()=>{let o=!0;return m.getAbout().then(n=>{o&&t(n)},()=>{}),()=>{o=!1}},[]),e?a.jsxs("p",{className:"help-version",title:e.revision??void 0,children:["Ontotator ",e.version,e.revision&&a.jsxs(a.Fragment,{children:[" · commit ",e.revision.slice(0,7)]})]}):null}const y=`# Ontotator user handbook
+import{r as i,a as m,j as a,b as h}from"./index-CUjntQeD.js";import{M as f,r as g}from"./index-Cpav5kO5.js";function w(){const[e,t]=i.useState(null);return i.useEffect(()=>{let o=!0;return m.getAbout().then(n=>{o&&t(n)},()=>{}),()=>{o=!1}},[]),e?a.jsxs("p",{className:"help-version",title:e.revision??void 0,children:["Ontotator ",e.version,e.revision&&a.jsxs(a.Fragment,{children:[" · commit ",e.revision.slice(0,7)]})]}):null}const y=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -248,7 +248,7 @@ What for: read what users report about error messages, pages that do not load, c
 3. Read a report. It shows its reference (for example *TR-12*), the user's text, who sent it and when. Below are the details Ontotator added: app version, the task if it was sent from one (its kind, for example *Annotation, from proposals*, the project and the text; for a practice task only *A practice task*, as practice projects are private), screen, browser, window size, the last error the app received and, from the crash message, the error.
 4. Click **Mark as done** when the report is handled. Click **Reopen** to open it again.
 
-Users send reports with **Technical problem…** in the sidebar or **Report a technical problem…** in the editor; see [Report a technical problem](getting-started.md#report-a-technical-problem). Their task is not paused, and project leads do not see these reports. A user can send at most 20 reports per hour.
+Users send reports with **Technical problem…** in the sidebar or **Report a technical problem…** in the editor; see [Report a technical problem](getting-started.md#report-a-technical-problem). Their task is not paused, and project leads do not see these reports. Each user sees their own reports and their status (*Open* or *Done*) under **Profile** › **My technical reports**, but not your name or the added details. A user can send at most 20 reports per hour.
 
 Reports stay inside Ontotator. Nothing goes out by e-mail or to GitHub. To open an issue, click **Copy report** and paste the text by hand. Remove clinical content and patient details first.
 
@@ -1450,13 +1450,24 @@ What for: tell the system administrators about an error message, a page that doe
 1. Click **Technical problem…** in the sidebar. In the editor, open **More** and choose **Report a technical problem…**. If a text cannot be displayed, the message *Something went wrong while displaying this text.* offers **Report a technical problem…** too, and so does *Something went wrong while displaying this page.* when another screen, such as My tasks or Documents, cannot be displayed.
 2. Under **What happened?**, write what you did and what you saw.
 3. Click **Send report**.
-4. The dialog shows a reference, for example *TR-12*. Quote it if you ask an administrator about your report.
+4. The dialog shows *Sent as TR-12.* (your reference). Quote it if you ask an administrator about your report. Click **See my reports** to open the list of your reports.
 
 The report goes to the system administrators, not to your project lead. Your task is not paused.
 
 Ontotator adds what the administrators need to find the cause: the app version, the task if you send it from one (its kind, the project and the text), the screen, your browser, the window size and the last error the app received. From the crash message it also adds the error. Open **Added automatically** to see it before you send.
 
 The report stays inside Ontotator; nothing is sent by e-mail or elsewhere. Do not write patient details beyond what is needed to describe the problem.
+
+### See your technical reports
+
+What for: look up a report you sent and whether it was handled.
+
+1. Click **Profile** in the sidebar and scroll to **My technical reports**. From the report dialog, click **My reports** (before sending) or **See my reports** (after sending).
+2. The table shows each report you sent, newest first: **Ref.** (for example *TR-12*), **Sent**, **What happened** (your text; open a long text to read all of it) and **Status**. If you sent 100 reports or more, the newest 100 are shown; click **Show older reports** below the table for the rest.
+
+**Open** means the administrators have not handled the report yet; **Done** means an administrator marked it as handled. Only you and the system administrators see your reports. Administrators do not answer in Ontotator; if you need an answer, contact an administrator and quote the reference.
+
+If you have typed text in the dialog, **My reports** does not close it: send or cancel the report first. The crash screens do not show these links.
 
 ## Switch project
 
