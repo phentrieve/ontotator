@@ -1,4 +1,4 @@
-import{r as i,a as m,j as a,b as h}from"./index-4hHHRAny.js";import{M as f,r as g}from"./index-ZqnTlURx.js";function w(){const[e,t]=i.useState(null);return i.useEffect(()=>{let o=!0;return m.getAbout().then(n=>{o&&t(n)},()=>{}),()=>{o=!1}},[]),e?a.jsxs("p",{className:"help-version",title:e.revision??void 0,children:["Ontotator ",e.version,e.revision&&a.jsxs(a.Fragment,{children:[" · commit ",e.revision.slice(0,7)]})]}):null}const y=`# Ontotator user handbook
+import{r as i,a as m,j as a,b as h}from"./index-DktusQBY.js";import{M as f,r as g}from"./index-NqQkDSBk.js";function w(){const[e,t]=i.useState(null);return i.useEffect(()=>{let o=!0;return m.getAbout().then(n=>{o&&t(n)},()=>{}),()=>{o=!1}},[]),e?a.jsxs("p",{className:"help-version",title:e.revision??void 0,children:["Ontotator ",e.version,e.revision&&a.jsxs(a.Fragment,{children:[" · commit ",e.revision.slice(0,7)]})]}):null}const y=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -463,7 +463,7 @@ If the text was changed elsewhere, a **Revision conflict** notice appears; click
 | Diagonal hatching | A finding with the value **Absent**. |
 | Thicker underline | Overlapping findings. |
 | Frame | The finding you point at or selected. |
-| **AI** | Proposed by a tool. Point at the badge to see which tool. |
+| **AI** | Proposed by a tool. Point at the badge to see which tool. A proposal carried over to a corrected text version names the tool that proposed it. |
 | **Pending** | A proposal you have not decided yet. Decided proposals show **Confirmed**, **Rejected**, **Replaced** or **Unresolved**. |
 | **Being replaced** | A proposal with your copy from **Edit & Replace** that has no changes yet. |
 | **Defaults to confirm** | The finding still has prefilled values you have not confirmed. |
