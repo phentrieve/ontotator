@@ -1,4 +1,4 @@
-import type { HistoryStepView } from "../api/client";
+import type { DraftHistoryView, HistoryStepView } from "../api/client";
 
 /**
  * Issue 320: the editor's name for one undo or redo step ("delete finding Seizure"), shown as
@@ -42,4 +42,36 @@ export function stepText(step: HistoryStepView, term: (layerId: string, termId: 
     case "reset_changes": return "reset all my changes";
     default: return "the last change";
   }
+}
+
+/** The last undo, redo or reset the editor saved, and the draft revision it made. */
+export type LastHistoryCommand = { revision: number; command: "undo_step" | "redo_step" | "reset_changes" };
+
+/**
+ * Whether Undo and Redo can be pressed, and the step each names. `history` is the last history read, `revision`
+ * the revision of the draft the editor shows, `last` the editor's last undo, redo or reset.
+ *
+ * Right after a change is saved, the history of the new revision is still being read (or the next queued change
+ * is saving). A key pressed in that moment must not be lost, so the controls then follow what made the revision:
+ * - an undo (`last` made this revision): Redo brings it back; Undo if the last history had more steps;
+ * - a redo: Undo takes it back; Redo if the last history had more undone steps;
+ * - a reset or any other change: Undo takes it back, and there is nothing to redo.
+ * The editor takes the step from the history of the saved draft, which it reads first; if that read fails, it
+ * says so. Only the history of exactly this revision names a step.
+ */
+export function historyControls(history: DraftHistoryView | null, revision: number, last: LastHistoryCommand | null = null): {
+  undo: HistoryStepView | null; redo: HistoryStepView | null; canUndo: boolean; canRedo: boolean;
+} {
+  if (!history) return { undo: null, redo: null, canUndo: false, canRedo: false };
+  if (history.revision === revision) {
+    const undo = history.undo ?? null;
+    const redo = history.redo ?? null;
+    return { undo, redo, canUndo: !!undo, canRedo: !!redo };
+  }
+  const made = last?.revision === revision ? last.command : null;
+  // The counts are exact when the last history is of the revision just before; an older one cannot say.
+  const direct = revision === history.revision + 1;
+  if (made === "undo_step") return { undo: null, redo: null, canUndo: !direct || history.undo_count > 1, canRedo: true };
+  if (made === "redo_step") return { undo: null, redo: null, canUndo: true, canRedo: !direct || history.redo_count > 1 };
+  return { undo: null, redo: null, canUndo: true, canRedo: false };
 }
