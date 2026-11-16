@@ -139,6 +139,10 @@ export type BulkWithdrawRequest = components["schemas"]["BulkWithdrawRequest"];
 export type BulkTaskActionView = components["schemas"]["BulkTaskActionView"];
 export type BulkUndoView = components["schemas"]["BulkUndoView"];
 export type BulkUndoResult = components["schemas"]["BulkUndoResult"];
+export type AcceptAgreeingRequest = Defaulted<components["schemas"]["AcceptAgreeingRequest"], "preview">;
+export type AcceptAgreeingView = components["schemas"]["AcceptAgreeingView"];
+export type BulkChangeFinalRequest = Defaulted<components["schemas"]["BulkChangeFinalRequest"], "rule">;
+export type BulkChangeFinalView = components["schemas"]["BulkChangeFinalView"];
 export type DocumentRowKeys = components["schemas"]["DocumentRowKeys"];
 export type DocumentsVisitView = components["schemas"]["DocumentsVisitView"];
 export type DocumentsSummaryView = components["schemas"]["DocumentsSummaryView"];
@@ -512,6 +516,10 @@ export class ApiClient {
   async bulkReopen(key: string, body: BulkReopenRequest, signal?: AbortSignal): Promise<BulkTaskActionView> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/bulk-task-actions/reopen`, { method: "POST", body: JSON.stringify(body), signal }); }
   /** Bulk withdrawal of the selected texts' open tasks: preview, or apply with the preview's token (lead only, issues 336, 339). */
   async bulkWithdraw(key: string, body: BulkWithdrawRequest, signal?: AbortSignal): Promise<BulkTaskActionView> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/bulk-task-actions/withdraw`, { method: "POST", body: JSON.stringify(body), signal }); }
+  /** Accept every agreeing text without a final result, of the project or of the selected `rows`: preview, or apply with the preview's token (lead only, issues 354, 336). */
+  async acceptAgreeing(key: string, body: AcceptAgreeingRequest, signal?: AbortSignal): Promise<AcceptAgreeingView> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/final-selections/accept-agreeing`, { method: "POST", body: JSON.stringify(body), signal }); }
+  /** Bulk Change final… of the selected texts by a rule (newest submission): preview, or apply with the preview's token (lead only, issue 336). */
+  async bulkChangeFinal(key: string, body: BulkChangeFinalRequest, signal?: AbortSignal): Promise<BulkChangeFinalView> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/final-selections/bulk-change`, { method: "POST", body: JSON.stringify(body), signal }); }
   /** Undo of an applied bulk action by the id of the server's record of it, while its texts are unchanged (409 BULK_UNDO_STALE otherwise). */
   async bulkUndo(key: string, undoId: number): Promise<BulkUndoResult> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/bulk-task-actions/undo`, { method: "POST", body: JSON.stringify({ undo_id: undoId }) }); }
   /** Record an opening of Documents (lead only); returns the NEW baseline (start of the previous visit). */

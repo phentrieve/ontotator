@@ -626,6 +626,50 @@ def build_s336(app: FastAPI) -> dict[str, Any]:
     return result(scenario, [(case, "en") for case in cases], documents=doc)
 
 
+def build_s336f(app: FastAPI) -> dict[str, Any]:
+    """Bulk Change final… and Accept agreeing results… (issue 336 step 2):
+    eight en texts EN100022 to EN100029, two annotators per text. Tom Reis's
+    submission is the final result of 22 to 26; afterwards R. Roe submitted
+    22, 23 and 24 (the newest submission there) and is assigned, not started,
+    on 26. Both submitted 27 and 28 without findings (full agreement, no
+    final result); only Tom Reis submitted 29."""
+    from t1_builders import native_unit
+
+    scenario = new_project(app, "S336F")
+    cases = [f"EN1000{number}" for number in range(22, 30)]
+    docs = import_texts(
+        scenario,
+        [
+            native_unit(case, "en", f"{SYNTHETIC} {case}", case_id=case)
+            for case in cases
+        ],
+    )
+    doc = {case: docs[(case, "en", 1)] for case in cases}
+    with scenario.db.transaction() as conn:
+        conn.execute(
+            update(ProjectRow)
+            .where(ProjectRow.project_key == scenario.key)
+            .values(annotations_per_text=2)
+        )
+    add_user(scenario, "lead", ["lead"])
+    for name, display in (("tom", "Tom Reis"), ("roe", "R. Roe")):
+        add_user(scenario, name, ["annotator"])
+        app.state.accounts.update_profile(
+            Actor.cli(), scenario.users[name], display_name=display
+        )
+    for case in ("EN100022", "EN100023", "EN100024", "EN100025", "EN100026"):
+        final = submit(scenario, doc[case], "tom")
+        select(scenario, doc[case], final["submission_id"])
+    for case in ("EN100022", "EN100023", "EN100024"):
+        submit(scenario, doc[case], "roe")
+    assign(scenario, doc["EN100026"], "roe", "annotate")
+    for case in ("EN100027", "EN100028"):
+        submit(scenario, doc[case], "tom")
+        submit(scenario, doc[case], "roe")
+    submit(scenario, doc["EN100029"], "tom")
+    return result(scenario, [(case, "en") for case in cases], documents=doc)
+
+
 BUILDERS: dict[str, Builder] = {
     "S0": build_s0,
     "S1": build_s1,
@@ -634,6 +678,7 @@ BUILDERS: dict[str, Builder] = {
     "S4": build_s4,
     "S5": build_s5,
     "S336": build_s336,
+    "S336F": build_s336f,
     # S8 is the S0 data at a 390 px viewport.
     "S8": build_s0,
 }

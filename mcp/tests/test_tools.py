@@ -656,6 +656,108 @@ async def test_accept_agreeing_texts_stale_token_returns_a_fresh_dry_run(
     assert (result["would_accept"], result["preview_token"]) == ([], "sha256:two")
 
 
+CHANGE = f"{P}/final-selections/bulk-change"
+TEXTS = [{"case_id": "c1", "language": "en"}, {"case_id": "c2", "language": "en"}]
+
+
+def _change_preview(**fields: Any) -> dict[str, Any]:
+    change = build(
+        "FinalChange",
+        case_id="c1",
+        language="en",
+        expected_revision=1,
+        from_submission_id="s1",
+        submission_id="s2",
+        kind="consolidation",
+        eligible_submissions=3,
+    )
+    skip = build(
+        "FinalChangeSkip",
+        case_id="c2",
+        language="en",
+        reason="already_newest",
+        message="The final result is already the newest submission.",
+    )
+    return (
+        build(
+            "BulkChangeFinalView",
+            project="p",
+            applied=False,
+            texts=2,
+            change_count=1,
+            skipped_count=1,
+            skipped_by_reason={"already_newest": 1},
+            changes=[change],
+            skipped=[skip],
+            preview_token="sha256:one",
+        )
+        | fields
+    )
+
+
+async def test_change_final_results_dry_run_then_confirm_with_its_token(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    fake.on("POST", CHANGE, _change_preview())
+    result = await call(
+        mcp_client, "change_final_results", {"project": "p", "texts": TEXTS}
+    )
+    [request] = fake.calls_to("POST", CHANGE)
+    assert request.json() == {
+        "rows": TEXTS,
+        "rule": "newest_submission",
+        "preview": True,
+    }
+    assert result["applied"] is False
+    assert [c["submission_id"] for c in result["would_change"]] == ["s2"]
+    assert result["skipped_by_reason"] == {"already_newest": 1}
+    assert (result["change_count"], result["preview_token"]) == (1, "sha256:one")
+    with pytest.raises(ToolFailed, match="preview_token"):
+        await call(
+            mcp_client,
+            "change_final_results",
+            {"project": "p", "texts": TEXTS, "confirm": True},
+        )
+    fake.on("POST", CHANGE, _change_preview(applied=True))
+    done = await call(
+        mcp_client,
+        "change_final_results",
+        {
+            "project": "p",
+            "texts": TEXTS,
+            "confirm": True,
+            "preview_token": "sha256:one",
+        },
+    )
+    assert fake.calls_to("POST", CHANGE)[-1].json() == {
+        "rows": TEXTS,
+        "rule": "newest_submission",
+        "preview_token": "sha256:one",
+    }
+    assert done["applied"] is True
+    assert [c["case_id"] for c in done["changed"]] == ["c1"]
+    assert not fake.calls_to("PUT", f"{P}/final-selections")
+
+
+async def test_change_final_results_stale_token_returns_a_fresh_dry_run(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    fresh = _change_preview(changes=[], change_count=0, preview_token="sha256:two")
+    fake.on("POST", CHANGE, refusal(409, "PREVIEW_STALE", {"preview": fresh}))
+    result = await call(
+        mcp_client,
+        "change_final_results",
+        {
+            "project": "p",
+            "texts": TEXTS,
+            "confirm": True,
+            "preview_token": "sha256:one",
+        },
+    )
+    assert result["applied"] is False and result["stale"] is True
+    assert (result["would_change"], result["preview_token"]) == ([], "sha256:two")
+
+
 def _agreement_text(case_id: str) -> dict[str, Any]:
     summary = build("AgreementSummary")
     return build(

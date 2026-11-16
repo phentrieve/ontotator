@@ -1,16 +1,22 @@
 """Explicit result selection and final export acknowledgements."""
 
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ontotator.api.identity import PrincipalDep
+from ontotator.api.person_views import PersonRefView
 from ontotator.api.routes import get_access
-from ontotator.api.work_plan_routes import RowRefView
+from ontotator.api.work_plan_routes import (
+    MAX_SELECTED_ROWS,
+    RowRefView,
+    require_one_selection,
+)
 from ontotator.application.final_results import FinalResultService
 from ontotator.auth.audit import Actor
+from ontotator.domain.work_plans import RowKey
 from ontotator.exchange.archive import expire_archive_files
 
 router = APIRouter(prefix="/api/v1/projects/{key}", tags=["final-results"])
@@ -67,11 +73,20 @@ class AcceptAgreeingRequest(BaseModel):
     preview_token: str | None = Field(default=None, max_length=80)
     # Only these cases; None: every text of the project.
     case_ids: list[str] | None = Field(default=None, max_length=10000)
+    # Only these texts (the Documents selection, issue 336); not together
+    # with ``case_ids``.
+    rows: list[RowRefView] | None = Field(
+        default=None, min_length=1, max_length=MAX_SELECTED_ROWS
+    )
 
     @model_validator(mode="after")
     def _token_to_apply(self) -> "AcceptAgreeingRequest":
         if not self.preview and self.preview_token is None:
             raise ValueError("Send preview: true, or the preview_token to apply.")
+        if self.rows is not None:
+            if self.case_ids is not None:
+                raise ValueError("send case_ids or rows, not both")
+            require_one_selection([], self.rows)
         return self
 
 
@@ -106,8 +121,85 @@ class AcceptAgreeingView(BaseModel):
     skipped: list[AgreeingSkip]
     # Texts that already have a final result: not changed (Change final…).
     already_final: int
+    # With ``rows``: the selected texts that already have a final result.
+    already_final_rows: list[RowRefView] = Field(default_factory=list)
     # Requested ``case_ids`` the project does not have.
     unknown_case_ids: list[str] = Field(default_factory=list)
+    preview_token: str
+
+
+class BulkChangeFinalRequest(BaseModel):
+    """Preview (``preview``) or apply (``preview_token``) bulk Change final…
+    for the selected texts (issue 336)."""
+
+    model_config = ConfigDict(extra="forbid")
+    rows: list[RowRefView] = Field(min_length=1, max_length=MAX_SELECTED_ROWS)
+    # The rule that picks each text's new final result. "newest_submission":
+    # the newest submission the final panel offers on the current version,
+    # when it was submitted after the final result was chosen.
+    rule: Literal["newest_submission"] = "newest_submission"
+    preview: bool = Field(default_factory=lambda: False)
+    # With ``preview``: only the counts and the token, no lists.
+    summary_only: bool = Field(default_factory=lambda: False)
+    # The token of the preview being applied; required unless ``preview``.
+    preview_token: str | None = Field(default=None, max_length=80)
+
+    @model_validator(mode="after")
+    def _token_to_apply(self) -> Self:
+        require_one_selection([], self.rows)
+        if not self.preview and self.preview_token is None:
+            raise ValueError("Send preview: true, or the preview_token to apply.")
+        return self
+
+
+class FinalChange(BaseModel):
+    case_id: str
+    language: str
+    # The final result being replaced and its revision.
+    expected_revision: int
+    from_document_id: str
+    from_submission_id: str
+    from_version: int | None = None
+    # The submission that becomes the final result.
+    document_id: str
+    submission_id: str
+    version: int
+    kind: Literal["annotation", "consolidation"]
+    # Who submitted it.
+    person: PersonRefView | None = None
+    # Submissions the final panel offers on the text; above 1 for an
+    # annotation: the others are not compared.
+    eligible_submissions: int
+
+
+class FinalChangeSkip(BaseModel):
+    case_id: str
+    language: str
+    reason: Literal[
+        "no_final",
+        "open_task",
+        "nothing_submitted",
+        "already_newest",
+        "not_newer",
+        "own_result",
+    ]
+    message: str
+
+
+class BulkChangeFinalView(BaseModel):
+    project: str
+    rule: Literal["newest_submission"]
+    # False: a preview; True: every text in ``changes`` has its new final.
+    applied: bool
+    # Selected texts found.
+    texts: int
+    # Counts of the lists below; the lists are empty with ``summary_only``.
+    change_count: int
+    skipped_count: int
+    # reason -> number of skipped texts (also with ``summary_only``).
+    skipped_by_reason: dict[str, int]
+    changes: list[FinalChange]
+    skipped: list[FinalChangeSkip]
     preview_token: str
 
 
@@ -309,6 +401,37 @@ def accept_agreeing(
         preview=body.preview,
         preview_token=body.preview_token,
         case_ids=body.case_ids,
+        rows=None
+        if body.rows is None
+        else [RowKey(row.case_id, row.language) for row in body.rows],
+    )
+
+
+@router.post("/final-selections/bulk-change", response_model=BulkChangeFinalView)
+def bulk_change_final(
+    key: str, body: BulkChangeFinalRequest, principal: PrincipalDep, request: Request
+) -> dict[str, Any]:
+    """Change the final result of many texts by a rule (issue 336).
+
+    Rule ``newest_submission``: each selected text that has a final result
+    gets its newest submission instead (of the submissions the final panel
+    offers on the current version), when that one was submitted after the
+    final result was chosen. ``preview: true`` lists the texts that would
+    change, with the result each one gets, the texts skipped and why (no
+    final result, open work, nothing submitted, already the newest, nothing
+    submitted since the final was chosen, your own result where the project
+    forbids it) and a ``preview_token``.
+    Applying sends that token: every listed text changes, or none (409
+    ``PREVIEW_STALE`` with a fresh ``preview`` in the details when anything
+    changed, also a final result changed meanwhile). Each text is audited
+    like a single change (``via: bulk_change_final``). There is no undo.
+    """
+    return _service(request, principal).change_finals(
+        key,
+        [RowKey(row.case_id, row.language) for row in body.rows],
+        preview=body.preview,
+        preview_token=body.preview_token,
+        summary_only=body.summary_only,
     )
 
 

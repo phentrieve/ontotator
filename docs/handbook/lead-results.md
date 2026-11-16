@@ -111,6 +111,25 @@ What for: take a final result back, for example before finished texts are annota
 
 The text asks for a final result again. **History** in the text card shows the withdrawal with your reason. If someone changed the final result meanwhile, nothing is withdrawn: the dialog says *This final result changed. Nothing was withdrawn.* and loads the current one. Check it, then tick **I understand** again to withdraw it, or click **Cancel**.
 
+### Accept or change the final result of several texts
+
+What for: settle many texts at once on **Documents**: accept every selected text whose annotations agree, or move final results to newer submissions after a second round, a reopened annotation or a consolidation.
+
+1. On **Documents**, select the texts, then click **More actions** in the selection bar.
+2. Choose one. An entry that does nothing for the selection stays in the menu, unavailable, and says why, for example *No selected text has a newer submission than its final result.*
+   - **Accept agreeing results…** is for texts without a final result. A text gets one when at least two annotations are submitted, nothing else is open on it and all findings agree in full, also on notes and modifier text spans. It never replaces a final result.
+   - **Change final…** is for texts that have a final result. The newest submission of the text (an annotation or a consolidation on the current version) replaces the final result when it was submitted after the final result was chosen. A submission that was already there when a lead chose the final result does not replace it.
+3. Read the preview. It groups the texts by what happens to them; click **Show all** to list every text of a group.
+   - **Accept agreeing results…**: *Accept the result of 38 texts · all annotations agree in full*; the texts left out, each group with its reason, for example *Skip 3 texts · the results differ: consolidate or choose in the text card*; and *Keep 12 final results · already final: use Change final… for them*.
+   - **Change final…**: *Use the newest consolidation for 5 texts · Carla Diaz 5* and *Use the newest annotation for 3 texts · Tom Reis 2, R. Roe 1* name whose submission becomes final. Texts are skipped when they have no final result yet, other work on them is still open, nothing is submitted on the current version, the final result already is the newest submission, nothing was submitted since the final result was chosen, or the newest submission is your own and the project rule says another lead must choose it.
+4. Click the button that names the work, for example *Change 8 final results*. The dialog lists what happens. Tick **I understand** and click the button again.
+
+Every listed text changes, or none: if a text or a final result changed since the preview, the dialog says *The texts changed since the preview. Check the new preview.* and shows it. Each text is recorded like a single **Accept result** or **Change final…**, so its **History** shows it.
+
+- **Change final…** takes the newest submission as it is. Where it is one of several annotations of the text, the dialog says in how many texts (*… it becomes final without comparing them.*). To compare first, open the text card instead.
+- Warnings you acknowledged for the earlier final result do not carry over to the new one. Final exports already made stay as they are.
+- Neither action has an undo. To go back, use **Change final…** or **Withdraw final…** in the text card ([Change a final result](#change-a-final-result), [Withdraw a final result](#withdraw-a-final-result)).
+
 ## Translation and text-change decisions
 
 ### Resolve a rejected or queried translation

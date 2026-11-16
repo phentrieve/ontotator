@@ -23,7 +23,8 @@ const STALE = "The texts changed since the preview. Check the new preview.";
 const SHOWN_TEXTS = 3;
 const TITLES: Readonly<Record<BulkAction, string>> = { reopen: "Reopen", withdraw: "Withdraw open tasks" };
 
-function GroupLine({ group, id }: { group: PreviewGroup; id: string }): JSX.Element {
+/** One group of a bulk preview: its title, its detail and its texts, the first three before "Show all". */
+export function GroupLine({ group, id }: { group: PreviewGroup; id: string }): JSX.Element {
   const [all, setAll] = useState(false);
   const more = group.texts.length > SHOWN_TEXTS;
   const listId = `${id}-texts`;

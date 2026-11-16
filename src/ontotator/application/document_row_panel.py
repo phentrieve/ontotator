@@ -83,6 +83,7 @@ __all__ = [
     "final_panel",
     "finding_of",
     "findings_of",
+    "newest_choices",
     "project_profile",
     "project_roles",
     "unresolved_notes",
@@ -646,6 +647,32 @@ def agreeing_choices(
                 "findings": len(findings_of(payloads[chosen], profile)),
             },
         )
+    return result
+
+
+def newest_choices(
+    conn: Connection,
+    pid: int,
+    ctx: _Context,
+    keys: Sequence[tuple[str, str]],
+) -> dict[tuple[str, str], tuple[Candidate, int, datetime] | None]:
+    """For each row of ``keys``: its newest eligible submission (VD16, by the
+    time it was recorded), how many eligible submissions the row has and
+    when the newest was recorded; None for a row without one (bulk Change
+    final…, issue 336). One statement for all rows."""
+    eligible = {key: row_comparison(ctx, *key).eligible for key in keys}
+    recorded_at = _recorded_at(
+        conn, pid, (c.submission_id for found in eligible.values() for c in found)
+    )
+    result: dict[tuple[str, str], tuple[Candidate, int, datetime] | None] = {}
+    for key, found in eligible.items():
+        if not found:
+            result[key] = None
+            continue
+        newest = max(
+            found, key=lambda c: (recorded_at[c.submission_id], c.submission_id)
+        )
+        result[key] = (newest, len(found), recorded_at[newest.submission_id])
     return result
 
 

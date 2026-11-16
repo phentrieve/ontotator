@@ -4265,6 +4265,61 @@
         "x-ontotator-project-token": true
       }
     },
+    "/api/v1/projects/{key}/final-selections/bulk-change": {
+      "post": {
+        "tags": [
+          "final-results"
+        ],
+        "summary": "Bulk Change Final",
+        "description": "Change the final result of many texts by a rule (issue 336).\n\nRule ``newest_submission``: each selected text that has a final result\ngets its newest submission instead (of the submissions the final panel\noffers on the current version), when that one was submitted after the\nfinal result was chosen. ``preview: true`` lists the texts that would\nchange, with the result each one gets, the texts skipped and why (no\nfinal result, open work, nothing submitted, already the newest, nothing\nsubmitted since the final was chosen, your own result where the project\nforbids it) and a ``preview_token``.\nApplying sends that token: every listed text changes, or none (409\n``PREVIEW_STALE`` with a fresh ``preview`` in the details when anything\nchanged, also a final result changed meanwhile). Each text is audited\nlike a single change (``via: bulk_change_final``). There is no undo.",
+        "operationId": "bulk_change_final_api_v1_projects__key__final_selections_bulk_change_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkChangeFinalRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkChangeFinalView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
     "/api/v1/projects/{key}/exports/final/preflight": {
       "post": {
         "tags": [
@@ -11116,6 +11171,22 @@
               }
             ],
             "title": "Case Ids"
+          },
+          "rows": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RowRefView"
+                },
+                "type": "array",
+                "maxItems": 200000,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rows"
           }
         },
         "additionalProperties": false,
@@ -11150,6 +11221,13 @@
           "already_final": {
             "type": "integer",
             "title": "Already Final"
+          },
+          "already_final_rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowRefView"
+            },
+            "type": "array",
+            "title": "Already Final Rows"
           },
           "unknown_case_ids": {
             "items": {
@@ -14175,6 +14253,120 @@
           "reason"
         ],
         "title": "BulkAcceptance"
+      },
+      "BulkChangeFinalRequest": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowRefView"
+            },
+            "type": "array",
+            "maxItems": 200000,
+            "minItems": 1,
+            "title": "Rows"
+          },
+          "rule": {
+            "type": "string",
+            "const": "newest_submission",
+            "title": "Rule",
+            "default": "newest_submission"
+          },
+          "preview": {
+            "type": "boolean",
+            "title": "Preview"
+          },
+          "summary_only": {
+            "type": "boolean",
+            "title": "Summary Only"
+          },
+          "preview_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Token"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rows"
+        ],
+        "title": "BulkChangeFinalRequest",
+        "description": "Preview (``preview``) or apply (``preview_token``) bulk Change final\u2026\nfor the selected texts (issue 336)."
+      },
+      "BulkChangeFinalView": {
+        "properties": {
+          "project": {
+            "type": "string",
+            "title": "Project"
+          },
+          "rule": {
+            "type": "string",
+            "const": "newest_submission",
+            "title": "Rule"
+          },
+          "applied": {
+            "type": "boolean",
+            "title": "Applied"
+          },
+          "texts": {
+            "type": "integer",
+            "title": "Texts"
+          },
+          "change_count": {
+            "type": "integer",
+            "title": "Change Count"
+          },
+          "skipped_count": {
+            "type": "integer",
+            "title": "Skipped Count"
+          },
+          "skipped_by_reason": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Skipped By Reason"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/FinalChange"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/FinalChangeSkip"
+            },
+            "type": "array",
+            "title": "Skipped"
+          },
+          "preview_token": {
+            "type": "string",
+            "title": "Preview Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project",
+          "rule",
+          "applied",
+          "texts",
+          "change_count",
+          "skipped_count",
+          "skipped_by_reason",
+          "changes",
+          "skipped",
+          "preview_token"
+        ],
+        "title": "BulkChangeFinalView"
       },
       "BulkKeptTaskView": {
         "properties": {
@@ -18437,6 +18629,125 @@
           "kind"
         ],
         "title": "ExportRequest"
+      },
+      "FinalChange": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "expected_revision": {
+            "type": "integer",
+            "title": "Expected Revision"
+          },
+          "from_document_id": {
+            "type": "string",
+            "title": "From Document Id"
+          },
+          "from_submission_id": {
+            "type": "string",
+            "title": "From Submission Id"
+          },
+          "from_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Version"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "submission_id": {
+            "type": "string",
+            "title": "Submission Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "annotation",
+              "consolidation"
+            ],
+            "title": "Kind"
+          },
+          "person": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonRefView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "eligible_submissions": {
+            "type": "integer",
+            "title": "Eligible Submissions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "expected_revision",
+          "from_document_id",
+          "from_submission_id",
+          "document_id",
+          "submission_id",
+          "version",
+          "kind",
+          "eligible_submissions"
+        ],
+        "title": "FinalChange"
+      },
+      "FinalChangeSkip": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "no_final",
+              "open_task",
+              "nothing_submitted",
+              "already_newest",
+              "not_newer",
+              "own_result"
+            ],
+            "title": "Reason"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "reason",
+          "message"
+        ],
+        "title": "FinalChangeSkip"
       },
       "FinalExportRequest": {
         "properties": {
