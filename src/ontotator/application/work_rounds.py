@@ -57,6 +57,7 @@ from ontotator.domain.work_rounds import (
     RoundKind,
     WorkRoundView,
     is_exact_ancestor,
+    unresolved_note,
 )
 from ontotator.domain.workspace import (
     Draft,
@@ -101,14 +102,18 @@ def _input_payload(
     mapped: Carried | NeedsReview,
     *,
     did: int | None = None,
+    note: str | None = None,
 ) -> dict[str, Any]:
     """The stored payload of one frozen round input.
 
     ``review_reason`` names why a carried finding could not be re-anchored; it
-    is stored for new rounds only (older payloads have no such key). An input
-    of a frozen draft (``did``, kind ``text_change``) has no source submission
-    and stores ``source_draft_snapshot_id``; submission inputs keep their
-    payload shape (``RoundInputView`` forbids unknown keys).
+    is stored for new rounds only (older payloads have no such key). ``note``
+    is the Unresolved note the source work left on a tool proposal (#418),
+    stored only when there is one, so an archived round keeps it without the
+    frozen draft it came from. An input of a frozen draft (``did``, kind
+    ``text_change``) has no source submission and stores
+    ``source_draft_snapshot_id``; submission inputs keep their payload shape
+    (``RoundInputView`` forbids unknown keys).
     """
     payload: dict[str, Any] = {
         "input_id": iid,
@@ -128,6 +133,8 @@ def _input_payload(
     }
     if did is not None:
         payload["source_draft_snapshot_id"] = did
+    if note is not None:
+        payload["unresolved_note"] = note
     return payload
 
 
@@ -789,6 +796,7 @@ class WorkRoundService:
                     )
                     for original in source.snapshots
                 ]
+            source_decisions = [d.model_dump(mode="json") for d in source.decisions]
             for position, (original, mapped) in enumerate(entries):
                 if original.annotation.layer_id not in scope.editable_layer_ids:
                     raise DomainError(
@@ -869,8 +877,21 @@ class WorkRoundService:
                         },
                     )
                     target = snapshot(annotation, evidence, document, profile)
+                note = (
+                    unresolved_note(
+                        {
+                            "annotation_id": original.annotation.annotation_id,
+                            "version": original.version,
+                        },
+                        source_decisions,
+                    )
+                    if original.annotation.provenance.actor.kind == "tool"
+                    else None
+                )
                 inputs.append(
-                    _input_payload(iid, sid, original, target, mapped, did=did)
+                    _input_payload(
+                        iid, sid, original, target, mapped, did=did, note=note
+                    )
                 )
         targets = ReviewTargetSet.create(
             [

@@ -47,12 +47,35 @@ export function translationState(row: DocumentRowView): State {
   return { state: cellLabel(row, "review"), tone: "now" };
 }
 
+const NOT_NEWER = new Set(["rejected", "query"]);
+
+/**
+ * The versions the Annotation cell counts, as the server's stage cells do: the newest version of each chain, a
+ * correction whose review was rejected or queried skipped (it is not newer). Work on an older version (a submission
+ * carried to the new version, or one the lead left behind with "Start v2 fresh") never counts (issue 420).
+ */
+function targetDocumentIds(row: DocumentRowView): Set<string> {
+  const newest = new Map<string, DocumentRowView["versions"][number]>();
+  for (const version of row.versions ?? []) {
+    const notNewer = version.origin === "correction" && version.translation_status === "reviewed" && NOT_NEWER.has(version.latest_review_decision ?? "");
+    const best = newest.get(version.chain_id);
+    if (!notNewer && (!best || version.version > best.version)) newest.set(version.chain_id, version);
+  }
+  return new Set([...newest.values()].map(version => version.document_id));
+}
+
 export function annotationState(row: DocumentRowView): State {
   const cell = row.stages?.annotation;
   const detail = cell?.detail ?? {};
   const target = detail.target ?? detail.total ?? 0;
-  // The server may send no counts: count the row's annotate work items; without any, no count.
-  const work = (row.work ?? []).filter(item => item.task === "annotate" && item.moved_to_version == null);
+  // The server may send no counts: count the row's annotate work items on the newest version; without any, no count.
+  // A submitted cell that names an older version (a final result on v1, nothing on v2 yet) counts that version.
+  const targets = targetDocumentIds(row);
+  const annotate = (row.work ?? []).filter(item => item.task === "annotate" && item.moved_to_version == null);
+  const onTargets = annotate.filter(item => targets.size === 0 || targets.has(item.document_id));
+  const work = cell?.state === "submitted" && onTargets.length === 0 && detail.version != null
+    ? annotate.filter(item => item.version === detail.version)
+    : onTargets;
   const total = detail.total ?? detail.target ?? work.length;
   const done = detail.submitted ?? work.filter(item => item.status === "submitted").length;
   const working = cell?.state === "in_progress" || cell?.state === "paused";

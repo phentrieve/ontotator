@@ -8119,6 +8119,8 @@ export interface components {
             username: string;
             /** Code */
             code: string;
+            /** Reason */
+            reason?: string | null;
         };
         /**
          * RepinReport
