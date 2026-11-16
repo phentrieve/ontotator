@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { annotationState, cardSegments, defaultSegment, finalizationState, translationState } from "../../src/documents/textCard/cardModel";
 import { annotateItem, cardRow } from "./cardFixtures";
-import { final, work } from "./fixtures";
+import { final, version, work } from "./fixtures";
 import { ana, cell, tom } from "./tableFixtures";
 
 const now = new Date("2026-10-22T12:00:00Z");
@@ -77,6 +77,25 @@ describe("Annotation", () => {
     expect(annotationState(cardRow({ annotation: cell("consolidating", "running") }, { work }))).toEqual({ state: "2 of 2 submitted", tone: "done" });
     expect(annotationState(cardRow({ annotation: cell("consolidating", "running") }, { work: [] }))).toEqual({ state: "submitted", tone: "done" });
     expect(annotationState(cardRow({ annotation: cell("in_progress", "running") }, { work: [] }))).toEqual({ state: "in progress", tone: "now" });
+  });
+  it("without server counts counts only work on the newest version (issue 420)", () => {
+    const versions = [
+      version({ document_id: "case-200-de", chain_id: "de", origin: "machine_translation", translation_status: "accepted", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", chain_id: "de", version: 2, origin: "correction", derived_from: "case-200-de", translation_status: "accepted" }),
+    ];
+    const v1 = annotateItem({ assignment_id: 1, status: "submitted" });
+    const carried = annotateItem({ assignment_id: 2, document_id: "case-200-de-v2", version: 2, status: "in_progress" });
+    // Carried to v2 (author or someone else): "0 of 1", never "1 of 2" (v1 submission + v2 task).
+    expect(annotationState(cardRow({ annotation: cell("in_progress", "running", { people: [ana], started: 1, open_tasks: 1 }) }, { versions, work: [v1, carried] })))
+      .toEqual({ state: "0 of 1 submitted", tone: "now" });
+    // Submitted on v2: "1 of 1", never "2 of 2".
+    const done = { ...carried, status: "submitted" as const };
+    expect(annotationState(cardRow({ annotation: cell("submitted", "done") }, { versions, work: [v1, done] }))).toEqual({ state: "1 of 1 submitted", tone: "done" });
+    // A correction that was rejected in review is not newer: v1 stays counted.
+    const rejected = [versions[0]!, { ...versions[1]!, translation_status: "reviewed" as const, latest_review_decision: "rejected" }];
+    expect(annotationState(cardRow({ annotation: cell("submitted", "done") }, { versions: rejected, work: [v1] }))).toEqual({ state: "1 of 1 submitted", tone: "done" });
+    // A submitted cell naming v1 (the final result is on v1, nothing on v2 yet) counts v1.
+    expect(annotationState(cardRow({ annotation: cell("submitted", "done", { version: 1 }) }, { versions, work: [v1] }))).toEqual({ state: "1 of 1 submitted", tone: "done" });
   });
   it("submitted and consolidating are done", () => {
     expect(annotationState(cardRow({ annotation: cell("submitted", "done", { submitted: 2, total: 2 }) }))).toEqual({ state: "2 of 2 submitted", tone: "done" });
