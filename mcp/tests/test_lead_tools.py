@@ -318,6 +318,48 @@ async def test_assign_texts_asks_for_a_review_of_an_accepted_translation(
     assert sent.json()["review_accepted_translation"] is True
 
 
+async def test_assign_texts_names_the_correction_for_a_review_accepted_version(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    def refused(document_id: str, reason: str | None) -> dict[str, Any]:
+        return {
+            "document_id": document_id,
+            "username": "u",
+            "code": "NOT_A_TRANSLATION",
+            "reason": reason,
+        }
+
+    fake.on(
+        "POST",
+        f"{P}/assignments",
+        {
+            "created": [],
+            "refused": [refused("d", "accepted_by_review"), refused("n", None)],
+        },
+    )
+    result = await call(
+        mcp_client,
+        "assign_texts",
+        {
+            "project": "p",
+            "assignments": [
+                {"document_id": "d", "username": "u"},
+                {"document_id": "n", "username": "u"},
+            ],
+            "task": "review_accepted_translation",
+        },
+    )
+    by_review, other = result["refused"]
+    assert "request_translation_correction" in by_review["hint"]
+    assert "hint" not in other
+    tools = {tool.name: tool for tool in (await mcp_client.list_tools()).tools}
+    schema = tools["assign_texts"].input_schema["properties"]["task"]
+    assert "request_translation_correction" in schema["description"]
+    correction = tools["request_translation_correction"].description or ""
+    assert "accepted" in correction.splitlines()[0]
+    assert "rejected or queried translation." not in correction.splitlines()[0]
+
+
 async def test_tool_texts_state_the_selection_limit(mcp_client: Client) -> None:
     tools = {tool.name: tool for tool in (await mcp_client.list_tools()).tools}
     for name in ("update_work_plan", "distribute_texts"):

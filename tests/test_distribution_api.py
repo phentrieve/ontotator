@@ -355,6 +355,7 @@ def test_http_human_edited_language_refusal_and_explicit_override(api):
             "document_id": "doc-beta",
             "username": "alice",
             "code": "LANGUAGE_CONFIRMATION_REQUIRED",
+            "reason": None,
         }
     ]
     # A fresh preview is required after Bob's successful row changed the load.
