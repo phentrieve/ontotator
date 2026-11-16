@@ -668,7 +668,8 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
             bool,
             Field(
                 description=(
-                    "Only annotations above the project's annotators per text:"
+                    "Only annotations above annotators per text (a text's own value,"
+                    " else the project's):"
                     " submitted, then started, then the earliest stay."
                 )
             ),

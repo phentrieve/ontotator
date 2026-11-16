@@ -115,6 +115,9 @@ export function historyLines(row: DocumentRowView, submissions: readonly RowSubm
     if (change.kind === "reassigned") {
       const name = (person: RowChangeView["from_person"]) => personLabel(person?.pseudonym ?? "", !!person?.is_me, person ?? undefined);
       lines.push({ key, stage, text: `${stage === "review" ? "Review" : change.task === "review" ? "Consolidation" : "Annotation"}: ${join(`reassigned from ${name(change.from_person)} to ${name(change.to_person)}`, when)}` });
+    } else if (change.kind === "final_withdrawn") {
+      const by = change.from_person ? personLabel(change.from_person.pseudonym, !!change.from_person.is_me, change.from_person) : null;
+      lines.push({ key, stage: "final", text: `Final: ${join(by ? `withdrawn by ${by}` : "withdrawn", change.reason, when)}` });
     } else {
       const mode = change.to_mode === "proposals" || change.to_mode === "scratch" ? MODE_WORDS[change.to_mode] : change.to_mode;
       lines.push({ key, stage, text: `Annotation: ${join(`${change.kind === "mode_restored" ? "mode restored" : "mode changed"}, now annotated ${mode}`, change.reason, when)}` });

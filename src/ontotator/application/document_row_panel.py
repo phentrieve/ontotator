@@ -78,6 +78,7 @@ if TYPE_CHECKING:  # document_rows imports this module
 __all__ = [
     "NOT_ELIGIBLE",
     "Candidate",
+    "agreeing_choices",
     "fill_agreement",
     "final_panel",
     "finding_of",
@@ -579,6 +580,73 @@ def fill_agreement(
             _full_agreement(item.comparable, recorded_at, payloads, profile, defaults)
             is not None
         )
+
+
+def agreeing_choices(
+    conn: Connection,
+    pid: int,
+    ctx: _Context,
+    keys: Sequence[tuple[str, str]],
+) -> dict[tuple[str, str], tuple[str | None, dict[str, Any] | None]]:
+    """For each row of ``keys``: the submission to accept when its compared
+    submissions agree in full, else why not (issue 354).
+
+    The rule of the final panel's ``all_match``: at least two eligible
+    submissions on the compared version, none of the row's eligible
+    submissions a consolidation, every consolidation group ``match``, and
+    the earliest of them that the viewer may accept (not their own work
+    when the project forbids it). Reads the submissions of all rows in a
+    fixed number of statements, as ``fill_agreement`` does for a page.
+    """
+    facts = ctx.facts
+    comparisons = {key: row_comparison(ctx, *key) for key in keys}
+    result: dict[tuple[str, str], tuple[str | None, dict[str, Any] | None]] = {}
+    compared: list[tuple[str, str]] = []
+    for key, item in comparisons.items():
+        if any(c.consolidation_round is not None for c in item.eligible):
+            result[key] = ("consolidation", None)
+        elif len(item.comparable) < 2:
+            result[key] = ("fewer_than_two", None)
+        else:
+            compared.append(key)
+    if not compared:
+        return result
+    wanted = [c.submission_id for key in compared for c in comparisons[key].comparable]
+    recorded_at = _recorded_at(conn, pid, wanted)
+    payloads = _payloads(conn, pid, wanted, strict=False)
+    profile, defaults = project_profile(conn, pid)
+    roles = project_roles(conn, pid, profile)
+    for key in compared:
+        comparable = comparisons[key].comparable
+        order = _full_agreement(
+            comparable, recorded_at, payloads, profile, defaults, roles
+        )
+        chosen = next(
+            (
+                sid
+                for sid in order or ()
+                if not (
+                    facts.adjudicator_not_annotator
+                    and payloads[sid].origin_key.annotator_id == facts.viewer_pseudonym
+                )
+            ),
+            None,
+        )
+        if chosen is None:
+            result[key] = ("differ", None)
+            continue
+        document_id = next(
+            c.document_id for c in comparable if c.submission_id == chosen
+        )
+        result[key] = (
+            None,
+            {
+                "document_id": document_id,
+                "submission_id": chosen,
+                "findings": len(findings_of(payloads[chosen], profile)),
+            },
+        )
+    return result
 
 
 def _changed_passages(

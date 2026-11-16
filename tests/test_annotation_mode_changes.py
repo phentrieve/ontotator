@@ -246,6 +246,18 @@ def test_a_chosen_final_result_keeps_the_mode(tmp_path):
     response = preview(env)
     assert response.status_code == 409
     assert response.json()["code"] == "ANNOTATION_MODE_FINAL_SELECTED"
+    # #343: once the final result is withdrawn, the mode can change again.
+    withdrawn = env.lead.post(
+        f"{BASE}/final-selections/withdraw",
+        json={
+            "case_id": "c1",
+            "language": "en",
+            "expected_revision": 1,
+            "reason": "Re-annotation from scratch",
+        },
+    )
+    assert withdrawn.status_code == 200, withdrawn.text
+    assert preview(env).status_code == 200
 
 
 def test_only_a_lead_changes_lists_or_restores(tmp_path):

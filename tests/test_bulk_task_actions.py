@@ -265,6 +265,53 @@ def test_over_limit_filter_and_withdraw_above_the_limit(env):
     assert [row for group in after.json()["groups"] for row in group["rows"]] == []
 
 
+def _own_limit(env: Any, case: str, value: int | None) -> None:
+    response = env.lead.put(
+        f"{BASE}/texts/{case}/en/annotations-per-text",
+        json={"value": value, "reason": "method comparison"},
+    )
+    assert response.status_code == 200, response.text
+
+
+def _over_limit(env: Any) -> list[str]:
+    page = env.lead.get(f"{BASE}/document-rows", params={"flags": "over_limit"})
+    assert page.status_code == 200, page.text
+    return [row["case_id"] for group in page.json()["groups"] for row in group["rows"]]
+
+
+def test_over_limit_and_withdraw_use_the_texts_own_limit(env):
+    """Issue 422: a text's own "Annotators per text" is its limit, for the
+    filter and for the withdrawal above the limit, above and below the
+    project's value."""
+    _limit(env, 2)
+    assign(env, doc("c1", "en"), "anno", "annotate")
+    c1_second = assign(env, doc("c1", "en"), "anno2", "annotate")
+    assign(env, doc("c2", "en"), "anno", "annotate")
+    c2_second = assign(env, doc("c2", "en"), "anno2", "annotate")
+
+    # Project limit 1, c2 has its own limit of 2: only c1 is above its limit.
+    _limit(env, 1)
+    _own_limit(env, "c2", 2)
+    assert _over_limit(env) == ["c1"]
+    found = _post(env, WITHDRAW, preview=True, over_limit_only=True).json()
+    assert [item["assignment_id"] for item in found["changes"]] == [c1_second]
+    assert {item["reason"] for item in found["kept"]} == {"within_limit"}
+    assert len(found["kept"]) == 3
+
+    # Project limit 2, c2 has its own limit of 1: only c2 is above its limit.
+    _limit(env, 2)
+    _own_limit(env, "c2", 1)
+    assert _over_limit(env) == ["c2"]
+    found = _post(env, WITHDRAW, preview=True, over_limit_only=True).json()
+    assert [item["assignment_id"] for item in found["changes"]] == [c2_second]
+
+    # Without its own value the text follows the project again.
+    _own_limit(env, "c2", None)
+    assert _over_limit(env) == []
+    found = _post(env, WITHDRAW, preview=True, over_limit_only=True).json()
+    assert found["changes"] == []
+
+
 def test_bulk_actions_are_for_leads_only(env):
     from auth_harness import logged_in
 

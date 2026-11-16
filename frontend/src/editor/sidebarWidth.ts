@@ -69,32 +69,53 @@ function storage(): Storage | null {
   }
 }
 
-export function readStoredWidth(username: string): number | null {
-  const raw = storage()?.getItem(storageKey(username));
+/** Storage key of one user's width; another resizable panel passes its own (`useSidebarWidth` `storageKeyFor`). */
+export type StorageKeyFor = (username: string) => string;
+
+export function readStoredWidth(username: string, keyFor: StorageKeyFor = storageKey): number | null {
+  let raw: string | null | undefined;
+  try {
+    raw = storage()?.getItem(keyFor(username));
+  } catch {
+    return null;
+  }
   if (raw == null || !/^\d+$/.test(raw.trim())) return null;
   const value = Number(raw);
   return Number.isFinite(value) && Number.isInteger(value) && value > 0 ? value : null;
 }
 
-export function writeStoredWidth(username: string, value: number): void {
+export function writeStoredWidth(username: string, value: number, keyFor: StorageKeyFor = storageKey): void {
   try {
-    storage()?.setItem(storageKey(username), String(Math.round(value)));
+    storage()?.setItem(keyFor(username), String(Math.round(value)));
   } catch {
     // Storage full or blocked: the width simply is not remembered.
   }
 }
 
-export function clearStoredWidth(username: string): void {
+export function clearStoredWidth(username: string, keyFor: StorageKeyFor = storageKey): void {
   try {
-    storage()?.removeItem(storageKey(username));
+    storage()?.removeItem(keyFor(username));
   } catch {
     // Ignore blocked storage.
   }
 }
 
-function currentLimits(withGuidelines = false): SidebarLimits {
+/** Limits of a resizable panel at a viewport width (default: the findings column's). */
+export type LimitsFor = (viewport: number, withGuidelines: boolean) => SidebarLimits;
+
+const findingsLimits: LimitsFor = (viewport, withGuidelines) => sidebarLimits({ viewport, inspector: inspectorWidth(viewport, withGuidelines) });
+
+function currentLimits(withGuidelines = false, limitsFor: LimitsFor = findingsLimits): SidebarLimits {
   const viewport = typeof window === "undefined" ? 1280 : window.innerWidth;
-  return sidebarLimits({ viewport, inspector: inspectorWidth(viewport, withGuidelines) });
+  return limitsFor(viewport, withGuidelines);
+}
+
+export interface SidebarWidthOptions {
+  inspectorWithGuidelines?: boolean;
+  /** Another panel's storage key (default: the findings column's). Keep it stable. */
+  storageKeyFor?: StorageKeyFor;
+  /** Another panel's limits (default: the findings column's). Keep it stable. */
+  limitsFor?: LimitsFor;
 }
 
 const sameLimits = (a: SidebarLimits, b: SidebarLimits) => a.min === b.min && a.max === b.max && a.fallback === b.fallback;
@@ -111,13 +132,18 @@ export interface SidebarWidthState {
  * Preferred findings-column width per user. The stored value is applied clamped to the
  * current limits; it is written after a drag end or 300 ms after the last key, never
  * during render. Reset removes the stored key. `inspectorWithGuidelines`: the inspector
- * holds the guidelines (at least 420 px), which lowers the maximum.
+ * holds the guidelines (at least 420 px), which lowers the maximum. Another resizable panel
+ * (the translation review's "Your review", issue 410) passes its own `storageKeyFor` and `limitsFor`.
  */
-export function useSidebarWidth(username: string | undefined, { inspectorWithGuidelines = false } = {}): SidebarWidthState {
-  const [limits, setLimits] = useState<SidebarLimits>(() => currentLimits(inspectorWithGuidelines));
+export function useSidebarWidth(username: string | undefined, { inspectorWithGuidelines = false, storageKeyFor = storageKey, limitsFor = findingsLimits }: SidebarWidthOptions = {}): SidebarWidthState {
+  const keyRef = useRef(storageKeyFor);
+  keyRef.current = storageKeyFor;
+  const limitsRef = useRef(limitsFor);
+  limitsRef.current = limitsFor;
+  const [limits, setLimits] = useState<SidebarLimits>(() => currentLimits(inspectorWithGuidelines, limitsFor));
   const guidelinesRef = useRef(inspectorWithGuidelines);
   guidelinesRef.current = inspectorWithGuidelines;
-  const [preferred, setPreferred] = useState<number | null>(() => (username ? readStoredWidth(username) : null));
+  const [preferred, setPreferred] = useState<number | null>(() => (username ? readStoredWidth(username, storageKeyFor) : null));
   const preferredRef = useRef(preferred);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** A key write was pending when a drag started; it is owed if the drag is cancelled. */
@@ -130,14 +156,14 @@ export function useSidebarWidth(username: string | undefined, { inspectorWithGui
   useEffect(() => {
     if (loadedFor.current === username) return;
     loadedFor.current = username;
-    const stored = username ? readStoredWidth(username) : null;
+    const stored = username ? readStoredWidth(username, keyRef.current) : null;
     preferredRef.current = stored;
     setPreferred(stored);
   }, [username]);
 
   useEffect(() => {
     const update = () => setLimits((previous) => {
-      const next = currentLimits(guidelinesRef.current);
+      const next = currentLimits(guidelinesRef.current, limitsRef.current);
       return sameLimits(next, previous) ? previous : next;
     });
     update();
@@ -161,7 +187,7 @@ export function useSidebarWidth(username: string | undefined, { inspectorWithGui
     timer.current = null;
     const user = userRef.current;
     const value = preferredRef.current;
-    if (user && value != null) writeStoredWidth(user, clampSidebarWidth(value, currentLimits(guidelinesRef.current)));
+    if (user && value != null) writeStoredWidth(user, clampSidebarWidth(value, currentLimits(guidelinesRef.current, limitsRef.current)), keyRef.current);
   }, []);
   // Unmount: a pending keyboard write is flushed, not dropped (a drag in progress is not committed).
   useEffect(() => () => {
@@ -188,7 +214,7 @@ export function useSidebarWidth(username: string | undefined, { inspectorWithGui
     suspendedKeyWrite.current = false;
     preferredRef.current = null;
     setPreferred(null);
-    if (userRef.current) clearStoredWidth(userRef.current);
+    if (userRef.current) clearStoredWidth(userRef.current, keyRef.current);
   }, [clearTimer]);
 
   const width = clampSidebarWidth(preferred ?? limits.fallback, limits);

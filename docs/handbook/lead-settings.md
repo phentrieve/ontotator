@@ -250,7 +250,7 @@ What for: decide how many people annotate each text and who may consolidate.
 5. Tick **Hide annotator names during consolidation** if consolidators should decide without knowing who marked what. Off by default.
 6. Click **Save changes**.
 
-Lowering the number removes nobody; existing assignments stay.
+Lowering the number removes nobody; existing assignments stay. A text can have its own number instead, set in the assign dialog ([Assign work for one text](lead-documents.md#assign-work-for-one-text)); it keeps it when you change the project setting.
 
 With hidden names, a consolidator sees the annotators of a text as *Annotator A*, *Annotator B* and so on, in the order they submitted, instead of names or pseudonyms; the same letters are used in the consolidation, the full editor and the submitted work they read for it. A person keeps their letter in later consolidation rounds of the same task. The technical ids and checksums the consolidator's browser receives are scrambled too, so they cannot be used to work out who wrote a finding. Tool proposals keep their robot icon. You and other leads still see every name, and exports are unchanged. The change applies to every consolidation the next time it opens, also to one already started. The audit trail records the change as *Project settings changed*, with the setting named.
 

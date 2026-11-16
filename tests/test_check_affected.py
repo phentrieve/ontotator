@@ -100,8 +100,7 @@ def test_changed_module_selects_named_and_importing_tests(quick):
     assert calls[0] == "docker info"
     assert calls[1 : 1 + len(STATIC)] == STATIC
     assert calls[1 + len(STATIC)] == (
-        "npm --prefix frontend run test:related --"
-        " --maxWorkers=2 --minWorkers=1 src/a.ts"
+        "npm --prefix frontend run test:related -- --maxWorkers=2 src/a.ts"
     )
     backend = calls[2 + len(STATIC)].split()
     assert backend[:6] == ["uv", "run", "pytest", "-q", "-n", "2"]
@@ -183,7 +182,7 @@ def test_check_sh_quick_delegates_with_arguments(quick):
         "--quick", "frontend/tests/a.test.ts", script="scripts/check.sh"
     )
     assert result.returncode == 0, result.stderr
-    assert calls[-1].endswith("--minWorkers=1 tests/a.test.ts")
+    assert calls[-1].endswith("--maxWorkers=2 tests/a.test.ts")
 
 
 @pytest.mark.parametrize("arguments", [("--bad",), ("--base",)])
@@ -216,7 +215,7 @@ def test_without_paths_uses_changes_against_the_base_ref(quick):
 
     result, calls = quick("--base", "trunk", ONTOTATOR_TEST_PG_URL="test-only")
     assert result.returncode == 0, result.stderr
-    assert calls[-2].endswith("--minWorkers=1 src/a.ts")
+    assert calls[-2].endswith("--maxWorkers=2 src/a.ts")
     assert calls[-1] == "uv run pytest -q tests/test_other.py"
 
     result, calls = quick("--base", "missing")

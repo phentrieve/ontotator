@@ -293,6 +293,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/rounds/{round_id}/source-text": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Round Source
+         * @description The earlier text version a carried round's work came from, for "Show
+         *     changes since vN" (issue 421); null when the round was not carried from
+         *     another version. Everyone who may see the round may read it.
+         */
+        get: operations["round_source_api_v1_rounds__round_id__source_text_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{workspace_id}/round-input-resolutions": {
         parameters: {
             query?: never;
@@ -713,6 +735,26 @@ export interface paths {
          * @description Send a technical report to the administrators; no task is paused.
          */
         post: operations["create_report_api_v1_technical_reports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/technical-reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Own Reports
+         * @description The caller's own reports, newest first: reference, text and status.
+         */
+        get: operations["list_own_reports_api_v1_me_technical_reports_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1325,6 +1367,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{key}/final-selections/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw Final
+         * @description Withdraw a text's final result, with a reason (#343).
+         *
+         *     The text has no final result until a lead chooses one again; submissions,
+         *     consolidations and final exports already made stay. 409
+         *     ``REVISION_CONFLICT`` when the final changed since ``expected_revision``.
+         */
+        post: operations["withdraw_final_api_v1_projects__key__final_selections_withdraw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{key}/final-selections/accept-agreeing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Agreeing
+         * @description Accept the result of every text whose annotations agree in full (#354).
+         *
+         *     ``preview: true`` lists the texts that would become final, every other
+         *     text without a final result with the reason it is left out, and a
+         *     ``preview_token``; unknown ``case_ids`` are named. Applying sends that token: all
+         *     listed texts become final, or none (409 ``PREVIEW_STALE`` with a fresh
+         *     ``preview`` in the details when anything changed). Texts that already
+         *     have a final result are only counted.
+         */
+        post: operations["accept_agreeing_api_v1_projects__key__final_selections_accept_agreeing_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{key}/exports/final/preflight": {
         parameters: {
             query?: never;
@@ -1623,6 +1716,52 @@ export interface paths {
         head?: never;
         /** Patch Work Plan */
         patch: operations["patch_work_plan_api_v1_projects__key__work_plans__case_id___language__patch"];
+        trace?: never;
+    };
+    "/api/v1/projects/{key}/texts/annotations-per-text": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Annotations Per Texts
+         * @description Several texts' own "Annotations per text" at once (issue 422).
+         *
+         *     All or nothing: one unknown text refuses the request. Each text is
+         *     compared with its own value; texts that already have it are unchanged.
+         */
+        put: operations["set_annotations_per_texts_api_v1_projects__key__texts_annotations_per_text_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{key}/texts/{case_id}/{language}/annotations-per-text": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Annotations Per Text
+         * @description One text's own "Annotations per text", target and limit (issue 422).
+         *
+         *     Idempotent; ``value: null`` returns the text to the project value.
+         *     Assignments above a lowered value stay.
+         */
+        put: operations["set_annotations_per_text_api_v1_projects__key__texts__case_id___language__annotations_per_text_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/projects/{key}/document-rows/move-to-front": {
@@ -3262,6 +3401,39 @@ export interface components {
             /** Revision */
             revision: string | null;
         };
+        /**
+         * AcceptAgreeingRequest
+         * @description Preview (``preview``) or apply (``preview_token``) accepting every
+         *     agreeing text (#354).
+         */
+        AcceptAgreeingRequest: {
+            /**
+             * Preview
+             * @default false
+             */
+            preview: boolean;
+            /** Preview Token */
+            preview_token?: string | null;
+            /** Case Ids */
+            case_ids?: string[] | null;
+        };
+        /** AcceptAgreeingView */
+        AcceptAgreeingView: {
+            /** Project */
+            project: string;
+            /** Applied */
+            applied: boolean;
+            /** Texts */
+            texts: components["schemas"]["AgreeingText"][];
+            /** Skipped */
+            skipped: components["schemas"]["AgreeingSkip"][];
+            /** Already Final */
+            already_final: number;
+            /** Unknown Case Ids */
+            unknown_case_ids?: string[];
+            /** Preview Token */
+            preview_token: string;
+        };
         /** AcceptExternalReview */
         AcceptExternalReview: {
             /** Reason */
@@ -3402,6 +3574,33 @@ export interface components {
              * @enum {string}
              */
             task: "annotate" | "review" | "translation_review";
+        };
+        /** AgreeingSkip */
+        AgreeingSkip: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "open_task" | "not_ready" | "not_in_plan" | "fewer_than_two" | "consolidation" | "differ";
+            /** Message */
+            message: string;
+        };
+        /** AgreeingText */
+        AgreeingText: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Document Id */
+            document_id: string;
+            /** Submission Id */
+            submission_id: string;
+            /** Findings */
+            findings?: number | null;
         };
         /**
          * AgreementDetailView
@@ -3662,6 +3861,54 @@ export interface components {
             annotations: components["schemas"]["AnnotationSnapshot"][];
             /** Evidence */
             evidence: components["schemas"]["EvidenceSnapshot"][];
+        };
+        /** AnnotationsPerTextBulkResult */
+        AnnotationsPerTextBulkResult: {
+            /** Texts */
+            texts: components["schemas"]["AnnotationsPerTextResult"][];
+        };
+        /** AnnotationsPerTextBulkSet */
+        AnnotationsPerTextBulkSet: {
+            /** Texts */
+            texts: components["schemas"]["RowRefView"][];
+            /** Value */
+            value: number | null;
+            /** Reason */
+            reason?: string | null;
+        };
+        /** AnnotationsPerTextResult */
+        AnnotationsPerTextResult: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Override */
+            override: number | null;
+            /** Project Value */
+            project_value: number;
+            /** Effective */
+            effective: number;
+            /** Changed */
+            changed: boolean;
+        };
+        /** AnnotationsPerTextSet */
+        AnnotationsPerTextSet: {
+            /** Value */
+            value: number | null;
+            /** Reason */
+            reason?: string | null;
+        };
+        /**
+         * AnnotationsPerTextView
+         * @description The text's "Annotations per text" (issue 422).
+         */
+        AnnotationsPerTextView: {
+            /** Effective */
+            effective: number;
+            /** Project */
+            project: number;
+            /** Override */
+            override?: number | null;
         };
         /**
          * AnnotatorPairAgreement
@@ -4176,6 +4423,8 @@ export interface components {
             people: components["schemas"]["BatchPersonView"][];
             /** Per Text */
             per_text: number;
+            /** Project Per Text */
+            project_per_text: number;
             /** Digest */
             digest: string;
             /** Needs People */
@@ -4194,6 +4443,10 @@ export interface components {
             reason: "waiting_for_review" | "not_in_plan" | "already_assigned" | "step_differs" | "discarded" | "no_proposals_on_version" | "other_root_in_review";
             /** Document Id */
             document_id?: string | null;
+            /** Assigned */
+            assigned?: number | null;
+            /** Per Text */
+            per_text?: number | null;
         };
         /** BatchTargetView */
         BatchTargetView: {
@@ -4207,6 +4460,8 @@ export interface components {
             version: number;
             /** Remaining */
             remaining: number;
+            /** Per Text */
+            per_text: number;
             /** Usernames */
             usernames: string[];
             /**
@@ -5460,6 +5715,11 @@ export interface components {
              */
             proposal_count: number;
             annotation_mode?: components["schemas"]["AnnotationModeView"] | null;
+            proposal_set?: components["schemas"]["RowProposalSetView"] | null;
+            newer_proposal_set?: components["schemas"]["RowProposalSetView"] | null;
+            /** Proposal Set Unrecorded */
+            proposal_set_unrecorded?: boolean;
+            annotations_per_text?: components["schemas"]["AnnotationsPerTextView"] | null;
             consolidation_progress?: components["schemas"]["ConsolidationProgressView"] | null;
             /**
              * Unreviewed Translation
@@ -5955,6 +6215,33 @@ export interface components {
             reason: string;
             /** Destination */
             destination: string;
+        };
+        /**
+         * FinalWithdrawalRequest
+         * @description Withdraw the final result of one text (#343).
+         */
+        FinalWithdrawalRequest: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Expected Revision */
+            expected_revision: number;
+            /** Reason */
+            reason: string;
+        };
+        /** FinalWithdrawalView */
+        FinalWithdrawalView: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Document Id */
+            document_id: string;
+            /** Submission Id */
+            submission_id: string;
+            /** Revision */
+            revision: number;
         };
         /**
          * FrozenTranslation
@@ -6977,6 +7264,29 @@ export interface components {
         OtherActiveHold: {
             /** Report Id */
             report_id: string;
+        };
+        /**
+         * OwnTechnicalReportView
+         * @description One report as its reporter reads it (issue 269): what they wrote and
+         *     whether it is handled. No context, no administrator names.
+         */
+        OwnTechnicalReportView: {
+            /** Id */
+            id: number;
+            /** Reference */
+            reference: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "done";
+            /** Description */
+            description: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /**
          * PairAgreement
@@ -8360,6 +8670,8 @@ export interface components {
             username: string;
             /** Code */
             code: string;
+            /** Reason */
+            reason?: string | null;
         };
         /**
          * RepinReport
@@ -8658,6 +8970,24 @@ export interface components {
             /** Unresolved Note */
             unresolved_note?: string | null;
         };
+        /**
+         * RoundSourceText
+         * @description The earlier text version a carried round's work came from (read-only).
+         *
+         *     The same ``(old, new)`` pair the carry re-anchored with ``text_map``: the
+         *     document of the source submission, or of the frozen draft of a text
+         *     change. Only for rounds whose source is another version of the text.
+         */
+        RoundSourceText: {
+            /** Document Id */
+            document_id: string;
+            /** Language */
+            language: string;
+            /** Version */
+            version: number;
+            /** Text */
+            text: string;
+        };
         /** RoundSourceView */
         RoundSourceView: {
             /** Submission Id */
@@ -8684,14 +9014,15 @@ export interface components {
         };
         /**
          * RowChangeView
-         * @description A change of who works on a row, or how: its History line.
+         * @description A change of who works on a row, or how: its History line. A withdrawn
+         *     final result (#343) names the lead in ``from_person``.
          */
         RowChangeView: {
             /**
              * Kind
              * @enum {string}
              */
-            kind: "reassigned" | "mode_changed" | "mode_restored";
+            kind: "reassigned" | "mode_changed" | "mode_restored" | "final_withdrawn";
             /**
              * At
              * Format: date-time
@@ -8753,6 +9084,27 @@ export interface components {
             /** Active Hold Count */
             active_hold_count: number;
             reporter?: components["schemas"]["PersonRefView"] | null;
+        };
+        /**
+         * RowProposalSetView
+         * @description An imported tool proposal set on one text version (issue 337).
+         */
+        RowProposalSetView: {
+            /** Set Id */
+            set_id: number;
+            /**
+             * Imported At
+             * Format: date-time
+             */
+            imported_at: string;
+            /** Tool */
+            tool?: string | null;
+            /** Tool Version */
+            tool_version?: string | null;
+            /** Proposal Count */
+            proposal_count: number;
+            /** Newest */
+            newest: boolean;
         };
         /** RowRefView */
         RowRefView: {
@@ -9384,6 +9736,7 @@ export interface components {
              * @default []
              */
             round_input_resolutions: components["schemas"]["RoundInputResolution"][];
+            carried_from?: components["schemas"]["RoundSourceText"] | null;
         };
         /** SubmissionHistorySummary */
         SubmissionHistorySummary: {
@@ -10583,6 +10936,9 @@ export interface components {
             assigned_by?: components["schemas"]["PersonRefView"] | null;
             /** Annotation Mode */
             annotation_mode?: ("proposals" | "scratch") | null;
+            proposal_set?: components["schemas"]["RowProposalSetView"] | null;
+            /** Proposal Set Unrecorded */
+            proposal_set_unrecorded?: boolean;
             /**
              * Unreviewed Translation
              * @default false
@@ -11407,6 +11763,37 @@ export interface operations {
             };
         };
     };
+    round_source_api_v1_rounds__round_id__source_text_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                round_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoundSourceText"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     resolve_input_api_v1_workspaces__workspace_id__round_input_resolutions_post: {
         parameters: {
             query?: never;
@@ -12175,6 +12562,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TechnicalReportReceipt"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_own_reports_api_v1_me_technical_reports_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnTechnicalReportView"][];
                 };
             };
             /** @description Validation Error */
@@ -13332,6 +13751,76 @@ export interface operations {
             };
         };
     };
+    withdraw_final_api_v1_projects__key__final_selections_withdraw_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FinalWithdrawalRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinalWithdrawalView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_agreeing_api_v1_projects__key__final_selections_accept_agreeing_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptAgreeingRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptAgreeingView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     final_preflight_api_v1_projects__key__exports_final_preflight_post: {
         parameters: {
             query?: never;
@@ -13905,6 +14394,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlanRowResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_annotations_per_texts_api_v1_projects__key__texts_annotations_per_text_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnnotationsPerTextBulkSet"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnnotationsPerTextBulkResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_annotations_per_text_api_v1_projects__key__texts__case_id___language__annotations_per_text_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                case_id: string;
+                language: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnnotationsPerTextSet"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnnotationsPerTextResult"];
                 };
             };
             /** @description Validation Error */

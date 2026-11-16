@@ -188,6 +188,10 @@ While your consolidation runs, **Open consolidation** in the text card opens you
 
 Only you and the members with the **Consolidator** role are listed; the hint under the list says so and links **Settings → People**. Give the role first. See [Change a member's roles](lead-settings.md#change-a-members-roles).
 
+### "A final result was chosen for this text, so its annotation mode stays."
+
+**Change mode…** is refused while the text has a final result. Withdraw it first: **Withdraw final…** in the text card's **Finalization**, then change the mode. See [Withdraw a final result](lead-results.md#withdraw-a-final-result).
+
 ### The export asks me to tick a box
 
 Some texts still need your decision or have no final result. Either decide them in **Documents** first, or tick the box to export the ready results and leave the others out. See [Export final results](lead-results.md#export-final-results).

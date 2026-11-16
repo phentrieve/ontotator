@@ -485,3 +485,55 @@ test("PUBLISHED: My tasks link and the guidelines page", async ({ page }) => {
   await openTask(page, s, "annotate-1");
   await expectGuidelinesItem(page, "Guidelines v1");
 });
+
+test("PUBLISHED: long links, wide tables and code wrap or scroll in their own box, never the panel or the page (#410)", async ({ page, browser }) => {
+  const s = await guidelineScenario(page, "PUBLISHED");
+  await loginGuidelineUser(page, s, "lead");
+  const long = "https://example.org/" + "very-long-path-segment-without-breaks-".repeat(8) + "end";
+  const cells = (make: (index: number) => string) => `| ${Array.from({ length: 12 }, (_, index) => make(index)).join(" | ")} |`;
+  const md = ["# Wide guideline", "", `See ${long} for details.`, "", cells(index => `Column header number ${index}`), cells(() => "---"),
+    cells(index => `cell-${index}-${"x".repeat(30)}`), "", "```", "code_line_without_any_breaks_".repeat(12), "```", "",
+    `Inline \`${"inline_code_token_".repeat(10)}\` and ${"Supercalifragilistic".repeat(8)}.`, ""].join("\n");
+  const { csrf_token } = (await (await page.request.get("/api/v1/auth/me")).json()) as { csrf_token: string };
+  const response = await page.request.post(`${root(s)}/guidelines`, {
+    headers: { Origin: new URL(page.url()).origin, "X-CSRF-Token": csrf_token },
+    multipart: { file: { name: "wide.md", mimeType: "text/markdown", buffer: Buffer.from(md) }, change_note: "Wide", expected_latest_version: "1" },
+  });
+  expect(response.ok(), await response.text()).toBeTruthy();
+  /** The guideline text fits its reader; the reader's scroll box and the page do not scroll sideways. */
+  const fits = async (target: Page) => {
+    const geometry = await target.evaluate(() => {
+      const documentBox = document.querySelector(".guideline-document")!, reader = document.querySelector(".guideline-reader")!;
+      let box: Element | null = reader;
+      while (box && getComputedStyle(box).overflowX === "visible") box = box.parentElement;
+      const page = document.scrollingElement!;
+      return { document: documentBox.getBoundingClientRect().width, reader: reader.clientWidth, readerScroll: reader.scrollWidth,
+        box: box ? box.scrollWidth - box.clientWidth : 0, page: page.scrollWidth - page.clientWidth, right: documentBox.getBoundingClientRect().right, viewport: innerWidth };
+    });
+    expect(geometry.document).toBeLessThanOrEqual(geometry.reader + 1);
+    expect(geometry.readerScroll).toBeLessThanOrEqual(geometry.reader + 1);
+    expect(geometry.box).toBeLessThanOrEqual(1);
+    expect(geometry.page).toBeLessThanOrEqual(0);
+    expect(geometry.right).toBeLessThanOrEqual(geometry.viewport);
+  };
+  for (const width of [1024, 390]) {
+    await page.setViewportSize({ width, height: 800 });
+    await visit(page, `/#/projects/${encodeURIComponent(s.project)}/guidelines`);
+    await expect(page.getByRole("heading", { name: "Wide guideline" })).toBeVisible();
+    await fits(page);
+  }
+  // Ben's translation review: the guidelines drawer beside the review.
+  const ben = await actor(browser, s, "ben");
+  for (const width of [1280, 390]) {
+    await ben.page.setViewportSize({ width, height: 800 });
+    await visit(ben.page, `/#/tasks/${s.assignments["review-de"]}`);
+    await expect(ben.page.getByRole("textbox", { name: "Translation (de)", exact: true })).toBeVisible();
+    await guidelinesButton(ben.page, 2).click();
+    await expect(ben.page.getByRole("heading", { name: "Wide guideline" })).toBeVisible();
+    await fits(ben.page);
+    // The long link wraps; the wide table scrolls in its own box.
+    const scroller = ben.page.locator(".guideline-table-scroll");
+    expect(await scroller.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
+  }
+  await ben.close();
+});

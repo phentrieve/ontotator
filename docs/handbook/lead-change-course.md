@@ -6,7 +6,7 @@ What stays fixed in every case:
 
 - Texts cannot be deleted. A text you no longer want stays in the project; you take it out of the plan ([Narrow the scope](#narrow-the-scope)).
 - A submission never changes. New work is a new round or a new submission; the earlier one stays in the history.
-- A final result can be replaced with **Change final…**, never withdrawn. While a text has a final result, its annotation mode cannot be changed.
+- A final result can be replaced with **Change final…** or withdrawn with **Withdraw final…** ([Withdraw a final result](lead-results.md#withdraw-a-final-result)). While a text has a final result, its annotation mode cannot be changed.
 - There is no pause button for texts. A task is paused only by a problem report ([Decide on a problem report](lead-results.md#decide-on-a-problem-report)).
 
 ## Use another translation of a text
@@ -69,16 +69,19 @@ An empty start is possible only before the first submission (**Start empty round
 
 A proposal set you import later is used only by annotation rounds that start after the import, for example for a new assignment of a text planned **Annotate from proposals**. A task keeps the proposals its round started with, also after **Reopen…** or a new round from a submission. Only a restart agreed on a problem report (**Agree clean restart…**) starts it again on the newest proposals.
 
+The text card shows which set a text's tasks work on: **Annotation** names it, for example *Proposals set 2026-10-02 (phentrieve 1.4), 24 proposals*, and adds *Newer set available: 2026-11-10* once a newer set of the text is imported. The note stays until every task of the text works on the newest set; until then the line names the older set still in use, and a person who is already on the newest set, or will start on it, has *newest set* in their row. Tasks that started before Ontotator recorded sets show *set not recorded*. The card offers no restart button yet.
+
 1. Import the new proposals in an Ontospan bundle ([Upload texts](lead-documents.md#upload-texts)). Only sets of kind `tool_output`, made entirely by tools, can be imported.
 2. For a text without assignments, assign it: it starts from the newest proposals.
 3. For one task already under way, its annotator can [report a text problem](annotator.md#report-a-text-problem) and you choose **Agree clean restart…** ([Decide on a problem report](lead-results.md#decide-on-a-problem-report)). The task starts a new round on the newest proposals; the earlier rounds stay in the history. Other people's tasks on the text keep their proposals.
+   Without a report, restart the task through the API or the MCP server: `POST /api/v1/assignments/{id}/rounds` with `kind` `clean_restart` and a `reason` (scope `project-admin`), or the MCP tool `start_new_round` with `kind` `clean_restart`, a `reason` and, after its dry run, `confirm`. The task ID is in the text card's **Details**. The current round and its draft are dropped; submitted work stays in the history. Afterwards the card names the newest set and *Newer set available* is gone once every task of the text is on it.
 4. To restart the whole text instead: open the text card, click **Annotation** and click **Change mode…**. Enter the **Reason** and click **Discard work and change mode** (or **Change mode**). The text is now from scratch, and the work on the whole text is discarded, submitted work included; the assignments are removed ([Change the annotation mode of one text](lead-documents.md#change-the-annotation-mode-of-one-text)). Then choose **From proposals** under **Annotation** and assign the text again.
 
-For a text with a final result this is not possible: **Change mode…** is refused with *A final result was chosen for this text, so its annotation mode stays.*
+For a text with a final result this is not possible: **Change mode…** is refused with *A final result was chosen for this text, so its annotation mode stays.* (error code `ANNOTATION_MODE_FINAL_SELECTED`). Withdraw the final result first ([Withdraw a final result](lead-results.md#withdraw-a-final-result)), or, to annotate such a text again without discarding work, add annotators as in [More annotators on finished texts](#more-annotators-on-finished-texts).
 
 ### More annotators on finished texts
 
-1. Raise the limit: **Settings**, tab **Workflow**, **Annotators per text** ([Set annotators per text and the consolidation rules](lead-settings.md#set-annotators-per-text-and-the-consolidation-rules)).
+1. Raise the limit: **Settings**, tab **Workflow**, **Annotators per text** ([Set annotators per text and the consolidation rules](lead-settings.md#set-annotators-per-text-and-the-consolidation-rules)). For a few texts only, give them their own limit in the assign dialog instead: the info button (i), **Only for the selected text** ([Assign work for one text](lead-documents.md#assign-work-for-one-text)); the API and MCP do the same (`PUT /api/v1/projects/{key}/texts/{case}/{language}/annotations-per-text`, MCP `set_annotations_per_text`).
 2. For texts without a final result, assign as usual: select them and click **Assign annotation…**.
 3. Texts with a final result are left out of the assign dialog, for one text as for many: it says *This text is at another step of the plan.* Only the command line or the API add an annotator to such a text ([On the command line](#on-the-command-line)).
 4. When their submissions arrive, the row asks you to confirm the final result. To use another result, click **Change final…** and **Use as final** ([Change a final result](lead-results.md#change-a-final-result)), or start a consolidation.

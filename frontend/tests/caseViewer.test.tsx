@@ -154,7 +154,11 @@ it('opens independent comparison alongside the actual viewer without replacing l
   expect(toolbar.closest('.comparison-reading')).toBe(mounted.container.querySelector('.comparison-reading'));
   expect(toolbar.closest('.compare-pane')).toBeNull();
   expect(within(toolbar).getByRole('checkbox', { name: 'Couple scrolling' })).toBeTruthy();
-  expect(within(screen.getByRole('group', { name: 'Text view' })).getAllByRole('combobox')).toHaveLength(2);
+  // Symmetric panes (#412): the current text's selects leave the toolbar for a group above the current text.
+  expect(within(screen.getByRole('group', { name: 'Text view' })).queryAllByRole('combobox')).toHaveLength(0);
+  const leftIdentity = screen.getByRole('group', { name: 'Current text identity' });
+  expect(within(leftIdentity).getByRole('heading', { name: 'Current text' })).toBeTruthy();
+  expect(within(leftIdentity).getAllByRole('combobox')).toHaveLength(2);
   expect(within(rightIdentity).getAllByRole('combobox')).toHaveLength(2);
   expect(mounted.container.querySelector('.variant-selectors')).toBeNull();
   expect(mounted.container.querySelector('.text-container')).toBe(left);
@@ -163,6 +167,7 @@ it('opens independent comparison alongside the actual viewer without replacing l
   fireEvent.click(screen.getByRole('button', { name: 'Close comparison' }));
   expect(mounted.container.querySelector('.text-container')).toBe(left);
   expect(document.activeElement).toBe(compare);
+  expect(within(screen.getByRole('group', { name: 'Text view' })).getAllByRole('combobox')).toHaveLength(2);
   vi.unstubAllGlobals();
 });
 

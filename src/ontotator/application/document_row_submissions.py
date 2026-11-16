@@ -22,6 +22,7 @@ from ontotator.domain import document_rows as rules
 from ontotator.domain.errors import DomainError
 from ontotator.domain.submission_labels import round_ordinals, submission_kind
 from ontotator.packages.models import PackageManifest
+from ontotator.storage.final_tables import FinalSelectionEventRow
 from ontotator.storage.guidelines import guideline_facts
 from ontotator.storage.live_submissions import live_submission
 from ontotator.storage.mode_change_tables import AnnotationModeChangeRow
@@ -441,7 +442,8 @@ def _row_changes(
     language: str,
     viewer_user_id: int,
 ) -> list[dict[str, Any]]:
-    """Reassignments and mode changes of the row, oldest first."""
+    """Reassignments, mode changes and withdrawn final results (#343) of the
+    row, oldest first."""
     reassigned = conn.execute(
         select(
             AuditEventRow.at,
@@ -475,9 +477,22 @@ def _row_changes(
             AnnotationModeChangeRow.language == language,
         )
     ).all()
+    payload = FinalSelectionEventRow.payload
+    withdrawals = conn.execute(
+        select(FinalSelectionEventRow.created_at, payload).where(
+            FinalSelectionEventRow.project_id == pid,
+            payload["case_id"].astext == case_id,
+            payload["language"].astext == language,
+            payload["withdrawn"].as_boolean().is_(True),
+        )
+    ).all()
     people = person_refs(
         conn,
-        {*(row.user_id for row in reassigned), *replacements.values()},
+        {
+            *(row.user_id for row in reassigned),
+            *replacements.values(),
+            *(row.payload["actor_id"] for row in withdrawals),
+        },
         viewer_id=viewer_user_id,
         viewer_is_lead=True,
     )
@@ -512,6 +527,15 @@ def _row_changes(
                     "to_mode": row.from_mode,
                 }
             )
+    changes.extend(
+        {
+            "kind": "final_withdrawn",
+            "at": row.created_at,
+            "from_person": people[row.payload["actor_id"]].model_dump(),
+            "reason": row.payload["reason"],
+        }
+        for row in withdrawals
+    )
     return sorted(changes, key=lambda change: change["at"])
 
 

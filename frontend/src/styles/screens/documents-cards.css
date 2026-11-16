@@ -66,3 +66,6 @@
   .documents-details-button { color: LinkText; }
   .document-card--active { border-color: Highlight; }
 }
+
+/* "Withdraw final…" (issue 343): the consequences as a bulleted list above the Reason. */
+.withdraw-final-consequences { list-style: disc; padding-inline-start: var(--space-5); margin: 0 0 var(--space-4); display: grid; gap: var(--space-1); }

@@ -86,12 +86,17 @@ export function memberReason(member: Pick<BatchPersonView, "unavailable" | "alre
 export const memberUnavailable = (member: Pick<BatchPersonView, "unavailable">): boolean => member.unavailable === "role_missing" || member.unavailable === "inactive";
 
 /** Targets that already hold some of their assignments: "case-0101, de: 1 of 2 assigned". */
-export function partlyAssignedLines(targets: readonly { case_id: string; language: string; remaining: number }[], perText: number): string[] {
-  const partial = targets.filter(target => target.remaining > 0 && target.remaining < perText);
-  if (partial.length <= 3) return partial.map(target => `${textLabel(target)}: ${perText - target.remaining} assigned (limit ${perText})`);
-  const groups = new Map<number, number>();
-  for (const target of partial) groups.set(perText - target.remaining, (groups.get(perText - target.remaining) ?? 0) + 1);
-  return [...groups].sort(([a], [b]) => a - b).map(([assigned, n]) => `${n} versions: ${assigned} assigned (limit ${perText})`);
+/** Texts that already have some annotators; a text's own limit (issue 422) wins over `perText`. */
+export function partlyAssignedLines(targets: readonly { case_id: string; language: string; remaining: number; per_text?: number }[], perText: number): string[] {
+  const limitOf = (target: { per_text?: number }) => target.per_text ?? perText;
+  const partial = targets.filter(target => target.remaining > 0 && target.remaining < limitOf(target));
+  if (partial.length <= 3) return partial.map(target => `${textLabel(target)}: ${limitOf(target) - target.remaining} assigned (limit ${limitOf(target)})`);
+  const groups = new Map<string, { assigned: number; limit: number; n: number }>();
+  for (const target of partial) {
+    const limit = limitOf(target), assigned = limit - target.remaining, key = `${assigned}/${limit}`;
+    groups.set(key, { assigned, limit, n: (groups.get(key)?.n ?? 0) + 1 });
+  }
+  return [...groups.values()].sort((a, b) => a.assigned - b.assigned || a.limit - b.limit).map(({ assigned, limit, n }) => `${n} versions: ${assigned} assigned (limit ${limit})`);
 }
 
 const joinNames = (names: readonly string[]): string => names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;

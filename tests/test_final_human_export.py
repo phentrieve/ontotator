@@ -255,9 +255,10 @@ _VOLATILE = [
 # proposals.csv. #303 added related_term_conflicts to agreement.csv and its
 # line to README.txt. #338 added the (here empty) "planned_out" record to
 # receipt.json and the "Taken out of the work plan" count and section to
-# README.txt.
+# README.txt. #417 said that copied proposals count for the original tool;
+# #389 explained mode_a, mode_b and the mode rows of agreement-summary.csv.
 CARRY_FORWARD_DIGEST = (
-    "39f2b51ee3a05895d736942542ed3ddbf4b830d4de7c1a6b93bcce63978d1195"
+    "82e33e503421feacca892abce1dd9687c984f1b0e078d618715ff42de3800394"
 )
 
 

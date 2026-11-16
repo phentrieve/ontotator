@@ -345,3 +345,59 @@ def test_anonymising_the_reporter_keeps_the_report_but_drops_the_browser(app):
     [item] = admin.get(ADMIN).json()
     assert item["reporter_username"] == erased.username
     assert item["reporter"]["pseudonym"] == erased.pseudonym
+
+
+MINE = "/api/v1/me/technical-reports"
+OWN_FIELDS = {"id", "reference", "status", "description", "created_at"}
+
+
+def test_a_user_lists_only_their_own_reports(app):
+    """Issue 269: alice sees what she sent, never what bob sent."""
+    alice = logged_in(app, "alice")
+    bob = logged_in(app, "bob")
+    first = alice.post(URL, json=_body("a1")).json()
+    theirs = bob.post(
+        URL, json={**_body("b1"), "description": "A private text of bob"}
+    ).json()
+    second = alice.post(
+        URL, json={**_body("a2"), "description": "The tree does not load."}
+    ).json()
+
+    mine = alice.get(MINE)
+    assert mine.status_code == 200, mine.text
+    assert [item["reference"] for item in mine.json()] == [
+        second["reference"],
+        first["reference"],
+    ]
+    assert mine.json()[0]["description"] == "The tree does not load."
+    assert all(item["status"] == "open" for item in mine.json())
+    assert "A private text of bob" not in mine.text
+    assert [item["reference"] for item in bob.get(MINE).json()] == [theirs["reference"]]
+    assert logged_in(app, "carol").get(MINE).json() == []
+
+
+def test_own_reports_show_the_status_but_no_admin_fields(app):
+    alice = logged_in(app, "alice")
+    receipt = alice.post(
+        URL,
+        json=_body(route="#/tasks/1", crash_message="Cannot read x"),
+        headers={"User-Agent": "TestBrowser/1.0"},
+    ).json()
+    admin = logged_in(app, "root", system_admin=True)
+    admin.post(f"{ADMIN}/{receipt['id']}/status", json={"status": "done"})
+
+    [item] = alice.get(MINE).json()
+    assert set(item) == OWN_FIELDS
+    assert item["status"] == "done"
+    # An administrator's own list holds only the reports they sent.
+    assert admin.get(MINE).json() == []
+
+
+def test_own_reports_are_paged_and_need_a_session(app):
+    alice = logged_in(app, "alice")
+    for index in range(3):
+        alice.post(URL, json=_body(f"r{index}"))
+    assert len(alice.get(f"{MINE}?limit=2").json()) == 2
+    assert len(alice.get(f"{MINE}?limit=2&offset=2").json()) == 1
+    assert alice.get(f"{MINE}?limit=0").status_code == 422
+    assert TestClient(app).get(MINE).status_code in {401, 403}

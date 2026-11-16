@@ -69,6 +69,7 @@ from ontotator.storage.tables import (
     ProjectRow,
     TranslationReviewDraftRow,
 )
+from ontotator.storage.text_settings import per_text_overrides
 from ontotator.storage.workflow_tables import WorkRoundStateRow
 
 BulkAction = Literal["reopen", "withdraw"]
@@ -327,7 +328,9 @@ class BulkTaskActionService:
                     kept.append((item, why))
         else:
             keep_ids = (
-                self._within_limit(project, assignments) if o.over_limit_only else set()
+                self._within_limit(conn, project, assignments)
+                if o.over_limit_only
+                else set()
             )
             for item in assignments:
                 # Above the limit: annotations only.
@@ -411,10 +414,12 @@ class BulkTaskActionService:
 
     @staticmethod
     def _within_limit(
-        project: RowMapping, assignments: Iterable[RowMapping]
+        conn: Connection, project: RowMapping, assignments: Iterable[RowMapping]
     ) -> set[int]:
         """Annotate assignments within "annotators per text" of their version
-        (the limit of each text from ``effective_annotation_limit``)."""
+        (the limit of each text from ``effective_annotation_limit``: its own
+        value where it has one, else the project's)."""
+        overrides = per_text_overrides(conn, int(project["id"]))
         by_document: dict[str, list[RowMapping]] = {}
         for item in assignments:
             if item["task"] == "annotate":
@@ -425,6 +430,7 @@ class BulkTaskActionService:
             for item in sorted(items, key=_rank)[
                 : effective_annotation_limit(
                     int(project["annotations_per_text"]),
+                    overrides,
                     items[0]["case_id"],
                     items[0]["language"],
                 )

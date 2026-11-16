@@ -107,6 +107,22 @@ def test_a_file_that_is_no_ontology_is_refused(tmp_path: Path) -> None:
     assert _store(db).list() == []
 
 
+@pytest.mark.parametrize(
+    "data",
+    [b"[1]", b'{"graphs":[1]}', b"[" * 200_000],
+    ids=["top-level-list", "graph-not-object", "deep-nesting"],
+)
+def test_malformed_ontology_json_is_refused_as_invalid(
+    tmp_path: Path, data: bytes
+) -> None:
+    """Wrong JSON shapes and too deep nesting are INVALID_ONTOLOGY, not a 500 (#397)."""
+    db = _db(tmp_path)
+    with pytest.raises(DomainError) as excinfo:
+        _store(db).add(Actor.cli(), "broken.json", data)
+    assert excinfo.value.code == "INVALID_ONTOLOGY"
+    assert _store(db).list() == []
+
+
 def test_a_translation_needs_its_naming(tmp_path: Path) -> None:
     db = _db(tmp_path)
     store = _store(db)

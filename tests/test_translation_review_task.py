@@ -900,7 +900,12 @@ def test_context_confirmation_materializes_inventory_once_for_all_new_rows(
         assert response.status_code == 200, response.text
         assert [row["document_id"] for row in response.json()["created"]] == selected
         assert response.json()["refused"] == [
-            {"document_id": SOURCE, "username": "unknown", "code": "USER_NOT_FOUND"}
+            {
+                "document_id": SOURCE,
+                "username": "unknown",
+                "code": "USER_NOT_FOUND",
+                "reason": None,
+            }
         ]
     finally:
         event.remove(env.db.engine, "after_cursor_execute", capture)
