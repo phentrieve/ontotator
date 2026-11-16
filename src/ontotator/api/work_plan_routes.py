@@ -375,6 +375,80 @@ def patch_work_plan(
     return _service(request, key, principal).patch_row(key, case_id, language, body)
 
 
+class AnnotationsPerTextSet(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # The text's own "Annotations per text"; None follows the project value.
+    value: int | None = Field(ge=1, le=5)
+    reason: str | None = Field(default=None, max_length=2000)
+
+
+class AnnotationsPerTextResult(BaseModel):
+    case_id: str
+    language: str
+    # The text's own value; None: it follows the project value.
+    override: int | None
+    project_value: int
+    # What the text gets: ``override`` if set, else ``project_value``.
+    effective: int
+    # False when the text already had this value (nothing written).
+    changed: bool
+
+
+class AnnotationsPerTextBulkSet(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    texts: list[RowRefView] = Field(min_length=1, max_length=MAX_SELECTED_ROWS)
+    # The texts' own "Annotations per text"; None follows the project value.
+    value: int | None = Field(ge=1, le=5)
+    reason: str | None = Field(default=None, max_length=2000)
+
+
+class AnnotationsPerTextBulkResult(BaseModel):
+    texts: list[AnnotationsPerTextResult]
+
+
+# Before the single-text route: its case ID is a path.
+@router.put("/texts/annotations-per-text", response_model=AnnotationsPerTextBulkResult)
+def set_annotations_per_texts(
+    key: str,
+    body: AnnotationsPerTextBulkSet,
+    principal: PrincipalDep,
+    request: Request,
+) -> dict[str, Any]:
+    """Several texts' own "Annotations per text" at once (issue 422).
+
+    All or nothing: one unknown text refuses the request. Each text is
+    compared with its own value; texts that already have it are unchanged.
+    """
+    return _service(request, key, principal).set_annotations_per_texts(
+        key,
+        [RowKey(row.case_id, row.language) for row in body.texts],
+        body.value,
+        body.reason,
+    )
+
+
+@router.put(
+    "/texts/{case_id:path}/{language}/annotations-per-text",
+    response_model=AnnotationsPerTextResult,
+)
+def set_annotations_per_text(
+    key: str,
+    case_id: str,
+    language: str,
+    body: AnnotationsPerTextSet,
+    principal: PrincipalDep,
+    request: Request,
+) -> dict[str, Any]:
+    """One text's own "Annotations per text", target and limit (issue 422).
+
+    Idempotent; ``value: null`` returns the text to the project value.
+    Assignments above a lowered value stay.
+    """
+    return _service(request, key, principal).set_annotations_per_text(
+        key, case_id, language, body.value, body.reason
+    )
+
+
 @router.post("/document-rows/move-to-front", response_model=MoveToFrontResult)
 def move_to_front(
     key: str, body: MoveToFrontRequest, principal: PrincipalDep, request: Request

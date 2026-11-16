@@ -258,7 +258,16 @@ class OntologyStore:
                 )
             except DomainError:
                 raise
-            except (OntologyError, ValueError, KeyError, TypeError) as exc:
+            except (
+                OntologyError,
+                ValueError,
+                KeyError,
+                TypeError,
+                AttributeError,
+                RecursionError,
+            ) as exc:
+                # Malformed JSON (a list where an object belongs, or nesting
+                # too deep to parse) is a bad file, not a server error (#397).
                 raise DomainError(
                     "INVALID_ONTOLOGY", f"'{name}' is not an ontology: {exc}"
                 ) from exc

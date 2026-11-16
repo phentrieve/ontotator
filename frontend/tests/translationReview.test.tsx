@@ -1007,6 +1007,41 @@ it("keeps the rail footer with Submit at 1440 px and renders no pinned bar", asy
   expect(document.querySelector(".translation-pinned-bar")).toBeNull();
   expect(screen.queryByRole("region", { name: "Decision and submit" })).toBeNull();
 });
+it("collapses and resizes Your review from 1100 px and remembers both (#410)", async () => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
+  const first = setup();
+  await screen.findByRole("textbox", { name: "Translation (de)" });
+  const sep = screen.getByRole("separator", { name: "Resize review panel" });
+  expect(sep.getAttribute("aria-valuenow")).toBe("360");
+  fireEvent.keyDown(sep, { key: "ArrowLeft", shiftKey: true });
+  expect(sep.getAttribute("aria-valuenow")).toBe("424");
+  expect((document.querySelector(".translation-workspace") as HTMLElement).style.getPropertyValue("--review-panel-width")).toBe("424px");
+  fireEvent.click(screen.getByRole("button", { name: "Collapse review panel" }));
+  const expand = screen.getByRole("button", { name: "Expand review panel" });
+  expect(expand.getAttribute("aria-expanded")).toBe("false");
+  await waitFor(() => expect(document.activeElement).toBe(expand));
+  expect((document.getElementById("translation-decision-body") as HTMLElement).hidden).toBe(true);
+  expect(screen.queryByRole("separator", { name: "Resize review panel" })).toBeNull();
+  // Collapsed, the pinned bar keeps the decision and the one Submit reachable.
+  expect(screen.getAllByRole("button", { name: "Submit review…" })).toHaveLength(1);
+  expect(submitButton().closest(".translation-pinned-bar")).not.toBeNull();
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 350)); });
+  first.unmount();
+  // A new visit starts collapsed; Skip to decision opens the rail at the remembered width.
+  setup();
+  await screen.findByRole("textbox", { name: "Translation (de)" });
+  expect(screen.getByRole("button", { name: "Expand review panel" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Skip to decision" }));
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Your review" })));
+  expect(screen.getByRole("separator", { name: "Resize review panel" }).getAttribute("aria-valuenow")).toBe("424");
+  expect(submitButton().closest(".translation-decision-footer")).not.toBeNull();
+});
+it("offers no resize or collapse below 1100 px", async () => {
+  setup(undefined, false, { width: 800, listeners: new Set() });
+  await screen.findByRole("textbox", { name: "Translation (de)" });
+  expect(screen.queryByRole("separator", { name: "Resize review panel" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Collapse review panel" })).toBeNull();
+});
 it("keeps Skip to decision", async () => {
   setup(undefined, false, { width: 800, listeners: new Set() });
   await screen.findByRole("textbox", { name: "Translation (de)" });

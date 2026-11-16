@@ -124,4 +124,10 @@ describe("reassignments and mode changes", () => {
       ["annotation", "Annotation: mode changed, now annotated from scratch, The tool proposals were wrong, 10:10"],
     ]);
   });
+  it("lists a withdrawn final result with the lead and the reason (issue 343)", () => {
+    const lines = historyLines(emptyRow, [], { now, changes: [
+      { kind: "final_withdrawn", at: "2026-10-31T10:20:00", from_person: { ...anna, is_me: true }, reason: "Re-annotation" },
+    ] });
+    expect(lines.map(line => [line.stage, line.text])).toEqual([["final", "Final: withdrawn by Anna Early (ann-1, you), Re-annotation, 10:20"]]);
+  });
 });

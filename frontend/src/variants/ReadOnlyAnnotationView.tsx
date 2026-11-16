@@ -11,6 +11,7 @@ import { modifierMarks } from '../editor/modifiers';
 import type { MentionDisplay } from '../spans/adapter';
 import { Button } from '../ui';
 import { actorName } from "../editor/actorName";
+import type { ChangePassage, TextChanges } from '../translation/textDiff';
 
 export interface ReadOnlyAnnotationViewProps {
   header?: import('react').ReactNode;
@@ -20,8 +21,14 @@ export interface ReadOnlyAnnotationViewProps {
   annotations: AnnotationSnapshot[];
   evidence: AnnotationVersion['evidence'];
   labelFor: (layerId: string | undefined, termId: string) => string | null;
+  /** Display-only change marks against another version of this text (Show changes). */
+  changes?: TextChanges | null;
+  /** Changed passages against the version the work was carried from (Show changes since vN, issue 421). */
+  passages?: readonly ChangePassage[] | null;
+  passagesSince?: string;
+  currentPassage?: number;
 }
-export function ReadOnlyAnnotationView({ header, text, annotations, evidence, labelFor, onTextElement, proposalContext }: ReadOnlyAnnotationViewProps): JSX.Element {
+export function ReadOnlyAnnotationView({ header, text, annotations, evidence, labelFor, onTextElement, proposalContext, changes, passages, passagesSince, currentPassage }: ReadOnlyAnnotationViewProps): JSX.Element {
   const [selected, setSelected] = useState<string | null>(null);
   const [element,setElement] = useState<HTMLDivElement|null>(null);
   const attachElement=useCallback((value:HTMLDivElement|null)=>{setElement(value);onTextElement?.(value);},[onTextElement]);
@@ -72,7 +79,7 @@ export function ReadOnlyAnnotationView({ header, text, annotations, evidence, la
         </p>)}
       </li>)}</ul>
     </aside>}
-    <TextPane header={header} onTextElement={attachElement} contextSegments={context.contextSegments} text={text} mentions={mentions} selectedEvidenceId={selected} selectionIntent="new_mention"
+    <TextPane header={header} onTextElement={attachElement} contextSegments={context.contextSegments} changes={changes} passages={passages} passagesSince={passagesSince} currentPassage={currentPassage} text={text} mentions={mentions} selectedEvidenceId={selected} selectionIntent="new_mention"
       readOnly isAttachingMention={false} resizableEvidenceIds={[]} onPick={setSelected} onSelection={() => {}} onChangeIntent={() => {}} />
   </div>;
   return proposalContext && setId !== null ? <ProposalMetadataProvider scope={proposalContext.scope} projectKey={proposalContext.projectKey} proposals={sources}>{content}</ProposalMetadataProvider> : content;

@@ -32,6 +32,17 @@ DocumentId = Annotated[
 Confirm = Annotated[
     bool, Field(description="False: dry run, changes nothing. True: apply.")
 ]
+ExpectedRevision = Annotated[
+    int | None,
+    Field(
+        ge=0,
+        description=(
+            "The revision of the final result the dry run showed"
+            " (plan.revision; 0: none). With it the call is refused when the"
+            " final result changed since the dry run."
+        ),
+    ),
+]
 WithdrawTasks = Annotated[
     bool,
     Field(
@@ -297,15 +308,19 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
             ),
         ],
         confirm: Confirm = False,
+        expected_revision: ExpectedRevision = None,
     ) -> dict[str, Any]:
         """Choose or change the final result of one text, after a dry run.
 
-        The dry run shows the current final result, the text's submissions
-        with their agreement and the causes a confirmation acknowledges
-        (for example a corrected text). With confirm the submission becomes
-        the final result, REPLACING an earlier one; naming the current one
-        confirms it and acknowledges those causes. Refused if the final
-        result changed since the dry run.
+        The dry run shows the current final result with its revision
+        (plan.revision), the text's submissions with their agreement and
+        the causes a confirmation acknowledges (for example a corrected
+        text). With confirm the submission becomes the final result,
+        REPLACING an earlier one; naming the current one confirms it and
+        acknowledges those causes. Pass the dry run's plan.revision as
+        expected_revision: the call is then refused if the final result
+        changed since the dry run. Without it the confirm call reads the
+        final result again and replaces whatever is current.
         """
         found, _ = await rows(api, project, case=case_id, language=[language])
         row = next(
@@ -335,8 +350,10 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
         final = row.get("final")
         same = bool(final and final.get("submission_id") == submission_id)
         causes = panel.get("causes", []) if same else []
+        revision = int(final["revision"]) if final else 0
         plan = {
             "current_final": final,
+            "revision": revision,
             "chosen": chosen,
             "replaces_final": bool(final) and not same,
             "acknowledges": [
@@ -349,6 +366,12 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
             plan["note"] = "The token's owner may not accept this result."
         if not confirm:
             return {"applied": False, "plan": plan}
+        if expected_revision is not None and expected_revision != revision:
+            raise OntotatorError(
+                f"The final result of {case_id} {language} changed since the dry"
+                f" run (revision {revision}, expected {expected_revision});"
+                " nothing was changed. Check the plan of a new dry run."
+            )
         if same and not causes:
             return {"applied": False, "plan": plan, "note": "Nothing to change."}
         selected: dict[str, Any] = await api.put(
@@ -356,11 +379,82 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
             {
                 "document_id": chosen["document_id"],
                 "submission_id": submission_id,
-                "expected_revision": int(final["revision"]) if final else 0,
+                "expected_revision": revision,
                 "acknowledged_cause_ids": [c["cause_id"] for c in causes],
             },
         )
         return {"applied": True, "plan": plan, "final": selected}
+
+    @register(server, scopes=("read", "project-admin"), effect="destructive")
+    async def withdraw_final_result(
+        project: Project,
+        case_id: str,
+        language: str,
+        reason: Annotated[
+            str,
+            Field(
+                min_length=1,
+                max_length=2000,
+                description="Why, e.g. 'Re-annotation with guideline 2.3'.",
+            ),
+        ],
+        confirm: Confirm = False,
+        expected_revision: ExpectedRevision = None,
+    ) -> dict[str, Any]:
+        """Withdraw the final result of one text, after a dry run.
+
+        The text then has no final result until one is chosen again
+        (set_final_result, accept_agreeing_texts); its submissions and
+        consolidations stay, final exports already made stay as they are,
+        and change_annotation_mode is possible again. The reason is recorded
+        in the audit and the text's history. The dry run shows the final
+        result and its revision (plan.revision); confirm needs that value as
+        expected_revision and is refused if the final result changed since
+        the dry run.
+        """
+        found, _ = await rows(api, project, case=case_id, language=[language])
+        row = next(
+            (
+                r
+                for r in found
+                if r.get("case_id") == case_id and r.get("language") == language
+            ),
+            None,
+        )
+        if row is None:
+            raise OntotatorError(f"Project {project} has no text {case_id} {language}.")
+        final = row.get("final")
+        if not final:
+            raise OntotatorError(f"{case_id} {language} has no final result.")
+        plan = {
+            "current_final": final,
+            "revision": int(final["revision"]),
+            "consequences": [
+                "The text has no final result until one is chosen again.",
+                "Final exports already made stay as they are.",
+                "The annotation mode can be changed again.",
+                "Submissions and consolidations stay.",
+            ],
+        }
+        if not confirm:
+            return {"applied": False, "plan": plan}
+        if expected_revision is None:
+            raise OntotatorError(
+                "Run the dry run first and pass its plan.revision as"
+                " expected_revision with confirm."
+            )
+        # The server compares the revision: a final result that changed since
+        # the dry run is refused there (REVISION_CONFLICT), not withdrawn.
+        withdrawn: dict[str, Any] = await api.post(
+            project_path(project, "final-selections", "withdraw"),
+            {
+                "case_id": case_id,
+                "language": language,
+                "expected_revision": expected_revision,
+                "reason": reason,
+            },
+        )
+        return {"applied": True, "plan": plan, "withdrawn": withdrawn}
 
     async def _variant(project: str, document_id: str) -> dict[str, Any]:
         found: dict[str, Any] = await api.get(
@@ -378,12 +472,16 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
         reason: Annotated[str, Field(min_length=1)],
         confirm_language: bool = False,
     ) -> dict[str, Any]:
-        """Ask a translation reviewer to correct a rejected or queried translation.
+        """Ask for a new translation review of an accepted translation version.
 
-        Gives the person a translation review task on this version; an
-        earlier submitted review of theirs is reopened with the current
-        text (the submitted review stays). The correction itself is done
-        in the web interface.
+        For a correction or a second opinion of a version that is accepted,
+        however it was accepted (by a translation review, by a lead, or on
+        import); any translation reviewer, with a reason. A version that is
+        not accepted is refused (TRANSLATION_NOT_ACCEPTED). Gives the person a
+        translation review task on this version; an earlier submitted review
+        of theirs is reopened with the current text (the submitted review
+        stays). The review itself is done in the web interface. For a
+        rejected or queried translation, use start_lead_correction.
         """
         variant = await _variant(project, document_id)
         task: dict[str, Any] = await api.post(
@@ -583,6 +681,43 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
             annotations_per_text=annotations_per_text,
         )
         return preview
+
+    @register(server, scopes="project-admin", effect="changes", idempotent=True)
+    async def set_annotations_per_text(
+        project: Project,
+        case_id: str,
+        language: str,
+        annotations_per_text: Annotated[
+            int | None,
+            Field(
+                ge=1,
+                le=5,
+                description=(
+                    "The text's own number of annotators (target and limit),"
+                    " e.g. 4 for a method comparison; None returns the text to"
+                    " the project's annotations_per_text."
+                ),
+            ),
+        ],
+        reason: Annotated[str | None, Field(max_length=2000)] = None,
+    ) -> dict[str, Any]:
+        """Give one text (case + language) its own annotations per text.
+
+        It replaces the project value for that text, for every version, as
+        target and as limit; other texts keep the project value. Lowering
+        it removes nobody. Assign afterwards with assign_texts.
+        """
+        result: dict[str, Any] = await api.put(
+            project_path(
+                project,
+                "texts",
+                seg(case_id),
+                seg(language),
+                "annotations-per-text",
+            ),
+            {"value": annotations_per_text, "reason": reason},
+        )
+        return result
 
     @register(server, scopes=("read", "project-admin"), effect="destructive")
     async def move_task_to_version(

@@ -68,8 +68,11 @@ def revoke_assignments(
     now: datetime,
     *,
     reason: str | None = "membership",
+    via: str | None = None,
 ) -> None:
-    """Revoke rows and audit each, preserving submissions and drafts."""
+    """Revoke rows and audit each, preserving submissions and drafts.
+
+    ``via`` names a bulk action in the audit entries (issue 336)."""
     for assignment in assignments:
         assignment_id = int(str(assignment["id"]))
         conn.execute(
@@ -88,6 +91,7 @@ def revoke_assignments(
                 "reason": reason,
                 "document_id": assignment["document_id"],
                 "task": assignment["task"],
+                **({} if via is None else {"via": via}),
             },
             at=now,
         )

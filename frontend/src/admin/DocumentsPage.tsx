@@ -34,6 +34,7 @@ import { leadSteps, rowActionLabel, stepBlockedReason } from "../documents/nextS
 import { TranslationCorrectionAction } from "../variants/TranslationCorrectionAction";
 import { DecisionBlock } from "../documents/FinalPanel";
 import { StageActions, type StageActionsProps } from "../documents/StageActions";
+import { WithdrawFinalDialog } from "../documents/WithdrawFinalDialog";
 import { TextCard, type CardStep } from "../documents/textCard/TextCard";
 import type { CardView, SegmentId } from "../documents/textCard/cardModel";
 import { CardPlanSelect, TextPlanDialog } from "../documents/PlanSteps";
@@ -371,6 +372,8 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
       me: assignMe,
       consolidatorRule: page?.adjudicator_not_annotator ?? false,
       onClose: () => setAssignDialog(null),
+      // Issue 422: a changed limit shows in the row and the text card at once.
+      onLimitChanged: () => { void refreshAll(); },
       // The toast region announces the message; a second live region would say it twice (#47 A-25).
       // Issue 248: the toast follows the refreshed rows, so it never announces work the row does not show yet.
       onAssigned: message => { setAssignDialog(null); void refreshAll().then(() => showToast({ message })); },
@@ -381,6 +384,10 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
   const [reviewDocument, setReviewDocument] = useState<string | null>(null);
 
   const [correctionFor, setCorrectionFor] = useState<{ row: DocumentRowView; variant: VariantSummary } | null>(null);
+  /** "Withdraw final…" (issue 343): the row whose final result the dialog takes back. */
+  const [withdrawFor, setWithdrawFor] = useState<DocumentRowView | null>(null);
+  /** The row as the page shows it now (after a refused withdrawal the reload brings the new revision). */
+  const withdrawRow = withdrawFor ? pageRows.find(entry => rowKeyOf(entry) === rowKeyOf(withdrawFor)) ?? withdrawFor : null;
   // Issue 341: the lead's actions on one version row (Correct the translation…, Accept this version…).
   const [versionAction, setVersionAction] = useState<{ kind: "correct" | "accept"; row: DocumentRowView; version: DocumentVersionView } | null>(null);
   const textVersionTools = useMemo<TextVersionsTools | undefined>(() => {
@@ -563,6 +570,7 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
     setAssignDialog({
       mode: "cases", projectKey, caseIds, sort: batchSort(request.sort), filters, me: assignMe,
       onClose: () => setAssignDialog(null),
+      onLimitChanged: () => { void refreshAll(); },
       onAssigned: (message, skipped) => {
         // The planned work is done for this selection; the skipped cases stay one click away.
         setAssignDialog(null);
@@ -740,6 +748,7 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
     canRequestCorrection: row => correctionVariant(row) != null,
     onChangeFinal: row => openCard({ key: rowKeyOf(row), stage: panelStage, tab: panelTab }, { changeFinal: true, focus: true }),
     canChangeFinal: row => row.final != null && !panelStep(row) && decisionKey.current !== rowKeyOf(row),
+    onWithdrawFinal: row => setWithdrawFor(row),
   };
   // Escape inside the options closes them; a discard confirmation inside handles its own Escape first (registered later).
   useShortcut("Escape", event => {
@@ -956,6 +965,14 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
       <TranslationCorrectionAction projectKey={projectKey} variant={correctionFor.variant} username={textVersionTools.username}
         requiredLanguages={textVersionTools.requiredLanguages(correctionFor.variant.document_id)} defaultOpen inDialog />
     </Dialog>}
+    {withdrawFor && withdrawRow && <WithdrawFinalDialog projectKey={projectKey} row={withdrawRow} onCancel={() => setWithdrawFor(null)}
+      onStale={reloadAfterAction}
+      onWithdrawn={() => {
+        setWithdrawFor(null);
+        notifyFinalSelectionChanged(projectKey);
+        showToast({ message: `Final result of ${rowName(withdrawFor)} withdrawn.` });
+        reloadAfterAction();
+      }} />}
     {versionAction?.kind === "correct" && <CorrectVersionDialog row={versionAction.row} version={versionAction.version} projectKey={projectKey}
       onNavigate={route => onNavigate(route)} onClose={() => setVersionAction(null)} />}
     {versionAction?.kind === "accept" && <AcceptVersionDialog row={versionAction.row} version={versionAction.version} projectKey={projectKey}

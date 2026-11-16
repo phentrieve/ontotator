@@ -212,7 +212,7 @@ step "TypeScript API drift" npm --prefix frontend run api:check
 if [ "${#frontend_files[@]}" -gt 0 ]; then
     step "frontend related tests (${#frontend_files[@]} changed files)" \
         npm --prefix frontend run test:related -- \
-        --maxWorkers="$vitest_workers" --minWorkers=1 "${frontend_files[@]}"
+        --maxWorkers="$vitest_workers" "${frontend_files[@]}"
 fi
 
 if [ "${#backend_tests[@]}" -gt 0 ]; then

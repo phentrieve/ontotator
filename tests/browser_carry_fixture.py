@@ -18,6 +18,9 @@ Scenarios:
   it (needs-review input with a stored ``review_reason``).
 - ``rounds3``: Round 1 submitted (replaced), Round 2 continued from it,
   checked and submitted (replaced), Round 3 continued from Round 2 (open).
+- ``corrected_done``: ``corrected`` with the needs-review input dismissed and
+  Round 2 submitted on v2, and a project lead (``lead``) who opens that
+  annotation in the text view ("Show changes since v1", issue 421).
 """
 
 from __future__ import annotations
@@ -340,6 +343,38 @@ def build_rounds3(app: FastAPI) -> dict[str, Any]:
     )
 
 
+def build_corrected_done(app: FastAPI) -> dict[str, Any]:
+    from ontotator.application.work_rounds import RoundInputResolutionService
+
+    built = build_corrected(app)
+    scenario = Scenario(app, built["project"], dict(built["users"]))
+    round_id = built["rounds"]["round2"]
+    scoped = _scoped(scenario, "annotator")
+    work = scoped.get_work_round(scenario.key, round_id)
+    assert work.workspace_key is not None
+    for item in _inputs(scenario, round_id):
+        RoundInputResolutionService(scoped).resolve(
+            work.workspace_key,
+            _envelope(
+                scoped,
+                work.workspace_key,
+                {
+                    "input_id": item["input_id"],
+                    "outcome": "dismissed",
+                    "reason": "Not in the corrected text.",
+                },
+            ),
+        )
+    submission_id = finish_round(scenario, "annotator", work.workspace_key)
+    add_user(scenario, "lead", ["lead"])
+    return {
+        **built,
+        "users": dict(scenario.users),
+        "submissions": {**built["submissions"], "round2": submission_id},
+        "lead_username": scenario.users["lead"],
+    }
+
+
 Builder = Callable[[FastAPI], dict[str, Any]]
 
 SCENARIOS: dict[str, Builder] = {
@@ -347,6 +382,7 @@ SCENARIOS: dict[str, Builder] = {
     "t5span": lambda app: build_t5(app, seizure_span=True),
     "corrected": build_corrected,
     "rounds3": build_rounds3,
+    "corrected_done": build_corrected_done,
 }
 
 

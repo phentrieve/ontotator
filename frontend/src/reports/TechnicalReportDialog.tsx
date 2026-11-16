@@ -6,7 +6,7 @@ import { Dialog } from "../ui/Dialog";
 import { InlineMessage } from "../ui/InlineMessage";
 import { Textarea } from "../ui/Textarea";
 import "./reports.css";
-import { closeTechnicalReport, MAX_DESCRIPTION, reportContext, subscribeTechnicalReport, technicalReportOpen } from "./technicalReport";
+import { closeTechnicalReport, MAX_DESCRIPTION, MY_TECHNICAL_REPORTS_HREF, reportContext, SHOW_MY_TECHNICAL_REPORTS, subscribeTechnicalReport, TECHNICAL_REPORT_SENT, technicalReportOpen } from "./technicalReport";
 
 function requestId(): string {
   try { if (typeof crypto?.randomUUID === "function") return crypto.randomUUID(); } catch { /* insecure context */ }
@@ -26,7 +26,8 @@ export function contextLines(context: TechnicalReportContext): string[] {
 
 /**
  * "Report a technical problem": the user describes what happened; the app adds the context. It goes to the
- * system administrators and pauses no task. After sending, the dialog shows the reference (TR-12) to quote.
+ * system administrators and pauses no task. After sending, the dialog shows the reference (TR-12) to quote and
+ * links to Profile › My technical reports.
  * Self-contained (api client and plain ui parts only), so the crash screen can show it while the app is broken.
  */
 export function TechnicalReportDialog({ crashMessage, onClose }: { crashMessage?: string; onClose: () => void }): JSX.Element {
@@ -51,6 +52,7 @@ export function TechnicalReportDialog({ crashMessage, onClose }: { crashMessage?
     setBusy(true); setError(null); setFieldError(null);
     try {
       const sent = await api.sendTechnicalReport({ request_id: id, description: text, context });
+      try { window.dispatchEvent(new Event(TECHNICAL_REPORT_SENT)); } catch { /* the crash screen: nothing listens */ }
       if (active.current) setReceipt(sent);
     } catch (failure) {
       if (active.current) setError(failure);
@@ -59,6 +61,10 @@ export function TechnicalReportDialog({ crashMessage, onClose }: { crashMessage?
     }
   };
 
+  // Profile › My technical reports (issue 269); not from the crash screen, where the app around it is broken.
+  const mine = crashMessage === undefined;
+  // The address may be open already (no route change): the section is told to scroll into view.
+  const showMine = () => { onClose(); window.dispatchEvent(new Event(SHOW_MY_TECHNICAL_REPORTS)); };
   const footer = receipt
     ? <Button ref={close} onClick={onClose}>Close</Button>
     : <>
@@ -69,10 +75,16 @@ export function TechnicalReportDialog({ crashMessage, onClose }: { crashMessage?
     // With text typed only Cancel closes: Esc must not drop what the user wrote.
     onClose={busy || (!receipt && description.trim()) ? undefined : onClose} footer={footer}>
     {receipt ? <InlineMessage tone="success">
-      <span className="technical-report-receipt">{`Sent to the administrators. Reference: ${receipt.reference}.`}</span>
-      {" "}Quote it if you contact an administrator.
+      <span className="technical-report-receipt">{`Sent as ${receipt.reference}.`}</span>
+      {" "}It went to the system administrators; quote the reference if you contact one.
+      {mine && <>{" "}<a href={MY_TECHNICAL_REPORTS_HREF} onClick={showMine}>See my reports</a></>}
     </InlineMessage> : <>
       <p>For an error message, something that does not load, a crash or general feedback. It goes to the system administrators. Your task is not paused. For a problem with the text itself, use <strong>Report a text problem…</strong> instead.</p>
+      {mine && <p><a href={MY_TECHNICAL_REPORTS_HREF} onClick={event => {
+        // Typed text is not dropped by leaving: send or cancel first.
+        if (description.trim()) { event.preventDefault(); setFieldError("Send or cancel this report first."); textarea.current?.focus(); return; }
+        showMine();
+      }}>My reports</a>: the reports you sent and whether they are done.</p>}
       <Textarea id="technical-report-description" ref={textarea} label="What happened?" rows={6} maxLength={MAX_DESCRIPTION}
         hint="What did you do, and what did you see? Do not add patient details beyond what is needed."
         error={fieldError ?? undefined} value={description} disabled={busy}
