@@ -8,9 +8,11 @@
  * Undo toast (D22); a save that changes nothing says why instead. The summary sends the selected texts (`rows`); the
  * plan dialog edits whole cases. "Move to front" (issue 339) puts the selected texts first in the project's order,
  * so their tasks come first in My tasks, after an inline confirmation. "More actions ▾" (issue 336, decision 336-C)
- * holds the bulk actions on the texts' tasks, "Reopen…" and "Withdraw open tasks…"; an entry that does nothing for
- * the selection stays in the menu, unavailable, with its reason. Each opens `BulkTaskDialog`; after it applies, the
- * toast offers Undo while the texts stay unchanged.
+ * holds the bulk actions on the texts' tasks, "Reopen…" and "Withdraw open tasks…", and on their final results,
+ * "Accept agreeing results…" (texts without a final result; issues 354, 339) and "Change final…" (the newest
+ * submission replaces the final result; issue 336 step 2); an entry that does nothing for the selection stays in the
+ * menu, unavailable, with its reason. The task actions open `BulkTaskDialog`; after one applies, the toast offers Undo
+ * while the texts stay unchanged. The final actions open `BulkFinalDialog`; they have no Undo.
  * The bar floats at the bottom of the viewport over the content (`useFloatingBar`): its arrival never moves the
  * table; the page reserves its height as bottom padding. Its place in the DOM keeps the focus order.
  */
@@ -21,6 +23,8 @@ import { errorMessage } from "../admin/errors";
 import { plural } from "../app/labels";
 import { Button, Checkbox, IconSortDown, InlineConfirm, InlineMessage, MenuButton, type ToastMessage } from "../ui";
 import { ACTION_LABELS, appliedText, unavailableReason, type BulkAction } from "./bulkActionModel";
+import { BulkFinalDialog } from "./BulkFinalDialog";
+import { finalAppliedText, finalUnavailableReason, FINAL_ACTION_LABELS, type FinalAction, type FinalPreview } from "./bulkFinalModel";
 import { BulkTaskDialog } from "./BulkTaskDialog";
 import { PLAN_CHANGED_MESSAGE, UNDO_WITHDRAWN_NOTE, undoneToast, WITHDRAW_CHECKBOX, withdrawnSummary } from "./PlanChips";
 import { PlanDialog } from "./PlanDialog";
@@ -150,8 +154,9 @@ export function SelectionBar({
   const current = summary?.key === idsKey + filtersKey ? summary.value : null;
 
   /** Per bulk action, its broadest preview for the selection: an entry without changes is unavailable (336-C). */
-  const [reach, setReach] = useState<{ key: string; reopen: BulkTaskActionView | null; withdraw: BulkTaskActionView | null } | null>(null);
+  const [reach, setReach] = useState<{ key: string; reopen: BulkTaskActionView | null; withdraw: BulkTaskActionView | null; accept: FinalPreview | null; change: FinalPreview | null } | null>(null);
   const [bulk, setBulk] = useState<BulkAction | null>(null);
+  const [finalAction, setFinalAction] = useState<FinalAction | null>(null);
   useEffect(() => {
     if (rows.length < MIN_TEXTS) return;
     let active = true;
@@ -159,11 +164,13 @@ export function SelectionBar({
     // A newer selection aborts the requests of the older one.
     const abort = new AbortController();
     const timer = window.setTimeout(() => {
-      const quiet = (request: Promise<BulkTaskActionView>) => request.catch(() => null);
+      const quiet = <T,>(request: Promise<T>) => request.catch(() => null);
       void Promise.all([
         quiet(api.bulkReopen(projectKey, { rows, ...BROAD }, abort.signal)),
         quiet(api.bulkWithdraw(projectKey, { rows, ...BROAD, include_started: true }, abort.signal)),
-      ]).then(([reopen, withdraw]) => { if (active) setReach({ key, reopen, withdraw }); });
+        quiet(api.acceptAgreeing(projectKey, { rows, preview: true }, abort.signal).then((data): FinalPreview => ({ action: "accept", data }))),
+        quiet(api.bulkChangeFinal(projectKey, { rows, preview: true, summary_only: true }, abort.signal).then((data): FinalPreview => ({ action: "change", data }))),
+      ]).then(([reopen, withdraw, accept, change]) => { if (active) setReach({ key, reopen, withdraw, accept, change }); });
     }, SUMMARY_DELAY_MS);
     return () => { active = false; window.clearTimeout(timer); abort.abort(); };
     // The key stands for the selection.
@@ -261,6 +268,15 @@ export function SelectionBar({
     latest.current.onChanged();
   };
 
+  /** After a bulk action on final results: the message (no Undo), refetch, the selection stays. */
+  const finalApplied = (result: FinalPreview) => {
+    setFinalAction(null);
+    const message = finalAppliedText(result);
+    latest.current.onAnnounce(message);
+    latest.current.showToast({ message });
+    latest.current.onChanged();
+  };
+
   const moveToFront = () => {
     setFrontBusy(true); setError(undefined);
     api.moveToFront(projectKey, rows).then(result => {
@@ -276,7 +292,7 @@ export function SelectionBar({
 
   const visible = keys.size >= MIN_TEXTS || undoState !== null;
   useFloatingBar(section, visible);
-  if (!visible && !plan && !bulk) return null;
+  if (!visible && !plan && !bulk && !finalAction) return null;
   const withdrawing = undoState?.kind === "conflict" && undoState.consequences.withdrawn.length > 0;
 
   return <>
@@ -291,10 +307,16 @@ export function SelectionBar({
           <Button variant="primary" onClick={onAssign}>{assignButtonText(current)}</Button>
           <Button onClick={() => setPlan(caseIds)}>Plan…</Button>
           <MenuButton size="md" label="More actions" buttonLabel="More actions" content={<>More actions<IconSortDown aria-hidden="true" /></>}
-            items={(["reopen", "withdraw"] as const).map(action => {
-              const reason = unavailableReason(action, reachable?.[action]);
-              return { id: action, label: ACTION_LABELS[action], disabled: reason !== null, ...(reason ? { description: reason } : {}), onSelect: () => setBulk(action) };
-            })} />
+            items={[
+              ...(["reopen", "withdraw"] as const).map(action => {
+                const reason = unavailableReason(action, reachable?.[action]);
+                return { id: action, label: ACTION_LABELS[action], disabled: reason !== null, ...(reason ? { description: reason } : {}), onSelect: () => setBulk(action) };
+              }),
+              ...(["accept", "change"] as const).map(action => {
+                const reason = finalUnavailableReason(reachable?.[action]);
+                return { id: action, label: FINAL_ACTION_LABELS[action], disabled: reason !== null, ...(reason ? { description: reason } : {}), onSelect: () => setFinalAction(action) };
+              }),
+            ]} />
           <Button ref={frontButton} aria-expanded={front} onClick={() => setFront(value => !value)}>{MOVE_TO_FRONT}</Button>
           <Button aria-pressed={showSelected} onClick={onToggleShowSelected}>Show selected</Button>
           <Button onClick={onClear}>Clear selection</Button>
@@ -318,6 +340,7 @@ export function SelectionBar({
         </InlineConfirm>
       </div>}
     </section>}
+    {finalAction && <BulkFinalDialog projectKey={projectKey} action={finalAction} rows={rows} onClose={() => setFinalAction(null)} onApplied={finalApplied} />}
     {bulk && <BulkTaskDialog projectKey={projectKey} action={bulk} rows={rows} onClose={() => setBulk(null)} onApplied={bulkApplied} />}
     {plan && <PlanDialog projectKey={projectKey} caseIds={plan} rows={rows} onClose={() => setPlan(null)}
       onSaved={(result, message) => { setPlan(null); saved(result, message); }} />}

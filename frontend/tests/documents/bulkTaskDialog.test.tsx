@@ -28,6 +28,9 @@ const rows = ["EN100022", "EN100023", "EN100025", "EN100026", "EN100027", "EN100
 beforeEach(() => {
   vi.spyOn(api, "bulkReopen").mockResolvedValue(reopenPreview());
   vi.spyOn(api, "bulkWithdraw").mockResolvedValue(reopenPreview({ action: "withdraw", changes: [], kept: [], skipped: [] }));
+  // The final actions of the same menu (bulkFinalDialog.test.tsx) are not asked here.
+  vi.spyOn(api, "acceptAgreeing").mockRejectedValue(new Error("not asked"));
+  vi.spyOn(api, "bulkChangeFinal").mockRejectedValue(new Error("not asked"));
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
@@ -135,7 +138,7 @@ it("More actions lists Reopen… and Withdraw open tasks…, applies and offers 
   fireEvent.click(screen.getByRole("button", { name: "More actions" }));
   const menu = screen.getByRole("menu", { name: "More actions" });
   const items = within(menu).getAllByRole("menuitem");
-  expect(items.map(item => item.textContent)).toEqual(["Reopen…", "Withdraw open tasks…No open tasks in the selected texts."]);
+  expect(items.map(item => item.textContent)).toEqual(["Reopen…", "Withdraw open tasks…No open tasks in the selected texts.", "Accept agreeing results…", "Change final…"]);
   expect(items[1].getAttribute("aria-disabled")).toBe("true");
   expect(items[0].getAttribute("aria-disabled")).toBeNull();
   fireEvent.click(items[0]);

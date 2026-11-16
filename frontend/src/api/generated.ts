@@ -1418,6 +1418,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{key}/final-selections/bulk-change": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk Change Final
+         * @description Change the final result of many texts by a rule (issue 336).
+         *
+         *     Rule ``newest_submission``: each selected text that has a final result
+         *     gets its newest submission instead (of the submissions the final panel
+         *     offers on the current version), when that one was submitted after the
+         *     final result was chosen and is a consolidation, the text's only
+         *     submission, or an annotation that agrees in full with the text's other
+         *     submissions (the rule of ``accept-agreeing``). ``preview: true`` lists
+         *     the texts that would change, with the result each one gets, the texts
+         *     skipped and why (no final result, open work, nothing submitted, already
+         *     the newest, nothing submitted since the final was chosen, your own
+         *     result where the project forbids it, submissions that differ) and a
+         *     ``preview_token``.
+         *     Applying sends that token: every listed text changes, or none (409
+         *     ``PREVIEW_STALE`` with a fresh ``preview`` in the details when anything
+         *     changed, also a final result changed meanwhile). Each text is audited
+         *     like a single change (``via: bulk_change_final``). There is no undo.
+         */
+        post: operations["bulk_change_final_api_v1_projects__key__final_selections_bulk_change_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{key}/exports/final/preflight": {
         parameters: {
             query?: never;
@@ -3444,6 +3480,8 @@ export interface components {
             preview_token?: string | null;
             /** Case Ids */
             case_ids?: string[] | null;
+            /** Rows */
+            rows?: components["schemas"]["RowRefView"][] | null;
         };
         /** AcceptAgreeingView */
         AcceptAgreeingView: {
@@ -3457,6 +3495,8 @@ export interface components {
             skipped: components["schemas"]["AgreeingSkip"][];
             /** Already Final */
             already_final: number;
+            /** Already Final Rows */
+            already_final_rows?: components["schemas"]["RowRefView"][];
             /** Unknown Case Ids */
             unknown_case_ids?: string[];
             /** Preview Token */
@@ -4604,6 +4644,55 @@ export interface components {
             languages: string[];
             /** Reason */
             reason: string;
+        };
+        /**
+         * BulkChangeFinalRequest
+         * @description Preview (``preview``) or apply (``preview_token``) bulk Change final…
+         *     for the selected texts (issue 336).
+         */
+        BulkChangeFinalRequest: {
+            /** Rows */
+            rows: components["schemas"]["RowRefView"][];
+            /**
+             * Rule
+             * @default newest_submission
+             * @constant
+             */
+            rule: "newest_submission";
+            /** Preview */
+            preview?: boolean;
+            /** Summary Only */
+            summary_only?: boolean;
+            /** Preview Token */
+            preview_token?: string | null;
+        };
+        /** BulkChangeFinalView */
+        BulkChangeFinalView: {
+            /** Project */
+            project: string;
+            /**
+             * Rule
+             * @constant
+             */
+            rule: "newest_submission";
+            /** Applied */
+            applied: boolean;
+            /** Texts */
+            texts: number;
+            /** Change Count */
+            change_count: number;
+            /** Skipped Count */
+            skipped_count: number;
+            /** Skipped By Reason */
+            skipped_by_reason: {
+                [key: string]: number;
+            };
+            /** Changes */
+            changes: components["schemas"]["FinalChange"][];
+            /** Skipped */
+            skipped: components["schemas"]["FinalChangeSkip"][];
+            /** Preview Token */
+            preview_token: string;
         };
         /** BulkKeptTaskView */
         BulkKeptTaskView: {
@@ -6065,6 +6154,49 @@ export interface components {
              * @enum {string}
              */
             kind: "t1" | "edit_log" | "work_time";
+        };
+        /** FinalChange */
+        FinalChange: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Expected Revision */
+            expected_revision: number;
+            /** From Document Id */
+            from_document_id: string;
+            /** From Submission Id */
+            from_submission_id: string;
+            /** From Version */
+            from_version?: number | null;
+            /** Document Id */
+            document_id: string;
+            /** Submission Id */
+            submission_id: string;
+            /** Version */
+            version: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "annotation" | "consolidation";
+            person?: components["schemas"]["PersonRefView"] | null;
+            /** Eligible Submissions */
+            eligible_submissions: number;
+        };
+        /** FinalChangeSkip */
+        FinalChangeSkip: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "no_final" | "open_task" | "nothing_submitted" | "already_newest" | "not_newer" | "own_result" | "differ";
+            /** Message */
+            message: string;
         };
         /** FinalExportRequest */
         FinalExportRequest: {
@@ -13925,6 +14057,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AcceptAgreeingView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_change_final_api_v1_projects__key__final_selections_bulk_change_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkChangeFinalRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkChangeFinalView"];
                 };
             };
             /** @description Validation Error */

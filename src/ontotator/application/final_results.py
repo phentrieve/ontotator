@@ -1,5 +1,6 @@
 """Lead-selected immutable results and transactional final export preflight."""
 
+from collections import Counter
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -16,6 +17,7 @@ from ontotator.application.final_causes import (
     authorize_final_results,
     derive_final_state,
 )
+from ontotator.application.people import person_refs
 from ontotator.application.translation_reviews import TranslationReviewRecord
 from ontotator.application.workflow_warnings import state_digest
 from ontotator.auth.audit import Actor, record_audit
@@ -119,6 +121,21 @@ AGREEING_SKIPS = {
     # does not let them accept their own work.
     "differ": "No result you may accept agrees in full; consolidate or choose"
     " on Documents.",
+}
+
+
+# Why bulk Change final… leaves a text as it is (issue 336, step 2), with the
+# words the dialog and the MCP tool show.
+CHANGE_SKIPS = {
+    "no_final": "No final result yet: use Accept agreeing results… or choose"
+    " one in the text card.",
+    "open_task": "Other work on the text is still open.",
+    "nothing_submitted": "Nothing is submitted on the current version of the text.",
+    "already_newest": "The final result is already the newest submission.",
+    "not_newer": "Nothing was submitted since the final result was chosen.",
+    "own_result": "The newest submission is your own; in this project another"
+    " lead must choose it.",
+    "differ": "The submissions differ: compare or consolidate first.",
 }
 
 
@@ -387,7 +404,12 @@ class FinalResultService:
             }
 
     def _agreeing(
-        self, conn: Connection, key: str, pid: int, case_ids: list[str] | None
+        self,
+        conn: Connection,
+        key: str,
+        pid: int,
+        case_ids: list[str] | None,
+        rows: list[RowKey] | None = None,
     ) -> dict[str, Any]:
         """Which texts accept_agreeing would make final now (#354).
 
@@ -398,8 +420,11 @@ class FinalResultService:
         the caller may accept. Every text of the scope is in exactly one of
         ``texts``, ``skipped`` (with the reason) and ``already_final`` (only
         counted: Change final… changes them); ``case_ids`` the project does
-        not have are named in ``unknown_case_ids``. The submissions are read
-        in a fixed number of statements, whatever the number of texts.
+        not have are named in ``unknown_case_ids``. ``rows`` instead limits
+        the scope to exactly these texts (the Documents selection, issue
+        336) and names the ones that already have a final result in
+        ``already_final_rows``. The submissions are read in a fixed number
+        of statements, whatever the number of texts.
         """
         assert self.actor.user_id is not None
         facts = load_facts(conn, self.repo, key, pid, self.actor.user_id, scope="panel")
@@ -410,17 +435,23 @@ class FinalResultService:
             if wanted is None
             else sorted(wanted - {case_id for case_id, _ in ctx.by_row})
         )
+        selected = None if rows is None else {(r.case_id, r.language) for r in rows}
         skipped: list[dict[str, Any]] = []
         candidates: list[tuple[str, str]] = []
         already_final = 0
+        final_rows: list[dict[str, str]] = []
         for case_id, language in sorted(ctx.by_row):
             if wanted is not None and case_id not in wanted:
                 continue
+            if selected is not None and (case_id, language) not in selected:
+                continue
             row = build_row(facts, case_id, language, ctx=ctx)
+            ref = {"case_id": case_id, "language": language}
             if row["final"] is not None:
                 already_final += 1
+                if selected is not None:
+                    final_rows.append(ref)
                 continue
-            ref = {"case_id": case_id, "language": language}
             open_work = any(
                 item["status"] != "submitted" and item.get("moved_to_version") is None
                 for item in row["work"]
@@ -452,12 +483,15 @@ class FinalResultService:
                 "already_final": already_final,
                 "case_ids": None if case_ids is None else sorted(set(case_ids)),
             }
+            # Without a selection the digest is the one of issue 354.
+            | ({} if selected is None else {"rows": sorted(selected)})
         )
         return {
             "project": key,
             "texts": texts,
             "skipped": skipped,
             "already_final": already_final,
+            "already_final_rows": final_rows,
             "unknown_case_ids": unknown,
             "preview_token": f"sha256:{digest}",
         }
@@ -469,9 +503,10 @@ class FinalResultService:
         preview: bool,
         preview_token: str | None,
         case_ids: list[str] | None,
+        rows: list[RowKey] | None = None,
     ) -> dict[str, Any]:
         """Preview, or apply all or nothing, the acceptance of every agreeing
-        text (#354). Apply recomputes the preview under the exclusive project
+        text (#354), of ``case_ids`` or of the selected ``rows``. Apply recomputes the preview under the exclusive project
         lock; a token that no longer matches is refused with
         ``PREVIEW_STALE`` and the fresh preview, so preview and apply give
         the same set. Each text is selected and audited like the single PUT
@@ -482,25 +517,14 @@ class FinalResultService:
             )
         with self.db.transaction() as conn:
             pid = self._authorize(conn, key, exclusive=not preview)
-            found = self._agreeing(conn, key, pid, case_ids)
+            found = self._agreeing(conn, key, pid, case_ids, rows)
             if preview:
                 return found | {"applied": False}
             if preview_token != found["preview_token"]:
                 raise DomainError(
                     "PREVIEW_STALE", {"preview": found | {"applied": False}}
                 )
-            bulk = _Bulk(
-                via="accept_agreeing",
-                rule=bool(
-                    conn.execute(
-                        select(ProjectRow.adjudicator_not_annotator).where(
-                            ProjectRow.id == pid
-                        )
-                    ).scalar_one()
-                ),
-                selected_by=_pseudonym(conn, self.actor.user_id),
-                withdrawn=_withdrawn_revisions(conn, pid),
-            )
+            bulk = self._bulk(conn, pid, "accept_agreeing")
             for item in found["texts"]:
                 self._select(
                     conn,
@@ -509,6 +533,246 @@ class FinalResultService:
                     item["document_id"],
                     item["submission_id"],
                     0,
+                    [],
+                    bulk=bulk,
+                )
+            return found | {"applied": True}
+
+    def _bulk(self, conn: Connection, pid: int, via: str) -> _Bulk:
+        return _Bulk(
+            via=via,
+            rule=bool(
+                conn.execute(
+                    select(ProjectRow.adjudicator_not_annotator).where(
+                        ProjectRow.id == pid
+                    )
+                ).scalar_one()
+            ),
+            selected_by=_pseudonym(conn, self.actor.user_id),
+            withdrawn=_withdrawn_revisions(conn, pid),
+        )
+
+    def _newest(
+        self,
+        conn: Connection,
+        key: str,
+        pid: int,
+        rows: list[RowKey],
+        *,
+        summary_only: bool,
+    ) -> dict[str, Any]:
+        """What bulk Change final… with the rule "newest submission" would do
+        to ``rows`` now (issue 336, step 2).
+
+        A text changes when it has a final result, no open work, and its
+        newest eligible submission (the submissions the final panel offers
+        on the current version: the last one of each submitted annotation
+        and of each submitted consolidation) is another one than the final,
+        was submitted after the final result was chosen, is one the caller
+        may choose, and is a consolidation, the text's only eligible
+        submission, or an annotation that agrees in full with the text's
+        other eligible submissions (the rule of ``accept_agreeing``: notes,
+        spans, modifiers and unresolved findings included). Submissions that
+        differ and were not consolidated never replace a final result. A submission that was already there when a lead
+        chose the final result never replaces it: that choice was made
+        knowing it. Every other selected text is skipped
+        with the reason. ``rows`` the project does not have are left out
+        (``texts`` counts the ones found). The number of statements does not
+        grow with the number of texts.
+        """
+        assert self.actor.user_id is not None
+        facts = load_facts(conn, self.repo, key, pid, self.actor.user_id, scope="panel")
+        ctx = page_context(facts)
+        found = [
+            (row.case_id, row.language)
+            for row in dict.fromkeys(rows)
+            if (row.case_id, row.language) in ctx.by_row
+        ]
+        skipped: list[dict[str, Any]] = []
+        candidates: list[tuple[tuple[str, str], dict[str, Any]]] = []
+        for case_id, language in found:
+            row = build_row(facts, case_id, language, ctx=ctx)
+            ref = {"case_id": case_id, "language": language}
+            if row["final"] is None:
+                skipped.append(ref | {"reason": "no_final"})
+            elif any(
+                item["status"] != "submitted" and item.get("moved_to_version") is None
+                for item in row["work"]
+            ):
+                skipped.append(ref | {"reason": "open_task"})
+            else:
+                candidates.append(((case_id, language), row["final"]))
+        newest = document_row_panel.newest_choices(
+            conn, pid, ctx, [text for text, _ in candidates]
+        )
+        chosen = sorted(
+            found[0].submission_id for found in newest.values() if found is not None
+        )
+        authors: dict[str, tuple[str, int | None]] = {
+            row.submission_id: (row.annotator_id, row.id)
+            for row in conn.execute(
+                select(
+                    SubmissionRow.submission_id, SubmissionRow.annotator_id, UserRow.id
+                )
+                .outerjoin(UserRow, UserRow.pseudonym == SubmissionRow.annotator_id)
+                .where(
+                    SubmissionRow.project_id == pid,
+                    SubmissionRow.submission_id.in_(chosen),
+                )
+            )
+        }
+        # An annotation among several submissions replaces the final only
+        # when all of them agree in full; a consolidation compared them.
+        agreeing = document_row_panel.agreeing_rows(
+            conn,
+            pid,
+            ctx,
+            [
+                text
+                for text, pick in newest.items()
+                if pick is not None
+                and pick[1] > 1
+                and pick[0].consolidation_round is None
+            ],
+        )
+        changes: list[dict[str, Any]] = []
+        for (case_id, language), final in candidates:
+            ref = {"case_id": case_id, "language": language}
+            pick = newest[(case_id, language)]
+            if pick is None:
+                skipped.append(ref | {"reason": "nothing_submitted"})
+                continue
+            candidate, eligible, recorded_at = pick
+            author, author_id = authors[candidate.submission_id]
+            if candidate.submission_id == final["submission_id"]:
+                skipped.append(ref | {"reason": "already_newest"})
+            elif recorded_at <= final["selected_at"]:
+                # The lead chose the final with this submission already there.
+                skipped.append(ref | {"reason": "not_newer"})
+            elif facts.adjudicator_not_annotator and author == facts.viewer_pseudonym:
+                skipped.append(ref | {"reason": "own_result"})
+            elif (
+                candidate.consolidation_round is None
+                and eligible > 1
+                and (case_id, language) not in agreeing
+            ):
+                skipped.append(ref | {"reason": "differ"})
+            else:
+                versions = {
+                    v.document_id: v.version for v in ctx.by_row[(case_id, language)]
+                }
+                changes.append(
+                    ref
+                    | {
+                        "expected_revision": final["revision"],
+                        "from_document_id": final["document_id"],
+                        "from_submission_id": final["submission_id"],
+                        "from_version": versions.get(final["document_id"]),
+                        "document_id": candidate.document_id,
+                        "submission_id": candidate.submission_id,
+                        "version": versions[candidate.document_id],
+                        "kind": "annotation"
+                        if candidate.consolidation_round is None
+                        else "consolidation",
+                        "author_id": author_id,
+                        "eligible_submissions": eligible,
+                    }
+                )
+        order = {text: index for index, text in enumerate(found)}
+        skipped.sort(key=lambda item: order[(item["case_id"], item["language"])])
+        digest = state_digest(
+            {
+                "rule": "newest_submission",
+                "rows": [list(text) for text in found],
+                "changes": [
+                    [
+                        item["case_id"],
+                        item["language"],
+                        item["expected_revision"],
+                        item["from_submission_id"],
+                        item["document_id"],
+                        item["submission_id"],
+                    ]
+                    for item in changes
+                ],
+                "skipped": [
+                    [item["case_id"], item["language"], item["reason"]]
+                    for item in skipped
+                ],
+            }
+        )
+        result: dict[str, Any] = {
+            "project": key,
+            "rule": "newest_submission",
+            "texts": len(found),
+            "change_count": len(changes),
+            "skipped_count": len(skipped),
+            "skipped_by_reason": dict(
+                sorted(Counter(item["reason"] for item in skipped).items())
+            ),
+            "changes": [],
+            "skipped": [],
+            "preview_token": f"sha256:{digest}",
+        }
+        if summary_only:
+            return result
+        people = person_refs(
+            conn,
+            {item["author_id"] for item in changes if item["author_id"] is not None},
+            viewer_id=self.actor.user_id,
+            viewer_is_lead=True,
+        )
+        for item in changes:
+            person = people.get(item.pop("author_id"))
+            item["person"] = None if person is None else person.model_dump()
+        for item in skipped:
+            item["message"] = CHANGE_SKIPS[item["reason"]]
+        return result | {"changes": changes, "skipped": skipped}
+
+    def change_finals(
+        self,
+        key: str,
+        rows: list[RowKey],
+        *,
+        preview: bool,
+        preview_token: str | None,
+        summary_only: bool = False,
+    ) -> dict[str, Any]:
+        """Preview, or apply all or nothing, bulk Change final… with the rule
+        "newest submission" for the selected texts (issue 336, step 2).
+
+        Apply recomputes the preview under the exclusive project lock; a
+        token that no longer matches is refused with ``PREVIEW_STALE`` and
+        the fresh preview. The token covers the texts, the final each one
+        has (its revision and submission) and the result it gets, so a final
+        changed meanwhile refuses the whole action. Each text is selected
+        and audited like the single PUT (``via``: "bulk_change_final"), with
+        the revision of the final it replaces.
+        """
+        if self.actor.user_id is None:
+            raise AccessDenied(
+                "NOT_ALLOWED", "Only a signed-in lead can choose final results."
+            )
+        with self.db.transaction() as conn:
+            pid = self._authorize(conn, key, exclusive=not preview)
+            found = self._newest(
+                conn, key, pid, rows, summary_only=preview and summary_only
+            )
+            if preview:
+                return found | {"applied": False}
+            if preview_token != found["preview_token"]:
+                raise DomainError(
+                    "PREVIEW_STALE", {"preview": found | {"applied": False}}
+                )
+            bulk = self._bulk(conn, pid, "bulk_change_final")
+            for item in found["changes"]:
+                self._select(
+                    conn,
+                    key,
+                    pid,
+                    item["document_id"],
+                    item["submission_id"],
+                    item["expected_revision"],
                     [],
                     bulk=bulk,
                 )

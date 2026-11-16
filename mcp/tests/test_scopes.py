@@ -125,6 +125,12 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "confirm": True,
             "preview_token": "sha256:x",
         },
+        "change_final_results": {
+            "project": "p",
+            "texts": [{"case_id": "c", "language": "en"}],
+            "confirm": True,
+            "preview_token": "sha256:x",
+        },
         "final_export_check": {"project": "p"},
         "start_export": {"project": "p", "kind": "final"},
         "get_job": {"job_id": 1, "wait": True},
@@ -460,6 +466,7 @@ async def test_annotations_match_what_a_tool_does(mcp_client: Client) -> None:
 IRREVERSIBLE = (
     "set_final_result",
     "accept_agreeing_texts",
+    "change_final_results",
     "carry_submission",
     "update_work_plan",
     "act_on_problem_report",

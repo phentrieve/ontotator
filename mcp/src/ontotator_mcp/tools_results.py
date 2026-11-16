@@ -141,7 +141,7 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
         what would be accepted, why each other text is not (skipped, with
         the counts per reason in skipped_by_reason), how many texts already
         have a final result (they are not changed; set_final_result changes
-        one), the case_ids the project does not have (unknown_case_ids) and
+        one, change_final_results many), the case_ids the project does not have (unknown_case_ids) and
         a preview_token. Confirm with that token: all listed
         texts become final, or none when anything changed since the dry run;
         then the answer is a fresh dry run with a new token
@@ -192,6 +192,106 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
             return summary(fresh, False) | {
                 "stale": True,
                 "note": "Texts changed since the dry run; nothing was accepted."
+                " Check this new dry run and confirm with its preview_token.",
+            }
+        return summary(applied, True)
+
+    @register(server, scopes="project-admin", effect="destructive")
+    async def change_final_results(
+        project: Project,
+        texts: Annotated[
+            list[dict[str, str]],
+            Field(
+                min_length=1,
+                max_length=10000,
+                description=(
+                    "The texts, each {'case_id': ..., 'language': ...}: at most"
+                    " 10000 per call, of at most 2000 cases."
+                ),
+            ),
+        ],
+        rule: Annotated[
+            Literal["newest_submission"],
+            Field(description="How each text's new final result is picked."),
+        ] = "newest_submission",
+        confirm: Annotated[
+            bool, Field(description="False: dry run. True: change the listed texts.")
+        ] = False,
+        preview_token: Annotated[
+            str | None,
+            Field(
+                max_length=80,
+                description=(
+                    "With confirm: the preview_token of the dry run, so exactly"
+                    " the changes it listed are made."
+                ),
+            ),
+        ] = None,
+    ) -> dict[str, Any]:
+        """Change the final result of many texts to their newest submission.
+
+        For texts that already have a final result (accept_agreeing_texts
+        covers texts without one). Rule newest_submission: of the submissions
+        a lead can choose on the text's current version (the last one of
+        each submitted annotation and of each submitted consolidation), the
+        newest becomes the final result when it was submitted after the
+        final result was chosen and is a consolidation, the text's only
+        submission, or an annotation that agrees in full with the text's
+        other submissions (the rule of accept_agreeing_texts). Texts are
+        skipped, with the reason,
+        when they have no final result, other work on them is open, nothing
+        is submitted on the current version, the final result already is the
+        newest submission, nothing was submitted since the final result was
+        chosen, the newest is your own and the project forbids choosing
+        your own result, or the submissions differ and were not
+        consolidated (reason 'differ': compare them with set_final_result
+        or start_consolidation). The dry run lists changes and skips and a
+        preview_token. Confirm with that token: every listed text changes,
+        or none when anything changed since (then the answer is a fresh dry
+        run, ``stale``). There is no undo: set_final_result changes one text
+        back.
+        """
+        path = project_path(project, "final-selections", "bulk-change")
+        body = {"rows": texts, "rule": rule}
+
+        def summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
+            changes = found.get("changes", [])
+            skipped = [
+                {key: item[key] for key in ("case_id", "language", "reason", "message")}
+                for item in found.get("skipped", [])
+            ]
+            return {
+                "applied": applied,
+                "rule": found.get("rule"),
+                "texts": found.get("texts", 0),
+                "changed" if applied else "would_change": changes[:MAX_LISTED],
+                "change_count": found.get("change_count", len(changes)),
+                "skipped": skipped[:MAX_LISTED],
+                "skipped_count": found.get("skipped_count", len(skipped)),
+                "skipped_by_reason": found.get("skipped_by_reason", {}),
+                "preview_token": found.get("preview_token"),
+            }
+
+        if not confirm:
+            preview: dict[str, Any] = await api.post(path, body | {"preview": True})
+            return summary(preview, False)
+        if preview_token is None:
+            raise OntotatorError(
+                "Run the dry run first and pass its preview_token with confirm."
+            )
+        try:
+            applied: dict[str, Any] = await api.post(
+                path, body | {"preview_token": preview_token}
+            )
+        except OntotatorError as exc:
+            fresh = (
+                exc.details.get("preview") if isinstance(exc.details, dict) else None
+            )
+            if exc.code != "PREVIEW_STALE" or not isinstance(fresh, dict):
+                raise
+            return summary(fresh, False) | {
+                "stale": True,
+                "note": "Texts changed since the dry run; nothing was changed."
                 " Check this new dry run and confirm with its preview_token.",
             }
         return summary(applied, True)

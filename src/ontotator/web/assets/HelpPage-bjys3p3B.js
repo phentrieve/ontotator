@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-DXtShrLU.js";import{n as a,t as o}from"./lib-Rayarld1.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-DEHI3xp8.js";import{n as a,t as o}from"./lib-KcgI0Jc7.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -1667,7 +1667,7 @@ What stays fixed in every case:
 
 - Texts cannot be deleted. A text you no longer want stays in the project; you take it out of the plan ([Narrow the scope](#narrow-the-scope)).
 - A submission never changes. New work is a new round or a new submission; the earlier one stays in the history.
-- A final result can be replaced with **Change final…** or withdrawn with **Withdraw final…** ([Withdraw a final result](lead-results.md#withdraw-a-final-result)). While a text has a final result, its annotation mode cannot be changed.
+- A final result can be replaced with **Change final…** or withdrawn with **Withdraw final…** ([Withdraw a final result](lead-results.md#withdraw-a-final-result)). For many texts, **More actions** › **Change final…** on **Documents** moves the final results to the newest submissions ([Accept or change the final result of several texts](lead-results.md#accept-or-change-the-final-result-of-several-texts)). While a text has a final result, its annotation mode cannot be changed.
 - There is no pause button for texts. A task is paused only by a problem report ([Decide on a problem report](lead-results.md#decide-on-a-problem-report)).
 
 ## Use another translation of a text
@@ -2127,6 +2127,8 @@ Every listed task changes, or none: if the texts changed since the preview, the 
 
 **Undo** in the message, for example *Reopened 14 assignments in 12 texts.*, takes the change back: reopened tasks count as submitted again; withdrawn tasks come back with their drafts. Undo is for the lead who made the change, once, within an hour, and only while nothing changed on these texts since: nobody saved a draft, nobody was assigned, the plan, the final result and the text version are the same. Otherwise the message says *Undo is no longer possible: the texts changed since.*
 
+The same menu holds **Accept agreeing results…** and **Change final…** for the final results of the selected texts: see [Accept or change the final result of several texts](lead-results.md#accept-or-change-the-final-result-of-several-texts).
+
 - Reopened translation reviews have no Undo: the review starts again from the current text of its version, and the earlier draft cannot be brought back. The dialog says so before you confirm. The submitted decision stays in the history.
 - Undo is recorded as a change of its own. A person who has the task open may be asked to reload it.
 
@@ -2312,6 +2314,25 @@ What for: take a final result back, for example before finished texts are annota
 4. Enter the **Reason**, tick **I understand** and click **Withdraw final result**.
 
 The text asks for a final result again. **History** in the text card shows the withdrawal with your reason. If someone changed the final result meanwhile, nothing is withdrawn: the dialog says *This final result changed. Nothing was withdrawn.* and loads the current one. Check it, then tick **I understand** again to withdraw it, or click **Cancel**.
+
+### Accept or change the final result of several texts
+
+What for: settle many texts at once on **Documents**: accept every selected text whose annotations agree, or move final results to newer submissions after a second round, a reopened annotation or a consolidation.
+
+1. On **Documents**, select the texts, then click **More actions** in the selection bar.
+2. Choose one. An entry that does nothing for the selection stays in the menu, unavailable, and says why, for example *No selected text has a newer submission than its final result.*
+   - **Accept agreeing results…** is for texts without a final result. A text gets one when at least two annotations are submitted, nothing else is open on it and all findings agree in full, also on notes and modifier text spans. It never replaces a final result.
+   - **Change final…** is for texts that have a final result. The newest submission of the text on the current version replaces the final result when it was submitted after the final result was chosen and is a consolidation, the text's only submission, or an annotation that agrees in full with the text's other submissions (as for **Accept agreeing results…**). A submission that was already there when a lead chose the final result does not replace it, and submissions that differ are never chosen for you.
+3. Read the preview. It groups the texts by what happens to them; click **Show all** to list every text of a group.
+   - **Accept agreeing results…**: *Accept the result of 38 texts · all annotations agree in full*; the texts left out, each group with its reason, for example *Skip 3 texts · the results differ: consolidate or choose in the text card*; and *Keep 12 final results · already final: use Change final… for them*.
+   - **Change final…**: *Use the newest consolidation for 5 texts · Carla Diaz 5* and *Use the newest annotation for 3 texts · Tom Reis 2, R. Roe 1* name whose submission becomes final. Texts are skipped when they have no final result yet, other work on them is still open, nothing is submitted on the current version, the final result already is the newest submission, nothing was submitted since the final result was chosen, the newest submission is your own and the project rule says another lead must choose it, or the submissions differ (*Skip 2 texts · submissions differ: compare or consolidate first*).
+4. Click the button that names the work, for example *Change 8 final results*. The dialog lists what happens. Tick **I understand** and click the button again.
+
+Every listed text changes, or none: if a text or a final result changed since the preview, the dialog says *The texts changed since the preview. Check the new preview.* and shows it. Each text is recorded like a single **Accept result** or **Change final…**, so its **History** shows it.
+
+- For texts skipped because the submissions differ, open the text card and compare them, or [start a consolidation](#start-a-consolidation); a submitted consolidation is then the newest submission.
+- Warnings you acknowledged for the earlier final result do not carry over to the new one. Final exports already made stay as they are.
+- Neither action has an undo. To go back, use **Change final…** or **Withdraw final…** in the text card ([Change a final result](#change-a-final-result), [Withdraw a final result](#withdraw-a-final-result)).
 
 ## Translation and text-change decisions
 
