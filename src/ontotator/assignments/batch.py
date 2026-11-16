@@ -265,7 +265,8 @@ class _Rows:
         work = self._work(version.document_id, task)
         no_proposals = False
         if task == "annotate":
-            remaining = self.facts.annotations_per_text - self.held[version.document_id]
+            limit = self.facts.per_text((version.case_id, version.language))
+            remaining = limit - self.held[version.document_id]
             if (
                 remaining > 0
                 and self.locked.get((version.case_id, version.language)) == "proposals"
@@ -384,10 +385,7 @@ class _Rows:
             task != "translation_review"
             and not candidates
             and codes & WAITING_FOR_REVIEW_STEPS
-            and any(
-                self.held[v.document_id] < self.facts.annotations_per_text
-                for v in newest
-            )
+            and any(self.held[v.document_id] < self.facts.per_text(key) for v in newest)
         ):
             return _Match((), "waiting_for_review", holders)
         if any(t.no_proposals for t in candidates):
@@ -650,7 +648,18 @@ class BatchAssignmentService:
                     name for name in got.get(case_id, []) if name not in target.holders
                 ][: target.remaining]
                 flat.append(target)
-        per_text = facts.annotations_per_text if task == "annotate" else 1
+        # Issue 422: each text's own limit; the batch names the one the
+        # selected texts share, else the project value.
+        shared = {
+            facts.per_text((case_id, spec.language))
+            for case_id in order
+            if (case_id, spec.language) in rows.rows
+        }
+        per_text = (
+            (shared.pop() if len(shared) == 1 else facts.annotations_per_text)
+            if task == "annotate"
+            else 1
+        )
         target_views = [
             {
                 "case_id": t.case_id,
@@ -658,6 +667,9 @@ class BatchAssignmentService:
                 "document_id": t.document_id,
                 "version": t.version,
                 "remaining": t.remaining,
+                "per_text": facts.per_text((t.case_id, t.language))
+                if task == "annotate"
+                else 1,
                 "usernames": list(t.usernames),
                 "unreviewed_translation": t.unreviewed_translation,
                 "waiting_for_translation_review": t.waiting_for_translation_review,
@@ -666,6 +678,20 @@ class BatchAssignmentService:
         ]
         skip_views: list[dict[str, Any]] = [
             {"case_id": case_id, "language": spec.language, "reason": skipped[case_id]}
+            | (
+                {
+                    "per_text": facts.per_text((case_id, spec.language)),
+                    "assigned": max(
+                        (
+                            rows.held.get(v.document_id, 0)
+                            for v in rows._newest((case_id, spec.language))
+                        ),
+                        default=0,
+                    ),
+                }
+                if task == "annotate" and skipped[case_id] == "already_assigned"
+                else {}
+            )
             for case_id in order
             if case_id in skipped
         ]
@@ -697,6 +723,7 @@ class BatchAssignmentService:
             "skipped": skip_views,
             "people": self._people(conn, pid, task, spec, flat, holders),
             "per_text": per_text,
+            "project_per_text": facts.annotations_per_text,
             "digest": digest,
             "needs_people": needs_people,
         }
@@ -885,6 +912,11 @@ class BatchAssignmentService:
                                 )
                             )
                     except DomainError as error:
+                        reason = (
+                            error.details.get("reason")
+                            if isinstance(error.details, dict)
+                            else None
+                        )
                         refused.append(
                             {
                                 "case_id": target.case_id,
@@ -892,6 +924,9 @@ class BatchAssignmentService:
                                 "document_id": target.document_id,
                                 "username": username,
                                 "code": error.code,
+                                # ``details.reason`` as on the single
+                                # assignment, e.g. ``accepted_by_review``.
+                                "reason": reason if isinstance(reason, str) else None,
                             }
                         )
             if refused:

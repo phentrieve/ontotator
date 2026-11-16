@@ -904,3 +904,74 @@ def test_working_time_keeps_its_times_and_orphaned_tasks(
         ).scalar_one()
     assert [i.assignment_id for i in intervals] == [-999_999, copied_task]
     assert {(i.started_at, i.ended_at) for i in intervals} == {(started, ended)}
+
+
+def _text_overrides(db: Any, key: str) -> list[tuple[Any, ...]]:
+    """(case, language, value, reason, pseudonym of who set it) per text."""
+    from ontotator.storage.plan_tables import TextSettingRow
+    from ontotator.storage.tables import UserRow
+
+    with db.snapshot() as conn:
+        return [
+            tuple(row)
+            for row in conn.execute(
+                select(
+                    TextSettingRow.case_id,
+                    TextSettingRow.language,
+                    TextSettingRow.annotations_per_text,
+                    TextSettingRow.reason,
+                    UserRow.pseudonym,
+                )
+                .join(ProjectRow, ProjectRow.id == TextSettingRow.project_id)
+                .join(UserRow, UserRow.id == TextSettingRow.updated_by)
+                .where(ProjectRow.project_key == key)
+            )
+        ]
+
+
+def _set_override(db: Any, key: str) -> None:
+    """The project's annotator gives the text its own value (a real person,
+    so the import has to map ``updated_by``)."""
+    from ontotator.storage.tables import AssignmentRow
+    from ontotator.storage.text_settings import write_per_text
+
+    with db.transaction() as conn:
+        pid, user = conn.execute(
+            select(AssignmentRow.project_id, AssignmentRow.user_id)
+            .join(ProjectRow, ProjectRow.id == AssignmentRow.project_id)
+            .where(ProjectRow.project_key == key)
+        ).one()
+        write_per_text(
+            conn, pid, CASE, "en", 3, reason="method comparison", actor_id=user
+        )
+
+
+def test_a_text_keeps_its_own_annotations_per_text(
+    servers: tuple[TestClient, TestClient], tmp_path: Path
+) -> None:
+    """Issue 422: the per-text override travels with the archive, with the
+    person who set it mapped to their account on the target."""
+    from ontotator.storage.plan_tables import TextSettingRow
+    from ontotator.storage.tables import AssignmentRow
+
+    source, target = servers
+    scenario = _simple_project(source.app)  # type: ignore[arg-type]
+    _set_override(_db(source), scenario.key)
+    before = _text_overrides(_db(source), scenario.key)
+    data = _export(source, scenario.key, tmp_path)
+
+    result = project_archive.import_archive(_db(target), OPERATOR, data)
+
+    assert result["verification"]["ok"]
+    after = _text_overrides(_db(target), scenario.key)
+    assert [row[:4] for row in after] == [(CASE, "en", 3, "method comparison")]
+    assert after == before
+    # ``updated_by`` is the imported annotator, not the source server's id.
+    with _db(target).snapshot() as conn:
+        setter, annotator = conn.execute(
+            select(TextSettingRow.updated_by, AssignmentRow.user_id)
+            .join(AssignmentRow, AssignmentRow.project_id == TextSettingRow.project_id)
+            .join(ProjectRow, ProjectRow.id == TextSettingRow.project_id)
+            .where(ProjectRow.project_key == scenario.key)
+        ).one()
+    assert setter == annotator

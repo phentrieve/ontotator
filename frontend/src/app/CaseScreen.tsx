@@ -17,6 +17,7 @@ import { ComparePane } from "../variants/ComparePane";
 import { Toolbar } from "../ui/Toolbar";
 import { VariantSelectors } from "../variants/VariantSelectors";
 import { ReadOnlyAnnotationView } from "../variants/ReadOnlyAnnotationView";
+import { useChangesSince, type ChangesSource } from "../editor/ChangesSince";
 import { useCaseVersions } from "../variants/useCaseVersions";
 import { VariantDetails, variantDescription } from "../variants/CaseViewer";
 import { annotationOptions, pickVariant, refForKey } from "../variants/versionState";
@@ -108,7 +109,7 @@ import { Toast } from "../ui/Toast";
 import { type MentionDisplay, type SelectionPayload } from "../spans/adapter";
 import { markColourSlot } from "../editor/markColours";
 import { IconCheck, IconClose, IconLock, IconMore, IconPencil, IconQuestion, IconRedo, IconRetry, IconUndo } from "../ui/icons";
-import { stepText } from "../editor/history";
+import { historyControls, stepText, type LastHistoryCommand } from "../editor/history";
 import { MenuButton, type MenuItem } from "../ui/MenuButton";
 import { isNegated } from "../editor/negation";
 import { Dialog } from "../ui/Dialog";
@@ -250,6 +251,8 @@ export interface CaseScreenProps {
   headerTimer?: React.ReactNode;
   /** Called whenever an edit is sent; the working time resumes on it. */
   onEdit?: () => void;
+  /** The earlier version the round's carried work came from: offers "Show changes since vN" over the text (issue 421). */
+  changesSource?: ChangesSource | null;
 }
 
 const NO_ROUND_INPUTS: readonly import("../api/client").RoundInputView[] = [];
@@ -268,7 +271,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   onSubmitted,
   annotatorName,
   leaveGuardRef,
-  readOnly: serverReadOnly = false, routeLeaveRef, assignmentNavigation, onReadonlyRequired, versionContext, menuItems = [], userPseudonym, guidelineNotice, guidelines = null, held = false, holdReason, saveBeforeReportRef, roundInputs = NO_ROUND_INPUTS, roundKind, roundActive = true, roundBadge, roundTitle, documentVersion, roundOrdinal, headerTimer, onEdit,
+  readOnly: serverReadOnly = false, routeLeaveRef, assignmentNavigation, onReadonlyRequired, versionContext, menuItems = [], userPseudonym, guidelineNotice, guidelines = null, held = false, holdReason, saveBeforeReportRef, roundInputs = NO_ROUND_INPUTS, roundKind, roundActive = true, roundBadge, roundTitle, documentVersion, roundOrdinal, headerTimer, onEdit, changesSource,
 }) => {
   const versionIdentity = JSON.stringify([versionContext?.username, versionContext?.assignmentId, versionContext?.canBrowseVersions, workspaceId, view.key]);
   const [acceptedSubmission, setAcceptedSubmission] = useState<{ identity: string; value: Submission } | null>(null);
@@ -283,6 +286,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const [comparisonIdentity, setComparisonIdentity] = useState<string | null>(null);
   const compareOpen = !!versionContext?.canBrowseVersions && comparisonIdentity === versionIdentity;
   const [leftTextElement, setLeftTextElement] = useState<HTMLDivElement | null>(null);
+  // Issue 421: a pure overlay; marking, resizing and checking carry on while it is on.
+  const changesSince = useChangesSince(changesSource, view.document.text, leftTextElement);
   const reanchorContext = useReanchorContext(view.document.text, leftTextElement, JSON.stringify([versionIdentity,display?.selection ?? "draft"]));
   const compareButton = useRef<HTMLButtonElement | null>(null);
   const closeComparison = () => { setComparisonIdentity(null); compareButton.current?.focus(); };
@@ -1735,9 +1740,11 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     return known;
   };
   const currentHistory = history && history.revision === draft.revision ? history : null;
+  // The last undo, redo or reset and the revision it made: what the controls offer until its history is read.
+  const [lastHistoryCommand, setLastHistoryCommand] = useState<LastHistoryCommand | null>(null);
   const stepName = (step: HistoryStepView) => stepText(step, (layerId, termId) => termLabel(layerId, termId) ?? undefined);
 
-  const enqueueHistory = (payload: Record<string, unknown>): Promise<Draft> => {
+  const enqueueHistory = (payload: { command: LastHistoryCommand["command"]; step?: number }): Promise<Draft> => {
     assertWritable();
     setActionError(null);
     const mutationId = crypto.randomUUID();
@@ -1747,6 +1754,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
       envelope ??= { mutation_id: mutationId, expected_revision: expectedRevision, payload };
       const updated = await api.applyHistory(workspaceId, envelope).catch(assignmentFailure);
       latestDraft.current = updated; setDraft(updated);
+      setLastHistoryCommand({ revision: updated.revision, command: payload.command });
       return updated;
     });
   };
@@ -1843,15 +1851,17 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     if (ok) await runHistory("reset_changes");
   };
 
-  const undoStep = currentHistory?.undo ?? null;
-  const redoStep = currentHistory?.redo ?? null;
-  const undoTitle = undoStep ? `Undo: ${stepName(undoStep)}` : "Nothing to undo";
-  const redoTitle = redoStep ? `Redo: ${stepName(redoStep)}` : "Nothing to redo";
+  // Between a save and the read of its history the controls keep working: an Undo pressed right after a change,
+  // or a Redo right after an Undo, is not dropped (runHistory saves and reads the history first). Only the
+  // current history names the step.
+  const { undo: undoStep, redo: redoStep, canUndo, canRedo } = historyControls(history, draft.revision, lastHistoryCommand);
+  const undoTitle = undoStep ? `Undo: ${stepName(undoStep)}` : canUndo ? "Undo the last change" : "Nothing to undo";
+  const redoTitle = redoStep ? `Redo: ${stepName(redoStep)}` : canRedo ? "Redo the last undone change" : "Nothing to redo";
   // Inside a text field the browser's own text undo keeps working (shortcuts skip typing targets).
   useShortcut(["Ctrl+z", "Meta+z"], () => { void runHistory("undo_step"); },
-    { scope: "screen", description: "Undo the last change", group: "Editor", enabled: historyEnabled && !!undoStep && !historyBusy, listWhenDisabled: historyEnabled });
+    { scope: "screen", description: "Undo the last change", group: "Editor", enabled: historyEnabled && canUndo && !historyBusy, listWhenDisabled: historyEnabled });
   useShortcut(["Ctrl+Shift+z", "Meta+Shift+z", "Ctrl+y"], () => { void runHistory("redo_step"); },
-    { scope: "screen", description: "Redo the last undone change", group: "Editor", enabled: historyEnabled && !!redoStep && !historyBusy, listWhenDisabled: historyEnabled });
+    { scope: "screen", description: "Redo the last undone change", group: "Editor", enabled: historyEnabled && canRedo && !historyBusy, listWhenDisabled: historyEnabled });
 
   useEffect(() => {
     if (!saveBeforeReportRef) return;
@@ -3815,9 +3825,9 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
 
           {historyEnabled && <span className="case-history" role="group" aria-label="Undo and redo">
             <IconButton size="sm" variant="quiet" label="Undo last change" title={undoTitle} icon={<IconUndo />}
-              disabled={!undoStep || historyBusy} onClick={() => { void runHistory("undo_step"); }} />
+              disabled={!canUndo || historyBusy} onClick={() => { void runHistory("undo_step"); }} />
             <IconButton size="sm" variant="quiet" label="Redo last change" title={redoTitle} icon={<IconRedo />}
-              disabled={!redoStep || historyBusy} onClick={() => { void runHistory("redo_step"); }} />
+              disabled={!canRedo || historyBusy} onClick={() => { void runHistory("redo_step"); }} />
           </span>}
 
           <MenuButton label="More actions" buttonLabel="More" icon={<IconMore />} items={[
@@ -4131,7 +4141,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
 
         {/* Center: Text View */}
         <TextPane
-          header={versionControls}
+          header={changesSince ? <>{versionControls}{changesSince.bar}</> : versionControls}
+          changes={changesSince?.changes} passages={changesSince?.passages} passagesSince={changesSince?.since} currentPassage={changesSince?.current}
           onTextElement={setLeftTextElement}
           contextSegments={reanchorContext.contextSegments}
           text={view.document.text}

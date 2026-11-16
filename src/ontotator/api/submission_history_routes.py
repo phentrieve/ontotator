@@ -14,7 +14,7 @@ from ontotator.application.consolidation_blinding import (
     Blinding,
     submission_blinding,
 )
-from ontotator.application.round_reads import enrich_inputs
+from ontotator.application.round_reads import enrich_inputs, round_source_text
 from ontotator.authz.visibility import current_access, require_case_text
 from ontotator.authz.workflow import may_read_human_submission
 from ontotator.domain.annotations import AnnotationSnapshot
@@ -25,7 +25,11 @@ from ontotator.domain.reanchor_resolution import (
     ReanchorResolution,
 )
 from ontotator.domain.review import ReviewDecision
-from ontotator.domain.work_rounds import CARRY_ROUND_KINDS, RoundInputView
+from ontotator.domain.work_rounds import (
+    CARRY_ROUND_KINDS,
+    RoundInputView,
+    RoundSourceText,
+)
 from ontotator.domain.workspace import RoundInputResolution, Submission
 from ontotator.storage.guidelines import guideline_facts
 from ontotator.storage.live_submissions import live_submission
@@ -62,6 +66,25 @@ class SubmissionHistoryDetail(BaseModel):
     reanchor_resolutions: list[ReanchorResolution] = []
     round_inputs: list[RoundInputView] = []
     round_input_resolutions: list[RoundInputResolution] = []
+    # Issue 421: the earlier text version the submission's carried round came
+    # from ("Show changes since vN"); null unless carried from another version.
+    carried_from: RoundSourceText | None = None
+
+
+def _carried_from(
+    repo: Repository, key: str, round_id: str | None
+) -> RoundSourceText | None:
+    """The source text of the submission's round. The reader may read the
+    submission, so the round is read unscoped (a consolidator does not see
+    another person's round, but sees the text the submission was made on)."""
+    if round_id is None:
+        return None
+    try:
+        return round_source_text(
+            repo, key, Repository(repo.db).get_work_round(key, round_id)
+        )
+    except DomainError:
+        return None
 
 
 def _carried_inputs(
@@ -166,6 +189,7 @@ def _history(
     summary = summaries[0]
     blinding = blindings[summary.submission_id]
     round_inputs = _carried_inputs(repo, key, summary.round_id)
+    carried_from = _carried_from(repo, key, summary.round_id)
     if blinding is not None:
         return SubmissionHistoryDetail(
             summary=summary,
@@ -180,6 +204,7 @@ def _history(
             ],
             round_inputs=[blinding.input_view(i) for i in round_inputs],
             round_input_resolutions=submission.round_input_resolutions,
+            carried_from=carried_from,
         )
     return SubmissionHistoryDetail(
         summary=summary,
@@ -192,6 +217,7 @@ def _history(
         reanchor_resolutions=submission.reanchor_resolutions,
         round_inputs=round_inputs,
         round_input_resolutions=submission.round_input_resolutions,
+        carried_from=carried_from,
     )
 
 

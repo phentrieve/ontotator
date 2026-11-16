@@ -1525,6 +1525,29 @@ describe("lead review fixes", () => {
     expect(document.querySelector("th[scope='rowgroup']")).toBeNull();
   });
 
+  it("Select all N with a filter and hidden texts not in plan counts and selects only the rows the table can show (issue 379)", async () => {
+    window.localStorage.clear();
+    // Filter language de: 2 planned texts and 2 hidden texts not in plan match.
+    const view = page([
+      group("case-1", [planRow("case-1", "de", stepOf("assign_annotation"))]),
+      group("case-2", [planRow("case-2", "de", stepOf("assign_annotation"))]),
+      group("case-3", [notInPlanRow("case-3", "de")]),
+      group("case-4", [notInPlanRow("case-4", "de")]),
+    ]);
+    mockRows({ ...view, bar: { ...view.bar, shown: 4, all: 4, facets: { plan: { not_in_plan: 2, not_decided: 0, annotate: 2 } } } });
+    vi.spyOn(api, "documentRowKeys").mockImplementation(async (_project, body) => deKeys(body?.active_only ? ["case-1", "case-2"] : ["case-1", "case-2", "case-3", "case-4"]));
+    renderPage({ query: { language: "de" } });
+    await screen.findByRole("checkbox", { name: "Show texts not in plan (2)" });
+    expect(within(filterTools()).getByText("2 of 4")).toBeTruthy();
+    const header = screen.getByRole("checkbox", { name: "Select all 2 filtered texts" }) as HTMLInputElement;
+    fireEvent.click(header);
+    await waitFor(() => expect(within(selectionRegion()).getByText(selectedText(2))).toBeTruthy());
+    expect(api.documentRowKeys).toHaveBeenCalledWith("p", { filters: { language: "de" }, active_only: true, sort: "case" });
+    expect(api.documentRowKeys).not.toHaveBeenCalledWith("p", expect.objectContaining({ active_only: false }));
+    expect(header.checked).toBe(true);
+    expect(header.indeterminate).toBe(false);
+  });
+
   it("hides texts not in plan behind the remembered switch; on they are muted rows with Add to plan… (VD1, F5)", async () => {
     window.localStorage.clear();
     const planned = planRow("case-2", "de", stepOf("assign_annotation"));

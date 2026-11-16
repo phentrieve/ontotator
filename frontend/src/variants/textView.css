@@ -30,3 +30,10 @@
   .case-viewer.case-comparing .comparison-reading > .layer-findings { grid-column: 1; grid-row: 4; }
   .case-viewer.case-comparing .compare-pane { grid-row: 5; }
 }
+
+/* Comparing: each text has the same identity group (title, "Language and version", "Show") directly above it, in
+   one shared row, so the two texts start at the same height (#412). */
+.case-viewer.case-comparing .compare-pane { background: none; }
+.case-viewer .comparison-pane-identity .text-view-selects { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: var(--space-2); }
+.case-viewer .comparison-pane-identity .text-view-field { display: flex; }
+.case-viewer.case-comparing .comparison-reading > .comparison-current-identity { grid-column: 1; grid-row: 2; }

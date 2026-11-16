@@ -68,3 +68,13 @@ it('names the step in its heading and reports the request once assigned', async 
   fireEvent.click(screen.getByRole('button', { name: 'Assign correction review' }));
   expect(await screen.findByRole('heading', { name: 'Translation correction requested' })).toBeTruthy();
 });
+
+it('explains the refusal while a lead correction of the version is open', async () => {
+  vi.mocked(api.assignTranslationCorrection).mockRejectedValue(new ApiError(409, 'exists', 'ASSIGNMENT_EXISTS', { reason: 'lead_correction_open' }));
+  render(<TranslationCorrectionAction {...props} defaultOpen />);
+  fireEvent.change(await screen.findByLabelText('Translation reviewer'), { target: { value: 'reviewer' } });
+  fireEvent.change(screen.getByLabelText('Reason for another review'), { target: { value: 'Dose missing' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Assign correction review' }));
+  expect(await screen.findByText(/^A lead is correcting this version\. Request the correction after that correction is submitted/)).toBeTruthy();
+  expect(screen.queryByText(/This task already exists/)).toBeNull();
+});

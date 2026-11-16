@@ -43,8 +43,10 @@ const SEGMENTS: ReadonlySet<string> = new Set(["decision", "assign", "progress",
 const DECISIONS: ReadonlySet<string> = new Set(["all", "report-or-pause", "confirm-final", "translation", "missing-final"]);
 const ORIGIN_LABELS: Readonly<Record<string, string>> = { machine_translation: "Machine translation", human_translation: "Human translation", correction: "Correction", native: "Source" };
 
-/** The flags facet's one option; its chip reads the same. */
+/** The flags facet's options; their chips read the same. */
 export const FLAGGED_UNCLEAR = "Flagged: guidelines unclear";
+/** Issue 339 b (decision 336-D): a current version has more annotators than "Annotators per text". */
+export const OVER_LIMIT = "More annotators than the limit";
 
 const option = (param: FacetParam, label: string, ...values: string[]): FacetOption => ({ id: `${param}-${values[0]}`, label, param, values });
 
@@ -79,7 +81,7 @@ export const FACET_GROUPS: readonly FacetGroup[] = [
     option("plan", "Not decided", "not_decided"),
   ] },
   // X5: findings flagged "guidelines unclear" in the submitted consolidation of the current version.
-  { id: "flags", legend: "Flags", options: [option("flags", FLAGGED_UNCLEAR, "guidelines_unclear")] },
+  { id: "flags", legend: "Flags", options: [option("flags", FLAGGED_UNCLEAR, "guidelines_unclear"), option("flags", OVER_LIMIT, "over_limit")] },
   // Spec §2b: texts whose newest proposal set has tool proposals (read model facet `proposals`).
   { id: "proposals", legend: "Tool proposals", options: [option("proposals", "With tool proposals", "with"), option("proposals", "Without", "without")] },
 ];
@@ -111,7 +113,7 @@ function stateKnown(param: "review_state" | "annotation_state" | "final_state", 
 const KNOWN: Readonly<Record<string, (value: string) => boolean>> = {
   language: () => true,
   waiting_on: () => true,
-  flags: value => value === "guidelines_unclear",
+  flags: value => value === "guidelines_unclear" || value === "over_limit",
   proposals: value => value === "with" || value === "without",
   origin: value => Object.hasOwn(originLabels, value),
   plan: value => Object.hasOwn(PLAN_LABELS, value),

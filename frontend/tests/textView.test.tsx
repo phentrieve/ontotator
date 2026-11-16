@@ -39,7 +39,9 @@ const viewer = async (extra: Record<string, unknown> = {}) => {
   const { CaseViewer } = await import('../src/variants/CaseViewer');
   const mounted = render(<CaseViewer {...props} {...extra} />);
   await screen.findByText('Immutable target');
-  await waitFor(() => expect(options(within(screen.getByRole('group', { name: 'Text view' })).getByLabelText('Show')).length).toBeGreaterThan(1));
+  // While comparing, the current text's selects sit in their own group above the text (#412).
+  const identity = () => screen.queryByRole('group', { name: 'Current text identity' }) ?? screen.getByRole('group', { name: 'Text view' });
+  await waitFor(() => expect(options(within(identity()).getByLabelText('Show')).length).toBeGreaterThan(1));
   return { CaseViewer, mounted };
 };
 
@@ -141,6 +143,23 @@ it('nothing is editable', async () => {
   expect(screen.queryByRole('button', { name: /Save|Delete|Remove/ })).toBeNull();
 });
 
+it('an annotation carried from an earlier version offers Show changes since that version (issue 421)', async () => {
+  vi.spyOn(api, 'getSubmissionHistory').mockResolvedValue({
+    summary: { submission_id: 'sub-tom', document_id: 'target', author_label: 'ann-1', created_at, mode: 'independent' },
+    annotations: [], evidence: [], decisions: [],
+    carried_from: { document_id: 'older', language: 'de', version: 1, text: 'Immutable draft' },
+  } as any);
+  const { mounted } = await viewer({ show: 'submission:sub-tom' });
+  const toggle = await screen.findByRole<HTMLInputElement>('checkbox', { name: 'Show changes since v1' });
+  expect(toggle.checked).toBe(false);
+  fireEvent.click(toggle);
+  const text = mounted.container.querySelector<HTMLElement>('.text-container')!;
+  await waitFor(() => expect(text.querySelector('.change-passage')?.textContent).toBe('target'));
+  expect(screen.getByText('1 passage changed')).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Changed text. In v1: draft' })).toBeTruthy();
+  expect(text.textContent).toBe('Immutable target');
+});
+
 it('legacy annotations= links map to show', async () => {
   vi.mocked(api.listTextLayers).mockResolvedValue([...leadLayers, { kind: 'own', ref: ownRef, label: ownRef.label, state: 'submitted', available: true }]);
   await viewer({ annotations: refKey(ownRef) });
@@ -178,6 +197,54 @@ it('an explicit "Text only" stays on the text even with a final result', async (
   await viewer({ show: 'text' });
   expect(screen.getByLabelText<HTMLSelectElement>('Show').value).toBe('text');
   expect(api.getAnnotationVersion).not.toHaveBeenCalled();
+});
+
+it('Show changes (off by default) marks removed text in the older and added text in the newer version, text unchanged', async () => {
+  const { mounted } = await viewer({ compare: 'corrected' });
+  const panel = await screen.findByRole('region', { name: 'Comparison' });
+  await waitFor(() => expect(panel.querySelector('.text-container')?.textContent).toBe('Immutable corrected'));
+  const toggle = screen.getByRole<HTMLInputElement>('checkbox', { name: 'Show changes' });
+  expect(toggle.checked).toBe(false);
+  const left = () => mounted.container.querySelector('.comparison-reading > .readonly-annotation-view .text-container')!;
+  const right = () => panel.querySelector('.text-container')!;
+  expect(mounted.container.querySelectorAll('.run--marker')).toHaveLength(0);
+  fireEvent.click(toggle);
+  // v1 on the left is the older text: "target" is removed there; v2 on the right adds "corrected".
+  await waitFor(() => expect([...left().querySelectorAll('.run--marker')].map(run => run.textContent)).toEqual(['target']));
+  expect(left().getAttribute('data-changes')).toBe('delete');
+  expect([...right().querySelectorAll('.run--marker')].map(run => run.textContent)).toEqual(['corrected']);
+  expect(right().getAttribute('data-changes')).toBe('insert');
+  expect(left().textContent).toBe('Immutable target'); expect(right().textContent).toBe('Immutable corrected');
+  expect(screen.getByText('1 passage added, 1 passage removed.')).toBeTruthy();
+  expect(screen.getByText(/^Changes from the current text \(de, version 1\) to the comparison text \(de, version 2\)/)).toBeTruthy();
+  expect(toggle.getAttribute('aria-describedby')).toBeTruthy();
+  fireEvent.click(toggle);
+  await waitFor(() => expect(mounted.container.querySelectorAll('.run--marker')).toHaveLength(0));
+  expect(left().hasAttribute('data-changes')).toBe(false);
+});
+
+it('Show changes says so when the texts differ too much, and marks nothing', async () => {
+  const text = (seed: number) => Array.from({ length: 6000 }, (_, index) => `w${index}x${seed}`).join(' ');
+  vi.mocked(api.getVariantText).mockImplementation(async (_project, doc) => ({ document_id: doc, text: text(doc === 'corrected' ? 2 : 1), text_sha256: 'text' }));
+  const { CaseViewer } = await import('../src/variants/CaseViewer');
+  const mounted = render(<CaseViewer {...props} compare="corrected" />);
+  const toggle = await screen.findByRole<HTMLInputElement>('checkbox', { name: 'Show changes' });
+  await waitFor(() => expect(mounted.container.querySelectorAll('.text-container')).toHaveLength(2));
+  fireEvent.click(toggle);
+  const note = await screen.findByText('The texts differ too much to show the changes.');
+  expect(note.getAttribute('role')).toBe('status');
+  expect(toggle.getAttribute('aria-describedby')).toBe(note.id);
+  expect(toggle.checked).toBe(true);
+  expect(mounted.container.querySelectorAll('.run--marker')).toHaveLength(0);
+  expect(mounted.container.querySelector('[data-changes]')).toBeNull();
+  expect(screen.queryByText(/removed text is struck through/)).toBeNull();
+});
+
+it('Show changes is offered only for two texts of the same language', async () => {
+  await viewer({ compare: 'source' });
+  const panel = await screen.findByRole('region', { name: 'Comparison' });
+  await waitFor(() => expect(panel.querySelector('.text-container')?.textContent).toBe('Immutable source'));
+  expect(screen.queryByRole('checkbox', { name: 'Show changes' })).toBeNull();
 });
 
 it('closing a deep-linked comparison keeps an explicit "Text only"', async () => {

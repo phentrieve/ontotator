@@ -1,10 +1,12 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MutableRefObject, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MutableRefObject, type ReactNode } from "react";
 import { api, ApiError, type CheckedSentences, type ReviewWorkspace, type TaskSummary, type TranslationReviewRecord, type SourceObligationView } from "../api/client";
 import { ErrorNotice } from "../admin/ErrorNotice";
 import { nextOpenTask } from "../app/caseOrder";
 import { MY_TASKS, routeHref, type Route, type RouteLeaveGuard } from "../app/router";
 import { isNotAvailable, NotFound, TASK_UNAVAILABLE, TASK_UNAVAILABLE_REASON } from "../app/NotFound";
-import { Button, Checkbox, ConfirmDialog, Dialog, IconRetry, InlineMessage, Kbd, MenuButton, StatusBadge, useMediaQuery, type StatusTone } from "../ui";
+import { Button, Checkbox, ConfirmDialog, Dialog, IconButton, IconChevronLeft, IconChevronRight, IconRetry, InlineMessage, Kbd, MenuButton, StatusBadge, useMediaQuery, type StatusTone } from "../ui";
+import { SidebarResizer } from "../editor/SidebarResizer";
+import { useSidebarWidth, type SidebarLimits } from "../editor/sidebarWidth";
 import { PausedNotice } from "../editor/PausedNotice";
 import { useShortcut } from "../ui/shortcuts";
 import { caretInParagraph, paragraphStarts } from "../variants/paragraphs";
@@ -18,7 +20,7 @@ import { ChecksSummary, ReviewSummary, SubmitSummary } from "./ReviewParts";
 import { ReviewForm } from "./ReviewForm";
 import { taskText } from "../app/identity";
 import { autoNoteText, chooseDecision, reactToTextEdit, USER_ORIGIN, type DecisionState } from "./decisionOrigin";
-import { annotateThisTextLabel, categoryLabels, comparisonCountsDiffer, couplingEditingNote, couplingNote, decisionKeyHint, decisionLabels, decisionOutcomes, formatReviewDate, issueMessages, languageName, leadCorrectionKeyHint, leadCorrectionNote, matchingParagraphStatus, nextTaskLabel, paragraphCountChanged, paragraphCountsDiffer, remainingTasksText, reviewIssueMessage, showMatchingLabel, showMatchingShortcut, showMatchingTitle } from "./labels";
+import { acceptedCorrection, annotateThisTextLabel, categoryLabels, comparisonCountsDiffer, couplingEditingNote, couplingNote, decisionKeyHint, decisionLabels, decisionOutcomes, formatReviewDate, issueMessages, languageName, leadCorrectionKeyHint, leadCorrectionNote, matchingParagraphStatus, nextTaskLabel, paragraphCountChanged, paragraphCountsDiffer, remainingTasksText, reviewIssueMessage, showMatchingLabel, showMatchingShortcut, showMatchingTitle } from "./labels";
 import { checkReview, type ClinicalCategory, type ReviewDecisionCode, type ReviewForm as FormValue } from "./reviewRules";
 import { LanguageTag } from "../ui/LanguageTag";
 import { SentenceCount, SentenceView } from "./SentenceMarks";
@@ -90,6 +92,18 @@ function paragraphAbove(element: HTMLElement, y: number): number {
   return paragraph;
 }
 
+/** Storage key of the reviewer's "Your review" width (issue 410). */
+const reviewPanelKey = (username: string) => `ontotator.translationReview.panelWidth.v1:${username}`;
+
+/**
+ * Limits of the "Your review" rail from 1100 px (issue 410): at least 300 px, at most half the window and never so wide
+ * that the texts get less than 560 px; by default clamp(360 px, 22 vw, 440 px), as before it could be resized.
+ */
+function reviewPanelLimits(viewport: number): SidebarLimits {
+  const max = Math.max(300, Math.min(720, Math.floor(viewport * 0.5), viewport - 560));
+  return { min: 300, max, fallback: Math.min(max, Math.round(Math.min(440, Math.max(360, viewport * 0.22)))) };
+}
+
 export function TranslationReviewScreen(props: TranslationReviewScreenProps): JSX.Element {
   const [loaded, setLoaded] = useState<{ workspace: ReviewWorkspace; generation: number } | null>(null);
   const [error, setError] = useState<unknown>(null), [retry, setRetry] = useState(0);
@@ -114,6 +128,12 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   const immutableReadOnly = workspace.read_only && (!workspace.assignment.held || workspace.assignment.status === "submitted" || workspace.submitted_record !== null);
   const held = props.held ?? workspace.assignment.held;
   const leadCorrection = workspace.lead_correction;
+  // Issue 341 b: the lead corrects an accepted version; the new version is reviewed again.
+  // `reviewed_again` also covers a further correction after that new version was rejected or queried.
+  const correctsAccepted = leadCorrection && !!workspace.reviewed_again;
+  const versionAccepted = workspace.variant.translation_status === "accepted";
+  const leadNote = !correctsAccepted ? leadCorrectionNote : versionAccepted ? acceptedCorrection.note : acceptedCorrection.noteNotAccepted;
+  const leadDescriptions = correctsAccepted ? { accepted_corrected: acceptedCorrection.description } : undefined;
   const editable = !immutableReadOnly && !held;
   // A stored Query/Rejected draft without the implied clinical change is normalised once on open (and saved).
   // A lead correction preselects Accepted with corrections; a stored other decision is replaced and saved.
@@ -372,6 +392,18 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   }, [startsRevision]);
   /** At least 1100 px: decision in a pinned rail; narrower: decision follows the texts and a bar pins Submit. */
   const wide = useMediaQuery("(min-width: 1100px)");
+  /** "Your review" rail (issue 410): from 1100 px it can be resized and collapsed; both are remembered per user in this browser. */
+  const panel = useSidebarWidth(props.username, { storageKeyFor: reviewPanelKey, limitsFor: reviewPanelLimits });
+  const panelCollapsedKey = `ontotator.translationReview.panelCollapsed.v1:${props.username}`;
+  const [panelCollapsed, setPanelCollapsed] = useState(() => { try { return window.localStorage.getItem(panelCollapsedKey) === "1"; } catch { return false; } });
+  /** Collapses or expands the rail; focus moves to `focus`, else to the control that replaces the clicked one. */
+  const collapsePanel = (collapsed: boolean, focus?: () => void) => {
+    setPanelCollapsed(collapsed);
+    try { window.localStorage.setItem(panelCollapsedKey, collapsed ? "1" : "0"); } catch { /* Blocked storage: not remembered. */ }
+    window.requestAnimationFrame(() => focus ? focus() : screenRoot.current?.querySelector<HTMLElement>(collapsed ? ".translation-decision-expand" : ".translation-decision-collapse")?.focus());
+  };
+  /** The rail with its footer is shown; collapsed (or below 1100 px) the pinned bar keeps the decision and Submit reachable. */
+  const railOpen = wide && !panelCollapsed;
   type Leave = { kind: "leave" | "logout"; resolve?: (allowed: boolean) => void; proceed?: () => void };
   const [leave, setLeave] = useState<Leave | null>(null);
   const pendingLeave = useRef<Leave | null>(null), leavePromise = useRef<Promise<boolean> | null>(null);
@@ -571,7 +603,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     if (active && active !== document.body) return;
     if (focusedControl.current === "submit") submitControl.current?.focus({ preventScroll: true });
     else if (focusedControl.current === "reason") submitReason.current?.focus({ preventScroll: true });
-  }, [wide]);
+  }, [railOpen]);
   /** Heights of the bands above and below the texts and of the pinned bar, for the text height below 1100 px. */
   useEffect(() => {
     const root = screenRoot.current;
@@ -593,7 +625,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     root.querySelectorAll(".translation-review > .notice, .translation-review-bar, .translation-checks, .translation-tools, .translation-pinned-bar, .translation-column-head, .translation-column-note, .translation-column-hint")
       .forEach(element => observer.observe(element));
     return () => observer.disconnect();
-  }, [wide, readOnly, showChanges, comparisonId, comparisonOpen, coupled, marking]);
+  }, [wide, railOpen, readOnly, showChanges, comparisonId, comparisonOpen, coupled, marking]);
   const closeDetails = (event: KeyboardEvent<HTMLDetailsElement>) => {
     if (event.key !== "Escape" || !event.currentTarget.open) return;
     event.preventDefault(); event.stopPropagation();
@@ -605,11 +637,15 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     const element = index < 0 ? null : targetElement?.querySelector<HTMLElement>(`[data-sentence="${index}"]`);
     element?.scrollIntoView?.({ block: "center" }); element?.focus({ preventScroll: true });
   };
-  const focusDecision = () => { decisionHeading.current?.scrollIntoView?.({ block: "nearest" }); decisionHeading.current?.focus(); };
+  const focusHeading = () => { decisionHeading.current?.scrollIntoView?.({ block: "nearest" }); decisionHeading.current?.focus(); };
+  const focusDecision = () => { if (wide && panelCollapsed) collapsePanel(false, focusHeading); else focusHeading(); };
   /** "Change ↓" in the pinned bar: bring the decision legend into view and move focus to it. */
   const focusDecisionLegend = () => {
-    const legend = screenRoot.current?.querySelector<HTMLElement>("[data-decision-legend]");
-    legend?.scrollIntoView?.({ block: "start" }); legend?.focus({ preventScroll: true });
+    const focusLegend = () => {
+      const legend = screenRoot.current?.querySelector<HTMLElement>("[data-decision-legend]");
+      legend?.scrollIntoView?.({ block: "start" }); legend?.focus({ preventScroll: true });
+    };
+    if (wide && panelCollapsed) collapsePanel(false, focusLegend); else focusLegend();
   };
 
   const [status, statusTone]: readonly [string, StatusTone] = readOnly ? ["Read-only", "neutral"] : ({
@@ -638,7 +674,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   /** Pinned bar: one line (first issue or blocker, "and n more"); the full list then stays in the decision form. */
   const reasonFirst = listedIssues ? issueMessages[issues[0]] : submitBlocker, reasonMore = listedIssues ? issues.length - 1 : 0;
   const submitReasonElement = reasonShown && <div id="review-submit-reason" ref={submitReason} tabIndex={-1} className="translation-submit-reason" aria-live="polite">
-    {!wide ? <p className="translation-submit-reason-line" title={`${reasonFirst ?? ""}${reasonMore > 0 ? ` and ${reasonMore} more` : ""}`}>
+    {!railOpen ? <p className="translation-submit-reason-line" title={`${reasonFirst ?? ""}${reasonMore > 0 ? ` and ${reasonMore} more` : ""}`}>
         <span className="translation-submit-reason-first">{reasonFirst}</span>{reasonMore > 0 && <span className="translation-submit-reason-more">{` and ${reasonMore} more`}</span>}</p>
       : listedIssues
         ? <><p>Before submitting:</p><ol className="review-issues" aria-label="Review issues">{issues.map((issue, index) => <li key={`${issue}-${index}`}>{issueMessages[issue]}</li>)}</ol></>
@@ -678,7 +714,8 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     {/* Under the task header, as in the annotation editor; gone once the review is submitted here. */}
     {!readOnly && props.guidelineNotice}
     <ChecksSummary failed={workspace.failed_checks} all={allChecks} />
-    <div className="translation-workspace">
+    <div className={`translation-workspace${wide && panelCollapsed ? " translation-workspace--collapsed" : ""}`}
+      style={railOpen ? { "--review-panel-width": `${panel.width}px` } as CSSProperties : undefined}>
       <div className="translation-texts">
         <div className="translation-tools" role="group" aria-label="Text view">
           {!readOnly && !touchOnly && <Checkbox id="review-mark-checked" label="Mark checked sentences" checked={marking} onChange={event => chooseMarking(event.target.checked)} />}
@@ -754,13 +791,22 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
           </p>}
         </div>
       </div>
-      <aside className="translation-decision density-compact" aria-labelledby="translation-decision-heading">
-        <div className="translation-decision-body">
-          <h2 id="translation-decision-heading" className="translation-section-title" ref={decisionHeading} tabIndex={-1}>Your review</h2>
+      <aside className={`translation-decision density-compact${wide && panelCollapsed ? " translation-decision--collapsed" : ""}`} aria-labelledby="translation-decision-heading">
+        {railOpen && <SidebarResizer side="start" label="Resize review panel" hint="Resize the review panel (focus the divider)" controls="translation-decision-body"
+          width={panel.width} limits={panel.limits} onChange={panel.setWidth} onReset={panel.reset} onCommit={panel.commit} />}
+        {wide && panelCollapsed && <button type="button" className="translation-decision-expand" aria-label="Expand review panel" title="Expand review panel"
+          aria-expanded={false} aria-controls="translation-decision-body" onClick={() => collapsePanel(false)}>
+          <IconChevronLeft /><span className="translation-decision-strip-label" aria-hidden="true">Your review</span></button>}
+        <div className="translation-decision-body" id="translation-decision-body" hidden={wide && panelCollapsed}>
+          <div className="translation-decision-head">
+            <h2 id="translation-decision-heading" className="translation-section-title" ref={decisionHeading} tabIndex={-1}>Your review</h2>
+            {wide && <IconButton size="sm" variant="quiet" className="translation-decision-collapse" label="Collapse review panel" icon={<IconChevronRight />}
+              aria-expanded aria-controls="translation-decision-body" onClick={() => collapsePanel(true)} />}
+          </div>
           <SourceObligationReview assignmentId={props.assignmentId} username={props.username} documentId={workspace.variant.document_id}
             translationText={text} canResolve={canSubmit && !!form && ['accepted_unchanged', 'accepted_corrected'].includes(form.decision)}
             busy={busy} readOnly={readOnly} error={error} onResolve={submit} />
-          {submitted && <InlineMessage tone="success" title="Review submitted"><p>{decisionOutcomes[submitted.decision]}</p>
+          {submitted && <InlineMessage tone="success" title="Review submitted"><p>{correctsAccepted && submitted.decision === "accepted_corrected" ? acceptedCorrection.outcome : decisionOutcomes[submitted.decision]}</p>
             {createdVersion !== null && <p>A corrected version v{createdVersion} was created.</p>}
             {submitted.created_variant_id && createdVersion === null && <Button size="sm" onClick={() => { void loadCreated(submitted); }}>Retry corrected version metadata</Button>}</InlineMessage>}
           {submitted && leadCorrection && <div className="translation-next-task">
@@ -778,13 +824,13 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
           </div>}
           {record ? <ReviewSummary record={record} heading="Submitted review" />
             : held ? <><InlineMessage tone="info">This task is paused. Your review choices are kept.</InlineMessage>
-              {leadCorrection && <InlineMessage tone="info">{leadCorrectionNote}</InlineMessage>}
-              <ReviewForm value={visualForm(rawForm)} issues={[]} failedCheckCount={workspace.failed_checks.length} readOnly decisions={leadCorrection ? leadDecisions : undefined} onChange={() => {}} /></>
+              {leadCorrection && <InlineMessage tone="info">{leadNote}</InlineMessage>}
+              <ReviewForm value={visualForm(rawForm)} issues={[]} failedCheckCount={workspace.failed_checks.length} readOnly decisions={leadCorrection ? leadDecisions : undefined} descriptions={leadDescriptions} onChange={() => {}} /></>
             : readOnly ? <InlineMessage tone="info">This review can no longer be edited.</InlineMessage>
             : <>
-              {leadCorrection && <InlineMessage tone="info">{leadCorrectionNote}</InlineMessage>}
+              {leadCorrection && <InlineMessage tone="info">{leadNote}</InlineMessage>}
               {decision(rawForm.decision) && !form && <InlineMessage tone="error">The review form contains unsupported values. Update the affected fields before submitting.</InlineMessage>}
-              <ReviewForm value={visualForm(rawForm)} issues={!wide && !busy ? issues : []} readOnly={busy} decisions={leadCorrection ? leadDecisions : undefined} failedCheckCount={workspace.failed_checks.length}
+              <ReviewForm value={visualForm(rawForm)} issues={!railOpen && !busy ? issues : []} readOnly={busy} decisions={leadCorrection ? leadDecisions : undefined} descriptions={leadDescriptions} failedCheckCount={workspace.failed_checks.length}
                 autoNote={autoNoteText(decisionState.note)} onChooseDecision={chooseOption} onChange={next => {
                 const current = draftRef.current;
                 edit({ ...current, form: { ...(!has(current.form, "clinical_change") ? { clinical_change: false } : {}), ...current.form, ...next } });
@@ -806,7 +852,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
               <p className="review-history-text">{value.proposed_text}</p></details>)}
           </section>}
         </div>
-        {!readOnly && wide && <div className="translation-decision-footer">
+        {!readOnly && railOpen && <div className="translation-decision-footer">
           {qualificationNote}
           {/* Why Submit is unavailable, right next to it; the review rules' issues are listed here too. */}
           {submitReasonElement}
@@ -815,7 +861,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
         </div>}
       </aside>
     </div>
-    {!readOnly && !wide && <div className="translation-pinned-bar density-compact" role="region" aria-label="Decision and submit">
+    {!readOnly && !railOpen && <div className="translation-pinned-bar density-compact" role="region" aria-label="Decision and submit">
       <p className="translation-pinned-decision"><strong>Decision:</strong> {decision(rawForm.decision) ? decisionLabels[rawForm.decision] : "Not chosen"}</p>
       <Button size="sm" onClick={focusDecisionLegend}>Change ↓</Button>
       {qualificationNote}
@@ -824,7 +870,8 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     </div>}
     {form && <ConfirmDialog focusConfirm open={confirming} title="Submit this review?" confirmLabel="Submit review" cancelLabel="Keep editing" busy={busy}
       message={<SubmitSummary decision={form.decision} clinical={form.clinical_change} categories={form.categories ?? []} rationale={form.rationale}
-        failedChecks={form.decision === "accepted_unchanged" ? workspace.failed_checks.map(check => check.code) : []} />}
+        failedChecks={form.decision === "accepted_unchanged" ? workspace.failed_checks.map(check => check.code) : []}
+        consequence={!correctsAccepted ? undefined : versionAccepted ? acceptedCorrection.consequence : acceptedCorrection.consequenceNotAccepted} />}
       onCancel={() => setConfirming(false)} onConfirm={() => { void submit(); }} />}
     {leave && <Dialog open title={leave.kind === "logout" ? "Unsaved changes" : "Changes not saved"} onClose={busy ? undefined : () => closeLeave(false)} footer={<>
       <Button disabled={busy} onClick={() => closeLeave(false)}>Cancel</Button>

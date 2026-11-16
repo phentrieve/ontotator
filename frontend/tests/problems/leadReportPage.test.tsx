@@ -79,6 +79,8 @@ describe("lead report page structure", () => {
     expect(await screen.findByRole("heading", { name: "Problem report not found" })).toBeTruthy();
     expect(screen.getByRole("link", { name: /Back to Documents/ })).toBeTruthy();
     cleanup();
+    // Vitest 3+ hands back the existing spy on a second spyOn; start from a fresh one.
+    vi.restoreAllMocks();
     const get = vi.spyOn(api, "getProblemReport").mockRejectedValueOnce(new ApiError(500, "Server down")).mockResolvedValueOnce(leadReport());
     vi.spyOn(api, "listDocumentRows").mockResolvedValue(rowsPage(null));
     render(<ProblemReportDetail projectKey="p" reportId="r1" canManage onNavigate={vi.fn()} />);

@@ -113,7 +113,7 @@ def codes(row: dict[str, Any]) -> list[str]:
     return [step["code"] for step in row["steps"]]
 
 
-def test_registry_has_eight_scenarios_and_unknown_is_404(client):
+def test_registry_has_nine_scenarios_and_unknown_is_404(client):
     assert set(BUILDERS) == {
         "D15",
         "DEFAULT_IMPORT",
@@ -122,6 +122,7 @@ def test_registry_has_eight_scenarios_and_unknown_is_404(client):
         "ACCEPTANCE",
         "ROWS",
         "REJECTED_TRANSLATION_FOR_LEAD",
+        "ACCEPTED_TRANSLATION_FOR_LEAD",
         "UPLOAD_DIALOG",
     }
     response = client.post("/__test_lead_workflow__", params={"scenario": "S99"})
@@ -246,6 +247,22 @@ def test_rows_mixed_plans_report_rejected_and_row_actions(client):
     assert {(True, True), (True, False), (False, True), (False, False)} <= plans
     assert not rows[(cases["not_in_plan"], "en")]["in_plan"]
     assert bar["needs_decision"] >= 4 and bar["to_assign"] > 0
+
+
+def test_accepted_translation_for_lead_builds(client):
+    """Issue 341: an accepted de version with annotation work, one unreviewed."""
+    built = scenario(client, "ACCEPTED_TRANSLATION_FOR_LEAD")
+    cases = built["cases"]
+    _, rows = lead_rows(client, built)
+    accepted = rows[(cases["accepted"], "de")]
+    (version,) = accepted["versions"]
+    assert version["translation_status"] == "accepted"
+    work = sorted(
+        (w["task"], w["status"]) for w in accepted["work"] if w["task"] == "annotate"
+    )
+    assert work == [("annotate", "open"), ("annotate", "submitted")]
+    (unreviewed,) = rows[(cases["unreviewed"], "de")]["versions"]
+    assert unreviewed["translation_status"] not in ("accepted", "reviewed")
 
 
 def test_rejected_translation_for_lead_builds(client):

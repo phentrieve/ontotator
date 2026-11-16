@@ -22,7 +22,9 @@ from ontotator.domain.submission_labels import round_ordinals
 from ontotator.domain.work_rounds import (
     CARRY_ROUND_KINDS,
     RoundInputView,
+    RoundSourceText,
     WorkRoundView,
+    unresolved_note,
 )
 from ontotator.storage.repository import Repository
 from ontotator.storage.tables import SubmissionRow
@@ -298,7 +300,8 @@ def enrich_inputs(
                     "source_recorded_at": row.recorded_at if row is not None else None,
                     "source_language": variant.language if variant else None,
                     "source_version": version,
-                    "unresolved_note": notes.get(view.input_id),
+                    # Stored with the input (#418), else read from its source.
+                    "unresolved_note": view.unresolved_note or notes.get(view.input_id),
                 }
             )
         )
@@ -313,7 +316,10 @@ def _unresolved_notes(
     from ontotator.storage.overview_tables import DraftSnapshotRow
 
     tool = [
-        v for v in views if v.source_snapshot.annotation.provenance.actor.kind == "tool"
+        v
+        for v in views
+        if v.source_snapshot.annotation.provenance.actor.kind == "tool"
+        and v.unresolved_note is None
     ]
     sids = {v.source_submission_id for v in tool if v.source_submission_id}
     dids = {
@@ -343,14 +349,11 @@ def _unresolved_notes(
     notes: dict[str, str] = {}
     for view in tool:
         source = view.source_submission_id or view.source_draft_snapshot_id
-        target = view.source_ref.model_dump()
-        for decision in decisions.get(source or "", []):
-            if (
-                decision["outcome"] == "uncertain"
-                and decision["target"] == target
-                and (decision.get("note") or "").strip()
-            ):
-                notes[view.input_id] = decision["note"].strip()
+        note = unresolved_note(
+            view.source_ref.model_dump(), decisions.get(source or "", [])
+        )
+        if note is not None:
+            notes[view.input_id] = note
     return notes
 
 
@@ -461,3 +464,57 @@ def assignment_submissions(
             }
         )
     return result
+
+
+def _source_document_id(conn: Connection, pid: int, view: WorkRoundView) -> str | None:
+    """The document the carry of ``view`` re-anchored from (``text_map``'s old
+    text): the source submission's text, or for a text change the version the
+    lead moved the draft from. None for other kinds and unknown sources."""
+    from ontotator.storage.overview_tables import TextChangeResolutionRow
+
+    if view.kind not in CARRY_ROUND_KINDS:
+        return None
+    if view.input_submission_ids:
+        found: str | None = conn.execute(
+            select(SubmissionRow.document_id).where(
+                SubmissionRow.project_id == pid,
+                SubmissionRow.submission_id == view.input_submission_ids[0],
+            )
+        ).scalar_one_or_none()
+        return found
+    moved: str | None = conn.execute(
+        select(TextChangeResolutionRow.from_document_id)
+        .where(
+            TextChangeResolutionRow.project_id == pid,
+            TextChangeResolutionRow.round_id == view.round_id,
+        )
+        .limit(1)
+    ).scalar_one_or_none()
+    return moved
+
+
+def round_source_text(
+    repo: Repository, project_key: str, view: WorkRoundView
+) -> RoundSourceText | None:
+    """The earlier text version an authorized carried round came from (issue
+    421, "Show changes since vN"); None when its source is the same text."""
+    if view.kind not in CARRY_ROUND_KINDS:
+        return None
+    # The round is authorized; its source text is read unscoped (the version
+    # the work was moved from may no longer be assigned to the reader).
+    plain = Repository(repo.db)
+    with plain.db.snapshot() as conn:
+        pid = plain._require_project(conn, project_key)
+        source_id = _source_document_id(conn, pid, view)
+        if source_id is None or source_id == view.document_id:
+            return None
+        variant = plain.get_variant(project_key, source_id)
+        document = plain.get_document(project_key, source_id)
+    if document is None:
+        return None
+    return RoundSourceText(
+        document_id=source_id,
+        language=variant.language,
+        version=variant.version,
+        text=document.text,
+    )

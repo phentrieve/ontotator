@@ -60,7 +60,7 @@ The header is the same on every page:
 - **Ontotator** on the left takes you to the start page.
 - The breadcrumb shows where you are, for example **My tasks** or **Documents**.
 - On the right are your display name, your pseudonym, your roles and **Log out**.
-- **Handbook** in the header opens this handbook inside the app. On the Documents, consolidation and translation review screens, **Help** opens the handbook section about that screen; in the editor it is **More** > **Help for this screen**. On the project forms, a link next to the task profile opens the section that explains it. Click a screenshot in the handbook to open it at full size in a new tab.
+- **Handbook** in the header opens this handbook inside the app. On the Documents, consolidation and translation review screens, **Help** opens the handbook section about that screen; in the editor it is **More** > **Help for this screen**. On the project forms, a link next to the task profile opens the section that explains it. In the text card, **How to use it** next to *Newer set available* opens the section on new tool proposals. Click a screenshot in the handbook to open it at full size in a new tab.
 - Below the chapter list, the handbook shows the app's version and commit, for example `Ontotator 0.3.0 · commit cc65cea`. Quote it when you report a problem.
 
 The sidebar lists **My tasks**, **Projects**, **Profile** and **Technical problem…** (see [Report a technical problem](#report-a-technical-problem)). The number after **My tasks** counts your open tasks, the same tasks as the **To do** tab; it updates as soon as you submit a text. Clicking **My tasks** or **Projects** loads your projects and the count again, so a project you were just added to shows up without reloading the page. Leads also see their project's pages (**Documents**, **Progress**, **Settings**, **Export**). System administrators also see **Administration** with **Users**, **Ontologies**, **Technical reports**, **New project** and **Server settings** (see [Administration](admin.md)). In the editor, the sidebar folds into **Sections**; click it to open it.
@@ -72,13 +72,24 @@ What for: tell the system administrators about an error message, a page that doe
 1. Click **Technical problem…** in the sidebar. In the editor, open **More** and choose **Report a technical problem…**. If a text cannot be displayed, the message *Something went wrong while displaying this text.* offers **Report a technical problem…** too, and so does *Something went wrong while displaying this page.* when another screen, such as My tasks or Documents, cannot be displayed.
 2. Under **What happened?**, write what you did and what you saw.
 3. Click **Send report**.
-4. The dialog shows a reference, for example *TR-12*. Quote it if you ask an administrator about your report.
+4. The dialog shows *Sent as TR-12.* (your reference). Quote it if you ask an administrator about your report. Click **See my reports** to open the list of your reports.
 
 The report goes to the system administrators, not to your project lead. Your task is not paused.
 
 Ontotator adds what the administrators need to find the cause: the app version, the task if you send it from one (its kind, the project and the text), the screen, your browser, the window size and the last error the app received. From the crash message it also adds the error. Open **Added automatically** to see it before you send.
 
 The report stays inside Ontotator; nothing is sent by e-mail or elsewhere. Do not write patient details beyond what is needed to describe the problem.
+
+### See your technical reports
+
+What for: look up a report you sent and whether it was handled.
+
+1. Click **Profile** in the sidebar and scroll to **My technical reports**. From the report dialog, click **My reports** (before sending) or **See my reports** (after sending).
+2. The table shows each report you sent, newest first: **Ref.** (for example *TR-12*), **Sent**, **What happened** (your text; open a long text to read all of it) and **Status**. If you sent 100 reports or more, the newest 100 are shown; click **Show older reports** below the table for the rest.
+
+**Open** means the administrators have not handled the report yet; **Done** means an administrator marked it as handled. Only you and the system administrators see your reports. Administrators do not answer in Ontotator; if you need an answer, contact an administrator and quote the reference.
+
+If you have typed text in the dialog, **My reports** does not close it: send or cancel the report first. The crash screens do not show these links.
 
 ## Switch project
 

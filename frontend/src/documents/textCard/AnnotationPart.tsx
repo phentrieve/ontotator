@@ -1,10 +1,12 @@
 import { textLabel } from "../../app/identity";
 import { useId, useRef, type ReactNode } from "react";
-import type { DocumentRowView, RowSubmissionView } from "../../api/client";
+import type { DocumentRowView, RowProposalSetView, RowSubmissionView } from "../../api/client";
 import { plural } from "../../app/labels";
 import type { ProjectDocumentsQuery, Route } from "../../app/router";
 import { annotationTaskName } from "../../editor/modes";
+import { helpHref } from "../../help/sections";
 import { Button } from "../../ui/Button";
+import { StatusBadge } from "../../ui/StatusBadge";
 import { RouteLink } from "../RowCells";
 import { shortName } from "../stageLabels";
 import type { TextVersionsTools } from "../TextVersions";
@@ -14,6 +16,35 @@ import { assignedLine, workerName, WorkPersonRow } from "./WorkPersonRow";
 
 const NO_PROPOSALS = "This text has no tool proposals, so it is annotated from scratch.";
 const MODE_TEXT = { proposals: "from proposals", scratch: "from scratch" } as const;
+
+/** "2026-11-10": the local day a proposal set was imported (337-A). */
+export function setDate(iso: string): string {
+  const day = new Date(iso);
+  if (Number.isNaN(day.getTime())) return iso.slice(0, 10);
+  return `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
+}
+
+/** "set 2026-10-02 (phentrieve 1.4), 24 proposals" (issue 337, 337-A). */
+export function proposalSetText(set: RowProposalSetView): string {
+  const tool = [set.tool, set.tool_version].filter(Boolean).join(" ");
+  return `set ${setDate(set.imported_at)}${tool ? ` (${tool})` : ""}, ${plural(set.proposal_count, "proposal")}`;
+}
+
+/** A person row names their set only when it differs from the text's: "newest set" or "set 2026-10-02". */
+export function personSetText(item: Pick<CardWorkItem, "proposal_set" | "proposal_set_unrecorded">, shown: RowProposalSetView | null | undefined): string | null {
+  const own = item.proposal_set;
+  // Started before sets were recorded: said per person only when the text's line names a set.
+  if (item.proposal_set_unrecorded && shown) return "set not recorded";
+  if (!own || !shown || own.set_id === shown.set_id) return null;
+  return own.newest ? "newest set" : `set ${setDate(own.imported_at)}`;
+}
+
+/** "Annotators: 4 for this text (project: 1)" when the text has its own value (issue 422, 422-B). */
+export function ownLimitText(row: Pick<DocumentRowView, "annotations_per_text">): string | null {
+  const limit = row.annotations_per_text;
+  if (!limit || limit.override == null) return null;
+  return `Annotators: ${limit.override} for this text (project: ${limit.project})`;
+}
 
 /** Joins the parts of a details line with " · ". */
 function joined(parts: readonly ReactNode[]): ReactNode {
@@ -82,6 +113,7 @@ export function AnnotationPart({ row, projectKey, query, submissions, canManage,
   const full = target > 0 && assigned >= target;
   const annotating = row.stages?.annotation.state !== "not_planned";
   const status = target > 0 ? (assigned === 0 ? `Nobody assigned yet (limit ${target} per text).` : `${assigned} of ${target} annotators assigned.`) : null;
+  const ownLimit = ownLimitText(row);
   // Version-aware as `CardPlanSelect`: "no_proposals" means the current version has none.
   const proposals = mode?.source === "no_proposals" ? 0 : mode?.proposal_count ?? row.proposal_count ?? 0;
   const openLayer = (name: string, documentId: string, submissionId: string, removed = false) =>
@@ -97,7 +129,16 @@ export function AnnotationPart({ row, projectKey, query, submissions, canManage,
     {/* Without the plan control (texts outside the plan, annotators) the mode is a line of its own. */}
     {!planControl && mode && <p>{annotationTaskName(mode.mode)}</p>}
     {!planControl && mode?.source === "no_proposals" && <p className="text-card-muted">{NO_PROPOSALS}</p>}
-    {proposals > 0 && <p className="text-card-muted">{plural(proposals, "tool proposal")}</p>}
+    {proposals > 0 && (row.proposal_set
+      ? <p className="text-card-muted text-card-proposal-set"><span className="text-card-label">Proposals</span> {proposalSetText(row.proposal_set)}
+        {mode?.mode === "proposals" && row.newer_proposal_set && <>
+          {" "}<StatusBadge tone="info">{`Newer set available: ${setDate(row.newer_proposal_set.imported_at)}`}</StatusBadge>
+          {" "}<a href={helpHref("newerProposals")} target="_blank" rel="noopener noreferrer">How to use it</a>
+        </>}</p>
+      : row.proposal_set_unrecorded
+        ? <p className="text-card-muted text-card-proposal-set"><span className="text-card-label">Proposals</span> set not recorded (the tasks started before sets were recorded)</p>
+        : <p className="text-card-muted">{plural(proposals, "tool proposal")}</p>)}
+    {ownLimit && <p className="text-card-muted">{ownLimit}</p>}
     {annotating && row.unreviewed_translation && <p className="text-card-muted">Translation not reviewed yet</p>}
     {annotating && status && <p id={`${id}-status`}>{status}</p>}
     {(people.length > 0 || removedPeople.length > 0) && <PersonList label="Annotators">
@@ -112,6 +153,7 @@ export function AnnotationPart({ row, projectKey, query, submissions, canManage,
           item.held && "Paused",
           submittedText,
           assignedText ? <>{assignedText}{modeText && `, ${modeText}`}</> : modeText,
+          personSetText(item, row.proposal_set),
         ]);
         return <WorkPersonRow key={item.assignment_id} item={item} caseId={row.case_id} textName={textLabel(row)} details={details} canManage={canManage} tools={tools}
           onChanged={onChanged} onRemoved={focusAfterRemoval} open={layer ? openLayer(workerName(item), item.document_id, layer.submission_id) : undefined} />;

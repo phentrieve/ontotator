@@ -699,7 +699,12 @@ def test_assignment_admin_routes_partial_refusals_display_name_and_confirmations
     assert len(created.json()["created"]) == 1
     assert created.json()["created"][0]["display_name"] == "alice"
     assert created.json()["refused"] == [
-        {"document_id": "doc-alpha", "username": "missing", "code": "USER_NOT_FOUND"}
+        {
+            "document_id": "doc-alpha",
+            "username": "missing",
+            "code": "USER_NOT_FOUND",
+            "reason": None,
+        }
     ]
     listed = admin.get(
         f"/api/v1/projects/{PROJECT}/assignments",

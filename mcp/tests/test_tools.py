@@ -570,38 +570,90 @@ def _results(fake: FakeApi) -> None:
     )
 
 
-async def test_accept_agreeing_texts_dry_run_changes_nothing(
+ACCEPT = f"{P}/final-selections/accept-agreeing"
+
+
+def _preview(**fields: Any) -> dict[str, Any]:
+    skipped = build(
+        "AgreeingSkip",
+        case_id="differ",
+        language="en",
+        reason="differ",
+        message="No result you may accept agrees in full.",
+    )
+    text = build(
+        "AgreeingText",
+        case_id="agree",
+        language="en",
+        document_id="agree-en-v1",
+        submission_id="s1",
+        findings=2,
+    )
+    return (
+        build(
+            "AcceptAgreeingView",
+            project="p",
+            applied=False,
+            texts=[text],
+            skipped=[skipped],
+            already_final=3,
+            unknown_case_ids=["nope"],
+            preview_token="sha256:one",
+        )
+        | fields
+    )
+
+
+async def test_accept_agreeing_texts_dry_run_asks_the_server_once(
     fake: FakeApi, mcp_client: Client
 ) -> None:
-    _results(fake)
-    result = await call(mcp_client, "accept_agreeing_texts", {"project": "p"})
+    fake.on("POST", ACCEPT, _preview())
+    result = await call(
+        mcp_client, "accept_agreeing_texts", {"project": "p", "case_ids": ["agree"]}
+    )
+    assert fake.templates() == [("POST", ACCEPT)]
+    [request] = fake.calls_to("POST", ACCEPT)
+    assert request.json() == {"preview": True, "case_ids": ["agree"]}
     assert result["applied"] is False
     assert [t["case_id"] for t in result["would_accept"]] == ["agree"]
-    reasons = {s["case_id"]: s["reason"] for s in result["skipped"]}
-    assert reasons["differ"].startswith("submissions differ")
-    assert reasons["open"] == "fewer than two submissions"
+    assert result["skipped"][0]["message"].startswith("No result")
+    assert result["skipped_by_reason"] == {"differ": 1}
+    assert result["unknown_case_ids"] == ["nope"]
+    assert (result["already_final"], result["preview_token"]) == (3, "sha256:one")
+
+
+async def test_accept_agreeing_texts_applies_the_dry_runs_token(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    fake.on("POST", ACCEPT, _preview(applied=True))
+    with pytest.raises(ToolFailed, match="preview_token"):
+        await call(
+            mcp_client, "accept_agreeing_texts", {"project": "p", "confirm": True}
+        )
+    assert not fake.calls
+    result = await call(
+        mcp_client,
+        "accept_agreeing_texts",
+        {"project": "p", "confirm": True, "preview_token": "sha256:one"},
+    )
+    [request] = fake.calls_to("POST", ACCEPT)
+    assert request.json() == {"preview_token": "sha256:one"}
+    assert [t["submission_id"] for t in result["accepted"]] == ["s1"]
     assert not fake.calls_to("PUT", f"{P}/final-selections")
 
 
-async def test_accept_agreeing_texts_accepts_with_confirm(
+async def test_accept_agreeing_texts_stale_token_returns_a_fresh_dry_run(
     fake: FakeApi, mcp_client: Client
 ) -> None:
-    _results(fake)
-    fake.on(
-        "PUT",
-        f"{P}/final-selections",
-        build("FinalSelectionView", submission_id="s1", document_id="agree-en-v1"),
-    )
+    fresh = _preview(texts=[], preview_token="sha256:two")
+    fake.on("POST", ACCEPT, refusal(409, "PREVIEW_STALE", {"preview": fresh}))
     result = await call(
-        mcp_client, "accept_agreeing_texts", {"project": "p", "confirm": True}
+        mcp_client,
+        "accept_agreeing_texts",
+        {"project": "p", "confirm": True, "preview_token": "sha256:one"},
     )
-    assert [t["submission_id"] for t in result["accepted"]] == ["s1"]
-    [selection] = fake.calls_to("PUT", f"{P}/final-selections")
-    assert selection.json() == {
-        "document_id": "agree-en-v1",
-        "submission_id": "s1",
-        "expected_revision": 0,
-    }
+    assert result["applied"] is False and result["stale"] is True
+    assert (result["would_accept"], result["preview_token"]) == ([], "sha256:two")
 
 
 def _agreement_text(case_id: str) -> dict[str, Any]:

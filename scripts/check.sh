@@ -138,7 +138,7 @@ fi
 if runs frontend; then
     # Keep RAM available for Docker and other work; callers can override explicitly.
     step "frontend unit tests" npm --prefix frontend test -- \
-        --maxWorkers="$vitest_workers" --minWorkers=1
+        --maxWorkers="$vitest_workers"
 fi
 if runs backend; then
     # pytest-xdist workers share one PostgreSQL server (tests/pg_harness.py).

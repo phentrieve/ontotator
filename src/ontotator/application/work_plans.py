@@ -62,6 +62,7 @@ from ontotator.storage.final_tables import FinalSelectionRow
 from ontotator.storage.plan_tables import DiscardedVariantRow
 from ontotator.storage.repository import _lock_id
 from ontotator.storage.tables import AssignmentRow, DocumentRow, ProjectRow
+from ontotator.storage.text_settings import per_text_overrides, write_per_text
 
 if TYPE_CHECKING:
     from ontotator.api.work_plan_routes import (
@@ -256,7 +257,13 @@ def enable_review_for_accepted(
     """D25: a new review of a lead/override-accepted newest version.
 
     Returns True when ``document_id`` qualifies; turns Review on for its row
-    (audited ``work_plan.update``, no consequences) if it was off.
+    (audited ``work_plan.update``, no consequences) if it was off. A newest
+    version whose newest acceptance record is not a lead's or an override's
+    (accepted only by a translation review, or marked reviewed in its import
+    package) is refused with reason ``accepted_by_review``: its new review is a
+    correction request (``translation-correction-assignment``), issue 409.
+    Only the acceptance record decides: a lead-accepted version stays
+    eligible after a later review accepted it as well.
     """
     document = conn.execute(
         select(
@@ -277,13 +284,11 @@ def enable_review_for_accepted(
         )
         .limit(1)
     ).first()
-    acceptance = store.acceptances(conn, project_id).get(document_id)
-    if (
-        newer is not None
-        or acceptance is None
-        or acceptance["source"] not in _REVIEWABLE_ACCEPTANCES
-    ):
+    if newer is not None:
         return False
+    acceptance = store.acceptances(conn, project_id).get(document_id)
+    if acceptance is None or acceptance["source"] not in _REVIEWABLE_ACCEPTANCES:
+        raise DomainError("NOT_A_TRANSLATION", {"reason": "accepted_by_review"})
     turn_review_on(conn, actor, project_id, RowKey(document.case_id, document.language))
     return True
 
@@ -1123,14 +1128,108 @@ class WorkPlanService:
                 .all()
             )
             discarded = set(store.discarded(conn, pid))
+            # Texts with their own limit keep it (issue 422).
+            own = per_text_overrides(conn, pid)
             over = sum(
                 any(
                     counts.get(_target(chain).document_id, 0) > annotations_per_text
                     for chain in _live(chains, discarded)
                 )
-                for chains in _chains(conn, pid).values()
+                for row_key, chains in _chains(conn, pid).items()
+                if (row_key.case_id, row_key.language) not in own
             )
             return {"rows_over_target": over}
+
+    def set_annotations_per_text(
+        self,
+        key: str,
+        case_id: str,
+        language: str,
+        value: int | None,
+        reason: str | None,
+    ) -> dict[str, Any]:
+        """Set one text's own "Annotations per text" (issue 422); None clears it.
+
+        The value replaces the project's as target and as limit of that text
+        (case + language, every version). Idempotent: the same value again
+        writes and audits nothing. Lowering it below the text's annotators
+        removes nobody, as lowering the project value. Audited as
+        ``text.annotations_per_text``.
+        """
+        (result,) = self.set_annotations_per_texts(
+            key, [RowKey(case_id, language)], value, reason
+        )["texts"]
+        return cast(dict[str, Any], result)
+
+    def set_annotations_per_texts(
+        self,
+        key: str,
+        rows: Sequence[RowKey],
+        value: int | None,
+        reason: str | None,
+    ) -> dict[str, Any]:
+        """``set_annotations_per_text`` for several texts at once.
+
+        One project lock and one transaction: an unknown text refuses the
+        whole request (``DOCUMENT_NOT_FOUND`` with the texts) and nothing is
+        written. Each text is compared with its own stored value, so texts
+        that already have ``value`` are left alone; one audit entry per
+        changed text.
+        """
+        wanted = list(dict.fromkeys(rows))
+        reason = (reason or "").strip() or None
+        with self.db.transaction() as conn:
+            project = self._lock(conn, key, exclusive=True)
+            pid = project["id"]
+            project_value = int(project["annotations_per_text"])
+            known = store.language_versions(
+                conn, pid, sorted({row.case_id for row in wanted})
+            )
+            unknown = [_ref(row) for row in wanted if row not in known]
+            if unknown:
+                raise DomainError("DOCUMENT_NOT_FOUND", {"texts": unknown})
+            stored = per_text_overrides(conn, pid)
+            results: list[dict[str, Any]] = []
+            for row in wanted:
+                old = stored.get((row.case_id, row.language))
+                changed = old != value
+                if changed:
+                    write_per_text(
+                        conn,
+                        pid,
+                        row.case_id,
+                        row.language,
+                        value,
+                        reason=reason,
+                        actor_id=self.actor.user_id,
+                    )
+                    record_audit(
+                        conn,
+                        self.actor,
+                        "text.annotations_per_text",
+                        target_type="text",
+                        target_id=f"{row.case_id} {row.language}",
+                        project_id=pid,
+                        details={
+                            "case_id": row.case_id,
+                            "language": row.language,
+                            "old": old,
+                            "new": value,
+                            "project_value": project_value,
+                        }
+                        | ({"reason": reason} if reason else {}),
+                    )
+                results.append(
+                    {
+                        "case_id": row.case_id,
+                        "language": row.language,
+                        "override": value,
+                        "project_value": project_value,
+                        "effective": project_value if value is None else value,
+                        "changed": changed,
+                    }
+                )
+            return {"texts": results}
 
     def move_to_front(self, key: str, rows: Sequence[RowKey]) -> dict[str, Any]:
         """Move texts to the front of the project's order (issue 339).
@@ -1446,4 +1545,150 @@ class WorkPlanService:
                 },
                 "revision": revision,
                 "withdrawn": self._withdrawn_views(conn, key, result.withdrawn),
+            }
+
+    # --- accepting one version (issue 341 d) ------------------------------- #
+
+    def _acceptable_version(
+        self, conn: Connection, key: str, pid: int, document_id: str
+    ) -> tuple[RowKey, rules.Version, str, str | None]:
+        """The row, the version, its text hash and why it cannot be accepted
+        (``None``: it can). Caller holds the project lock."""
+        document = conn.execute(
+            select(
+                DocumentRow.case_id,
+                DocumentRow.language,
+                DocumentRow.text_sha256,
+            ).where(
+                DocumentRow.project_id == pid,
+                DocumentRow.document_id == document_id,
+            )
+        ).one_or_none()
+        if document is None:
+            raise DomainError("DOCUMENT_NOT_FOUND")
+        require_project_management(
+            conn, self.actor, key, pid, Action.OVERRIDE_TRANSLATION_STATUS
+        )
+        row_key = RowKey(document.case_id, document.language)
+        chain = next(
+            c
+            for c in _chains(conn, pid, [document.case_id])[row_key]
+            if any(v.document_id == document_id for v in c.versions)
+        )
+        if chain.root.origin == "native":
+            raise DomainError("NOT_A_TRANSLATION", {"reason": "not_a_translation"})
+        target = next(v for v in chain.versions if v.document_id == document_id)
+        ids = [v.document_id for v in chain.versions]
+        refusal: str | None = None
+        if set(ids) & set(store.discarded(conn, pid)):
+            refusal = "discarded"
+        elif chain.newest.document_id != document_id:
+            refusal = "not_newest"
+        elif target.translation_status == "accepted":
+            refusal = "accepted"
+        elif target.translation_status == "reviewed":
+            refusal = "reviewed"
+        elif (
+            conn.execute(
+                select(AssignmentRow.id)
+                .where(
+                    AssignmentRow.project_id == pid,
+                    AssignmentRow.document_id.in_(ids),
+                    AssignmentRow.task == "translation_review",
+                    AssignmentRow.revoked_at.is_(None),
+                    AssignmentRow.status != "submitted",
+                )
+                .limit(1)
+            ).first()
+            is not None
+        ):
+            refusal = "review_open"
+        return row_key, target, document.text_sha256, refusal
+
+    def accept_version_preview(self, key: str, document_id: str) -> dict[str, Any]:
+        """Read only: whether ``accept_version`` would accept this version, the
+        refusal ``reason`` if not, and the text hash the acceptance must name."""
+        with self.db.transaction() as conn:
+            project = self._lock(conn, key, exclusive=False)
+            row_key, target, text_sha256, refusal = self._acceptable_version(
+                conn, key, project["id"], document_id
+            )
+            return {
+                "case_id": row_key.case_id,
+                "language": row_key.language,
+                "document_id": document_id,
+                "version": target.version,
+                "translation_status": target.translation_status,
+                "acceptable": refusal is None,
+                "reason": refusal,
+                "text_sha256": text_sha256,
+            }
+
+    def accept_version(
+        self, key: str, document_id: str, reason: str, expected_text_sha256: str
+    ) -> dict[str, Any]:
+        """Accept exactly one translation version as reviewed outside Ontotator.
+
+        The same rule and record as the work plan's acceptance (D20: reason
+        required, ``source="lead"``, audited
+        ``translation.accept_external_review``), but for the newest version of
+        one chain only: parallel translations of the row stay as they are.
+        Refused (``VERSION_NOT_ACCEPTABLE``) for an older version, a discarded
+        one, one already accepted or reviewed, and while a translation review
+        of its chain is open.
+        """
+        reason = reason.strip()
+        if not reason:
+            raise DomainError("OVERRIDE_REASON_REQUIRED")
+        with self.db.transaction() as conn:
+            project = self._lock(conn, key, exclusive=True)
+            pid = project["id"]
+            row_key, target, text_sha256, refusal = self._acceptable_version(
+                conn, key, pid, document_id
+            )
+            if text_sha256 != expected_text_sha256:
+                raise DomainError("VARIANT_REVIEW_STALE")
+            if refusal is not None:
+                raise DomainError("VERSION_NOT_ACCEPTABLE", {"reason": refusal})
+            now = datetime.now(UTC)
+            conn.execute(
+                update(DocumentRow)
+                .where(
+                    DocumentRow.project_id == pid,
+                    DocumentRow.document_id == document_id,
+                )
+                .values(translation_status="accepted", status_reason=reason)
+            )
+            store.add_acceptance(
+                conn,
+                pid,
+                document_id,
+                source="lead",
+                reason=reason,
+                accepted_by=self.actor.user_id,
+            )
+            record_audit(
+                conn,
+                self.actor,
+                "translation.accept_external_review",
+                target_type="document",
+                target_id=document_id,
+                project_id=pid,
+                details={
+                    "document_id": document_id,
+                    "case_id": row_key.case_id,
+                    "language": row_key.language,
+                    "from": target.translation_status,
+                    "to": "accepted",
+                    "reason": reason,
+                    "scope": "version",
+                },
+                at=now,
+            )
+            return {
+                "case_id": row_key.case_id,
+                "language": row_key.language,
+                "document_id": document_id,
+                "version": target.version,
+                "translation_status": "accepted",
             }
