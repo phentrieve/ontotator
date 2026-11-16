@@ -98,6 +98,36 @@ it("drag_end_commits_the_dragged_width", () => {
   expect(onCommit.mock.calls).toEqual([["drag-start"], ["drag"]]);
 });
 
+it("a divider on a panel's start edge widens the panel to the left (Your review, #410)", () => {
+  const onChange = vi.fn();
+  render(<SidebarResizer side="start" label="Resize review panel" width={400} limits={{ min: 300, max: 640, fallback: 360 }} controls="review"
+    onChange={onChange} onReset={vi.fn()} onCommit={vi.fn()} />);
+  const sep = screen.getByRole("separator", { name: "Resize review panel" });
+  fireEvent.keyDown(sep, { key: "ArrowLeft" }); expect(onChange).toHaveBeenLastCalledWith(416);
+  fireEvent.keyDown(sep, { key: "ArrowRight", shiftKey: true }); expect(onChange).toHaveBeenLastCalledWith(336);
+  fireEvent.pointerDown(sep, { clientX: 800, pointerId: 1 });
+  fireEvent.pointerMove(sep, { clientX: 700, pointerId: 1 });
+  fireEvent.pointerUp(sep, { clientX: 700, pointerId: 1 });
+  expect(onChange).toHaveBeenLastCalledWith(500);
+});
+
+it("another panel keeps its own stored width and limits", () => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
+  const keyFor = (user: string) => `review.width:${user}`;
+  const limitsFor = (viewport: number) => ({ min: 300, max: Math.floor(viewport / 2), fallback: 360 });
+  localStorage.setItem(storageKey("anna"), "250");
+  localStorage.setItem(keyFor("anna"), "900");
+  const { result } = renderHook(() => useSidebarWidth("anna", { storageKeyFor: keyFor, limitsFor }));
+  expect(result.current.width).toBe(720);
+  act(() => result.current.setWidth(500));
+  act(() => result.current.commit("drag"));
+  expect(localStorage.getItem(keyFor("anna"))).toBe("500");
+  expect(localStorage.getItem(storageKey("anna"))).toBe("250");
+  act(() => result.current.reset());
+  expect(localStorage.getItem(keyFor("anna"))).toBeNull();
+  expect(result.current.width).toBe(360);
+});
+
 function Harness({ username }: { username: string }) {
   const { width, limits, setWidth, commit, reset } = useSidebarWidth(username);
   return <SidebarResizer width={width} limits={limits} controls="sidebar" onChange={setWidth} onReset={reset} onCommit={commit} />;

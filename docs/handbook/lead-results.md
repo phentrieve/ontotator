@@ -139,7 +139,7 @@ Ontotator records the acceptance with your name, the reason and the time. It acc
 
 What for: decide what happens when a text gets a new version while someone is still annotating the old one. The row's next step is **Handle text change**.
 
-Before you start: if the task is paused by a problem report, [decide the report](#decide-on-a-problem-report) first.
+Before you start: if the task is paused by a problem report, [decide the report](#decide-on-a-problem-report) first. To see what changed, compare the two versions in the text view with **Show changes** ([Read a text and other people's work in the text view](lead-documents.md#read-a-text-and-other-peoples-work-in-the-text-view)).
 
 1. In the row, click **Handle text change…**. A task on a correction that was not accepted only offers **Withdraw**. The dialog says why and what to do next.
 2. Choose one:
@@ -153,6 +153,8 @@ Work from proposals is carried too: the decisions on the proposals move to the m
 ### Carry submitted work to a new text version
 
 What for: reuse submitted findings after the text was corrected. The row's next step reads, for example, *Carry to v2…*.
+
+Before you start: to see what changed, open the text view of the old version, click **Compare**, choose the new version on the right and tick **Show changes** ([Read a text and other people's work in the text view](lead-documents.md#read-a-text-and-other-peoples-work-in-the-text-view)).
 
 1. In the row, click the carry button, for example *Carry to v2…*.
 2. Choose who continues: the author, **Someone else…** (then pick the **Annotator**), or start the new version fresh, for example *Start v2 fresh*: nothing is carried, and the assign dialog opens next.

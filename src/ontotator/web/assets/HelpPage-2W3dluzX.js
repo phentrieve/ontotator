@@ -1,4 +1,4 @@
-import{r as i,a as m,j as a,b as h}from"./index-Cqz0cggC.js";import{M as f,r as g}from"./index-B_5CLfiu.js";function w(){const[e,t]=i.useState(null);return i.useEffect(()=>{let o=!0;return m.getAbout().then(n=>{o&&t(n)},()=>{}),()=>{o=!1}},[]),e?a.jsxs("p",{className:"help-version",title:e.revision??void 0,children:["Ontotator ",e.version,e.revision&&a.jsxs(a.Fragment,{children:[" · commit ",e.revision.slice(0,7)]})]}):null}const y=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-C-wzIMJX.js";import{n as a,t as o}from"./lib-JI64Lwhq.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -115,7 +115,7 @@ Words you meet in the app, in alphabetical order. The handbook uses one word per
 - **Bold** text is a label exactly as the app shows it, for example **My tasks**. <!-- handbook: not-a-label -->
 - *Italic* text is an example of a label or message that changes, for example *Publish as v2* or *CASE-1 en*.
 - Keys are written like \`Ctrl+Z\` (macOS: \`Cmd+Z\`). A letter key such as \`j\` means the plain key; \`Shift+K\` means with Shift.
-`,k=`# Administration
+`,d=`# Administration
 
 This chapter is for system administrators. You manage user accounts, ontology releases and projects in the app, and read the technical reports users send. Back to the [handbook overview](README.md).
 
@@ -396,7 +396,7 @@ What for: see every API token of the server, stop one, or create a system token 
 Only a system token may hold the **System administration** scope, for ontology and translation uploads and user accounts. It acts as you and is revoked when you are no longer a system administrator, when you change your password and when your account is deactivated. Token creation, revocation and every change made with a token are in the audit trail.
 
 On the server, \`ontotator admin tokens create\`, \`list\` and \`revoke\` do the same from the command line.
-`,v=`# Annotator reference
+`,ee=`# Annotator reference
 
 This chapter is for annotators and translation reviewers. It explains the editor, how to mark findings, check tool proposals and carried findings, submit a text and review a translation. Back to the [handbook overview](README.md).
 
@@ -807,6 +807,8 @@ Steps:
 7. Click **Submit review…** (or press \`Ctrl+Enter\`), read what will happen, then click **Submit review**.
 8. A message confirms the review, with **View result**. Your next open task opens on its own, another translation review first, or **My tasks** if none is left. If you also annotate this text and your review finished its translation, your annotation of the text opens instead and the message adds *Annotate this text now*. Finished means: the translation is accepted (with corrections, on the corrected version), every other translation of the text is accepted too, and no further review or decision of the lead is pending. After **Query** or **Rejected** it does not come first.
 
+On a wide screen, **Your review** is a column on the right. To give the texts more room, drag its left edge (**Resize review panel**), or focus the edge and press \`←\` or \`→\`; \`Enter\` restores the default width. **Collapse review panel** folds it to a narrow strip: the bar at the bottom then shows the decision and **Submit review…**, and **Expand review panel** or **Change ↓** opens it again. Width and folding are remembered in this browser.
+
 If the source text was updated, **Source updates to review** appears. Open it, compare **Original source** and **Updated source**, and click **Submit review and resolve source update**.
 
 ![A translation review: the source on the left, the translation on the right, the failed automatic check above them. On the right, Query is chosen with the category Number or unit and a rationale, above Submit review…](images/annotator-translation-review.png)
@@ -853,7 +855,7 @@ What for: work without the mouse. Shortcuts are off while you type in a field or
 | \`Alt+P\` | Switch project |
 
 In a translation review: \`1\` to \`4\` choose a decision (outside the text), \`Ctrl+Enter\` submits (with a confirmation), \`Alt+M\` shows the matching paragraph. With **Mark checked sentences** on, Enter or Space marks the focused sentence and Shift+Enter marks a range.
-`,b=`# Consolidator
+`,te=`# Consolidator
 
 This chapter is for consolidators. A consolidation merges two or more submissions on one text into one result: findings that everyone agrees on are taken over, and you decide the rest. Back to the [handbook overview](README.md).
 
@@ -1042,7 +1044,7 @@ Groups you changed here are tagged **edited in editor** on the consolidation scr
 ## Read others' work in the text view
 
 Consolidators can open the text view of a text they consolidate to read each person's findings side by side. See [Read a text and other people's work in the text view](lead-documents.md#read-a-text-and-other-peoples-work-in-the-text-view).
-`,x=`# Frequently asked questions
+`,ne=`# Frequently asked questions
 
 Short answers to problems people often meet. Each answer links to the chapter with the full steps.
 
@@ -1281,7 +1283,7 @@ The token was created without the scope the request needs, for example **Export*
 ### A script's API token suddenly stops working
 
 The token expired or was revoked. A new password, a reset code and deactivation revoke all of the owner's tokens. Losing the lead role revokes the owner's project tokens for that project, and losing the administrator role the owner's system tokens (and project tokens of projects they do not lead). A personal token is not revoked when its owner loses a role, but it can no longer do what the role allowed: a project that disappears from its answers or a 403 means exactly that. Check its **Status** under **API tokens** and create a new one if needed.
-`,T=`# Your first task, start to finish
+`,f=`# Your first task, start to finish
 
 This chapter takes you through one annotation task, from your first login to a submitted text. Do it once in this order; afterwards, look things up in the [annotator reference](annotator.md). Back to the [handbook overview](README.md).
 
@@ -1376,7 +1378,7 @@ If something is wrong with the text itself (cut off, wrong patient, unreadable):
 ## If you were given a translation review
 
 A *Translation review* task shows the source and the translation side by side. You correct the translation if needed and choose a decision. See [Review a translation](annotator.md#review-a-translation).
-`,A=`# Getting started
+`,p=`# Getting started
 
 This chapter is for everyone. It shows how to log in, find your tasks and keep your profile up to date. Back to the [handbook overview](README.md).
 
@@ -1629,7 +1631,7 @@ The program sends the token in the header \`Authorization: Bearer <token>\`. It 
 An AI assistant that speaks MCP, such as Claude Desktop, can use a token too: the Ontotator MCP server lets it set up a project, follow progress and download exports for you. Installing and configuring it is described in the [MCP server guide](../../mcp/README.md). Prefer a project token with a short lifetime for it.
 
 To stop a token, click **Revoke…** in its row, then **Revoke token**. Every program that uses it stops working at once. All your tokens are also revoked when you change your password, when an administrator issues you a reset code and when your account is deactivated. Losing a project role does not revoke a personal token, but the token at once loses what the role allowed: it can only ever do what you may do yourself right now.
-`,C=`# Lead: change course in a running project
+`,m=`# Lead: change course in a running project
 
 This chapter is for project leads whose project is already under way and must change direction: a better translation turns up, finished texts must be annotated again, or there are more texts than the team can finish. Each procedure says what Ontotator does today and where it stops. Back to the [lead overview](lead.md).
 
@@ -1744,7 +1746,7 @@ Whoever runs the server can do some of this on the command line ([Server operati
 - \`ontotator admin assign PROJECT USER --document ID\` assigns an annotation of the text with that document ID (see **Technical details** in the text card's **Details**), also on a text with a final result, within **Annotators per text**. Repeat \`--document\` for more texts. It cannot assign translation reviews or consolidations.
 
 There is no command to request a translation correction, to discard a translation or to change the annotation mode; use the app for these.
-`,j=`# Lead: texts, work plans and progress
+`,h=`# Lead: texts, work plans and progress
 
 This chapter is for project leads. It covers the **Documents** page: uploading texts, the text card, planning and assigning work, and following progress. Back to the [lead overview](lead.md).
 
@@ -1942,7 +1944,8 @@ What for: read a text with other people's findings or the final result, and comp
 1. Open the text view with **Open text** in the text card.
 2. Choose the language and version in **Language and version**.
 3. In **Show**, choose **Text only**, a proposal layer, someone's annotations or the result. Its findings are listed under **Findings**.
-4. Optional: click **Compare** to open a second pane with its own **Language and version** and **Show**. Tick **Couple scrolling** to scroll both together. Click **Close comparison** to close it.
+4. Optional: click **Compare** to open a second pane. Each pane has its own **Language and version** and **Show** directly above its text: **Current text** on the left, **Comparison text** on the right, so both texts start at the same height. Tick **Couple scrolling** to scroll both together. Click **Close comparison** to close it.
+   - When both panes show texts of the same language, for example v1 and its correction v2, tick **Show changes** to see what changed. The older version strikes through the removed passages, the newer version underlines the added ones; the line above the texts counts them. The marks do not change the texts, the findings or **Couple scrolling**. A change of spaces or line breaks only is not marked or counted. If the two texts have little in common, the line reads *The texts differ too much to show the changes* and nothing is marked.
 5. Optional: click **Submissions** to open the **Submission history**. Choose a row to show it, then click **Close**. Each finding names its author by pseudonym; leads always see them, also when the project hides annotator names from consolidators.
 
 **Open my task** goes to your own task on this text.
@@ -2140,7 +2143,7 @@ What for: see the whole project at a glance.
 ![The Progress page with the stage cards and the People table](images/lead-progress.png)
 
 Click **Refresh progress** to update.
-`,S=`# Lead: results, decisions and export
+`,g=`# Lead: results, decisions and export
 
 This chapter is for project leads. It covers choosing the final result of each text, consolidations, the decisions on translations, text changes and problem reports, and the export. Back to the [lead overview](lead.md).
 
@@ -2281,7 +2284,7 @@ Ontotator records the acceptance with your name, the reason and the time. It acc
 
 What for: decide what happens when a text gets a new version while someone is still annotating the old one. The row's next step is **Handle text change**.
 
-Before you start: if the task is paused by a problem report, [decide the report](#decide-on-a-problem-report) first.
+Before you start: if the task is paused by a problem report, [decide the report](#decide-on-a-problem-report) first. To see what changed, compare the two versions in the text view with **Show changes** ([Read a text and other people's work in the text view](lead-documents.md#read-a-text-and-other-peoples-work-in-the-text-view)).
 
 1. In the row, click **Handle text change…**. A task on a correction that was not accepted only offers **Withdraw**. The dialog says why and what to do next.
 2. Choose one:
@@ -2295,6 +2298,8 @@ Work from proposals is carried too: the decisions on the proposals move to the m
 ### Carry submitted work to a new text version
 
 What for: reuse submitted findings after the text was corrected. The row's next step reads, for example, *Carry to v2…*.
+
+Before you start: to see what changed, open the text view of the old version, click **Compare**, choose the new version on the right and tick **Show changes** ([Read a text and other people's work in the text view](lead-documents.md#read-a-text-and-other-peoples-work-in-the-text-view)).
 
 1. In the row, click the carry button, for example *Carry to v2…*.
 2. Choose who continues: the author, **Someone else…** (then pick the **Annotator**), or start the new version fresh, for example *Start v2 fresh*: nothing is carried, and the assign dialog opens next.
@@ -2388,7 +2393,7 @@ What for: find an earlier export again, see who made it and why one failed.
 - While the list is open, it updates when you create a research export here. Click **Refresh history** to see a final export or exports others started meanwhile.
 
 Only leads and system administrators see the history. People appear by name and pseudonym, as elsewhere for leads.
-`,O=`# Lead: project settings
+`,_=`# Lead: project settings
 
 This chapter is for project leads. It covers every tab under **Settings**: the project name and languages, the ontology, the submission rules, the workflow, the people and the guidelines. Back to the [lead overview](lead.md).
 
@@ -2747,7 +2752,7 @@ Warning: the text of the withdrawn version is deleted for good. The version numb
 2. In the version's row, click **More…**, then the withdraw item, for example *Withdraw v2…*.
 3. Optional: enter **Reason (optional)**. Do not repeat confidential content.
 4. Confirm, for example with *Withdraw v2*.
-`,I=`# Lead overview
+`,v=`# Lead overview
 
 This chapter is for project leads. A lead sets up the project, uploads texts, plans and assigns the work, accepts the results and exports them. Back to the [handbook overview](README.md).
 
@@ -2776,4 +2781,4 @@ The lead's tasks are in four chapters:
 10. Export the final results: [Export final results](lead-results.md#export-final-results).
 
 Try it with the demo project: the [demo project guide](../../examples/demo-project/README.md) walks through every step with invented clinical letters, tool proposals, translations and guidelines.
-`,R="/assets/admin-new-project-CGTeKPxx.png",W="/assets/admin-setup-code-CZZgVGoA.png",P="/assets/annotator-carried-finding-D5UZjxHK.png",D="/assets/annotator-editor-CAd7OSG6.png",E="/assets/annotator-finding-values-6gVLE5AQ.png",_="/assets/annotator-new-finding-C8PXYuWh.png",M="/assets/annotator-proposal-review-DKcoMVoU.png",N="/assets/annotator-submit-dialog-DOoSdxWi.png",U="/assets/annotator-translation-review-CSZhuMrQ.png",F="/assets/consolidator-group-table-D50EmCag.png",Y="/assets/consolidator-submit-dialog-BcMrmOrK.png",L="/assets/getting-started-my-tasks-YOxDQEjf.png",H="/assets/getting-started-set-password-DIoRgsgg.png",B="/assets/lead-assign-B8Ie7Zk1.png",G="/assets/lead-compare-results-BTROFCQQ.png",z="/assets/lead-documents-CwdSqVJR.png",q="/assets/lead-export-C_812wdj.png",K="/assets/lead-move-release-check-Eg2HvkLX.png",V="/assets/lead-problem-report-DLzAKkVn.png",Z="/assets/lead-progress-Sy_O2mx-.png",Q="/assets/lead-text-card-kP0674nd.png",$="/assets/lead-upload-preview-DzB_mX2T.png",J="/assets/lead-work-plan-BB2DXTMk.png",X="/assets/workflow-Dii9V6xB.png",ee="https://github.com/phentrieve/ontotator/blob/main",l="https://handbook.invalid/docs/handbook/",te=Object.assign({"../../../docs/handbook/README.md":y,"../../../docs/handbook/admin.md":k,"../../../docs/handbook/annotator.md":v,"../../../docs/handbook/consolidator.md":b,"../../../docs/handbook/faq.md":x,"../../../docs/handbook/first-task.md":T,"../../../docs/handbook/getting-started.md":A,"../../../docs/handbook/lead-change-course.md":C,"../../../docs/handbook/lead-documents.md":j,"../../../docs/handbook/lead-results.md":S,"../../../docs/handbook/lead-settings.md":O,"../../../docs/handbook/lead.md":I}),ne=Object.assign({"../../../docs/handbook/images/admin-new-project.png":R,"../../../docs/handbook/images/admin-setup-code.png":W,"../../../docs/handbook/images/annotator-carried-finding.png":P,"../../../docs/handbook/images/annotator-editor.png":D,"../../../docs/handbook/images/annotator-finding-values.png":E,"../../../docs/handbook/images/annotator-new-finding.png":_,"../../../docs/handbook/images/annotator-proposal-review.png":M,"../../../docs/handbook/images/annotator-submit-dialog.png":N,"../../../docs/handbook/images/annotator-translation-review.png":U,"../../../docs/handbook/images/consolidator-group-table.png":F,"../../../docs/handbook/images/consolidator-submit-dialog.png":Y,"../../../docs/handbook/images/getting-started-my-tasks.png":L,"../../../docs/handbook/images/getting-started-set-password.png":H,"../../../docs/handbook/images/lead-assign.png":B,"../../../docs/handbook/images/lead-compare-results.png":G,"../../../docs/handbook/images/lead-documents.png":z,"../../../docs/handbook/images/lead-export.png":q,"../../../docs/handbook/images/lead-move-release-check.png":K,"../../../docs/handbook/images/lead-problem-report.png":V,"../../../docs/handbook/images/lead-progress.png":Z,"../../../docs/handbook/images/lead-text-card.png":Q,"../../../docs/handbook/images/lead-upload-preview.png":$,"../../../docs/handbook/images/lead-work-plan.png":J,"../../../docs/handbook/images/workflow.png":X}),c=e=>e.slice(e.lastIndexOf("/")+1),r=Object.fromEntries(Object.entries(te).map(([e,t])=>[c(e).replace(/\.md$/,""),t])),oe=Object.fromEntries(Object.entries(ne).map(([e,t])=>[`images/${c(e)}`,t]));function ae(e){var t;return((t=/^# +(.+)$/m.exec(r[e]??""))==null?void 0:t[1].trim())??e}function se(){const e=[...(r.README??"").matchAll(/\]\(([A-Za-z0-9_-]+)\.md[)#]/g)].map(t=>t[1]);return[...new Set(["README",...e,...Object.keys(r).sort()])].filter(t=>t in r)}function re(e){return e.toLowerCase().replace(/[^\p{L}\p{M}\p{N}\p{Pc} -]/gu,"").replace(/ /g,"-")}function ie(){const e=new Map;return t=>{const o=re(t);let n=o;for(;e.has(n);){const s=e.get(o)+1;e.set(o,s),n=`${o}-${s}`}return e.set(n,0),n}}function he(e,t){var d;if(/^[a-z][a-z0-9+.-]*:/i.test(e))return{kind:"external",href:e};const o=new URL(e,`${l}${t}.md`),n=decodeURIComponent(o.hash.slice(1)),s=(d=/^\/docs\/handbook\/([A-Za-z0-9_-]+)\.md$/.exec(o.pathname))==null?void 0:d[1];return s&&s in r?s===t&&n?{kind:"anchor",id:n}:{kind:"chapter",href:h({name:"help",chapter:s,...n?{section:n}:{}})}:{kind:"external",href:`${ee}${o.pathname}${o.hash}`}}function de(e,t){if(/^[a-z][a-z0-9+.-]*:/i.test(e))return null;const o=new URL(e,`${l}${t}.md`).pathname.replace(/^\/docs\/handbook\//,"");return oe[o]??null}const p=e=>e.type==="text"?e.value:"children"in e?e.children.map(p).join(""):"";function le(){return e=>{const t=ie(),o=n=>n.children.forEach(s=>{s.type==="element"&&(/^h[1-6]$/.test(s.tagName)?s.properties.id=t(p(s)):o(s))});o(e)}}function u(e){var t;(t=document.getElementById(e))==null||t.scrollIntoView()}const ce=e=>e.button===0&&!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&!e.altKey;function pe(e){return{a:({href:t,children:o})=>{if(!t)return a.jsx(a.Fragment,{children:o});const n=he(t,e);return n.kind==="external"?a.jsx("a",{href:n.href,target:"_blank",rel:"noopener noreferrer",children:o}):n.kind==="chapter"?a.jsx("a",{href:n.href,children:o}):a.jsx("a",{href:h({name:"help",chapter:e,section:n.id}),onClick:s=>{ce(s)&&(s.preventDefault(),u(n.id))},children:o})},img:({src:t,alt:o})=>{const n=t?de(t,e):null;return n?a.jsx("a",{className:"help-image-link",href:n,target:"_blank",rel:"noopener noreferrer",title:"Open the image at full size in a new tab",children:a.jsx("img",{className:"help-image",src:n,alt:o??"",loading:"lazy"})}):a.jsx("span",{className:"guideline-image-text",children:o?`Image: ${o}`:"Image"})},table:({children:t})=>a.jsx("div",{className:"guideline-table-scroll",tabIndex:0,role:"region","aria-label":"Table",children:a.jsx("table",{children:t})})}}function fe({chapter:e="README",section:t}){const o=r[e];return i.useEffect(()=>{var n,s;t?u(t):(s=(n=document.getElementById("main"))==null?void 0:n.scrollTo)==null||s.call(n,0,0)},[e,t]),a.jsxs("div",{className:"help-page",children:[a.jsxs("nav",{className:"help-chapters","aria-label":"Handbook chapters",children:[a.jsx("ul",{children:se().map(n=>a.jsx("li",{children:a.jsx("a",{href:h({name:"help",chapter:n}),"aria-current":n===e?"page":void 0,children:ae(n)})},n))}),a.jsx(w,{})]}),a.jsx("article",{className:"guideline-document help-document",children:o===void 0?a.jsxs(a.Fragment,{children:[a.jsx("h1",{children:"Chapter not found"}),a.jsxs("p",{children:["This handbook has no chapter “",e,"”. Pick one from the list."]})]}):a.jsx("div",{className:"guideline-markdown",children:a.jsx(f,{remarkPlugins:[g],rehypePlugins:[le],skipHtml:!0,components:pe(e),children:o})})})]})}export{fe as default};
+`,y=`/assets/admin-new-project-CGTeKPxx.png`,b=`/assets/admin-setup-code-CZZgVGoA.png`,x=`/assets/annotator-carried-finding-D5UZjxHK.png`,S=`/assets/annotator-editor-CAd7OSG6.png`,C=`/assets/annotator-finding-values-6gVLE5AQ.png`,w=`/assets/annotator-new-finding-C8PXYuWh.png`,T=`/assets/annotator-proposal-review-DKcoMVoU.png`,E=`/assets/annotator-submit-dialog-DOoSdxWi.png`,D=`/assets/annotator-translation-review-CSZhuMrQ.png`,O=`/assets/consolidator-group-table-D50EmCag.png`,k=`/assets/consolidator-submit-dialog-BcMrmOrK.png`,A=`/assets/getting-started-my-tasks-YOxDQEjf.png`,j=`/assets/getting-started-set-password-DIoRgsgg.png`,M=`/assets/lead-assign-B8Ie7Zk1.png`,N=`/assets/lead-compare-results-BTROFCQQ.png`,P=`/assets/lead-documents-CwdSqVJR.png`,F=`/assets/lead-export-C_812wdj.png`,re=`/assets/lead-move-release-check-Eg2HvkLX.png`,I=`/assets/lead-problem-report-DLzAKkVn.png`,L=`/assets/lead-progress-Sy_O2mx-.png`,R=`/assets/lead-text-card-kP0674nd.png`,z=`/assets/lead-upload-preview-DzB_mX2T.png`,B=`/assets/lead-work-plan-BB2DXTMk.png`,V=`/assets/workflow-Dii9V6xB.png`,H=`https://github.com/phentrieve/ontotator/blob/main`,U=`https://handbook.invalid/docs/handbook/`,W=Object.assign({"../../../docs/handbook/README.md":u,"../../../docs/handbook/admin.md":d,"../../../docs/handbook/annotator.md":ee,"../../../docs/handbook/consolidator.md":te,"../../../docs/handbook/faq.md":ne,"../../../docs/handbook/first-task.md":f,"../../../docs/handbook/getting-started.md":p,"../../../docs/handbook/lead-change-course.md":m,"../../../docs/handbook/lead-documents.md":h,"../../../docs/handbook/lead-results.md":g,"../../../docs/handbook/lead-settings.md":_,"../../../docs/handbook/lead.md":v}),G=Object.assign({"../../../docs/handbook/images/admin-new-project.png":y,"../../../docs/handbook/images/admin-setup-code.png":b,"../../../docs/handbook/images/annotator-carried-finding.png":x,"../../../docs/handbook/images/annotator-editor.png":S,"../../../docs/handbook/images/annotator-finding-values.png":C,"../../../docs/handbook/images/annotator-new-finding.png":w,"../../../docs/handbook/images/annotator-proposal-review.png":T,"../../../docs/handbook/images/annotator-submit-dialog.png":E,"../../../docs/handbook/images/annotator-translation-review.png":D,"../../../docs/handbook/images/consolidator-group-table.png":O,"../../../docs/handbook/images/consolidator-submit-dialog.png":k,"../../../docs/handbook/images/getting-started-my-tasks.png":A,"../../../docs/handbook/images/getting-started-set-password.png":j,"../../../docs/handbook/images/lead-assign.png":M,"../../../docs/handbook/images/lead-compare-results.png":N,"../../../docs/handbook/images/lead-documents.png":P,"../../../docs/handbook/images/lead-export.png":F,"../../../docs/handbook/images/lead-move-release-check.png":re,"../../../docs/handbook/images/lead-problem-report.png":I,"../../../docs/handbook/images/lead-progress.png":L,"../../../docs/handbook/images/lead-text-card.png":R,"../../../docs/handbook/images/lead-upload-preview.png":z,"../../../docs/handbook/images/lead-work-plan.png":B,"../../../docs/handbook/images/workflow.png":V}),K=e=>e.slice(e.lastIndexOf(`/`)+1),q=Object.fromEntries(Object.entries(W).map(([e,t])=>[K(e).replace(/\.md$/,``),t])),J=Object.fromEntries(Object.entries(G).map(([e,t])=>[`images/${K(e)}`,t]));function Y(e){var t;return((t=/^# +(.+)$/m.exec(q[e]??``))==null?void 0:t[1].trim())??e}function X(){let e=[...(q.README??``).matchAll(/\]\(([A-Za-z0-9_-]+)\.md[)#]/g)].map(e=>e[1]);return[...new Set([`README`,...e,...Object.keys(q).sort()])].filter(e=>e in q)}function ie(e){return e.toLowerCase().replace(/[^\p{L}\p{M}\p{N}\p{Pc} -]/gu,``).replace(/ /g,`-`)}function ae(){let e=new Map;return t=>{let n=ie(t),r=n;for(;e.has(r);){let t=e.get(n)+1;e.set(n,t),r=`${n}-${t}`}return e.set(r,0),r}}function oe(e,t){var n;if(/^[a-z][a-z0-9+.-]*:/i.test(e))return{kind:`external`,href:e};let r=new URL(e,`${U}${t}.md`),a=decodeURIComponent(r.hash.slice(1)),o=(n=/^\/docs\/handbook\/([A-Za-z0-9_-]+)\.md$/.exec(r.pathname))==null?void 0:n[1];return o&&o in q?o===t&&a?{kind:`anchor`,id:a}:{kind:`chapter`,href:i({name:`help`,chapter:o,...a?{section:a}:{}})}:{kind:`external`,href:`${H}${r.pathname}${r.hash}`}}function se(e,t){return/^[a-z][a-z0-9+.-]*:/i.test(e)?null:J[new URL(e,`${U}${t}.md`).pathname.replace(/^\/docs\/handbook\//,``)]??null}var Z=e=>e.type===`text`?e.value:`children`in e?e.children.map(Z).join(``):``;function Q(){return e=>{let t=ae(),n=e=>e.children.forEach(e=>{e.type===`element`&&(/^h[1-6]$/.test(e.tagName)?e.properties.id=t(Z(e)):n(e))});n(e)}}function $(e){var t;(t=document.getElementById(e))==null||t.scrollIntoView()}var ce=e=>e.button===0&&!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&!e.altKey;function le(e){return{a:({href:t,children:n})=>{if(!t)return(0,c.jsx)(c.Fragment,{children:n});let r=oe(t,e);return r.kind===`external`?(0,c.jsx)(`a`,{href:r.href,target:`_blank`,rel:`noopener noreferrer`,children:n}):r.kind===`chapter`?(0,c.jsx)(`a`,{href:r.href,children:n}):(0,c.jsx)(`a`,{href:i({name:`help`,chapter:e,section:r.id}),onClick:e=>{ce(e)&&(e.preventDefault(),$(r.id))},children:n})},img:({src:t,alt:n})=>{let r=t?se(t,e):null;return r?(0,c.jsx)(`a`,{className:`help-image-link`,href:r,target:`_blank`,rel:`noopener noreferrer`,title:`Open the image at full size in a new tab`,children:(0,c.jsx)(`img`,{className:`help-image`,src:r,alt:n??``,loading:`lazy`})}):(0,c.jsx)(`span`,{className:`guideline-image-text`,children:n?`Image: ${n}`:`Image`})},table:({children:e})=>(0,c.jsx)(`div`,{className:`guideline-table-scroll`,tabIndex:0,role:`region`,"aria-label":`Table`,children:(0,c.jsx)(`table`,{children:e})})}}function ue({chapter:e=`README`,section:t}){let n=q[e];return(0,s.useEffect)(()=>{var e,n;t?$(t):(e=document.getElementById(`main`))==null||(n=e.scrollTo)==null||n.call(e,0,0)},[e,t]),(0,c.jsxs)(`div`,{className:`help-page`,children:[(0,c.jsxs)(`nav`,{className:`help-chapters`,"aria-label":`Handbook chapters`,children:[(0,c.jsx)(`ul`,{children:X().map(t=>(0,c.jsx)(`li`,{children:(0,c.jsx)(`a`,{href:i({name:`help`,chapter:t}),"aria-current":t===e?`page`:void 0,children:Y(t)})},t))}),(0,c.jsx)(l,{})]}),(0,c.jsx)(`article`,{className:`guideline-document help-document`,children:n===void 0?(0,c.jsxs)(c.Fragment,{children:[(0,c.jsx)(`h1`,{children:`Chapter not found`}),(0,c.jsxs)(`p`,{children:[`This handbook has no chapter “`,e,`”. Pick one from the list.`]})]}):(0,c.jsx)(`div`,{className:`guideline-markdown`,children:(0,c.jsx)(a,{remarkPlugins:[o],rehypePlugins:[Q],skipHtml:!0,components:le(e),children:n})})})]})}export{ue as default};

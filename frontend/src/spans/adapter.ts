@@ -57,6 +57,8 @@ export interface SpanEditorHandle {
   scrollToEvidence: (evidenceId: string, ifNeeded?: boolean) => void;
   /** Evidence ids whose runs get the `run--framed` frame (hover, focus, selection of a finding). */
   setFramed: (evidenceIds: string[]) => void;
+  /** Display-only passages (UTF-16 offsets) whose runs get `run--marker`; never mentions, never picked. */
+  setMarkers: (ranges: ReadonlyArray<{ start: number; end: number }>) => void;
   destroy: () => void;
 }
 
@@ -217,6 +219,9 @@ export function mountSpanEditor(
     },
     setFramed: (evidenceIds: string[]) => {
       editor.setFramed(evidenceIds);
+    },
+    setMarkers: (ranges) => {
+      editor.setMarkers(ranges.map((range) => ({ char_start: range.start, char_end: range.end })));
     },
     destroy: () => {
       editor.destroy();

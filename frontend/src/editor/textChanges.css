@@ -1,0 +1,31 @@
+/* Show changes in a reading text (TextPane `changes`): the same colours as the review screen's change view
+   (translation/DiffView), and never colour alone: added text is underlined, removed text struck through.
+   The fill is a background colour, so an annotation mark (a background image) still shows over it. */
+.text-container[data-changes] .run--marker {
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  text-decoration-thickness: 2px;
+}
+
+.text-container[data-changes="insert"] .run--marker {
+  background-color: var(--success-light);
+  text-decoration-line: underline;
+  text-decoration-color: var(--success);
+  text-underline-offset: 3px;
+}
+
+.text-container[data-changes="delete"] .run--marker {
+  background-color: var(--danger-light);
+  text-decoration-line: line-through;
+  text-decoration-color: var(--danger);
+}
+
+/* The legend shows a sample of each mark. */
+.text-changes-legend :is(ins, del) { color: inherit; text-decoration-thickness: 2px; }
+.text-changes-legend ins { background-color: var(--success-light); text-decoration-line: underline; text-decoration-color: var(--success); text-underline-offset: 3px; }
+.text-changes-legend del { background-color: var(--danger-light); text-decoration-line: line-through; text-decoration-color: var(--danger); }
+
+@media (forced-colors: active) {
+  .text-container[data-changes] .run--marker,
+  .text-changes-legend :is(ins, del) { text-decoration-color: CanvasText; }
+}

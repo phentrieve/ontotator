@@ -13,10 +13,10 @@ const assignment = { ...assigned(workspaceFixture()).assignment, workflow_revisi
 const source = { submission_id: "exact-source", document_id: "old-document", language: "en", version: 1, created_at: "2026-10-18T12:00:00Z", round_id: null, finding_count: 0 };
 const round: WorkRoundView = { round_id: "round-exact", project_key: "pkg", assignment_id: 1, document_id: "doc", annotator_id: "alice", kind: "carry_forward", mode: "independent", state: "submitted", workflow_revision: 3, input_manifest_sha256: "manifest", input_submission_ids: ["exact-source"], active: true, submission_count: 1, input_count: 1 };
 
-function renderRounds(rounds: WorkRoundView[], sources: typeof source[], handlers: { onCreate?: ReturnType<typeof vi.fn>; onOpen?: ReturnType<typeof vi.fn>; assignment?: typeof assignment } = {}) {
+function renderRounds(rounds: WorkRoundView[], sources: typeof source[], handlers: { onCreate?: Parameters<typeof WorkRoundsDialog>[0]["onCreate"]; onOpen?: Parameters<typeof WorkRoundsDialog>[0]["onOpen"]; assignment?: typeof assignment } = {}) {
   vi.spyOn(api, "listWorkRounds").mockResolvedValue(rounds);
   vi.spyOn(api, "listRoundSources").mockResolvedValue(sources);
-  render(<WorkRoundsDialog assignment={handlers.assignment ?? assignment} onClose={vi.fn()} onCreate={handlers.onCreate ?? vi.fn()} onOpen={handlers.onOpen ?? vi.fn()} onReload={vi.fn()} />);
+  render(<WorkRoundsDialog assignment={handlers.assignment ?? assignment} onClose={vi.fn()} onCreate={handlers.onCreate ?? vi.fn(async () => {})} onOpen={handlers.onOpen ?? vi.fn(async () => {})} onReload={vi.fn()} />);
 }
 
 it("starts a continued round from one deliberately selected immutable own submission", async () => {

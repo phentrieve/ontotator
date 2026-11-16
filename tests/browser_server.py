@@ -73,6 +73,8 @@ from tests.work_plan_support import plan_all  # noqa: E402
 ONTOLOGY = ROOT / "tests/fixtures/hp.json"
 MONDO_ONTOLOGY = ROOT / "tests/fixtures/mondo.json"
 PORT = int(os.environ.get("HPO_E2E_PORT", "18765"))
+# Idle keep-alive connections stay open this long (uvicorn's default is 5 s).
+BROWSER_KEEP_ALIVE_SECONDS = 600
 # The password of every user that ``/__test_user__`` sets up (frontend/browser/helpers.ts).
 TEST_PASSWORD = "browser test passphrase"
 
@@ -1514,5 +1516,5 @@ if __name__ == "__main__":
             host="127.0.0.1",
             port=PORT,
             log_level="warning",
-            timeout_keep_alive=600,
+            timeout_keep_alive=BROWSER_KEEP_ALIVE_SECONDS,
         )

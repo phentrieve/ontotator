@@ -1,7 +1,11 @@
 /* Guideline reading view (Settings, task drawer, guidelines page) and Settings › Guidelines. */
+/* One column no wider than its container: a wide table or code line scrolls in its own box, never the drawer or
+   the page (#410). A grid track sized `auto` would grow to the document's min-content width instead. */
 .guideline-reader {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
+  min-width: 0;
 }
 
 /* The h2 of the type ramp (the class opts out of the raw-element ramp). */
