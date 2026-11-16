@@ -454,3 +454,104 @@ async def test_withdraw_guideline_names_the_latest_version_it_saw(
     [post] = fake.calls_to("POST", f"{P}/guidelines/{{version}}/withdraw")
     assert post.request.url.path.endswith("/guidelines/3/withdraw")
     assert post.json() == {"reason": "wrong file", "expected_latest_version": 3}
+
+
+BULK_REOPEN = f"{P}/bulk-task-actions/reopen"
+BULK_WITHDRAW = f"{P}/bulk-task-actions/withdraw"
+
+
+def _bulk(action: str, token: str, **fields: Any) -> dict[str, Any]:
+    person = {"pseudonym": "ann-1", "display_name": "Tom Reis", "is_me": False}
+    change = build(
+        "BulkTaskView",
+        case_id="c1",
+        language="en",
+        assignment_id=7,
+        task="annotate",
+        status="submitted",
+        person=person,
+    )
+    kept = build(
+        "BulkKeptTaskView",
+        case_id="c1",
+        language="en",
+        assignment_id=8,
+        task="annotate",
+        status="open",
+        person=person,
+        reason="not_submitted",
+        message="Not submitted yet.",
+    )
+    return (
+        build(
+            "BulkTaskActionView",
+            action=action,
+            applied=False,
+            texts=1,
+            changes=[change],
+            kept=[kept],
+            skipped=[],
+            preview_token=token,
+            undo=None,
+        )
+        | fields
+    )
+
+
+async def test_reopen_texts_dry_run_then_confirm_with_the_token(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    texts = [{"case_id": "c1", "language": "en"}]
+    fake.on("POST", BULK_REOPEN, _bulk("reopen", "sha256:a"))
+    dry = await call(
+        mcp_client,
+        "reopen_texts",
+        {"project": "p", "texts": texts, "reason": "Guideline 2.3"},
+    )
+    assert dry["applied"] is False
+    assert dry["would_change"][0]["person"] == "Tom Reis"
+    assert dry["kept"][0]["why"] == "Not submitted yet."
+    assert dry["preview_token"] == "sha256:a"
+    [post] = fake.calls_to("POST", BULK_REOPEN)
+    assert post.json() == {"rows": texts, "reason": "Guideline 2.3", "preview": True}
+    with pytest.raises(ToolFailed):
+        await call(
+            mcp_client,
+            "reopen_texts",
+            {"project": "p", "texts": texts, "reason": "x", "confirm": True},
+        )
+    fake.on("POST", BULK_REOPEN, _bulk("reopen", "sha256:a", applied=True))
+    done = await call(
+        mcp_client,
+        "reopen_texts",
+        {
+            "project": "p",
+            "texts": texts,
+            "reason": "Guideline 2.3",
+            "confirm": True,
+            "preview_token": "sha256:a",
+        },
+    )
+    assert done["applied"] is True and done["change_count"] == 1
+    assert fake.calls_to("POST", BULK_REOPEN)[-1].json()["preview_token"] == "sha256:a"
+
+
+async def test_withdraw_open_tasks_answers_a_stale_token_with_a_fresh_dry_run(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    fresh = _bulk("withdraw", "sha256:b")
+    fake.on("POST", BULK_WITHDRAW, refusal(409, "PREVIEW_STALE", {"preview": fresh}))
+    result = await call(
+        mcp_client,
+        "withdraw_open_tasks",
+        {
+            "project": "p",
+            "texts": [{"case_id": "c1", "language": "en"}],
+            "over_limit_only": True,
+            "confirm": True,
+            "preview_token": "sha256:a",
+        },
+    )
+    assert result["stale"] is True and result["preview_token"] == "sha256:b"
+    [post] = fake.calls_to("POST", BULK_WITHDRAW)
+    assert post.json()["over_limit_only"] is True

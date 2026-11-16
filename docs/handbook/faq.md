@@ -144,6 +144,10 @@ The result has findings with values filled in by default, modifier terms used as
 
 In projects where the consolidator of a text may not be one of its annotators, you cannot choose a result you made yourself. Another lead must choose it. See [Accept a result or compare results](lead-results.md#accept-a-result-or-compare-results).
 
+### Undo after Reopen… or Withdraw open tasks… says "Undo is no longer possible: the texts changed since."
+
+Undo of these bulk actions works once, for the lead who made the change, within an hour, and only while nothing changed on the texts since, for example nobody saved a draft and nobody was assigned. Reopen or withdraw the remaining tasks again, or assign the work anew. If the dialog itself says *The texts changed since the preview. Check the new preview.*, nothing was changed yet: read the new preview and confirm again. See [Reopen or withdraw the tasks of several texts](lead-documents.md#reopen-or-withdraw-the-tasks-of-several-texts).
+
 ### My uploaded texts do not show up
 
 An import runs in the background; reload **Documents** when it is done. If the project plan for new imports is **Plan nothing; I plan texts on Documents**, the new texts show as *Not decided* until you plan them. See [Upload texts](lead-documents.md#upload-texts).

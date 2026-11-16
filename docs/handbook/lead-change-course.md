@@ -59,6 +59,8 @@ Before you start: [publish the new guideline version](lead-settings.md#publish-t
 3. The task shows **Reopened** in their **My tasks**. They continue on their submitted work as it was: nothing is carried and nothing is marked **Check needed**.
 4. When they submit again and the text already has a final result, the row's next step is **Confirm final result**. Choose the newer result or keep the old one ([Review changes to a final result](lead-results.md#review-changes-to-a-final-result)).
 
+For many texts at once, select them and choose **More actions** › **Reopen…** in the selection bar ([Reopen or withdraw the tasks of several texts](lead-documents.md#reopen-or-withdraw-the-tasks-of-several-texts)). Texts with a final result are skipped.
+
 Annotators can also do this themselves: **More** › **Work rounds** › **Continue from** starts a new round from their submission, where each carried finding must be checked again ([Start a new work round](annotator.md#start-a-new-work-round)).
 
 An empty start is possible only before the first submission (**Start empty round**). After a submission, a fresh start needs your agreement: the annotator [reports a text problem](annotator.md#report-a-text-problem) and you choose **Agree clean restart…** ([Decide on a problem report](lead-results.md#decide-on-a-problem-report)). The new round has none of the earlier findings; a task from scratch starts empty, a task from proposals starts again on the newest tool proposals of the text, all open.
@@ -101,7 +103,7 @@ To take the change back, click **Undo** in the message. It restores the plan and
 
 Other ways to make the work smaller:
 
-- Fewer people per text: lower **Annotators per text**. Nobody is removed; texts that already have more annotators keep them. Lowered from the info button in the assign dialog, the limit says how many texts already have more, but there is no list of them. Remove the extra people one by one with **Remove…** in the text card ([Remove, reassign or reopen an assignment](lead-documents.md#remove-reassign-or-reopen-an-assignment)).
+- Fewer people per text: lower **Annotators per text**. Nobody is removed; texts that already have more annotators keep them. Lowered from the info button in the assign dialog, the limit says how many texts already have more. To list them, tick **More annotators than the limit** under **Flags** in **Filter** ([Filter the list](lead-documents.md#filter-the-list)). To take the extra open tasks back, select those texts and choose **More actions** › **Withdraw open tasks…** with **Only annotations above the limit of annotators per text** ([Reopen or withdraw the tasks of several texts](lead-documents.md#reopen-or-withdraw-the-tasks-of-several-texts)), or remove one person at a time with **Remove…** in the text card ([Remove, reassign or reopen an assignment](lead-documents.md#remove-reassign-or-reopen-an-assignment)).
 - Order of work: **My tasks** lists open tasks by status, then in the project's order, first imported first. To have urgent texts done first, select them and click **Move to front** ([Move texts to the front of the queue](lead-documents.md#move-texts-to-the-front-of-the-queue)).
 - Stop work for a while without withdrawing it: only through a problem report, with **Pause other tasks…**.
 

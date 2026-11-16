@@ -269,6 +269,8 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   ANNOTATION_MODE_FINAL_SELECTED: "A final result was chosen for this text, so its annotation mode stays. To change it, first use Withdraw final… under Finalization.",
   WITHDRAW_REASON_REQUIRED: "Withdrawing a final result requires a reason.",
   PREVIEW_STALE: "The texts changed since the preview. Check the new preview.",
+  BULK_UNDO_STALE: "Undo is no longer possible: the texts changed since.",
+  BULK_REASON_REQUIRED: "Reopening tasks requires a reason.",
   MODE_CHANGE_STALE: "The work on this text changed. Check the new list before you change the mode.",
   MODE_CHANGE_REASON_REQUIRED: "Changing the mode requires a reason.",
   MODE_CHANGE_NOT_FOUND: "This mode change no longer exists. Reload the text.",

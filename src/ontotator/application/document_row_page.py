@@ -17,6 +17,7 @@ from ontotator.application import document_row_stages as stages
 from ontotator.domain import document_rows as rules
 from ontotator.domain import next_steps as steps_rules
 from ontotator.domain import stage_cells as cells_rules
+from ontotator.domain.annotation_limits import effective_annotation_limit
 from ontotator.domain.annotation_modes import AnnotationMode, text_mode
 from ontotator.domain.document_rows import PAGE_SIZE
 from ontotator.domain.work_plans import PlanFlags
@@ -129,6 +130,8 @@ class _Context:
         # Per row, filled by _build_row: effective (review, annotate) flags,
         # bar segment of the next step and pseudonyms owning the next step.
         self.flags: dict[RowKey, tuple[bool, bool]] = {}
+        # Per row, filled by _row_steps: more annotators than the limit.
+        self.over_limit: dict[RowKey, bool] = {}
         # A final on a discarded root is not the row's final (export, steps).
         self.has_final: dict[RowKey, bool] = {}
         # Annotation tasks closed until the translation review is accepted.
@@ -598,6 +601,7 @@ def _build_row(ctx: _Context, case_id: str, language: str) -> dict[str, Any]:
         "others_activity_at": others_at,
         # Pre-check only (facet, filter); exact after paging.
         "flagged_unclear": 1 if flagged_round is not None else 0,
+        "over_limit": ctx.over_limit.get(key, False),
         "flagged_group_id": None,
         "flagged_round_id": flagged_round,
         "proposal_count": proposal_count,
@@ -1092,6 +1096,15 @@ def _row_steps(
         sum(1 for item in annotations if item.document_id == target.document_id)
         for target in targets
     ]
+    # Filter "More annotators than the limit" (issue 339 b), as the limit
+    # notice counts: unrevoked annotate tasks on a current version.
+    ctx.over_limit[key] = any(
+        n
+        > effective_annotation_limit(
+            facts.annotations_per_text, facts.per_text_overrides, *key
+        )
+        for n in per_target
+    )
     old_work = _old_work(ctx, live, targets, annotations)
     # Rule 8 compares annotation_assignments + pending_old_people with
     # "Annotations per text": the pair adds up to the minimum over the
@@ -1417,7 +1430,7 @@ def _row_level_matches(ctx: _Context, row: Mapping[str, Any], query: RowQuery) -
         selected = getattr(query, f"{name}_state")
         if selected and row["stages"][name]["state"] not in selected:
             return False
-    if query.flags and not row["flagged_unclear"]:
+    if query.flags and set(query.flags).isdisjoint(facets.flag_values(row)):
         return False
     if query.proposals and facets.proposal_value(row) not in query.proposals:
         return False

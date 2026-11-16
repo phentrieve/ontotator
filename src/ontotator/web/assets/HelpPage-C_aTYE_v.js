@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-CB1-5Dd6.js";import{n as a,t as o}from"./lib-BghjL_ui.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-DrMZf9mB.js";import{n as a,t as o}from"./lib-Czm0Pv3w.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -1204,6 +1204,10 @@ The result has findings with values filled in by default, modifier terms used as
 
 In projects where the consolidator of a text may not be one of its annotators, you cannot choose a result you made yourself. Another lead must choose it. See [Accept a result or compare results](lead-results.md#accept-a-result-or-compare-results).
 
+### Undo after Reopen… or Withdraw open tasks… says "Undo is no longer possible: the texts changed since."
+
+Undo of these bulk actions works once, for the lead who made the change, within an hour, and only while nothing changed on the texts since, for example nobody saved a draft and nobody was assigned. Reopen or withdraw the remaining tasks again, or assign the work anew. If the dialog itself says *The texts changed since the preview. Check the new preview.*, nothing was changed yet: read the new preview and confirm again. See [Reopen or withdraw the tasks of several texts](lead-documents.md#reopen-or-withdraw-the-tasks-of-several-texts).
+
 ### My uploaded texts do not show up
 
 An import runs in the background; reload **Documents** when it is done. If the project plan for new imports is **Plan nothing; I plan texts on Documents**, the new texts show as *Not decided* until you plan them. See [Upload texts](lead-documents.md#upload-texts).
@@ -1710,6 +1714,8 @@ Before you start: [publish the new guideline version](lead-settings.md#publish-t
 3. The task shows **Reopened** in their **My tasks**. They continue on their submitted work as it was: nothing is carried and nothing is marked **Check needed**.
 4. When they submit again and the text already has a final result, the row's next step is **Confirm final result**. Choose the newer result or keep the old one ([Review changes to a final result](lead-results.md#review-changes-to-a-final-result)).
 
+For many texts at once, select them and choose **More actions** › **Reopen…** in the selection bar ([Reopen or withdraw the tasks of several texts](lead-documents.md#reopen-or-withdraw-the-tasks-of-several-texts)). Texts with a final result are skipped.
+
 Annotators can also do this themselves: **More** › **Work rounds** › **Continue from** starts a new round from their submission, where each carried finding must be checked again ([Start a new work round](annotator.md#start-a-new-work-round)).
 
 An empty start is possible only before the first submission (**Start empty round**). After a submission, a fresh start needs your agreement: the annotator [reports a text problem](annotator.md#report-a-text-problem) and you choose **Agree clean restart…** ([Decide on a problem report](lead-results.md#decide-on-a-problem-report)). The new round has none of the earlier findings; a task from scratch starts empty, a task from proposals starts again on the newest tool proposals of the text, all open.
@@ -1752,7 +1758,7 @@ To take the change back, click **Undo** in the message. It restores the plan and
 
 Other ways to make the work smaller:
 
-- Fewer people per text: lower **Annotators per text**. Nobody is removed; texts that already have more annotators keep them. Lowered from the info button in the assign dialog, the limit says how many texts already have more, but there is no list of them. Remove the extra people one by one with **Remove…** in the text card ([Remove, reassign or reopen an assignment](lead-documents.md#remove-reassign-or-reopen-an-assignment)).
+- Fewer people per text: lower **Annotators per text**. Nobody is removed; texts that already have more annotators keep them. Lowered from the info button in the assign dialog, the limit says how many texts already have more. To list them, tick **More annotators than the limit** under **Flags** in **Filter** ([Filter the list](lead-documents.md#filter-the-list)). To take the extra open tasks back, select those texts and choose **More actions** › **Withdraw open tasks…** with **Only annotations above the limit of annotators per text** ([Reopen or withdraw the tasks of several texts](lead-documents.md#reopen-or-withdraw-the-tasks-of-several-texts)), or remove one person at a time with **Remove…** in the text card ([Remove, reassign or reopen an assignment](lead-documents.md#remove-reassign-or-reopen-an-assignment)).
 - Order of work: **My tasks** lists open tasks by status, then in the project's order, first imported first. To have urgent texts done first, select them and click **Move to front** ([Move texts to the front of the queue](lead-documents.md#move-texts-to-the-front-of-the-queue)).
 - Stop work for a while without withdrawing it: only through a problem report, with **Pause other tasks…**.
 
@@ -1904,6 +1910,8 @@ What for: show only texts in a certain state, language or origin, or the texts o
 4. Under **Order**, choose **Case ID**, **Import order** or **Last activity**.
 
 Active filters show as chips above the table. Remove one with its ✕, or click **Clear all**. Options without texts are hidden; click the button below the options, for example *Show 4 empty filters*, to see them.
+
+To find texts with more annotators than **Annotators per text** allows, for example after you lowered the limit, tick **More annotators than the limit** under **Flags**. It counts the unremoved annotation tasks of a text's current version, open and submitted. A text with its own limit ([Assign work for one text](#assign-work-for-one-text)) is measured against that limit, not the project's. To withdraw the extra open tasks, select the texts and use [Withdraw open tasks…](#reopen-or-withdraw-the-tasks-of-several-texts).
 
 ### Sort and page through the table
 
@@ -2091,6 +2099,28 @@ What happens to a waiting task:
 The dialog works through the whole selection, one task and language at a time: translation reviews first, then annotation. After the assign button it stays open on the next step, lists what is already assigned and says what comes next. An annotation that waits for its review is the next step once the review is assigned. To pass a step without assigning it, click **Skip this task**; to go to another step, choose it under **Task**. Click **Close** when you are done, or assign the last step.
 
 The closing message appears once the table shows the new assignments. It names what is left unassigned, for example *Left unassigned: annotation of case-0102 en*, and offers those cases, for example *Select the 2 skipped cases*. The message stays until you close it.
+
+### Reopen or withdraw the tasks of several texts
+
+What for: let the annotators revise many texts at once, for example after a guideline change, or take open tasks back, for example the annotations above a lowered **Annotators per text**.
+
+1. Select the texts, then click **More actions** in the selection bar.
+2. Choose **Reopen…** for submitted tasks, or **Withdraw open tasks…** for tasks not submitted yet. An entry that does nothing for the selection stays in the menu, unavailable, and says why, for example *No submitted tasks in the selected texts.*
+3. Under **Tasks**, tick which tasks: **Annotations** (ticked at first), **Translation reviews** or **Consolidations**.
+4. For **Withdraw open tasks…**: by default only tasks nobody has started are withdrawn. Tick **Also withdraw started tasks** to include tasks in progress or reopened; their drafts are kept. Tick **Only annotations above the limit of annotators per text** to keep the limit's number of annotations per text (a text's own limit where it has one) and withdraw only the open ones above it. Submitted work stays first, then started work, then the earliest assigned.
+5. Read the preview. It groups the tasks by what happens to them and names the people with their number of tasks, for example *Reopen 9 submitted tasks · Tom Reis 5, R. Roe 4*. Click **Show all** to list every text of a group. What stays as it is has its own group with the reason, for example:
+   - *Skip 3 texts · final result chosen: use Change final… first*: texts with a final result are not reopened.
+   - *Keep 2 open tasks · not submitted yet*: there is nothing to reopen yet.
+   - *Keep 1 started task · work has begun: tick “Also withdraw started tasks”*: started tasks (unless ticked), tasks paused by a problem report and lead corrections are not withdrawn; each has its own group.
+6. Enter the **Reason**. For **Reopen…** it is required: the people see it in **My tasks**. For **Withdraw open tasks…** it is optional (**Reason (optional)**). It is kept in each text's history.
+7. Click the button that names the work, for example *Reopen 14 assignments*. The dialog lists what happens. Tick **I understand** (or **I understand — withdraw the open tasks**) and click the button again.
+
+Every listed task changes, or none: if the texts changed since the preview, the dialog says *The texts changed since the preview. Check the new preview.* and shows it. Each task is recorded in the audit trail as a single reopen or withdrawal would be, so the history of every text shows it.
+
+**Undo** in the message, for example *Reopened 14 assignments in 12 texts.*, takes the change back: reopened tasks count as submitted again; withdrawn tasks come back with their drafts. Undo is for the lead who made the change, once, within an hour, and only while nothing changed on these texts since: nobody saved a draft, nobody was assigned, the plan, the final result and the text version are the same. Otherwise the message says *Undo is no longer possible: the texts changed since.*
+
+- Reopened translation reviews have no Undo: the review starts again from the current text of its version, and the earlier draft cannot be brought back. The dialog says so before you confirm. The submitted decision stays in the history.
+- Undo is recorded as a change of its own. A person who has the task open may be asked to reload it.
 
 ### Move texts to the front of the queue
 

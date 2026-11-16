@@ -41,6 +41,72 @@ CodesPath = Annotated[
 CODE_COLUMNS = ("username", "display_name", "email", "code", "expires_at")
 # Tasks a lead can hand to someone else (a consolidation opens through its round).
 HANDOVER_TASKS = ("annotate", "translation_review")
+# Bulk actions on the tasks of many texts (issue 336): their entries listed in full.
+MAX_BULK_LISTED = 50
+TaskKind = Literal["annotate", "translation_review", "review"]
+Texts = Annotated[
+    list[dict[str, str]],
+    Field(
+        min_length=1,
+        max_length=10000,
+        description=(
+            "The texts, each {'case_id': ..., 'language': ...}: at most 10000"
+            " per call, of at most 2000 cases (the server's selection cap)."
+        ),
+    ),
+]
+Tasks = Annotated[
+    list[TaskKind] | None,
+    Field(
+        description=(
+            "Which tasks of the texts: annotate (default), translation_review,"
+            " review (consolidation)."
+        )
+    ),
+]
+PreviewToken = Annotated[
+    str | None,
+    Field(
+        max_length=80,
+        description=(
+            "With confirm: the preview_token of the dry run, so exactly the"
+            " tasks it listed change."
+        ),
+    ),
+]
+
+
+def bulk_summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
+    """A bulk action's preview or result, lists cut to MAX_BULK_LISTED."""
+
+    def brief(item: dict[str, Any]) -> dict[str, Any]:
+        person = item.get("person") or {}
+        entry = {
+            key: item.get(key)
+            for key in ("case_id", "language", "assignment_id", "task", "status")
+        }
+        entry["person"] = person.get("display_name") or person.get("pseudonym")
+        if "message" in item:
+            entry["why"] = item["message"]
+        return entry
+
+    changes = [brief(item) for item in found.get("changes", [])]
+    kept = [brief(item) for item in found.get("kept", [])]
+    skipped = [
+        {key: item.get(key) for key in ("case_id", "language", "message")}
+        for item in found.get("skipped", [])
+    ]
+    return {
+        "applied": applied,
+        "changed" if applied else "would_change": _cut(changes, MAX_BULK_LISTED),
+        "change_count": found.get("change_count", len(changes)),
+        "kept": _cut(kept, MAX_BULK_LISTED),
+        "kept_count": found.get("kept_count", len(kept)),
+        "skipped_texts": _cut(skipped, MAX_BULK_LISTED),
+        "preview_token": found.get("preview_token"),
+    }
+
+
 # A copy of ontotator.exchange.spreadsheet (#386): this package is installed on
 # its own and does not depend on the server. Keep the two in step.
 ESCAPED_START = ("=", "+", "-", "@", "\t", "\r", "'")
@@ -524,6 +590,114 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
             f"/api/v1/assignments/{seg(assignment_id)}/reopen", {"reason": reason}
         )
         return assignment_summary(reopened)
+
+    async def _bulk(
+        project: str,
+        action: str,
+        body: dict[str, Any],
+        confirm: bool,
+        preview_token: str | None,
+    ) -> dict[str, Any]:
+        """Dry run, or apply with the dry run's token; a stale token answers
+        with the fresh dry run (``stale``)."""
+        path = project_path(project, "bulk-task-actions", action)
+        if not confirm:
+            preview: dict[str, Any] = await api.post(path, body | {"preview": True})
+            return bulk_summary(preview, False)
+        if preview_token is None:
+            raise OntotatorError(
+                "Run the dry run first and pass its preview_token with confirm."
+            )
+        try:
+            applied: dict[str, Any] = await api.post(
+                path, body | {"preview_token": preview_token}
+            )
+        except OntotatorError as exc:
+            fresh = (
+                exc.details.get("preview") if isinstance(exc.details, dict) else None
+            )
+            if exc.code != "PREVIEW_STALE" or not isinstance(fresh, dict):
+                raise
+            return bulk_summary(fresh, False) | {
+                "stale": True,
+                "note": "Tasks changed since the dry run; nothing was changed."
+                " Check this new dry run and confirm with its preview_token.",
+            }
+        return bulk_summary(applied, True)
+
+    @register(server, scopes="project-admin", effect="changes")
+    async def reopen_texts(
+        project: Project,
+        texts: Texts,
+        reason: Annotated[
+            str,
+            Field(
+                min_length=1,
+                max_length=2000,
+                description="Why, e.g. 'Guideline 2.3 changed'; the people see it.",
+            ),
+        ],
+        tasks: Tasks = None,
+        confirm: Annotated[
+            bool, Field(description="False: dry run. True: reopen the listed tasks.")
+        ] = False,
+        preview_token: PreviewToken = None,
+    ) -> dict[str, Any]:
+        """Reopen the submitted tasks of many texts, after a dry run.
+
+        Like reopen_task for each task: its person gets it back in My tasks
+        with the reason. Texts with a final result are skipped (change it
+        first); unsubmitted tasks are kept. The dry run lists both and a
+        preview_token; confirm with it: every listed task is reopened, or
+        none when anything changed since (then the answer is a fresh dry run,
+        ``stale``).
+        """
+        body = {"rows": texts, "reason": reason} | ({"tasks": tasks} if tasks else {})
+        return await _bulk(project, "reopen", body, confirm, preview_token)
+
+    @register(server, scopes="project-admin", effect="destructive")
+    async def withdraw_open_tasks(
+        project: Project,
+        texts: Texts,
+        tasks: Tasks = None,
+        include_started: Annotated[
+            bool,
+            Field(description="Also tasks in progress or reopened (drafts stay)."),
+        ] = False,
+        over_limit_only: Annotated[
+            bool,
+            Field(
+                description=(
+                    "Only annotations above annotators per text (a text's own value,"
+                    " else the project's):"
+                    " submitted, then started, then the earliest stay."
+                )
+            ),
+        ] = False,
+        reason: Annotated[str | None, Field(max_length=2000)] = None,
+        confirm: Annotated[
+            bool, Field(description="False: dry run. True: withdraw the listed tasks.")
+        ] = False,
+        preview_token: PreviewToken = None,
+    ) -> dict[str, Any]:
+        """Withdraw the open tasks of many texts, after a dry run.
+
+        Like withdraw_task for each task: it leaves the person's list; drafts
+        and submitted work stay. By default only tasks not yet started;
+        paused tasks and lead corrections are kept. Confirm with the dry
+        run's preview_token: all listed tasks are withdrawn, or none when
+        anything changed since (a fresh dry run, ``stale``).
+        """
+        body: dict[str, Any] = {
+            "rows": texts,
+            "include_started": include_started,
+            "over_limit_only": over_limit_only,
+        }
+        if tasks:
+            body["tasks"] = tasks
+        if reason:
+            body["reason"] = reason
+        return await _bulk(project, "withdraw", body, confirm, preview_token)
 
     @register(server, scopes=("read", "project-admin"), effect="destructive")
     async def hand_over_open_tasks(

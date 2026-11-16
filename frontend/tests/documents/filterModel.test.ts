@@ -32,6 +32,7 @@ describe("filter model", () => {
     ["Final facet", { final_state: "none,after_annotation,after_review,choose" }, { final_state: ["none", "after_annotation", "after_review", "choose"] }, ["Final: No final yet"]],
     ["Waiting on facet", { waiting_on: "me,ann-0001" }, { waiting_on: ["me", "ann-0001"] }, ["Waiting on: You", "Waiting on: ann-0001"]],
     ["Flags facet (X5)", { flags: "guidelines_unclear,nope" }, { flags: "guidelines_unclear" }, ["Flagged: guidelines unclear"]],
+    ["Over-limit filter (issue 339 b)", { flags: "over_limit" }, { flags: "over_limit" }, ["More annotators than the limit"]],
     ["Plan not in plan reads Not planned", { plan: "not_in_plan" }, { plan: "not_in_plan" }, ["Plan: Not planned"]],
     ["Review and annotation not planned keep the short chip", { review_state: "not_planned", annotation_state: "not_planned" }, { review_state: "not_planned", annotation_state: "not_planned" }, ["Translation review: Not planned", "Annotation: Not planned"]],
     ["Exact case (deep link)", { case: "case-104" }, { case: "case-104" }, ["Case ID: case-104"]],
@@ -100,6 +101,14 @@ describe("filter model", () => {
     expect(optionOf("Annotation not planned")).toMatchObject({ param: "annotation_state", values: ["not_planned"] });
     expect(clearAllPatch({ flags: "guidelines_unclear" })).toMatchObject({ flags: undefined });
     expect(filtersActive({ flags: "guidelines_unclear" })).toBe(true);
+  });
+
+  it("offers More annotators than the limit in Flags (issue 339 b, decision 336-D)", () => {
+    const over = optionOf("More annotators than the limit");
+    expect(over).toMatchObject({ param: "flags", values: ["over_limit"] });
+    expect(optionCount({ flags: { over_limit: 3 } }, over)).toBe(3);
+    expect(toggleOption({ flags: "guidelines_unclear" }, over, true)).toEqual({ flags: "guidelines_unclear,over_limit" });
+    expect(FACET_GROUPS.find(group => group.id === "flags")!.options.map(option => option.label)).toEqual(["Flagged: guidelines unclear", "More annotators than the limit"]);
   });
 
   it("toggles grouped options and counts their values", () => {

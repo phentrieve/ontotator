@@ -4961,7 +4961,10 @@
                 {
                   "type": "array",
                   "items": {
-                    "const": "guidelines_unclear",
+                    "enum": [
+                      "guidelines_unclear",
+                      "over_limit"
+                    ],
                     "type": "string"
                   }
                 },
@@ -5558,7 +5561,10 @@
                 {
                   "type": "array",
                   "items": {
-                    "const": "guidelines_unclear",
+                    "enum": [
+                      "guidelines_unclear",
+                      "over_limit"
+                    ],
                     "type": "string"
                   }
                 },
@@ -6459,6 +6465,171 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DiscardResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/bulk-task-actions/reopen": {
+      "post": {
+        "tags": [
+          "bulk-task-actions"
+        ],
+        "summary": "Bulk Reopen",
+        "description": "Reopen the submitted tasks of many texts (issue 336).\n\n``preview: true`` lists the tasks that would be reopened, the tasks kept\nand why, the texts skipped (a final result is chosen) and a\n``preview_token``. Applying sends that token and a ``reason``: every\nlisted task is reopened, or none (409 ``PREVIEW_STALE`` with a fresh\n``preview`` in the details when anything changed). Each task is audited\nlike a single reopen (``via: bulk_reopen``).",
+        "operationId": "bulk_reopen_api_v1_projects__key__bulk_task_actions_reopen_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkReopenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkTaskActionView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/bulk-task-actions/withdraw": {
+      "post": {
+        "tags": [
+          "bulk-task-actions"
+        ],
+        "summary": "Bulk Withdraw",
+        "description": "Withdraw the open tasks of many texts (issues 336, 339).\n\nLike a single withdrawal the drafts stay. Started tasks only with\n``include_started``; ``over_limit_only`` withdraws only annotations above\n\"annotators per text\" of their version (submitted, then started, then the\noldest stay). Preview and apply as ``bulk-task-actions/reopen``; each\ntask is audited like a single withdrawal (``via: bulk_withdraw``).",
+        "operationId": "bulk_withdraw_api_v1_projects__key__bulk_task_actions_withdraw_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkWithdrawRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkTaskActionView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/bulk-task-actions/undo": {
+      "post": {
+        "tags": [
+          "bulk-task-actions"
+        ],
+        "summary": "Bulk Undo",
+        "description": "Undo a bulk reopen or withdrawal by the ``undo.id`` of its apply.\n\nThe server keeps what the action changed; the request names only that\nrecord. It works once, for the lead who applied the action, before\n``undo.expires_at``, and only while the texts are exactly as the action\nleft them (tasks, drafts, review drafts, rounds, final results, plan,\nversions); otherwise 409 ``BULK_UNDO_STALE`` and nothing is undone.\nReopened tasks are submitted again; withdrawn tasks come back with their\ndrafts. An action that reopened a translation review has no Undo.",
+        "operationId": "bulk_undo_api_v1_projects__key__bulk_task_actions_undo_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkUndoRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkUndoResult"
                 }
               }
             }
@@ -13717,6 +13888,74 @@
         ],
         "title": "BulkAcceptance"
       },
+      "BulkKeptTaskView": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "assignment_id": {
+            "type": "integer",
+            "title": "Assignment Id"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "task": {
+            "type": "string",
+            "enum": [
+              "annotate",
+              "review",
+              "translation_review"
+            ],
+            "title": "Task"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "in_progress",
+              "submitted",
+              "reopened"
+            ],
+            "title": "Status"
+          },
+          "person": {
+            "$ref": "#/components/schemas/PersonRefView"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "assignment_id",
+          "document_id",
+          "version",
+          "task",
+          "status",
+          "person",
+          "reason",
+          "message"
+        ],
+        "title": "BulkKeptTaskView"
+      },
       "BulkPlanRequest": {
         "properties": {
           "case_ids": {
@@ -13869,6 +14108,71 @@
         ],
         "title": "BulkPreview"
       },
+      "BulkReopenRequest": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowRefView"
+            },
+            "type": "array",
+            "maxItems": 200000,
+            "minItems": 1,
+            "title": "Rows"
+          },
+          "tasks": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "annotate",
+                "review",
+                "translation_review"
+              ]
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Tasks"
+          },
+          "preview": {
+            "type": "boolean",
+            "title": "Preview"
+          },
+          "summary_only": {
+            "type": "boolean",
+            "title": "Summary Only"
+          },
+          "preview_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Token"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rows"
+        ],
+        "title": "BulkReopenRequest",
+        "description": "Reopen the submitted tasks of the selected texts. ``reason`` is\nrequired to apply; the people see it in My tasks."
+      },
       "BulkResult": {
         "properties": {
           "changed_rows": {
@@ -13923,6 +14227,35 @@
         ],
         "title": "BulkResult"
       },
+      "BulkSkippedTextView": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "reason": {
+            "type": "string",
+            "const": "final_chosen",
+            "title": "Reason"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "reason",
+          "message"
+        ],
+        "title": "BulkSkippedTextView"
+      },
       "BulkTargetView": {
         "properties": {
           "document_id": {
@@ -13952,6 +14285,266 @@
           "mode"
         ],
         "title": "BulkTargetView"
+      },
+      "BulkTaskActionView": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "reopen",
+              "withdraw"
+            ],
+            "title": "Action"
+          },
+          "applied": {
+            "type": "boolean",
+            "title": "Applied"
+          },
+          "texts": {
+            "type": "integer",
+            "title": "Texts"
+          },
+          "change_count": {
+            "type": "integer",
+            "title": "Change Count"
+          },
+          "kept_count": {
+            "type": "integer",
+            "title": "Kept Count"
+          },
+          "skipped_count": {
+            "type": "integer",
+            "title": "Skipped Count"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/BulkTaskView"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "kept": {
+            "items": {
+              "$ref": "#/components/schemas/BulkKeptTaskView"
+            },
+            "type": "array",
+            "title": "Kept"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/BulkSkippedTextView"
+            },
+            "type": "array",
+            "title": "Skipped"
+          },
+          "preview_token": {
+            "type": "string",
+            "title": "Preview Token"
+          },
+          "undo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BulkUndoView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "action",
+          "applied",
+          "texts",
+          "change_count",
+          "kept_count",
+          "skipped_count",
+          "changes",
+          "kept",
+          "skipped",
+          "preview_token"
+        ],
+        "title": "BulkTaskActionView"
+      },
+      "BulkTaskView": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "assignment_id": {
+            "type": "integer",
+            "title": "Assignment Id"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "task": {
+            "type": "string",
+            "enum": [
+              "annotate",
+              "review",
+              "translation_review"
+            ],
+            "title": "Task"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "in_progress",
+              "submitted",
+              "reopened"
+            ],
+            "title": "Status"
+          },
+          "person": {
+            "$ref": "#/components/schemas/PersonRefView"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "assignment_id",
+          "document_id",
+          "version",
+          "task",
+          "status",
+          "person"
+        ],
+        "title": "BulkTaskView"
+      },
+      "BulkUndoRequest": {
+        "properties": {
+          "undo_id": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Undo Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "undo_id"
+        ],
+        "title": "BulkUndoRequest"
+      },
+      "BulkUndoResult": {
+        "properties": {
+          "undone": {
+            "type": "integer",
+            "title": "Undone"
+          }
+        },
+        "type": "object",
+        "required": [
+          "undone"
+        ],
+        "title": "BulkUndoResult"
+      },
+      "BulkUndoView": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "expires_at"
+        ],
+        "title": "BulkUndoView",
+        "description": "The server's record of an applied action; ``id`` undoes it once,\nbefore ``expires_at``, for the lead who applied it."
+      },
+      "BulkWithdrawRequest": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowRefView"
+            },
+            "type": "array",
+            "maxItems": 200000,
+            "minItems": 1,
+            "title": "Rows"
+          },
+          "tasks": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "annotate",
+                "review",
+                "translation_review"
+              ]
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Tasks"
+          },
+          "preview": {
+            "type": "boolean",
+            "title": "Preview"
+          },
+          "summary_only": {
+            "type": "boolean",
+            "title": "Summary Only"
+          },
+          "preview_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Token"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "include_started": {
+            "type": "boolean",
+            "title": "Include Started"
+          },
+          "over_limit_only": {
+            "type": "boolean",
+            "title": "Over Limit Only"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rows"
+        ],
+        "title": "BulkWithdrawRequest",
+        "description": "Withdraw the open tasks of the selected texts; drafts stay."
       },
       "CarryPerson": {
         "properties": {
@@ -16433,12 +17026,18 @@
             "anyOf": [
               {
                 "type": "string",
-                "const": "guidelines_unclear"
+                "enum": [
+                  "guidelines_unclear",
+                  "over_limit"
+                ]
               },
               {
                 "items": {
                   "type": "string",
-                  "const": "guidelines_unclear"
+                  "enum": [
+                    "guidelines_unclear",
+                    "over_limit"
+                  ]
                 },
                 "type": "array"
               },
@@ -16785,6 +17384,10 @@
               }
             ],
             "title": "Flagged Round Id"
+          },
+          "over_limit": {
+            "type": "boolean",
+            "title": "Over Limit"
           },
           "proposal_count": {
             "type": "integer",
