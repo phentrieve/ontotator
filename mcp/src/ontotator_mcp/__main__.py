@@ -26,6 +26,9 @@ environment:
                            in, separated by the path separator; required for
                            any local file access (unset, the file tools refuse
                            and the others still work)
+  ONTOTATOR_MCP_READ_CONTENT
+                           1 adds the tools that return texts and submitted
+                           annotations (off by default)
 """
 
 

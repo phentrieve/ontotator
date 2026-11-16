@@ -2,7 +2,9 @@
 
 `ontotator-mcp` lets an MCP client, such as Claude Desktop or Claude Code, set up and run an [Ontotator](../README.md) project for you: upload ontologies, create a project, import texts and machine proposals, assign people, follow progress and agreement, accept agreeing results and download exports. It runs on your computer, speaks MCP over stdio and calls the HTTP API of your Ontotator instance with an [API token](../docs/operations.md#api-tokens).
 
-What it does not do: annotation, review and translation review stay in the web interface. No tool reads or writes annotators' drafts or the findings of their submissions (`get_text_detail` lists submissions by author, time and mode only), and the server refuses the annotation routes to every API token anyway.
+What it does not do: annotation, review and translation review stay in the web interface. No tool reads or writes annotators' drafts or the findings of their submissions (`get_text_detail` lists submissions by author, time and mode only), and the server refuses the annotation routes to every API token anyway. No tool returns the text of a document either, unless you ask for it: `list_translation_reviews` leaves out the text a reviewer proposed without `include_text`.
+
+That is the default. With `ONTOTATOR_MCP_READ_CONTENT=1` four more tools read a text version and submitted annotations; see [Content tools](#content-tools-opt-in). Drafts and other unsubmitted work stay out of reach in either case.
 
 ## Install
 
@@ -35,6 +37,7 @@ The token is shown once. Store it like a password: the MCP client keeps it in it
 | `ONTOTATOR_TIMEOUT` | Seconds per HTTP request (default 60). |
 | `ONTOTATOR_JOB_TIMEOUT` | Seconds a tool waits for an import or export job (default 900). |
 | `ONTOTATOR_MCP_FILES_DIR` | Required for local files. The folders the tools may read local files from and write downloads to, as absolute paths (or starting with `~`), several separated by `:` (`;` on Windows). Unset, the server still starts, but every tool that reads or writes a local file refuses; the other tools work. |
+| `ONTOTATOR_MCP_READ_CONTENT` | `1` adds the [content tools](#content-tools-opt-in), which return texts and submitted annotations. Unset (the default) or `0`, these tools do not exist; any other value stops the server with a message. |
 
 ### Local files
 
@@ -168,6 +171,24 @@ A token can do only what both its scopes and its owner's roles allow. Many tools
 | `download_project_archive` | admin | writes a local file | Download the ZIP of a finished project archive job to a local path. |
 
 Useful token sets: a project token with `read`, `import`, `export` and `project-admin` covers everything a lead does, handing tasks on included; `read` is enough for status, `export` alone for exports and downloads; ontology uploads, new projects, accounts (`list_users`, `create_users`, `issue_setup_codes`, `update_user`) and project archives need a system token with `admin` (and `read`).
+
+### Content tools (opt-in)
+
+By default no tool puts clinical text or the findings of a submission into the model's context. Start the server with `ONTOTATOR_MCP_READ_CONTENT=1` to add four read-only tools; without the variable they are not registered, so a client does not see them and cannot call them. Use them to compare two submissions of one text before a final result exists, to compare annotations across two versions of a text, or to fetch one text version without exporting the project.
+
+| Tool | Token scopes | Effect | What it does |
+| --- | --- | --- | --- |
+| `get_text_version` | read | reads | One text version: case, language, version, origin, predecessor, translation status, text hash. |
+| `list_annotation_versions` | read | reads | The annotation states of a text version the token's owner may read: kind, id, label, time. |
+| `get_annotation_version` | read | reads | One annotation state of a text version: its annotations (term, values, note) and evidence. |
+| `get_submission` | read | reads | One submitted result: its annotations, evidence, proposal decisions and carried inputs. |
+
+- **Text only on request.** `get_text_version` returns the text only with `include_text=true`. `get_annotation_version` and `get_submission` return passages as offsets (`start`, `end`, counted in Unicode code points); with `include_text=true` each passage also carries its `text`, and `get_submission` returns the earlier text a carried round came from (`carried_from.text`), which it otherwise names without the text. Terms, values and annotators' notes are always part of the result: they are what the tools are for.
+- **Submitted work only.** The tools read immutable states: submissions and imported tool proposals. A draft, an open round or an unfinished consolidation has no ID these tools accept (`VERSION_NOT_FOUND`), and the routes that open a draft need a browser session.
+- **What the token's owner may read.** Each tool returns what its HTTP route returns for the token's owner, no more: a lead reads every submission of a text, anyone else their own submissions and the ones their tasks give them. With **Hide annotator names during consolidation** on, a consolidator's token gets *Annotator A*, *Annotator B* and opaque IDs in place of names and pseudonyms, as in the web interface. The MCP server neither adds nor removes anything there.
+- A token with `read` is enough. Prefer a project token with a short lifetime, and turn the variable on only for the client and the work that need it.
+
+`list_translation_reviews` is always available and follows the same rule: without `include_text` it leaves out `proposed_text` (the full text the reviewer submitted) and `rationale`; with `include_text=true` it returns them. The same two fields are left out of the reviews in `get_text_detail`. Until 0.10.2 `list_translation_reviews` and `get_text_detail` always returned them.
 
 ### Changes while a project runs
 

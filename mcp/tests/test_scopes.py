@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import io
 import zipfile
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +30,7 @@ from ontotator_mcp.resources import (
 )
 from ontotator_mcp.server import build_server
 from ontotator_mcp.tooling import TOOL_SCOPES, scope_text
+from ontotator_mcp.tools_content import CONTENT_TOOLS
 
 P = "/api/v1/projects/{key}"
 
@@ -187,6 +189,26 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
         "list_mode_changes": {"project": "p"},
         "get_text_detail": {"project": "p", "document_id": "c-en-v1"},
         "list_translation_reviews": {"project": "p"},
+        # The content tools (ONTOTATOR_MCP_READ_CONTENT=1), with every route.
+        "get_text_version": {
+            "project": "p",
+            "document_id": "c-en-v1",
+            "include_text": True,
+        },
+        "list_annotation_versions": {"project": "p", "document_id": "c-en-v1"},
+        "get_annotation_version": {
+            "project": "p",
+            "document_id": "c-en-v1",
+            "kind": "submission",
+            "version_id": "s1",
+            "include_text": True,
+        },
+        "get_submission": {
+            "project": "p",
+            "document_id": "c-en-v1",
+            "submission_id": "s1",
+            "include_text": True,
+        },
         "withdraw_guideline": {"project": "p", "version": 2},
         "start_new_round": {
             "project": "p",
@@ -384,7 +406,10 @@ async def test_every_tool_names_the_scopes_of_its_routes(
     fake: FakeApi, settings: Settings, tmp_path: Path
 ) -> None:
     _flows(fake)
-    server = build_server(settings, transport=httpx.MockTransport(fake))
+    # With the content tools: every tool the server can have.
+    server = build_server(
+        replace(settings, read_content=True), transport=httpx.MockTransport(fake)
+    )
     arguments = _arguments(tmp_path)
     async with Client(server) as client:
         listed = {tool.name: tool for tool in (await client.list_tools()).tools}
@@ -564,7 +589,8 @@ README_EFFECTS = {
 
 def test_the_readme_lists_every_tool_with_its_scopes_and_effect() -> None:
     readme = (Path(__file__).resolve().parents[1] / "README.md").read_text()
-    build_server(Settings(url="https://o.test", token="t"))
+    build_server(Settings(url="https://o.test", token="t", read_content=True))
+    assert set(CONTENT_TOOLS) <= set(TOOL_SCOPES)
     for info in TOOL_SCOPES.values():
         effect = README_EFFECTS[info.effect]
         assert f"| `{info.name}` | {info.label} | {effect} |" in readme, info.name

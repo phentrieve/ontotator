@@ -102,12 +102,15 @@ def live() -> Iterator[dict[str, str]]:
             process.wait(timeout=30)
 
 
-def _server(info: dict[str, str], token: str, *files_dirs: Path) -> Any:
+def _server(
+    info: dict[str, str], token: str, *files_dirs: Path, read_content: bool = False
+) -> Any:
     settings = Settings(
         url=info["url"],
         token=token,
         poll_interval=0.2,
         files_dirs=tuple(folder.resolve() for folder in files_dirs),
+        read_content=read_content,
     )
     return build_server(settings)
 
@@ -311,3 +314,51 @@ async def test_setup_import_status_and_export(
             await call(reader, "start_export", {"project": PROJECT, "kind": "edit_log"})
         assert "'export' scope" in str(refused.value)
         assert live["read_token"] not in str(refused.value)
+        # Without ONTOTATOR_MCP_READ_CONTENT the content tools do not exist.
+        with pytest.raises(ToolFailed, match="Unknown tool"):
+            await call(
+                reader,
+                "get_text_version",
+                {"project": PROJECT, "document_id": documents[0]},
+            )
+
+    # With it, a read token reads a text version; the text only on request (#442).
+    content = _server(live, live["read_token"], read_content=True)
+    async with Client(content) as reader:
+        about = {"project": PROJECT, "document_id": documents[0]}
+        version = await call(reader, "get_text_version", about)
+        assert version["document_id"] == documents[0]
+        assert (version["language"], version["version"]) == ("en", 1)
+        assert "text" not in version
+        full = await call(reader, "get_text_version", about | {"include_text": True})
+        assert full["text"].strip()
+        assert full["text_sha256"] == version["text_sha256"]
+        # Nothing is submitted (that needs the browser): only the imported
+        # tool proposals are offered. Their passages are offsets; with
+        # include_text each carries the text it marks.
+        [offered] = await call(reader, "list_annotation_versions", about)
+        assert offered["kind"] == "proposals"
+        one = about | {"kind": "proposals", "version_id": offered["id"]}
+        plain = await call(reader, "get_annotation_version", one)
+        assert plain["annotations"]
+        assert full["text"] not in json.dumps(plain)
+        spans = [
+            segment
+            for evidence in plain["evidence"]
+            for segment in evidence["mention"]["segments"]
+        ]
+        assert spans and all(set(segment) == {"start", "end"} for segment in spans)
+        marked = await call(
+            reader, "get_annotation_version", one | {"include_text": True}
+        )
+        for evidence in marked["evidence"]:
+            for segment in evidence["mention"]["segments"]:
+                expected = full["text"][segment["start"] : segment["end"]]
+                assert segment["text"] == expected != ""
+        # An unknown id is refused, an open task's work included.
+        for tool, extra in (
+            ("get_submission", {"submission_id": "sub-unknown"}),
+            ("get_annotation_version", {"kind": "own", "version_id": "sub-unknown"}),
+        ):
+            with pytest.raises(ToolFailed, match="VERSION_NOT_FOUND"):
+                await call(reader, tool, about | extra)
