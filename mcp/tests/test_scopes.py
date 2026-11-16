@@ -120,7 +120,11 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "language": "en",
             "reviewer": "r",
         },
-        "accept_agreeing_texts": {"project": "p", "confirm": True},
+        "accept_agreeing_texts": {
+            "project": "p",
+            "confirm": True,
+            "preview_token": "sha256:x",
+        },
         "final_export_check": {"project": "p"},
         "start_export": {"project": "p", "kind": "final"},
         "get_job": {"job_id": 1, "wait": True},
@@ -184,6 +188,14 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "language": "en",
             "submission_id": "s1",
             "confirm": True,
+        },
+        "withdraw_final_result": {
+            "project": "p",
+            "case_id": "w",
+            "language": "en",
+            "reason": "Re-annotation",
+            "confirm": True,
+            "expected_revision": 1,
         },
         "request_translation_correction": {
             "project": "p",
@@ -255,7 +267,19 @@ def _flows(fake: FakeApi) -> None:
         {"case_ids": ["c"], "total": 1, "truncated": False},
     )
     both = [work("submitted", "a"), work("submitted", "b")]
-    fake.on("GET", f"{P}/document-rows", page([row("c", work=both)]))
+    final = build(
+        "FinalSelectionSummary",
+        case_id="w",
+        language="en",
+        document_id="w-en-v1",
+        submission_id="s9",
+        revision=1,
+    )
+    fake.on(
+        "GET",
+        f"{P}/document-rows",
+        page([row("c", work=both), row("w", final=final)]),
+    )
     fake.on(
         "GET",
         "/api/v1/projects/{key}/document-rows/{case_id}/{language}/final-panel",

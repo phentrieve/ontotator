@@ -94,7 +94,8 @@ In week six, 80 new letters arrive, one student leaves for a clinical rotation, 
 | Problem reports filed by annotators | `GET P/problem-reports` | `read` | `list_problem_reports` | added in this PR (listing) |
 | Pause more tasks, release, restart empty or resolve a report | `GET /problem-reports/{id}`, `/pause-candidates`, `POST /problem-reports/{id}/actions` | `read`, `project-admin` | `act_on_problem_report` | covered (#346) |
 | A translation reviewer or the lead corrects a rejected translation; discard a translation | `POST P/documents/{doc}/translation-correction-assignment`, `/lead-correction`, `POST P/variants/{doc}/discard` | `read`, `project-admin` (lead correction no longer session only, #345) | `request_translation_correction`, `start_lead_correction`, `discard_translation` | covered (#345, #346) |
-| Choose or change the final result of one text | `GET P/document-rows/{case}/{language}/final-panel`, `PUT P/final-selections` | `read`, `project-admin` | `set_final_result` (dry run, `expected_revision`) | covered (#346) |
+| Choose or change the final result of one text | `GET P/document-rows/{case}/{language}/final-panel`, `PUT P/final-selections` | `read`, `project-admin` | `set_final_result` (dry run shows the revision; pass it as `expected_revision` to refuse a final that changed meanwhile) | covered (#346) |
+| Withdraw the final result of one text | `GET P/document-rows`, `POST P/final-selections/withdraw` | `read`, `project-admin` | `withdraw_final_result` (dry run shows the revision; confirm needs it as `expected_revision`; reason) | covered (#343) |
 
 Verdict: **sufficient after this work**. Before it, the most common change of a running project, a person leaving, needed the web interface for every task, and a project token could not reassign at all because the task routes have no project in their path.
 
@@ -130,7 +131,7 @@ The data warehouse loads the final results every night with `ci-export`, and Dr.
 | Texts by language, stage, query or proposals, page by page | `GET P/document-rows` (paged, filtered) | `read` | `list_texts` | covered |
 | Progress per text and person | `GET P/progress` | `read` | `get_progress` | covered (not paged: one large answer for big projects) |
 | Agreement over the project: summary (macro mean, pooled), per pair of annotators, per text | `GET P/agreement` (leads, like the final export: it names the annotators) | `read` | `agreement_summary` | covered: the figures of the final export's `agreement.csv` and `agreement-summary.csv` for the current final results, in one call |
-| Agreement of one text before a result is chosen | `GET P/document-rows/{case}/{language}/final-panel` | `read` | `accept_agreeing_texts` (dry run) | covered |
+| Agreement of one text before a result is chosen | `GET P/document-rows/{case}/{language}/final-panel` | `read` | `set_final_result` (dry run) | covered |
 | Working time | `GET P/work-time` | `read` | `working_time_summary` | covered |
 | Problem reports that would block or warn the export | `GET P/problem-reports` (paged) | `read` | `list_problem_reports` | added in this PR |
 | One problem report with its events and holds | `GET /problem-reports/{id}` | `read` | `get_problem_report` | covered (personal token; project tokens with #351) |
@@ -138,7 +139,7 @@ The data warehouse loads the final results every night with `ci-export`, and Dr.
 | Annotation mode changes, per text or for the whole project | `GET P/annotation-mode-changes` (`case_id` and `language` optional) | `read` | `list_mode_changes` | covered |
 | One text's tasks, rounds, submissions and translation reviews | `GET P/assignments?document_id=`, `GET /assignments/{id}/rounds`, `GET P/documents/{doc}/submissions`, `GET P/documents/{doc}/translation-reviews` | `read` | `get_text_detail` | covered (rounds: personal token; project tokens with #351) |
 | Every translation review of the project | `GET P/translation-reviews` | `read` | `list_translation_reviews` | covered |
-| Accept texts whose annotations agree in full | `PUT P/final-selections` | `read`, `project-admin` | `accept_agreeing_texts` | covered (choosing among differing results stays in the web interface) |
+| Accept texts whose annotations agree in full | `POST P/final-selections/accept-agreeing` (preview, then apply with its `preview_token`) | `project-admin` | `accept_agreeing_texts` | covered (#354; choosing among differing results stays in the web interface) |
 | Check the final export | `GET P/workflow-warnings` | `read` | `final_export_check` | covered |
 | Start the nightly export; a retry must not create a second one | `POST P/exports/final` (`request_id`) | `export` | `start_export` with `request_id` | added in this PR (the route already accepted it; the tool always sent a new one) |
 | Wait, download, verify the SHA-256 | `GET /jobs/{id}`, `GET /jobs/{id}/download` | `export` | `get_job`, `download_export` | covered |

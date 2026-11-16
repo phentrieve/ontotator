@@ -587,9 +587,10 @@ class OpenTranslationReviewView(_View):
 
 
 class RowChangeView(_View):
-    """A change of who works on a row, or how: its History line."""
+    """A change of who works on a row, or how: its History line. A withdrawn
+    final result (#343) names the lead in ``from_person``."""
 
-    kind: Literal["reassigned", "mode_changed", "mode_restored"]
+    kind: Literal["reassigned", "mode_changed", "mode_restored", "final_withdrawn"]
     at: datetime
     task: str | None = None
     from_person: PersonRefView | None = None

@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, Request
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ontotator.api.identity import PrincipalDep
 from ontotator.api.routes import get_access
@@ -34,6 +34,81 @@ class FinalSelectionView(BaseModel):
     updated_at: datetime | None = None
     selected_by: str | None = None
     adjudicator_not_annotator: bool | None = None
+
+
+class FinalWithdrawalRequest(BaseModel):
+    """Withdraw the final result of one text (#343)."""
+
+    model_config = ConfigDict(extra="forbid")
+    case_id: str
+    language: str
+    # The revision of the final result being withdrawn.
+    expected_revision: int = Field(ge=1)
+    reason: str = Field(min_length=1, max_length=2000)
+
+
+class FinalWithdrawalView(BaseModel):
+    case_id: str
+    language: str
+    # The withdrawn result.
+    document_id: str
+    submission_id: str
+    # The withdrawal's revision; the text has no final result now.
+    revision: int
+
+
+class AcceptAgreeingRequest(BaseModel):
+    """Preview (``preview``) or apply (``preview_token``) accepting every
+    agreeing text (#354)."""
+
+    model_config = ConfigDict(extra="forbid")
+    preview: bool = False
+    # The token of the preview being applied; required unless ``preview``.
+    preview_token: str | None = Field(default=None, max_length=80)
+    # Only these cases; None: every text of the project.
+    case_ids: list[str] | None = Field(default=None, max_length=10000)
+
+    @model_validator(mode="after")
+    def _token_to_apply(self) -> "AcceptAgreeingRequest":
+        if not self.preview and self.preview_token is None:
+            raise ValueError("Send preview: true, or the preview_token to apply.")
+        return self
+
+
+class AgreeingText(BaseModel):
+    case_id: str
+    language: str
+    # The submission that becomes the final result.
+    document_id: str
+    submission_id: str
+    findings: int | None = None
+
+
+class AgreeingSkip(BaseModel):
+    case_id: str
+    language: str
+    reason: Literal[
+        "open_task",
+        "not_ready",
+        "not_in_plan",
+        "fewer_than_two",
+        "consolidation",
+        "differ",
+    ]
+    message: str
+
+
+class AcceptAgreeingView(BaseModel):
+    project: str
+    # False: a preview; True: every listed text has become final.
+    applied: bool
+    texts: list[AgreeingText]
+    skipped: list[AgreeingSkip]
+    # Texts that already have a final result: not changed (Change final…).
+    already_final: int
+    # Requested ``case_ids`` the project does not have.
+    unknown_case_ids: list[str] = Field(default_factory=list)
+    preview_token: str
 
 
 class FinalWarning(BaseModel):
@@ -198,6 +273,42 @@ def select_final(
         body.submission_id,
         body.expected_revision,
         body.acknowledged_cause_ids,
+    )
+
+
+@router.post("/final-selections/withdraw", response_model=FinalWithdrawalView)
+def withdraw_final(
+    key: str, body: FinalWithdrawalRequest, principal: PrincipalDep, request: Request
+) -> dict[str, Any]:
+    """Withdraw a text's final result, with a reason (#343).
+
+    The text has no final result until a lead chooses one again; submissions,
+    consolidations and final exports already made stay. 409
+    ``REVISION_CONFLICT`` when the final changed since ``expected_revision``.
+    """
+    return _service(request, principal).withdraw(
+        key, body.case_id, body.language, body.expected_revision, body.reason
+    )
+
+
+@router.post("/final-selections/accept-agreeing", response_model=AcceptAgreeingView)
+def accept_agreeing(
+    key: str, body: AcceptAgreeingRequest, principal: PrincipalDep, request: Request
+) -> dict[str, Any]:
+    """Accept the result of every text whose annotations agree in full (#354).
+
+    ``preview: true`` lists the texts that would become final, every other
+    text without a final result with the reason it is left out, and a
+    ``preview_token``; unknown ``case_ids`` are named. Applying sends that token: all
+    listed texts become final, or none (409 ``PREVIEW_STALE`` with a fresh
+    ``preview`` in the details when anything changed). Texts that already
+    have a final result are only counted.
+    """
+    return _service(request, principal).accept_agreeing(
+        key,
+        preview=body.preview,
+        preview_token=body.preview_token,
+        case_ids=body.case_ids,
     )
 
 

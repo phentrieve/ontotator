@@ -6,7 +6,7 @@ What stays fixed in every case:
 
 - Texts cannot be deleted. A text you no longer want stays in the project; you take it out of the plan ([Narrow the scope](#narrow-the-scope)).
 - A submission never changes. New work is a new round or a new submission; the earlier one stays in the history.
-- A final result can be replaced with **Change final…**, never withdrawn. While a text has a final result, its annotation mode cannot be changed.
+- A final result can be replaced with **Change final…** or withdrawn with **Withdraw final…** ([Withdraw a final result](lead-results.md#withdraw-a-final-result)). While a text has a final result, its annotation mode cannot be changed.
 - There is no pause button for texts. A task is paused only by a problem report ([Decide on a problem report](lead-results.md#decide-on-a-problem-report)).
 
 ## Use another translation of a text
@@ -75,7 +75,7 @@ The text card shows which set a text's tasks work on: **Annotation** names it, f
    Without a report, restart the task through the API or the MCP server: `POST /api/v1/assignments/{id}/rounds` with `kind` `clean_restart` and a `reason` (scope `project-admin`), or the MCP tool `start_new_round` with `kind` `clean_restart`, a `reason` and, after its dry run, `confirm`. The task ID is in the text card's **Details**. The current round and its draft are dropped; submitted work stays in the history. Afterwards the card names the newest set and *Newer set available* is gone once every task of the text is on it.
 4. To restart the whole text instead: open the text card, click **Annotation** and click **Change mode…**. Enter the **Reason** and click **Discard work and change mode** (or **Change mode**). The text is now from scratch, and the work on the whole text is discarded, submitted work included; the assignments are removed ([Change the annotation mode of one text](lead-documents.md#change-the-annotation-mode-of-one-text)). Then choose **From proposals** under **Annotation** and assign the text again.
 
-For a text with a final result this is not possible: **Change mode…** is refused with *A final result was chosen for this text, so its annotation mode stays.* (error code `ANNOTATION_MODE_FINAL_SELECTED`). A final result cannot be withdrawn; to annotate such a text again, add annotators as in [More annotators on finished texts](#more-annotators-on-finished-texts).
+For a text with a final result this is not possible: **Change mode…** is refused with *A final result was chosen for this text, so its annotation mode stays.* (error code `ANNOTATION_MODE_FINAL_SELECTED`). Withdraw the final result first ([Withdraw a final result](lead-results.md#withdraw-a-final-result)), or, to annotate such a text again without discarding work, add annotators as in [More annotators on finished texts](#more-annotators-on-finished-texts).
 
 ### More annotators on finished texts
 
