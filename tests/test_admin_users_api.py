@@ -1,6 +1,7 @@
 """Users administration acceptance through real sessions and transactions."""
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -196,6 +197,34 @@ def test_invalid_compound_create_and_patch_roll_back(app):
 def test_required_admin_patch_fields_cannot_be_null(app, body):
     admin = logged_in(app, "root", system_admin=True)
     assert admin.patch("/api/v1/admin/users/root", json=body).status_code == 422
+
+
+def test_code_responses_state_the_expiry_of_the_validity_setting(app, monkeypatch):
+    def hours_left(body: dict) -> float:
+        until = datetime.fromisoformat(body["expires_at"])
+        return (until - datetime.now(UTC)).total_seconds() / 3600
+
+    admin = logged_in(app, "root", system_admin=True)
+    path = "/api/v1/admin/users/"
+    default = admin.post(path, json={"username": "dora", "display_name": "D"})
+    assert 167.9 < hours_left(default.json()) <= 168
+    monkeypatch.setenv("ONTOTATOR_SETUP_CODE_HOURS", "72")
+    created = admin.post(path, json={"username": "erin", "display_name": "E"})
+    assert 71.9 < hours_left(created.json()) <= 72
+    reissued = admin.post(path + "erin/reset-code")
+    assert 71.9 < hours_left(reissued.json()) <= 72
+    redeemed = TestClient(app).post(
+        "/api/v1/auth/redeem-code",
+        json={
+            "username": "erin",
+            "code": reissued.json()["code"],
+            "new_password": PASSWORD,
+        },
+        headers=ORIGIN,
+    )
+    assert redeemed.status_code == 200, redeemed.text
+    reset = admin.post(path + "erin/reset-code")
+    assert 1.9 < hours_left(reset.json()) <= 2
 
 
 def test_admin_email_clear_differs_from_omission_and_reset_code_is_single_use(app):

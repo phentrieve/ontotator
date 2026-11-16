@@ -11,9 +11,15 @@ export type CodeOnceDialogProps = components["schemas"]["CodeResponse"] & {
   onClose: () => void;
 };
 
+/** How long a code is still valid, from the server's expiry: "7 days", "2 hours". Whole days from two days on; never below one hour. */
+export function validityText(expiresAt: string, now = Date.now()): string {
+  const hours = Math.max(1, Math.round((new Date(expiresAt).getTime() - now) / 3_600_000));
+  if (hours < 48) return `${hours} ${hours === 1 ? "hour" : "hours"}`;
+  return `${Math.round(hours / 24)} days`;
+}
+
 /** What the recipient needs in one message: where to go, which button, username, code and expiry. */
 export function handoverText({ code, expires_at, kind, username }: Pick<CodeOnceDialogProps, "code" | "expires_at" | "kind" | "username">, loginUrl: string, now = Date.now()): string {
-  const hours = Math.max(1, Math.round((new Date(expires_at).getTime() - now) / 3_600_000));
   return [
     kind === "setup" ? "Your Ontotator account is ready." : "Your Ontotator password can be reset.",
     `1. Open ${loginUrl}`,
@@ -22,7 +28,7 @@ export function handoverText({ code, expires_at, kind, username }: Pick<CodeOnce
     "",
     `Code: ${code}`,
     "",
-    `The code works once and is valid for about ${hours} ${hours === 1 ? "hour" : "hours"}, until ${formatDateTime(expires_at)}. Capital letters, spaces and hyphens do not matter.`,
+    `The code works once and is valid for about ${validityText(expires_at, now)}, until ${formatDateTime(expires_at)}. Capital letters, spaces and hyphens do not matter.`,
   ].join("\n");
 }
 
@@ -41,6 +47,8 @@ function CodeSession(props: CodeOnceDialogProps): JSX.Element {
   const [copy, setCopy] = useState<CopyState>(null);
   const active = useRef(false);
   const [text] = useState(() => handoverText(props, `${window.location.origin}${window.location.pathname}`));
+  // Fixed while the dialog is open, like the hand-over text beside it.
+  const [validity] = useState(() => validityText(expires_at));
   useEffect(() => {
     active.current = true;
     return () => { active.current = false; };
@@ -63,7 +71,7 @@ function CodeSession(props: CodeOnceDialogProps): JSX.Element {
     footer={<Button variant="primary" disabled={!acknowledged} onClick={close}>Close</Button>}>
     <p>This code is shown only once. Hand it over in person or by a secure channel.</p>
     <p className="code-once-value"><code>{code}</code></p>
-    <p>Expires (local time): <time dateTime={expires_at}>{formatDateTime(expires_at)}</time></p>
+    <p>This code works once and expires in {validity}, on <time dateTime={expires_at}>{formatDateTime(expires_at)}</time> (local time).</p>
     <Toolbar label="Copy">
       <Button loading={state("code") === "pending"} onClick={() => { void copyValue("code"); }}>{state("code") === "copied" ? "Copied" : "Copy"}</Button>
       <Button loading={state("text") === "pending"} onClick={() => { void copyValue("text"); }}>{state("text") === "copied" ? "Hand-over text copied" : "Copy hand-over text"}</Button>
