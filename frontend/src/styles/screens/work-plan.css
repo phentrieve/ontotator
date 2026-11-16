@@ -102,5 +102,8 @@
 .bulk-group--skip { border-inline-start-color: var(--notice-warning-border); }
 .bulk-group--keep { border-inline-start-color: var(--border); }
 .bulk-group p { margin: 0; }
+/* Who a bulk mode change affects: one line per person (issue 336 step 4). */
+.bulk-people { display: grid; gap: var(--space-1); font-size: var(--size-sm); }
+.bulk-people ul { margin: 0; padding-inline-start: var(--space-4); }
 .bulk-group-detail,
 .bulk-group-texts { color: var(--text-muted); }

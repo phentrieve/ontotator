@@ -485,3 +485,88 @@ async def test_tool_texts_state_the_selection_limit(mcp_client: Client) -> None:
     tools = {tool.name: tool for tool in (await mcp_client.list_tools()).tools}
     for name in ("update_work_plan", "distribute_texts"):
         assert "at most 2000" in (tools[name].description or ""), name
+
+
+async def test_change_annotation_modes_dry_run_confirm_and_stale_token(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    bulk = f"{P}/annotation-mode-changes/bulk"
+    texts = [{"case_id": "c", "language": "en"}, {"case_id": "d", "language": "en"}]
+    tom = {"pseudonym": "ann-1", "display_name": "Tom Reis", "is_me": False}
+    roe = {"pseudonym": "ann-2", "display_name": None, "is_me": False}
+
+    def preview(token: str, **fields: Any) -> dict[str, Any]:
+        change = build(
+            "ModeChangePreview",
+            case_id="c",
+            language="en",
+            from_mode="proposals",
+            to_mode="scratch",
+            submissions=[
+                build("DiscardedSubmissionView", submission_id="s1", author=tom)
+            ],
+            assignments=[
+                build("RevokedAssignmentView", status="submitted", person=tom),
+                build("RevokedAssignmentView", status="open", person=roe),
+            ],
+        )
+        skipped = build(
+            "BulkModeSkippedView",
+            case_id="d",
+            language="en",
+            reason="final_result",
+            message="Final result chosen: use Withdraw final… first.",
+        )
+        return (
+            build(
+                "BulkModeChangeView",
+                mode="scratch",
+                applied=False,
+                texts=2,
+                change_count=1,
+                skipped_count=1,
+                skipped_by_reason={"final_result": 1},
+                submission_count=1,
+                assignment_count=2,
+                changes=[change],
+                skipped=[skipped],
+                preview_token=token,
+            )
+            | fields
+        )
+
+    fake.on("POST", bulk, preview("sha256:a"))
+    args = {"project": "p", "texts": texts, "mode": "scratch", "reason": "Wrong model"}
+    dry = await call(mcp_client, "change_annotation_modes", args)
+    assert dry["applied"] is False and dry["preview_token"] == "sha256:a"
+    assert dry["would_change"] == [
+        {
+            "case_id": "c",
+            "language": "en",
+            "from_mode": "proposals",
+            "discarded_submissions": 1,
+            "authors": ["Tom Reis"],
+            "withdrawn_unsubmitted_tasks": ["ann-2"],
+        }
+    ]
+    assert dry["skipped_texts"][0]["message"].startswith("Final result chosen")
+    [post] = fake.calls_to("POST", bulk)
+    assert post.json() == {"rows": texts, "mode": "scratch", "preview": True}
+    with pytest.raises(ToolFailed):
+        await call(mcp_client, "change_annotation_modes", args | {"confirm": True})
+    assert len(fake.calls_to("POST", bulk)) == 1
+    confirmed = args | {"confirm": True, "preview_token": "sha256:a"}
+    fake.on("POST", bulk, preview("sha256:a", applied=True))
+    done = await call(mcp_client, "change_annotation_modes", confirmed)
+    assert done["applied"] is True and done["change_count"] == 1
+    assert fake.calls_to("POST", bulk)[-1].json() == {
+        "rows": texts,
+        "mode": "scratch",
+        "preview_token": "sha256:a",
+        "reason": "Wrong model",
+    }
+    fake.on(
+        "POST", bulk, refusal(409, "PREVIEW_STALE", {"preview": preview("sha256:b")})
+    )
+    stale = await call(mcp_client, "change_annotation_modes", confirmed)
+    assert stale["stale"] is True and stale["preview_token"] == "sha256:b"

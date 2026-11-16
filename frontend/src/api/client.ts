@@ -111,6 +111,8 @@ export type RowChangeView = components["schemas"]["RowChangeView"];
 export type ModeChangeTarget = components["schemas"]["ModeChangeTarget"];
 export type ModeChangeRequest = components["schemas"]["ModeChangeRequest"];
 export type ModeChangePreview = components["schemas"]["ModeChangePreview"];
+export type BulkModeChangeRequest = components["schemas"]["BulkModeChangeRequest"];
+export type BulkModeChangeView = components["schemas"]["BulkModeChangeView"];
 export type ModeChangeView = components["schemas"]["ModeChangeView"];
 export type ModeChangeList = components["schemas"]["ModeChangeList"];
 export type ModeChangeResult = components["schemas"]["ModeChangeResult"];
@@ -672,6 +674,8 @@ export class ApiClient {
   }
 
   /** What changing a locked text's annotation mode discards and revokes (lead only, no write). */
+  /** Bulk "Change mode…" of the selected texts: preview, or apply with the preview's token and a reason (lead only, issue 336). */
+  async bulkChangeMode(key: string, body: BulkModeChangeRequest, signal?: AbortSignal): Promise<BulkModeChangeView> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/annotation-mode-changes/bulk`, { method: "POST", body: JSON.stringify(body), signal }); }
   async previewModeChange(key: string, body: ModeChangeTarget): Promise<ModeChangePreview> {
     return this.request<ModeChangePreview>(`/api/v1/projects/${encodeURIComponent(key)}/annotation-mode-changes/preview`, { method: "POST", body: JSON.stringify(body) });
   }

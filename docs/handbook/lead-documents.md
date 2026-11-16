@@ -299,6 +299,8 @@ Once someone is assigned, started or submitted work, a line *Fixed: …* says wh
 
 **History** in the text card shows the change and its reason.
 
+For many texts at once, see [Change the annotation mode of several texts](#change-the-annotation-mode-of-several-texts).
+
 ### Assign work to the selected texts
 
 What for: give translation reviews or annotations to people.
@@ -372,6 +374,27 @@ What happens to the work:
 - After **Restart** the submitted work is set aside: it is not carried into the new round.
 - Every listed task gets its round, or none: if the texts changed since the preview, the dialog says *The texts changed since the preview. Check the new preview.* and shows it. Each round is recorded in the audit trail like a single new round.
 - This action has no undo, and no action on a single text brings back a round that was replaced. To let people only correct a submission in place, use **Reopen…** instead.
+
+### Change the annotation mode of several texts
+
+What for: switch many texts that already have annotation work between from proposals and from scratch, for example when the tool proposals turn out unusable, or usable after all. For each text it does what **Change mode…** in the text card does ([Change the annotation mode of one text](#change-the-annotation-mode-of-one-text)): the annotation of the text starts again, and the work on it is discarded.
+
+1. Select the texts, then click **More actions** in the selection bar and choose **Change mode…**. When no selected text can change its mode, the entry is unavailable and says why, for example *No annotation work on the selected texts yet: set the mode with Plan….*
+2. Under **Annotate the texts**, choose **From scratch** or **From proposals**. Neither is chosen at first. Each option says how many of the selected texts it changes.
+3. Read the preview. The first group names the texts that change and the work that goes, for example *Annotate 4 texts from proposals · discards 6 submissions, removes 2 unsubmitted assignments*; click **Show all** to list every text. Below it, a list names every person affected, for example *Tom Reis: 4 submissions are discarded.* and *R. Roe: 2 submissions are discarded; 1 unsubmitted assignment is removed.* Consolidations are named as such. Texts that keep their mode have their own group with the reason:
+   - *Skip 1 text · final result chosen: use Withdraw final… first*: a final result rests on the work ([Withdraw a final result](lead-results.md#withdraw-a-final-result)).
+   - *Skip 2 texts · no annotation work yet: set the mode with Plan…*: nothing fixes the mode of these texts; **Plan…** or the text card sets it directly.
+   - *Skip 6 texts · already annotated from scratch*: the text is already annotated this way.
+   - *Skip 1 text · no tool proposals for the text*: only a text with tool proposals can be annotated from proposals.
+4. Enter the **Reason**. It is required and recorded with each text's change.
+5. Click the button that names the work, for example *Change mode of 4 texts*. The dialog says what happens and lists the people again. Tick **I understand — discard the work and change the mode** (**I understand** when no submitted work is discarded) and click the button again.
+
+What happens to the work:
+
+- The mode change always discards the work of a whole text, never of single people: every submission on it (annotations and consolidations) is discarded and every assignment is removed, also those in progress. Drafts are kept. Discarded work is kept, not deleted: it no longer counts for progress, consolidation, the final result or exports.
+- The texts have no annotators afterwards: assign them again ([Assign work to the selected texts](#assign-work-to-the-selected-texts)).
+- Every listed text changes, or none: if the texts changed since the preview, the dialog says *The texts changed since the preview. Check the new preview.* and shows it. Each text is recorded like a single mode change, so **History** in its card shows the change and the reason.
+- There is no undo for the whole action. **Restore…** in a text card brings the discarded work of that text back while no new annotation has started on it.
 
 - Reopened translation reviews have no Undo: the review starts again from the current text of its version, and the earlier draft cannot be brought back. The dialog says so before you confirm. The submitted decision stays in the history.
 - Undo is recorded as a change of its own. A person who has the task open may be asked to reload it.

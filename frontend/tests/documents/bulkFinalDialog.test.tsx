@@ -44,6 +44,7 @@ beforeEach(() => {
   vi.spyOn(api, "bulkReopen").mockResolvedValue(nothing);
   vi.spyOn(api, "bulkWithdraw").mockResolvedValue({ ...nothing, action: "withdraw" });
   vi.spyOn(api, "bulkStartRound").mockResolvedValue({ ...nothing, action: "start_round", kind: "carry_forward" });
+  vi.spyOn(api, "bulkChangeMode").mockResolvedValue({ mode: "scratch", applied: false, texts: 0, change_count: 0, skipped_count: 0, skipped_by_reason: {}, submission_count: 0, assignment_count: 0, changes: [], skipped: [], preview_token: "sha256:m" });
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 

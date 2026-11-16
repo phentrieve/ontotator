@@ -19,7 +19,13 @@ from ontotator.storage.tables import (
     SubmissionRow,
 )
 
-__all__ = ["SUBMISSION_MODES", "load_text_mode", "locked_modes", "work_modes"]
+__all__ = [
+    "SUBMISSION_MODES",
+    "load_text_mode",
+    "locked_modes",
+    "locked_text_modes",
+    "work_modes",
+]
 
 SUBMISSION_MODES: dict[str, AnnotationMode] = {
     "proposal_check": "proposals",
@@ -104,6 +110,17 @@ def locked_modes(
     project; two queries (the batch planner, plan P3 point 7)."""
     locked: dict[tuple[str, str], AnnotationMode] = {}
     for case, language, _at, mode in _work(conn, project_id, None):
+        locked.setdefault((case, language), mode)
+    return locked
+
+
+def locked_text_modes(
+    conn: Connection, project_id: int, documents: list[str]
+) -> dict[tuple[str, str], AnnotationMode]:
+    """The fixed mode (oldest work) per locked text among the texts whose
+    versions are ``documents`` (all versions of each text); two queries."""
+    locked: dict[tuple[str, str], AnnotationMode] = {}
+    for case, language, _at, mode in _work(conn, project_id, documents):
         locked.setdefault((case, language), mode)
     return locked
 

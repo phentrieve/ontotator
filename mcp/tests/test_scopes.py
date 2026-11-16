@@ -202,6 +202,14 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "reason": "Proposals were wrong",
             "confirm": True,
         },
+        "change_annotation_modes": {
+            "project": "p",
+            "texts": [{"case_id": "c", "language": "en"}],
+            "mode": "scratch",
+            "reason": "Proposals were wrong",
+            "confirm": True,
+            "preview_token": "sha256:x",
+        },
         "restore_annotation_mode": {
             "project": "p",
             "case_id": "c",
@@ -476,6 +484,7 @@ IRREVERSIBLE = (
     "accept_agreeing_texts",
     "change_final_results",
     "start_rounds",
+    "change_annotation_modes",
     "carry_submission",
     "update_work_plan",
     "act_on_problem_report",

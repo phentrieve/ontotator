@@ -2048,6 +2048,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{key}/annotation-mode-changes/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk Change Mode
+         * @description Change the annotation mode of many texts (issue 336, step 4).
+         *
+         *     Each text is changed as ``POST annotation-mode-changes`` changes one: its
+         *     live submissions are marked discarded, its live annotate and review
+         *     assignments are revoked and the mode is stored. ``preview: true`` lists,
+         *     per text, the submissions and assignments with their people, the texts
+         *     left as they are with the reason (the single change's refusals; a text
+         *     with a final result: withdraw it first) and a ``preview_token``. Applying
+         *     sends that token and a ``reason``: every listed text changes, or none
+         *     (409 ``PREVIEW_STALE`` with a fresh ``preview`` in the details when
+         *     anything changed). Each text is audited like a single change
+         *     (``annotation_mode.change``, ``via: bulk_change_mode``) and can be
+         *     restored on its own (``.../{change_id}/restore``); there is no bulk undo.
+         */
+        post: operations["bulk_change_mode_api_v1_projects__key__annotation_mode_changes_bulk_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{key}/documents/{doc}/translation-correction-assignment": {
         parameters: {
             query?: never;
@@ -4752,6 +4784,72 @@ export interface components {
             person: components["schemas"]["PersonRefView"];
             /** Reason */
             reason: string;
+            /** Message */
+            message: string;
+        };
+        /**
+         * BulkModeChangeRequest
+         * @description Change the annotation mode of the selected texts. ``reason`` is
+         *     required to apply.
+         */
+        BulkModeChangeRequest: {
+            /** Rows */
+            rows: components["schemas"]["RowRefView"][];
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "proposals" | "scratch";
+            /** Reason */
+            reason?: string | null;
+            /** Preview */
+            preview?: boolean;
+            /** Summary Only */
+            summary_only?: boolean;
+            /** Preview Token */
+            preview_token?: string | null;
+        };
+        /** BulkModeChangeView */
+        BulkModeChangeView: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "proposals" | "scratch";
+            /** Applied */
+            applied: boolean;
+            /** Texts */
+            texts: number;
+            /** Change Count */
+            change_count: number;
+            /** Skipped Count */
+            skipped_count: number;
+            /** Skipped By Reason */
+            skipped_by_reason: {
+                [key: string]: number;
+            };
+            /** Submission Count */
+            submission_count: number;
+            /** Assignment Count */
+            assignment_count: number;
+            /** Changes */
+            changes: components["schemas"]["ModeChangePreview"][];
+            /** Skipped */
+            skipped: components["schemas"]["BulkModeSkippedView"][];
+            /** Preview Token */
+            preview_token: string;
+        };
+        /** BulkModeSkippedView */
+        BulkModeSkippedView: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "no_current_version" | "not_locked" | "unchanged" | "no_proposals" | "final_result";
             /** Message */
             message: string;
         };
@@ -15261,6 +15359,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ModeChangeResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_change_mode_api_v1_projects__key__annotation_mode_changes_bulk_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkModeChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkModeChangeView"];
                 };
             };
             /** @description Validation Error */

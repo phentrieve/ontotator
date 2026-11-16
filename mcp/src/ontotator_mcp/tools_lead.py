@@ -237,6 +237,127 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
         )
         return {"applied": True, "preview": preview, "result": result}
 
+    @register(server, scopes="project-admin", effect="destructive")
+    async def change_annotation_modes(
+        project: Project,
+        texts: Annotated[
+            list[dict[str, str]],
+            Field(
+                min_length=1,
+                max_length=10000,
+                description=(
+                    "The texts, each {'case_id': ..., 'language': ...}: at most"
+                    " 10000 per call, of at most 2000 cases."
+                ),
+            ),
+        ],
+        mode: Annotated[
+            Literal["proposals", "scratch"],
+            Field(
+                description=(
+                    "'proposals': annotate from the machine proposals;"
+                    " 'scratch': from an empty text."
+                )
+            ),
+        ],
+        reason: Annotated[str, Field(min_length=1, max_length=2000)],
+        confirm: Annotated[
+            bool, Field(description="False: dry run. True: change the listed texts.")
+        ] = False,
+        preview_token: Annotated[
+            str | None,
+            Field(
+                max_length=80,
+                description=(
+                    "With confirm: the preview_token of the dry run, so exactly"
+                    " the texts it listed change."
+                ),
+            ),
+        ] = None,
+    ) -> dict[str, Any]:
+        """Change the annotation mode of many texts that have work, after a
+        dry run. THE WORK ON THEM IS DISCARDED.
+
+        Like change_annotation_mode for each text: its submissions
+        (annotations and consolidations) are DISCARDED and its tasks are
+        withdrawn. The dry run names, per text, whose submissions and whose
+        unsubmitted tasks, and the texts left as they are with the reason
+        (final result chosen: withdraw it first; no work yet; already in
+        this mode; no proposals). Confirm with its preview_token: every
+        listed text changes, or none when anything changed since (a fresh
+        dry run, ``stale``). There is no bulk undo; restore_annotation_mode
+        brings back one text while no new work started on it.
+        """
+        path = project_path(project, "annotation-mode-changes/bulk")
+        body: dict[str, Any] = {"rows": texts, "mode": mode}
+
+        def summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
+            def people(items: list[dict[str, Any]], key: str) -> list[str]:
+                names = [
+                    (item.get(key) or {}).get("display_name")
+                    or (item.get(key) or {}).get("pseudonym")
+                    for item in items
+                ]
+                return sorted({str(name) for name in names if name})
+
+            changes = [
+                {
+                    "case_id": item.get("case_id"),
+                    "language": item.get("language"),
+                    "from_mode": item.get("from_mode"),
+                    "discarded_submissions": len(item.get("submissions", [])),
+                    "authors": people(item.get("submissions", []), "author"),
+                    "withdrawn_unsubmitted_tasks": people(
+                        [
+                            task
+                            for task in item.get("assignments", [])
+                            if task.get("status") != "submitted"
+                        ],
+                        "person",
+                    ),
+                }
+                for item in found.get("changes", [])
+            ]
+            skipped = [
+                {key: item.get(key) for key in ("case_id", "language", "message")}
+                for item in found.get("skipped", [])
+            ]
+            return {
+                "applied": applied,
+                "mode": found.get("mode"),
+                "changed" if applied else "would_change": _cut(changes, 50),
+                "change_count": found.get("change_count", len(changes)),
+                "discarded_submission_count": found.get("submission_count"),
+                "withdrawn_task_count": found.get("assignment_count"),
+                "skipped_texts": _cut(skipped, 50),
+                "skipped_by_reason": found.get("skipped_by_reason", {}),
+                "preview_token": found.get("preview_token"),
+            }
+
+        if not confirm:
+            preview: dict[str, Any] = await api.post(path, body | {"preview": True})
+            return summary(preview, False)
+        if preview_token is None:
+            raise OntotatorError(
+                "Run the dry run first and pass its preview_token with confirm."
+            )
+        try:
+            applied: dict[str, Any] = await api.post(
+                path, body | {"preview_token": preview_token, "reason": reason}
+            )
+        except OntotatorError as exc:
+            fresh = (
+                exc.details.get("preview") if isinstance(exc.details, dict) else None
+            )
+            if exc.code != "PREVIEW_STALE" or not isinstance(fresh, dict):
+                raise
+            return summary(fresh, False) | {
+                "stale": True,
+                "note": "Texts changed since the dry run; nothing was changed."
+                " Check this new dry run and confirm with its preview_token.",
+            }
+        return summary(applied, True)
+
     @register(server, scopes=("read", "project-admin"), effect="changes")
     async def restore_annotation_mode(
         project: Project,

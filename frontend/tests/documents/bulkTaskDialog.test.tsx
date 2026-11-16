@@ -46,6 +46,7 @@ beforeEach(() => {
   vi.spyOn(api, "bulkReopen").mockResolvedValue(reopenPreview());
   vi.spyOn(api, "bulkWithdraw").mockResolvedValue(reopenPreview({ action: "withdraw", changes: [], kept: [], skipped: [] }));
   vi.spyOn(api, "bulkStartRound").mockImplementation(async (_key, body) => roundPreview(body.kind));
+  vi.spyOn(api, "bulkChangeMode").mockResolvedValue({ mode: "scratch", applied: false, texts: 0, change_count: 0, skipped_count: 0, skipped_by_reason: {}, submission_count: 0, assignment_count: 0, changes: [], skipped: [], preview_token: "sha256:m" });
   // The final actions of the same menu (bulkFinalDialog.test.tsx) are not asked here.
   vi.spyOn(api, "acceptAgreeing").mockRejectedValue(new Error("not asked"));
   vi.spyOn(api, "bulkChangeFinal").mockRejectedValue(new Error("not asked"));
@@ -156,7 +157,7 @@ it("More actions lists Reopen… and Withdraw open tasks…, applies and offers 
   fireEvent.click(screen.getByRole("button", { name: "More actions" }));
   const menu = screen.getByRole("menu", { name: "More actions" });
   const items = within(menu).getAllByRole("menuitem");
-  expect(items.map(item => item.textContent)).toEqual(["Reopen…", "Withdraw open tasks…No open tasks in the selected texts.", "Accept agreeing results…", "Change final…", "Start a round…"]);
+  expect(items.map(item => item.textContent)).toEqual(["Reopen…", "Withdraw open tasks…No open tasks in the selected texts.", "Accept agreeing results…", "Change final…", "Start a round…", "Change mode…No selected text can change its annotation mode."]);
   expect(items[1].getAttribute("aria-disabled")).toBe("true");
   expect(items[0].getAttribute("aria-disabled")).toBeNull();
   fireEvent.click(items[0]);
