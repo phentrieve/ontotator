@@ -273,6 +273,16 @@ In a task from proposals, your decisions on the proposals are carried to the new
 
 A row **Not on this text** means the finding could not be placed in this text. Select it and choose one: **Mark in text**, **Link to an existing finding**, or **Dismiss with reason…**. A finding re-created with **Mark in text** keeps the original's term, values and note.
 
+### See what changed since the earlier version
+
+When the carried work comes from an earlier version of the text, for example after **Carry to v2…** or **Handle text change…**, the line above the text offers **Show changes since** v1 (with the number of that version). It is off by default.
+
+1. Tick **Show changes since** v1 (or press `Space` on it). Each changed passage gets a dashed frame, and added text is underlined. The line next to it counts the passages, for example *1 passage changed*.
+2. Click **Next ›** or **‹ Previous** to scroll to the next or previous passage; it gets a solid frame and the line reads, for example, *1 passage changed · 1 of 1*.
+3. Where text was removed, a small **−** marker stands in the text. Point at it or move to it with `Tab` to see the earlier wording, with the removed words struck through. `Esc` closes it.
+
+The marks are only shown over the text: the text stays exactly this version, so you can mark text, add or re-create findings and check carried findings as usual while they are on. A changed sentence the tool did not propose a finding for may need a new finding. The marks compare the two versions word by word, while **Check needed** is decided from the exact characters under each finding, so a finding inside a marked passage is not always marked **Check needed**, and the other way round. Untick the box to hide the marks.
+
 ![A carried finding with What to check and the Mark as checked button](images/annotator-carried-finding.png)
 
 ## Re-create findings after a text correction
@@ -285,6 +295,8 @@ What for: move your findings to the corrected text after the text got a new vers
 4. Check the text span and the values of the saved finding, then click **Complete text-change review**. A later change to the finding needs this again.
 
 If the finding no longer fits, click **Dismiss with reason**, fill in **Reason for dismissal** and click **Save dismissal**.
+
+To see which passages the correction changed, tick **Show changes since** v1 above the text ([See what changed since the earlier version](#see-what-changed-since-the-earlier-version)).
 
 ## Submit the text
 

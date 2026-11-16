@@ -109,3 +109,93 @@ export function changeRanges(before: string, after: string, parts: readonly Text
   }
   return { removed: displayRanges(before, removed), added: displayRanges(after, added) };
 }
+
+/** A part of the older wording of a changed passage: kept, or removed by the newer text. */
+export interface PassagePart {
+  text: string;
+  removed: boolean;
+}
+
+/**
+ * One changed passage of the newer text (Show changes since vN, issue 421): `[start, end)` in the newer text (empty
+ * where text was only removed), `[beforeStart, beforeEnd)` in the older one, and the older wording of the passage.
+ */
+export interface ChangePassage {
+  start: number;
+  end: number;
+  beforeStart: number;
+  beforeEnd: number;
+  /** The older wording: kept parts and removed parts, in order. */
+  before: PassagePart[];
+  /** Some text of the older version was removed here (the passage gets a "−" marker). */
+  hasRemoved: boolean;
+}
+
+/** Grows `[start, end)` to the edges of the long graphemes it cuts (as `displayRanges` does for marks). */
+function growToGraphemes(graphemes: readonly TextRange[], start: number, end: number): TextRange {
+  if (end > start) for (const grapheme of graphemes) {
+    if (grapheme.end <= start) continue;
+    if (grapheme.start >= end) break;
+    start = Math.min(start, grapheme.start); end = Math.max(end, grapheme.end);
+  }
+  return { start, end };
+}
+
+/** Words of an unchanged stretch that still joins two changes into one passage; never across a line break. */
+const JOIN_WORDS = 2;
+const joins = (equal: string): boolean => !/[\r\n]/.test(equal) && (equal.match(/[\p{L}\p{N}]+/gu)?.length ?? 0) <= JOIN_WORDS;
+
+/**
+ * Changed passages of `after` against `before`, from the same word diff as `changeRanges`: neighbouring changes with
+ * at most two unchanged words between them on one line read as one passage ("Puls regelmäßig, apikal auskultierte
+ * Herzfrequenz 120/min, Temperatur"), so the count and the Previous / Next steps follow sentences, not single words.
+ * The display rules of `changeRanges` apply: a passage never splits a grapheme, and a passage whose changes are all
+ * whitespace (CRLF to LF, a no-break space to a space) is left out. `null` when the texts differ too much
+ * (`diffTextBounded`): show no marks and say so.
+ */
+export function changePassages(before: string, after: string, parts: readonly TextDiffPart[] | null = diffTextBounded(before, after)): ChangePassage[] | null {
+  if (!parts) return null;
+  const passages: Array<ChangePassage & { visible: boolean }> = [];
+  let current: (ChangePassage & { visible: boolean }) | null = null;
+  let gap: string | null = null;
+  let inBefore = 0, inAfter = 0;
+  for (const part of parts) {
+    const length = part.text.length;
+    if (part.op === "equal") {
+      if (current) gap = part.text;
+      inBefore += length; inAfter += length;
+      continue;
+    }
+    if (current && gap !== null && !joins(gap)) { passages.push(current); current = null; }
+    if (!current) current = { start: inAfter, end: inAfter, beforeStart: inBefore, beforeEnd: inBefore, before: [], hasRemoved: false, visible: false };
+    else if (gap !== null) current.before.push({ text: gap, removed: false });
+    gap = null;
+    const visible = /\S/.test(part.text);
+    if (visible) current.visible = true;
+    if (part.op === "delete") {
+      current.before.push({ text: part.text, removed: true });
+      if (visible) current.hasRemoved = true;
+      inBefore += length;
+    } else {
+      inAfter += length;
+    }
+    current.end = inAfter; current.beforeEnd = inBefore;
+  }
+  if (current) passages.push(current);
+  const inAfterText = longGraphemes(after), inBeforeText = longGraphemes(before), result: ChangePassage[] = [];
+  for (const { visible, ...passage } of passages) {
+    if (!visible) continue;
+    const shown = growToGraphemes(inAfterText, passage.start, passage.end);
+    const earlier = growToGraphemes(inBeforeText, passage.beforeStart, passage.beforeEnd);
+    // The earlier wording covers whole graphemes too: the unchanged rest of a cut grapheme joins it.
+    const head = before.slice(earlier.start, passage.beforeStart), tail = before.slice(passage.beforeEnd, earlier.end);
+    const grown: ChangePassage = { ...passage, ...shown, beforeStart: earlier.start, beforeEnd: earlier.end,
+      before: [...(head ? [{ text: head, removed: false }] : []), ...passage.before, ...(tail ? [{ text: tail, removed: false }] : [])] };
+    const last = result[result.length - 1];
+    if (last && last.end > last.start && grown.start < last.end) {
+      last.end = Math.max(last.end, grown.end); last.beforeEnd = Math.max(last.beforeEnd, grown.beforeEnd);
+      last.before.push(...grown.before); last.hasRemoved ||= grown.hasRemoved;
+    } else result.push(grown);
+  }
+  return result;
+}

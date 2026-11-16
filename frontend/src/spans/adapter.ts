@@ -59,6 +59,11 @@ export interface SpanEditorHandle {
   setFramed: (evidenceIds: string[]) => void;
   /** Display-only passages (UTF-16 offsets) whose runs get `run--marker`; never mentions, never picked. */
   setMarkers: (ranges: ReadonlyArray<{ start: number; end: number }>) => void;
+  /**
+   * Display-only changed passages (UTF-16 offsets; empty where text was only removed): framed as one passage each,
+   * with a focusable "−" marker named `removedLabel` where the older version had text (issue 421).
+   */
+  setPassages: (passages: ReadonlyArray<{ start: number; end: number; removedLabel?: string | null; current?: boolean }>) => void;
   destroy: () => void;
 }
 
@@ -222,6 +227,9 @@ export function mountSpanEditor(
     },
     setMarkers: (ranges) => {
       editor.setMarkers(ranges.map((range) => ({ char_start: range.start, char_end: range.end })));
+    },
+    setPassages: (passages) => {
+      editor.setPassages(passages.map((passage) => ({ ...passage })));
     },
     destroy: () => {
       editor.destroy();

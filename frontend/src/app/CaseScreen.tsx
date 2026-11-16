@@ -17,6 +17,7 @@ import { ComparePane } from "../variants/ComparePane";
 import { Toolbar } from "../ui/Toolbar";
 import { VariantSelectors } from "../variants/VariantSelectors";
 import { ReadOnlyAnnotationView } from "../variants/ReadOnlyAnnotationView";
+import { useChangesSince, type ChangesSource } from "../editor/ChangesSince";
 import { useCaseVersions } from "../variants/useCaseVersions";
 import { VariantDetails, variantDescription } from "../variants/CaseViewer";
 import { annotationOptions, pickVariant, refForKey } from "../variants/versionState";
@@ -250,6 +251,8 @@ export interface CaseScreenProps {
   headerTimer?: React.ReactNode;
   /** Called whenever an edit is sent; the working time resumes on it. */
   onEdit?: () => void;
+  /** The earlier version the round's carried work came from: offers "Show changes since vN" over the text (issue 421). */
+  changesSource?: ChangesSource | null;
 }
 
 const NO_ROUND_INPUTS: readonly import("../api/client").RoundInputView[] = [];
@@ -268,7 +271,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   onSubmitted,
   annotatorName,
   leaveGuardRef,
-  readOnly: serverReadOnly = false, routeLeaveRef, assignmentNavigation, onReadonlyRequired, versionContext, menuItems = [], userPseudonym, guidelineNotice, guidelines = null, held = false, holdReason, saveBeforeReportRef, roundInputs = NO_ROUND_INPUTS, roundKind, roundActive = true, roundBadge, roundTitle, documentVersion, roundOrdinal, headerTimer, onEdit,
+  readOnly: serverReadOnly = false, routeLeaveRef, assignmentNavigation, onReadonlyRequired, versionContext, menuItems = [], userPseudonym, guidelineNotice, guidelines = null, held = false, holdReason, saveBeforeReportRef, roundInputs = NO_ROUND_INPUTS, roundKind, roundActive = true, roundBadge, roundTitle, documentVersion, roundOrdinal, headerTimer, onEdit, changesSource,
 }) => {
   const versionIdentity = JSON.stringify([versionContext?.username, versionContext?.assignmentId, versionContext?.canBrowseVersions, workspaceId, view.key]);
   const [acceptedSubmission, setAcceptedSubmission] = useState<{ identity: string; value: Submission } | null>(null);
@@ -283,6 +286,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const [comparisonIdentity, setComparisonIdentity] = useState<string | null>(null);
   const compareOpen = !!versionContext?.canBrowseVersions && comparisonIdentity === versionIdentity;
   const [leftTextElement, setLeftTextElement] = useState<HTMLDivElement | null>(null);
+  // Issue 421: a pure overlay; marking, resizing and checking carry on while it is on.
+  const changesSince = useChangesSince(changesSource, view.document.text, leftTextElement);
   const reanchorContext = useReanchorContext(view.document.text, leftTextElement, JSON.stringify([versionIdentity,display?.selection ?? "draft"]));
   const compareButton = useRef<HTMLButtonElement | null>(null);
   const closeComparison = () => { setComparisonIdentity(null); compareButton.current?.focus(); };
@@ -4136,7 +4141,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
 
         {/* Center: Text View */}
         <TextPane
-          header={versionControls}
+          header={changesSince ? <>{versionControls}{changesSince.bar}</> : versionControls}
+          changes={changesSince?.changes} passages={changesSince?.passages} passagesSince={changesSince?.since} currentPassage={changesSince?.current}
           onTextElement={setLeftTextElement}
           contextSegments={reanchorContext.contextSegments}
           text={view.document.text}

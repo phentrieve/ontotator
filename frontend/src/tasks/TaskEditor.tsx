@@ -1,6 +1,6 @@
 import { taskText } from "../app/identity";
 import { useEffect, useRef, useState, type ComponentProps, type MutableRefObject } from "react";
-import { api, ApiError, type AssignmentOpenRequest, type AssignmentView, type AssignmentWorkspace, type CurrentUser, type RoundInputView, type TaskSummary, type WorkRoundView } from "../api/client";
+import { api, ApiError, type AssignmentOpenRequest, type AssignmentView, type AssignmentWorkspace, type CurrentUser, type RoundInputView, type RoundSourceText, type TaskSummary, type WorkRoundView } from "../api/client";
 import { ErrorNotice } from "../admin/ErrorNotice";
 import { Button, Dialog, InlineMessage, Select, type ToastMessage } from "../ui";
 import { CaseScreen } from "../app/CaseScreen";
@@ -107,6 +107,7 @@ function AnnotationTaskEditor({ assignmentId, user, onNavigate, routeLeaveRef, l
   const [roundDialogOpen, setRoundDialogOpen] = useState(false);
   const [roundInputs, setRoundInputs] = useState<RoundInputView[]>([]);
   const [roundInfo, setRoundInfo] = useState<WorkRoundView | null>(null);
+  const [changesSource, setChangesSource] = useState<RoundSourceText | null>(null);
   const [taskError, setTaskError] = useState<unknown>(null);
   const saveBeforeReportRef = useRef<(() => Promise<void>) | null>(null);
   // Issue 298: an editable annotation task in the editor records working time (not the consolidation view).
@@ -139,8 +140,12 @@ function AnnotationTaskEditor({ assignmentId, user, onNavigate, routeLeaveRef, l
       selectedRound.current = requestedRound;
       selectedWorkRound.current = requestedWorkRound;
       const info = rounds.find(value => value.round_id === roundId) ?? null;
+      // Issue 421: the version carried work came from ("Show changes since vN"); the task opens without it on failure.
+      const source = roundId && info && (info.kind === "carry_forward" || info.kind === "text_change" || info.kind === "handover")
+        ? await api.getRoundSourceText(roundId).catch(() => null) : null;
+      if (!active.current || request !== generation.current) return;
       const editableState = info ? info.active && info.state === "editable" : opened.assignment.status !== "submitted";
-      setRoundInputs(inputs); setRoundInfo(info);
+      setRoundInputs(inputs); setRoundInfo(info); setChangesSource(source);
       setWorkspace({ ...opened, read_only: opened.read_only && (!opened.assignment.held || !editableState) }); setRevision(value => value + 1);
     } catch (failure) {
       if (active.current && request === generation.current) setError(failure);
@@ -228,7 +233,7 @@ function AnnotationTaskEditor({ assignmentId, user, onNavigate, routeLeaveRef, l
         ...(guidelines.item ? [guidelines.item] : []),
         { id: "help", label: "Help for this screen", onSelect: () => window.open(helpHref(helpScreen), "_blank", "noopener,noreferrer") }]}
       roundInputs={roundInputs} roundKind={roundInfo?.kind} roundActive={roundInfo?.active} roundBadge={roundBadge} roundTitle={roundTitle}
-      roundOrdinal={roundInfo?.round_ordinal} documentVersion={roundInfo?.document_version}
+      roundOrdinal={roundInfo?.round_ordinal} documentVersion={roundInfo?.document_version} changesSource={changesSource}
       held={assignment.held} holdReason={assignment.hold_reason} saveBeforeReportRef={saveBeforeReportRef}
       headerTimer={<WorkTimerControl timer={workTimer} />} onEdit={workTimer.edit}
       guidelines={guidelines.panel}

@@ -174,6 +174,8 @@ export type OpenWorkspaceRequest = components["schemas"]["OpenWorkspaceRequest"]
 export type OpenWorkspaceResponse = components["schemas"]["OpenWorkspaceResponse"];
 export type WorkRoundView = components["schemas"]["WorkRoundView"];
 export type RoundInputView = components["schemas"]["RoundInputView"];
+/** The earlier text version a carried round came from ("Show changes since vN", issue 421). */
+export type RoundSourceText = components["schemas"]["RoundSourceText"];
 export type RoundSourceView = components["schemas"]["RoundSourceView"];
 // Consolidation view (acceptance fixes 2026-10-21, WP-E)
 export type ConsolidationView = components["schemas"]["ConsolidationView"];
@@ -1289,6 +1291,11 @@ export class ApiClient {
 
   async listRoundInputs(roundId: string): Promise<RoundInputView[]> {
     return this.request(`/api/v1/rounds/${encodeURIComponent(roundId)}/inputs`, { method: "GET" });
+  }
+
+  /** The text version the round's carried work came from; null unless it was carried from another version. */
+  async getRoundSourceText(roundId: string): Promise<RoundSourceText | null> {
+    return this.request(`/api/v1/rounds/${encodeURIComponent(roundId)}/source-text`, { method: "GET" });
   }
 
   /** Assign the consolidator and start the consolidation round in one step (lead only); choosing yourself grants the Consolidator role. */

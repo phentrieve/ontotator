@@ -20,6 +20,7 @@ from ontotator.application.round_reads import (
     enrich_inputs,
     enrich_rounds,
     enrich_sources,
+    round_source_text,
 )
 from ontotator.application.work_rounds import (
     RoundInputResolutionService,
@@ -32,6 +33,7 @@ from ontotator.domain.errors import DomainError
 from ontotator.domain.work_rounds import (
     CreatableRoundKind,
     RoundInputView,
+    RoundSourceText,
     WorkRoundView,
 )
 from ontotator.domain.workspace import Draft, MutationEnvelope
@@ -163,6 +165,18 @@ def round_inputs(
         blinding = round_blinding(conn, get_access(request), pid, project, round_id)
     # Issue 302: a consolidator does not see the input authors.
     return [blinding.input_view(i) for i in items] if blinding else items
+
+
+@router.get("/rounds/{round_id}/source-text")
+def round_source(
+    round_id: str, request: Request, principal: PrincipalDep
+) -> RoundSourceText | None:
+    """The earlier text version a carried round's work came from, for "Show
+    changes since vN" (issue 421); null when the round was not carried from
+    another version. Everyone who may see the round may read it."""
+    repo = get_repo(request)
+    item = _visible_round(repo, round_id)
+    return round_source_text(repo, item.project_key, item)
 
 
 @router.post("/workspaces/{workspace_id}/round-input-resolutions")

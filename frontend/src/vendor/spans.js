@@ -79,6 +79,7 @@ export class SpanEditor {
     this.mentions = [];
     this.suggestions = [];
     this.markers = [];
+    this.passages = [];
     this.paragraphStarts = [];
     this.activeIds = new Set();
     this.framedIds = new Set();
@@ -199,6 +200,38 @@ export class SpanEditor {
   setMarkers(markers) {
     this.markers = markers || [];
     this.render();
+  }
+
+  /**
+   * Display-only changed passages ({ start, end, removedLabel, current }, UTF-16): their runs
+   * are wrapped in one `.change-passage` (data-passage = index, data-current) for a frame around
+   * the whole passage, and a passage with removed text starts with a focusable `.change-removed`
+   * marker named `removedLabel`. The marker has no text of its own (its glyph is CSS),
+   * so the text, its offsets and selections stay exactly those of `this.text`.
+   */
+  setPassages(passages) {
+    this.passages = (passages || [])
+      .map((p, index) => ({ start: p.start | 0, end: p.end | 0, removedLabel: p.removedLabel || null, current: Boolean(p.current), index }))
+      .filter((p) => p.end >= p.start)
+      .sort((a, b) => a.start - b.start || a.end - b.end);
+    this.render();
+  }
+
+  _passageNode(passage) {
+    const node = document.createElement("span");
+    node.className = "change-passage";
+    node.dataset.passage = String(passage.index);
+    if (passage.current) node.dataset.current = "";
+    if (passage.removedLabel) {
+      const marker = document.createElement("button");
+      marker.type = "button";
+      marker.className = "change-removed";
+      marker.dataset.offset = String(passage.start);
+      marker.dataset.passage = String(passage.index);
+      marker.setAttribute("aria-label", passage.removedLabel);
+      node.appendChild(marker);
+    }
+    return node;
   }
 
   /**
@@ -491,10 +524,26 @@ export class SpanEditor {
     const runs = decomposeRuns(
       this.text.length,
       this.mentions,
-      [...marks.flatMap((m) => [m.start, m.end]), ...this.paragraphStarts],
+      [...marks.flatMap((m) => [m.start, m.end]), ...this.passages.flatMap((p) => [p.start, p.end]), ...this.paragraphStarts],
     );
     const tints = normaliseSpans(this.suggestions);
     const fragment = document.createDocumentFragment();
+    // Runs of a changed passage go into its wrapper; everything else into the fragment.
+    let target = fragment;
+    let openPassage = null;
+    let nextPassage = 0;
+    const openPassagesAt = (offset) => {
+      while (nextPassage < this.passages.length && this.passages[nextPassage].start <= offset) {
+        const passage = this.passages[nextPassage];
+        nextPassage += 1;
+        const wrapper = this._passageNode(passage);
+        target.appendChild(wrapper);
+        if (passage.end > passage.start && !openPassage) {
+          target = wrapper;
+          openPassage = passage;
+        }
+      }
+    };
 
     const paragraphIndexes = new Map(this.paragraphStarts.map((start, index) => [start, index]));
     const appendParagraph = (offset) => {
@@ -508,12 +557,13 @@ export class SpanEditor {
         display: "inline-block", width: "0", height: "0", verticalAlign: "top",
         padding: "0", margin: "0", border: "0", pointerEvents: "none", userSelect: "none",
       });
-      fragment.appendChild(marker);
+      target.appendChild(marker);
     };
     const { starts, ends } = this._handlesByOffset();
     if (!runs.length) appendParagraph(0);
     for (const run of runs) {
       appendParagraph(run.start);
+      if (!openPassage) openPassagesAt(run.start);
       const node = document.createElement("span");
       node.className = "run";
       node.dataset.start = String(run.start);
@@ -553,15 +603,23 @@ export class SpanEditor {
       }
 
       node.appendChild(document.createTextNode(this.text.slice(run.start, run.end)));
-      for (const handle of starts.get(run.start) || []) fragment.appendChild(this._handleNode(handle));
-      fragment.appendChild(node);
-      for (const handle of ends.get(run.end) || []) fragment.appendChild(this._handleNode(handle));
+      for (const handle of starts.get(run.start) || []) target.appendChild(this._handleNode(handle));
+      target.appendChild(node);
+      for (const handle of ends.get(run.end) || []) target.appendChild(this._handleNode(handle));
+      if (openPassage && run.end >= openPassage.end) {
+        target = fragment;
+        openPassage = null;
+      }
     }
+    // Text removed at the very end of the text.
+    if (runs.length) openPassagesAt(this.text.length);
     // Redrawing replaces the handles: keep keyboard focus on the edge that had it.
     const active = document.activeElement;
     const focusedEdge = active?.classList?.contains("resize-handle") && this.container.contains(active)
       ? { ...active.dataset }
       : null;
+    const focusedChange = active?.classList?.contains("change-removed") && this.container.contains(active)
+      ? `.change-removed[data-passage="${active.dataset.passage}"]` : null;
     const refocusing = this._refocusing;
     this._refocusing = true;
     this.container.replaceChildren(fragment);
@@ -571,6 +629,7 @@ export class SpanEditor {
       (candidates.find((node) => node.dataset.offset === focusedEdge.offset)
         || candidates.find((node) => node.dataset.segment === focusedEdge.segment))?.focus();
     }
+    if (focusedChange) this.container.querySelector(focusedChange)?.focus({ preventScroll: true });
     this._refocusing = refocusing;
     if (!this.text) {
       this.container.appendChild(document.createTextNode(NBSP));
@@ -580,6 +639,8 @@ export class SpanEditor {
   _offsetOf(node, offset) {
     let element = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
     if (element?.classList?.contains("resize-handle")) return Number(element.dataset.offset);
+    // A removed-text marker stands at its offset; it has no characters of its own.
+    if (element?.classList?.contains("change-removed")) return Number(element.dataset.offset);
     while (element && element !== this.container && !element.classList?.contains("run")) {
       element = element.parentElement;
     }

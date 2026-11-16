@@ -293,6 +293,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/rounds/{round_id}/source-text": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Round Source
+         * @description The earlier text version a carried round's work came from, for "Show
+         *     changes since vN" (issue 421); null when the round was not carried from
+         *     another version. Everyone who may see the round may read it.
+         */
+        get: operations["round_source_api_v1_rounds__round_id__source_text_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{workspace_id}/round-input-resolutions": {
         parameters: {
             query?: never;
@@ -8569,6 +8591,24 @@ export interface components {
             /** Unresolved Note */
             unresolved_note?: string | null;
         };
+        /**
+         * RoundSourceText
+         * @description The earlier text version a carried round's work came from (read-only).
+         *
+         *     The same ``(old, new)`` pair the carry re-anchored with ``text_map``: the
+         *     document of the source submission, or of the frozen draft of a text
+         *     change. Only for rounds whose source is another version of the text.
+         */
+        RoundSourceText: {
+            /** Document Id */
+            document_id: string;
+            /** Language */
+            language: string;
+            /** Version */
+            version: number;
+            /** Text */
+            text: string;
+        };
         /** RoundSourceView */
         RoundSourceView: {
             /** Submission Id */
@@ -9316,6 +9356,7 @@ export interface components {
              * @default []
              */
             round_input_resolutions: components["schemas"]["RoundInputResolution"][];
+            carried_from?: components["schemas"]["RoundSourceText"] | null;
         };
         /** SubmissionHistorySummary */
         SubmissionHistorySummary: {
@@ -11329,6 +11370,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RoundInputView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    round_source_api_v1_rounds__round_id__source_text_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                round_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoundSourceText"] | null;
                 };
             };
             /** @description Validation Error */
