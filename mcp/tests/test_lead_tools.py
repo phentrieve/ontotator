@@ -350,6 +350,40 @@ async def test_translation_tools_send_the_versions_text_hash(
     assert lead.json() == {"expected_text_sha256": "a" * 64, "confirm_language": False}
 
 
+async def test_accept_translation_version_confirms_with_the_dry_runs_text_hash(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    accept = f"{P}/variants/{{document_id}}/accept"
+    preview = build(
+        "AcceptVersionPreview",
+        document_id="d",
+        acceptable=False,
+        reason="review_open",
+        text_sha256="b" * 64,
+    )
+    fake.on("GET", accept, preview)
+    args = {"project": "p", "document_id": "d", "reason": "Checked"}
+    dry = await call(mcp_client, "accept_translation_version", args)
+    assert dry["applied"] is False
+    assert dry["plan"]["acceptable"] is False
+    assert dry["plan"]["reason"] == "review_open"
+    assert dry["plan"]["text_sha256"] == "b" * 64
+    assert not fake.calls_to("POST", accept)
+    with pytest.raises(ToolFailed, match="expected_text_sha256"):
+        await call(mcp_client, "accept_translation_version", args | {"confirm": True})
+    assert not fake.calls_to("POST", accept)
+    done = await call(
+        mcp_client,
+        "accept_translation_version",
+        args | {"confirm": True, "expected_text_sha256": "b" * 64},
+    )
+    assert done["applied"] is True
+    # The hash is the dry run's, not re-read at confirm.
+    assert len(fake.calls_to("GET", accept)) == 1
+    [sent] = fake.calls_to("POST", accept)
+    assert sent.json() == {"reason": "Checked", "expected_text_sha256": "b" * 64}
+
+
 async def test_assign_texts_asks_for_a_review_of_an_accepted_translation(
     fake: FakeApi, mcp_client: Client
 ) -> None:

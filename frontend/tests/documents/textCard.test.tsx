@@ -456,6 +456,30 @@ describe("translation part", () => {
     expect(within(part).queryByRole("button", { name: "Request translation correction" })).toBeNull();
   });
 
+  it("issue 341: Correct the translation… on the accepted newest version, Accept this version… on the one not reviewed", () => {
+    const versions = [
+      version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "reviewed", chain_name: "m1", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "m1", translation_status: "accepted" }),
+      version({ document_id: "case-200-mt", origin: "machine_translation", derived_from: "case-200-en", chain_name: "mt", translation_status: "ready_for_review" }),
+    ];
+    const onCorrectTranslation = vi.fn(), onAcceptVersion = vi.fn();
+    const textVersionTools = { username: "lead", members: [], assignments: [], variants: new Map(), requiredLanguages: () => ["de"],
+      onAssignmentsChanged: vi.fn(), onRequestCorrection: vi.fn(), onCorrectTranslation, onAcceptVersion };
+    const row = assignRow({ versions, parallel_roots: true, work: [] });
+    renderCard({ row, initialSegment: "translation", textVersionTools });
+    const part = within(card()).getByRole("heading", { name: "Translation" }).closest("section")!;
+    const correct = within(part).getAllByText("Correct the translation…");
+    expect(correct).toHaveLength(1);
+    expect(correct[0].getAttribute("aria-label")).toBe("Correct the translation m1 v2 of case-200 de…");
+    fireEvent.click(correct[0]);
+    expect(onCorrectTranslation).toHaveBeenCalledWith(row, versions[1]);
+    const accept = within(part).getAllByText("Accept this version…");
+    expect(accept).toHaveLength(1);
+    expect(accept[0].getAttribute("aria-label")).toBe("Accept mt v1 of case-200 de…");
+    fireEvent.click(accept[0]);
+    expect(onAcceptVersion).toHaveBeenCalledWith(row, versions[2]);
+  });
+
   it("calls a native text the source text and a failed check failed", () => {
     renderCard({ row: assignRow({ is_source: true, versions: [version({ document_id: "case-200-de" })] }), initialSegment: "translation" });
     expect(within(card()).getByText("Source text")).toBeTruthy();

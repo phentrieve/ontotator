@@ -1294,6 +1294,25 @@ it("lead correction shows only Accepted with corrections, preselected, with the 
   expect(save).toHaveBeenLastCalledWith(17, { expected_revision: 6, text: "Lead fix", form: { decision: "accepted_corrected", clinical_change: false } });
   expect(submitButton().getAttribute("aria-disabled")).toBeNull();
 });
+it("issue 341 b: a lead correction of an accepted version says the new version is reviewed again", async () => {
+  const workspace = leadWorkspace();
+  setup({ ...workspace, reviewed_again: true, variant: { ...workspace.variant, translation_status: "accepted" } });
+  await screen.findByRole("textbox", { name: "Translation (de)" });
+  expect(screen.getByText("You are correcting this accepted translation as project lead. The corrected text becomes a new version that is reviewed again.")).toBeDefined();
+  expect(screen.getByText("Your corrected version is reviewed again.")).toBeDefined();
+  vi.useFakeTimers();
+  fireEvent.change(screen.getByRole("textbox", { name: "Translation (de)" }), { target: { value: "Lead fix" } });
+  await clock();
+  await act(async () => { fireEvent.click(submitButton()); });
+  const dialog = screen.getByRole("dialog", { name: "Submit this review?" });
+  expect(within(dialog).getByText(/starts as a correction with review On\. This version stays accepted/)).toBeDefined();
+});
+it("issue 341 b: a further lead correction after a rejection is reviewed again too", async () => {
+  setup({ ...leadWorkspace(), reviewed_again: true });
+  await screen.findByRole("textbox", { name: "Translation (de)" });
+  expect(screen.getByText("You are correcting this translation as project lead. The corrected text becomes a new version that is reviewed again.")).toBeDefined();
+  expect(screen.getByText("Your corrected version is reviewed again.")).toBeDefined();
+});
 it("lead correction turns a stored other decision into Accepted with corrections", async () => {
   const workspace = leadWorkspace();
   const { save } = setup({ ...workspace, draft: { ...workspace.draft, form: { decision: "query", clinical_change: true } } });

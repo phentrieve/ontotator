@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { personLabel } from '../app/identity';
-import { api, type AssignmentView, type Member, type VariantSummary } from '../api/client';
+import { api, ApiError, type AssignmentView, type Member, type VariantSummary } from '../api/client';
 import { eligibleMembers, unreadLanguages } from '../admin/assignmentUI';
 import { ErrorNotice } from '../admin/ErrorNotice';
 import { Button, Checkbox, InlineMessage, Select, Textarea } from '../ui';
@@ -14,6 +14,14 @@ interface Props {
   /** Inside a dialog whose title names the action: no heading of its own. */
   inDialog?: boolean;
 }
+/** Issue 341 b: a lead correction of this version is open; a second review of it is refused. */
+export const LEAD_CORRECTING = 'A lead is correcting this version. Request the correction after that correction is submitted, or withdraw it with Remove… in the lead’s row of the Translation part.';
+function leadCorrecting(error: unknown): boolean {
+  if (!(error instanceof ApiError) || error.code !== 'ASSIGNMENT_EXISTS') return false;
+  const details = error.details;
+  return typeof details === 'object' && details !== null && (details as { reason?: unknown }).reason === 'lead_correction_open';
+}
+
 export function TranslationCorrectionAction(props: Props): JSX.Element | null {
   if (props.variant.translation_status !== 'accepted') return null;
   return <CorrectionContent key={JSON.stringify([props.projectKey, props.variant.document_id, props.variant.text_sha256, props.username])} {...props} />;
@@ -63,7 +71,8 @@ function CorrectionContent({ projectKey, variant, username, requiredLanguages, d
         checked={confirmLanguage} disabled={busy} onChange={event => setConfirmLanguage(event.target.checked)} />}
       <Button disabled={!member || !requiredLanguages || !reason.trim() || (missingLanguages.length > 0 && !confirmLanguage) || busy} loading={busy} onClick={() => { void assign(); }}>Assign correction review</Button>
     </>}
-    {error != null && <><ErrorNotice error={error} />{!members && <Button onClick={() => setAttempt(value => value + 1)}>Reload translation reviewers</Button>}</>}
+    {leadCorrecting(error) ? <InlineMessage tone="warning">{LEAD_CORRECTING}</InlineMessage> : error != null && <ErrorNotice error={error} />}
+    {error != null && <>{!members && <Button onClick={() => setAttempt(value => value + 1)}>Reload translation reviewers</Button>}</>}
     {assigned && <InlineMessage tone="success">Translation correction assigned to {personLabel(member, { fallback: 'the reviewer' })}.
       {assigned.username === username && <> <a className="btn btn-secondary btn-sm" href={`#/tasks/${assigned.id}`} onKeyDown={onSpaceActivate}>Open my translation review</a></>}
     </InlineMessage>}

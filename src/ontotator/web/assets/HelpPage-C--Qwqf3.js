@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-DrMZf9mB.js";import{n as a,t as o}from"./lib-Czm0Pv3w.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-N3jU3Gui.js";import{n as a,t as o}from"./lib-CRBG4WJN.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -821,6 +821,8 @@ Steps:
 
 On a wide screen, **Your review** is a column on the right. To give the texts more room, drag its left edge (**Resize review panel**), or focus the edge and press \`←\` or \`→\`; \`Enter\` restores the default width. **Collapse review panel** folds it to a narrow strip: the bar at the bottom then shows the decision and **Submit review…**, and **Expand review panel** or **Change ↓** opens it again. Width and folding are remembered in this browser.
 
+A project lead who corrects a translation themselves sees only **Accepted with corrections**. When the lead corrects a translation that was already accepted, the corrected version is reviewed again: it then appears as a new translation review task, usually for you ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
+
 If the source text was updated, **Source updates to review** appears. Open it, compare **Original source** and **Updated source**, and click **Submit review and resolve source update**.
 
 ![A translation review: the source on the left, the translation on the right, the failed automatic check above them. On the right, Query is chosen with the category Number or unit and a rationale, above Submit review…](images/annotator-translation-review.png)
@@ -1235,6 +1237,10 @@ The text is not in the work plan. Plan it first. See [Add a text to the plan](le
 ### "This person already submitted this review. To let them review it again, use Reopen."
 
 You assigned a translation review to someone who already reviewed this version, for example after they rejected it. A second assignment is not possible; reopen their review instead: **Resolve…**, then the reopen item, for example *Reopen Ana Weber's review…*. See [Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation).
+
+### "This version can no longer be accepted here."
+
+**Accept this version…** was refused: the version was accepted or reviewed meanwhile, a newer version exists, it was discarded, or a translation review of it is open. The dialog names the reason. Close it and look at the version list again. See [Accept one translation version](lead-results.md#accept-one-translation-version).
 
 ### A task is still paused after I closed the report
 
@@ -1678,11 +1684,11 @@ Before you start: decide whether the new text replaces the current translation o
 This works without a file. The new text is pasted into a translation review.
 
 1. Open the text card and click **Translation**.
-2. If the current version is accepted: at the version, click **Request correction…**, choose the **Translation reviewer**, enter the **Reason for another review** (say where the new text comes from) and click **Assign correction review**. The reviewer replaces the text, writes the origin into the **Rationale** and submits **Accepted with corrections** ([Request a translation correction](lead-documents.md#request-a-translation-correction)).
-3. If the current version was rejected or queried: click **Resolve…**, then **Correct the translation…**, paste the new text yourself and submit ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
-4. The corrected text becomes the next version and counts as accepted.
+2. If the current version is accepted: at the version, click **Request correction…**, choose the **Translation reviewer**, enter the **Reason for another review** (say where the new text comes from) and click **Assign correction review**. The reviewer replaces the text, writes the origin into the **Rationale** and submits **Accepted with corrections** ([Request a translation correction](lead-documents.md#request-a-translation-correction)). The corrected text becomes the next version and counts as accepted.
+3. Or, if the current version is accepted, paste the new text yourself: at the version, click **Correct the translation…**. The dialog lists the annotation work that stays on the accepted version. Your corrected text becomes the next version and starts as a correction with review On, so it is reviewed again ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
+4. If the current version was rejected or queried: click **Resolve…**, then **Correct the translation…**, paste the new text yourself and submit. The corrected text becomes the next version and counts as accepted.
 
-**Request correction…** is offered only at an accepted version, and **Correct the translation…** only at the newest version after a rejection or a query. The provider or model of the new text can only be named in the **Rationale**; Ontotator has no field for it.
+**Request correction…** is offered only at an accepted version, and **Correct the translation…** at the newest version that is accepted, rejected or queried. The provider or model of the new text can only be named in the **Rationale**; Ontotator has no field for it.
 
 ### Replace or add a translation by file
 
@@ -1693,7 +1699,8 @@ This works without a file. The new text is pasted into a translation review.
 5. Decide whether the new version is reviewed:
    - With **Translation review** on for the text, the row's next step is **Assign review…**. Assign a reviewer as usual ([Assign work for one text](lead-documents.md#assign-work-for-one-text)).
    - With it off, the row's next step is **Assign review or accept…** ([Accept a translation that was not reviewed](lead-results.md#accept-a-translation-that-was-not-reviewed)).
-   - To accept it without a review while Review is on: open the text card, click **Translation** and set **Review** to **Off**. If annotation must wait for an accepted translation, the card asks for a **Reason**; click **Save change**. This accepts the newest version of every translation of the text, parallel translations included, not only the one you uploaded.
+   - To accept only the new version without a review: open the text card, click **Translation** and, at the version, click **Accept this version…**, enter a **Reason** and click *Accept v2* ([Accept one translation version](lead-results.md#accept-one-translation-version)). Other translations of the text stay as they are.
+   - Setting **Review** to **Off** in the **Translation** part instead accepts the newest version of every translation of the text, parallel translations included, not only the one you uploaded.
 6. If someone is still annotating the old version, or a submission exists on it, the row shows **Handle text change…** or *Carry to v2…*. Decide as in [Handle a text change for open annotation work](lead-results.md#handle-a-text-change-for-open-annotation-work) and [Carry submitted work to a new text version](lead-results.md#carry-submitted-work-to-a-new-text-version).
 7. If the text already has a final result, the row asks you to confirm it: [Review changes to a final result](lead-results.md#review-changes-to-a-final-result).
 
@@ -1984,6 +1991,7 @@ What for: see each version of a translation, its reviews and its origin.
 1. Open the text card and click **Translation**.
 2. The list shows each version with its origin and status, then one row per person who worked on it: the name, the task and the status. Older ones are under **Older versions**; with parallel versions they are grouped by version chain.
 3. Click **View text** to read a version, or **Translation reviews** to see every review decision. In a reviewer's row, **Reopen…** lets them review the version again and **Remove…** removes their assignment.
+   At the newest accepted version, **Correct the translation…** lets you correct it yourself ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)).
 4. Click **Compare with source** to compare the translation with the source text.
 
 ### Request a translation correction
@@ -1995,7 +2003,7 @@ What for: have a translation corrected by a reviewer.
 3. Choose the **Translation reviewer** and enter the **Reason for another review**.
 4. Click **Assign correction review**, then **Close**.
 
-If the reviewer submits **Accepted with corrections**, the corrected text becomes a new text version.
+If the reviewer submits **Accepted with corrections**, the corrected text becomes a new text version. While a lead is correcting the same version themselves, the request is refused with *A lead is correcting this version.* ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
 
 ## Work plans and assignments
 
@@ -2321,13 +2329,16 @@ What for: decide what happens after a reviewer rejected or queried a translation
 
 ### Correct a translation yourself
 
-What for: fix a queried or rejected translation without assigning another review.
+What for: fix a queried, rejected or accepted translation without assigning another review.
 
-1. In the row, click **Resolve…**, then **Correct the translation…** (or **Continue your correction**).
-2. Read the panel: you review the version yourself, and your corrected text becomes the next text version and counts as accepted. If your profile lists languages but not this one, tick *Correct despite missing de in your profile*. Without a qualification in your profile, the panel links to **Add your qualification in your profile**; after saving, **Back to Documents** returns you to the texts.
-3. Click **Open translation review**. The screen says **You are correcting this translation as project lead.**
+1. For a queried or rejected translation: in the row, click **Resolve…**, then **Correct the translation…** (or **Continue your correction**). For an accepted translation: open the text card, click **Translation** and, at the newest accepted version, click **Correct the translation…**.
+2. Read the panel: you review the version yourself, and your corrected text becomes the next text version. After a rejection or a query, it counts as accepted. A correction of an accepted version starts as a correction with review On: it is reviewed again before annotation moves to it. If people annotated the accepted version, the dialog says so before you start, for example *Annotation has work on v1. 3 annotations (2 submitted, 1 open) stay on v1. After saving, the row offers Handle text change…*. The dialog also names open consolidations and a final result on that version; they stay on it too. Nothing is carried automatically. If the reviewer rejects or queries your corrected version and you correct it once more, that next version is reviewed again as well; to take it without a review, use **Accept this version…** ([Accept one translation version](#accept-one-translation-version)). If your profile lists languages but not this one, tick *Correct despite missing de in your profile*. Without a qualification in your profile, the panel links to **Add your qualification in your profile**; after saving, **Back to Documents** returns you to the texts.
+3. Click **Open translation review**. The screen says **You are correcting this translation as project lead.** (for an accepted version: **You are correcting this accepted translation as project lead.**)
 4. Correct the translation as described in [Review a translation](annotator.md#review-a-translation). Only **Accepted with corrections** is offered.
 5. Submit with **Submit review…** (or \`Ctrl+Enter\`), then click **Back to Documents**.
+6. After the correction of an accepted version, assign the review of the new version as usual. The annotation work on the old version is handled with **Handle text change…** and *Carry to v2…* ([Handle a text change for open annotation work](#handle-a-text-change-for-open-annotation-work)); with **Annotate only after the translation review is accepted** on, the row offers them once the new version is accepted.
+
+While your correction of an accepted version is open, **Request correction…** for the same version is refused (*A lead is correcting this version.*): submit your correction first, or withdraw it with **Remove…** in your row of the **Translation** part.
 
 ### Accept a translation that was not reviewed
 
@@ -2338,7 +2349,18 @@ What for: annotate a translation that was reviewed outside Ontotator. The row's 
    - Click **Turn translation review on**, then assign a review.
    - Tick **This translation was reviewed outside Ontotator — accept it as it is**, enter a **Reason** and click **Accept and annotate**.
 
-Ontotator records the acceptance with your name, the reason and the time. It accepts the newest version of every translation of the text, parallel translations included. To have an accepted translation reviewed after all, click **Assign a new review…** in the **Translation** part of the text card.
+Ontotator records the acceptance with your name, the reason and the time. It accepts the newest version of every translation of the text, parallel translations included. To accept only one of them, use [Accept one translation version](#accept-one-translation-version). To have an accepted translation reviewed after all, click **Assign a new review…** in the **Translation** part of the text card.
+
+### Accept one translation version
+
+What for: accept exactly one version, for example an imported correction that was checked outside Ontotator, without touching the other translations of the text.
+
+1. Open the text card and click **Translation**.
+2. At the version, click **Accept this version…**. It is offered at the newest version of a translation that is neither reviewed nor accepted.
+3. Enter a **Reason**, for example *Checked against the DeepL output*. *The acceptance is recorded with your name, the reason and the time.*
+4. Click the button that names the version, for example *Accept v2*.
+
+The version then reads like other acceptances, for example *Accepted: reviewed outside Ontotator, Project lead (ann-0002), 14 Nov, 19:40, Checked against the DeepL output*. While a translation review of the version is open, the acceptance is refused: withdraw the review with **Remove…** first.
 
 ### Handle a text change for open annotation work
 

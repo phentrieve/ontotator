@@ -23,11 +23,11 @@ Before you start: decide whether the new text replaces the current translation o
 This works without a file. The new text is pasted into a translation review.
 
 1. Open the text card and click **Translation**.
-2. If the current version is accepted: at the version, click **Request correction…**, choose the **Translation reviewer**, enter the **Reason for another review** (say where the new text comes from) and click **Assign correction review**. The reviewer replaces the text, writes the origin into the **Rationale** and submits **Accepted with corrections** ([Request a translation correction](lead-documents.md#request-a-translation-correction)).
-3. If the current version was rejected or queried: click **Resolve…**, then **Correct the translation…**, paste the new text yourself and submit ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
-4. The corrected text becomes the next version and counts as accepted.
+2. If the current version is accepted: at the version, click **Request correction…**, choose the **Translation reviewer**, enter the **Reason for another review** (say where the new text comes from) and click **Assign correction review**. The reviewer replaces the text, writes the origin into the **Rationale** and submits **Accepted with corrections** ([Request a translation correction](lead-documents.md#request-a-translation-correction)). The corrected text becomes the next version and counts as accepted.
+3. Or, if the current version is accepted, paste the new text yourself: at the version, click **Correct the translation…**. The dialog lists the annotation work that stays on the accepted version. Your corrected text becomes the next version and starts as a correction with review On, so it is reviewed again ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
+4. If the current version was rejected or queried: click **Resolve…**, then **Correct the translation…**, paste the new text yourself and submit. The corrected text becomes the next version and counts as accepted.
 
-**Request correction…** is offered only at an accepted version, and **Correct the translation…** only at the newest version after a rejection or a query. The provider or model of the new text can only be named in the **Rationale**; Ontotator has no field for it.
+**Request correction…** is offered only at an accepted version, and **Correct the translation…** at the newest version that is accepted, rejected or queried. The provider or model of the new text can only be named in the **Rationale**; Ontotator has no field for it.
 
 ### Replace or add a translation by file
 
@@ -38,7 +38,8 @@ This works without a file. The new text is pasted into a translation review.
 5. Decide whether the new version is reviewed:
    - With **Translation review** on for the text, the row's next step is **Assign review…**. Assign a reviewer as usual ([Assign work for one text](lead-documents.md#assign-work-for-one-text)).
    - With it off, the row's next step is **Assign review or accept…** ([Accept a translation that was not reviewed](lead-results.md#accept-a-translation-that-was-not-reviewed)).
-   - To accept it without a review while Review is on: open the text card, click **Translation** and set **Review** to **Off**. If annotation must wait for an accepted translation, the card asks for a **Reason**; click **Save change**. This accepts the newest version of every translation of the text, parallel translations included, not only the one you uploaded.
+   - To accept only the new version without a review: open the text card, click **Translation** and, at the version, click **Accept this version…**, enter a **Reason** and click *Accept v2* ([Accept one translation version](lead-results.md#accept-one-translation-version)). Other translations of the text stay as they are.
+   - Setting **Review** to **Off** in the **Translation** part instead accepts the newest version of every translation of the text, parallel translations included, not only the one you uploaded.
 6. If someone is still annotating the old version, or a submission exists on it, the row shows **Handle text change…** or *Carry to v2…*. Decide as in [Handle a text change for open annotation work](lead-results.md#handle-a-text-change-for-open-annotation-work) and [Carry submitted work to a new text version](lead-results.md#carry-submitted-work-to-a-new-text-version).
 7. If the text already has a final result, the row asks you to confirm it: [Review changes to a final result](lead-results.md#review-changes-to-a-final-result).
 

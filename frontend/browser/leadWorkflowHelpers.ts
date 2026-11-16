@@ -9,6 +9,7 @@ export type LeadScenarioName =
   | "ACCEPTANCE"
   | "ROWS"
   | "REJECTED_TRANSLATION_FOR_LEAD"
+  | "ACCEPTED_TRANSLATION_FOR_LEAD"
   | "UPLOAD_DIALOG";
 
 /** The people of every lead workflow scenario. */
@@ -46,10 +47,11 @@ export interface LeadScenario {
   /**
    * ROWS: the case of each row action (de rows; "chip" and "acceptance" are fr rows).
    * REJECTED_TRANSLATION_FOR_LEAD: "rejected", "queried" and "to_assign" (de rows, Review and Annotate on).
+   * ACCEPTED_TRANSLATION_FOR_LEAD: "accepted" (with annotation work) and "unreviewed" (issue 341).
    */
   cases?: Record<
     | "chip" | "acceptance" | "rejected" | "report" | "choose_final" | "review_changes" | "not_in_plan"
-    | "queried" | "to_assign",
+    | "queried" | "to_assign" | "accepted" | "unreviewed",
     string
   >;
   report_id?: string;

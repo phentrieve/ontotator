@@ -1,0 +1,105 @@
+/**
+ * Lead actions on one version row of the Translation part (issue 341):
+ * - `CorrectVersionDialog` (b): "Correct the translation…" of an accepted version; the lead correction panel
+ *   lists the annotation work that stays on the version before anything is saved.
+ * - `AcceptVersionDialog` (d): "Accept this version…" with a required reason, recorded like the work plan's
+ *   acceptance ("Accepted: reviewed outside Ontotator, {lead}, {time}, {reason}"); other chains stay as they are.
+ */
+import { useId, useRef, useState } from "react";
+import { api, ApiError, type DocumentRowView, type DocumentVersionView } from "../api/client";
+import { textLabel } from "../app/identity";
+import type { Route } from "../app/router";
+import { ErrorNotice } from "../admin/ErrorNotice";
+import { Button, Dialog, InlineMessage, Textarea } from "../ui";
+import { LeadCorrectionPanel } from "./LeadCorrectionPanel";
+import { ACCEPTANCE_RECORDED } from "./PlanChips";
+import { versionName } from "./labels";
+
+/** "de v2", or "{chain name} v2" with parallel roots. */
+function versionLabel(row: DocumentRowView, version: DocumentVersionView): string {
+  return `${row.language} ${versionName(version.version, version.chain_name, row.parallel_roots)}`;
+}
+
+export interface CorrectVersionDialogProps {
+  row: DocumentRowView;
+  version: DocumentVersionView;
+  projectKey: string;
+  onNavigate: (route: Route) => void;
+  onClose: () => void;
+  returnFocus?: () => HTMLElement | null | undefined;
+}
+
+export function CorrectVersionDialog({ row, version, projectKey, onNavigate, onClose, returnFocus }: CorrectVersionDialogProps): JSX.Element {
+  return <Dialog open size="md" title={`Correct the translation, ${row.case_id} ${versionLabel(row, version)}, accepted`} onClose={onClose} returnFocus={returnFocus}>
+    <LeadCorrectionPanel row={row} projectKey={projectKey} documentId={version.document_id} inDialog
+      onNavigate={route => { onClose(); onNavigate(route); }} onCancel={onClose} />
+  </Dialog>;
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** `VERSION_NOT_ACCEPTABLE` reasons, as the version row would explain them. */
+const NOT_ACCEPTABLE: Readonly<Record<string, string>> = {
+  not_newest: "A newer version of this translation exists. Reload the row to see it.",
+  accepted: "This version is already accepted. Reload the row to see its current state.",
+  reviewed: "This version was reviewed in Ontotator. Reload the row to see its current state.",
+  discarded: "This translation was discarded. Reload the row to see its current state.",
+  review_open: "A translation review of this version is open. Withdraw it with Remove… in the reviewer’s row of the Translation part before you accept the version.",
+};
+
+function refusalText(error: unknown): string | null {
+  if (!(error instanceof ApiError)) return null;
+  if (error.code === "VARIANT_REVIEW_STALE") return "The text of this version changed. Reload the row to see the current text.";
+  if (error.code !== "VERSION_NOT_ACCEPTABLE") return null;
+  const reason = isRecord(error.details) && typeof error.details.reason === "string" ? error.details.reason : "";
+  return Object.hasOwn(NOT_ACCEPTABLE, reason) ? NOT_ACCEPTABLE[reason] : null;
+}
+
+export interface AcceptVersionDialogProps {
+  row: DocumentRowView;
+  version: DocumentVersionView;
+  projectKey: string;
+  /** Saved: the announcement ("EN100022 de v2 accepted as reviewed outside Ontotator."). */
+  onAccepted: (message: string) => void;
+  onClose: () => void;
+  returnFocus?: () => HTMLElement | null | undefined;
+}
+
+export function AcceptVersionDialog({ row, version, projectKey, onAccepted, onClose, returnFocus }: AcceptVersionDialogProps): JSX.Element {
+  const id = useId();
+  const writing = useRef(false);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>();
+  const [tried, setTried] = useState(false);
+  const label = versionLabel(row, version);
+  const short = versionName(version.version, version.chain_name, row.parallel_roots);
+  const missing = !reason.trim();
+
+  const accept = async () => {
+    setTried(true);
+    if (writing.current || missing) return;
+    writing.current = true; setBusy(true); setError(undefined);
+    try {
+      const { text_sha256 } = await api.getVariantMetadata(projectKey, version.document_id);
+      await api.acceptVersion(projectKey, version.document_id, { reason: reason.trim(), expected_text_sha256: text_sha256 });
+      onAccepted(`${textLabel(row)} ${short} accepted as reviewed outside Ontotator.`);
+    } catch (failure: unknown) {
+      setError(failure);
+    } finally { writing.current = false; setBusy(false); }
+  };
+
+  const refused = refusalText(error);
+  return <Dialog open size="sm" title={`Accept ${label}`} onClose={busy ? undefined : onClose} returnFocus={returnFocus}
+    footer={<>
+      <Button disabled={busy} onClick={onClose}>Cancel</Button>
+      <Button variant="primary" loading={busy} aria-disabled={missing || busy ? true : undefined}
+        aria-describedby={missing && tried ? `${id}-missing` : undefined} onClick={() => { void accept(); }}>{`Accept ${short}`}</Button>
+    </>}>
+    <Textarea id={`${id}-reason`} label="Reason" required maxLength={2000} value={reason} disabled={busy}
+      onChange={event => setReason(event.target.value)} />
+    <p className="field-hint">{ACCEPTANCE_RECORDED}</p>
+    {missing && tried && <p id={`${id}-missing`} className="action-reason">Enter a reason.</p>}
+    {refused ? <InlineMessage tone="warning">{refused}</InlineMessage> : error !== undefined && <ErrorNotice error={error} />}
+  </Dialog>;
+}

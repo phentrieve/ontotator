@@ -104,6 +104,8 @@ export type AnnotationsPerTextResult = components["schemas"]["AnnotationsPerText
 export type RowProposalSetView = components["schemas"]["RowProposalSetView"];
 export type DiscardRequest = Defaulted<components["schemas"]["DiscardRequest"], "confirm">;
 export type DiscardResult = components["schemas"]["DiscardResult"];
+export type AcceptVersionRequest = components["schemas"]["AcceptVersionRequest"];
+export type AcceptVersionResult = components["schemas"]["AcceptVersionResult"];
 // Annotation-mode change after submissions, and its restore
 export type RowChangeView = components["schemas"]["RowChangeView"];
 export type ModeChangeTarget = components["schemas"]["ModeChangeTarget"];
@@ -222,6 +224,7 @@ export type AssignmentSubmissionView = components["schemas"]["AssignmentSubmissi
 export type SourceObligationView = components["schemas"]["SourceObligationView"];
 export type CorrectionAssignmentRequest = components["schemas"]["CorrectionAssignmentRequest"];
 export type LeadCorrectionRequest = components["schemas"]["LeadCorrectionRequest"];
+export type LeadCorrectionPreview = components["schemas"]["LeadCorrectionPreview"];
 export type ResolveSourceObligationRequest = components["schemas"]["ResolveSourceObligationRequest"];
 export type ProblemReportRequest = components["schemas"]["ProblemReportRequest"];
 export type ProblemActionRequest = components["schemas"]["ProblemActionRequest"];
@@ -646,6 +649,11 @@ export class ApiClient {
 
   async lookupCaseIds(key: string, ids: readonly string[]): Promise<CaseIdLookupResult> {
     return this.request<CaseIdLookupResult>(`/api/v1/projects/${encodeURIComponent(key)}/case-ids/lookup`, { method: "POST", body: JSON.stringify({ ids }) });
+  }
+
+  /** Issue 341 d: accept exactly one version as reviewed outside Ontotator. */
+  async acceptVersion(key: string, documentId: string, body: AcceptVersionRequest): Promise<AcceptVersionResult> {
+    return this.request<AcceptVersionResult>(`/api/v1/projects/${encodeURIComponent(key)}/variants/${encodeURIComponent(documentId)}/accept`, { method: "POST", body: JSON.stringify(body) });
   }
 
   async discardVariant(key: string, documentId: string, body: DiscardRequest): Promise<DiscardResult> {
@@ -1363,7 +1371,12 @@ export class ApiClient {
     return this.request(`/api/v1/projects/${encodeURIComponent(projectKey)}/documents/${encodeURIComponent(documentId)}/translation-correction-assignment`, { method: "POST", body: JSON.stringify(body) });
   }
 
-  /** F1: the lead reviews a rejected or queried version themselves. */
+  /** Issue 341 b: whether a lead correction is available and the annotation work that stays on the version. */
+  async getLeadCorrectionPreview(projectKey: string, documentId: string): Promise<LeadCorrectionPreview> {
+    return this.request(`/api/v1/projects/${encodeURIComponent(projectKey)}/documents/${encodeURIComponent(documentId)}/lead-correction`, { method: "GET" });
+  }
+
+  /** F1: the lead reviews a rejected, queried or accepted version themselves. */
   async startLeadCorrection(projectKey: string, documentId: string, body: LeadCorrectionRequest): Promise<AssignmentView> {
     return this.request(`/api/v1/projects/${encodeURIComponent(projectKey)}/documents/${encodeURIComponent(documentId)}/lead-correction`, { method: "POST", body: JSON.stringify(body) });
   }

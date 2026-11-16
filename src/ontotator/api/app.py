@@ -531,6 +531,7 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
                     "TRANSLATION_NOT_ACCEPTED": 409,
                     "TRANSLATION_NOT_REVIEWED": 409,
                     "LEAD_CORRECTION_NOT_AVAILABLE": 409,
+                    "VERSION_NOT_ACCEPTABLE": 409,
                     "LANGUAGE_CONFIRMATION_REQUIRED": 409,
                     "REASSIGN_CONFIRMATION_REQUIRED": 409,
                     "ADJUDICATOR_IS_ANNOTATOR": 409,

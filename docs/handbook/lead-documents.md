@@ -212,6 +212,7 @@ What for: see each version of a translation, its reviews and its origin.
 1. Open the text card and click **Translation**.
 2. The list shows each version with its origin and status, then one row per person who worked on it: the name, the task and the status. Older ones are under **Older versions**; with parallel versions they are grouped by version chain.
 3. Click **View text** to read a version, or **Translation reviews** to see every review decision. In a reviewer's row, **Reopen…** lets them review the version again and **Remove…** removes their assignment.
+   At the newest accepted version, **Correct the translation…** lets you correct it yourself ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)).
 4. Click **Compare with source** to compare the translation with the source text.
 
 ### Request a translation correction
@@ -223,7 +224,7 @@ What for: have a translation corrected by a reviewer.
 3. Choose the **Translation reviewer** and enter the **Reason for another review**.
 4. Click **Assign correction review**, then **Close**.
 
-If the reviewer submits **Accepted with corrections**, the corrected text becomes a new text version.
+If the reviewer submits **Accepted with corrections**, the corrected text becomes a new text version. While a lead is correcting the same version themselves, the request is refused with *A lead is correcting this version.* ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
 
 ## Work plans and assignments
 

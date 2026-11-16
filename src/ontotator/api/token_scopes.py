@@ -138,7 +138,13 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     # The lead takes a rejected translation over (issue 345): project work of
     # the lead, as the correction assignment above.
     ("POST", f"{P}/documents/{{doc:path}}/lead-correction"): "project-admin",
+    # Issue 341 b: what the lead correction would start (read only).
+    ("GET", f"{P}/documents/{{doc:path}}/lead-correction"): "read",
     ("POST", f"{P}/variants/{{document_id:path}}/discard"): "project-admin",
+    # Issue 341 d: accept exactly one version, as the discard above.
+    ("POST", f"{P}/variants/{{document_id:path}}/accept"): "project-admin",
+    # Its dry run: only a token that may accept needs it.
+    ("GET", f"{P}/variants/{{document_id:path}}/accept"): "project-admin",
     ("GET", f"{P}/proposal-sets/{{set_id}}"): "read",
     ("GET", f"{P}/workflow-warnings"): "read",
     # Import

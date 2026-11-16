@@ -6484,6 +6484,122 @@
         "x-ontotator-project-token": true
       }
     },
+    "/api/v1/projects/{key}/variants/{document_id}/accept": {
+      "post": {
+        "tags": [
+          "work-plans"
+        ],
+        "summary": "Accept Version",
+        "description": "Accept this one version, audited with the reason (issue 341 d).",
+        "operationId": "accept_version_api_v1_projects__key__variants__document_id__accept_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptVersionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptVersionResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      },
+      "get": {
+        "tags": [
+          "work-plans"
+        ],
+        "summary": "Preview Accept Version",
+        "description": "Read only: whether this version can be accepted, and why not.",
+        "operationId": "preview_accept_version_api_v1_projects__key__variants__document_id__accept_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptVersionPreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
     "/api/v1/projects/{key}/bulk-task-actions/reopen": {
       "post": {
         "tags": [
@@ -6968,7 +7084,7 @@
           "translation-workflow"
         ],
         "summary": "Start Lead Correction",
-        "description": "F1: the lead reviews a rejected or queried version themselves.",
+        "description": "F1: the lead reviews a rejected, queried or accepted version themselves.",
         "operationId": "start_lead_correction_api_v1_projects__key__documents__doc__lead_correction_post",
         "parameters": [
           {
@@ -7023,6 +7139,58 @@
           }
         },
         "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      },
+      "get": {
+        "tags": [
+          "translation-workflow"
+        ],
+        "summary": "Preview Lead Correction",
+        "description": "Issue 341 b: availability and the annotation work that stays on the version.",
+        "operationId": "preview_lead_correction_api_v1_projects__key__documents__doc__lead_correction_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "doc",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Doc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeadCorrectionPreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "read",
         "x-ontotator-project-token": true
       }
     },
@@ -11021,6 +11189,126 @@
           "reason"
         ],
         "title": "AcceptExternalReview"
+      },
+      "AcceptVersionPreview": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "translation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translation Status"
+          },
+          "acceptable": {
+            "type": "boolean",
+            "title": "Acceptable"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "text_sha256": {
+            "type": "string",
+            "title": "Text Sha256"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "document_id",
+          "version",
+          "translation_status",
+          "acceptable",
+          "reason",
+          "text_sha256"
+        ],
+        "title": "AcceptVersionPreview",
+        "description": "Whether \"Accept this version\u2026\" would accept it, and the text hash to send."
+      },
+      "AcceptVersionRequest": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Reason"
+          },
+          "expected_text_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Text Sha256"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason",
+          "expected_text_sha256"
+        ],
+        "title": "AcceptVersionRequest",
+        "description": "Issue 341 d: accept exactly one version as reviewed outside Ontotator."
+      },
+      "AcceptVersionResult": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "translation_status": {
+            "type": "string",
+            "const": "accepted",
+            "title": "Translation Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "document_id",
+          "version",
+          "translation_status"
+        ],
+        "title": "AcceptVersionResult"
       },
       "ActiveHoldView": {
         "properties": {
@@ -20180,6 +20468,106 @@
         "title": "LayerDefinition",
         "description": "Definition of an annotation layer binding an ontology and types."
       },
+      "LeadCorrectionAnnotationsView": {
+        "properties": {
+          "submitted": {
+            "type": "integer",
+            "title": "Submitted"
+          },
+          "open": {
+            "type": "integer",
+            "title": "Open"
+          }
+        },
+        "type": "object",
+        "required": [
+          "submitted",
+          "open"
+        ],
+        "title": "LeadCorrectionAnnotationsView"
+      },
+      "LeadCorrectionPreview": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "next_version": {
+            "type": "integer",
+            "title": "Next Version"
+          },
+          "translation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translation Status"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "reviewed_again": {
+            "type": "boolean",
+            "title": "Reviewed Again"
+          },
+          "review_on": {
+            "type": "boolean",
+            "title": "Review On"
+          },
+          "annotate_accepted_only": {
+            "type": "boolean",
+            "title": "Annotate Accepted Only"
+          },
+          "annotations": {
+            "$ref": "#/components/schemas/LeadCorrectionAnnotationsView"
+          },
+          "open_consolidations": {
+            "type": "integer",
+            "title": "Open Consolidations"
+          },
+          "final_result": {
+            "type": "boolean",
+            "title": "Final Result"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "version",
+          "next_version",
+          "translation_status",
+          "available",
+          "reason",
+          "reviewed_again",
+          "review_on",
+          "annotate_accepted_only",
+          "annotations",
+          "open_consolidations",
+          "final_result"
+        ],
+        "title": "LeadCorrectionPreview",
+        "description": "What \"Correct the translation\u2026\" would start (issue 341 b)."
+      },
       "LeadCorrectionRequest": {
         "properties": {
           "expected_text_sha256": {
@@ -26017,6 +26405,11 @@
           "lead_correction": {
             "type": "boolean",
             "title": "Lead Correction",
+            "default": false
+          },
+          "reviewed_again": {
+            "type": "boolean",
+            "title": "Reviewed Again",
             "default": false
           },
           "checked_sentences": {

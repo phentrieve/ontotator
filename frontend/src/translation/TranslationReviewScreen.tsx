@@ -20,7 +20,7 @@ import { ChecksSummary, ReviewSummary, SubmitSummary } from "./ReviewParts";
 import { ReviewForm } from "./ReviewForm";
 import { taskText } from "../app/identity";
 import { autoNoteText, chooseDecision, reactToTextEdit, USER_ORIGIN, type DecisionState } from "./decisionOrigin";
-import { annotateThisTextLabel, categoryLabels, comparisonCountsDiffer, couplingEditingNote, couplingNote, decisionKeyHint, decisionLabels, decisionOutcomes, formatReviewDate, issueMessages, languageName, leadCorrectionKeyHint, leadCorrectionNote, matchingParagraphStatus, nextTaskLabel, paragraphCountChanged, paragraphCountsDiffer, remainingTasksText, reviewIssueMessage, showMatchingLabel, showMatchingShortcut, showMatchingTitle } from "./labels";
+import { acceptedCorrection, annotateThisTextLabel, categoryLabels, comparisonCountsDiffer, couplingEditingNote, couplingNote, decisionKeyHint, decisionLabels, decisionOutcomes, formatReviewDate, issueMessages, languageName, leadCorrectionKeyHint, leadCorrectionNote, matchingParagraphStatus, nextTaskLabel, paragraphCountChanged, paragraphCountsDiffer, remainingTasksText, reviewIssueMessage, showMatchingLabel, showMatchingShortcut, showMatchingTitle } from "./labels";
 import { checkReview, type ClinicalCategory, type ReviewDecisionCode, type ReviewForm as FormValue } from "./reviewRules";
 import { LanguageTag } from "../ui/LanguageTag";
 import { SentenceCount, SentenceView } from "./SentenceMarks";
@@ -128,6 +128,12 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   const immutableReadOnly = workspace.read_only && (!workspace.assignment.held || workspace.assignment.status === "submitted" || workspace.submitted_record !== null);
   const held = props.held ?? workspace.assignment.held;
   const leadCorrection = workspace.lead_correction;
+  // Issue 341 b: the lead corrects an accepted version; the new version is reviewed again.
+  // `reviewed_again` also covers a further correction after that new version was rejected or queried.
+  const correctsAccepted = leadCorrection && !!workspace.reviewed_again;
+  const versionAccepted = workspace.variant.translation_status === "accepted";
+  const leadNote = !correctsAccepted ? leadCorrectionNote : versionAccepted ? acceptedCorrection.note : acceptedCorrection.noteNotAccepted;
+  const leadDescriptions = correctsAccepted ? { accepted_corrected: acceptedCorrection.description } : undefined;
   const editable = !immutableReadOnly && !held;
   // A stored Query/Rejected draft without the implied clinical change is normalised once on open (and saved).
   // A lead correction preselects Accepted with corrections; a stored other decision is replaced and saved.
@@ -800,7 +806,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
           <SourceObligationReview assignmentId={props.assignmentId} username={props.username} documentId={workspace.variant.document_id}
             translationText={text} canResolve={canSubmit && !!form && ['accepted_unchanged', 'accepted_corrected'].includes(form.decision)}
             busy={busy} readOnly={readOnly} error={error} onResolve={submit} />
-          {submitted && <InlineMessage tone="success" title="Review submitted"><p>{decisionOutcomes[submitted.decision]}</p>
+          {submitted && <InlineMessage tone="success" title="Review submitted"><p>{correctsAccepted && submitted.decision === "accepted_corrected" ? acceptedCorrection.outcome : decisionOutcomes[submitted.decision]}</p>
             {createdVersion !== null && <p>A corrected version v{createdVersion} was created.</p>}
             {submitted.created_variant_id && createdVersion === null && <Button size="sm" onClick={() => { void loadCreated(submitted); }}>Retry corrected version metadata</Button>}</InlineMessage>}
           {submitted && leadCorrection && <div className="translation-next-task">
@@ -818,13 +824,13 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
           </div>}
           {record ? <ReviewSummary record={record} heading="Submitted review" />
             : held ? <><InlineMessage tone="info">This task is paused. Your review choices are kept.</InlineMessage>
-              {leadCorrection && <InlineMessage tone="info">{leadCorrectionNote}</InlineMessage>}
-              <ReviewForm value={visualForm(rawForm)} issues={[]} failedCheckCount={workspace.failed_checks.length} readOnly decisions={leadCorrection ? leadDecisions : undefined} onChange={() => {}} /></>
+              {leadCorrection && <InlineMessage tone="info">{leadNote}</InlineMessage>}
+              <ReviewForm value={visualForm(rawForm)} issues={[]} failedCheckCount={workspace.failed_checks.length} readOnly decisions={leadCorrection ? leadDecisions : undefined} descriptions={leadDescriptions} onChange={() => {}} /></>
             : readOnly ? <InlineMessage tone="info">This review can no longer be edited.</InlineMessage>
             : <>
-              {leadCorrection && <InlineMessage tone="info">{leadCorrectionNote}</InlineMessage>}
+              {leadCorrection && <InlineMessage tone="info">{leadNote}</InlineMessage>}
               {decision(rawForm.decision) && !form && <InlineMessage tone="error">The review form contains unsupported values. Update the affected fields before submitting.</InlineMessage>}
-              <ReviewForm value={visualForm(rawForm)} issues={!railOpen && !busy ? issues : []} readOnly={busy} decisions={leadCorrection ? leadDecisions : undefined} failedCheckCount={workspace.failed_checks.length}
+              <ReviewForm value={visualForm(rawForm)} issues={!railOpen && !busy ? issues : []} readOnly={busy} decisions={leadCorrection ? leadDecisions : undefined} descriptions={leadDescriptions} failedCheckCount={workspace.failed_checks.length}
                 autoNote={autoNoteText(decisionState.note)} onChooseDecision={chooseOption} onChange={next => {
                 const current = draftRef.current;
                 edit({ ...current, form: { ...(!has(current.form, "clinical_change") ? { clinical_change: false } : {}), ...current.form, ...next } });
@@ -864,7 +870,8 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     </div>}
     {form && <ConfirmDialog focusConfirm open={confirming} title="Submit this review?" confirmLabel="Submit review" cancelLabel="Keep editing" busy={busy}
       message={<SubmitSummary decision={form.decision} clinical={form.clinical_change} categories={form.categories ?? []} rationale={form.rationale}
-        failedChecks={form.decision === "accepted_unchanged" ? workspace.failed_checks.map(check => check.code) : []} />}
+        failedChecks={form.decision === "accepted_unchanged" ? workspace.failed_checks.map(check => check.code) : []}
+        consequence={!correctsAccepted ? undefined : versionAccepted ? acceptedCorrection.consequence : acceptedCorrection.consequenceNotAccepted} />}
       onCancel={() => setConfirming(false)} onConfirm={() => { void submit(); }} />}
     {leave && <Dialog open title={leave.kind === "logout" ? "Unsaved changes" : "Changes not saved"} onClose={busy ? undefined : () => closeLeave(false)} footer={<>
       <Button disabled={busy} onClick={() => closeLeave(false)}>Cancel</Button>
