@@ -124,6 +124,7 @@ A token can do only what both its scopes and its owner's roles allow. Many tools
 | `reopen_task` | project-admin | overwrites | Reopen a submitted task so its person can change the submission. |
 | `reopen_texts` | project-admin | overwrites | Reopen the submitted tasks of many texts, after a dry run. |
 | `withdraw_open_tasks` | project-admin | may remove or withdraw | Withdraw the open tasks of many texts, after a dry run. |
+| `start_rounds` | project-admin | may remove or withdraw | Start a new work round for the submitted annotations of many texts, after a dry run. THERE IS NO UNDO. |
 | `hand_over_open_tasks` | read, project-admin | may remove or withdraw | Hand a person's open tasks to others in turn, after a dry run. |
 | `list_problem_reports` | read | reads | Problem reports annotators filed in the project. |
 | `get_problem_report` | read | reads | One problem report with its events, holds and resolution. |

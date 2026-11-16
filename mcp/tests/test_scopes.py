@@ -167,6 +167,14 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "confirm": True,
             "preview_token": "sha256:x",
         },
+        "start_rounds": {
+            "project": "p",
+            "texts": [{"case_id": "c", "language": "en"}],
+            "kind": "clean_restart",
+            "reason": "New tool set",
+            "confirm": True,
+            "preview_token": "sha256:x",
+        },
         "hand_over_open_tasks": {
             "project": "p",
             "from_username": "leaving",
@@ -467,6 +475,7 @@ IRREVERSIBLE = (
     "set_final_result",
     "accept_agreeing_texts",
     "change_final_results",
+    "start_rounds",
     "carry_submission",
     "update_work_plan",
     "act_on_problem_report",

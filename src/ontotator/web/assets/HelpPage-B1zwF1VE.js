@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-DEHI3xp8.js";import{n as a,t as o}from"./lib-KcgI0Jc7.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-DcHjg9Hi.js";import{n as a,t as o}from"./lib-DBJJDHSP.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -1723,21 +1723,22 @@ Before you start: [publish the new guideline version](lead-settings.md#publish-t
 
 For many texts at once, select them and choose **More actions** › **Reopen…** in the selection bar ([Reopen or withdraw the tasks of several texts](lead-documents.md#reopen-or-withdraw-the-tasks-of-several-texts)). Texts with a final result are skipped.
 
-Annotators can also do this themselves: **More** › **Work rounds** › **Continue from** starts a new round from their submission, where each carried finding must be checked again ([Start a new work round](annotator.md#start-a-new-work-round)).
+Annotators can also do this themselves: **More** › **Work rounds** › **Continue from** starts a new round from their submission, where each carried finding must be checked again ([Start a new work round](annotator.md#start-a-new-work-round)). You can start such rounds for the submitted annotations of many texts: **More actions** › **Start a round…** › **Continue from the submission** ([Start a new round for several texts](lead-documents.md#start-a-new-round-for-several-texts)).
 
-An empty start is possible only before the first submission (**Start empty round**). After a submission, a fresh start needs your agreement: the annotator [reports a text problem](annotator.md#report-a-text-problem) and you choose **Agree clean restart…** ([Decide on a problem report](lead-results.md#decide-on-a-problem-report)). The new round has none of the earlier findings; a task from scratch starts empty, a task from proposals starts again on the newest tool proposals of the text, all open.
+An empty start is possible only before the first submission (**Start empty round**). After a submission, a fresh start needs your agreement: the annotator [reports a text problem](annotator.md#report-a-text-problem) and you choose **Agree clean restart…** ([Decide on a problem report](lead-results.md#decide-on-a-problem-report)). The new round has none of the earlier findings; a task from scratch starts empty, a task from proposals starts again on the newest tool proposals of the text, all open. For submitted annotations you can restart without a report: **More actions** › **Start a round…** › **Restart**, with a reason.
 
 ### Work from new tool proposals
 
-A proposal set you import later is used only by annotation rounds that start after the import, for example for a new assignment of a text planned **Annotate from proposals**. A task keeps the proposals its round started with, also after **Reopen…** or a new round from a submission. Only a restart agreed on a problem report (**Agree clean restart…**) starts it again on the newest proposals.
+A proposal set you import later is used only by annotation rounds that start after the import, for example for a new assignment of a text planned **Annotate from proposals**. A task keeps the proposals its round started with, also after **Reopen…** or a new round from a submission. A restart starts it again on the newest proposals: **Restart** under **More actions** › **Start a round…** for submitted annotations, or a restart agreed on a problem report (**Agree clean restart…**).
 
-The text card shows which set a text's tasks work on: **Annotation** names it, for example *Proposals set 2026-10-02 (phentrieve 1.4), 24 proposals*, and adds *Newer set available: 2026-11-10* once a newer set of the text is imported. The note stays until every task of the text works on the newest set; until then the line names the older set still in use, and a person who is already on the newest set, or will start on it, has *newest set* in their row. Tasks that started before Ontotator recorded sets show *set not recorded*. The card offers no restart button yet.
+The text card shows which set a text's tasks work on: **Annotation** names it, for example *Proposals set 2026-10-02 (phentrieve 1.4), 24 proposals*, and adds *Newer set available: 2026-11-10* once a newer set of the text is imported. The note stays until every task of the text works on the newest set; until then the line names the older set still in use, and a person who is already on the newest set, or will start on it, has *newest set* in their row. Tasks that started before Ontotator recorded sets show *set not recorded*. The card itself offers no restart button; select the text and use **More actions** › **Start a round…**.
 
 1. Import the new proposals in an Ontospan bundle ([Upload texts](lead-documents.md#upload-texts)). Only sets of kind \`tool_output\`, made entirely by tools, can be imported.
 2. For a text without assignments, assign it: it starts from the newest proposals.
-3. For one task already under way, its annotator can [report a text problem](annotator.md#report-a-text-problem) and you choose **Agree clean restart…** ([Decide on a problem report](lead-results.md#decide-on-a-problem-report)). The task starts a new round on the newest proposals; the earlier rounds stay in the history. Other people's tasks on the text keep their proposals.
+3. For submitted annotations, of one text or many: select the texts and choose **More actions** › **Start a round…** › **Restart** ([Start a new round for several texts](lead-documents.md#start-a-new-round-for-several-texts)). Each task starts a new round on the newest proposals, all open.
+4. For one task already under way, its annotator can [report a text problem](annotator.md#report-a-text-problem) and you choose **Agree clean restart…** ([Decide on a problem report](lead-results.md#decide-on-a-problem-report)). The task starts a new round on the newest proposals; the earlier rounds stay in the history. Other people's tasks on the text keep their proposals.
    Without a report, restart the task through the API or the MCP server: \`POST /api/v1/assignments/{id}/rounds\` with \`kind\` \`clean_restart\` and a \`reason\` (scope \`project-admin\`), or the MCP tool \`start_new_round\` with \`kind\` \`clean_restart\`, a \`reason\` and, after its dry run, \`confirm\`. The task ID is in the text card's **Details**. The current round and its draft are dropped; submitted work stays in the history. Afterwards the card names the newest set and *Newer set available* is gone once every task of the text is on it.
-4. To restart the whole text instead: open the text card, click **Annotation** and click **Change mode…**. Enter the **Reason** and click **Discard work and change mode** (or **Change mode**). The text is now from scratch, and the work on the whole text is discarded, submitted work included; the assignments are removed ([Change the annotation mode of one text](lead-documents.md#change-the-annotation-mode-of-one-text)). Then choose **From proposals** under **Annotation** and assign the text again.
+5. To restart the whole text instead: open the text card, click **Annotation** and click **Change mode…**. Enter the **Reason** and click **Discard work and change mode** (or **Change mode**). The text is now from scratch, and the work on the whole text is discarded, submitted work included; the assignments are removed ([Change the annotation mode of one text](lead-documents.md#change-the-annotation-mode-of-one-text)). Then choose **From proposals** under **Annotation** and assign the text again.
 
 For a text with a final result this is not possible: **Change mode…** is refused with *A final result was chosen for this text, so its annotation mode stays.* (error code \`ANNOTATION_MODE_FINAL_SELECTED\`). Withdraw the final result first ([Withdraw a final result](lead-results.md#withdraw-a-final-result)), or, to annotate such a text again without discarding work, add annotators as in [More annotators on finished texts](#more-annotators-on-finished-texts).
 
@@ -2129,6 +2130,29 @@ Every listed task changes, or none: if the texts changed since the preview, the 
 
 The same menu holds **Accept agreeing results…** and **Change final…** for the final results of the selected texts: see [Accept or change the final result of several texts](lead-results.md#accept-or-change-the-final-result-of-several-texts).
 
+### Start a new round for several texts
+
+What for: give submitted annotations a new work round, for many texts at once. Either the people continue from what they submitted, or they start again without their earlier findings, for example on tool proposals imported after they began ([Work from new tool proposals](lead-change-course.md#work-from-new-tool-proposals)). It also works for a single selected text.
+
+1. Select the texts, then click **More actions** in the selection bar and choose **Start a round…**. When the selection has nothing to start a round for, the entry is unavailable and says why, for example *No submitted annotations in the selected texts.*
+2. Under **New round**, choose how the round starts:
+   - **Continue from the submission**: the new round starts with what the person submitted. They check it, change it and submit again.
+   - **Restart**: the new round has none of the earlier findings. A task from scratch starts empty; a task from tool proposals starts again from the newest proposals, all open.
+3. Read the preview. It names the people with their number of tasks, for example *Continue 7 submitted tasks in a new round · Tom Reis 5, R. Roe 2*; click **Show all** to list every text. Only submitted annotations on the current version of a text get a round. What stays as it is has its own group with the reason:
+   - *Skip 1 text · final result chosen: use Withdraw final… first*: the final result rests on a submission ([Withdraw a final result](lead-results.md#withdraw-a-final-result)).
+   - *Skip 1 text · a consolidation is open: finish or withdraw it first*: the consolidation works on the submissions.
+   - *Keep 2 open tasks · not submitted yet*: tasks that are assigned, in progress or reopened are not touched.
+   - Also kept, each in its own group: a task paused by a problem report, a task on an earlier or discarded version, a task whose person can no longer take it, a task whose translation is not accepted yet and, for **Restart**, submitted work without a work round (older or imported work: use **Reopen…**).
+4. Enter the reason. For **Restart** it is required (**Reason**); for **Continue from the submission** it is optional (**Reason (optional)**). It is recorded with each new round in the audit trail.
+5. Click the button that names the work, for example *Start 7 rounds*. The dialog says what happens. Tick **I understand** (for a restart **I understand — restart without the earlier findings**) and click the button again.
+
+What happens to the work:
+
+- Each person gets the task back in **My tasks** and must submit again. The earlier submission no longer counts as submitted; it stays in the history and the earlier rounds stay readable under **More** › **Work rounds**.
+- After **Restart** the submitted work is set aside: it is not carried into the new round.
+- Every listed task gets its round, or none: if the texts changed since the preview, the dialog says *The texts changed since the preview. Check the new preview.* and shows it. Each round is recorded in the audit trail like a single new round.
+- This action has no undo, and no action on a single text brings back a round that was replaced. To let people only correct a submission in place, use **Reopen…** instead.
+
 - Reopened translation reviews have no Undo: the review starts again from the current text of its version, and the earlier draft cannot be brought back. The dialog says so before you confirm. The submitted decision stays in the history.
 - Undo is recorded as a change of its own. A person who has the task open may be asked to reload it.
 
@@ -2313,7 +2337,7 @@ What for: take a final result back, for example before finished texts are annota
 3. Read what happens: the text has no final result until you choose one again; final exports already made stay as they are; **Change mode…** is possible again; submissions and consolidation stay.
 4. Enter the **Reason**, tick **I understand** and click **Withdraw final result**.
 
-The text asks for a final result again. **History** in the text card shows the withdrawal with your reason. If someone changed the final result meanwhile, nothing is withdrawn: the dialog says *This final result changed. Nothing was withdrawn.* and loads the current one. Check it, then tick **I understand** again to withdraw it, or click **Cancel**.
+The text asks for a final result again, and its submitted annotations can get a new work round again: **More actions** › **Start a round…** skips texts with a final result ([Start a new round for several texts](lead-documents.md#start-a-new-round-for-several-texts)). **History** in the text card shows the withdrawal with your reason. If someone changed the final result meanwhile, nothing is withdrawn: the dialog says *This final result changed. Nothing was withdrawn.* and loads the current one. Check it, then tick **I understand** again to withdraw it, or click **Cancel**.
 
 ### Accept or change the final result of several texts
 

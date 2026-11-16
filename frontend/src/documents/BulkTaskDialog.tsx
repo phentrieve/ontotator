@@ -3,7 +3,7 @@ import { api, ApiError, type BulkTaskActionView, type RowRefView } from "../api/
 import { ErrorNotice } from "../admin/ErrorNotice";
 import { plural } from "../app/labels";
 import { Button, Checkbox, Dialog, InlineMessage, Textarea } from "../ui";
-import { applyLabel, consequenceLines, previewGroups, TASK_LABELS, willChangeText, type BulkAction, type PreviewGroup } from "./bulkActionModel";
+import { applyLabel, consequenceLines, previewGroups, ROUND_KINDS, TASK_LABELS, willChangeText, type BulkAction, type PreviewGroup, type RoundKind } from "./bulkActionModel";
 
 export interface BulkTaskDialogProps {
   projectKey: string;
@@ -21,7 +21,12 @@ const CHECKING = "Checking the selected texts…";
 const STALE = "The texts changed since the preview. Check the new preview.";
 /** Texts a collapsed group names before "Show all". */
 const SHOWN_TEXTS = 3;
-const TITLES: Readonly<Record<BulkAction, string>> = { reopen: "Reopen", withdraw: "Withdraw open tasks" };
+const TITLES: Readonly<Record<BulkAction, string>> = { reopen: "Reopen", withdraw: "Withdraw open tasks", start_round: "Start a round" };
+const REASON_HINTS: Readonly<Record<BulkAction, string>> = {
+  reopen: "The people see it in My tasks. It is kept in each text's history.",
+  withdraw: "Kept with each withdrawal in the text's history.",
+  start_round: "Recorded with each new round in the audit log.",
+};
 
 /** One group of a bulk preview: its title, its detail and its texts, the first three before "Show all". */
 export function GroupLine({ group, id }: { group: PreviewGroup; id: string }): JSX.Element {
@@ -43,6 +48,8 @@ export function GroupLine({ group, id }: { group: PreviewGroup; id: string }): J
  * the choices with a live preview grouped by consequence and the reason, then a consequences step with "I
  * understand", then the action. Applying sends the preview's token: every listed task changes or none; when the texts
  * changed meanwhile the dialog shows the new preview. Below 700 px the dialog is a full-screen sheet.
+ * "Start a round…" (step 3) offers the two rounds a lead can start for one submitted annotation and nothing else;
+ * a restart needs a reason, as the single action does.
  */
 export function BulkTaskDialog({ projectKey, action, rows, onClose, onApplied }: BulkTaskDialogProps): JSX.Element {
   const ids = useId().replace(/:/g, "");
@@ -50,6 +57,7 @@ export function BulkTaskDialog({ projectKey, action, rows, onClose, onApplied }:
   const [tasks, setTasks] = useState<TaskKind[]>(["annotate"]);
   const [includeStarted, setIncludeStarted] = useState(false);
   const [overLimit, setOverLimit] = useState(false);
+  const [kind, setKind] = useState<RoundKind>("carry_forward");
   const [reason, setReason] = useState("");
   const [preview, setPreview] = useState<{ request: string; data: BulkTaskActionView } | null>(null);
   const [previewError, setPreviewError] = useState<unknown>();
@@ -63,10 +71,12 @@ export function BulkTaskDialog({ projectKey, action, rows, onClose, onApplied }:
   const generation = useRef(0);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
+  const round = action === "start_round";
   const options = action === "reopen" ? { tasks } : { tasks, include_started: includeStarted, over_limit_only: overLimit };
-  const requestKey = JSON.stringify(options);
+  const requestKey = JSON.stringify(round ? { kind } : options);
   const rowsKey = JSON.stringify(rows);
   const send = (body: { preview?: boolean; preview_token?: string; reason?: string }, signal?: AbortSignal) => {
+    if (round) return api.bulkStartRound(projectKey, { rows: [...rows], kind, ...body }, signal);
     const request = { rows: [...rows], ...options, ...body };
     return action === "reopen" ? api.bulkReopen(projectKey, request, signal) : api.bulkWithdraw(projectKey, request, signal);
   };
@@ -89,7 +99,8 @@ export function BulkTaskDialog({ projectKey, action, rows, onClose, onApplied }:
   const fresh = preview !== null && preview.request === requestKey ? preview.data : null;
   const groups = fresh ? previewGroups(fresh) : [];
   const changes = fresh?.changes.length ?? 0;
-  const reasonRequired = action === "reopen";
+  const reasonRequired = action === "reopen" || (round && kind === "clean_restart");
+  const destructive = action === "withdraw" || (round && kind === "clean_restart");
 
   let blocked: string | null = null;
   if (!tasks.length) blocked = "Choose at least one kind of task.";
@@ -126,14 +137,24 @@ export function BulkTaskDialog({ projectKey, action, rows, onClose, onApplied }:
   const footer = <>
     <span id={blockedId} className="dialog-footer-reason" hidden={!blocked}>{blocked}</span>
     {confirming ? <Button onClick={() => { setConfirming(false); setUnderstood(false); }}>Back</Button> : <Button onClick={onClose}>Cancel</Button>}
-    <Button variant={action === "withdraw" && confirming ? "danger" : "primary"} loading={saving} aria-disabled={blocked ? true : undefined} aria-describedby={blocked ? blockedId : undefined}
+    <Button variant={destructive && confirming ? "danger" : "primary"} loading={saving} aria-disabled={blocked ? true : undefined} aria-describedby={blocked ? blockedId : undefined}
       onClick={primary}>{applyLabel(action, changes)}</Button>
   </>;
 
   return <Dialog open title={`${TITLES[action]}: ${plural(rows.length, "text")}`} size="md" onClose={saving ? undefined : onClose} footer={footer}>
     <div className="bulk-dialog">
       {notice && <InlineMessage tone="info">{notice}</InlineMessage>}
-      {!confirming && <fieldset className="plan-step">
+      {!confirming && round && <fieldset className="plan-step">
+        <legend>New round</legend>
+        {(Object.keys(ROUND_KINDS) as RoundKind[]).map(value => <div key={value} className="plan-option">
+          <input type="radio" id={`${ids}-kind-${value}`} name={`${ids}-kind`} checked={kind === value} aria-describedby={`${ids}-kind-${value}-help`}
+            onChange={() => { setKind(value); setNotice(null); setError(undefined); }} />
+          <label htmlFor={`${ids}-kind-${value}`}>{ROUND_KINDS[value].label}</label>
+          <p id={`${ids}-kind-${value}-help`} className="plan-option-help">{ROUND_KINDS[value].help}</p>
+        </div>)}
+        <p className="field-hint">For submitted annotations on the current version of each text.</p>
+      </fieldset>}
+      {!confirming && !round && <fieldset className="plan-step">
         <legend>Tasks</legend>
         {(Object.keys(TASK_LABELS) as TaskKind[]).map(task => <Checkbox key={task} id={`${ids}-task-${task}`} label={TASK_LABELS[task]}
           checked={tasks.includes(task)} disabled={action === "withdraw" && overLimit && task !== "annotate"} onChange={event => toggleTask(task, event.target.checked)} />)}
@@ -151,14 +172,14 @@ export function BulkTaskDialog({ projectKey, action, rows, onClose, onApplied }:
       {fresh && <p className="work-plan-summary" aria-live="polite"><strong>Will change:</strong> {willChangeText(fresh)}</p>}
       {!confirming && <Textarea id={`${ids}-reason`} label={reasonRequired ? "Reason" : "Reason (optional)"} required={reasonRequired} maxLength={2000} value={reason}
         onChange={event => setReason(event.target.value)}
-        hint={reasonRequired ? "The people see it in My tasks. It is kept in each text's history." : "Kept with each withdrawal in the text's history."} />}
+        hint={REASON_HINTS[action]} />}
       {confirming && fresh && <div className="work-plan-confirm">
         <div className="work-plan-warning">
           <strong>What happens</strong>
           <ul>{consequenceLines(fresh).map(line => <li key={line}>{line}</li>)}</ul>
           {reason.trim() && <p>Reason: {reason.trim()}</p>}
         </div>
-        <Checkbox id={`${ids}-understood`} label={action === "withdraw" ? "I understand — withdraw the open tasks" : "I understand"} checked={understood} onChange={event => setUnderstood(event.target.checked)} />
+        <Checkbox id={`${ids}-understood`} label={action === "withdraw" ? "I understand — withdraw the open tasks" : round && kind === "clean_restart" ? "I understand — restart without the earlier findings" : "I understand"} checked={understood} onChange={event => setUnderstood(event.target.checked)} />
       </div>}
       {error !== undefined && <ErrorNotice error={error} />}
     </div>

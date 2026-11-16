@@ -12,7 +12,8 @@
  * "Accept agreeing results…" (texts without a final result; issues 354, 339) and "Change final…" (the newest
  * submission replaces the final result; issue 336 step 2); an entry that does nothing for the selection stays in the
  * menu, unavailable, with its reason. The task actions open `BulkTaskDialog`; after one applies, the toast offers Undo
- * while the texts stay unchanged. The final actions open `BulkFinalDialog`; they have no Undo.
+ * while the texts stay unchanged. The final actions open `BulkFinalDialog`; they have no Undo. "Start a round…"
+ * (issue 336 step 3) gives the submitted annotations a new work round in `BulkTaskDialog`, also without Undo.
  * The bar floats at the bottom of the viewport over the content (`useFloatingBar`): its arrival never moves the
  * table; the page reserves its height as bottom padding. Its place in the DOM keeps the focus order.
  */
@@ -154,7 +155,7 @@ export function SelectionBar({
   const current = summary?.key === idsKey + filtersKey ? summary.value : null;
 
   /** Per bulk action, its broadest preview for the selection: an entry without changes is unavailable (336-C). */
-  const [reach, setReach] = useState<{ key: string; reopen: BulkTaskActionView | null; withdraw: BulkTaskActionView | null; accept: FinalPreview | null; change: FinalPreview | null } | null>(null);
+  const [reach, setReach] = useState<{ key: string; reopen: BulkTaskActionView | null; withdraw: BulkTaskActionView | null; start_round: BulkTaskActionView | null; accept: FinalPreview | null; change: FinalPreview | null } | null>(null);
   const [bulk, setBulk] = useState<BulkAction | null>(null);
   const [finalAction, setFinalAction] = useState<FinalAction | null>(null);
   useEffect(() => {
@@ -170,7 +171,9 @@ export function SelectionBar({
         quiet(api.bulkWithdraw(projectKey, { rows, ...BROAD, include_started: true }, abort.signal)),
         quiet(api.acceptAgreeing(projectKey, { rows, preview: true }, abort.signal).then((data): FinalPreview => ({ action: "accept", data }))),
         quiet(api.bulkChangeFinal(projectKey, { rows, preview: true, summary_only: true }, abort.signal).then((data): FinalPreview => ({ action: "change", data }))),
-      ]).then(([reopen, withdraw, accept, change]) => { if (active) setReach({ key, reopen, withdraw, accept, change }); });
+        // Continuing reaches every task a restart reaches.
+        quiet(api.bulkStartRound(projectKey, { rows, kind: "carry_forward", preview: true, summary_only: true }, abort.signal)),
+      ]).then(([reopen, withdraw, accept, change, start_round]) => { if (active) setReach({ key, reopen, withdraw, start_round, accept, change }); });
     }, SUMMARY_DELAY_MS);
     return () => { active = false; window.clearTimeout(timer); abort.abort(); };
     // The key stands for the selection.
@@ -253,7 +256,7 @@ export function SelectionBar({
         onAction: () => {
           latest.current.onAnnounce("Saving…");
           api.bulkUndo(projectKey, undoToken.id).then(() => {
-            const done = result.action === "reopen" ? "The reopened tasks are submitted again." : "The withdrawn tasks are back.";
+            const done = result.action !== "withdraw" ? "The reopened tasks are submitted again." : "The withdrawn tasks are back.";
             latest.current.onAnnounce(done);
             latest.current.showToast({ message: done });
             latest.current.onChanged();
@@ -315,6 +318,10 @@ export function SelectionBar({
               ...(["accept", "change"] as const).map(action => {
                 const reason = finalUnavailableReason(reachable?.[action]);
                 return { id: action, label: FINAL_ACTION_LABELS[action], disabled: reason !== null, ...(reason ? { description: reason } : {}), onSelect: () => setFinalAction(action) };
+              }),
+              ...(["start_round"] as const).map(action => {
+                const reason = unavailableReason(action, reachable?.[action]);
+                return { id: action, label: ACTION_LABELS[action], disabled: reason !== null, ...(reason ? { description: reason } : {}), onSelect: () => setBulk(action) };
               }),
             ]} />
           <Button ref={frontButton} aria-expanded={front} onClick={() => setFront(value => !value)}>{MOVE_TO_FRONT}</Button>

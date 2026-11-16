@@ -555,3 +555,43 @@ async def test_withdraw_open_tasks_answers_a_stale_token_with_a_fresh_dry_run(
     assert result["stale"] is True and result["preview_token"] == "sha256:b"
     [post] = fake.calls_to("POST", BULK_WITHDRAW)
     assert post.json()["over_limit_only"] is True
+
+
+BULK_START_ROUND = f"{P}/bulk-task-actions/start-round"
+
+
+async def test_start_rounds_dry_run_confirm_and_stale_token(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    texts = [{"case_id": "c1", "language": "en"}]
+    preview = _bulk("start_round", "sha256:a", kind="clean_restart")
+    fake.on("POST", BULK_START_ROUND, preview)
+    args = {"project": "p", "texts": texts, "kind": "clean_restart"}
+    dry = await call(mcp_client, "start_rounds", args)
+    assert dry["applied"] is False and dry["preview_token"] == "sha256:a"
+    assert dry["would_change"][0]["person"] == "Tom Reis"
+    [post] = fake.calls_to("POST", BULK_START_ROUND)
+    assert post.json() == {"rows": texts, "kind": "clean_restart", "preview": True}
+    # A restart is not confirmed without a reason, nor without the token.
+    for extra in ({"preview_token": "sha256:a"}, {"reason": "New tool set"}):
+        with pytest.raises(ToolFailed):
+            await call(mcp_client, "start_rounds", args | {"confirm": True} | extra)
+    assert len(fake.calls_to("POST", BULK_START_ROUND)) == 1
+    confirmed = args | {
+        "confirm": True,
+        "reason": "New tool set",
+        "preview_token": "sha256:a",
+    }
+    fake.on("POST", BULK_START_ROUND, preview | {"applied": True})
+    done = await call(mcp_client, "start_rounds", confirmed)
+    assert done["applied"] is True and done["change_count"] == 1
+    assert fake.calls_to("POST", BULK_START_ROUND)[-1].json() == {
+        "rows": texts,
+        "kind": "clean_restart",
+        "reason": "New tool set",
+        "preview_token": "sha256:a",
+    }
+    fresh = _bulk("start_round", "sha256:b", kind="clean_restart")
+    fake.on("POST", BULK_START_ROUND, refusal(409, "PREVIEW_STALE", {"preview": fresh}))
+    stale = await call(mcp_client, "start_rounds", confirmed)
+    assert stale["stale"] is True and stale["preview_token"] == "sha256:b"
