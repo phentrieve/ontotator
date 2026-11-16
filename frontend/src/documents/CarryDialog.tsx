@@ -77,6 +77,15 @@ export function CarryDialog(props: CarryDialogProps): JSX.Element {
   const [retryCarry, setRetryCarry] = useState<(() => void) | null>(null);
   const [confirming, setConfirming] = useState<"language" | "unreviewed" | null>(null);
   const [confirmedLanguage, setConfirmedLanguage] = useState(false);
+  // The footer Retry leaves while its request runs: focus waits on the busy Assign, then goes to the new Retry (issue 419).
+  const assignButton = useRef<HTMLButtonElement>(null);
+  const footerRetry = useRef<HTMLButtonElement>(null);
+  const retryFocus = useRef(false);
+  useEffect(() => {
+    if (!retryFocus.current || busy) return;
+    retryFocus.current = false;
+    if (document.activeElement === assignButton.current) footerRetry.current?.focus();
+  }, [busy, retryCarry]);
   const writing = useRef(false);
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
@@ -141,10 +150,11 @@ export function CarryDialog(props: CarryDialogProps): JSX.Element {
   ];
 
   return <Dialog open size="sm" title={carryTitle(to, textLabel(row))} onClose={busy ? undefined : props.onClose} footer={<>
-    {failure && <p className="text-change-error" role="alert">{failure}{retryCarry && <>{" "}<Button size="sm" disabled={busy} onClick={retryCarry}>Retry</Button></>}</p>}
+    {failure && <p className="text-change-error" role="alert">{failure}{retryCarry && <>{" "}<Button ref={footerRetry} size="sm" disabled={busy}
+      onClick={() => { retryFocus.current = true; assignButton.current?.focus(); retryCarry(); }}>Retry</Button></>}</p>}
     {reason && <span id={reasonId} className="dialog-footer-reason">{reason}</span>}
     <Button disabled={busy} onClick={props.onClose}>Cancel</Button>
-    <Button variant="primary" loading={busy} aria-disabled={reason ? "true" : undefined} aria-describedby={reason ? reasonId : undefined}
+    <Button ref={assignButton} variant="primary" loading={busy} aria-disabled={reason ? "true" : undefined} aria-describedby={reason ? reasonId : undefined}
       onClick={() => { void carry(false); }}>Assign</Button>
   </>}>
     <div className="text-change-dialog" ref={body}>

@@ -67,7 +67,11 @@ export function useConsolidation(roundId: string, options: { workspaceView?: Wor
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
-  const apply = (value: ConsolidationView) => { revision.current = value.draft_revision; setView(value); };
+  // The last view read from the server, before React renders it: a command's caller picks from the refreshed view (issue 375).
+  const latest = useRef<ConsolidationView | null>(null);
+  const apply = (value: ConsolidationView) => { revision.current = value.draft_revision; latest.current = value; setView(value); };
+  /** The view after the last read, also while its render is still pending. */
+  const latestView = useCallback(() => latest.current, []);
 
   useEffect(() => {
     let active = true;
@@ -189,7 +193,7 @@ export function useConsolidation(roundId: string, options: { workspaceView?: Wor
 
   const dismissOutcome = useCallback((groupId: string) => setOutcomes(current => { const next = { ...current }; delete next[groupId]; return next; }), []);
 
-  return { view, error, refreshError, workspace, draft, busy, outcomes, reload, refresh, resolve, annotate, reopen, reopenAll, undoReopenAll, addFinding, setAddedValues, submit, dismissOutcome };
+  return { view, latestView, error, refreshError, workspace, draft, busy, outcomes, reload, refresh, resolve, annotate, reopen, reopenAll, undoReopenAll, addFinding, setAddedValues, submit, dismissOutcome };
 }
 
 export type ConsolidationData = ReturnType<typeof useConsolidation>;

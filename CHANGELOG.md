@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Consolidation: after **Reopen all decisions…** the first open group in text order opens, not the group that was first open before the reopen (#375).
+- Text-change dialogs: in **Handle text change…** a Retry while the new version has no proposals keeps the reason, the disabled **Move** and **Finish** and the current choice until the answer arrives, so **Move** no longer flashes selected; Retry shows busy and keeps focus. In **Carry to v2…** the footer Retry after a failed **Assign** keeps focus in the dialog (on the busy **Assign**, then on the new Retry) (#419).
+- Documents: a regression test covers **Select all N filtered texts** with a filter and hidden texts not in plan; it counts and selects only the rows the table can show (#379, fixed in 0.10.0 by #383).
 - MCP: a second translation review of an accepted translation is easier to find. `request_translation_correction` now says what it does: a new translation review (a correction or a second opinion) of an **accepted** version, however it was accepted, by any translation reviewer, with a reason. `assign_texts` with `task: review_accepted_translation` covers versions accepted by a lead or an import override; for a version without such an acceptance (accepted only by a translation review, or marked reviewed in its import package) it now refuses with `NOT_A_TRANSLATION` and `reason: accepted_by_review` and a hint naming `request_translation_correction` (**Request correction…** in the web interface). Refused rows of `POST /projects/{key}/assignments` and of `ASSIGNMENT_BATCH_REFUSED` have a new optional `reason` field (#409).
 
 ## [0.10.2] - 2026-11-14
