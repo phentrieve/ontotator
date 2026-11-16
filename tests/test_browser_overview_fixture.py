@@ -411,13 +411,26 @@ SCENARIO_TABLE: dict[str, dict[tuple[str, str], Expect]] = {
         )
         for case in ("case-173", "case-174")
     },
+    # Issue 420: the v1 submission carried to v2 counts neither as submitted
+    # nor as a second annotator; the server sends no counts (one per text).
+    "S18": {
+        ("case-118", "de"): Expect(
+            ACCEPTED,
+            ("in_progress", "running"),
+            NONE,
+            ANA,
+            None,
+            {"annotation": {"people": [ANA], "submitted": None, "total": None}},
+        ),
+    },
 }
-# The Text cell's marker "v2 corrected" (scenarios 12 to 15).
+# The Text cell's marker "v2 corrected" (scenarios 12 to 15 and 18).
 MARKERS = {
     ("S12", "case-112", "de"): {"kind": "corrected", "version": 2},
     ("S13", "case-113", "de"): {"kind": "corrected", "version": 2},
     ("S14", "case-114", "de"): {"kind": "corrected", "version": 2},
     ("S15", "case-115", "en"): {"kind": "corrected", "version": 2},
+    ("S18", "case-118", "de"): {"kind": "corrected", "version": 2},
 }
 
 
@@ -431,7 +444,7 @@ def cell_detail(cell: dict[str, Any], expected: dict[str, Any]) -> dict[str, Any
 
 def test_registry_and_unknown_names(client):
     assert set(BUILDERS) == {
-        *(f"S{n}" for n in range(1, 18) if n != 7),
+        *(f"S{n}" for n in range(1, 19) if n != 7),
         "S7a",
         "S7b",
         "WALKTHROUGH",

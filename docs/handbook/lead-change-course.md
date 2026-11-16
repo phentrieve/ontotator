@@ -75,7 +75,7 @@ The text card shows which set a text's tasks work on: **Annotation** names it, f
    Without a report, restart the task through the API or the MCP server: `POST /api/v1/assignments/{id}/rounds` with `kind` `clean_restart` and a `reason` (scope `project-admin`), or the MCP tool `start_new_round` with `kind` `clean_restart`, a `reason` and, after its dry run, `confirm`. The task ID is in the text card's **Details**. The current round and its draft are dropped; submitted work stays in the history. Afterwards the card names the newest set and *Newer set available* is gone once every task of the text is on it.
 4. To restart the whole text instead: open the text card, click **Annotation** and click **Change mode…**. Enter the **Reason** and click **Discard work and change mode** (or **Change mode**). The text is now from scratch, and the work on the whole text is discarded, submitted work included; the assignments are removed ([Change the annotation mode of one text](lead-documents.md#change-the-annotation-mode-of-one-text)). Then choose **From proposals** under **Annotation** and assign the text again.
 
-For a text with a final result this is not possible: **Change mode…** is refused with *A final result was chosen for this text, so its annotation mode stays.*
+For a text with a final result this is not possible: **Change mode…** is refused with *A final result was chosen for this text, so its annotation mode stays.* (error code `ANNOTATION_MODE_FINAL_SELECTED`). A final result cannot be withdrawn; to annotate such a text again, add annotators as in [More annotators on finished texts](#more-annotators-on-finished-texts).
 
 ### More annotators on finished texts
 

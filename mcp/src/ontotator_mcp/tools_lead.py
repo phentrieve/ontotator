@@ -378,12 +378,16 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
         reason: Annotated[str, Field(min_length=1)],
         confirm_language: bool = False,
     ) -> dict[str, Any]:
-        """Ask a translation reviewer to correct a rejected or queried translation.
+        """Ask for a new translation review of an accepted translation version.
 
-        Gives the person a translation review task on this version; an
-        earlier submitted review of theirs is reopened with the current
-        text (the submitted review stays). The correction itself is done
-        in the web interface.
+        For a correction or a second opinion of a version that is accepted,
+        however it was accepted (by a translation review, by a lead, or on
+        import); any translation reviewer, with a reason. A version that is
+        not accepted is refused (TRANSLATION_NOT_ACCEPTED). Gives the person a
+        translation review task on this version; an earlier submitted review
+        of theirs is reopened with the current text (the submitted review
+        stays). The review itself is done in the web interface. For a
+        rejected or queried translation, use start_lead_correction.
         """
         variant = await _variant(project, document_id)
         task: dict[str, Any] = await api.post(

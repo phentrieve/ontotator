@@ -367,6 +367,7 @@ def test_commit_is_all_or_nothing_on_refusal(env):
             "document_id": de(CASES[4]),
             "username": "ben",
             "code": "ADJUDICATOR_IS_ANNOTATOR",
+            "reason": None,
         }
     ]
     assert assignment_count(env) == before
@@ -596,6 +597,49 @@ def test_review_accepted_translation_targets_externally_accepted_rows_only(env):
     with env.db.transaction() as conn:
         flags = store.effective_plan(conn, env.pid, [CASES[0]])
     assert flags[RowKey(CASES[0], "de")] == BOTH
+
+
+def test_batch_refusal_carries_the_reason(env, monkeypatch):
+    """A refusal between preview and commit names its reason like the single
+    assignment (issue 409)."""
+    from ontotator.application import work_plans
+    from ontotator.domain.errors import DomainError
+
+    lead = env.app.state.accounts.get_by_username("leader")
+    set_status(env, "accepted", CASES[0])
+    plan(env, ANNOTATE, CASES[0])
+    with env.db.transaction() as conn:
+        store.add_acceptance(
+            conn,
+            env.pid,
+            de(CASES[0]),
+            source="lead",
+            reason="checked externally",
+            accepted_by=lead.id,
+        )
+
+    def refuse(*_: Any) -> bool:
+        raise DomainError("NOT_A_TRANSLATION", {"reason": "accepted_by_review"})
+
+    monkeypatch.setattr(work_plans, "enable_review_for_accepted", refuse)
+    response = commit(
+        env,
+        "translation_review",
+        case_ids=CASES[:1],
+        review_accepted_translation=True,
+        usernames=["ana"],
+    )
+    assert response.status_code == 409, response.text
+    assert response.json()["details"]["refused"] == [
+        {
+            "case_id": CASES[0],
+            "language": "de",
+            "document_id": de(CASES[0]),
+            "username": "ana",
+            "code": "NOT_A_TRANSLATION",
+            "reason": "accepted_by_review",
+        }
+    ]
 
 
 def test_review_accepted_translation_skips_versions_with_a_correction(env, tmp_path):

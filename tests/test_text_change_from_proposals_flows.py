@@ -14,6 +14,7 @@ import zipfile
 from typing import Any
 from uuid import uuid4
 
+import pytest
 from proposal_check_support import BASE, assign, client, open_task, proposal_env
 from test_text_change_from_proposals import (
     NEW_WORD,
@@ -27,6 +28,8 @@ from test_text_change_from_proposals import (
     _run_reanchor_jobs,
     _submit_task,
 )
+
+from ontotator.auth.audit import Actor
 
 AXES = {"assertion": "present", "experiencer": "patient", "temporality": "current"}
 
@@ -348,22 +351,23 @@ def test_corrections_added_and_unresolved_work_is_carried_and_exported(tmp_path)
         new["a3"].annotation.annotation_id: "uncertain",
         added["annotation"]["annotation_id"]: "carried",
     }
-    # The carried submission is counted for the tool of v2's proposals (the
-    # re-anchor job's set); the v1 submission for the original tool.
+    # The carried submission is counted for the tool that produced the
+    # proposals, as the v1 submission is: v2's re-anchored set keeps the
+    # original tool, no re-anchor pseudo-tool appears (#417).
     person = opened["view"]["key"]["annotator_id"]
+    assert {r["tool"] for r in exported["proposals"]} == {"test-tool"}
     [row] = [
         r
         for r in exported["proposals"]
-        if r["row_type"] == "annotator"
-        and r["pseudonym"] == person
-        and r["tool"] == "ontotator-reanchor"
+        if r["row_type"] == "annotator" and r["pseudonym"] == person
     ]
-    assert (row["submissions"], row["changed"], row["uncertain"], row["added"]) == (
-        "1",
-        "1",
-        "1",
-        "1",
-    )
+    assert (
+        row["submissions"],
+        row["confirmed"],
+        row["changed"],
+        row["uncertain"],
+        row["added"],
+    ) == ("2", "1", "2", "2", "2")
     # The Unresolved proposal is no finding of the person: 2 final findings.
     sources = [r for r in exported["proposals"] if r["row_type"] == "source"]
     assert sources and {r["final_findings"] for r in sources} == {"2"}
@@ -561,3 +565,149 @@ def _newest_c1(env: Any) -> str:
                 .limit(1)
             ).scalar_one()
         )
+
+
+def _open_check_with_unresolved(env: Any, note: str) -> int:
+    """An open proposal check on c1: p1 accepted, p2 Unresolved with ``note``
+    (its passage changes: no counterpart on v2), p3 rejected. Returns the
+    assignment ID."""
+    work = assign(env, env.c1, "anno")
+    opened = open_task(env, "anno", work["id"])
+    old = {_local(s): s for s in _proposals(env, env.c1)}
+    revision = int(opened["view"]["draft"]["revision"])
+    for local, payload in [
+        ("p1", {"outcome": "confirmed"}),
+        ("p2", {"outcome": "uncertain", "note": note}),
+        ("p3", {"outcome": "rejected"}),
+    ]:
+        revision = _post(
+            env,
+            "anno",
+            opened["workspace_id"],
+            "decisions",
+            _envelope(revision, {"target": _ref(old[local]), **payload}),
+        )["revision"]
+    return int(work["id"])
+
+
+def test_moved_open_work_keeps_the_unresolved_note_through_a_package(tmp_path):
+    """Issue 418: the note of an Unresolved proposal without counterpart is
+    stored with the round input of moved open work, so it survives a package
+    round trip, whose archived round has no frozen draft to read it from."""
+    from pg_harness import database_for
+    from sqlalchemy import select
+    from test_text_change_from_proposals import _move
+
+    from ontotator.application import round_reads
+    from ontotator.storage.repository import Repository
+    from ontotator.storage.workflow_tables import RoundInputRow
+
+    note = "is this the neonatal period?"
+    env = proposal_env(tmp_path)
+    assignment_id = _open_check_with_unresolved(env, note)
+    v2 = _correction_of_c1(env)
+    _run_reanchor_jobs(env)
+    moved = _move(env, assignment_id, v2)
+    assert moved.status_code == 200, moved.text
+    opened, inputs = _carried_round(env, "anno", v2)
+    [item] = inputs
+    assert (item["mapping_status"], item["unresolved_note"]) == ("needs_review", note)
+    assert item["source_draft_snapshot_id"] is not None
+    round_id = opened["view"]["key"]["round_id"]
+    # Stored with the input, not only read from the frozen draft.
+    with env.db.transaction() as conn:
+        [stored] = conn.execute(
+            select(RoundInputRow.payload).where(RoundInputRow.round_id == round_id)
+        ).scalars()
+    assert stored["unresolved_note"] == note
+
+    package = env.app.state.repo.export_package("proj")
+    archived = package.manifest.workflow_history[round_id]
+    # Beside the inputs, which keep the shape older readers accept.
+    assert archived["unresolved_notes"] == {item["input_id"]: note}
+    assert all("unresolved_note" not in i for i in archived["inputs"])
+    target = Repository(database_for(tmp_path / "imported.db"))
+    target.import_package(package)
+    items = target.get_round_input_inventory("proj", round_id)
+    [read] = round_reads.enrich_inputs(target, "proj", items)
+    assert (read.mapping_status, read.unresolved_note) == ("needs_review", note)
+
+    # An older package without the map still imports, without the note.
+    def with_history(package_id: str, entry: dict[str, Any]) -> Any:
+        history = dict(package.manifest.workflow_history) | {round_id: entry}
+        return package.model_copy(
+            update={
+                "manifest": package.manifest.model_copy(
+                    update={"package_id": package_id, "workflow_history": history}
+                )
+            }
+        )
+
+    older = {k: v for k, v in archived.items() if k != "unresolved_notes"}
+    other = Repository(database_for(tmp_path / "older.db"))
+    other.import_package(with_history("older", older))
+    [old] = round_reads.enrich_inputs(
+        other, "older", other.get_round_input_inventory("older", round_id)
+    )
+    assert (old.mapping_status, old.unresolved_note) == ("needs_review", None)
+    # A note for an input the round does not have is refused.
+    bad = with_history("bad", archived | {"unresolved_notes": {"no-such": note}})
+    with pytest.raises(ValueError, match="Unresolved notes"):
+        type(package).model_validate(bad.model_dump() | {"manifest": bad.manifest})
+
+
+def test_open_work_moved_after_a_project_archive_import_keeps_its_note(tmp_path):
+    """Issue 418: an open proposal check with an Unresolved decision without
+    counterpart, archived and imported as a new project, then moved to v2,
+    still shows the note on its Check needed item."""
+    from sqlalchemy import select
+
+    from ontotator.exchange import archive as project_archive
+    from ontotator.storage.tables import AssignmentRow, DocumentRow, ProjectRow
+
+    note = "is this the neonatal period?"
+    env = proposal_env(tmp_path)
+    _open_check_with_unresolved(env, note)
+    _correction_of_c1(env)
+    _run_reanchor_jobs(env)
+    built = project_archive.build_archive(env.db, "proj", tmp_path / "proj.zip")
+    imported = project_archive.import_archive(
+        env.db, Actor.cli(), built.path.read_bytes()
+    )
+    key = imported["project"]
+    assert key != "proj"
+    with env.db.transaction() as conn:
+        pid = conn.execute(
+            select(ProjectRow.id).where(ProjectRow.project_key == key)
+        ).scalar_one()
+        v2 = conn.execute(
+            select(DocumentRow.document_id).where(
+                DocumentRow.project_id == pid,
+                DocumentRow.case_id == "c1",
+                DocumentRow.version == 2,
+            )
+        ).scalar_one()
+        work = conn.execute(
+            select(AssignmentRow.id, AssignmentRow.workflow_revision).where(
+                AssignmentRow.project_id == pid,
+                AssignmentRow.task == "annotate",
+                AssignmentRow.revoked_at.is_(None),
+            )
+        ).one()
+    moved = env.lead.post(
+        f"/api/v1/assignments/{work.id}/move-to-version",
+        json={
+            "target_document_id": v2,
+            "expected_workflow_revision": work.workflow_revision,
+            "request_id": f"move-{uuid4().hex}",
+        },
+    )
+    assert moved.status_code == 200, moved.text
+    new_id = moved.json()["assignment"]["id"]
+    opened = open_task(env, "anno", new_id)
+    inputs = client(env, "anno").get(
+        f"/api/v1/rounds/{opened['view']['key']['round_id']}/inputs"
+    )
+    assert inputs.status_code == 200, inputs.text
+    [item] = inputs.json()
+    assert (item["mapping_status"], item["unresolved_note"]) == ("needs_review", note)

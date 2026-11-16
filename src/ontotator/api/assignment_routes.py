@@ -223,6 +223,9 @@ class AssignRequest(BaseModel):
 
 class RefusedAssignment(AssignmentRowRequest):
     code: str
+    # The refusal's ``details.reason`` when it has one, e.g. ``accepted_by_review``
+    # for ``NOT_A_TRANSLATION`` (issue 409: use the translation correction).
+    reason: str | None = None
 
 
 class AssignResponse(BaseModel):
@@ -416,7 +419,16 @@ def assign(
                 )
             )
         except DomainError as exc:
-            refused.append(RefusedAssignment(**row.model_dump(), code=exc.code))
+            reason = (
+                exc.details.get("reason") if isinstance(exc.details, dict) else None
+            )
+            refused.append(
+                RefusedAssignment(
+                    **row.model_dump(),
+                    code=exc.code,
+                    reason=reason if isinstance(reason, str) else None,
+                )
+            )
     return AssignResponse(created=_views(request, created), refused=refused)
 
 
