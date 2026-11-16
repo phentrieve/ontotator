@@ -27,6 +27,7 @@ __all__ = [
     "text_documents",
     "text_row",
     "text_target_document",
+    "text_target_documents",
     "text_translation_statuses",
 ]
 
@@ -116,6 +117,50 @@ def text_target_document(conn: Connection, project_id: int, row: TextRow) -> str
         key=lambda c: (-1 if c.root.position is None else c.root.position, c.root_id),
     )
     return _target(latest).document_id
+
+
+def text_target_documents(
+    conn: Connection, project_id: int, rows: Collection[RowKey]
+) -> dict[RowKey, str]:
+    """``text_target_document`` of each of ``rows`` (a text without a live
+    version is absent); two queries, however many texts."""
+    if not rows:
+        return {}
+    chains = {
+        row: found
+        for row, found in _chains(
+            conn, project_id, sorted({row.case_id for row in rows})
+        ).items()
+        if row in rows
+    }
+    discarded = set(
+        conn.execute(
+            select(DiscardedVariantRow.document_id).where(
+                DiscardedVariantRow.project_id == project_id,
+                DiscardedVariantRow.document_id.in_(
+                    [
+                        v.document_id
+                        for found in chains.values()
+                        for c in found
+                        for v in c.versions
+                    ]
+                ),
+            )
+        ).scalars()
+    )
+    targets: dict[RowKey, str] = {}
+    for row, found in chains.items():
+        live = _live(found, discarded)
+        if live:
+            latest = max(
+                live,
+                key=lambda c: (
+                    -1 if c.root.position is None else c.root.position,
+                    c.root_id,
+                ),
+            )
+            targets[row] = _target(latest).document_id
+    return targets
 
 
 def finished_translation_documents(

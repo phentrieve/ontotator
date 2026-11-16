@@ -36,7 +36,7 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
     const more = bar.getByRole("button", { name: "More actions" });
     await more.click();
     const menu = page.getByRole("menu", { name: "More actions" });
-    await expect(menu.getByRole("menuitem")).toHaveText(["Reopen…", "Withdraw open tasks…", /^Accept agreeing results…/, /^Change final…/, /^Start a round…/]);
+    await expect(menu.getByRole("menuitem")).toHaveText(["Reopen…", "Withdraw open tasks…", /^Accept agreeing results…/, /^Change final…/, /^Start a round…/, /^Change mode…/]);
     await expect(menu.getByRole("menuitem", { name: "Reopen…" })).not.toHaveAttribute("aria-disabled", "true");
     expect(await noHorizontalScroll(page)).toBe(true);
     await shot(page, `336-menu-after${suffix}`);

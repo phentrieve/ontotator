@@ -7125,6 +7125,61 @@
         "x-ontotator-project-token": true
       }
     },
+    "/api/v1/projects/{key}/annotation-mode-changes/bulk": {
+      "post": {
+        "tags": [
+          "annotation-mode-changes"
+        ],
+        "summary": "Bulk Change Mode",
+        "description": "Change the annotation mode of many texts (issue 336, step 4).\n\nEach text is changed as ``POST annotation-mode-changes`` changes one: its\nlive submissions are marked discarded, its live annotate and review\nassignments are revoked and the mode is stored. ``preview: true`` lists,\nper text, the submissions and assignments with their people, the texts\nleft as they are with the reason (the single change's refusals; a text\nwith a final result: withdraw it first) and a ``preview_token``. Applying\nsends that token and a ``reason``: every listed text changes, or none\n(409 ``PREVIEW_STALE`` with a fresh ``preview`` in the details when\nanything changed). Each text is audited like a single change\n(``annotation_mode.change``, ``via: bulk_change_mode``) and can be\nrestored on its own (``.../{change_id}/restore``); there is no bulk undo.",
+        "operationId": "bulk_change_mode_api_v1_projects__key__annotation_mode_changes_bulk_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkModeChangeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkModeChangeView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
     "/api/v1/projects/{key}/documents/{doc}/translation-correction-assignment": {
       "post": {
         "tags": [
@@ -14490,6 +14545,178 @@
           "message"
         ],
         "title": "BulkKeptTaskView"
+      },
+      "BulkModeChangeRequest": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowRefView"
+            },
+            "type": "array",
+            "maxItems": 200000,
+            "minItems": 1,
+            "title": "Rows"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "proposals",
+              "scratch"
+            ],
+            "title": "Mode"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "preview": {
+            "type": "boolean",
+            "title": "Preview"
+          },
+          "summary_only": {
+            "type": "boolean",
+            "title": "Summary Only"
+          },
+          "preview_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Token"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rows",
+          "mode"
+        ],
+        "title": "BulkModeChangeRequest",
+        "description": "Change the annotation mode of the selected texts. ``reason`` is\nrequired to apply."
+      },
+      "BulkModeChangeView": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "proposals",
+              "scratch"
+            ],
+            "title": "Mode"
+          },
+          "applied": {
+            "type": "boolean",
+            "title": "Applied"
+          },
+          "texts": {
+            "type": "integer",
+            "title": "Texts"
+          },
+          "change_count": {
+            "type": "integer",
+            "title": "Change Count"
+          },
+          "skipped_count": {
+            "type": "integer",
+            "title": "Skipped Count"
+          },
+          "skipped_by_reason": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Skipped By Reason"
+          },
+          "submission_count": {
+            "type": "integer",
+            "title": "Submission Count"
+          },
+          "assignment_count": {
+            "type": "integer",
+            "title": "Assignment Count"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ModeChangePreview"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/BulkModeSkippedView"
+            },
+            "type": "array",
+            "title": "Skipped"
+          },
+          "preview_token": {
+            "type": "string",
+            "title": "Preview Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode",
+          "applied",
+          "texts",
+          "change_count",
+          "skipped_count",
+          "skipped_by_reason",
+          "submission_count",
+          "assignment_count",
+          "changes",
+          "skipped",
+          "preview_token"
+        ],
+        "title": "BulkModeChangeView"
+      },
+      "BulkModeSkippedView": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "no_current_version",
+              "not_locked",
+              "unchanged",
+              "no_proposals",
+              "final_result"
+            ],
+            "title": "Reason"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "reason",
+          "message"
+        ],
+        "title": "BulkModeSkippedView"
       },
       "BulkPlanRequest": {
         "properties": {

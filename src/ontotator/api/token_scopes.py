@@ -201,6 +201,7 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     ("GET", f"{P}/annotation-mode-changes"): "read",
     ("POST", f"{P}/annotation-mode-changes"): "project-admin",
     ("POST", f"{P}/annotation-mode-changes/preview"): "project-admin",
+    ("POST", f"{P}/annotation-mode-changes/bulk"): "project-admin",
     ("POST", f"{P}/annotation-mode-changes/{{change_id}}/restore"): "project-admin",
     ("POST", f"{P}/consolidations"): "project-admin",
     ("POST", f"{P}/submissions/{{submission_id:path}}/carry"): "project-admin",

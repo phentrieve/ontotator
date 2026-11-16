@@ -14,11 +14,12 @@
  * menu, unavailable, with its reason. The task actions open `BulkTaskDialog`; after one applies, the toast offers Undo
  * while the texts stay unchanged. The final actions open `BulkFinalDialog`; they have no Undo. "Start a round…"
  * (issue 336 step 3) gives the submitted annotations a new work round in `BulkTaskDialog`, also without Undo.
+ * "Change mode…" (step 4) changes the annotation mode of the texts in `BulkModeDialog`; each text is restored in its card.
  * The bar floats at the bottom of the viewport over the content (`useFloatingBar`): its arrival never moves the
  * table; the page reserves its height as bottom padding. Its place in the DOM keeps the focus order.
  */
 import { useEffect, useId, useRef, useState } from "react";
-import { api, type BulkResult, type BulkTaskActionView, type ConsequencesView, type DocumentRowFilters, type RowRefView, type SelectionSummary, type UndoView } from "../api/client";
+import { api, type BulkModeChangeView, type BulkResult, type BulkTaskActionView, type ConsequencesView, type DocumentRowFilters, type RowRefView, type SelectionSummary, type UndoView } from "../api/client";
 import { ErrorNotice } from "../admin/ErrorNotice";
 import { errorMessage } from "../admin/errors";
 import { plural } from "../app/labels";
@@ -26,6 +27,8 @@ import { Button, Checkbox, IconSortDown, InlineConfirm, InlineMessage, MenuButto
 import { ACTION_LABELS, appliedText, unavailableReason, type BulkAction } from "./bulkActionModel";
 import { BulkFinalDialog } from "./BulkFinalDialog";
 import { finalAppliedText, finalUnavailableReason, FINAL_ACTION_LABELS, type FinalAction, type FinalPreview } from "./bulkFinalModel";
+import { BulkModeDialog } from "./BulkModeDialog";
+import { modeAppliedText, modeUnavailableReason, MODE_ACTION_LABEL } from "./bulkModeModel";
 import { BulkTaskDialog } from "./BulkTaskDialog";
 import { PLAN_CHANGED_MESSAGE, UNDO_WITHDRAWN_NOTE, undoneToast, WITHDRAW_CHECKBOX, withdrawnSummary } from "./PlanChips";
 import { PlanDialog } from "./PlanDialog";
@@ -155,9 +158,10 @@ export function SelectionBar({
   const current = summary?.key === idsKey + filtersKey ? summary.value : null;
 
   /** Per bulk action, its broadest preview for the selection: an entry without changes is unavailable (336-C). */
-  const [reach, setReach] = useState<{ key: string; reopen: BulkTaskActionView | null; withdraw: BulkTaskActionView | null; start_round: BulkTaskActionView | null; accept: FinalPreview | null; change: FinalPreview | null } | null>(null);
+  const [reach, setReach] = useState<{ key: string; reopen: BulkTaskActionView | null; withdraw: BulkTaskActionView | null; start_round: BulkTaskActionView | null; scratch: BulkModeChangeView | null; proposals: BulkModeChangeView | null; accept: FinalPreview | null; change: FinalPreview | null } | null>(null);
   const [bulk, setBulk] = useState<BulkAction | null>(null);
   const [finalAction, setFinalAction] = useState<FinalAction | null>(null);
+  const [modeChange, setModeChange] = useState(false);
   useEffect(() => {
     if (rows.length < MIN_TEXTS) return;
     let active = true;
@@ -173,7 +177,10 @@ export function SelectionBar({
         quiet(api.bulkChangeFinal(projectKey, { rows, preview: true, summary_only: true }, abort.signal).then((data): FinalPreview => ({ action: "change", data }))),
         // Continuing reaches every task a restart reaches.
         quiet(api.bulkStartRound(projectKey, { rows, kind: "carry_forward", preview: true, summary_only: true }, abort.signal)),
-      ]).then(([reopen, withdraw, accept, change, start_round]) => { if (active) setReach({ key, reopen, withdraw, start_round, accept, change }); });
+        // One preview per mode: the entry acts when either changes a text.
+        quiet(api.bulkChangeMode(projectKey, { rows, mode: "scratch", preview: true, summary_only: true }, abort.signal)),
+        quiet(api.bulkChangeMode(projectKey, { rows, mode: "proposals", preview: true, summary_only: true }, abort.signal)),
+      ]).then(([reopen, withdraw, accept, change, start_round, scratch, proposals]) => { if (active) setReach({ key, reopen, withdraw, start_round, scratch, proposals, accept, change }); });
     }, SUMMARY_DELAY_MS);
     return () => { active = false; window.clearTimeout(timer); abort.abort(); };
     // The key stands for the selection.
@@ -280,6 +287,15 @@ export function SelectionBar({
     latest.current.onChanged();
   };
 
+  /** After a bulk mode change: the message (no Undo; each text is restored in its card), refetch, the selection stays. */
+  const modeApplied = (result: BulkModeChangeView) => {
+    setModeChange(false);
+    const message = modeAppliedText(result);
+    latest.current.onAnnounce(message);
+    latest.current.showToast({ message });
+    latest.current.onChanged();
+  };
+
   const moveToFront = () => {
     setFrontBusy(true); setError(undefined);
     api.moveToFront(projectKey, rows).then(result => {
@@ -295,7 +311,8 @@ export function SelectionBar({
 
   const visible = keys.size >= MIN_TEXTS || undoState !== null;
   useFloatingBar(section, visible);
-  if (!visible && !plan && !bulk && !finalAction) return null;
+  if (!visible && !plan && !bulk && !finalAction && !modeChange) return null;
+  const modeReason = modeUnavailableReason([reachable?.scratch, reachable?.proposals]);
   const withdrawing = undoState?.kind === "conflict" && undoState.consequences.withdrawn.length > 0;
 
   return <>
@@ -323,6 +340,7 @@ export function SelectionBar({
                 const reason = unavailableReason(action, reachable?.[action]);
                 return { id: action, label: ACTION_LABELS[action], disabled: reason !== null, ...(reason ? { description: reason } : {}), onSelect: () => setBulk(action) };
               }),
+              { id: "change_mode", label: MODE_ACTION_LABEL, disabled: modeReason !== null, ...(modeReason ? { description: modeReason } : {}), onSelect: () => setModeChange(true) },
             ]} />
           <Button ref={frontButton} aria-expanded={front} onClick={() => setFront(value => !value)}>{MOVE_TO_FRONT}</Button>
           <Button aria-pressed={showSelected} onClick={onToggleShowSelected}>Show selected</Button>
@@ -348,6 +366,8 @@ export function SelectionBar({
       </div>}
     </section>}
     {finalAction && <BulkFinalDialog projectKey={projectKey} action={finalAction} rows={rows} onClose={() => setFinalAction(null)} onApplied={finalApplied} />}
+    {modeChange && <BulkModeDialog projectKey={projectKey} rows={rows} onClose={() => setModeChange(false)} onApplied={modeApplied}
+      reach={reachable?.scratch && reachable.proposals ? { scratch: reachable.scratch.change_count, proposals: reachable.proposals.change_count } : undefined} />}
     {bulk && <BulkTaskDialog projectKey={projectKey} action={bulk} rows={rows} onClose={() => setBulk(null)} onApplied={bulkApplied} />}
     {plan && <PlanDialog projectKey={projectKey} caseIds={plan} rows={rows} onClose={() => setPlan(null)}
       onSaved={(result, message) => { setPlan(null); saved(result, message); }} />}
