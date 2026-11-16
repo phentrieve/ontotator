@@ -1,6 +1,6 @@
 """Lead-only Documents read API: grouped rows and per-row submissions."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Any, Literal, Self
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -88,6 +88,19 @@ class VersionDiscardView(_View):
     discarded_by: PersonRefView | None = None
 
 
+class VersionUploadView(_View):
+    """How a version uploaded from the text card was made (issue 341 a)."""
+
+    method: Literal["machine_translation", "human_translation", "manual_correction"]
+    provider: str | None = None
+    model: str | None = None
+    made_on: date | None = None
+    made_by: str | None = None
+    note: str | None = None
+    uploaded_at: datetime | None = None
+    uploaded_by: PersonRefView | None = None
+
+
 class DocumentVersionView(_View):
     document_id: str
     external_id: str
@@ -104,6 +117,7 @@ class DocumentVersionView(_View):
     last_activity_at: datetime | None
     acceptance: VersionAcceptanceView | None = None
     discarded: VersionDiscardView | None = None
+    upload: VersionUploadView | None = None
 
 
 class RowProposalSetView(_View):

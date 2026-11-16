@@ -690,6 +690,99 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
         )
         return {"applied": True, "result": result}
 
+    @register(server, scopes="project-admin", effect="changes")
+    async def upload_translation_version(
+        project: Project,
+        document_id: Annotated[
+            str,
+            Field(
+                description=(
+                    "The newest version of the translation (list_texts,"
+                    " versions); the new version follows it."
+                )
+            ),
+        ],
+        text: Annotated[
+            str, Field(min_length=1, description="The whole new text (UTF-8).")
+        ],
+        method: Annotated[
+            Literal["machine_translation", "human_translation", "manual_correction"],
+            Field(description="How the text was made."),
+        ],
+        provider: Annotated[
+            str | None,
+            Field(description="Required for machine_translation, e.g. 'DeepL'."),
+        ] = None,
+        model: Annotated[
+            str | None, Field(description="Model or tool, e.g. 'deepl-2026-10'.")
+        ] = None,
+        made_on: Annotated[
+            str | None, Field(description="Date the text was made, YYYY-MM-DD.")
+        ] = None,
+        made_by: Annotated[
+            str | None, Field(description="Person or group who made the text.")
+        ] = None,
+        note: Annotated[
+            str | None, Field(description="Free note (shown on the row).")
+        ] = None,
+        expected_previous_sha256: Annotated[
+            str | None,
+            Field(
+                description=(
+                    "With confirm: the text_sha256 the dry run returned, so the"
+                    " version that was compared is the version that is followed."
+                )
+            ),
+        ] = None,
+        confirm: Confirm = False,
+    ) -> dict[str, Any]:
+        """Upload a new version of one translation made elsewhere, after a dry run.
+
+        The text becomes the next version of the translation: always a
+        correction of document_id (the newest version of its translation),
+        ready for review, with Review on for the text. Nothing is accepted:
+        accept it afterwards with accept_translation_version, or assign a
+        translation review. The dry run says whether a version can follow
+        (reason if not: not_newest, discarded, review_open, unchanged),
+        which number it gets, how many annotations, open consolidations and
+        whether a final result stay on the current version (handle them with
+        the text-change tools), and the text_sha256 of the current version;
+        confirm sends that hash back as expected_previous_sha256 and is
+        refused if a newer version arrived since. A source text is not
+        uploaded here (import a package instead).
+        """
+        base = project_path(project, "variants", seg(document_id), "versions")
+        if not confirm:
+            plan: dict[str, Any] = await api.post(f"{base}/preview", {"text": text})
+            # The texts themselves are the caller's and the server's; the
+            # plan keeps what decides the upload.
+            stored = plan.pop("text", None) or ""
+            previous = plan.pop("previous_text", None) or ""
+            plan["text_characters"] = len(stored)
+            plan["previous_text_characters"] = len(previous)
+            return {"applied": False, "plan": plan}
+        if not expected_previous_sha256:
+            raise OntotatorError(
+                "Run the dry run first and pass its text_sha256 as"
+                " expected_previous_sha256."
+            )
+        body: dict[str, Any] = {
+            "text": text,
+            "expected_text_sha256": expected_previous_sha256,
+            "method": method,
+        }
+        for name, value in (
+            ("provider", provider),
+            ("model", model),
+            ("made_on", made_on),
+            ("made_by", made_by),
+            ("note", note),
+        ):
+            if value:
+                body[name] = value
+        result: dict[str, Any] = await api.post(base, body)
+        return {"applied": True, "result": result}
+
     @register(server, scopes=("read", "project-admin"), effect="destructive")
     async def discard_translation(
         project: Project,

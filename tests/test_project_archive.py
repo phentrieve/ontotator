@@ -929,6 +929,75 @@ def _text_overrides(db: Any, key: str) -> list[tuple[Any, ...]]:
         ]
 
 
+def test_an_uploaded_translation_version_round_trips(
+    servers: tuple[TestClient, TestClient], tmp_path: Path
+) -> None:
+    """Issue 341 a: the uploaded version and its upload record (how the text
+    was made, and the uploader mapped to their account) travel with the
+    archive."""
+    from ontotator.application.version_uploads import VersionUploadService, uploads
+    from ontotator.storage.tables import JobRow, UserRow
+
+    source, target = servers
+    built = _consolidation_project(source.app)  # type: ignore[arg-type]
+    scenario: Scenario = built["scenario"]
+    app: Any = source.app
+    lead = app.state.accounts.get_by_username(scenario.users["lead"])
+    previous = app.state.repo.get_variant(scenario.key, built["translation_id"])
+    saved = VersionUploadService(_db(source), app.state.jobs).upload(
+        Actor.user(lead.id, lead.username),
+        scenario.key,
+        previous.document_id,
+        text=GERMAN + " Neu übersetzt.",
+        expected_text_sha256=previous.text_sha256,
+        method="machine_translation",
+        provider="DeepL",
+        model="deepl-2026-10",
+        note="Checked against the source",
+    )
+    # The upload queued the re-anchoring of proposals; an archive waits for it.
+    with _db(source).snapshot() as conn:
+        (job_id,) = conn.execute(
+            select(JobRow.id).where(JobRow.kind == "reanchor")
+        ).scalars()
+    jobs = app.state.jobs
+    assert jobs.run(jobs.claim(job_id, "archive-test"), "archive-test").status == (
+        "succeeded"
+    )
+    data = _export(source, scenario.key, tmp_path)
+
+    result = project_archive.import_archive(_db(target), OPERATOR, data)
+
+    assert result["verification"]["ok"], result["verification"]
+    assert _counts(_db(target), scenario.key) == _counts(_db(source), scenario.key)
+
+    def record(client: TestClient) -> tuple[Any, ...]:
+        with _db(client).snapshot() as conn:
+            pid = conn.execute(
+                select(ProjectRow.id).where(ProjectRow.project_key == scenario.key)
+            ).scalar_one()
+            row = uploads(conn, pid)[saved["document_id"]]
+            uploader = conn.execute(
+                select(UserRow.pseudonym).where(UserRow.id == row["uploaded_by"])
+            ).scalar_one()
+        return (
+            row["method"],
+            row["provider"],
+            row["model"],
+            row["note"],
+            row["uploaded_at"],
+            uploader,
+        )
+
+    assert record(target) == record(source)
+    assert record(target)[:4] == (
+        "machine_translation",
+        "DeepL",
+        "deepl-2026-10",
+        "Checked against the source",
+    )
+
+
 def _set_override(db: Any, key: str) -> None:
     """The project's annotator gives the text its own value (a real person,
     so the import has to map ``updated_by``)."""

@@ -33,7 +33,7 @@ export function checkGuidelineFile(file: File): string | null {
   return null;
 }
 
-function readBytes(file: File): Promise<Uint8Array> {
+export function readBytes(file: File): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer));

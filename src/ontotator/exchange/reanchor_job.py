@@ -288,6 +288,14 @@ class ReviewProducer(BaseModel):
     review_id: StrictInt = Field(gt=0)
 
 
+class UploadProducer(BaseModel):
+    """A version uploaded from the text card (issue 341 a)."""
+
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["version_upload"] = "version_upload"
+    upload_id: StrictInt = Field(gt=0)
+
+
 class CorrectionPair(BaseModel):
     model_config = ConfigDict(extra="forbid")
     old_document_id: str = Field(min_length=1)
@@ -296,7 +304,9 @@ class CorrectionPair(BaseModel):
 
 class ReanchorPayload(CorrectionPair):
     project: str = Field(min_length=1)
-    producer: Annotated[ImportProducer | ReviewProducer, Field(discriminator="kind")]
+    producer: Annotated[
+        ImportProducer | ReviewProducer | UploadProducer, Field(discriminator="kind")
+    ]
 
 
 def enqueue_import_pairs(
@@ -382,6 +392,31 @@ def enqueue_review_pair(
     )
 
 
+def enqueue_upload_pair(
+    jobs: JobQueue,
+    project: str,
+    project_id: int,
+    old: str,
+    new: str,
+    upload_id: int,
+    actor: Actor,
+) -> int:
+    payload = ReanchorPayload(
+        project=project,
+        old_document_id=old,
+        new_document_id=new,
+        producer=UploadProducer(upload_id=upload_id),
+    )
+    # Part of the saved upload: never refused for the queue limit.
+    return jobs.enqueue(
+        "reanchor",
+        payload.model_dump(mode="json"),
+        project_id=project_id,
+        actor=actor,
+        queue_limit=False,
+    )
+
+
 @dataclass(frozen=True)
 class PairJob:
     job_id: int
@@ -450,6 +485,32 @@ def _authority(conn: Connection, pair: PairJob, project_id: int) -> None:
             raise DomainError("REANCHOR_PRODUCER_INVALID")
         if actor.user_id is None and not actor.label.startswith("cli:"):
             raise DomainError("NOT_ALLOWED")
+        require_project_management(
+            conn, actor, payload.project, project_id, Action.IMPORT_DOCUMENTS
+        )
+    elif isinstance(payload.producer, UploadProducer):
+        from ontotator.storage.plan_tables import TranslationVersionUploadRow
+
+        upload = conn.execute(
+            select(
+                TranslationVersionUploadRow.project_id,
+                TranslationVersionUploadRow.previous_document_id,
+                TranslationVersionUploadRow.document_id,
+                TranslationVersionUploadRow.uploaded_by,
+            ).where(TranslationVersionUploadRow.id == payload.producer.upload_id)
+        ).one_or_none()
+        if (
+            upload is None
+            or actor.user_id is None
+            or tuple(upload)
+            != (
+                project_id,
+                payload.old_document_id,
+                payload.new_document_id,
+                actor.user_id,
+            )
+        ):
+            raise DomainError("REANCHOR_PRODUCER_INVALID")
         require_project_management(
             conn, actor, payload.project, project_id, Action.IMPORT_DOCUMENTS
         )

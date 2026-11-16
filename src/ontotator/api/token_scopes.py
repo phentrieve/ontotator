@@ -146,6 +146,11 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     ("POST", f"{P}/variants/{{document_id:path}}/accept"): "project-admin",
     # Its dry run: only a token that may accept needs it.
     ("GET", f"{P}/variants/{{document_id:path}}/accept"): "project-admin",
+    # Issue 341 a: upload a new version of one translation; it adds a text
+    # (as an import) and is a lead's project work (as the acceptance above).
+    ("POST", f"{P}/variants/{{document_id:path}}/versions"): "project-admin",
+    # Its dry run: only a token that may upload needs it.
+    ("POST", f"{P}/variants/{{document_id:path}}/versions/preview"): "project-admin",
     ("GET", f"{P}/proposal-sets/{{set_id}}"): "read",
     ("GET", f"{P}/workflow-warnings"): "read",
     # Import

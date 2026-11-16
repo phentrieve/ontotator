@@ -357,6 +357,7 @@ VERSION_KEYS = {
     "last_activity_at",
     "acceptance",
     "discarded",
+    "upload",
 }
 WORK_KEYS = {
     "person",

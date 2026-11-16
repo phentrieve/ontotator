@@ -106,6 +106,11 @@ export type DiscardRequest = Defaulted<components["schemas"]["DiscardRequest"], 
 export type DiscardResult = components["schemas"]["DiscardResult"];
 export type AcceptVersionRequest = components["schemas"]["AcceptVersionRequest"];
 export type AcceptVersionResult = components["schemas"]["AcceptVersionResult"];
+// Issue 341 a: "Upload new version…" on a translation version
+export type VersionUploadPreview = components["schemas"]["VersionUploadPreview"];
+export type VersionUploadRequest = components["schemas"]["VersionUploadRequest"];
+export type VersionUploadResult = components["schemas"]["VersionUploadResult"];
+export type VersionUploadView = components["schemas"]["VersionUploadView"];
 // Annotation-mode change after submissions, and its restore
 export type RowChangeView = components["schemas"]["RowChangeView"];
 export type ModeChangeTarget = components["schemas"]["ModeChangeTarget"];
@@ -667,6 +672,16 @@ export class ApiClient {
   /** Issue 341 d: accept exactly one version as reviewed outside Ontotator. */
   async acceptVersion(key: string, documentId: string, body: AcceptVersionRequest): Promise<AcceptVersionResult> {
     return this.request<AcceptVersionResult>(`/api/v1/projects/${encodeURIComponent(key)}/variants/${encodeURIComponent(documentId)}/accept`, { method: "POST", body: JSON.stringify(body) });
+  }
+
+  /** Issue 341 a, read only: whether a new version can follow this one, the work that stays on it and, with a text, the text as stored. */
+  async previewVersionUpload(key: string, documentId: string, text?: string): Promise<VersionUploadPreview> {
+    return this.request<VersionUploadPreview>(`/api/v1/projects/${encodeURIComponent(key)}/variants/${encodeURIComponent(documentId)}/versions/preview`, { method: "POST", body: JSON.stringify(text === undefined ? {} : { text }) });
+  }
+
+  /** Issue 341 a: save a text as the next version of this translation (a correction, ready for review). */
+  async uploadVersion(key: string, documentId: string, body: VersionUploadRequest): Promise<VersionUploadResult> {
+    return this.request<VersionUploadResult>(`/api/v1/projects/${encodeURIComponent(key)}/variants/${encodeURIComponent(documentId)}/versions`, { method: "POST", body: JSON.stringify(body) });
   }
 
   async discardVariant(key: string, documentId: string, body: DiscardRequest): Promise<DiscardResult> {

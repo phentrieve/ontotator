@@ -209,3 +209,17 @@ button.documents-text-name { min-height: 24px; padding: 0; border: 0; background
 /* Plan… of an undecided row: two options per flag, neither pressed until the lead decides. */
 .documents-plan-choices { display: grid; gap: var(--space-2); }
 .documents-plan-choice { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+
+/* "Upload new version…" (issue 341 a): the text, how it was made, then the changes against the current version. */
+.upload-version { display: grid; gap: var(--space-3); min-width: 0; }
+.upload-version > p { margin: 0; }
+.upload-version .form-group,
+.upload-version .notice { margin-bottom: 0; }
+.upload-version-input { justify-self: start; }
+.upload-version textarea { min-height: 9rem; resize: vertical; font-family: var(--font-serif); font-size: var(--size-reading); line-height: var(--leading-reading); }
+.upload-version-file { display: grid; gap: var(--space-1); min-width: 0; }
+.upload-version-file-facts { margin: 0; font-weight: var(--weight-strong); overflow-wrap: anywhere; }
+.upload-version-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: var(--space-3); min-width: 0; }
+.upload-version .form-control { width: 100%; max-width: none; }
+.upload-version .translation-diff,
+.upload-version .translation-text { height: auto; max-height: min(40vh, 22rem); min-height: 6rem; border: 1px solid var(--border); border-radius: var(--radius); white-space: pre-wrap; overflow: auto; overflow-wrap: anywhere; padding: var(--space-3); font-family: var(--font-serif); font-size: var(--size-reading); line-height: var(--leading-reading); background: var(--surface-raised); }

@@ -47,11 +47,11 @@ export interface LeadScenario {
   /**
    * ROWS: the case of each row action (de rows; "chip" and "acceptance" are fr rows).
    * REJECTED_TRANSLATION_FOR_LEAD: "rejected", "queried" and "to_assign" (de rows, Review and Annotate on).
-   * ACCEPTED_TRANSLATION_FOR_LEAD: "accepted" (with annotation work) and "unreviewed" (issue 341).
+   * ACCEPTED_TRANSLATION_FOR_LEAD: "accepted" (with annotation work), "unreviewed" and "in_review" (an open translation review; issue 341).
    */
   cases?: Record<
     | "chip" | "acceptance" | "rejected" | "report" | "choose_final" | "review_changes" | "not_in_plan"
-    | "queried" | "to_assign" | "accepted" | "unreviewed",
+    | "queried" | "to_assign" | "accepted" | "unreviewed" | "in_review",
     string
   >;
   report_id?: string;

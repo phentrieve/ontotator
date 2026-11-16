@@ -246,6 +246,15 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "expected_text_sha256": "a" * 64,
             "confirm": True,
         },
+        "upload_translation_version": {
+            "project": "p",
+            "document_id": "d",
+            "text": "Bei Aufnahme: Puls regelmäßig.",
+            "method": "machine_translation",
+            "provider": "DeepL",
+            "expected_previous_sha256": "a" * 64,
+            "confirm": True,
+        },
         "discard_translation": {
             "project": "p",
             "document_id": "d",

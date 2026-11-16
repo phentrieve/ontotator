@@ -31,6 +31,8 @@ export interface TextVersionsTools {
   onCorrectTranslation?: (row: DocumentRowView, version: DocumentVersionView) => void;
   /** The lead: "Accept this version…" on the newest version that is not reviewed or accepted (issue 341 d). */
   onAcceptVersion?: (row: DocumentRowView, version: DocumentVersionView) => void;
+  /** The lead: "Upload new version…" on the newest version of a translation (issue 341 a). */
+  onUploadVersion?: (row: DocumentRowView, version: DocumentVersionView) => void;
 }
 
 /** Issue 341 d: a newest translation version that is neither reviewed nor accepted, not discarded. */
@@ -42,6 +44,34 @@ export function acceptableVersion(row: Pick<DocumentRowView, "plan_row">, versio
 /** Issue 341 b: the newest accepted translation version the lead may correct, not discarded. */
 export function correctableVersion(row: Pick<DocumentRowView, "plan_row">, version: DocumentVersionView): boolean {
   return version.is_newest_in_chain && version.translation_status === "accepted" && !isDiscarded(row, version);
+}
+
+/** Issue 341 a: the newest version of a translation the lead may upload a new version after, not discarded. */
+export function uploadableVersion(row: Pick<DocumentRowView, "plan_row">, version: DocumentVersionView): boolean {
+  return version.is_newest_in_chain && version.translation_status != null && !isDiscarded(row, version);
+}
+
+const uploadMethodLabels: Readonly<Record<NonNullable<DocumentVersionView["upload"]>["method"], string>> = {
+  machine_translation: "Machine translation", human_translation: "Human translation", manual_correction: "Corrected by hand",
+};
+
+/** How an uploaded version was made: "Machine translation, DeepL, deepl-2026-10"; "Human translation"; "Corrected by hand". */
+export function uploadMethodLabel(upload: NonNullable<DocumentVersionView["upload"]>): string {
+  return [uploadMethodLabels[upload.method], upload.provider?.trim(), upload.model?.trim()].filter(Boolean).join(", ");
+}
+
+/** "12 Nov 2026" from a calendar date ("2026-11-12"), without a time zone shift. */
+function calendarDate(value: string): string {
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return value;
+  return `${day} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][month - 1] ?? month} ${year}`;
+}
+
+/** "Uploaded by Project lead (ann-0002), 16 Nov, 10:12 · Made on 12 Nov 2026 by Dr. Roe · Checked against the source". */
+export function uploadLabel(upload: NonNullable<DocumentVersionView["upload"]>, now?: Date): string {
+  const who = ["Uploaded", upload.uploaded_by ? `by ${identityLabel(upload.uploaded_by)}` : null].filter(Boolean).join(" ");
+  const made = [upload.made_on ? `on ${calendarDate(upload.made_on)}` : null, upload.made_by?.trim() ? `by ${upload.made_by.trim()}` : null].filter(Boolean).join(" ");
+  return [[who, upload.uploaded_at ? formatTime(upload.uploaded_at, { now }) : null].filter(Boolean).join(", "), made ? `Made ${made}` : null, upload.note?.trim()].filter(Boolean).join(" · ");
 }
 
 /** Acceptance record of a translation version (spec "Annotate without review: acceptance record"). */
@@ -181,19 +211,22 @@ export const TextVersions = forwardRef<HTMLUListElement, TextVersionsProps>(func
             onClick={() => tools.onCorrectTranslation?.(row, version)}>Correct the translation…</Button>}
           {tools.onAcceptVersion && acceptableVersion(row, version) && <Button size="sm" aria-label={`Accept ${fullName}…`}
             onClick={() => tools.onAcceptVersion?.(row, version)}>Accept this version…</Button>}
+          {tools.onUploadVersion && uploadableVersion(row, version) && <Button size="sm" aria-label={`Upload new version of ${fullName}…`}
+            onClick={() => tools.onUploadVersion?.(row, version)}>Upload new version…</Button>}
           {version.translation_status != null && tools.onShowTranslationReviews && <Button size="sm" aria-label={`Translation reviews for ${name}`} onClick={() => tools.onShowTranslationReviews?.(version.document_id)}>Translation reviews</Button>}
         </>;
       }
       return <li key={version.document_id} className="text-version">
         <div className="text-version-head">
           <span className="text-version-name">{name}</span>
-          <span className="text-version-origin">{originText(version, row)}</span>
+          <span className="text-version-origin">{originText(version, row)}{version.upload && ` · ${uploadMethodLabel(version.upload)}`}</span>
           {badge && <StatusBadge tone={badgeTone(version)}>{badge}</StatusBadge>}
           {discarded && <StatusBadge tone="neutral">Discarded</StatusBadge>}
           {/* With several chains the name already carries the chain. */}
           {!row.parallel_roots && <span className="text-version-chain">{version.chain_name}</span>}
           {!version.matches_filter && <span className="cell-secondary">Does not match the filters</span>}
         </div>
+        {version.upload && <p className="text-version-record">{uploadLabel(version.upload, now)}</p>}
         {acceptance && <p className="text-version-record">{acceptanceLabel(acceptance, now)}</p>}
         {discarded && discardLabel(version, now) !== "Discarded" && <p className="text-version-record">{discardLabel(version, now)}</p>}
         {work.length > 0 && <PersonList label={`Assignments on ${name}`}>

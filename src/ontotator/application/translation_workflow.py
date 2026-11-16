@@ -45,6 +45,63 @@ from ontotator.storage.workflow_tables import (
 )
 
 
+def work_on_version(
+    conn: Connection,
+    project: Mapping[Any, Any],
+    variant: VariantInfo,
+    variants: Mapping[str, VariantInfo],
+) -> dict[str, Any]:
+    """What a new version after ``variant`` leaves on it (issue 341 a, b).
+
+    ``annotations`` counts the live annotation tasks on this version
+    (submitted, open), ``open_consolidations`` and ``final_result`` name
+    consolidation tasks and a final result on it: all stay on the version,
+    and the row then offers the text-change steps. ``next_version`` is the
+    number the new version gets, ``review_on`` the row's Review flag and
+    ``annotate_accepted_only`` the project's rule.
+    """
+    pid = project["id"]
+    work = conn.execute(
+        select(AssignmentRow.task, AssignmentRow.status).where(
+            AssignmentRow.project_id == pid,
+            AssignmentRow.document_id == variant.document_id,
+            AssignmentRow.task.in_(("annotate", "review")),
+            AssignmentRow.revoked_at.is_(None),
+        )
+    ).all()
+    statuses = [row.status for row in work if row.task == "annotate"]
+    consolidations = sum(
+        1 for row in work if row.task == "review" and row.status != "submitted"
+    )
+    final_here = (
+        conn.execute(
+            select(FinalSelectionRow.document_id).where(
+                FinalSelectionRow.project_id == pid,
+                FinalSelectionRow.case_id == variant.case_id,
+                FinalSelectionRow.language == variant.language,
+                FinalSelectionRow.document_id == variant.document_id,
+            )
+        ).first()
+        is not None
+    )
+    key = RowKey(variant.case_id, variant.language)
+    flags = work_plan_store.effective_plan(conn, pid, [variant.case_id]).get(key)
+    newest = max(
+        v.version
+        for v in variants.values()
+        if (v.external_id, v.language) == (variant.external_id, variant.language)
+    )
+    submitted = sum(1 for status in statuses if status == "submitted")
+    return {
+        "next_version": newest + 1,
+        "review_on": bool(flags and flags.review),
+        "annotate_accepted_only": bool(project["annotate_accepted_translations_only"]),
+        "annotations": {"submitted": submitted, "open": len(statuses) - submitted},
+        "open_consolidations": consolidations,
+        "final_result": final_here,
+    }
+
+
 class TranslationWorkflowService:
     def __init__(self, db: Database, jobs: JobQueue):
         self.db = db
@@ -382,58 +439,14 @@ class TranslationWorkflowService:
             ):
                 # The lead's own ordinary review is open: start refuses too.
                 reason = "review_open"
-            work = conn.execute(
-                select(AssignmentRow.task, AssignmentRow.status).where(
-                    AssignmentRow.project_id == pid,
-                    AssignmentRow.document_id == document_id,
-                    AssignmentRow.task.in_(("annotate", "review")),
-                    AssignmentRow.revoked_at.is_(None),
-                )
-            ).all()
-            statuses = [row.status for row in work if row.task == "annotate"]
-            consolidations = sum(
-                1 for row in work if row.task == "review" and row.status != "submitted"
-            )
-            final_here = (
-                conn.execute(
-                    select(FinalSelectionRow.document_id).where(
-                        FinalSelectionRow.project_id == pid,
-                        FinalSelectionRow.case_id == variant.case_id,
-                        FinalSelectionRow.language == variant.language,
-                        FinalSelectionRow.document_id == document_id,
-                    )
-                ).first()
-                is not None
-            )
-            key = RowKey(variant.case_id, variant.language)
-            flags = work_plan_store.effective_plan(conn, pid, [variant.case_id]).get(
-                key
-            )
-            newest = max(
-                v.version
-                for v in variants.values()
-                if (v.external_id, v.language)
-                == (variant.external_id, variant.language)
-            )
-            submitted = sum(1 for status in statuses if status == "submitted")
             return {
                 "document_id": document_id,
                 "version": variant.version,
-                "next_version": newest + 1,
                 "translation_status": variant.translation_status,
                 "available": reason is None,
                 "reason": reason,
                 "reviewed_again": descends_from_accepted(variant, variants.get),
-                "review_on": bool(flags and flags.review),
-                "annotate_accepted_only": bool(
-                    project["annotate_accepted_translations_only"]
-                ),
-                "annotations": {
-                    "submitted": submitted,
-                    "open": len(statuses) - submitted,
-                },
-                "open_consolidations": consolidations,
-                "final_result": final_here,
+                **work_on_version(conn, project, variant, variants),
             }
 
     @staticmethod
