@@ -4431,7 +4431,7 @@
           "final-results"
         ],
         "summary": "Bulk Change Final",
-        "description": "Change the final result of many texts by a rule (issue 336).\n\nRule ``newest_submission``: each selected text that has a final result\ngets its newest submission instead (of the submissions the final panel\noffers on the current version), when that one was submitted after the\nfinal result was chosen and is a consolidation, the text's only\nsubmission, or an annotation that agrees in full with the text's other\nsubmissions (the rule of ``accept-agreeing``). ``preview: true`` lists\nthe texts that would change, with the result each one gets, the texts\nskipped and why (no final result, open work, nothing submitted, already\nthe newest, nothing submitted since the final was chosen, your own\nresult where the project forbids it, submissions that differ) and a\n``preview_token``.\nApplying sends that token: every listed text changes, or none (409\n``PREVIEW_STALE`` with a fresh ``preview`` in the details when anything\nchanged, also a final result changed meanwhile). Each text is audited\nlike a single change (``via: bulk_change_final``). An applied action\nreturns ``undo``; ``final-selections/bulk-change/undo`` takes its ``id``.",
+        "description": "Change the final result of many texts by a rule (issue 336).\n\nRule ``newest_submission``: each selected text that has a final result\ngets its newest submission instead (of the submissions the final panel\noffers on the current version), when that one was submitted after the\nfinal result was chosen and is a consolidation, the text's only\nsubmission, or an annotation that agrees in full with the text's other\nsubmissions (the rule of ``accept-agreeing``). ``preview: true`` lists\nthe texts that would change, with the result each one gets, the texts\nskipped and why (no final result, open work, nothing submitted, already\nthe newest, nothing submitted since the final was chosen, your own\nresult where the project forbids it, submissions that differ), the\nselected texts the project does not have (``unknown_rows``) and a\n``preview_token``.\nApplying sends that token: every listed text changes, or none (409\n``PREVIEW_STALE`` with a fresh ``preview`` in the details when anything\nchanged, also a final result changed meanwhile). Each text is audited\nlike a single change (``via: bulk_change_final``). An applied action\nreturns ``undo``; ``final-selections/bulk-change/undo`` takes its ``id``.",
         "operationId": "bulk_change_final_api_v1_projects__key__final_selections_bulk_change_post",
         "parameters": [
           {
@@ -6878,7 +6878,7 @@
           "bulk-task-actions"
         ],
         "summary": "Bulk Reopen",
-        "description": "Reopen the submitted tasks of many texts (issue 336).\n\n``preview: true`` lists the tasks that would be reopened, the tasks kept\nand why, the texts skipped (a final result is chosen) and a\n``preview_token``. Applying sends that token and a ``reason``: every\nlisted task is reopened, or none (409 ``PREVIEW_STALE`` with a fresh\n``preview`` in the details when anything changed). Each task is audited\nlike a single reopen (``via: bulk_reopen``).",
+        "description": "Reopen the submitted tasks of many texts (issue 336).\n\n``preview: true`` lists the tasks that would be reopened, the tasks kept\nand why, the texts skipped (a final result is chosen), the selected\ntexts the project does not have (``unknown_rows``) and a\n``preview_token``. Applying sends that token and a ``reason``: every\nlisted task is reopened, or none (409 ``PREVIEW_STALE`` with a fresh\n``preview`` in the details when anything changed). Each task is audited\nlike a single reopen (``via: bulk_reopen``).",
         "operationId": "bulk_reopen_api_v1_projects__key__bulk_task_actions_reopen_post",
         "parameters": [
           {
@@ -7043,7 +7043,7 @@
           "bulk-task-actions"
         ],
         "summary": "Bulk Undo",
-        "description": "Undo a bulk reopen or withdrawal by the ``undo.id`` of its apply.\n\nThe server keeps what the action changed; the request names only that\nrecord. It works once, for the lead who applied the action, before\n``undo.expires_at``, and only while the texts are exactly as the action\nleft them (tasks, drafts, review drafts, rounds, final results, plan,\nversions); otherwise 409 ``BULK_UNDO_STALE`` and nothing is undone.\nReopened tasks are submitted again; withdrawn tasks come back with their\ndrafts. An action that reopened a translation review has no Undo.",
+        "description": "Undo a bulk reopen or withdrawal by the ``undo.id`` of its apply.\n\nThe server keeps what the action changed; the request names only that\nrecord. It works once, for the lead who applied the action, before\n``undo.expires_at``, and only while the texts are exactly as the action\nleft them (tasks, drafts, review drafts, rounds, final results, plan,\nversions); otherwise 409 ``BULK_UNDO_STALE`` and nothing is undone.\nReopened tasks are submitted again; withdrawn tasks come back with their\ndrafts. An action that reopened a translation review has no Undo.\n``preview: true`` changes nothing: it lists the tasks the Undo would\nbring back (``tasks``) and, in ``blocked``, why it cannot run now\n(``changed``, ``not_in_plan``, ``person_unavailable``); a record that is\nunknown, expired or already undone is refused in a preview too.",
         "operationId": "bulk_undo_api_v1_projects__key__bulk_task_actions_undo_post",
         "parameters": [
           {
@@ -7348,7 +7348,7 @@
           "annotation-mode-changes"
         ],
         "summary": "Bulk Change Mode",
-        "description": "Change the annotation mode of many texts (issue 336, step 4).\n\nEach text is changed as ``POST annotation-mode-changes`` changes one: its\nlive submissions are marked discarded, its live annotate and review\nassignments are revoked and the mode is stored. ``preview: true`` lists,\nper text, the submissions and assignments with their people, the texts\nleft as they are with the reason (the single change's refusals; a text\nwith a final result: withdraw it first) and a ``preview_token``. Applying\nsends that token and a ``reason``: every listed text changes, or none\n(409 ``PREVIEW_STALE`` with a fresh ``preview`` in the details when\nanything changed). Each text is audited like a single change\n(``annotation_mode.change``, ``via: bulk_change_mode``) and can be\nrestored on its own (``.../{change_id}/restore``); there is no bulk undo.",
+        "description": "Change the annotation mode of many texts (issue 336, step 4).\n\nEach text is changed as ``POST annotation-mode-changes`` changes one: its\nlive submissions are marked discarded, its live annotate and review\nassignments are revoked and the mode is stored. ``preview: true`` lists,\nper text, the submissions and assignments with their people, the texts\nleft as they are with the reason (the single change's refusals; a text\nwith a final result: withdraw it first), the selected texts the project\ndoes not have (``unknown_rows``) and a ``preview_token``. Applying\nsends that token and a ``reason``: every listed text changes, or none\n(409 ``PREVIEW_STALE`` with a fresh ``preview`` in the details when\nanything changed). Each text is audited like a single change\n(``annotation_mode.change``, ``via: bulk_change_mode``) and can be\nrestored on its own (``.../{change_id}/restore``); there is no bulk undo.",
         "operationId": "bulk_change_mode_api_v1_projects__key__annotation_mode_changes_bulk_post",
         "parameters": [
           {
@@ -15140,6 +15140,13 @@
             "type": "integer",
             "title": "Texts"
           },
+          "unknown_rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowRefView"
+            },
+            "type": "array",
+            "title": "Unknown Rows"
+          },
           "change_count": {
             "type": "integer",
             "title": "Change Count"
@@ -15349,6 +15356,13 @@
           "texts": {
             "type": "integer",
             "title": "Texts"
+          },
+          "unknown_rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowRefView"
+            },
+            "type": "array",
+            "title": "Unknown Rows"
           },
           "change_count": {
             "type": "integer",
@@ -15872,6 +15886,13 @@
             "type": "integer",
             "title": "Texts"
           },
+          "unknown_rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowRefView"
+            },
+            "type": "array",
+            "title": "Unknown Rows"
+          },
           "change_count": {
             "type": "integer",
             "title": "Change Count"
@@ -15997,12 +16018,39 @@
         ],
         "title": "BulkTaskView"
       },
+      "BulkUndoBlock": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": [
+              "changed",
+              "not_in_plan",
+              "person_unavailable"
+            ],
+            "title": "Reason"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason",
+          "message"
+        ],
+        "title": "BulkUndoBlock"
+      },
       "BulkUndoRequest": {
         "properties": {
           "undo_id": {
             "type": "integer",
             "minimum": 1.0,
             "title": "Undo Id"
+          },
+          "preview": {
+            "type": "boolean",
+            "title": "Preview"
           }
         },
         "additionalProperties": false,
@@ -16017,6 +16065,69 @@
           "undone": {
             "type": "integer",
             "title": "Undone"
+          },
+          "applied": {
+            "type": "boolean",
+            "title": "Applied"
+          },
+          "undo_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undo Id"
+          },
+          "action": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "reopen",
+                  "withdraw"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "task_count": {
+            "type": "integer",
+            "title": "Task Count"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/BulkUndoTaskView"
+            },
+            "type": "array",
+            "title": "Tasks"
+          },
+          "blocked": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BulkUndoBlock"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -16024,6 +16135,59 @@
           "undone"
         ],
         "title": "BulkUndoResult"
+      },
+      "BulkUndoTaskView": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "assignment_id": {
+            "type": "integer",
+            "title": "Assignment Id"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "task": {
+            "type": "string",
+            "enum": [
+              "annotate",
+              "review",
+              "translation_review"
+            ],
+            "title": "Task"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "in_progress",
+              "submitted",
+              "reopened"
+            ],
+            "title": "Status"
+          },
+          "person": {
+            "$ref": "#/components/schemas/PersonRefView"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "assignment_id",
+          "document_id",
+          "task",
+          "status",
+          "person"
+        ],
+        "title": "BulkUndoTaskView"
       },
       "BulkUndoView": {
         "properties": {
@@ -28612,6 +28776,72 @@
           },
           "checked_sentences": {
             "$ref": "#/components/schemas/CheckedSentences"
+          },
+          "version_origin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VersionOrigin"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "previous_version": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewText"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "second_review_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Second Review At"
+          },
+          "second_review_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Second Review Reason"
+          },
+          "reopened_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reopened At"
+          },
+          "reopen_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reopen Reason"
           }
         },
         "type": "object",
@@ -28932,6 +29162,18 @@
             "type": "integer",
             "title": "Finding Count",
             "default": 0
+          },
+          "refused_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "CONSOLIDATION_OPEN"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refused By"
           }
         },
         "type": "object",
@@ -31604,6 +31846,29 @@
             ],
             "title": "Consolidation Reason"
           },
+          "second_review_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Second Review At"
+          },
+          "second_review_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Second Review Reason"
+          },
           "report_answered": {
             "type": "boolean",
             "title": "Report Answered",
@@ -32643,6 +32908,13 @@
           "texts": {
             "type": "integer",
             "title": "Texts"
+          },
+          "unknown_rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowRefView"
+            },
+            "type": "array",
+            "title": "Unknown Rows"
           },
           "change_count": {
             "type": "integer",
@@ -34644,6 +34916,111 @@
         ],
         "title": "VersionMarkerView",
         "description": "Text cell marker: \"v2 corrected\", \"v2\" or \"{version} translations\"\n(parallel roots: ``version`` is the number of roots)."
+      },
+      "VersionOrigin": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "upload",
+              "review_correction",
+              "lead_correction",
+              "editorial_correction",
+              "correction"
+            ],
+            "title": "Kind"
+          },
+          "previous_version": {
+            "type": "integer",
+            "title": "Previous Version"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "made_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Made On"
+          },
+          "made_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Made By"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "previous_version"
+        ],
+        "title": "VersionOrigin",
+        "description": "How a version after the first was made, for its reviewer.\n\n``upload``: a lead uploaded the text (\"Upload new version\u2026\", with the\nupload record's fields); ``review_correction``: a translation reviewer\ncorrected the previous version; ``lead_correction``: a lead did\n(\"Correct the translation\u2026\"); ``editorial_correction``: a lead fixed\nspacing, typos or grammar without a review (\"Fix typos\u2026\", ``note`` is\nthe recorded reason); ``correction``: no record (an import)."
       },
       "VersionRef": {
         "properties": {

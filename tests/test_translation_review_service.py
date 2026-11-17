@@ -516,7 +516,9 @@ def test_correction_chain_workspace_retains_original_source_run_and_exact_baseli
         opened.source.variant.document_id == "source"
         and opened.source.text == "Source text"
     )
-    assert [c.code for c in opened.failed_checks] == ["units_added"]
+    # The failed check is one of the first version; the run keeps it.
+    assert opened.failed_checks == []
+    assert opened.translation_ancestor.translation["checks"][0]["code"] == "units_added"
     rev2 = env.service.save_draft(
         env.accesses["alice"],
         aid,

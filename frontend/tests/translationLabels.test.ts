@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { clinicalChangeFacts, decisionDescriptions, decisionKeyHint, rationaleHint, allChecksLine, calmCheckText, checkBandText, checkDeviationGuidance, checkExplanation, checkLabel, checkNoLocation, failedChecksTitle, shortCheckLabel, unknownCheckExplanation, formatReviewDate, languageName, translationStatusLabel } from "../src/translation/labels";
+import { clinicalChangeFacts, decisionDescriptions, decisionKeyHint, rationaleHint, allChecksLine, calmCheckText, checkBandText, checkDeviationGuidance, checkExplanation, checkLabel, checkNoLocation, failedChecksTitle, shortCheckLabel, unknownCheckExplanation, formatReviewDate, languageName, translationStatusLabel, translationNote, decisionConsequence, versionOriginRows, earlierChecksText } from "../src/translation/labels";
 
 describe("translation review labels", () => {
   it("names known check codes and turns unknown codes into words", () => {
@@ -77,5 +77,34 @@ describe("translation review labels", () => {
     expect(rationaleHint(undefined, false, 1)).toBe("Optional.");
     expect(rationaleHint("query", true, 0)).toBe("Required for a clinically relevant change.");
     expect(rationaleHint("accepted_unchanged", true, 1)).toBe("Required for a clinically relevant change.");
+  });
+});
+
+describe("a version after the first (user review 2026-11)", () => {
+  it("names the baseline: the machine translation only for a machine translation's first version", () => {
+    expect(translationNote({ origin: "machine_translation", version: 1 }, "same")).toBe("Same as the machine translation.");
+    expect(translationNote({ origin: "machine_translation", version: 1 }, "edited")).toBe("Underlined text differs from the machine translation.");
+    expect(translationNote({ origin: "machine_translation", version: 1 }, "changes")).toBe("Showing changes against the machine translation. Turn off Show changes to edit.");
+    expect(translationNote({ origin: "correction", version: 2 }, "same", 1)).toBe("Same as the version you were given (v2). Compare shows what changed since v1.");
+    expect(translationNote({ origin: "correction", version: 2 }, "edited", 1)).toBe("Underlined text differs from the version you were given (v2). Compare shows what changed since v1.");
+    expect(translationNote({ origin: "correction", version: 2 }, "changes", 1)).toBe("Showing your changes against the version you were given (v2). Turn off Show changes to edit. Compare shows what changed since v1.");
+    expect(translationNote({ origin: "human_translation", version: 1 }, "same")).toBe("Same as the version you were given (v1).");
+    expect(decisionConsequence("accepted_corrected", { origin: "correction" })).toContain("The version you were given stays as it was.");
+    expect(decisionConsequence("accepted_corrected", { origin: "machine_translation" })).toContain("The machine translation stays as it was.");
+  });
+  it("describes how the version was made, not the run of the first version", () => {
+    expect(versionOriginRows({ kind: "upload", previous_version: 1, at: "2026-11-17T09:30:00Z", method: "machine_translation", provider: "DeepL", model: "deepl-2026-10", made_on: "2026-11-12", made_by: "Dr. Roe", note: "Checked" }))
+      .toEqual([["This version", "Machine translation, DeepL, deepl-2026-10"], ["Uploaded", `by the project lead on ${formatReviewDate("2026-11-17T09:30:00Z")}`],
+        ["Made", "on 12 November 2026 by Dr. Roe"], ["Note", "Checked"], ["Version before", "v1"]]);
+    expect(versionOriginRows({ kind: "upload", previous_version: 2, method: "human_translation" })).toEqual([["This version", "Human translation"], ["Uploaded", "by the project lead"], ["Version before", "v2"]]);
+    expect(versionOriginRows({ kind: "lead_correction", previous_version: 1, at: "2026-11-17T09:30:00Z" }))
+      .toEqual([["This version", "Corrected by the project lead"], ["Corrected", `on ${formatReviewDate("2026-11-17T09:30:00Z")}`], ["Version before", "v1"]]);
+    expect(versionOriginRows({ kind: "review_correction", previous_version: 1 })[0]).toEqual(["This version", "Corrected in a translation review"]);
+    // "Fix typos…" (issue 453): named as what it is, with the recorded reason.
+    expect(versionOriginRows({ kind: "editorial_correction", previous_version: 2, at: "2026-11-17T09:30:00Z", note: "Spacing; Typo" }))
+      .toEqual([["This version", `Typos fixed by the project lead on ${formatReviewDate("2026-11-17T09:30:00Z")}`], ["What was fixed", "Spacing; Typo"], ["Version before", "v2"]]);
+    expect(versionOriginRows({ kind: "correction", previous_version: 1 })).toEqual([["This version", "Correction"], ["Version before", "v1"]]);
+    expect(earlierChecksText(1, 2, [])).toBe("The automatic checks ran on v1, not on this version (v2).");
+    expect(earlierChecksText(1, 2, ["units_added", "numbers_changed"])).toBe("The automatic checks ran on v1, not on this version (v2). 2 automatic checks failed on v1: Units added and Numbers changed.");
   });
 });

@@ -1,7 +1,7 @@
 """Lead pause (issue 464) and new versions of a paused text.
 
 The pause belongs to the text (case, language), not to a version. "Fix
-typos…" (editorial correction, issue 453) and "Upload new version…" (issue
+typos…" (editorial correction, issue 453) and "Upload a corrected text…" (issue
 341 a) are the lead's own actions and change nobody's work in progress, so
 both stay possible on a paused text; a task that follows the correction to
 the new version is still paused there.

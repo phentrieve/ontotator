@@ -1492,7 +1492,8 @@ export interface paths {
          *     the texts that would change, with the result each one gets, the texts
          *     skipped and why (no final result, open work, nothing submitted, already
          *     the newest, nothing submitted since the final was chosen, your own
-         *     result where the project forbids it, submissions that differ) and a
+         *     result where the project forbids it, submissions that differ), the
+         *     selected texts the project does not have (``unknown_rows``) and a
          *     ``preview_token``.
          *     Applying sends that token: every listed text changes, or none (409
          *     ``PREVIEW_STALE`` with a fresh ``preview`` in the details when anything
@@ -1978,7 +1979,8 @@ export interface paths {
          * @description Reopen the submitted tasks of many texts (issue 336).
          *
          *     ``preview: true`` lists the tasks that would be reopened, the tasks kept
-         *     and why, the texts skipped (a final result is chosen) and a
+         *     and why, the texts skipped (a final result is chosen), the selected
+         *     texts the project does not have (``unknown_rows``) and a
          *     ``preview_token``. Applying sends that token and a ``reason``: every
          *     listed task is reopened, or none (409 ``PREVIEW_STALE`` with a fresh
          *     ``preview`` in the details when anything changed). Each task is audited
@@ -2070,6 +2072,10 @@ export interface paths {
          *     versions); otherwise 409 ``BULK_UNDO_STALE`` and nothing is undone.
          *     Reopened tasks are submitted again; withdrawn tasks come back with their
          *     drafts. An action that reopened a translation review has no Undo.
+         *     ``preview: true`` changes nothing: it lists the tasks the Undo would
+         *     bring back (``tasks``) and, in ``blocked``, why it cannot run now
+         *     (``changed``, ``not_in_plan``, ``person_unavailable``); a record that is
+         *     unknown, expired or already undone is refused in a preview too.
          */
         post: operations["bulk_undo_api_v1_projects__key__bulk_task_actions_undo_post"];
         delete?: never;
@@ -2152,7 +2158,8 @@ export interface paths {
          *     assignments are revoked and the mode is stored. ``preview: true`` lists,
          *     per text, the submissions and assignments with their people, the texts
          *     left as they are with the reason (the single change's refusals; a text
-         *     with a final result: withdraw it first) and a ``preview_token``. Applying
+         *     with a final result: withdraw it first), the selected texts the project
+         *     does not have (``unknown_rows``) and a ``preview_token``. Applying
          *     sends that token and a ``reason``: every listed text changes, or none
          *     (409 ``PREVIEW_STALE`` with a fresh ``preview`` in the details when
          *     anything changed). Each text is audited like a single change
@@ -5019,6 +5026,8 @@ export interface components {
             applied: boolean;
             /** Texts */
             texts: number;
+            /** Unknown Rows */
+            unknown_rows?: components["schemas"]["RowRefView"][];
             /** Change Count */
             change_count: number;
             /** Skipped Count */
@@ -5098,6 +5107,8 @@ export interface components {
             applied: boolean;
             /** Texts */
             texts: number;
+            /** Unknown Rows */
+            unknown_rows?: components["schemas"]["RowRefView"][];
             /** Change Count */
             change_count: number;
             /** Skipped Count */
@@ -5276,6 +5287,8 @@ export interface components {
             applied: boolean;
             /** Texts */
             texts: number;
+            /** Unknown Rows */
+            unknown_rows?: components["schemas"]["RowRefView"][];
             /** Change Count */
             change_count: number;
             /** Kept Count */
@@ -5318,15 +5331,62 @@ export interface components {
             /** Text Paused */
             text_paused?: boolean;
         };
+        /** BulkUndoBlock */
+        BulkUndoBlock: {
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "changed" | "not_in_plan" | "person_unavailable";
+            /** Message */
+            message: string;
+        };
         /** BulkUndoRequest */
         BulkUndoRequest: {
             /** Undo Id */
             undo_id: number;
+            /** Preview */
+            preview?: boolean;
         };
         /** BulkUndoResult */
         BulkUndoResult: {
             /** Undone */
             undone: number;
+            /** Applied */
+            applied?: boolean;
+            /** Undo Id */
+            undo_id?: number | null;
+            /** Action */
+            action?: ("reopen" | "withdraw") | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Task Count */
+            task_count?: number;
+            /** Tasks */
+            tasks?: components["schemas"]["BulkUndoTaskView"][];
+            blocked?: components["schemas"]["BulkUndoBlock"] | null;
+        };
+        /** BulkUndoTaskView */
+        BulkUndoTaskView: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Assignment Id */
+            assignment_id: number;
+            /** Document Id */
+            document_id: string;
+            /**
+             * Task
+             * @enum {string}
+             */
+            task: "annotate" | "review" | "translation_review";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "in_progress" | "submitted" | "reopened";
+            person: components["schemas"]["PersonRefView"];
         };
         /**
          * BulkUndoView
@@ -9857,6 +9917,16 @@ export interface components {
              */
             reviewed_again: boolean;
             checked_sentences?: components["schemas"]["CheckedSentences"];
+            version_origin?: components["schemas"]["VersionOrigin"] | null;
+            previous_version?: components["schemas"]["ReviewText"] | null;
+            /** Second Review At */
+            second_review_at?: string | null;
+            /** Second Review Reason */
+            second_review_reason?: string | null;
+            /** Reopened At */
+            reopened_at?: string | null;
+            /** Reopen Reason */
+            reopen_reason?: string | null;
         };
         /** RevokedAssignmentView */
         RevokedAssignmentView: {
@@ -9956,6 +10026,8 @@ export interface components {
              * @default 0
              */
             finding_count: number;
+            /** Refused By */
+            refused_by?: "CONSOLIDATION_OPEN" | null;
         };
         /**
          * RowChangeView
@@ -10866,6 +10938,10 @@ export interface components {
             reopen_reason?: string | null;
             /** Consolidation Reason */
             consolidation_reason?: string | null;
+            /** Second Review At */
+            second_review_at?: string | null;
+            /** Second Review Reason */
+            second_review_reason?: string | null;
             /**
              * Report Answered
              * @default false
@@ -11242,6 +11318,8 @@ export interface components {
             applied: boolean;
             /** Texts */
             texts: number;
+            /** Unknown Rows */
+            unknown_rows?: components["schemas"]["RowRefView"][];
             /** Change Count */
             change_count: number;
             /** Skipped Count */
@@ -11943,6 +12021,40 @@ export interface components {
             kind: "corrected" | "version" | "parallel";
             /** Version */
             version: number;
+        };
+        /**
+         * VersionOrigin
+         * @description How a version after the first was made, for its reviewer.
+         *
+         *     ``upload``: a lead uploaded the text ("Upload new version…", with the
+         *     upload record's fields); ``review_correction``: a translation reviewer
+         *     corrected the previous version; ``lead_correction``: a lead did
+         *     ("Correct the translation…"); ``editorial_correction``: a lead fixed
+         *     spacing, typos or grammar without a review ("Fix typos…", ``note`` is
+         *     the recorded reason); ``correction``: no record (an import).
+         */
+        VersionOrigin: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "upload" | "review_correction" | "lead_correction" | "editorial_correction" | "correction";
+            /** Previous Version */
+            previous_version: number;
+            /** At */
+            at?: string | null;
+            /** Method */
+            method?: string | null;
+            /** Provider */
+            provider?: string | null;
+            /** Model */
+            model?: string | null;
+            /** Made On */
+            made_on?: string | null;
+            /** Made By */
+            made_by?: string | null;
+            /** Note */
+            note?: string | null;
         };
         /** VersionRef */
         VersionRef: {

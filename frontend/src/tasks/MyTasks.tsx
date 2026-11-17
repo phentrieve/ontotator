@@ -6,7 +6,7 @@ import { assignmentStatusLabels, consolidationReasonText, formatDateTime, reopen
 import { taskText } from "../app/identity";
 import { failedChecksTitle } from "../translation/labels";
 import { IconInfo, IconWarning } from "../ui/icons";
-import { Button, DataTable, EmptyState, InlineMessage, Popover, Select, StatusBadge, tabId, Tabs, type Column } from "../ui";
+import { Button, DataTable, EmptyState, InlineMessage, Popover, Select, StatusBadge, tabId, Tabs, useMediaQuery, type Column } from "../ui";
 import { LanguageText } from "../ui/LanguageTag";
 import { AssignedDate } from "../ui/AssignedDate";
 import { onSpaceActivate } from "../ui/spaceActivates";
@@ -14,6 +14,7 @@ import { annotationTaskName } from "../editor/modes";
 import { PracticeCard, PracticeGroup } from "../practice/PracticeOnMyTasks";
 import { usePractice } from "../practice/usePractice";
 import { notifyTasksChanged } from "./tasksEvents";
+import { reopenedText, secondReviewText } from "./LeadReason";
 import { pauseMarks } from "./pauseLabels";
 
 export interface MyTasksProps {
@@ -69,11 +70,19 @@ export function memberHint(members: Pick<ProjectSummary, "name" | "roles">[]): s
 
 const answerRoute = (task: TaskSummary, reportId: string): Route => ({ name: "projectProblemReport", key: task.project_key, reportId });
 
-/** The "Reopened" badge itself opens a popover with when and why (#34): the row stays one badge high. */
-function ReopenedInfo({ notice }: { notice: string }): JSX.Element {
+/** Why a task reads "Reopened": the lead's reopen, or for a review reopened by "Ask a reviewer to correct…" that request. */
+const reopenedNotice = (task: TaskSummary): string | null =>
+  task.status === "reopened" && !reopenedText(task) ? secondReviewText(task) ?? reopenNotice(task) : reopenNotice(task);
+
+/**
+ * The "Reopened" badge itself opens a popover with when and why (#34): the row stays one badge high.
+ * `inline` (narrow screens, where the status sits under the task) writes the notice out below the badge instead.
+ */
+function ReopenedInfo({ notice, inline = false }: { notice: string; inline?: boolean }): JSX.Element {
   const [open, setOpen] = useState(false);
   const anchor = useRef<HTMLButtonElement>(null);
   const id = useId();
+  if (inline) return <><StatusBadge status="reopened">{assignmentStatusLabels.reopened}</StatusBadge><p className="task-reopen-reason">{notice}</p></>;
   return <>
     <button ref={anchor} type="button" className="task-reopen-info" aria-label="Reopened, why" aria-expanded={open} aria-controls={open ? id : undefined}
       onClick={() => setOpen(value => !value)}><StatusBadge status="reopened">{assignmentStatusLabels.reopened} <IconInfo /></StatusBadge></button>
@@ -84,6 +93,7 @@ function ReopenedInfo({ notice }: { notice: string }): JSX.Element {
 }
 
 export function MyTasks({ project, status, projects, onNavigate, username }: MyTasksProps): JSX.Element {
+  const narrow = useMediaQuery("(max-width: 700px)");
   // A visit without a project filter reopens the last chosen project ("" = All my tasks), once per visit,
   // as soon as the project list is known (a project the user left is not restored).
   const restored = useRef(false);
@@ -197,10 +207,12 @@ export function MyTasks({ project, status, projects, onNavigate, username }: MyT
       {taskDescription(task)}
       {failedChecks(task) > 0 && <span className="task-check-flag"><IconWarning /> {failedChecksTitle(failedChecks(task))}</span>}
       {task.consolidation_reason && <p className="cell-secondary task-consolidation-reason">{consolidationReasonText(task.consolidation_reason)}</p>}
+      {secondReviewText(task) && <p className="cell-secondary task-lead-reason">{secondReviewText(task)}</p>}
     </> },
     { id: "status", header: "Status", cell: task => <>
       {task.waiting_for_translation_review || task.waiting_for_lead ? <StatusBadge tone="neutral">{task.waiting_for_lead ? WAITING_FOR_LEAD : WAITING_FOR_REVIEW}</StatusBadge>
-        : reopenNotice(task) ? <ReopenedInfo notice={reopenNotice(task)!} /> : <StatusBadge status={task.status}>{assignmentStatusLabels[task.status]}</StatusBadge>}
+        // Narrow: the notice is written out below the badge; a second-review reason already stands under the task name.
+        : reopenedNotice(task) && !(narrow && reopenedNotice(task) === secondReviewText(task)) ? <ReopenedInfo notice={reopenedNotice(task)!} inline={narrow} /> : <StatusBadge status={task.status}>{assignmentStatusLabels[task.status]}</StatusBadge>}
       {task.report_answered && (task.answered_report_id ? <a className="task-answer-link" href={routeHref(answerRoute(task, task.answered_report_id))} onClick={event => {
         if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
         event.preventDefault(); onNavigate(answerRoute(task, task.answered_report_id!));
@@ -213,6 +225,20 @@ export function MyTasks({ project, status, projects, onNavigate, username }: MyT
       if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
       event.preventDefault(); onNavigate({ name: "task", assignmentId: task.assignment_id });
     }}>{task.held ? "View paused task" : taskActionLabels[task.status]}</a> },
+  ];
+  // Narrow screens (a phone): the seven columns do not fit and the pinned Action column covered Status. The text,
+  // the task and the status with its reason share one stacked cell beside the action; nothing scrolls sideways.
+  // Each part is the cell of its wide column, so a line added to a column appears here as well.
+  const column = (id: string) => columns.find(item => item.id === id)!;
+  const mixedProjects = project === undefined && new Set(shown.map(task => task.project_key)).size > 1;
+  const shownColumns: Column<TaskSummary>[] = !narrow ? columns : [
+    { id: "task", header: "Task", cell: task => <div className="task-stack">
+      <strong className="task-stack__text">{column("text").cell(task)}</strong>
+      {mixedProjects && <span className="cell-secondary">{column("project").cell(task)}</span>}
+      <div className="task-stack__task">{column("task").cell(task)}</div>
+      <div className="task-stack__status">{column("status").cell(task)}</div>
+    </div> },
+    column("open"),
   ];
   // One entry: the project's Documents, or with several managed projects (or none, as a member) the Projects page.
   const members = projects.filter(item => project === undefined || item.project_key === project);
@@ -229,7 +255,7 @@ export function MyTasks({ project, status, projects, onNavigate, username }: MyT
     if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
     event.preventDefault(); onNavigate(allRoute);
   }}>Show all tasks</a>} />;
-  const table = <DataTable label="My tasks" className="data-table--pin-end" rows={shown} columns={columns} rowKey={task => String(task.assignment_id)} rowProps={task => ({ "data-testid": "task-row", "aria-label": `${projectLabel(task.project_name, task.project_key)}: ${taskText(task)}${failedChecks(task) > 0 ? `, ${failedChecksTitle(failedChecks(task))}` : ""}${task.waiting_for_translation_review ? `, ${WAITING_FOR_REVIEW}` : task.waiting_for_lead ? `, ${WAITING_FOR_LEAD}` : ""}` })} />;
+  const table = <DataTable label="My tasks" className={narrow ? "my-tasks-table--narrow" : "data-table--pin-end"} rows={shown} columns={shownColumns} rowKey={task => String(task.assignment_id)} rowProps={task => ({ "data-testid": "task-row", "aria-label": `${projectLabel(task.project_name, task.project_key)}: ${taskText(task)}${failedChecks(task) > 0 ? `, ${failedChecksTitle(failedChecks(task))}` : ""}${task.waiting_for_translation_review ? `, ${WAITING_FOR_REVIEW}` : task.waiting_for_lead ? `, ${WAITING_FOR_LEAD}` : ""}` })} />;
   return <section aria-label="My tasks">
     <h1>My tasks</h1>
     {practiceState && <PracticeCard state={practiceState} onChange={practiceChanged} onNavigate={onNavigate} />}

@@ -201,6 +201,9 @@ class BulkChangeFinalView(BaseModel):
     applied: bool
     # Selected texts found.
     texts: int
+    # Selected texts the project does not have (another spelling, letter
+    # case or language), as they were sent; also with ``summary_only``.
+    unknown_rows: list[RowRefView] = Field(default_factory=list)
     # Counts of the lists below; the lists are empty with ``summary_only``.
     change_count: int
     skipped_count: int
@@ -495,7 +498,8 @@ def bulk_change_final(
     the texts that would change, with the result each one gets, the texts
     skipped and why (no final result, open work, nothing submitted, already
     the newest, nothing submitted since the final was chosen, your own
-    result where the project forbids it, submissions that differ) and a
+    result where the project forbids it, submissions that differ), the
+    selected texts the project does not have (``unknown_rows``) and a
     ``preview_token``.
     Applying sends that token: every listed text changes, or none (409
     ``PREVIEW_STALE`` with a fresh ``preview`` in the details when anything

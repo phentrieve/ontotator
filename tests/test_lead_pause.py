@@ -293,3 +293,28 @@ def test_the_pause_keeps_the_texts_own_annotators_per_text(env):
         ).one()
     # The record of the last pause stays.
     assert (row.paused, row.pause_reason) == (False, WHY)
+
+
+def test_texts_the_project_does_not_have_are_named(env):
+    """A wrong case ID, letter case or language is in ``unknown_rows`` of the
+    preview and of the applied answer (pause and release)."""
+    wrong = [
+        {"case_id": "nope", "language": "en"},
+        {"case_id": "C1", "language": "en"},
+        {"case_id": "c1", "language": "xx"},
+    ]
+    rows = [{"case_id": "c1", "language": "en"}, *wrong]
+    found = _post(env, PAUSE, rows, preview=True)
+    assert found.status_code == 200, found.text
+    assert found.json()["texts"] == 1
+    assert found.json()["unknown_rows"] == wrong
+    applied = _post(
+        env, PAUSE, rows, preview_token=found.json()["preview_token"], reason="Check"
+    )
+    assert applied.status_code == 200, applied.text
+    assert applied.json()["applied"] is True
+    assert applied.json()["unknown_rows"] == wrong
+    released = _post(env, RELEASE, rows, preview=True, summary_only=True)
+    assert released.json()["unknown_rows"] == wrong
+    known = _post(env, RELEASE, rows[:1], preview=True)
+    assert known.json()["unknown_rows"] == []

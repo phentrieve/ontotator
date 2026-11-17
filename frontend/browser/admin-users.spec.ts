@@ -202,7 +202,7 @@ test("Reset code: the code is shown once and sets a new password; the old one st
   const { target } = await openUsers(page);
   await more(page, target, "Reset code");
   const confirm = page.getByRole("dialog", { name: `Issue a new reset code for ${DISPLAY_NAME}?`, exact: true });
-  await expect(confirm).toContainText("Any unused code stops working. The current password keeps working until the new code is used.");
+  await expect(confirm).toContainText("Any unused code stops working. This logs the person out everywhere and revokes their API tokens. The current password keeps working until the new code is used.");
   await confirm.getByRole("button", { name: "Reset code", exact: true }).click();
   const handover = page.getByRole("dialog", { name: `Reset code for ${target}`, exact: true });
   const code = await handover.locator("code").innerText();

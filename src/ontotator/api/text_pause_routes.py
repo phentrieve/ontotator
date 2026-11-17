@@ -90,6 +90,9 @@ class TextPauseActionView(BaseModel):
     applied: bool
     # Selected texts found.
     texts: int
+    # Selected texts the project does not have (another spelling, letter
+    # case or language), as they were sent; also with ``summary_only``.
+    unknown_rows: list[RowRefView] = Field(default_factory=list)
     # Counts; the lists are empty with ``summary_only``.
     change_count: int
     skipped_count: int

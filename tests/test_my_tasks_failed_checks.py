@@ -80,9 +80,11 @@ def test_translation_review_counts_failed_checks_of_the_reviewed_run(env):
     assert counts(env, "translation_review") == [2]
 
 
-def test_correction_counts_its_translation_ancestor(env):
+def test_correction_does_not_count_the_checks_of_the_first_version(env):
+    """A later version was never checked: the run's failed checks are those
+    of the first version and are not counted on its review."""
     review(env, "flawed", version=2)
-    assert counts(env, "translation_review") == [2]
+    assert counts(env, "translation_review") == [0]
 
 
 def test_passing_run_gives_zero_and_other_tasks_give_null(env):

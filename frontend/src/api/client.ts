@@ -106,7 +106,7 @@ export type DiscardRequest = Defaulted<components["schemas"]["DiscardRequest"], 
 export type DiscardResult = components["schemas"]["DiscardResult"];
 export type AcceptVersionRequest = components["schemas"]["AcceptVersionRequest"];
 export type AcceptVersionResult = components["schemas"]["AcceptVersionResult"];
-// Issue 341 a: "Upload new version…" on a translation version
+// Issue 341 a: "Upload a corrected text…" on a translation version
 export type VersionUploadPreview = components["schemas"]["VersionUploadPreview"];
 export type VersionUploadRequest = components["schemas"]["VersionUploadRequest"];
 export type VersionUploadResult = components["schemas"]["VersionUploadResult"];

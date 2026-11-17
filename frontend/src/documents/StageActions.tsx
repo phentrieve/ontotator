@@ -30,7 +30,7 @@ export interface StageActionsProps {
   /** "Withdraw final…" (issue 343), next to "Change final…" and under the same condition (`canChangeFinal`). */
   onWithdrawFinal?: (row: DocumentRowView) => void;
   textVersionTools?: TextVersionsTools;
-  /** The text card: its person rows carry every person's Reassign… / Reopen… / Remove…, its versions Request correction. */
+  /** The text card: its person rows carry every person's Reassign… / Reopen… / Remove…, its versions "Ask a reviewer to correct…". */
   inCard?: boolean;
 }
 

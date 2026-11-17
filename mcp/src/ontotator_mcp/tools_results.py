@@ -10,7 +10,9 @@ from pydantic import Field
 
 from ontotator_mcp.client import OntotatorClient, project_path, seg
 from ontotator_mcp.errors import OntotatorError
+from ontotator_mcp.models import TextRef
 from ontotator_mcp.tooling import register
+from ontotator_mcp.tools_setup import unknown_texts
 
 Project = Annotated[str, Field(description="Project key, e.g. 'ward-7'.")]
 ExportKind = Literal[
@@ -206,7 +208,7 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
     async def change_final_results(
         project: Project,
         texts: Annotated[
-            list[dict[str, str]],
+            list[TextRef],
             Field(
                 min_length=1,
                 max_length=10000,
@@ -251,8 +253,9 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
         chosen, the newest is your own and the project forbids choosing
         your own result, or the submissions differ and were not
         consolidated (reason 'differ': compare them with set_final_result
-        or start_consolidation). The dry run lists changes and skips and a
-        preview_token. Confirm with that token: every listed text changes,
+        or start_consolidation). The dry run lists changes and skips, the
+        texts the project does not have (unknown_texts: another spelling,
+        letter case or language) and a preview_token. Confirm with that token: every listed text changes,
         or none when anything changed since (then the answer is a fresh dry
         run, ``stale``). The confirmed answer carries ``undo`` (id and
         expires_at): undo_change_final_results takes that id and brings the
@@ -260,7 +263,7 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
         changed on the texts.
         """
         path = project_path(project, "final-selections", "bulk-change")
-        body = {"rows": texts, "rule": rule}
+        body = {"rows": [text.model_dump() for text in texts], "rule": rule}
 
         def summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
             changes = found.get("changes", [])
@@ -277,6 +280,7 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
                 "skipped": skipped[:MAX_LISTED],
                 "skipped_count": found.get("skipped_count", len(skipped)),
                 "skipped_by_reason": found.get("skipped_by_reason", {}),
+                **unknown_texts(found),
                 "preview_token": found.get("preview_token"),
             } | ({"undo": found["undo"]} if applied and found.get("undo") else {})
 

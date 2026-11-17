@@ -17,7 +17,7 @@ Want to try first? A private practice project with invented texts lets you do ev
 After login you see **My tasks**. Leads and administrators see **Projects** the first time.
 
 1. Click **My tasks** in the sidebar.
-2. On the tab **To do**, find a row whose **Task** is *Annotation, from scratch* or *Annotation, from proposals*.
+2. On the tab **To do**, find a row whose **Task** is *Annotation, from scratch* or *Annotation, from proposals*. On a phone, the task and its status stand under the name of the text.
 3. Click **Start**. A task marked **Waiting for translation review** cannot be started yet; it opens by itself once the translation review is accepted.
 
 The editor opens. If you have no task, you see **No texts are assigned to you yet.**; ask your lead.
@@ -84,7 +84,7 @@ Details: [Submit the text](annotator.md#submit-the-text).
 - Your task shows **Submitted** in **My tasks**. It is read-only now; click **View** to look at it.
 - The next open task opens on its own, or **My tasks** if none is left.
 - The lead sees your submission next to the other annotators' work on the same text, and accepts one result or starts a consolidation. You do not see other people's work.
-- Your task is done. You do not need to do anything else unless the lead reopens it (**Reopened** in **My tasks**) or you notice a mistake.
+- Your task is done. You do not need to do anything else unless the lead reopens it (**Reopened** in **My tasks**; click the badge to read the lead's reason) or you notice a mistake. A translation review the lead asks for a second time names the lead's reason under the task, for example *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.*
 
 If you notice a mistake after submitting: open the task, choose **More** › **Work rounds** and click **Continue from this submission** ([Start a new work round](annotator.md#start-a-new-work-round)). Fix the finding, check the carried findings and submit again.
 

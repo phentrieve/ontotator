@@ -49,6 +49,18 @@ def _cut(items: Any, limit: int = MAX_LISTED) -> Any:
     return items
 
 
+def unknown_texts(found: dict[str, Any], limit: int = 50) -> dict[str, Any]:
+    """``unknown_texts`` of a bulk answer: the selected texts the project does
+    not have (another spelling, letter case or language), as they were given.
+    Nothing happens to them. An older server does not report them
+    (``unknown_rows``); then the answer has no such entry instead of an empty
+    list."""
+    rows = found.get("unknown_rows")
+    if not isinstance(rows, list):
+        return {}
+    return {"unknown_texts": _cut(rows, limit), "unknown_text_count": len(rows)}
+
+
 def utc_now() -> datetime:
     return datetime.now(UTC)
 

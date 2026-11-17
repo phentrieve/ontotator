@@ -88,7 +88,8 @@
 .translation-editor { height: min(60vh, 40rem); min-height: 16rem; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-raised); }
 .translation-text,
 .translation-review .translation-diff { padding: var(--space-4) var(--space-5); white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-serif); font-size: var(--size-reading); line-height: var(--leading-reading); color: var(--text); }
-.source-obligation-review .translation-column > .translation-text { flex: none; height: min(42vh, 24rem); min-height: 12rem; }
+.source-obligation-review .translation-column > .translation-text,
+.source-obligation-review .translation-column > .translation-diff { flex: none; height: min(42vh, 24rem); min-height: 12rem; }
 .source-obligation-current > .translation-text { height: min(32vh, 18rem); min-height: 10rem; }
 
 /* The one editable surface: a growing textarea over a mirror that marks changed text. */
@@ -285,3 +286,7 @@
 .show-invisibles [data-invisible="soft-hyphen"]::before { content: "\00AC"; top: -0.55em; left: 0; transform: translateX(-50%); font-size: 0.75em; color: var(--warning); }
 /* The mark of a line end hangs over the right edge of a full line; it must not make the box scroll sideways. */
 .translation-text.show-invisibles, .translation-review .translation-diff.show-invisibles, .translation-diff.show-invisibles, .translation-editor.show-invisibles { overflow-x: hidden; }
+
+/* Submit confirmation while a source update is open: a warning with the way to the source update dialog. */
+.review-confirm-source-update { display: grid; gap: var(--space-2); justify-items: start; margin: 0 0 var(--space-3); padding: var(--space-2) var(--space-3); border: 1px solid var(--notice-warning-border); border-radius: var(--radius); background: var(--notice-warning-fill); color: var(--notice-warning-text); }
+.review-confirm-source-update p { margin: 0; }

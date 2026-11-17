@@ -25,7 +25,7 @@ export interface TextVersionsTools {
   onAssignmentsChanged: () => void;
   /** Opens the translation review history of a version. */
   onShowTranslationReviews?: (documentId: string) => void;
-  /** Opens the page's "Request translation correction" dialog for an accepted version (else the inline form). */
+  /** Opens the page's "Ask a reviewer to correct" dialog for an accepted version (else the inline form). */
   onRequestCorrection?: (row: DocumentRowView, variant: VariantSummary) => void;
   /** The lead: "Correct it myself…" on the newest accepted version (issue 341 b). */
   onCorrectTranslation?: (row: DocumentRowView, version: DocumentVersionView) => void;
