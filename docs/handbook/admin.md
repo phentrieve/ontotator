@@ -74,7 +74,11 @@ What for: a code expired, got lost, or someone forgot their password.
 
 1. On **Users**, click **More…** in the person's row.
 2. Choose **New setup code** (setup still pending) or **Reset code** (password already set).
-3. Confirm with **New setup code** or **Reset code**. Any earlier unused code stops working. With a reset code, the current password keeps working until the new code is used.
+3. Confirm with **New setup code** or **Reset code**. The dialog says what follows:
+   - Any earlier unused code stops working.
+   - A reset code logs the person out on all devices at once, not only when the code is used. Someone in the middle of a task sees *Your session has ended. Please log in again.* at their next click, so issue a reset code only when the person asked for one or the account may be in the wrong hands.
+   - All API tokens of the person are revoked, with a reset code and with a new setup code alike.
+   - With a reset code, the current password keeps working until the new code is used: the person can log in again right away.
 4. [Hand over the code](#hand-over-a-setup-or-reset-code).
 
 Deactivated accounts get no new code. Activate the account first.
@@ -274,7 +278,7 @@ What for: see every API token of the server, stop one, or create a system token 
 1. Click **Server settings** under **Administration**.
 2. Go to **API tokens**. The table shows each token's **Kind** (*Personal*, *Project* or *System*), **Owner**, **Project**, **Scopes**, expiry, last use and **Status**.
 3. To stop a token, click **Revoke…** in its row, then **Revoke token**. A token the server revoked by itself says why next to **Revoked**, for example *project role removed* or *password changed*.
-4. To create a system token, click **New system token…**, enter a **Token name**, tick its scopes and click **Create token**. Copy the token from the dialog; it is shown only once.
+4. To create a system token, click **New system token…**, enter a **Token name**, tick its scopes and click **Create token**. Copy the token from the dialog with **Copy token**; it is shown only once. Tick **I have stored the token**, then click **Close**; the dialog cannot be closed before.
 
 Only a system token may hold the **System administration** scope, for ontology and translation uploads and user accounts. It acts as you and is revoked when you are no longer a system administrator, when you change your password and when your account is deactivated. Token creation, revocation and every change made with a token are in the audit trail.
 

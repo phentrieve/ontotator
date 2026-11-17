@@ -68,7 +68,8 @@ describe("users administration", () => {
     render(<UsersPage currentUser={currentUser} />); await load();
     more("alex", "Reset code");
     let confirm = screen.getByRole("dialog", { name: "Issue a new reset code for Alex Smith?" });
-    expect(confirm.textContent).toContain("Any unused code stops working.");
+    // Review finding A: the code ends the sessions and revokes the tokens at once (accounts.issue_reset_code).
+    expect(confirm.textContent).toBe("Issue a new reset code for Alex Smith?Any unused code stops working. This logs the person out everywhere and revokes their API tokens. The current password keeps working until the new code is used.CancelReset code");
     fireEvent.click(within(confirm).getByRole("button", { name: "Cancel" })); expect(api.adminIssueResetCode).not.toHaveBeenCalled();
     more("alex", "Reset code");
     confirm = screen.getByRole("dialog", { name: "Issue a new reset code for Alex Smith?" });
@@ -82,7 +83,9 @@ describe("users administration", () => {
     render(<UsersPage currentUser={currentUser} />); await load();
     more("alex", "New setup code");
     const confirm = screen.getByRole("dialog", { name: "Issue a new setup code for Alex Smith?" });
-    expect(confirm.textContent).toContain("The current setup code stops working.");
+    // No session to end before a password exists; tokens made for the person on the server are revoked.
+    expect(confirm.textContent).toContain("The current setup code stops working. Any API tokens of the person are revoked.");
+    expect(confirm.textContent).not.toContain("logs the person out");
     fireEvent.click(within(confirm).getByRole("button", { name: "New setup code" }));
     const dialog = await screen.findByRole("dialog", { name: "Setup code for alex" });
     expect(dialog.textContent).toContain("Your Ontotator account is ready.");
