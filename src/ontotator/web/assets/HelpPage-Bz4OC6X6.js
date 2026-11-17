@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-YuXV4H14.js";import{n as a,t as o}from"./lib-BZbEZxEn.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-CEguPw5Z.js";import{n as a,t as o}from"./lib-HS49T9t5.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -1252,7 +1252,7 @@ You assigned a translation review to someone who already reviewed this version, 
 
 ### An editorial correction was refused
 
-The correction would change a number, is larger than the cap (5 % of the text, at least 20 and at most 200 characters), or the version cannot be corrected any more: a newer version arrived, a translation review of it is open, it was rejected or queried, or it was discarded. The answer names the reason. A change of content belongs in a translation review. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
+**Editorial correction…** did not save: the correction would change a number, is larger than the cap (5 % of the text, at least 20 and at most 200 characters), or the version cannot be corrected any more: a newer version arrived, a translation review of it is open, it was rejected or queried, or it was discarded. The dialog names the reason; your text stays in the dialog until you close it. A change of content belongs in a translation review. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
 
 ### A task is still paused after I closed the report
 
@@ -1701,7 +1701,7 @@ This works without building a bundle. You upload the new text at the version, or
 4. If the current version was rejected or queried: click **Resolve…**, then **Correct the translation…**, paste the new text yourself and submit. The corrected text becomes the next version and counts as accepted.
 5. Or, whatever the state of the current version, upload the new text: at the newest version, click **Upload new version…**, paste the text or choose a .txt file, say how the text was made (for a machine translation with its provider and model), check the changes and save. The text becomes the next version, a correction that starts as *Ready for review*; accept it with **Accept this version…** if it was reviewed outside Ontotator ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)).
 
-**Request correction…** is offered only at an accepted version, **Correct the translation…** at the newest version that is accepted, rejected or queried, and **Upload new version…** at the newest version of every translation that has no open translation review. Only **Upload new version…** has fields for the provider and model of the new text; in a translation review they can only be named in the **Rationale**. A typo, a missing space or a grammar slip needs none of these steps: an editorial correction fixes it without a review and keeps the status of the text ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
+**Request correction…** is offered only at an accepted version, **Correct the translation…** at the newest version that is accepted, rejected or queried, and **Upload new version…** at the newest version of every translation that has no open translation review. Only **Upload new version…** has fields for the provider and model of the new text; in a translation review they can only be named in the **Rationale**. A typo, a missing space or a grammar slip needs none of these steps: **Editorial correction…** at the newest version fixes it without a review and keeps the status of the text ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
 
 ### Replace or add a translation by file
 
@@ -2007,7 +2007,7 @@ What for: see each version of a translation, its reviews and its origin.
 1. Open the text card and click **Translation**.
 2. The list shows each version with its origin and status, then one row per person who worked on it: the name, the task and the status. Older ones are under **Older versions**; with parallel versions they are grouped by version chain.
 3. Click **View text** to read a version, or **Translation reviews** to see every review decision. In a reviewer's row, **Reopen…** lets them review the version again and **Remove…** removes their assignment.
-   At the newest accepted version, **Correct the translation…** lets you correct it yourself ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)). At the newest version of a translation, **Upload new version…** brings in a text made elsewhere as the next version ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)). A version made by an editorial correction says so under its name, with the lead and the reason ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
+   At the newest accepted version, **Correct the translation…** lets you correct it yourself ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)). At the newest version of a translation, **Upload new version…** brings in a text made elsewhere as the next version ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)). **Editorial correction…** at the newest version fixes spacing, typos or grammar without a review and keeps the status of the text; a version made this way says so under its name, with the lead and the reason ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
 4. Click **Compare with source** to compare the translation with the source text.
 
 ### Request a translation correction
@@ -2474,23 +2474,31 @@ A source text has no **Upload new version…**: a corrected source text comes in
 
 What for: correct spacing, a typo or grammar in a translation without a translation review. This is an editorial correction: the content of the text stays as it is, and an accepted text stays accepted.
 
-An editorial correction is made with the MCP tool \`editorial_correction\` ([MCP server guide](../../mcp/README.md)) or with \`POST /api/v1/projects/{key}/documents/{document_id}/editorial-correction\`, both with a project token of a lead that has the scope *Project administration*. The tool takes the passages to replace, each with its replacement, and a reason. Without \`confirm\` it changes nothing and returns the changed passages and what would follow.
+1. Open the text card and click **Translation**.
+2. At the newest version of the translation, click **Editorial correction…**. The dialog says which version the text becomes and that it keeps its status, for example *The corrected text becomes v3 and keeps the status of v2 (Accepted); it is not reviewed again.*
+3. Correct the text under **Corrected text**. It starts with the text of the version; the words you change are marked while you type.
+4. Enter the **Reason**, for example *Space before a full stop*. It is required and is kept with the version.
+5. Click **Check changes**. The dialog shows the changes against the current version, for example *Changes to v2 · 1 character changed, at most 20*, the reason, and under *What happens to the work on v2* what follows. **Back** returns to the text.
+6. Click the button that names the new version, for example *Save as v3*.
 
-The corrected text becomes the next version of the translation, a correction of the version it fixes with that version's status: the correction of an accepted v2 is an accepted v3, and v2 stays accepted as well. The version row names the correction, for example *Editorial correction by Project lead (ann-0002), 17 Nov, 10:12 · Space before the full stop*. The audit log records who corrected the text, the changed passages and the reason.
+The corrected text becomes the next version of the translation, a correction of the version it fixes with that version's status: the correction of an accepted v2 is an accepted v3, and v2 stays accepted as well. No translation review is started and **Review** is not changed. The version row names the correction, for example *Editorial correction by Project lead (ann-0002), 17 Nov, 10:12 · Space before the full stop*. The audit log records who corrected the text, the changed passages and the reason.
 
 What happens to work on the corrected version:
 
 - Annotation tasks nobody opened move to the new version.
-- Annotations that were opened or submitted, open consolidations and a final result stay on the corrected version. Handle them with **Handle text change…** and *Carry to v3…* ([Handle a text change for open annotation work](#handle-a-text-change-for-open-annotation-work)).
+- Annotations that were opened or submitted, open consolidations and a final result stay on the corrected version. Handle them with **Handle text change…** and *Carry to v3…* ([Handle a text change for open annotation work](#handle-a-text-change-for-open-annotation-work)). The dialog says how many findings of submitted annotations mark changed words and need a check when they are carried.
 - Tool proposals are carried to the new text; a proposal whose marked words were changed waits for a check, as after a corrected translation review.
 
-An editorial correction is refused in these cases:
+An editorial correction is refused in these cases, and the dialog says so before anything is saved:
 
-- A number would change. The digits of the text must stay the same, in the same order; a space next to a number may change.
+- A number would change: *A number would change. An editorial correction leaves every digit as it is; change numbers in a translation review.* The digits of the text must stay the same, in the same order; a space next to a number may change.
 - The change is too large: inserted and deleted characters together may be at most 5 % of the text, but at least 20 and at most 200 characters. A larger change belongs in a translation review ([Correct a translation yourself](#correct-a-translation-yourself)).
-- A translation review of the version is open, the version is not the newest of its translation or it was discarded.
-- The newest version was rejected or queried. Resolve that first ([Resolve a rejected or queried translation](#resolve-a-rejected-or-queried-translation)).
-- The text is a source text. A corrected source text comes in as an Ontospan bundle.
+- A translation review of the version is open: *A translation review of this version is open.* Withdraw it with **Remove…** in the reviewer's row of the **Translation** part, or make the fix in that review.
+- The version is not the newest of its translation or it was discarded.
+
+A version that was rejected or queried has no **Editorial correction…**: resolve it first ([Resolve a rejected or queried translation](#resolve-a-rejected-or-queried-translation)). A source text has none either; a corrected source text comes in as an Ontospan bundle.
+
+The same correction can be made without the browser: the MCP tool \`editorial_correction\` ([MCP server guide](../../mcp/README.md)) and \`POST /api/v1/projects/{key}/documents/{document_id}/editorial-correction\` take the passages to replace, each with its replacement, and the reason, with a project token of a lead that has the scope *Project administration*. Without \`confirm\` the tool changes nothing and returns the changed passages and what would follow.
 
 ### Handle a text change for open annotation work
 
