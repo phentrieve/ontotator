@@ -451,7 +451,13 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
         acknowledges those causes. Pass the dry run's plan.revision as
         expected_revision: the call is then refused if the final result
         changed since the dry run. Without it the confirm call reads the
-        final result again and replaces whatever is current.
+        final result again and replaces whatever is current. When the
+        confirmed call replaced another final result, the answer carries
+        ``undo`` (id and expires_at): undo_change_final_results takes that
+        id and brings the earlier final result back, once, within 60
+        minutes and while nothing else changed on the text. A first choice
+        and a confirmation have no undo; withdraw_final_result takes a
+        final result back.
         """
         found, _ = await rows(api, project, case=case_id, language=[language])
         row = next(
@@ -514,7 +520,11 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
                 "acknowledged_cause_ids": [c["cause_id"] for c in causes],
             },
         )
-        return {"applied": True, "plan": plan, "final": selected}
+        # A replaced final result can be taken back: the handle of
+        # undo_change_final_results, as change_final_results returns it.
+        undo = selected.pop("undo", None)
+        answer = {"applied": True, "plan": plan, "final": selected}
+        return answer | ({"undo": undo} if undo else {})
 
     @register(server, scopes=("read", "project-admin"), effect="destructive")
     async def withdraw_final_result(
