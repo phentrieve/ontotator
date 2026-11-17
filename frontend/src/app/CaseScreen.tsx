@@ -3548,6 +3548,29 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     setMobilePane("details");
     setSearchFocusRequest(count => count + 1);
   };
+  // At <=700 px the workspace starts under the header and is one window high, so its bottom edge is below the
+  // fold while the page is unscrolled (issue 452). The "New finding" bar therefore sticks to the bottom of the
+  // window (CSS), and the text does not move when a passage is marked. Only when the bar would lie over the
+  // marked passage does the page scroll, by just that much; the bar stays at the window's bottom meanwhile.
+  const pendingBarShown = panesLayout && !attachActive && pendingIsMarkedSpan && !readOnly && mobilePane === "text";
+  const pendingBarRef = useRef<HTMLDivElement>(null);
+  const pendingBarMark = pendingBarShown ? pendingAnnotation?.evidenceId : undefined;
+  // A passive effect: the text pane has drawn the mark by then (its effects run first).
+  useEffect(() => {
+    const bar = pendingBarRef.current;
+    if (!pendingBarShown || !bar || !pendingBarMark) return;
+    const marks = [...(rootRef.current?.querySelectorAll<HTMLElement>(".text-container .run--marked") ?? [])]
+      .filter(run => (run.dataset.mentions ?? "").split(",").includes(pendingBarMark));
+    if (!marks.length) return;
+    const overlap = Math.max(...marks.map(run => run.getBoundingClientRect().bottom)) - bar.getBoundingClientRect().top;
+    if (overlap <= 0) return;
+    for (let scroller = bar.parentElement; scroller; scroller = scroller.parentElement) {
+      if (scroller.scrollHeight > scroller.clientHeight && /auto|scroll/.test(getComputedStyle(scroller).overflowY)) {
+        scroller.scrollBy({ top: Math.ceil(overlap) + 8 });
+        break;
+      }
+    }
+  }, [pendingBarShown, pendingBarMark]);
 
   const shortcutOptions = { scope: "screen" as const, root: rootRef };
   // Keys that wait for a selection stay in the ? help, marked "not available right now": the finding keys
@@ -4202,15 +4225,6 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
           resyncToken={textResyncToken}
           scrollRequest={textScrollRequest}
         />
-        {/* Above 700 px nothing floats over the text (#21): the New finding panel holds the hint and the one Discard. */}
-        {panesLayout && !attachActive && pendingIsMarkedSpan && !readOnly && mobilePane === "text" && (
-          <div className="pending-bar" role="group" aria-label="New finding">
-            <span className="pending-bar__text">New finding “{quoteSegments(view.document.text, pendingAnnotation!.segments, 40)}”</span>
-            <Button type="button" variant="primary" size="sm" onClick={chooseTerm}>Choose term</Button>
-            <Button type="button" variant="secondary" size="sm" onClick={discardPending}>Discard</Button>
-            <CopyTextButton text={passageRef.current} onAnnounce={announceCarried} compact={narrowBar} />
-          </div>
-        )}
 
         {/* Right: Annotation & Search Panel + Review Actions */}
         <div className="inspector-pane density-compact" ref={inspectorRef}>
@@ -4567,6 +4581,16 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
           />
         )}
       </div>
+      {/* Above 700 px nothing floats over the text (#21): the New finding panel holds the hint and the one Discard.
+          Below the panes, not inside them: the bar sticks to the bottom of the window while the page is unscrolled (issue 452). */}
+      {pendingBarShown && (
+        <div ref={pendingBarRef} className="pending-bar" role="group" aria-label="New finding">
+          <span className="pending-bar__text">New finding “{quoteSegments(view.document.text, pendingAnnotation!.segments, 40)}”</span>
+          <Button type="button" variant="primary" size="sm" onClick={chooseTerm}>Choose term</Button>
+          <Button type="button" variant="secondary" size="sm" onClick={discardPending}>Discard</Button>
+          <CopyTextButton text={passageRef.current} onAnnounce={announceCarried} compact={narrowBar} />
+        </div>
+      )}
       </div>
 
       </>}

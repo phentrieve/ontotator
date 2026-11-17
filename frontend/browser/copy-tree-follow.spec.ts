@@ -312,8 +312,7 @@ for (const size of SIZES) {
         // The text stays in view; the "New finding" bar holds the button, as an icon.
         const bar = page.getByRole("group", { name: "New finding", exact: true });
         const icon = bar.getByRole("button", { name: "Copy text" });
-        // The workspace is as high as the window and starts under the header: the bar shows once the header scrolled away.
-        await bar.scrollIntoViewIfNeeded();
+        // The workspace is as high as the window and starts under the header: the bar sticks to the window's bottom (issue 452).
         await expect(icon).toBeInViewport({ ratio: 1 });
         await shot(page, `${size.name}-new-finding-bar`);
         await resetClipboard(page);

@@ -136,3 +136,67 @@ for (const size of [DESKTOP, PHONE]) {
     expect(errors).toEqual([]);
   });
 }
+
+// ---- Issue 452 ------------------------------------------------------------------------------------------------
+
+const pageScroll = (page: Page) => page.locator(".shell-reading").evaluate(element => element.scrollTop);
+
+for (const size of [PHONE, { width: 375, height: 667 }, { width: 667, height: 375 }]) {
+  test(`issue 452: after marking text, "Choose term" is in view and clickable without scrolling (${size.width} × ${size.height})`, async ({ page }) => {
+    const errors = consoleErrors(page);
+    const s = await openLoop(page, size);
+    const text = s.texts["loop-en"];
+    expect(await pageScroll(page), "the page starts unscrolled").toBe(0);
+    await shot(page, `452-unmarked-${size.width}x${size.height}`);
+
+    // A passage at the top of the text.
+    const marked = page.locator(".text-container .run--marked").first();
+    await selectText(page, text.indexOf("patient"), text.indexOf("patient") + "patient".length);
+    await expect(pendingBar(page)).toBeVisible();
+    await shot(page, `452-marked-${size.width}x${size.height}`);
+    for (const name of ["Choose term", "Discard", "Copy text"]) {
+      const button = pendingBar(page).getByRole("button", { name, exact: true });
+      await expect(button, name).toBeInViewport({ ratio: 1 });
+      expect(await onTop(button), `${name} is not covered`).toBe(true);
+    }
+    // Nothing moved: the page is still unscrolled, the bar is at the bottom edge of the window.
+    expect(await pageScroll(page)).toBe(0);
+    const bar = (await pendingBar(page).boundingBox())!;
+    expect(Math.round(bar.y + bar.height)).toBe(size.height);
+    // The marked passage is in view, above the bar, and nothing lies over it.
+    await expect(marked).toBeInViewport({ ratio: 1 });
+    expect(await onTop(marked), "the marked text is not covered").toBe(true);
+    const mark = (await marked.boundingBox())!;
+    expect(mark.y + mark.height).toBeLessThanOrEqual(bar.y);
+    expect(await noSidewaysScroll(page)).toBe(true);
+
+    // The bar leads on to the term search.
+    await chooseTerm(page).click();
+    await expect(search(page)).toBeVisible();
+    await expect(search(page)).toHaveValue("patient");
+    await shot(page, `452-term-search-${size.width}x${size.height}`);
+    expect(errors).toEqual([]);
+  });
+}
+
+test("issue 452: a passage marked where the bar appears is moved clear of it, by no more than needed", async ({ page }) => {
+  const errors = consoleErrors(page);
+  // A window so low that the first line of the text is at its bottom edge, where the bar goes.
+  const s = await openLoop(page, { width: 390, height: 270 });
+  const text = s.texts["loop-en"];
+  const line = (await textPane(page).locator(".run").first().boundingBox())!;
+  expect(line.y + line.height, "the text's first line is where the bar will be").toBeGreaterThan(270 - 40);
+  await selectText(page, text.indexOf("patient"), text.indexOf("patient") + "patient".length);
+  await expect(pendingBar(page)).toBeVisible();
+  const marked = page.locator(".text-container .run--marked").first();
+  await expect.poll(() => pageScroll(page)).toBeGreaterThan(0);
+  await shot(page, "452-marked-under-bar-390x270");
+  const [bar, mark] = [(await pendingBar(page).boundingBox())!, (await marked.boundingBox())!];
+  expect(mark.y + mark.height).toBeLessThanOrEqual(bar.y);
+  expect(bar.y - (mark.y + mark.height), "scrolled no further than needed").toBeLessThanOrEqual(12);
+  await expect(marked).toBeInViewport({ ratio: 1 });
+  expect(await onTop(marked)).toBe(true);
+  await expect(chooseTerm(page)).toBeInViewport({ ratio: 1 });
+  expect(await onTop(chooseTerm(page))).toBe(true);
+  expect(errors).toEqual([]);
+});

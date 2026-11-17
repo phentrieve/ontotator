@@ -105,6 +105,7 @@ What for: record a term that the text mentions.
 
 1. Select the words in the text with the mouse. With the keyboard: click before the first word (or press Tab until the text has focus), hold Shift and move with the arrow keys.
 2. The panel **New finding** shows the marked text. To adjust it, drag the edge handles at its start and end, or focus a handle and press `←` or `→`.
+   - On a phone, the text stays where it is and a **New finding** bar appears at the bottom of the screen. Tap **Choose term** to go on to the term search, or **Discard**.
 3. **Search term** is already filled with the marked words, and the hits are listed under **Terms**. Change the words, or type a code such as `HP:0001250`, if the right term is not among them.
 4. Press Enter to add the top hit, or click a hit. Enter adds nothing when the top hit is a **Weak match**: click a hit, or choose it with `↓` and press Enter.
 5. The finding is created with the project's prefilled values. [Confirm or change them](#set-values-and-confirm-defaults).
