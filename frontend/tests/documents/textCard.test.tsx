@@ -525,7 +525,7 @@ describe("translation part", () => {
     const row = assignRow({ versions, work: [] });
     renderCard({ row, initialSegment: "translation", now: new Date("2026-11-20T12:00:00") });
     const part = within(card()).getByRole("heading", { name: "Translation" }).closest("section")!;
-    expect(within(part).getByText("Editorial correction by Project lead (ann-0002), 17 Nov, 10:12 · Space before the full stop")).toBeTruthy();
+    expect(within(part).getByText("Typo fix by Project lead (ann-0002), 17 Nov, 10:12 · Space before the full stop")).toBeTruthy();
   });
 
   it("issue 341: Upload new version… on the newest version of each translation, with how an uploaded version was made", () => {

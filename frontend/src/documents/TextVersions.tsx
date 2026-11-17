@@ -74,9 +74,9 @@ export function uploadLabel(upload: NonNullable<DocumentVersionView["upload"]>, 
   return [[who, upload.uploaded_at ? formatTime(upload.uploaded_at, { now }) : null].filter(Boolean).join(", "), made ? `Made ${made}` : null, upload.note?.trim()].filter(Boolean).join(" · ");
 }
 
-/** "Editorial correction by Project lead (ann-0002), 17 Nov, 10:12 · Space before the full stop" (issue 453). */
+/** "Typo fix by Project lead (ann-0002), 17 Nov, 10:12 · Spacing; Typo" (issue 453: the record of an editorial correction). */
 export function editorialCorrectionLabel(record: NonNullable<DocumentVersionView["editorial_correction"]>, now?: Date): string {
-  const who = ["Editorial correction", record.corrected_by ? `by ${identityLabel(record.corrected_by)}` : null].filter(Boolean).join(" ");
+  const who = ["Typo fix", record.corrected_by ? `by ${identityLabel(record.corrected_by)}` : null].filter(Boolean).join(" ");
   return [[who, record.corrected_at ? formatTime(record.corrected_at, { now }) : null].filter(Boolean).join(", "), record.reason.trim()].filter(Boolean).join(" · ");
 }
 

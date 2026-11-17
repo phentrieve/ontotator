@@ -208,7 +208,7 @@ What for: correct spacing, a typo or grammar in a translation without a translat
 
 An editorial correction is made with the MCP tool `editorial_correction` ([MCP server guide](../../mcp/README.md)) or with `POST /api/v1/projects/{key}/documents/{document_id}/editorial-correction`, both with a project token of a lead that has the scope *Project administration*. The tool takes the passages to replace, each with its replacement, and a reason. Without `confirm` it changes nothing and returns the changed passages and what would follow.
 
-The corrected text becomes the next version of the translation, a correction of the version it fixes with that version's status: the correction of an accepted v2 is an accepted v3, and v2 stays accepted as well. The version row names the correction, for example *Editorial correction by Project lead (ann-0002), 17 Nov, 10:12 · Space before the full stop*. The audit log records who corrected the text, the changed passages and the reason.
+The corrected text becomes the next version of the translation, a correction of the version it fixes with that version's status: the correction of an accepted v2 is an accepted v3, and v2 stays accepted as well. The version row names the correction, for example *Typo fix by Project lead (ann-0002), 17 Nov, 10:12 · Space before the full stop*. The audit log records who corrected the text, the changed passages and the reason.
 
 What happens to work on the corrected version:
 
