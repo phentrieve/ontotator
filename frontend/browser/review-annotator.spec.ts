@@ -5,6 +5,7 @@
  *   a task from proposals gives its reason.
  * - My tasks on a phone: text, task, status with its reason and the action are readable without sideways
  *   scrolling, for annotation, consolidation and translation review rows with long names.
+ * - "Copy text" and Ctrl/Cmd+C copy the passage of a selected tool proposal, as they do for a finding.
  *
  * Every test builds its own project. With REVIEW_ANNOTATOR_SHOTS=<directory> the states are saved as screenshots.
  */
@@ -226,3 +227,55 @@ test("1440: My tasks keeps its columns, and Reopened opens its reason", async ({
   await shot(page, "my-tasks-1440");
   expect(errors).toEqual([]);
 });
+
+for (const [name, size] of [["1440", DESKTOP], ["390", PHONE]] as [string, Size][]) {
+  test(`${name}: "Copy text" and the copy shortcut copy the passage of a selected tool proposal`, async ({ page, browserName }) => {
+    test.skip(browserName !== "chromium", "The clipboard is read back; the other engines are covered by the unit tests.");
+    const errors = consoleErrors(page);
+    await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.setViewportSize(size);
+    const scenario = await proposalCheckScenario(page, "ONE_ASSIGNED");
+    await loginCheckUser(page, scenario, "tom");
+    await page.goto(`/#/tasks/${scenario.assignments.tom}`);
+    await expect(page.locator(".text-container")).toBeVisible();
+    const clipboard = () => page.evaluate(() => navigator.clipboard.readText());
+    const reset = () => page.evaluate(() => navigator.clipboard.writeText("-"));
+    const views = page.getByRole("navigation", { name: "Select view" });
+    const phone = size.width < 700;
+
+    if (phone) await views.getByRole("button", { name: /^Findings/ }).click();
+    await page.locator('.sidebar [data-list-key^="target:"]').first().click();
+    const panel = page.locator(".review-actions__proposal");
+    if (phone && !await panel.isVisible()) await views.getByRole("button", { name: "Details", exact: true }).click();
+    const quote = panel.locator(".review-actions__quote").first();
+    const button = quote.getByRole("button", { name: /^(Copy text|Copied)$/ });
+    await button.scrollIntoViewIfNeeded();
+    expect(await onTop(button)).toBe(true);
+    // The quoted passage itself, without the button's label.
+    const passage = (await quote.evaluate(element => element.firstChild?.textContent ?? "")).trim();
+    expect(passage.length).toBeGreaterThan(2);
+    expect(await page.locator(".text-container").innerText()).toContain(passage);
+
+    await reset();
+    await button.click();
+    await expect.poll(clipboard).toBe(passage);
+    await expect(button).toHaveAccessibleName("Copied");
+    await shot(page, `proposal-copy-${name}`);
+    await expect(button).toHaveAccessibleName("Copy text", { timeout: 4000 });
+
+    // The shortcut, with nothing else selected.
+    await reset();
+    await page.keyboard.press("ControlOrMeta+c");
+    await expect.poll(clipboard).toBe(passage);
+
+    // A field with its own selection copies that selection.
+    const note = page.getByRole("textbox", { name: "Reviewer note", exact: true });
+    await note.fill("my own words");
+    await note.selectText();
+    await page.keyboard.press("ControlOrMeta+c");
+    await expect.poll(clipboard).toBe("my own words");
+    await note.fill("");
+    expect(await noSidewaysScroll(page)).toBe(true);
+    expect(errors).toEqual([]);
+  });
+}
