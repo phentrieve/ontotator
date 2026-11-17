@@ -216,6 +216,34 @@ What for: see each version of a translation, its reviews and its origin.
    At the newest accepted version, **Correct the translation…** lets you correct it yourself ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)). At the newest version of a translation, **Upload new version…** brings in a text made elsewhere as the next version ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)).
 4. Click **Compare with source** to compare the translation with the source text.
 
+### Find spacing errors and invisible characters
+
+What for: find texts with spacing errors or invisible characters, for example before you assign them.
+
+Ontotator computes typography hints for a text when you ask for them. A hint names a rule and a position in the text. Hints are not stored and never block review, annotation or export; nothing is corrected automatically.
+
+| Rule code | What it finds |
+| --- | --- |
+| `DOUBLE_SPACE` | Two or more spaces inside a line. |
+| `SPACE_BEFORE_PUNCTUATION` | A space before `,` `;` `:` `!` `?` or `.` |
+| `MISSING_SPACE_AFTER_PUNCTUATION` | Punctuation directly between two words, for example *Fieber,Husten*. Numbers, dates, times, abbreviations such as *z.B.* or *e.g.*, web addresses and ellipses are left alone. |
+| `TRAILING_WHITESPACE_LINE` | Spaces or tabs at the end of a line. |
+| `TRAILING_WHITESPACE_TEXT` | Spaces, tabs or line breaks at the end of the text. |
+| `TAB` | A tab. |
+| `NON_BREAKING_SPACE` | A non-breaking space. |
+| `ZERO_WIDTH_CHARACTER` | A zero-width space or joiner, or a byte order mark. |
+| `SOFT_HYPHEN` | A soft hyphen. |
+| `CONTROL_CHARACTER` | Another control character. |
+
+There is no page for the hints yet. Read them through the API or the MCP server (token scope `read`):
+
+- One text version: `GET /api/v1/projects/{key}/documents/{document_id}/typography-hints`, or the MCP tool `list_typography_hints` with `document_id`. Each hint has `rule`, `start` and `end`; positions count Unicode code points, as the positions of findings do.
+- The whole project: `GET /api/v1/projects/{key}/typography-hints`, or `list_typography_hints` without `document_id`. It returns the number of hints per rule for each text that has any, 100 texts per page (`limit` up to 200); pass `next_after` as `after` for the next page. Only the newest version of each text is counted unless you ask for `versions=all`.
+
+You get hints for the texts you may read, as with the texts themselves. The MCP tool returns no text; a server started with `ONTOTATOR_MCP_READ_CONTENT=1` can add excerpts with `include_text` ([MCP server guide](../../mcp/README.md)).
+
+To see the characters in a text, a reviewer ticks **Show invisible characters** in the translation review ([Show invisible characters](annotator.md#show-invisible-characters)). To fix them in a translation, correct it ([Request a translation correction](#request-a-translation-correction)).
+
 ### Request a translation correction
 
 What for: have a translation corrected by a reviewer.

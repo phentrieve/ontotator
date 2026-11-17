@@ -451,6 +451,28 @@ With the keyboard: Tab to a sentence, then press Enter or Space to mark it. Shif
 
 On a touch-only device such as a phone or tablet, **Mark checked sentences** is not offered, because a swipe on the text has to scroll. A review you can only read does not offer it either.
 
+### Show invisible characters
+
+What for: see spacing errors and characters you cannot see otherwise, such as a double space, a tab or a non-breaking space.
+
+1. Tick **Show invisible characters** above the texts. Your choice is remembered in this browser.
+2. Read the marks in all texts:
+
+   | Mark | Character |
+   | --- | --- |
+   | grey dot `·` | space; two dots are a double space |
+   | arrow `→` | tab |
+   | small circle `°` | non-breaking space |
+   | amber bar between two characters | zero-width character, for example a zero-width space |
+   | small `¬` above the line | soft hyphen |
+   | `¶` | end of a line; a dot before it is a space at the end of the line |
+
+3. Correct the translation as usual. Untick the box to hide the marks again.
+
+The marks only change what you see. They are not part of the text: selecting, copying and saving give the text without them, and the lines break where they broke before. The marks also show with **Show changes** and **Mark checked sentences**.
+
+Ontotator does not correct anything by itself, and a mark never blocks your review.
+
 ## Keyboard shortcuts
 
 What for: work without the mouse. Shortcuts are off while you type in a field or when a dialog is open. Letter keys work in lower and upper case alike. **Keyboard shortcuts (?)** in **More**, or `?`, lists the shortcuts of the current screen, grouped for example under *Finding*, *Decisions* and *Carried findings*. A key that needs something first, such as a selected finding or proposal, is listed with *(not available right now)*. Many buttons also show their key next to the label.

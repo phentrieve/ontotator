@@ -184,6 +184,13 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     setMarkingOn(on);
     try { window.localStorage.setItem(markingKey, on ? "1" : "0"); } catch { /* Blocked storage: not remembered. */ }
   };
+  // "Show invisible characters" (issue 454) starts off; on or off is remembered per user in this browser. It only changes how the texts are drawn.
+  const invisiblesKey = `ontotator.translationReview.showInvisibles.v1:${props.username}`;
+  const [showInvisibles, setShowInvisibles] = useState(() => { try { return window.localStorage.getItem(invisiblesKey) === "1"; } catch { return false; } });
+  const chooseInvisibles = (on: boolean) => {
+    setShowInvisibles(on);
+    try { window.localStorage.setItem(invisiblesKey, on ? "1" : "0"); } catch { /* Blocked storage: not remembered. */ }
+  };
   // On a touch screen a swipe on the text would mark instead of scroll, so the mode is not offered there.
   const touchOnly = useMediaQuery("(hover: none) and (pointer: coarse)");
   /**
@@ -722,6 +729,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
           {!readOnly && !touchOnly && <span className="translation-tools-divider" aria-hidden="true" />}
           <Checkbox id="review-show-changes" label="Show changes" checked={showChanges && !marking} disabled={marking} onChange={event => setShowChanges(event.target.checked)} />
           {pairing.available && <Checkbox id="review-couple" label="Couple scrolling" checked={coupled} onChange={event => setRequestedCoupling(event.target.checked ? couplingIdentity : null)} />}
+          <Checkbox id="review-show-invisibles" label="Show invisible characters" checked={showInvisibles} onChange={event => chooseInvisibles(event.target.checked)} />
           <div className="translation-tools-end">
             <Button ref={matchButton} size="sm" title={showMatchingTitle} aria-keyshortcuts="Alt+M" onMouseDown={event => event.preventDefault()} onClick={showMatching}>
               {showMatchingLabel}<span aria-hidden="true"> <Kbd>Alt M</Kbd></span></Button>
@@ -739,9 +747,9 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
               {marking && <SentenceCount name="Source" count={sideCount(sourceStates)} />}</div>
             {marking
               ? <SentenceView ref={setSourceElement} text={workspace.source.text} sentences={sourceSentences} states={sourceStates} label={`Source (${sourceLanguage})`} lang={sourceLanguage}
-                  disabled={busy} onToggle={index => applyMarks("source", states => toggled(states, index))}
+                  disabled={busy} showInvisibles={showInvisibles} onToggle={index => applyMarks("source", states => toggled(states, index))}
                   onRange={(from, to, checked) => applyMarks("source", states => withRange(states, from, to, checked))} />
-              : <TextView ref={setSourceElement} text={workspace.source.text} label={`Source (${sourceLanguage})`} lang={sourceLanguage} />}
+              : <TextView ref={setSourceElement} text={workspace.source.text} label={`Source (${sourceLanguage})`} lang={sourceLanguage} showInvisibles={showInvisibles} />}
           </div>
           <div className="translation-column">
             <div className="translation-column-head density-compact">
@@ -754,12 +762,12 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
             </div>
             {marking
               ? <SentenceView ref={setTargetElement} text={text} sentences={targetSentences} states={targetStates} label={`Translation (${targetLanguage})`} lang={targetLanguage}
-                  disabled={busy} onToggle={index => applyMarks("translation", states => toggled(states, index))}
+                  disabled={busy} showInvisibles={showInvisibles} onToggle={index => applyMarks("translation", states => toggled(states, index))}
                   onRange={(from, to, checked) => applyMarks("translation", states => withRange(states, from, to, checked))} />
               : showChanges
-              ? <DiffView ref={setTargetElement} before={workspace.text} after={text} lang={targetLanguage} />
+              ? <DiffView ref={setTargetElement} before={workspace.text} after={text} lang={targetLanguage} showInvisibles={showInvisibles} />
               : <TranslationEditor ref={setTargetElement} id="review-translation" labelledBy="review-translation-label" describedBy="review-translation-note"
-                  machineText={workspace.text} value={text} lang={targetLanguage} readOnly={readOnly} disabled={busy}
+                  machineText={workspace.text} value={text} lang={targetLanguage} readOnly={readOnly} disabled={busy} showInvisibles={showInvisibles}
                   onChange={event => editText(event.target.value)}
                   onBlur={() => { composing.current = false; commitStarts(); }}
                   onCompositionStart={() => { composing.current = true; window.clearTimeout(startsTimer.current); }}
@@ -778,7 +786,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
               <Button size="sm" className="translation-compare-close" aria-label="Close comparison" onClick={() => showComparison(false)}>Close</Button>
               </div>
             </div>
-            <TextView key={comparisonId} ref={setComparisonElement} text={comparison.text} label="Comparison" lang={comparison.variant.language} />
+            <TextView key={comparisonId} ref={setComparisonElement} text={comparison.text} label="Comparison" lang={comparison.variant.language} showInvisibles={showInvisibles} />
           </div>}
           {/* One line below the panes spanning the text columns, so the notes never push one pane below the others. */}
           {coupled && <p className="translation-column-hint">
