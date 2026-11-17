@@ -70,3 +70,17 @@ it("keeps the first version of a machine translation as before", async () => {
   expect(screen.queryByRole("button", { name: "Compare" })).toBeNull();
   expect(screen.getByRole("region", { name: "Automatic translation checks" }).textContent).toContain("1 automatic check failed: Units added in translation");
 });
+
+it("shows the lead's reason for the review above the decision", async () => {
+  await open(reviewWorkspace({ second_review_at: "2026-11-17T09:30:00Z", second_review_reason: "Check the dose in paragraph 2.",
+    reopened_at: "2026-11-18T10:00:00Z", reopen_reason: "The unit is mg in my copy.",
+    assignment: { ...reviewWorkspace().assignment, status: "reopened" } }));
+  const note = screen.getByRole("note", { name: "From the lead" });
+  expect([...note.querySelectorAll("p")].map(line => line.textContent)).toEqual([
+    expect.stringMatching(/^Second review requested by the lead on .+: Check the dose in paragraph 2\.$/),
+    expect.stringMatching(/^Reopened by the lead on .+: The unit is mg in my copy\.$/)]);
+  // Above the decision form, inside "Your review".
+  const legend = document.querySelector("[data-decision-legend]")!;
+  expect(note.compareDocumentPosition(legend) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(note.closest(".translation-decision")).not.toBeNull();
+});

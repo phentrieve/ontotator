@@ -9529,6 +9529,14 @@ export interface components {
             checked_sentences?: components["schemas"]["CheckedSentences"];
             version_origin?: components["schemas"]["VersionOrigin"] | null;
             previous_version?: components["schemas"]["ReviewText"] | null;
+            /** Second Review At */
+            second_review_at?: string | null;
+            /** Second Review Reason */
+            second_review_reason?: string | null;
+            /** Reopened At */
+            reopened_at?: string | null;
+            /** Reopen Reason */
+            reopen_reason?: string | null;
         };
         /** RevokedAssignmentView */
         RevokedAssignmentView: {
@@ -10507,6 +10515,10 @@ export interface components {
             reopen_reason?: string | null;
             /** Consolidation Reason */
             consolidation_reason?: string | null;
+            /** Second Review At */
+            second_review_at?: string | null;
+            /** Second Review Reason */
+            second_review_reason?: string | null;
             /**
              * Report Answered
              * @default false

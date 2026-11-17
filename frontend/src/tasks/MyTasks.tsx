@@ -14,6 +14,7 @@ import { annotationTaskName } from "../editor/modes";
 import { PracticeCard, PracticeGroup } from "../practice/PracticeOnMyTasks";
 import { usePractice } from "../practice/usePractice";
 import { notifyTasksChanged } from "./tasksEvents";
+import { reopenedText, secondReviewText } from "./LeadReason";
 
 export interface MyTasksProps {
   project?: string;
@@ -67,6 +68,10 @@ export function memberHint(members: Pick<ProjectSummary, "name" | "roles">[]): s
 }
 
 const answerRoute = (task: TaskSummary, reportId: string): Route => ({ name: "projectProblemReport", key: task.project_key, reportId });
+
+/** Why a task reads "Reopened": the lead's reopen, or for a review reopened by "Request correction…" that request. */
+const reopenedNotice = (task: TaskSummary): string | null =>
+  task.status === "reopened" && !reopenedText(task) ? secondReviewText(task) ?? reopenNotice(task) : reopenNotice(task);
 
 /** The "Reopened" badge itself opens a popover with when and why (#34): the row stays one badge high. */
 function ReopenedInfo({ notice }: { notice: string }): JSX.Element {
@@ -196,10 +201,11 @@ export function MyTasks({ project, status, projects, onNavigate, username }: MyT
       {taskDescription(task)}
       {failedChecks(task) > 0 && <span className="task-check-flag"><IconWarning /> {failedChecksTitle(failedChecks(task))}</span>}
       {task.consolidation_reason && <p className="cell-secondary task-consolidation-reason">{consolidationReasonText(task.consolidation_reason)}</p>}
+      {secondReviewText(task) && <p className="cell-secondary task-lead-reason">{secondReviewText(task)}</p>}
     </> },
     { id: "status", header: "Status", cell: task => <>
       {task.waiting_for_translation_review || task.waiting_for_lead ? <StatusBadge tone="neutral">{task.waiting_for_lead ? WAITING_FOR_LEAD : WAITING_FOR_REVIEW}</StatusBadge>
-        : reopenNotice(task) ? <ReopenedInfo notice={reopenNotice(task)!} /> : <StatusBadge status={task.status}>{assignmentStatusLabels[task.status]}</StatusBadge>}
+        : reopenedNotice(task) ? <ReopenedInfo notice={reopenedNotice(task)!} /> : <StatusBadge status={task.status}>{assignmentStatusLabels[task.status]}</StatusBadge>}
       {task.report_answered && (task.answered_report_id ? <a className="task-answer-link" href={routeHref(answerRoute(task, task.answered_report_id))} onClick={event => {
         if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
         event.preventDefault(); onNavigate(answerRoute(task, task.answered_report_id!));

@@ -19,6 +19,7 @@ import { notifyFinalSelectionChanged } from '../variants/finalSelectionState';
 import { ChecksSummary, ReviewSummary, SubmitSummary } from "./ReviewParts";
 import { ReviewForm } from "./ReviewForm";
 import { taskText } from "../app/identity";
+import { LeadReason } from "../tasks/LeadReason";
 import { autoNoteText, chooseDecision, reactToTextEdit, USER_ORIGIN, type DecisionState } from "./decisionOrigin";
 import { acceptedCorrection, annotateThisTextLabel, categoryLabels, comparisonCountsDiffer, couplingEditingNote, couplingNote, decisionConsequence, decisionKeyHint, decisionLabels, decisionOutcomes, formatReviewDate, issueMessages, languageName, leadCorrectionKeyHint, leadCorrectionNote, matchingParagraphStatus, nextTaskLabel, paragraphCountChanged, paragraphCountsDiffer, remainingTasksText, reviewIssueMessage, showMatchingLabel, showMatchingShortcut, showMatchingTitle, translationNote, versionOriginRows } from "./labels";
 import { checkReview, type ClinicalCategory, type ReviewDecisionCode, type ReviewForm as FormValue } from "./reviewRules";
@@ -832,6 +833,8 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
             {wide && <IconButton size="sm" variant="quiet" className="translation-decision-collapse" label="Collapse review panel" icon={<IconChevronRight />}
               aria-expanded aria-controls="translation-decision-body" onClick={() => collapsePanel(true)} />}
           </div>
+          {/* Why the lead asked for this review, where the reviewer decides; a reopen only until it is submitted again. */}
+          <LeadReason task={{ ...workspace, status: record ? "submitted" : workspace.assignment.status }} />
           <SourceObligationReview assignmentId={props.assignmentId} username={props.username} documentId={workspace.variant.document_id}
             translationText={text} canResolve={canSubmit && !!form && ['accepted_unchanged', 'accepted_corrected'].includes(form.decision)}
             busy={busy} readOnly={readOnly} error={error} onResolve={submit} />

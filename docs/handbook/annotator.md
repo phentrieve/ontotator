@@ -433,6 +433,15 @@ On a wide screen, **Your review** is a column on the right. To give the texts mo
 
 A project lead who corrects a translation themselves sees only **Accepted with corrections**. When the lead corrects a translation that was already accepted, the corrected version is reviewed again: it then appears as a new translation review task, usually for you ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
 
+#### Why the lead asked for this review
+
+When the lead asked for the review with **Request correction…**, or reopened a review you had submitted, the lead's words stand above **Decision**:
+
+- *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.* The same line is under the task name in **My tasks**.
+- *Reopened by the lead on 18 Nov 2026, 10:00: The unit is mg in my copy.* In **My tasks**, click the **Reopened** badge to read it. Without a reason from the lead it ends with *No reason given.*
+
+A reopened review starts again from the text of its version; your earlier decision is listed under **Previous reviews**.
+
 #### Review a later version
 
 What for: review a translation that already has an earlier version, for example a text the lead uploaded with **Upload new version…** or corrected, or a version another reviewer corrected. The text name in **My tasks** and in the task ends with the version, for example *case-0101 de v2 corrected*.

@@ -15,6 +15,7 @@ import { WorkRoundsDialog } from "./WorkRoundsDialog";
 import { TaskProblemActions } from "./TaskProblemActions";
 import { TaskGuidelines } from "./TaskGuidelines";
 import { notifyTasksChanged } from "./tasksEvents";
+import { LeadReason } from "./LeadReason";
 import { ReportAnswerNotice } from "../problems/ReportAnswerNotice";
 import { roundBadge as roundBadgeOf, roundIdentity } from "../editor/rounds/roundLabels";
 import { ConsolidationScreen } from "../consolidation/ConsolidationScreen";
@@ -191,7 +192,8 @@ function AnnotationTaskEditor({ assignmentId, user, onNavigate, routeLeaveRef, l
     // The task's guidelines and "Report a text problem" stay at hand: the consolidator decides guideline questions.
     return <TaskGuidelines assignment={assignment} place="header" readOnly={workspace.read_only || assignment.held}>{guidelines => <>
       <ConsolidationScreen projectKey={assignment.project_key} roundId={roundInfo.round_id} assignmentId={assignmentId} practice={!!listed?.practice}
-        onNavigate={onNavigate} workspaceView={workspace.read_only ? null : workspace.view} notice={guidelines.notice}
+        onNavigate={onNavigate} workspaceView={workspace.read_only ? null : workspace.view}
+        notice={<>{!workspace.read_only && listed && <LeadReason task={listed} className="lead-reason lead-reason--band" />}{guidelines.notice}</>}
         headerActions={<>{guidelines.button}<HelpLink screen="consolidation" />
           {/* Group commands save at once: nothing to save before a report. */}
           <TaskProblemActions assignment={assignment} textName={listed ? taskText(listed) : undefined} readOnly={workspace.read_only} onSaveBeforeReport={async () => undefined} onRefresh={value => {

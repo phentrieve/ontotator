@@ -184,6 +184,20 @@ describe("My tasks component", () => {
     expect(within(rows[1]).queryByText(/^Reason from the lead/)).toBeNull();
   });
 
+  it("shows the lead's reason for a second review under the task name, and as the reason of its Reopened badge", async () => {
+    vi.mocked(api.listMyTasks).mockResolvedValue([
+      { ...task(4, "reopened"), task: "translation_review", second_review_at: "2026-11-17T09:30:00Z", second_review_reason: "Check the dose in paragraph 2." },
+      { ...task(5, "open"), task: "translation_review", second_review_at: "2026-11-17T09:30:00Z", second_review_reason: "Units." }, task(3, "open")]);
+    render(<MyTasks projects={[]} onNavigate={vi.fn()} />);
+    const rows = await screen.findAllByTestId("task-row");
+    expect(within(rows[0]).getByText(/^Second review requested by the lead on .+: Check the dose in paragraph 2\.$/)).toBeDefined();
+    expect(within(rows[1]).getByText(/^Second review requested by the lead on .+: Units\.$/)).toBeDefined();
+    expect(within(rows[2]).queryByText(/^Second review requested/)).toBeNull();
+    // The request set the status "Reopened"; the badge never says "No reason given." beside the reason.
+    fireEvent.click(within(rows[0]).getByRole("button", { name: "Reopened, why" }));
+    expect((await screen.findByRole("dialog", { name: "Why reopened" })).textContent).toMatch(/^Second review requested by the lead on .+: Check the dose in paragraph 2\.$/);
+  });
+
   it("shows pauses alongside underlying status and keeps saved work accessible", async () => {
     vi.mocked(api.listMyTasks).mockResolvedValue([
       { ...task(11, "open"), held: true, hold_reason: "Source evidence needs clarification" },

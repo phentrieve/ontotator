@@ -12,7 +12,9 @@ from sqlalchemy import Connection, RowMapping, func, insert, select, update
 from ontotator.assignments.service import (
     Assignment,
     AssignmentService,
+    latest_reopen,
     move_waiting_tasks,
+    second_review_requests,
 )
 from ontotator.auth.audit import Actor, record_audit
 from ontotator.auth.authority import lock_user_authority
@@ -264,6 +266,13 @@ class ReviewWorkspace:
     # so the reviewer sees what changed. None for the first version.
     version_origin: VersionOrigin | None = None
     previous_version: ReviewText | None = None
+    # What the lead said when asking for this review (as in My tasks): the
+    # reason of "Request correction…" for the task's current round, and of the
+    # latest "Reopen…" while the task is reopened.
+    second_review_at: datetime | None = None
+    second_review_reason: str | None = None
+    reopened_at: datetime | None = None
+    reopen_reason: str | None = None
 
 
 class TranslationReviewService:
@@ -550,6 +559,14 @@ class TranslationReviewService:
             comparisons = translation_review_comparisons(
                 variant, ancestor, variants.values()
             )
+            second = second_review_requests(
+                conn, {assignment.id: assignment.active_round_id}
+            ).get(assignment.id)
+            reopen = (
+                latest_reopen(conn, assignment.id)
+                if assignment.status == "reopened"
+                else None
+            )
             # A later version: the version it was corrected from.
             previous = (
                 variants.get(variant.derived_from)
@@ -586,6 +603,10 @@ class TranslationReviewService:
                 previous_version=None
                 if previous is None
                 else ReviewText(previous, self._text(conn, pid, previous)),
+                second_review_at=second[0] if second else None,
+                second_review_reason=second[1] if second else None,
+                reopened_at=reopen[0] if reopen else None,
+                reopen_reason=reopen[1] if reopen else None,
             )
 
     @staticmethod

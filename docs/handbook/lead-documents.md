@@ -251,7 +251,7 @@ What for: have a translation corrected by a reviewer.
 
 1. Open the text card and click **Translation**.
 2. At the version, click **Request correction…**. It is offered only at an accepted version; for a rejected or queried one, use **Resolve…** ([Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation)).
-3. Choose the **Translation reviewer** and enter the **Reason for another review**.
+3. Choose the **Translation reviewer** and enter the **Reason for another review**. The reviewer reads it under the task in **My tasks** and above **Decision** in the review (*Second review requested by the lead on …*), so say what to look at.
 4. Click **Assign correction review**, then **Close**.
 
 If the reviewer submits **Accepted with corrections**, the corrected text becomes a new text version. While a lead is correcting the same version themselves, the request is refused with *A lead is correcting this version.* ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).

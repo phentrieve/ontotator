@@ -53,6 +53,7 @@ async function submitReview(page: Page, id: number, form: Record<string, unknown
   return workspace;
 }
 const project = (s: ReviewFlowScenario) => `/api/v1/projects/${encodeURIComponent(s.project)}`;
+const ACCEPTED = { decision: "accepted_unchanged", clinical_change: false, categories: [], rationale: "Units checked." };
 const REJECTED = { decision: "rejected", clinical_change: true, categories: ["value"], rationale: "The dose is wrong." };
 
 /**
@@ -126,6 +127,61 @@ for (const [name, viewport] of sizes) {
     await dialog.getByRole("button", { name: "Keep editing", exact: true }).click();
     await noPageScroll(page);
     await shot(page, `f1-review-${name}`, name === "390");
+    expect(errors).toEqual([]);
+  });
+}
+
+const CORRECTION_REASON = "Bitte Dosis in Absatz 2 noch einmal prüfen.";
+const REOPEN_REASON = "Please look at paragraph 3 again; the unit is mg in my copy.";
+const leadReason = (page: Page) => page.getByRole("note", { name: "From the lead", exact: true });
+
+for (const [name, viewport] of sizes) {
+  test(`the lead's reason for a second review and for a reopen is in My tasks and in the review (${name})`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const errors = watchErrors(page);
+    const s = await reviewFlowScenario(page, "REVIEW_FLOW");
+    const second = s.assignments["second-translation"], failed = s.assignments["failed-translation"];
+    await loginScenarioUser(page, s, "ana");
+    const accepted = await submitReview(page, second, ACCEPTED);
+    await submitReview(page, failed, REJECTED);
+    await page.context().clearCookies();
+    await loginScenarioUser(page, s, "lead");
+    // "Request correction…" of the accepted version, to the reviewer who accepted it; "Reopen…" of the rejected one.
+    await call(page, `${project(s)}/documents/${encodeURIComponent(accepted.variant.document_id)}/translation-correction-assignment`, "POST",
+      { username: s.users.ana, expected_text_sha256: accepted.variant.text_sha256, reason: CORRECTION_REASON });
+    await call(page, `/api/v1/assignments/${failed}/reopen`, "POST", { reason: REOPEN_REASON });
+    await page.context().clearCookies();
+    await loginScenarioUser(page, s, "ana");
+    await page.goto(TASKS_HOME);
+    // My tasks: one line under the task name; the Reopened badge gives the same reason, never "No reason given."
+    const row = taskRow(page, second);
+    await expect(row.locator(".task-lead-reason")).toHaveText(new RegExp(`^Second review requested by the lead on .+: ${CORRECTION_REASON}$`));
+    await expect(taskRow(page, failed).locator(".task-lead-reason")).toHaveCount(0);
+    await row.getByRole("button", { name: "Reopened, why", exact: true }).click();
+    // On a phone the popover is a sheet with its title.
+    const why = page.getByRole("dialog", { name: "Why reopened", exact: true });
+    await expect(why).toHaveText(new RegExp(`Second review requested by the lead on .+: ${CORRECTION_REASON}$`));
+    await expect(why).not.toContainText("No reason given");
+    await page.keyboard.press("Escape");
+    await expect(why).toHaveCount(0);
+    await noPageScroll(page);
+    await shot(page, `f2-mytasks-${name}`, true);
+    // The review: the reason stands above Decision.
+    await page.goto(`/#/tasks/${second}`);
+    await expect(target(page)).toBeVisible();
+    await expect(leadReason(page)).toHaveText(new RegExp(`^Second review requested by the lead on .+: ${CORRECTION_REASON}$`));
+    const reasonBox = await leadReason(page).boundingBox(), decision = await page.locator("[data-decision-legend]").boundingBox();
+    expect(reasonBox!.y + reasonBox!.height).toBeLessThanOrEqual(decision!.y);
+    await leadReason(page).scrollIntoViewIfNeeded();
+    await noPageScroll(page);
+    await shot(page, `f2-second-review-${name}`);
+    // A reopened review names the reopen reason in the task as well.
+    await page.goto(`/#/tasks/${failed}`);
+    await expect(target(page)).toBeVisible();
+    await expect(leadReason(page)).toHaveText(new RegExp(`^Reopened by the lead on .+: ${REOPEN_REASON.replace("?", "\\?")}$`));
+    await leadReason(page).scrollIntoViewIfNeeded();
+    await noPageScroll(page);
+    await shot(page, `f2-reopened-${name}`);
     expect(errors).toEqual([]);
   });
 }
