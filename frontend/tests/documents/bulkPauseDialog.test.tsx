@@ -8,7 +8,7 @@ import { BulkPauseDialog } from "../../src/documents/BulkPauseDialog";
 import { pauseAppliedText, pauseApplyLabel, pauseConsequences, pauseGroups, pauseSummaryText, pauseUnavailableReason } from "../../src/documents/bulkPauseModel";
 import { leadPauseLine, pausedWord } from "../../src/documents/labels";
 import { stageText } from "../../src/documents/stageLabels";
-import { pauseMarks, pauseNotice } from "../../src/tasks/pauseLabels";
+import { pauseMarks, pauseNotice, REPORT_WAY_OUT } from "../../src/tasks/pauseLabels";
 
 const tom = { pseudonym: "ann-1", display_name: "Tom Reis", is_me: false };
 const roe = { pseudonym: "ann-2", display_name: "R. Roe", is_me: false };
@@ -135,7 +135,7 @@ it("names the cause of a paused task: the lead, a problem report, or both", () =
   expect(pauseMarks({ held: true, hold_reason: "Text is cut off" })).toEqual([{ cause: "report", badge: "Paused", reason: "Text is cut off" }]);
   expect(pauseNotice(byLead)).toMatchObject({ title: "Paused by lead", reason: WHY });
   expect(pauseNotice(both)).toMatchObject({ title: "Paused by a problem report and by lead", reason: `Text is cut off · Lead: ${WHY}` });
-  expect(pauseNotice({ held: true, hold_reason: "Text is cut off", pause_causes: ["report"] })).toEqual({ title: "Task paused", reason: "Text is cut off" });
+  expect(pauseNotice({ held: true, hold_reason: "Text is cut off", pause_causes: ["report"] })).toEqual({ title: "Task paused", reason: "Text is cut off", kept: REPORT_WAY_OUT });
   expect(pausedWord({ held: true, pause_causes: ["lead"] })).toBe("Paused by lead");
   expect(pausedWord({ held: true, pause_causes: ["report", "lead"] })).toBe("Paused by a problem report and by lead");
   expect(pausedWord({ held: true, pause_causes: ["report"] })).toBe("Paused");

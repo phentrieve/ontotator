@@ -373,8 +373,9 @@ def build_s464(app: FastAPI) -> dict[str, Any]:
     (R. Roe submitted it) and is assigned, not started, on 23, as R. Roe is.
     Tom Reis's submission is the final result of 24 and the only work on 25.
     R. Roe has started 26 and reported a problem there (the task is paused
-    by the report). Nobody works on 27. Ana Weber is an annotator without
-    tasks; Carla Diaz is the lead."""
+    by the report). Nobody works on 27. Both submitted 28 with one finding
+    each, and Kim Lang's consolidation of it is open. Ana Weber is an
+    annotator without tasks; Carla Diaz is the lead."""
     from datetime import UTC, datetime
 
     from t1_builders import native_unit
@@ -384,7 +385,7 @@ def build_s464(app: FastAPI) -> dict[str, Any]:
     from ontotator.storage.tables import AssignmentRow
 
     scenario = new_project(app, "S464")
-    cases = [f"EN1000{number}" for number in range(22, 28)]
+    cases = [f"EN1000{number}" for number in range(22, 29)]
     docs = import_texts(
         scenario,
         [
@@ -400,13 +401,15 @@ def build_s464(app: FastAPI) -> dict[str, Any]:
             .values(annotations_per_text=2)
         )
     add_user(scenario, "lead", ["lead"])
+    add_user(scenario, "kim", ["adjudicator"])
     for name, display in (
         ("lead", "Carla Diaz"),
+        ("kim", "Kim Lang"),
         ("tom", "Tom Reis"),
         ("roe", "R. Roe"),
         ("ana", "Ana Weber"),
     ):
-        if name != "lead":
+        if name not in ("lead", "kim"):
             add_user(scenario, name, ["annotator"])
         app.state.accounts.update_profile(
             Actor.cli(), scenario.users[name], display_name=display
@@ -432,6 +435,17 @@ def build_s464(app: FastAPI) -> dict[str, Any]:
             )
             .values(status="in_progress", updated_at=datetime.now(UTC))
         )
+    from browser_documents_scenarios import start_round
+    from browser_overview_scenarios import assign_and_annotate
+
+    inputs = [
+        assign_and_annotate(scenario, doc["EN100028"], name, [term])["submission_id"]
+        for name, term in (("tom", "HP:0001250"), ("roe", "HP:0001252"))
+    ]
+    consolidation = assign(scenario, doc["EN100028"], "kim", "review")
+    start_round(
+        scenario, consolidation, "kim", kind="consolidation", sources=inputs, by="lead"
+    )
     opened = report(
         scenario,
         "roe",
@@ -449,6 +463,7 @@ def build_s464(app: FastAPI) -> dict[str, Any]:
             "started": started["assignment_id"],
             "waiting_tom": waiting["tom"],
             "reported": reported["assignment_id"],
+            "consolidation": consolidation,
         },
         report_id=opened.report_id,
     )

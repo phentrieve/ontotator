@@ -207,8 +207,9 @@ def test_s12_orphan_pause_and_extended_hold_note(client):
 def test_s464_work_in_progress_a_report_pause_and_nothing_paused_by_a_lead(client):
     """Issue 464: the lead pause spec starts from texts no lead has paused."""
     body = scenario(client, "S464")
-    assert len(body["rows"]) == 6 and set(body["users"]) == {
+    assert len(body["rows"]) == 7 and set(body["users"]) == {
         "lead",
+        "kim",
         "tom",
         "roe",
         "ana",
@@ -224,3 +225,8 @@ def test_s464_work_in_progress_a_report_pause_and_nothing_paused_by_a_lead(clien
     assert not any(found for case, found in causes.items() if case != "EN100026")
     assert rows["EN100024"]["final"] is not None
     assert rows["EN100027"]["work"] == []
+    review = [w for w in rows["EN100028"]["work"] if w["task"] == "review"]
+    assert [w["assignment_id"] for w in review] == [
+        body["assignments"]["consolidation"]
+    ]
+    assert rows["EN100028"]["stages"]["annotation"]["state"] == "consolidating"

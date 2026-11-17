@@ -361,4 +361,86 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
     await roe.context().close();
     expect(errors).toEqual([]);
   });
+  test(`a paused consolidation is read-only and names the pause: by the lead, then by a problem report (${width} px)`, async ({ page, browser }) => {
+    const errors: string[] = [];
+    watch(page, errors);
+    await page.setViewportSize(size);
+    const s = await documentsScenario(page, "S464") as Scenario;
+    // Kim Lang has the consolidation open before the pause lands; one refused decision is what this test is about.
+    const kim = await person(browser, s.users.kim, size, errors, /status of 409 \(Conflict\)/);
+    const task = `/#/tasks/${s.assignments.consolidation}`;
+    await kim.goto(task);
+    const keep = kim.getByRole("button", { name: /^Keep .+'s finding$/ });
+    const add = kim.getByRole("button", { name: /^Add finding/ });
+    await expect(kim.getByRole("heading", { level: 1, name: /^Consolidate EN100028/ })).toBeVisible();
+    await expect(keep.first()).toBeVisible();
+
+    await loginExisting(page, s.users.lead);
+    await page.goto(`/#/projects/${encodeURIComponent(s.project)}/documents`);
+    await documentsReady(page);
+    await selectTexts(page, ["EN100028"]);
+    await run(page, "Pause", 1, 1, WHY);
+    await expect(rowOf(page, "EN100028").getByText("Paused by lead").first()).toBeVisible();
+
+    // The decision is refused; the screen names the pause (not "changed elsewhere") and turns read-only.
+    await keep.first().click();
+    await expect(kim.getByText(`Paused by lead: ${WHY}`)).toBeVisible();
+    await expect(kim.getByText(/changed elsewhere/)).toHaveCount(0);
+    await expect(keep).toHaveCount(0);
+    await expect(add).toHaveCount(0);
+    await expect(kim.getByRole("button", { name: /^Submit/ })).toHaveCount(0);
+    await kim.getByRole("button", { name: "Show more" }).click();
+    await expect(kim.getByText("It opens again when the project lead releases the text.", { exact: false })).toBeVisible();
+    expect(await noHorizontalScroll(kim)).toBe(true);
+    await shot(kim, `464-consolidation-paused-by-lead${suffix}`);
+    // Opened again, and in the full editor: the same banner, read-only.
+    await kim.reload();
+    await expect(kim.getByText(`Paused by lead: ${WHY}`)).toBeVisible();
+    await expect(keep).toHaveCount(0);
+    await kim.goto(`${task}?view=editor`);
+    await expect(kim.getByText(`Paused by lead: ${WHY}`)).toBeVisible();
+    await expect(kim.getByRole("button", { name: /^Finish & submit/ })).toHaveCount(0);
+    await shot(kim, `464-consolidation-editor-paused-by-lead${suffix}`);
+
+    await page.locator(".ui-toast").getByRole("button", { name: "Dismiss" }).click();
+    await run(page, "Release", 1, 1);
+    await kim.goto(task);
+    await expect(keep.first()).toBeVisible();
+    await expect(kim.getByText(/^Paused by lead: /)).toHaveCount(0);
+
+    // A problem report pauses the consolidation as well: the banner says so and how to continue.
+    await kim.getByRole("button", { name: /^Report a text problem/ }).click();
+    const form = kim.getByRole("dialog", { name: "New problem report", exact: true });
+    await form.getByRole("textbox", { name: /What is the problem\?/ }).fill("Two findings name the same passage.");
+    await form.getByRole("button", { name: "Report and pause my task", exact: true }).click();
+    const reports = kim.getByRole("dialog").filter({ hasText: "Your reports" });
+    await expect(reports).toContainText("Your task: Paused");
+    await reports.locator(".modal-actions").getByRole("button", { name: "Close", exact: true }).click();
+    await expect(kim.getByText("Task paused: Two findings name the same passage.")).toBeVisible();
+    await expect(keep).toHaveCount(0);
+    await expect(add).toHaveCount(0);
+    await kim.getByRole("button", { name: "Show more" }).click();
+    await expect(kim.getByText("To continue, open “Report a text problem” and choose “Resume my task…”", { exact: false })).toBeVisible();
+    expect(await noHorizontalScroll(kim)).toBe(true);
+    await shot(kim, `464-consolidation-paused-by-report${suffix}`);
+    await kim.goto(`${task}?view=editor`);
+    await expect(kim.getByText("Task paused: Two findings name the same passage.")).toBeVisible();
+    await shot(kim, `464-consolidation-editor-paused-by-report${suffix}`);
+
+    // Resumed from the report: the decisions are back.
+    await kim.goto(task);
+    await kim.getByRole("button", { name: /^(Report a text problem|Text problems)/ }).click();
+    const list = kim.getByRole("dialog").filter({ hasText: "Your reports" });
+    await list.getByRole("button", { name: "Resume my task…", exact: true }).click();
+    await list.getByRole("textbox", { name: /Why can you continue\?/ }).fill("Checked with the lead.");
+    await list.getByRole("button", { name: "Resume my task", exact: true }).click();
+    await expect(list).toContainText("Your task: Active");
+    await list.locator(".modal-actions").getByRole("button", { name: "Close", exact: true }).click();
+    await expect(keep.first()).toBeVisible();
+    await expect(kim.getByText(/^Task paused: /)).toHaveCount(0);
+
+    await kim.context().close();
+    expect(errors).toEqual([]);
+  });
+
 }

@@ -39,6 +39,8 @@ export interface TranslationReviewScreenProps {
   holdReason?: string | null;
   /** The paused banner's title: "Paused by lead" when the lead paused the text (issue 464); default "Task paused". */
   holdTitle?: string;
+  /** The way out of the pause, after what stays available. */
+  holdKept?: string;
   /** A save was refused because the task is paused: the caller reloads the task's state. */
   onTaskHeld?: () => void;
   saveBeforeReportRef?: MutableRefObject<(() => Promise<void>) | null>;
@@ -702,7 +704,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     aria-disabled={canSubmit ? undefined : true} loading={busy} onClick={requestSubmit}>Submit review…</Button>;
 
   return <section className="translation-review" aria-label="Translation review" ref={screenRoot}>
-    {held && <PausedNotice title={props.holdTitle} reason={props.holdReason ?? workspace.assignment.hold_reason} kept="Your local translation and review input are kept." />}
+    {held && <PausedNotice title={props.holdTitle} reason={props.holdReason ?? workspace.assignment.hold_reason} kept={`Your local translation and review input are kept.${props.holdKept ? ` ${props.holdKept}` : ""}`} />}
     <Button className="translation-skip" onClick={focusDecision}>Skip to decision</Button>
     <div className="translation-review-bar density-compact">
       <h1>{label}</h1>

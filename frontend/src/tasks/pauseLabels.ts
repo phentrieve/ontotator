@@ -13,6 +13,8 @@ export interface PausedTask {
 }
 
 export const PAUSED_BY_LEAD = "Paused by lead";
+/** The way out of a pause from a problem report, as the paused banner says it. */
+export const REPORT_WAY_OUT = "To continue, open “Report a text problem” and choose “Resume my task…”, or wait for the project lead's decision.";
 const NO_REASON = "A project problem needs attention.";
 
 const causesOf = (task: PausedTask): readonly PauseCause[] => task.pause_causes?.length ? task.pause_causes : task.held ? ["report"] : [];
@@ -32,7 +34,7 @@ export function pauseMarks(task: PausedTask): { cause: PauseCause; badge: string
 /** The editor's paused banner: its title and its reason line. With both causes the banner names both. */
 export function pauseNotice(task: PausedTask): { title: string; reason: string | null; kept?: string } {
   const lead = task.lead_pause_reason?.trim() || "The project lead paused the work on this text.";
-  if (!pausedByLead(task)) return { title: "Task paused", reason: task.hold_reason ?? null };
-  if (causesOf(task).includes("report")) return { title: "Paused by a problem report and by lead", reason: `${task.hold_reason?.trim() || NO_REASON} · Lead: ${lead}`, kept: "It opens again when the report is decided and the project lead has released the text." };
+  if (!pausedByLead(task)) return { title: "Task paused", reason: task.hold_reason ?? null, kept: REPORT_WAY_OUT };
+  if (causesOf(task).includes("report")) return { title: "Paused by a problem report and by lead", reason: `${task.hold_reason?.trim() || NO_REASON} · Lead: ${lead}`, kept: "It opens again when the report's pause is released (“Report a text problem”, “Resume my task…”) and the project lead has released the text." };
   return { title: PAUSED_BY_LEAD, reason: lead, kept: "It opens again when the project lead releases the text." };
 }
