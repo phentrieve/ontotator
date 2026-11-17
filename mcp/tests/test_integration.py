@@ -643,3 +643,68 @@ async def test_a_bulk_reopen_and_a_withdrawal_can_be_undone(
         )
         assert started["applied"] is True and started["change_count"] == 1
         assert "undo" not in started
+
+
+@pytest.mark.anyio
+async def test_wrong_input_is_named_not_ignored(live: dict[str, str]) -> None:
+    """A misspelt argument is refused, and a text the project does not have
+    is named by every bulk tool (review findings F3 and F4)."""
+    made = _scenario(live, "S336F")
+    project = made["project"]
+    known = {"case_id": "EN100022", "language": "en"}
+    wrong = [
+        {"case_id": "EN999999", "language": "en"},
+        {"case_id": "EN100023", "language": "de"},
+        {"case_id": "en100022", "language": "en"},
+    ]
+    async with Client(_server(live, made["token"])) as client:
+        # ``case_id`` for ``case_ids`` ran a dry run over the whole project.
+        with pytest.raises(ToolFailed, match="did you mean 'case_ids'"):
+            await call(
+                client,
+                "accept_agreeing_texts",
+                {"project": project, "case_id": ["EN100029"]},
+            )
+        whole = await call(client, "accept_agreeing_texts", {"project": project})
+        assert whole["selection"] == f"all texts of project '{project}'"
+        assert len(whole["would_accept"]) == 2
+        one = await call(
+            client,
+            "accept_agreeing_texts",
+            {"project": project, "case_ids": ["EN100029", "EN999999"]},
+        )
+        assert one["selection"] == f"2 cases (case_ids) of project '{project}'"
+        assert one["would_accept"] == [] and one["unknown_case_ids"] == ["EN999999"]
+
+        about = {"project": project, "texts": [known, *wrong]}
+        for tool, extra in (
+            ("reopen_texts", {"reason": "Check"}),
+            ("withdraw_open_tasks", {}),
+            ("start_rounds", {"kind": "carry_forward"}),
+            ("change_final_results", {}),
+            ("change_annotation_modes", {"mode": "proposals", "reason": "Check"}),
+        ):
+            dry = await call(client, tool, about | extra)
+            assert dry["applied"] is False, tool
+            assert dry["unknown_texts"] == wrong, tool
+            assert dry["selection"] == f"4 texts of project '{project}'", tool
+            # Only unknown texts: nothing to do, and the answer says why.
+            none = await call(
+                client, tool, {"project": project, "texts": wrong} | extra
+            )
+            assert none["change_count"] == 0 and none["unknown_texts"] == wrong, tool
+
+        # The applied answer names them too. EN100026: R. Roe's open task.
+        withdraw = {
+            "project": project,
+            "texts": [{"case_id": "EN100026", "language": "en"}, *wrong],
+        }
+        dry = await call(client, "withdraw_open_tasks", withdraw)
+        assert dry["change_count"] == 1
+        done = await call(
+            client,
+            "withdraw_open_tasks",
+            withdraw | {"confirm": True, "preview_token": dry["preview_token"]},
+        )
+        assert done["applied"] is True and done["unknown_texts"] == wrong
+        assert done["selection"] == f"4 texts of project '{project}'"

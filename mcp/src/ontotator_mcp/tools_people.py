@@ -23,9 +23,9 @@ from pydantic import Field
 
 from ontotator_mcp.client import OntotatorClient, project_path, seg
 from ontotator_mcp.errors import OntotatorError
-from ontotator_mcp.models import NewUser
+from ontotator_mcp.models import NewUser, TextRef
 from ontotator_mcp.tooling import register
-from ontotator_mcp.tools_setup import OPEN_STATES, _cut
+from ontotator_mcp.tools_setup import OPEN_STATES, _cut, unknown_texts
 
 Project = Annotated[str, Field(description="Project key, e.g. 'ward-7'.")]
 CodesPath = Annotated[
@@ -45,7 +45,7 @@ HANDOVER_TASKS = ("annotate", "translation_review")
 MAX_BULK_LISTED = 50
 TaskKind = Literal["annotate", "translation_review", "review"]
 Texts = Annotated[
-    list[dict[str, str]],
+    list[TextRef],
     Field(
         min_length=1,
         max_length=10000,
@@ -77,7 +77,8 @@ PreviewToken = Annotated[
 
 
 def bulk_summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
-    """A bulk action's preview or result, lists cut to MAX_BULK_LISTED. An
+    """A bulk action's preview or result, lists cut to MAX_BULK_LISTED, with
+    the selected texts the project does not have (``unknown_texts``). An
     applied reopen or withdrawal keeps the server's ``undo`` (id and
     expires_at), which undo_reopen_or_withdraw takes."""
 
@@ -98,15 +99,19 @@ def bulk_summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
         {key: item.get(key) for key in ("case_id", "language", "message")}
         for item in found.get("skipped", [])
     ]
-    return {
-        "applied": applied,
-        "changed" if applied else "would_change": _cut(changes, MAX_BULK_LISTED),
-        "change_count": found.get("change_count", len(changes)),
-        "kept": _cut(kept, MAX_BULK_LISTED),
-        "kept_count": found.get("kept_count", len(kept)),
-        "skipped_texts": _cut(skipped, MAX_BULK_LISTED),
-        "preview_token": found.get("preview_token"),
-    } | ({"undo": found["undo"]} if applied and found.get("undo") else {})
+    return (
+        {
+            "applied": applied,
+            "changed" if applied else "would_change": _cut(changes, MAX_BULK_LISTED),
+            "change_count": found.get("change_count", len(changes)),
+            "kept": _cut(kept, MAX_BULK_LISTED),
+            "kept_count": found.get("kept_count", len(kept)),
+            "skipped_texts": _cut(skipped, MAX_BULK_LISTED),
+        }
+        | unknown_texts(found, MAX_BULK_LISTED)
+        | {"preview_token": found.get("preview_token")}
+        | ({"undo": found["undo"]} if applied and found.get("undo") else {})
+    )
 
 
 # A copy of ontotator.exchange.spreadsheet (#386): this package is installed on
@@ -604,6 +609,7 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         """Dry run, or apply with the dry run's token; a stale token answers
         with the fresh dry run (``stale``)."""
         path = project_path(project, "bulk-task-actions", action)
+        body = body | {"rows": [text.model_dump() for text in body["rows"]]}
         if not confirm:
             preview: dict[str, Any] = await api.post(path, body | {"preview": True})
             return bulk_summary(preview, False)
@@ -650,7 +656,9 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
 
         Like reopen_task for each task: its person gets it back in My tasks
         with the reason. Texts with a final result are skipped (change it
-        first); unsubmitted tasks are kept. The dry run lists both and a
+        first); unsubmitted tasks are kept. The dry run lists both, the
+        texts the project does not have (unknown_texts: another spelling,
+        letter case or language; nothing happens to them) and a
         preview_token; confirm with it: every listed task is reopened, or
         none when anything changed since (then the answer is a fresh dry run,
         ``stale``). The confirmed answer carries ``undo`` (id and
@@ -691,7 +699,8 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
 
         Like withdraw_task for each task: it leaves the person's list; drafts
         and submitted work stay. By default only tasks not yet started;
-        paused tasks and lead corrections are kept. Confirm with the dry
+        paused tasks and lead corrections are kept; texts the project does
+        not have are named (unknown_texts). Confirm with the dry
         run's preview_token: all listed tasks are withdrawn, or none when
         anything changed since (a fresh dry run, ``stale``). The confirmed
         answer carries ``undo`` (id and expires_at): undo_reopen_or_withdraw
@@ -815,7 +824,8 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         submission no longer counts. Only submitted annotations on a text's
         current version take a round; texts with a final result or an open
         consolidation are skipped, other tasks are kept (the dry run says
-        why). Confirm with the dry run's preview_token: every listed task
+        why); texts the project does not have are named (unknown_texts).
+        Confirm with the dry run's preview_token: every listed task
         gets its round, or none when anything changed since (a fresh dry
         run, ``stale``). No tool takes a round back: the answer has no
         ``undo``, and undo_reopen_or_withdraw does not apply.

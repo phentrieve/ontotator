@@ -536,3 +536,32 @@ def test_summary_only_preview_and_a_flat_number_of_queries(env):
 
     # Two tasks or four: the same number of statements.
     assert statements(ROWS[:1]) == statements(ROWS)
+
+
+def test_texts_the_project_does_not_have_are_named(env):
+    """A wrong case ID, letter case or language is in ``unknown_rows`` of the
+    preview, of the summary and of the applied answer (reopen, withdraw)."""
+    _limit(env, 2)
+    a1 = assign(env, doc("c1", "en"), "anno", "annotate")
+    wrong = [
+        {"case_id": "nope", "language": "en"},
+        {"case_id": "C1", "language": "en"},
+        {"case_id": "c1", "language": "xx"},
+    ]
+    rows = [ROWS[0], *wrong, wrong[0]]
+    for url in (REOPEN, WITHDRAW):
+        found = env.lead.post(url, json={"rows": rows, "preview": True}).json()
+        assert found["texts"] == 1
+        assert found["unknown_rows"] == wrong
+        brief = env.lead.post(
+            url, json={"rows": rows, "preview": True, "summary_only": True}
+        ).json()
+        assert brief["unknown_rows"] == wrong
+        assert brief["preview_token"] == found["preview_token"]
+    assert _post(env, WITHDRAW, preview=True).json()["unknown_rows"] == []
+    applied = env.lead.post(
+        WITHDRAW, json={"rows": rows, "preview_token": found["preview_token"]}
+    )
+    assert applied.status_code == 200, applied.text
+    assert applied.json()["unknown_rows"] == wrong
+    assert _status(env, a1) == ("open", True)

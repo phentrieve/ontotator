@@ -1483,7 +1483,8 @@ export interface paths {
          *     the texts that would change, with the result each one gets, the texts
          *     skipped and why (no final result, open work, nothing submitted, already
          *     the newest, nothing submitted since the final was chosen, your own
-         *     result where the project forbids it, submissions that differ) and a
+         *     result where the project forbids it, submissions that differ), the
+         *     selected texts the project does not have (``unknown_rows``) and a
          *     ``preview_token``.
          *     Applying sends that token: every listed text changes, or none (409
          *     ``PREVIEW_STALE`` with a fresh ``preview`` in the details when anything
@@ -1969,7 +1970,8 @@ export interface paths {
          * @description Reopen the submitted tasks of many texts (issue 336).
          *
          *     ``preview: true`` lists the tasks that would be reopened, the tasks kept
-         *     and why, the texts skipped (a final result is chosen) and a
+         *     and why, the texts skipped (a final result is chosen), the selected
+         *     texts the project does not have (``unknown_rows``) and a
          *     ``preview_token``. Applying sends that token and a ``reason``: every
          *     listed task is reopened, or none (409 ``PREVIEW_STALE`` with a fresh
          *     ``preview`` in the details when anything changed). Each task is audited
@@ -2147,7 +2149,8 @@ export interface paths {
          *     assignments are revoked and the mode is stored. ``preview: true`` lists,
          *     per text, the submissions and assignments with their people, the texts
          *     left as they are with the reason (the single change's refusals; a text
-         *     with a final result: withdraw it first) and a ``preview_token``. Applying
+         *     with a final result: withdraw it first), the selected texts the project
+         *     does not have (``unknown_rows``) and a ``preview_token``. Applying
          *     sends that token and a ``reason``: every listed text changes, or none
          *     (409 ``PREVIEW_STALE`` with a fresh ``preview`` in the details when
          *     anything changed). Each text is audited like a single change
@@ -4900,6 +4903,8 @@ export interface components {
             applied: boolean;
             /** Texts */
             texts: number;
+            /** Unknown Rows */
+            unknown_rows?: components["schemas"]["RowRefView"][];
             /** Change Count */
             change_count: number;
             /** Skipped Count */
@@ -4977,6 +4982,8 @@ export interface components {
             applied: boolean;
             /** Texts */
             texts: number;
+            /** Unknown Rows */
+            unknown_rows?: components["schemas"]["RowRefView"][];
             /** Change Count */
             change_count: number;
             /** Skipped Count */
@@ -5155,6 +5162,8 @@ export interface components {
             applied: boolean;
             /** Texts */
             texts: number;
+            /** Unknown Rows */
+            unknown_rows?: components["schemas"]["RowRefView"][];
             /** Change Count */
             change_count: number;
             /** Kept Count */

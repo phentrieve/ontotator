@@ -138,6 +138,9 @@ class BulkTaskActionView(BaseModel):
     applied: bool
     # Selected texts found.
     texts: int
+    # Selected texts the project does not have (another spelling, letter
+    # case or language), as they were sent; also with ``summary_only``.
+    unknown_rows: list[RowRefView] = Field(default_factory=list)
     # Counts of the three lists below; the lists are empty with
     # ``summary_only``.
     change_count: int
@@ -220,7 +223,8 @@ def bulk_reopen(
     """Reopen the submitted tasks of many texts (issue 336).
 
     ``preview: true`` lists the tasks that would be reopened, the tasks kept
-    and why, the texts skipped (a final result is chosen) and a
+    and why, the texts skipped (a final result is chosen), the selected
+    texts the project does not have (``unknown_rows``) and a
     ``preview_token``. Applying sends that token and a ``reason``: every
     listed task is reopened, or none (409 ``PREVIEW_STALE`` with a fresh
     ``preview`` in the details when anything changed). Each task is audited

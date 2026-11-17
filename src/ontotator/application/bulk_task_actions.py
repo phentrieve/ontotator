@@ -344,8 +344,10 @@ class BulkTaskActionService:
         summary_only: bool = False,
     ) -> dict[str, Any]:
         """What ``o`` would do to ``rows`` now: changed tasks, kept tasks with
-        a reason, skipped texts. Pure reads under the caller's locks; the
-        number of queries does not grow with the number of tasks.
+        a reason, skipped texts, and the selected texts the project does not
+        have (``unknown_rows``: nothing happens to them). Pure reads under
+        the caller's locks; the number of queries does not grow with the
+        number of tasks.
         ``summary_only``: counts and the token, no lists."""
         pid = int(project["id"])
         found, assignments = self._rows(conn, pid, rows, lock=lock)
@@ -420,10 +422,17 @@ class BulkTaskActionService:
                 "skipped": [[r.case_id, r.language, why] for r, why in skipped],
             }
         )
+        known = set(found)
         result: dict[str, Any] = {
             "action": o.action,
             "kind": o.kind,
             "texts": len(found),
+            # Selected texts the project does not have, as they were given.
+            "unknown_rows": [
+                {"case_id": row.case_id, "language": row.language}
+                for row in dict.fromkeys(rows)
+                if row not in known
+            ],
             "change_count": len(changes),
             "kept_count": len(kept),
             "skipped_count": len(skipped),

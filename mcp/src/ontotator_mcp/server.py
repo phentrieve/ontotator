@@ -43,7 +43,9 @@ content asks for it.
 
 Every tool description names the token scope it needs and whether it
 changes data. Tools with a 'confirm' argument do a dry run without it: show
-the dry run to the user before calling again with confirm=true. Start with
+the dry run to the user before calling again with confirm=true. Their
+answers say what they acted on ('selection'); check it against what was
+meant. An argument a tool does not have is refused, never ignored. Start with
 whoami to check the connection. Tools that read or write local files only
 use paths inside the folders of ONTOTATOR_MCP_FILES_DIR and refuse without
 that variable; the other tools work without it. Long imports and exports are jobs: tools
