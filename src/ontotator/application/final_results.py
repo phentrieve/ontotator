@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from sqlalchemy import Connection, delete, func, insert, select, update
 
-from ontotator.application import document_row_panel
+from ontotator.application import document_row_panel, final_change_undo
 from ontotator.application.document_row_page import build_row, page_context
 from ontotator.application.document_row_panel import row_comparison
 from ontotator.application.document_rows import load_facts
@@ -747,7 +747,8 @@ class FinalResultService:
         has (its revision and submission) and the result it gets, so a final
         changed meanwhile refuses the whole action. Each text is selected
         and audited like the single PUT (``via``: "bulk_change_final"), with
-        the revision of the final it replaces.
+        the revision of the final it replaces. An applied action returns
+        ``undo``, the handle of its Undo (``final_change_undo``).
         """
         if self.actor.user_id is None:
             raise AccessDenied(
@@ -759,14 +760,17 @@ class FinalResultService:
                 conn, key, pid, rows, summary_only=preview and summary_only
             )
             if preview:
-                return found | {"applied": False}
+                return found | {"applied": False, "undo": None}
             if preview_token != found["preview_token"]:
                 raise DomainError(
-                    "PREVIEW_STALE", {"preview": found | {"applied": False}}
+                    "PREVIEW_STALE",
+                    {"preview": found | {"applied": False, "undo": None}},
                 )
-            bulk = self._bulk(conn, pid, "bulk_change_final")
-            for item in found["changes"]:
-                self._select(
+            bulk = self._bulk(conn, pid, final_change_undo.VIA)
+            texts = [(item["case_id"], item["language"]) for item in found["changes"]]
+            previous = final_change_undo.previous_finals(conn, pid, texts)
+            results = {
+                text: self._select(
                     conn,
                     key,
                     pid,
@@ -776,7 +780,27 @@ class FinalResultService:
                     [],
                     bulk=bulk,
                 )
-            return found | {"applied": True}
+                for text, item in zip(texts, found["changes"], strict=True)
+            }
+            undo = final_change_undo.record_applied(
+                conn, self.actor, key, pid, found["changes"], previous, results
+            )
+            return found | {"applied": True, "undo": undo}
+
+    def undo_change_finals(
+        self, key: str, undo_id: int, *, preview: bool
+    ) -> dict[str, Any]:
+        """Preview, or apply all or nothing, the Undo of the bulk Change
+        final… that returned ``undo_id`` (``final_change_undo``)."""
+        if self.actor.user_id is None:
+            raise AccessDenied(
+                "NOT_ALLOWED", "Only a signed-in lead can choose final results."
+            )
+        with self.db.transaction() as conn:
+            pid = self._authorize(conn, key, exclusive=not preview)
+            return final_change_undo.undo(
+                conn, self.actor, key, pid, undo_id, preview=preview
+            )
 
     def _projection(self, conn: Connection, key: str, pid: int) -> dict[str, Any]:
         return derive_final_state(conn, self.repo, key, pid)

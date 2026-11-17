@@ -4430,7 +4430,7 @@
           "final-results"
         ],
         "summary": "Bulk Change Final",
-        "description": "Change the final result of many texts by a rule (issue 336).\n\nRule ``newest_submission``: each selected text that has a final result\ngets its newest submission instead (of the submissions the final panel\noffers on the current version), when that one was submitted after the\nfinal result was chosen and is a consolidation, the text's only\nsubmission, or an annotation that agrees in full with the text's other\nsubmissions (the rule of ``accept-agreeing``). ``preview: true`` lists\nthe texts that would change, with the result each one gets, the texts\nskipped and why (no final result, open work, nothing submitted, already\nthe newest, nothing submitted since the final was chosen, your own\nresult where the project forbids it, submissions that differ) and a\n``preview_token``.\nApplying sends that token: every listed text changes, or none (409\n``PREVIEW_STALE`` with a fresh ``preview`` in the details when anything\nchanged, also a final result changed meanwhile). Each text is audited\nlike a single change (``via: bulk_change_final``). There is no undo.",
+        "description": "Change the final result of many texts by a rule (issue 336).\n\nRule ``newest_submission``: each selected text that has a final result\ngets its newest submission instead (of the submissions the final panel\noffers on the current version), when that one was submitted after the\nfinal result was chosen and is a consolidation, the text's only\nsubmission, or an annotation that agrees in full with the text's other\nsubmissions (the rule of ``accept-agreeing``). ``preview: true`` lists\nthe texts that would change, with the result each one gets, the texts\nskipped and why (no final result, open work, nothing submitted, already\nthe newest, nothing submitted since the final was chosen, your own\nresult where the project forbids it, submissions that differ) and a\n``preview_token``.\nApplying sends that token: every listed text changes, or none (409\n``PREVIEW_STALE`` with a fresh ``preview`` in the details when anything\nchanged, also a final result changed meanwhile). Each text is audited\nlike a single change (``via: bulk_change_final``). An applied action\nreturns ``undo``; ``final-selections/bulk-change/undo`` takes its ``id``.",
         "operationId": "bulk_change_final_api_v1_projects__key__final_selections_bulk_change_post",
         "parameters": [
           {
@@ -4460,6 +4460,61 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/BulkChangeFinalView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/final-selections/bulk-change/undo": {
+      "post": {
+        "tags": [
+          "final-results"
+        ],
+        "summary": "Undo Bulk Change Final",
+        "description": "Undo a bulk Change final\u2026 by the ``undo.id`` of its apply.\n\nThe server keeps the final result each text had; the request names only\nthat record. It works once, for the lead who applied the action, before\n``undo.expires_at`` (otherwise 409 ``BULK_UNDO_STALE`` with ``reason``\n``not_found``, ``already_undone`` or ``expired``). ``preview: true``\nlists the final result each text would get back (``restores``) and the\ntexts that changed since the action, with the reason (``blocked``): the\nfinal result, the text's versions, its plan row, a task of the text or\nits submissions. Applying restores every text, or none: with a blocked\ntext it answers 409 ``BULK_UNDO_STALE`` (``reason`` ``changed``) with\nthat ``preview`` in the details. Final exports made since the action do\nnot block; they stay as they are and ``exports_since`` counts them. Each\ntext is audited like a single change (``via: bulk_change_final_undo``).",
+        "operationId": "undo_bulk_change_final_api_v1_projects__key__final_selections_bulk_change_undo_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkChangeFinalUndoRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkChangeFinalUndoView"
                 }
               }
             }
@@ -14697,6 +14752,90 @@
         "title": "BulkChangeFinalRequest",
         "description": "Preview (``preview``) or apply (``preview_token``) bulk Change final\u2026\nfor the selected texts (issue 336)."
       },
+      "BulkChangeFinalUndoRequest": {
+        "properties": {
+          "undo_id": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Undo Id"
+          },
+          "preview": {
+            "type": "boolean",
+            "title": "Preview"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "undo_id"
+        ],
+        "title": "BulkChangeFinalUndoRequest"
+      },
+      "BulkChangeFinalUndoView": {
+        "properties": {
+          "project": {
+            "type": "string",
+            "title": "Project"
+          },
+          "undo_id": {
+            "type": "integer",
+            "title": "Undo Id"
+          },
+          "applied": {
+            "type": "boolean",
+            "title": "Applied"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "texts": {
+            "type": "integer",
+            "title": "Texts"
+          },
+          "restore_count": {
+            "type": "integer",
+            "title": "Restore Count"
+          },
+          "blocked_count": {
+            "type": "integer",
+            "title": "Blocked Count"
+          },
+          "restores": {
+            "items": {
+              "$ref": "#/components/schemas/FinalRestore"
+            },
+            "type": "array",
+            "title": "Restores"
+          },
+          "blocked": {
+            "items": {
+              "$ref": "#/components/schemas/FinalRestoreBlock"
+            },
+            "type": "array",
+            "title": "Blocked"
+          },
+          "exports_since": {
+            "type": "integer",
+            "title": "Exports Since"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project",
+          "undo_id",
+          "applied",
+          "expires_at",
+          "texts",
+          "restore_count",
+          "blocked_count",
+          "restores",
+          "blocked",
+          "exports_since"
+        ],
+        "title": "BulkChangeFinalUndoView"
+      },
       "BulkChangeFinalView": {
         "properties": {
           "project": {
@@ -14748,6 +14887,16 @@
           "preview_token": {
             "type": "string",
             "title": "Preview Token"
+          },
+          "undo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BulkUndoView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -19795,6 +19944,117 @@
           "state_digest"
         ],
         "title": "FinalPreflight"
+      },
+      "FinalRestore": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "submission_id": {
+            "type": "string",
+            "title": "Submission Id"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "from_document_id": {
+            "type": "string",
+            "title": "From Document Id"
+          },
+          "from_submission_id": {
+            "type": "string",
+            "title": "From Submission Id"
+          },
+          "from_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Version"
+          },
+          "selected_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonRefView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "selected_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Selected At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "document_id",
+          "submission_id",
+          "from_document_id",
+          "from_submission_id",
+          "selected_at"
+        ],
+        "title": "FinalRestore"
+      },
+      "FinalRestoreBlock": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "final",
+              "versions",
+              "plan",
+              "tasks",
+              "submissions"
+            ],
+            "title": "Reason"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "reason",
+          "message"
+        ],
+        "title": "FinalRestoreBlock"
       },
       "FinalSelectionRequest": {
         "properties": {

@@ -133,6 +133,7 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "confirm": True,
             "preview_token": "sha256:x",
         },
+        "undo_change_final_results": {"project": "p", "undo_id": 7, "confirm": True},
         "final_export_check": {"project": "p"},
         "start_export": {"project": "p", "kind": "final"},
         "get_job": {"job_id": 1, "wait": True},

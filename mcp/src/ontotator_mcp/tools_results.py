@@ -254,8 +254,10 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
         or start_consolidation). The dry run lists changes and skips and a
         preview_token. Confirm with that token: every listed text changes,
         or none when anything changed since (then the answer is a fresh dry
-        run, ``stale``). There is no undo: set_final_result changes one text
-        back.
+        run, ``stale``). The confirmed answer carries ``undo`` (id and
+        expires_at): undo_change_final_results takes that id and brings the
+        earlier final results back for 60 minutes, while nothing else
+        changed on the texts.
         """
         path = project_path(project, "final-selections", "bulk-change")
         body = {"rows": texts, "rule": rule}
@@ -276,7 +278,7 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
                 "skipped_count": found.get("skipped_count", len(skipped)),
                 "skipped_by_reason": found.get("skipped_by_reason", {}),
                 "preview_token": found.get("preview_token"),
-            }
+            } | ({"undo": found["undo"]} if applied and found.get("undo") else {})
 
         if not confirm:
             preview: dict[str, Any] = await api.post(path, body | {"preview": True})
@@ -299,6 +301,97 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
                 "stale": True,
                 "note": "Texts changed since the dry run; nothing was changed."
                 " Check this new dry run and confirm with its preview_token.",
+            }
+        return summary(applied, True)
+
+    @register(server, scopes="project-admin", effect="changes")
+    async def undo_change_final_results(
+        project: Project,
+        undo_id: Annotated[
+            int,
+            Field(
+                ge=1,
+                description=(
+                    "``undo.id`` of the confirmed change_final_results answer."
+                ),
+            ),
+        ],
+        confirm: Annotated[
+            bool,
+            Field(
+                description=("False: dry run. True: restore the earlier final results.")
+            ),
+        ] = False,
+    ) -> dict[str, Any]:
+        """Undo a change_final_results, after a dry run.
+
+        The server kept the final result each text had; this names only that
+        record. It works once, with the token of the lead who made the
+        change, within 60 minutes. The dry run lists the final result each
+        text would get back (would_restore) and the texts in the way
+        (blocked, with the reason): a text blocks when its final result was
+        changed, confirmed or withdrawn since, or its versions, its plan
+        row, one of its tasks or its submissions changed. With confirm every
+        text gets its earlier final result back, with the lead who had
+        chosen it and the warnings that lead had confirmed, or none: one
+        blocked text refuses the whole undo (the answer is then the dry run,
+        ``refused``). Final exports made since the change do not block; they
+        stay as they are, with the changed results (exports_since).
+        """
+        path = project_path(project, "final-selections", "bulk-change", "undo")
+
+        def summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
+            restores = [
+                {
+                    "case_id": item.get("case_id"),
+                    "language": item.get("language"),
+                    "submission_id": item.get("submission_id"),
+                    "version": item.get("version"),
+                    "replaces_submission_id": item.get("from_submission_id"),
+                    "chosen_by": (item.get("selected_by") or {}).get("display_name")
+                    or (item.get("selected_by") or {}).get("pseudonym"),
+                    "chosen_at": item.get("selected_at"),
+                }
+                for item in found.get("restores", [])
+            ]
+            blocked = [
+                {
+                    key: item.get(key)
+                    for key in ("case_id", "language", "reason", "message")
+                }
+                for item in found.get("blocked", [])
+            ]
+            return {
+                "applied": applied,
+                "undo_id": found.get("undo_id"),
+                "expires_at": found.get("expires_at"),
+                "texts": found.get("texts", 0),
+                "restored" if applied else "would_restore": restores[:MAX_LISTED],
+                "restore_count": found.get("restore_count", len(restores)),
+                "blocked": blocked[:MAX_LISTED],
+                "blocked_count": found.get("blocked_count", len(blocked)),
+                "exports_since": found.get("exports_since", 0),
+            }
+
+        if not confirm:
+            preview: dict[str, Any] = await api.post(
+                path, {"undo_id": undo_id, "preview": True}
+            )
+            return summary(preview, False)
+        try:
+            applied: dict[str, Any] = await api.post(path, {"undo_id": undo_id})
+        except OntotatorError as exc:
+            fresh = (
+                exc.details.get("preview") if isinstance(exc.details, dict) else None
+            )
+            # The client appends the refusal's reason to its code.
+            if exc.code != "BULK_UNDO_STALE/changed" or not isinstance(fresh, dict):
+                raise
+            return summary(fresh, False) | {
+                "refused": True,
+                "note": "Texts changed since the final results were changed"
+                " (blocked); nothing was restored. set_final_result changes"
+                " one text back.",
             }
         return summary(applied, True)
 

@@ -223,6 +223,7 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     ("POST", f"{P}/final-selections/withdraw"): "project-admin",
     ("POST", f"{P}/final-selections/accept-agreeing"): "project-admin",
     ("POST", f"{P}/final-selections/bulk-change"): "project-admin",
+    ("POST", f"{P}/final-selections/bulk-change/undo"): "project-admin",
     # Agreement behind the final results (issue 353): leads, like the export.
     ("GET", f"{P}/agreement"): "read",
     # Problem reports

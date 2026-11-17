@@ -151,6 +151,7 @@ export type AcceptAgreeingRequest = Defaulted<components["schemas"]["AcceptAgree
 export type AcceptAgreeingView = components["schemas"]["AcceptAgreeingView"];
 export type BulkChangeFinalRequest = Defaulted<components["schemas"]["BulkChangeFinalRequest"], "rule">;
 export type BulkChangeFinalView = components["schemas"]["BulkChangeFinalView"];
+export type BulkChangeFinalUndoView = components["schemas"]["BulkChangeFinalUndoView"];
 export type DocumentRowKeys = components["schemas"]["DocumentRowKeys"];
 export type DocumentsVisitView = components["schemas"]["DocumentsVisitView"];
 export type DocumentsSummaryView = components["schemas"]["DocumentsSummaryView"];
@@ -530,6 +531,8 @@ export class ApiClient {
   async acceptAgreeing(key: string, body: AcceptAgreeingRequest, signal?: AbortSignal): Promise<AcceptAgreeingView> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/final-selections/accept-agreeing`, { method: "POST", body: JSON.stringify(body), signal }); }
   /** Bulk Change final… of the selected texts by a rule (newest submission): preview, or apply with the preview's token (lead only, issue 336). */
   async bulkChangeFinal(key: string, body: BulkChangeFinalRequest, signal?: AbortSignal): Promise<BulkChangeFinalView> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/final-selections/bulk-change`, { method: "POST", body: JSON.stringify(body), signal }); }
+  /** Undoes a bulk Change final… by the `undo.id` of its apply: every text gets its earlier final result back, or none (409 `BULK_UNDO_STALE` with the preview in `details`). */
+  async bulkChangeFinalUndo(key: string, undoId: number, preview = false): Promise<BulkChangeFinalUndoView> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/final-selections/bulk-change/undo`, { method: "POST", body: JSON.stringify({ undo_id: undoId, preview }) }); }
   /** Undo of an applied bulk action by the id of the server's record of it, while its texts are unchanged (409 BULK_UNDO_STALE otherwise). */
   async bulkUndo(key: string, undoId: number): Promise<BulkUndoResult> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/bulk-task-actions/undo`, { method: "POST", body: JSON.stringify({ undo_id: undoId }) }); }
   /** Record an opening of Documents (lead only); returns the NEW baseline (start of the previous visit). */
