@@ -83,6 +83,25 @@ describe("carriedListOrder", () => {
   it("keeps the draft order without carried inputs", () => {
     expect(carriedListOrder([], ["b", "a"])).toEqual(["annotation:b", "annotation:a"]);
   });
+  // Issue 436: the findings that are not carried follow the text, not the order they were created in.
+  it("orders the other findings by the start of their first segment", () => {
+    const starts: Record<string, number | null> = { s2: 40, s5: 120, s9: 300, s3: 75 };
+    expect(carriedListOrder([], ["s2", "s5", "s9", "s3"], id => starts[id])).toEqual(["annotation:s2", "annotation:s3", "annotation:s5", "annotation:s9"]);
+  });
+  it("puts findings without a text span last and keeps ties in draft order", () => {
+    const starts: Record<string, number | null> = { spanless1: null, late: 50, tieA: 10, spanless2: null, tieB: 10, first: 0 };
+    expect(carriedListOrder([], ["spanless1", "late", "tieA", "spanless2", "tieB", "first"], id => starts[id]))
+      .toEqual(["annotation:first", "annotation:tieA", "annotation:tieB", "annotation:late", "annotation:spanless1", "annotation:spanless2"]);
+  });
+  it("keeps carried rows first in input order, whatever their place in the text", () => {
+    const states = deriveCarriedStates([input("i1", snap("input-i1")), input("i2", null), input("i3", snap("input-i3"))], [], [snap("ann-1"), snap("input-i3"), snap("input-i1"), snap("ann-2")]);
+    const starts: Record<string, number | null> = { "input-i1": 90, "input-i3": 5, "ann-1": 60, "ann-2": 20 };
+    expect(carriedListOrder(states, ["ann-1", "input-i3", "input-i1", "ann-2"], id => starts[id]))
+      .toEqual(["annotation:input-i1", "input:i2", "annotation:input-i3", "annotation:ann-2", "annotation:ann-1"]);
+  });
+  it("a start of 0 is a position, not 'no span'", () => {
+    expect(carriedListOrder([], ["none", "zero"], id => (id === "zero" ? 0 : null))).toEqual(["annotation:zero", "annotation:none"]);
+  });
 });
 
 describe("carriedChosenAxisIds", () => {

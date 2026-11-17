@@ -11,7 +11,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { cardSegment, documentsReady, openTextCard, personRow, rowCell, showSegment, textRow } from "./documentsHelpers";
 import { newBadge, openDocuments, rowAction, textCard } from "./documentsOverviewHelpers";
 import { guidelineScenario, loginGuidelineUser } from "./guidelineHelpers";
-import { expectSubmitted, loginExisting, openTasksHome, selectText, TEST_PASSWORD } from "./helpers";
+import { expectSubmitted, loginExisting, loginThroughForm, openTasksHome, selectText, TEST_PASSWORD } from "./helpers";
 import { leadScenario } from "./leadWorkflowHelpers";
 import { loginOverviewUser, overviewAct, overviewScenario, type OverviewActBody, type OverviewScenario } from "./overviewHelpers";
 import { proposalCheckScenario, loginScenarioUser as loginProposalUser } from "./proposalCheckHelpers";
@@ -49,12 +49,7 @@ async function setPasswordForm(page: Page, username: string): Promise<Locator> {
 
 /** The lead logs in with the project as last used: the landing opens its Documents. */
 async function loginLead(page: Page, project: string, username: string): Promise<void> {
-  await page.goto("/");
-  await page.evaluate(([key, value]) => window.localStorage.setItem(key, value), [`ontotator.lastProject.v1:${username}`, project]);
-  const form = page.getByRole("form", { name: "Log in to Ontotator" });
-  await form.getByLabel("Username", { exact: true }).fill(username);
-  await form.getByLabel("Password", { exact: true }).fill(TEST_PASSWORD);
-  await form.getByRole("button", { name: "Log in", exact: true }).click();
+  await loginThroughForm(page, username, undefined, { lastProject: project });
   await expect(page.getByRole("heading", { name: "Documents", level: 1 })).toBeVisible();
   await documentsReady(page);
 }
