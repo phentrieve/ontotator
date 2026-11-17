@@ -6,6 +6,7 @@ import { modeBadge } from "../../editor/modes";
 import { Button } from "../../ui/Button";
 import { versionName } from "../labels";
 import { RouteLink } from "../RowCells";
+import { submissionVersion } from "../SubmissionsTable";
 import { acceptanceLabel, acceptanceOf, discardLabel, isDiscarded, type TextVersionsTools } from "../TextVersions";
 
 /** Report state words of the details list (same words as `reportStateBadge`). */
@@ -63,11 +64,11 @@ export function TextDetails({ row, data, plan, planRevision, reportRoute, onRout
           </Fragment>;
         })}
         {(data?.submissions ?? []).map(item => <Fragment key={item.submission_id}>
-          <dt>{`Submission ID, ${item.author_label}`}</dt>
+          <dt>{`Submission ID, ${item.author_label}, ${submissionVersion(item.version, item.chain_name, row.parallel_roots)}`}</dt>
           <dd>{`${item.submission_id}${item.round_id ? `, round ${item.round_id}` : ""}, ${modeBadge(item.mode).label}`}</dd>
         </Fragment>)}
         {(data?.rounds ?? []).filter(round => !round.submitted).map(round => <Fragment key={round.round_id}>
-          <dt>{`Round ID, ${round.author_label}`}</dt><dd>{`${round.round_id}, ${modeBadge(round.mode).label}`}</dd>
+          <dt>{`Round ID, ${round.author_label}, ${submissionVersion(round.version, round.chain_name, row.parallel_roots)}`}</dt><dd>{`${round.round_id}, ${modeBadge(round.mode).label}`}</dd>
         </Fragment>)}
       </dl>
     </section>

@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-COjRuShn.js";import{n as a,t as o}from"./lib-BSe6BkSP.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-EjJngTEr.js";import{n as a,t as o}from"./lib-Bu-HJ8iH.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -1963,6 +1963,7 @@ In the card:
 - Your steps stand where they act. An open problem report is a notice above the path with **Open** and **Decide on report…**. Other steps stand at the top of their part under *Next step*, for example **Resolve…** in **Translation** or **Carry to v2…** in **Annotation**. A part's other actions share its action row, for example **Open result**, **Change final…** and **Withdraw final…** in **Finalization**.
 - Every person's remove action is **Remove…**. Its dialog says what happens: an unsubmitted annotation is removed with its draft; other work is revoked and stays in the history.
 - In **Annotation**, a text with tool proposals names the proposal set its annotators work on, for example *Proposals set 2026-10-02 (phentrieve 1.4), 24 proposals*. When a newer set was imported for the text and a task still works on an older one, the line names the older set and *Newer set available: 2026-11-10* follows, with **How to use it** ([Work from new tool proposals](lead-change-course.md#work-from-new-tool-proposals)); it goes away once every task of the text is on the newest set. Tasks that started before sets were recorded show *set not recorded*. A person's row names the set only when it differs from the text's, for example *newest set*.
+- When a text has more than one version (for example after a translation correction), each person's row in **Annotation** ends with the version their task or submission is on, for example *Submitted 22 Oct, 14 findings · assigned 15 Oct · v1* and *Assigned 18 Oct by you, from proposals · v2*; the row of a running consolidation in **Finalization** names it the same way. With parallel versions the row names the version chain too, for example *DeepL v2*. A text with one version shows no version in these rows. A translation reviewer's row always says *Review of v2*.
 - In **Finalization**, **Open consolidation** opens your own running consolidation as your task; a submitted one opens read-only.
 - In **Finalization**, when submissions differ, the agreement line is followed by the findings that differ in detail; a term and its parent or child on the same passage are named as *Related terms: …* (see [Accept a result or compare results](lead-results.md#accept-a-result-or-compare-results)).
 - ✕ or Esc closes the card.
@@ -1973,7 +1974,7 @@ What for: see what happened to a text and its technical IDs.
 
 1. In the text card footer, click **History** or **Details**. The view's name stands next to **Back** at the top of the card.
    - **History** lists all activity, newest first, with reviewers' reasons, reassignments and mode changes.
-   - **Details** shows the **Plan**, the **Problem reports** and the **Technical details**. Each problem report shows its title, then who reported it, when, its state and the paused tasks, then **Open report**.
+   - **Details** shows the **Plan**, the **Problem reports** and the **Technical details**. Each problem report shows its title, then who reported it, when, its state and the paused tasks, then **Open report**. In the **Technical details**, the lines **Submission ID** and **Round ID** name the person and the version, for example *Submission ID, ann-0004, v1*.
 2. Click **Back** to return to the path.
 
 ### Read a text and other people's work in the text view
@@ -2314,7 +2315,7 @@ After the start:
 - If you chose someone else: Ontotator sends no e-mail. Tell the person that a consolidation is waiting in their **My tasks**.
 - If you chose yourself: you get the Consolidator role for this project. Click **Open consolidation** in the text card or **Open my task** in the text's row on **Documents**. Each opens your task, where you decide and submit.
 
-While the consolidation runs, the card shows the consolidator and how many groups are still open. What the consolidator does is in the [consolidator chapter](consolidator.md).
+While the consolidation runs, the card shows the consolidator and how many groups are still open. When the text has more than one version, the consolidator's row also names the version the consolidation runs on, for example *2 of 5 groups open · assigned 18 Oct by you · v1*. What the consolidator does is in the [consolidator chapter](consolidator.md).
 
 ### Read a submitted consolidation
 

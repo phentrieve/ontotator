@@ -9,7 +9,7 @@ import { earlyFinal, openAnnotateWork } from "../finalPanelText";
 import { RouteLink } from "../RowCells";
 import { shortName } from "../stageLabels";
 import type { TextVersionsTools } from "../TextVersions";
-import { finalizationState, textViewRoute } from "./cardModel";
+import { finalizationState, personVersion, textViewRoute } from "./cardModel";
 import { PersonList, possessive, useFocusAfterRemoval } from "./PersonRow";
 import { assignedLine, workerName, WorkPersonRow } from "./WorkPersonRow";
 
@@ -91,8 +91,10 @@ export function FinalizationPart({ row, projectKey, query, decision, onNavigate,
     {running.length > 0 ? <PersonList label="Consolidators">
       {running.map(item => {
         const assigned = assignedLine(item, now, !groups);
+        // The version the consolidation runs on, when the text has several (issue 445).
+        const parts = [groups, assigned, personVersion(row, item)].filter(Boolean);
         return <WorkPersonRow key={item.assignment_id} item={item} caseId={row.case_id} textName={textLabel(row)} canManage={canManage} tools={tools} onChanged={() => onChanged?.()}
-          onRemoved={focusAfterRemoval} details={groups && assigned ? <>{groups} · {assigned}</> : groups ?? assigned}
+          onRemoved={focusAfterRemoval} details={parts.length > 0 ? parts.map((part, index) => <span key={index}>{index > 0 && " · "}{part}</span>) : undefined}
           open={item.is_me ? consolidationLink(`Open consolidation of ${workerName(item)}`, item.assignment_id) : undefined} />;
       })}
     </PersonList> : <>

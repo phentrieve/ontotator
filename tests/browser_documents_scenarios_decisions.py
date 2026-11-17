@@ -290,6 +290,43 @@ def build_s17(app: FastAPI) -> dict[str, Any]:
     )
 
 
+def build_s445(app: FastAPI) -> dict[str, Any]:
+    """The version per person in the text card (issue 445). ``case-0445`` en has
+    v1 and the correction v2: Tom Reis submitted on v1, R. Roe started round 1
+    on v2 (open, nothing saved). ``case-0446`` en has one version: Tom Reis
+    submitted, R. Roe started."""
+    from t1_builders import correction_unit, native_unit
+
+    scenario = new_project(app, "S445")
+    two, one = "case-0445", "case-0446"
+    v1_unit = native_unit(two, "en", SYNTHETIC, case_id=two)
+    v2_unit = correction_unit(v1_unit, SYNTHETIC + " She also has microcephaly.")
+    single = native_unit(one, "en", SYNTHETIC + " Her sister is healthy.", case_id=one)
+    docs = import_texts(scenario, [v1_unit, v2_unit, single])
+    v1, v2, only = docs[(two, "en", 1)], docs[(two, "en", 2)], docs[(one, "en", 1)]
+    with scenario.db.transaction() as conn:
+        conn.execute(
+            update(ProjectRow)
+            .where(ProjectRow.project_key == scenario.key)
+            .values(annotations_per_text=2)
+        )
+    add_user(scenario, "lead", ["lead"])
+    for name, display in (("tom", "Tom Reis"), ("roe", "R. Roe")):
+        add_user(scenario, name, ["annotator"])
+        app.state.accounts.update_profile(
+            Actor.cli(), scenario.users[name], display_name=display
+        )
+    submit(scenario, v1, "tom")
+    in_progress(scenario, v2, "roe")
+    submit(scenario, only, "tom")
+    in_progress(scenario, only, "roe")
+    return result(
+        scenario,
+        [(two, "en"), (one, "en")],
+        documents={"v1": v1, "v2": v2, "single": only},
+    )
+
+
 BUILDERS: dict[str, Builder] = {
     "S11": build_s11,
     "S13": build_s13,
@@ -297,4 +334,5 @@ BUILDERS: dict[str, Builder] = {
     "S15": build_s15,
     "S16": build_s16,
     "S17": build_s17,
+    "S445": build_s445,
 }
