@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-BozvE_uX.js";import{n as a,t as o}from"./lib-DCN8p5_t.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-CQJPfwFe.js";import{n as a,t as o}from"./lib-DZMK_VWn.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -224,7 +224,7 @@ What for: check what was changed on an account and by whom.
 
 1. On **Users**, click **More…** in the row and choose **History**. For anonymised accounts, click the **History** button in the row.
 2. Read the table: **When**, **By**, **What**, **Whom**, **Project**, **Details**. **What** names the change in plain words, for example *Project settings changed*, *Final result withdrawn*, *Final export created* or *Phenopackets created*. Research exports are listed too, for example *Edit log exported* or *Working time exported*. A text given its own number of annotators reads *Annotators per text changed for one text*, with the text, the old and new value and the project value under **Details**.
-3. Changes made with an API token name it under **Details** (*Via API token*); the single requests a token made are left out here. The dialog shows the newest 200 entries. For the whole trail, use the command \`ontotator admin audit\`, see [Server operations](../operations.md#users-ontologies-and-projects). An editorial correction of a translation is recorded as *Editorial correction of a translation*; its details carry the reason and the changed passages.
+3. Changes made with an API token name it under **Details** (*Via API token*); the single requests a token made are left out here. The dialog shows the newest 200 entries. For the whole trail, use the command \`ontotator admin audit\`, see [Server operations](../operations.md#users-ontologies-and-projects). An editorial correction of a translation is recorded as *Typo fix in a translation*; its details carry the reason and the changed passages.
 
 ## Anonymise a deactivated account
 
@@ -424,6 +424,8 @@ The editor has three columns:
 | Middle: the text | The text you annotate. Marked passages are highlighted. |
 | Right: details | The selected finding: **Values**, **Modifiers**, **Note**, its mentions and the term search. With nothing selected, the **New finding** panel opens here when you mark text. |
 
+The findings in the list follow the text: a finding stands where its first marked passage begins, so a finding you add in the middle of the text appears between its neighbours, not at the end. Findings without a text span come last. Carried findings stay at the top of the list, in the order of the earlier round.
+
 To make the findings list wider or narrower, drag the divider between the findings list and the text (**Resize findings column**), or focus it and press \`←\` or \`→\`. On a narrow screen, the tabs **Findings**, **Document** and **Details** switch between the columns; **Back to text** returns to the text.
 
 The toolbar shows the text name, its language and the mode:
@@ -501,6 +503,7 @@ What for: record a term that the text mentions.
 
 1. Select the words in the text with the mouse. With the keyboard: click before the first word (or press Tab until the text has focus), hold Shift and move with the arrow keys.
 2. The panel **New finding** shows the marked text. To adjust it, drag the edge handles at its start and end, or focus a handle and press \`←\` or \`→\`.
+   - On a phone, the text stays where it is and a **New finding** bar appears at the bottom of the screen. Tap **Choose term** to go on to the term search, or **Discard**.
 3. **Search term** is already filled with the marked words, and the hits are listed under **Terms**. Change the words, or type a code such as \`HP:0001250\`, if the right term is not among them.
 4. Press Enter to add the top hit, or click a hit. Enter adds nothing when the top hit is a **Weak match**: click a hit, or choose it with \`↓\` and press Enter.
 5. The finding is created with the project's prefilled values. [Confirm or change them](#set-values-and-confirm-defaults).
@@ -849,6 +852,28 @@ With the keyboard: Tab to a sentence, then press Enter or Space to mark it. Shif
 
 On a touch-only device such as a phone or tablet, **Mark checked sentences** is not offered, because a swipe on the text has to scroll. A review you can only read does not offer it either.
 
+### Show invisible characters
+
+What for: see spacing errors and characters you cannot see otherwise, such as a double space, a tab or a non-breaking space.
+
+1. Tick **Show invisible characters** above the texts. Your choice is remembered in this browser.
+2. Read the marks in all texts:
+
+   | Mark | Character |
+   | --- | --- |
+   | grey dot \`·\` | space; two dots are a double space |
+   | arrow \`→\` | tab |
+   | small circle \`°\` | non-breaking space |
+   | amber bar between two characters | zero-width character, for example a zero-width space |
+   | small \`¬\` above the line | soft hyphen |
+   | \`¶\` | end of a line; a dot before it is a space at the end of the line |
+
+3. Correct the translation as usual. Untick the box to hide the marks again.
+
+The marks only change what you see. They are not part of the text: selecting, copying and saving give the text without them, and the lines break where they broke before. The marks also show with **Show changes** and **Mark checked sentences**.
+
+Ontotator does not correct anything by itself, and a mark never blocks your review.
+
 ## Keyboard shortcuts
 
 What for: work without the mouse. Shortcuts are off while you type in a field or when a dialog is open. Letter keys work in lower and upper case alike. **Keyboard shortcuts (?)** in **More**, or \`?\`, lists the shortcuts of the current screen, grouped for example under *Finding*, *Decisions* and *Carried findings*. A key that needs something first, such as a selected finding or proposal, is listed with *(not available right now)*. Many buttons also show their key next to the label.
@@ -1063,7 +1088,7 @@ Groups you changed here are tagged **edited in editor** on the consolidation scr
 
 Consolidators can open the text view of a text they consolidate to read each person's findings side by side. See [Read a text and other people's work in the text view](lead-documents.md#read-a-text-and-other-peoples-work-in-the-text-view).
 
-When a submission was carried over from an earlier version of the text, the text view of it offers **Show changes since** v1 (with the number of that version). It marks the changed passages as described for annotators in [See what changed since the earlier version](annotator.md#see-what-changed-since-the-earlier-version); the consolidation screen itself does not show them.
+When a submission was carried over from an earlier version of the text, the text view of it offers **Show changes since** v1 (with the number of that version). It marks the changed passages as described for annotators in [See what changed since the earlier version](annotator.md#see-what-changed-since-the-earlier-version); the consolidation screen itself does not show them. On a phone, the text view lists the findings of the shown work below the text, which keeps the full width.
 `,ne=`# Frequently asked questions
 
 Short answers to problems people often meet. Each answer links to the chapter with the full steps.
@@ -1250,9 +1275,9 @@ You assigned a translation review to someone who already reviewed this version, 
 
 **Upload new version…** was refused when you saved: a newer version of the translation arrived meanwhile, the translation was discarded, or a translation review of the version was assigned. The dialog names the reason. Close it and look at the version list again; your text is not saved, so keep it. See [Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation).
 
-### "Fix typos…" did not save
+### An editorial correction was refused
 
-**Fix typos…** did not save: a newer version arrived, a translation review of the version is open, it was discarded, or the text is the same as before. The dialog names the reason; your text stays in the dialog until you close it. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
+The version cannot be corrected any more: a newer version arrived, a translation review of it is open, or it was discarded. Or the text is the same as before. The answer names the reason. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
 
 ### A task is still paused after I closed the report
 
@@ -1355,7 +1380,7 @@ The guidelines tell you what to mark and how: which findings count, how much tex
 
 ## 4. Get to know the screen
 
-The editor has three columns: the list of **Findings** on the left, the text in the middle and the details of the selected finding on the right. The toolbar shows the mode, for example **Annotate from scratch**, and the save status. Everything is saved automatically; **Saved** means your work is stored. In a project that records working time, the toolbar also shows a timer with **Pause timer**; see [Working time](annotator.md#working-time). See [The editor screen](annotator.md#the-editor-screen).
+The editor has three columns: the list of **Findings** on the left, in the order of the text, the text in the middle and the details of the selected finding on the right. The toolbar shows the mode, for example **Annotate from scratch**, and the save status. Everything is saved automatically; **Saved** means your work is stored. In a project that records working time, the toolbar also shows a timer with **Pause timer**; see [Working time](annotator.md#working-time). See [The editor screen](annotator.md#the-editor-screen).
 
 ## 5. Mark a finding
 
@@ -1701,7 +1726,7 @@ This works without building a bundle. You upload the new text at the version, or
 4. If the current version was rejected or queried: click **Resolve…**, then **Correct the translation…**, paste the new text yourself and submit. The corrected text becomes the next version and counts as accepted.
 5. Or, whatever the state of the current version, upload the new text: at the newest version, click **Upload new version…**, paste the text or choose a .txt file, say how the text was made (for a machine translation with its provider and model), check the changes and save. The text becomes the next version, a correction that starts as *Ready for review*; accept it with **Accept this version…** if it was reviewed outside Ontotator ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)).
 
-**Request correction…** is offered only at an accepted version, **Correct the translation…** at the newest version that is accepted, rejected or queried, and **Upload new version…** at the newest version of every translation that has no open translation review. Only **Upload new version…** has fields for the provider and model of the new text; in a translation review they can only be named in the **Rationale**. A typo, a missing space or a grammar slip needs none of these steps: **Fix typos…** at the newest version fixes it without a review and keeps the status of the text ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
+**Request correction…** is offered only at an accepted version, **Correct the translation…** at the newest version that is accepted, rejected or queried, and **Upload new version…** at the newest version of every translation that has no open translation review. Only **Upload new version…** has fields for the provider and model of the new text; in a translation review they can only be named in the **Rationale**. A typo, a missing space or a grammar slip needs none of these steps: an editorial correction fixes it without a review and keeps the status of the text ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
 
 ### Replace or add a translation by file
 
@@ -1992,7 +2017,7 @@ What for: read a text with other people's findings or the final result, and comp
 
 1. Open the text view with **Open text** in the text card.
 2. Choose the language and version in **Language and version**.
-3. In **Show**, choose **Text only**, a proposal layer, someone's annotations or the result. Its findings are listed under **Findings**.
+3. In **Show**, choose **Text only**, a proposal layer, someone's annotations or the result. Its findings are listed under **Findings**: beside the text, or below it on a phone, where the text keeps the full width.
 4. Optional: click **Compare** to open a second pane. Each pane has its own **Language and version** and **Show** directly above its text: **Current text** on the left, **Comparison text** on the right, so both texts start at the same height. Tick **Couple scrolling** to scroll both together. Click **Close comparison** to close it.
    - When both panes show texts of the same language, for example v1 and its correction v2, tick **Show changes** to see what changed. The older version strikes through the removed passages, the newer version underlines the added ones; the line above the texts counts them. The marks do not change the texts, the findings or **Couple scrolling**. A change of spaces or line breaks only is not marked or counted. If the two texts have little in common, the line reads *The texts differ too much to show the changes* and nothing is marked.
    - When **Show** has someone's annotations that were carried from an earlier version of the text (after **Carry to v2…** or **Handle text change…**), tick **Show changes since** v1 above the text: changed passages get a dashed frame, added text is underlined, and a **−** marker shows the earlier wording of removed text. **Next ›** and **‹ Previous** step through the passages. The annotator sees the same marks in their task. Not offered while **Compare** is open, which has its own **Show changes**.
@@ -2007,8 +2032,37 @@ What for: see each version of a translation, its reviews and its origin.
 1. Open the text card and click **Translation**.
 2. The list shows each version with its origin and status, then one row per person who worked on it: the name, the task and the status. Older ones are under **Older versions**; with parallel versions they are grouped by version chain.
 3. Click **View text** to read a version, or **Translation reviews** to see every review decision. In a reviewer's row, **Reopen…** lets them review the version again and **Remove…** removes their assignment.
-   At the newest accepted version, **Correct the translation…** lets you correct it yourself ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)). At the newest version of a translation, **Upload new version…** brings in a text made elsewhere as the next version ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)). **Fix typos…** at the newest version fixes spacing, typos or grammar without a review and keeps the status of the text; a version made this way says *Editorial correction* under its name, with the lead and the reason ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
+   At the newest accepted version, **Correct the translation…** lets you correct it yourself ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)). At the newest version of a translation, **Upload new version…** brings in a text made elsewhere as the next version ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)). A version made by an editorial correction says so under its name, with the lead and the reason ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
 4. Click **Compare with source** to compare the translation with the source text.
+
+### Find spacing errors and invisible characters
+
+What for: find texts with spacing errors or invisible characters, for example before you assign them.
+
+Ontotator computes typography hints for a text when you ask for them. A hint names a rule and a position in the text. Hints are not stored and never block review, annotation or export; nothing is corrected automatically.
+
+| Rule code | What it finds |
+| --- | --- |
+| \`DOUBLE_SPACE\` | Two or more spaces inside a line. |
+| \`SPACE_BEFORE_PUNCTUATION\` | A space before \`,\` \`;\` \`:\` \`!\` \`?\` or \`.\` |
+| \`MISSING_SPACE_AFTER_PUNCTUATION\` | Punctuation directly between two words, for example *Fieber,Husten*. Numbers, dates, times, abbreviations such as *z.B.* or *e.g.*, web addresses and ellipses are left alone. |
+| \`TRAILING_WHITESPACE_LINE\` | Spaces or tabs at the end of a line. |
+| \`TRAILING_WHITESPACE_TEXT\` | Spaces, tabs or more than one line break at the end of the text. A single final line break is no hint. |
+| \`TAB\` | A tab. |
+| \`ZERO_WIDTH_CHARACTER\` | A zero-width space or joiner, or a byte order mark. |
+| \`SOFT_HYPHEN\` | A soft hyphen. |
+| \`CONTROL_CHARACTER\` | Another control character. |
+
+A non-breaking space is no hint, because it is often correct, for example between a number and its unit. **Show invisible characters** marks it all the same.
+
+There is no page for the hints yet. Read them through the API or the MCP server (token scope \`read\`):
+
+- One text version: \`GET /api/v1/projects/{key}/documents/{document_id}/typography-hints\`, or the MCP tool \`list_typography_hints\` with \`document_id\`. Each hint has \`rule\`, \`start\` and \`end\`; positions count Unicode code points, as the positions of findings do.
+- The whole project: \`GET /api/v1/projects/{key}/typography-hints\`, or \`list_typography_hints\` without \`document_id\`. It returns the number of hints per rule for each text that has any, 100 texts per page (\`limit\` up to 200); pass \`next_after\` as \`after\` for the next page. Only the newest version of each text is counted unless you ask for \`versions=all\`.
+
+You get hints for the texts you may read, as with the texts themselves. The MCP tool returns no text; a server started with \`ONTOTATOR_MCP_READ_CONTENT=1\` can add excerpts with \`include_text\` ([MCP server guide](../../mcp/README.md)).
+
+To see the characters in a text, a reviewer ticks **Show invisible characters** in the translation review ([Show invisible characters](annotator.md#show-invisible-characters)). To fix them in a translation, correct it ([Request a translation correction](#request-a-translation-correction)).
 
 ### Request a translation correction
 
@@ -2144,6 +2198,8 @@ What for: let the annotators revise many texts at once, for example after a guid
 Every listed task changes, or none: if the texts changed since the preview, the dialog says *The texts changed since the preview. Check the new preview.* and shows it. Each task is recorded in the audit trail as a single reopen or withdrawal would be, so the history of every text shows it.
 
 **Undo** in the message, for example *Reopened 14 assignments in 12 texts.*, takes the change back: reopened tasks count as submitted again; withdrawn tasks come back with their drafts. Undo is for the lead who made the change, once, within an hour, and only while nothing changed on these texts since: nobody saved a draft, nobody was assigned, the plan, the final result and the text version are the same. Otherwise the message says *Undo is no longer possible: the texts changed since.*
+
+A message never lies over a dialog you open after it. If you open the next dialog while the message is still showing, the message waits; when you close the dialog, it is back with its **Undo** and stays for its full time again. This holds for every message with **Undo**, also in the annotation view.
 
 The same menu holds **Accept agreeing results…** and **Change final…** for the final results of the selected texts: see [Accept or change the final result of several texts](lead-results.md#accept-or-change-the-final-result-of-several-texts).
 
@@ -2287,7 +2343,7 @@ What for: choose the final result of a text.
 1. On **Documents**, tab **Needs your decision**, click **Accept result…** or **Compare results…** in the row. The row reads **Accept result…** when there is one result to accept or the submissions agree in full, also on notes and modifier text spans, and **Compare results…** when they differ in anything. The card opens at **Finalization**.
 2. With one submission or a submitted consolidation, check it and click **Accept result**. For a consolidation, the card says how its findings came about, for example *Consolidated by Carla Diaz · 32 matching, 1 decided by Carla, 2 groups left out*. Left-out groups are not in the result. If an annotator left findings **Unresolved**, the card lists them with who wrote each note. Accepting a submission directly keeps the flag and the note in the export; open the submission to check them first.
 3. If all annotations agree, the card says so. Click **Accept result**. A finding an annotator left **Unresolved** never counts as agreed, so that text goes through the next step instead.
-4. If they differ, the card shows the agreement, for example *Agreement: 5 of 9 findings match, 1 differs in context only*. When matching findings still differ in a note, a text span or a modifier text span, a line below names them, for example *Notes differ on 1 finding: Ataxia*. When people chose a term and its parent or child on the same passage, a line names the pair, for example *Related terms: Seizure / Status epilepticus*; it still counts as a difference. Findings an annotator left **Unresolved** count as differences and are listed with who wrote each note. **How is this counted?** explains the numbers. Open a submission with **Open submission** to read it in the read-only text view. If that work was carried over from an earlier version of the text, tick **Show changes since** v1 above the text to see the changed passages ([See what changed since the earlier version](annotator.md#see-what-changed-since-the-earlier-version)).
+4. If they differ, the card shows the agreement, for example *Agreement: 5 of 9 findings match, 1 differs in context only*. When matching findings still differ in a note, a text span or a modifier text span, a line below names them, for example *Notes differ on 1 finding: Ataxia*. When people chose a term and its parent or child on the same passage, a line names the pair, for example *Related terms: Seizure / Status epilepticus*; it still counts as a difference. Findings an annotator left **Unresolved** count as differences and are listed with who wrote each note. **How is this counted?** explains the numbers. Open a submission with **Open submission** to read it in the read-only text view; on a phone, its findings are listed below the text. If that work was carried over from an earlier version of the text, tick **Show changes since** v1 above the text to see the changed passages ([See what changed since the earlier version](annotator.md#see-what-changed-since-the-earlier-version)).
 5. Warning: the next action saves at once, without a confirmation. Click **Use as final** in the row of the submission you want (at phone width the submissions are listed one under the other, with their buttons below each). Or [start a consolidation](#start-a-consolidation) instead.
 
 After saving, the card moves on to the next text that needs a decision. The decided row stays in the tab with a *Resolved* badge until you click **Refresh** or change the tab. To undo, [change the final result](#change-a-final-result).
@@ -2472,35 +2528,27 @@ A source text has no **Upload new version…**: a corrected source text comes in
 
 ### Fix a typo in a translation without a review
 
-What for: correct spacing, a typo or grammar in a translation without a translation review. The content of the text stays as it is, and an accepted text stays accepted. Ontotator calls this an editorial correction; the version list, the audit log and the API use that term.
+What for: correct spacing, a typo or grammar in a translation without a translation review. This is an editorial correction: the content of the text stays as it is, and an accepted text stays accepted.
 
-1. Open the text card and click **Translation**.
-2. At the newest version of the translation, click **Fix typos…**. Unlike **Correct the translation…** and **Upload new version…**, it keeps the status of the text and starts no review.
-3. Correct the text under **Corrected text**. It starts with the text of the version. The words you change are marked while you type, and the changes appear below the field with removed text struck through and a count, for example *Changes to v2 · 1 character changed*.
-4. Under **What did you fix?**, click **Spacing**, **Typo** or **Grammar**; you can choose several. **Note** is optional, for example the word you corrected. One of the two is required and is kept with the version.
-5. Read what happens to the work on the version (see below) and the status line, for example *v3 keeps the status of v2: Accepted. No translation review is started.*
-6. Click the button that names the new version, for example *Save as v3*.
+An editorial correction is made with the MCP tool \`editorial_correction\` ([MCP server guide](../../mcp/README.md)) or with \`POST /api/v1/projects/{key}/documents/{document_id}/editorial-correction\`, both with a project token of a lead that has the scope *Project administration*. The tool takes the passages to replace, each with its replacement, and a reason. Without \`confirm\` it changes nothing and returns the changed passages and what would follow.
 
-If a number changes, the dialog points it out, for example *Changes a number: 15 → 50. Check that this is intended.*; you can still save.
-
-The corrected text becomes the next version of the translation, a correction of the version it fixes with that version's status: the correction of an accepted v2 is an accepted v3, and v2 stays accepted as well. A version that was rejected or queried can be corrected too: its correction is rejected or queried like it, and you resolve it as before ([Resolve a rejected or queried translation](#resolve-a-rejected-or-queried-translation)). No translation review is started and **Review** is not changed. The version row names the correction, for example *Editorial correction by Project lead (ann-0002), 17 Nov, 10:12 · Spacing; Typo*. The audit log records who corrected the text, the changed passages and the reason.
+The corrected text becomes the next version of the translation, a correction of the version it fixes with that version's status: the correction of an accepted v2 is an accepted v3, and v2 stays accepted as well. The version row names the correction, for example *Typo fix by Project lead (ann-0002), 17 Nov, 10:12 · Space before the full stop*. The audit log records who corrected the text, the changed passages and the reason.
 
 What happens to work on the corrected version:
 
-- If nobody worked on it, the dialog says so: *Nobody has worked on v2 yet.*
-- Annotation tasks nobody opened move to the new version: *2 waiting tasks continue on v3.*
-- Annotations that were opened or submitted, open consolidations and a final result stay on the corrected version. Only then the dialog shows a highlighted block, *Work stays on v2*, with what stays and what to do, for example *2 annotations stay on v2. After saving, use Handle text change… and Carry to v3… on this row to move them.* Move started work with **Handle text change…** ([Handle a text change for open annotation work](#handle-a-text-change-for-open-annotation-work)) and submitted work with *Carry to v3…* ([Carry submitted work to a new text version](#carry-submitted-work-to-a-new-text-version)). The block also says how many findings mark words you changed and will need a check.
-- Tool proposals move to the new text; a proposal whose marked words were changed waits for a check, as after a corrected translation review.
+- Annotation tasks nobody opened move to the new version.
+- Annotations that were opened or submitted, open consolidations and a final result stay on the corrected version. Handle them with **Handle text change…** and *Carry to v3…* ([Handle a text change for open annotation work](#handle-a-text-change-for-open-annotation-work)).
+- Tool proposals are carried to the new text; a proposal whose marked words were changed waits for a check, as after a corrected translation review.
 
-The correction is refused in these cases, and the dialog says so in place:
+The answer says how many characters changed. When a number changes, it names the numbers, for example 15 → 50, so that you can check them; nothing is refused for it.
 
-- A translation review of the version is open: *A translation review of this version is open.* Withdraw it with **Remove…** in the reviewer's row of the **Translation** part, or make the fix in that review.
-- The version is not the newest of its translation or it was discarded.
-- The text is unchanged: *No changes to v2. Nothing is saved.*
+An editorial correction is refused in these cases:
 
-A source text has no **Fix typos…**; a corrected source text comes in as an Ontospan bundle. A change of content, for example a different finding or a rewritten sentence, belongs in a translation review ([Correct a translation yourself](#correct-a-translation-yourself)).
+- A translation review of the version is open, the version is not the newest of its translation or it was discarded.
+- The text is unchanged.
+- The text is a source text. A corrected source text comes in as an Ontospan bundle.
 
-The same correction can be made without the browser: the MCP tool \`editorial_correction\` ([MCP server guide](../../mcp/README.md)) and \`POST /api/v1/projects/{key}/documents/{document_id}/editorial-correction\` take the passages to replace, each with its replacement, and the reason, with a project token of a lead that has the scope *Project administration*. Without \`confirm\` the tool changes nothing and returns the changed passages and what would follow.
+A version that was rejected or queried can be corrected as well. The new version is rejected or queried like the one it corrects, and you resolve it as before ([Resolve a rejected or queried translation](#resolve-a-rejected-or-queried-translation)).
 
 ### Handle a text change for open annotation work
 

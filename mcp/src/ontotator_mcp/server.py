@@ -19,6 +19,7 @@ from ontotator_mcp.tools_people import register_people
 from ontotator_mcp.tools_results import register_results
 from ontotator_mcp.tools_setup import register_setup
 from ontotator_mcp.tools_status import register_status
+from ontotator_mcp.tools_typography import register_typography
 
 INSTRUCTIONS = """\
 Tools for one Ontotator instance (collaborative annotation of ontology terms
@@ -85,6 +86,7 @@ def build_server(
     register_lead(server, api)
     register_status(server, api)
     register_monitoring(server, api)
+    register_typography(server, api, read_content=settings.read_content)
     register_results(server, api)
     if settings.read_content:
         register_content(server, api)
