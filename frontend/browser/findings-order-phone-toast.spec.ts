@@ -200,3 +200,52 @@ test("issue 452: a passage marked where the bar appears is moved clear of it, by
   expect(await onTop(chooseTerm(page))).toBe(true);
   expect(errors).toEqual([]);
 });
+
+// ---- Issue 438 ------------------------------------------------------------------------------------------------
+
+const CASE = "EN100024";
+const showSelect = (page: Page) => page.getByRole("combobox", { name: "Show", exact: true }).first();
+const layer = (page: Page) => page.getByRole("region", { name: "Findings", exact: true });
+const readingText = (page: Page) => page.locator(".case-viewer .text-container").first();
+const box = async (locator: Locator) => (await locator.boundingBox())!;
+
+for (const size of [PHONE, { width: 375, height: 667 }, DESKTOP]) {
+  const phone = size.width < 700;
+  test(`issue 438: text view with a submission layer, ${phone ? "the text keeps the full width" : "the layer stays beside the text"} (${size.width} px)`, async ({ page }) => {
+    const errors = consoleErrors(page);
+    await page.setViewportSize(size);
+    const s = await proposalCheckScenario(page, "CHECKED");
+    await loginCheckUser(page, s, "lead");
+    await page.goto(`/#/projects/${encodeURIComponent(s.project)}/cases/${CASE}?variant=${encodeURIComponent(s.cases[CASE])}`);
+    await expect(showSelect(page)).toBeVisible({ timeout: 30_000 });
+    await expect(readingText(page)).toBeVisible();
+    const textOnly = await box(readingText(page));
+
+    // Tom's submission as the shown layer.
+    const value = await showSelect(page).locator("option", { hasText: s.display_names.tom }).first().getAttribute("value");
+    await showSelect(page).selectOption(value!);
+    await expect(layer(page)).toContainText("(HP:0002133)");
+    await expect(page.locator(".text-container .run--marked").first()).toBeVisible();
+    await shot(page, `438-layer-${size.width}`);
+
+    const [text, findings] = [await box(readingText(page)), await box(layer(page))];
+    if (phone) {
+      // The text is as wide as without a layer (the window less its margins), and the layer is below it.
+      expect(text.width).toBeGreaterThanOrEqual(textOnly.width - 1);
+      expect(text.width).toBeGreaterThanOrEqual(size.width - 48);
+      expect(findings.y).toBeGreaterThanOrEqual(text.y + text.height - 1);
+      expect(findings.width).toBeGreaterThanOrEqual(size.width - 48);
+      // The layer is reachable: its findings scroll into view.
+      await layer(page).getByRole("listitem").first().scrollIntoViewIfNeeded();
+      await expect(layer(page).getByRole("listitem").first()).toBeInViewport({ ratio: 1 });
+      await shot(page, `438-layer-findings-${size.width}`);
+    } else {
+      // Desktop is unchanged: a 300 px column to the right of the text.
+      expect(findings.width).toBe(300);
+      expect(findings.x).toBeGreaterThanOrEqual(text.x + text.width - 1);
+      expect(Math.abs(findings.y - text.y)).toBeLessThan(120);
+    }
+    expect(await noSidewaysScroll(page)).toBe(true);
+    expect(errors).toEqual([]);
+  });
+}
