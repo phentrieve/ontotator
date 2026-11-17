@@ -17,7 +17,7 @@ Want to try first? A private practice project with invented texts lets you do ev
 After login you see **My tasks**. Leads and administrators see **Projects** the first time.
 
 1. Click **My tasks** in the sidebar.
-2. On the tab **To do**, find a row whose **Task** is *Annotation, from scratch* or *Annotation, from proposals*.
+2. On the tab **To do**, find a row whose **Task** is *Annotation, from scratch* or *Annotation, from proposals*. On a phone, the task and its status stand under the name of the text.
 3. Click **Start**. A task marked **Waiting for translation review** cannot be started yet; it opens by itself once the translation review is accepted.
 
 The editor opens. If you have no task, you see **No texts are assigned to you yet.**; ask your lead.

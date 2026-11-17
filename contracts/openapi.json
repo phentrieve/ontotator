@@ -29085,6 +29085,18 @@
             "type": "integer",
             "title": "Finding Count",
             "default": 0
+          },
+          "refused_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "CONSOLIDATION_OPEN"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refused By"
           }
         },
         "type": "object",

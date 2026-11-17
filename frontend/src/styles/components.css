@@ -776,6 +776,17 @@ ul.task-counts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space
 .task-reopen-info .icon { width: 12px; height: 12px; margin-inline-start: 2px; vertical-align: -1px; }
 .task-answer-link { text-decoration: none; }
 .task-answer-link .status-pill { text-decoration: underline; text-underline-offset: 2px; }
+/* My tasks on a narrow screen: text, task and status (with its reason) stacked in one cell beside the action. */
+.task-stack { display: grid; gap: var(--space-1); min-width: 0; overflow-wrap: anywhere; }
+.task-stack__status { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
+.task-stack__status > p { flex: 1 0 100%; margin: 0; }
+/* No hover on a phone: the whole reason is written out, not clamped behind a title. */
+.task-stack .task-hold-reason { display: block; max-width: none; }
+.task-reopen-reason { margin: var(--space-1) 0 0; white-space: normal; }
+/* Fixed layout: the table is exactly as wide as its box, whatever the names; the action keeps a column of its own. */
+.my-tasks-table--narrow { table-layout: fixed; }
+.my-tasks-table--narrow th:last-child { width: 8.5rem; }
+.my-tasks-table--narrow td:last-child { overflow-wrap: anywhere; }
 
 /* Keeps a row's action column in view while the rest of a wide table scrolls. */
 .data-table--pin-end :is(th, td:not([colspan])):last-child { position: sticky; right: 0; background: var(--surface); box-shadow: inset 1px 0 var(--border); }

@@ -112,7 +112,7 @@ What for: record a term that the text mentions.
 
 To drop a mark without adding a finding, click **Discard** or press Esc.
 
-To look the marked words up elsewhere, for example in a web search, click **Copy text** or press `Ctrl+C` (`Cmd+C` on a Mac). Both copy the marked text of the new finding, or the selected (otherwise the first) mention of the selected finding; parts of a mention with words in between are joined by a space. Text you have selected in a field is copied as usual. **Copy text** is also at each mention under **Mentions**.
+To look the marked words up elsewhere, for example in a web search, click **Copy text** or press `Ctrl+C` (`Cmd+C` on a Mac). Both copy the marked text of the new finding, or the selected (otherwise the first) mention of the selected finding or tool proposal; parts of a mention with words in between are joined by a space. Text you have selected in a field is copied as usual. **Copy text** is also at each mention under **Mentions**.
 
 ## Search a term
 
@@ -246,7 +246,7 @@ Tools make mistakes. Check every proposal as if you had marked it yourself: the 
 
 1. The list **Review Proposals** shows every proposal. Your additions are under **Your own findings**.
 2. Select a proposal, or move with `j` and `k`. The text shows where it was found.
-3. Check the marked text, the term and each value.
+3. Check the marked text, the term and each value. To look the passage up elsewhere, click **Copy text** next to the quoted passage in the details, or press `Ctrl+C` (`Cmd+C` on a Mac): both copy the passage of the selected proposal, as for a finding ([Mark text and add a finding](#mark-text-and-add-a-finding)). A proposal with several mentions has **Copy text** at each.
 4. Decide:
    - **Confirm**: the passage, term and all values are right. Values tagged **Defaulted** were not set by the tool but prefilled; Confirm accepts them as shown, so check them too.
    - **Reject**: the proposal is wrong and nothing should replace it.
@@ -361,7 +361,8 @@ What happens to your earlier work:
 - The lead sees your task as not submitted, and a new consolidation cannot start from the replaced submission. The lead can still read it.
 - If the lead had already accepted your earlier submission as the final result, the lead is asked to review that choice.
 - You must [submit](#submit-the-text) the new round to hand in your work again.
-- While a consolidation of the text is open, a new round from your submission is refused: *A consolidation is open on this text: finish or withdraw it first.* Ask your lead.
+- While your submission is being consolidated, you cannot continue from it. The dialog then shows no choice and no button under **Start a new round**, only: *Your submission is being consolidated, so you cannot continue from it now. Ask your project lead.* The lead can finish the consolidation or withdraw it; after that the dialog offers your submission again.
+- In a task from tool proposals you cannot continue from a submission yourself. The dialog says: *In a task from tool proposals you cannot continue from a submission yourself. Ask your project lead to start a new round.*
 
 ## Report a text problem
 

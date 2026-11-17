@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { api, AuthError, notifySessionRestored, type AssignmentView, type RoundInputView, type RoundSourceView, type WorkRoundView } from "../src/api/client";
+import { api, ApiError, AuthError, notifySessionRestored, type AssignmentView, type RoundInputView, type RoundSourceView, type WorkRoundView } from "../src/api/client";
 import { WorkRoundsDialog } from "../src/tasks/WorkRoundsDialog";
 import { RoundInputEvidenceDialog } from "../src/tasks/RoundInputEvidenceDialog";
 import { historical } from "./variantFixtures";
@@ -173,6 +173,52 @@ describe("Work rounds dialog", () => {
     expect(await screen.findByText("No submission can be continued right now.")).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: "Reload task state" }));
     expect(onReload).toHaveBeenCalled();
+  });
+
+  it("says before any click that a submission being consolidated cannot be continued (review F1)", async () => {
+    const { onCreate } = renderDialog({}, { sources: [{ ...source, refused_by: "CONSOLIDATION_OPEN" }] });
+    expect(await screen.findByText("Your submission is being consolidated, so you cannot continue from it now. Ask your project lead.")).toBeDefined();
+    expect(screen.queryByRole("radio")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Continue from this submission" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reload task state" })).toBeNull();
+    expect(dialog().textContent).not.toContain("finish or withdraw");
+    expect(onCreate).not.toHaveBeenCalled();
+  });
+
+  it("shows a refusal that still comes from the server in the owner's words, focused, without a reload (review F2)", async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    const onCreate = vi.fn().mockRejectedValue(new ApiError(409, "A consolidation is open on this text: finish or withdraw it first.", "CONSOLIDATION_OPEN"));
+    renderDialog({ onCreate });
+    fireEvent.click(await screen.findByRole("radio"));
+    fireEvent.click(screen.getByRole("button", { name: "Continue from this submission" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("Your submission is being consolidated, so you cannot continue from it now. Ask your project lead.");
+    await waitFor(() => expect(document.activeElement).toBe(alert.parentElement));
+    expect(scroll).toHaveBeenCalled();
+    // The choice and the button are gone: trying again or reloading cannot change the answer.
+    expect(screen.queryByRole("radio")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Continue from this submission" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reload task state" })).toBeNull();
+    delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+  });
+
+  it("brings any other refusal into view as well and keeps the reload there", async () => {
+    const onCreate = vi.fn().mockRejectedValue(new Error("The round could not be opened"));
+    renderDialog({ onCreate });
+    fireEvent.click(await screen.findByRole("radio"));
+    fireEvent.click(screen.getByRole("button", { name: "Continue from this submission" }));
+    const alert = await screen.findByRole("alert");
+    await waitFor(() => expect(document.activeElement).toBe(alert.parentElement));
+    expect(screen.getByRole("button", { name: "Reload task state" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Continue from this submission" })).toBeDefined();
+  });
+
+  it("gives the reason in a task from proposals instead of a reload", async () => {
+    renderDialog({ assignment: { ...assignment, annotation_mode: "proposals" } as AssignmentView }, { sources: [] });
+    expect(await screen.findByText("In a task from tool proposals you cannot continue from a submission yourself. Ask your project lead to start a new round.")).toBeDefined();
+    expect(screen.queryByText("No submission can be continued right now.")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reload task state" })).toBeNull();
   });
 
   it("offers Start empty round only for an untouched open task", async () => {

@@ -2293,12 +2293,17 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   }, [followAnnotationId]);
 
   // Ctrl+C (Cmd+C) with nothing else selected copies the active passage, to look it up elsewhere: the marked
-  // text of a new finding, else the selected (or first) mention of the selected finding. Several segments are
-  // joined by a space, as a web search reads them. A selection of its own (a field, the page) copies as usual.
+  // text of a new finding, else the selected (or first) mention of the selected finding or, in a task from
+  // proposals, of the selected tool proposal. Several segments are joined by a space, as a web search reads them.
+  // A selection of its own (a field, the page) copies as usual.
   const passageRef = useRef("");
   const passageRefs = selectedAnnotation?.annotation.evidence_refs ?? [];
+  const targetEvidence = selectedTarget && !selectedAnnotation ? targetSnapshot?.evidence ?? [] : [];
+  const targetMention = targetEvidence.find(ev => selectedTarget
+    && `target:${selectedTarget.annotation_id}:${selectedTarget.version}:${ev.mention.evidence_id}:${ev.version}` === selectedEvidenceId) ?? targetEvidence[0];
   const passageSegments = pendingAnnotation?.segments?.length ? pendingAnnotation.segments
-    : allEvidenceMap[(passageRefs.find(ref => ref.evidence_id === selectedEvidenceId) ?? passageRefs[0])?.evidence_id ?? ""]?.mention.segments;
+    : allEvidenceMap[(passageRefs.find(ref => ref.evidence_id === selectedEvidenceId) ?? passageRefs[0])?.evidence_id ?? ""]?.mention.segments
+      ?? targetMention?.mention.segments;
   passageRef.current = passageSegments?.length ? quoteOf(view.document.text, passageSegments, " ") : "";
   useEffect(() => {
     const copyPassage = (event: ClipboardEvent) => {
@@ -4429,6 +4434,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
               onDeselect={handleDeselectAll}
               onRepeatDecision={outcome => { repeatDecision(selectedTarget, outcome); }}
               onMoveMention={proposalCopyCanMove(selectedTarget) ? index => { void moveProposalMention(selectedTarget, index).catch(reportError); } : undefined}
+              onCopyAnnounce={announceCarried}
               onShowMention={ev => {
                 const evidenceId = `target:${selectedTarget.annotation_id}:${selectedTarget.version}:${ev.mention.evidence_id}:${ev.version}`;
                 setSelectedEvidenceId(evidenceId);
