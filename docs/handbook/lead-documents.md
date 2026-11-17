@@ -351,7 +351,7 @@ Every listed task changes, or none: if the texts changed since the preview, the 
 
 **Undo** in the message, for example *Reopened 14 assignments in 12 texts.*, takes the change back: reopened tasks count as submitted again; withdrawn tasks come back with their drafts. Undo is for the lead who made the change, once, within an hour, and only while nothing changed on these texts since: nobody saved a draft, nobody was assigned, the plan, the final result and the text version are the same. Otherwise the message says *Undo is no longer possible: the texts changed since.*
 
-The same menu holds **Accept agreeing results…** and **Change final…** for the final results of the selected texts: see [Accept or change the final result of several texts](lead-results.md#accept-or-change-the-final-result-of-several-texts).
+The same menu holds **Accept agreeing results…** and **Change final…** for the final results of the selected texts: see [Accept or change the final result of several texts](lead-results.md#accept-or-change-the-final-result-of-several-texts). The message after **Change final…** has **Undo** as well: it brings the earlier final results back, for the lead who made the change, once, within an hour, and only while nothing changed on these texts since.
 
 ### Start a new round for several texts
 
