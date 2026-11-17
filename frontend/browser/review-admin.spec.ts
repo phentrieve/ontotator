@@ -15,11 +15,14 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { authenticatedRequest, loginThroughForm, TEST_PASSWORD } from "./helpers";
+import { leadScenario } from "./leadWorkflowHelpers";
 
 test.setTimeout(120_000);
 test.use({ actionTimeout: 15_000, permissions: ["clipboard-read", "clipboard-write"] });
 
 const SIZES = [{ name: "1440", width: 1440, height: 900 }, { name: "390", width: 390, height: 844 }] as const;
+const UNAUTHENTICATED = "Failed to load resource: the server responded with a status of 401 (Unauthorized)";
+const REFUSED = "Failed to load resource: the server responded with a status of 409 (Conflict)";
 
 /** Console errors and page errors of the test. */
 function collectErrors(page: Page): string[] {
@@ -111,6 +114,75 @@ for (const size of SIZES) {
       await expect(setup).not.toContainText("logs the person out");
       await setup.getByRole("button", { name: "Cancel", exact: true }).click();
       expect(errors).toEqual([]);
+    });
+
+    test("B: an administrator who takes the last lead away is told that the project will have no lead; a lead is refused", async ({ page }) => {
+      const errors = collectErrors(page);
+      const s = await leadScenario(page, "DEFAULT_IMPORT");
+      const suffix = randomUUID().slice(0, 8);
+      const admin = `lead-admin-${suffix}`;
+      await createUser(page, { username: admin, pseudonym: admin, display_name: "Rita Admin", system_admin: "true" });
+      const people = `/#/projects/${encodeURIComponent(s.project)}/settings/people`;
+      const members = page.getByRole("region", { name: "Members", exact: true });
+      const status = members.locator("p.settings-confirmation");
+      const leads = async () => {
+        const response = await authenticatedRequest(page, `/api/v1/projects/${encodeURIComponent(s.project)}/members`);
+        expect(response.ok(), await response.text()).toBeTruthy();
+        return (await response.json() as { username: string; roles: string[] }[]).filter(member => member.roles.includes("lead")).map(member => member.username);
+      };
+
+      // The project's only lead, who is no administrator: the dialog is as before and the server refuses.
+      await loginThroughForm(page, s.users.lead, s.display_names.lead);
+      await page.goto(people);
+      await members.getByRole("checkbox", { name: `${s.users.lead}: Lead`, exact: true }).click();
+      const ownRemoval = page.getByRole("dialog", { name: "Remove Project Lead from the project?", exact: true });
+      await expect(ownRemoval).toContainText("Project Lead loses access to this project.");
+      await expect(ownRemoval).not.toContainText("will have no lead");
+      await ownRemoval.getByRole("button", { name: "Remove from project", exact: true }).click();
+      await expect(members.getByRole("alert")).toContainText("Add another project lead before removing the last lead.");
+      await shot(page, `B-lead-refused-${size.name}`);
+      expect(await leads()).toEqual([s.users.lead]);
+      await page.getByRole("button", { name: "Log out", exact: true }).click();
+      await expect(page.getByRole("form", { name: "Log in to Ontotator" })).toBeVisible();
+
+      // The administrator becomes the second lead, removes the first and then unticks their own Lead box.
+      await loginThroughForm(page, admin, "Rita Admin");
+      await page.goto(people);
+      await members.getByRole("button", { name: "Add member…", exact: true }).click();
+      const add = members.getByRole("form", { name: "Add member", exact: true });
+      await add.getByRole("combobox", { name: /^Username/ }).fill(admin);
+      await add.getByRole("checkbox", { name: "New member: Lead", exact: true }).check();
+      await add.getByRole("button", { name: "Add member", exact: true }).click();
+      await expect(status).toHaveText("Rita Admin is now Lead.");
+      await add.getByRole("button", { name: "Close", exact: true }).click();
+
+      // With a second lead in the project nothing warns; the other person may lose access.
+      await members.getByRole("button", { name: "Remove Project Lead from the project", exact: true }).click();
+      const otherRemoval = page.getByRole("dialog", { name: "Remove Project Lead from the project?", exact: true });
+      await expect(otherRemoval).toContainText("Project Lead loses access to this project.");
+      await expect(otherRemoval).not.toContainText("will have no lead");
+      await otherRemoval.getByRole("button", { name: "Remove from project", exact: true }).click();
+      await expect(status).toHaveText("Project Lead is no longer a member of this project.");
+
+      await members.getByRole("checkbox", { name: `${admin}: Lead`, exact: true }).click();
+      const lastLead = page.getByRole("dialog", { name: "Remove Rita Admin from the project?", exact: true });
+      await expect(lastLead).toBeVisible();
+      await shot(page, `B-last-lead-dialog-${size.name}`);
+      await expect(lastLead.locator(".ui-dialog-body")).toHaveText("This project will have no lead. You can still manage it as system administrator. This logs Rita Admin out of Ontotator on all devices; they can log in again right away.");
+      await expectInsideWindow(page, lastLead);
+      await expectNoSidewaysScroll(page);
+      await lastLead.getByRole("button", { name: "Remove from project", exact: true }).click();
+      await expect(status).toHaveText("Rita Admin is no longer a member of this project.");
+      // Up to here the only errors are the lead's refusal and the 401 of the log-out in between.
+      expect(errors.filter(error => error !== REFUSED && error !== UNAUTHENTICATED)).toEqual([]);
+
+      // As the dialog said: logged out, and after a new log-in the project without a lead is still theirs to manage.
+      await loginThroughForm(page, admin, "Rita Admin");
+      expect(await leads()).toEqual([]);
+      await page.goto(people);
+      await expect(members.getByRole("button", { name: "Add member…", exact: true })).toBeVisible();
+      await shot(page, `B-no-lead-people-${size.name}`);
+      await expectNoSidewaysScroll(page);
     });
   });
 }

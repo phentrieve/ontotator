@@ -290,6 +290,8 @@ What for: give or take away a role.
 
 A project needs at least one lead: **Add another project lead before removing the last lead.**
 
+The exception is a system administrator, who may take away the last lead, their own lead role included, for example to hand a project over. The dialog then says *This project will have no lead. You can still manage it as system administrator.* On their own row it does not speak of lost access or revoked tokens, because an administrator keeps both. A project without a lead shows "–" under **Lead** on **Projects** and can only be managed by an administrator until one is added ([Add a member](#add-a-member)).
+
 ## Remove a member
 
 What for: take someone off the project.

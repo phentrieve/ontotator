@@ -1,11 +1,15 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { api, ApiError, type Member, type MemberCandidate } from "../api/client";
+import { api, ApiError, type CurrentUser, type Member, type MemberCandidate } from "../api/client";
 import { Button, Checkbox, ConfirmDialog, DataTable, EmptyState, InlineMessage, StatusBadge, SuggestInput, type Column, type StatusTone, EmptyValue } from "../ui";
 import { ErrorNotice } from "./ErrorNotice";
 import { SettingsHint } from "./SettingsCard";
 import { labelFor, roleLabels, taskLabels } from "../app/labels";
 import { personLabel, textLabel } from "../app/identity";
-export interface MembersSectionProps { projectKey: string }
+export interface MembersSectionProps {
+  projectKey: string;
+  /** Who is looking: a system administrator may remove the last lead and keeps managing the project. */
+  currentUser?: Pick<CurrentUser, "username" | "is_system_admin">;
+}
 
 const roles = ["lead", "annotator", "adjudicator"] as const;
 /** Accounts that cannot work right now are marked, as in the Assign dialog; active ones read plainly. */
@@ -28,7 +32,25 @@ export function roleChangeText(name: string, before: readonly string[], after: r
 type Affected = { id: number; document_id: string; case_id?: string | null; language?: string | null; task: string };
 type Pending = { username: string; roles: string[]; assignments: Affected[]; fromAdd: boolean };
 /** ``lead``: the person loses the lead role, which their project API tokens need (issue 305). */
-type Removal = { username: string; name: string; roles: string[]; removed: string; lead: boolean };
+export type Removal = { username: string; name: string; roles: string[]; removed: string; lead: boolean };
+
+/**
+ * What the removal dialog says. The server lets only a system administrator take the last lead away
+ * (anyone else gets LAST_LEAD), so only they are warned that the project will have no lead. Whether
+ * another person is an administrator is not known here: only the administrator's own row drops
+ * "loses access" and the token sentence, which do not hold for them.
+ */
+export function removalText(removal: Removal, lastLead: boolean, viewer: MembersSectionProps["currentUser"]): string {
+  const admin = viewer?.is_system_admin === true;
+  const ownRow = admin && viewer.username === removal.username;
+  return [
+    removal.roles.length ? `${removal.name} keeps the other roles in this project.` : !ownRow && `${removal.name} loses access to this project.`,
+    admin && lastLead && "This project will have no lead.",
+    admin && (lastLead || ownRow) && "You can still manage it as system administrator.",
+    `This logs ${removal.name} out of Ontotator on all devices; they can log in again right away.`,
+    removal.lead && !ownRow && `The project API tokens ${removal.name} created for this project are revoked, unless ${removal.name} is a system administrator.`,
+  ].filter(Boolean).join(" ");
+}
 function affectedAssignments(error: unknown): Affected[] | null {
   if (!(error instanceof ApiError) || error.code !== "MEMBER_HAS_ASSIGNMENTS" || !error.details || typeof error.details !== "object") return null;
   const assignments = error.details.assignments;
@@ -47,7 +69,7 @@ const candidateLabel = (user: MemberCandidate): string =>
 /** One suggestion: username, display name and languages. */
 const candidateOption = (user: MemberCandidate): { value: string; label: string } => ({ value: user.username, label: candidateLabel(user) });
 
-function MemberEditor({ projectKey }: MembersSectionProps): JSX.Element {
+function MemberEditor({ projectKey, currentUser }: MembersSectionProps): JSX.Element {
   const id = useId();
   const [members, setMembers] = useState<Member[] | null>(null);
   const [suggestions, setSuggestions] = useState<MemberCandidate[]>([]);
@@ -109,6 +131,8 @@ function MemberEditor({ projectKey }: MembersSectionProps): JSX.Element {
   const memberName = (member: Member) => member.display_name?.trim() || member.username || personLabel(member);
   const pendingMember = members?.find(member => member.username === pending?.username);
   const pendingName = pendingMember ? memberName(pendingMember) : pending?.username;
+  const leads = members?.filter(member => member.roles.includes("lead")) ?? [];
+  const lastLead = removal !== null && removal.lead && leads.length === 1 && leads[0].username === removal.username;
   const columns: Column<Member>[] = [
     { id: "person", header: "Person", cell: member => personLabel(member) },
     { id: "username", header: "Username", cell: member => member.username },
@@ -152,7 +176,7 @@ function MemberEditor({ projectKey }: MembersSectionProps): JSX.Element {
     <ConfirmDialog open={removal !== null} tone="danger" busy={busy}
       title={removal ? (removal.roles.length ? `Remove the ${labelFor(roleLabels, removal.removed)} role from ${removal.name}?` : `Remove ${removal.name} from the project?`) : ""}
       confirmLabel={removal?.roles.length ? "Remove role" : "Remove from project"}
-      message={removal && <><p>{removal.roles.length ? `${removal.name} keeps the other roles in this project.` : `${removal.name} loses access to this project.`} This logs {removal.name} out of Ontotator on all devices; they can log in again right away.{removal.lead && ` The project API tokens ${removal.name} created for this project are revoked, unless ${removal.name} is a system administrator.`}</p></>}
+      message={removal && <p>{removalText(removal, lastLead, currentUser)}</p>}
       onCancel={() => { if (!writing.current) { setRemoval(null); setError(undefined); } }}
       onConfirm={() => { if (removal) void change(removal.username, removal.roles, false); }} />
     <ConfirmDialog open={pending !== null} title="Revoke affected assignments?" busy={busy} confirmLabel="Remove and revoke their open assignments"
