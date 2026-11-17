@@ -202,7 +202,10 @@ class CellDetail:
     versions, of ``total`` roots); in Annotation and Final the counts are the
     minimum over the row's target versions ("1 of 2 assigned", "1 of 2
     submitted"). The Annotation ``total`` of ``submitted`` is "annotators per
-    text", or the people holding that target when more do (issue 283). ``reason`` is free text only (Review re_review: "Dosis
+    text", or the people holding that target when more do (issue 283). An
+    Annotation cell ``in_progress`` below the limit counts ``submitted`` out
+    of the people holding the target and carries ``assigned`` / ``target``
+    ("not started · max 2"). ``reason`` is free text only (Review re_review: "Dosis
     prüfen"); codes go to ``note``, Final ``confirm`` cause codes to
     ``causes``. ``started`` of ``open_tasks``: how many of the open
     assignments the cell names have started (``StageFacts``, issue 258);
@@ -488,7 +491,11 @@ def _annotation(facts: StageFacts, codes: frozenset[str]) -> StageCell:
             )
     per_text = step.per_text
     counted = per_text > 1
-    if "assign_annotation" in codes:
+    open_work = bool(step.open_annotations or facts.annotators_open)
+    # Room for another annotator. With an open task the cell shows that task
+    # (below); the room is then a remark of the in-progress cell.
+    room = "assign_annotation" in codes
+    if room and not open_work and not step.finishing:
         assigned = step.annotation_assignments
         return _cell(
             "partly_assigned" if assigned else "unassigned",
@@ -522,19 +529,25 @@ def _annotation(facts: StageFacts, codes: frozenset[str]) -> StageCell:
             submitted=submitted if counted else None,
             total=per_text if counted else None,
         )
-    if step.open_annotations or facts.annotators_open:
+    if open_work:
         note: dict[str, Any] = (
             {"note": "may_change", "version": newest}
             if step.open_translation_reviews or facts.review_people
             else waiting_note
         )
         many = counted or submitted > 0
+        if room:
+            # Below the limit: out of the people who hold the text, and the
+            # limit as "max" (``assigned`` / ``target``, as partly_assigned).
+            total = max(submitted, facts.annotators_holding, 1)
         return _cell(
             "in_progress",
             "running",
             people=facts.annotators_open,
             submitted=submitted if many else None,
             total=total if many else None,
+            assigned=step.annotation_assignments if room and counted else None,
+            target=per_text if room and counted else None,
             round_ordinal=facts.round_ordinal,
             **note,
             **started,

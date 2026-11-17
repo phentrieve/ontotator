@@ -90,10 +90,11 @@ export function submittedOf(submitted: number, total: number): string {
  * have one.
  */
 const NARROW_STATES: readonly (readonly [RegExp, string])[] = [
-  [/^assigned, not started$/, "not started"],
+  // "· max 2" (an open task below the limit) stays in the title; the narrow cell names the work.
+  [/^assigned, not started(?: · max \d+)?$/, "not started"],
   [/^(?:after translation review|waiting for review \(.*\))$/, "after review"],
   [/^in review, .+$/, "in review"],
-  [/^(\d+) of (\d+) submitted(?:, .+)?$/, "$1/$2 submitted"],
+  [/^(\d+) of (\d+) submitted(?:, .+)?(?: · max \d+)?$/, "$1/$2 submitted"],
   [/^(\d+) annotators? · max (\d+)$/, "$1 · max $2"],
   [/^not reviewed, optional$/, "not reviewed"],
   [/^(?:Final is|In progress|Submitted|Finishing) on old text$/, "on old text"],
@@ -206,8 +207,10 @@ function annotationText(cell: StageCellView): StageText {
       return { symbol: "○", word: counted("Unassigned"), detail: join(working, waiting) };
     }
     case "in_progress": {
+      // Below the limit (the server sends `target` then): "max 2" after the open work.
+      const max = detail.target != null && (detail.assigned ?? 0) < detail.target ? `max ${detail.target}` : null;
       if (detail.total != null && detail.submitted != null) {
-        return { symbol: "◐", word: submittedOf(detail.submitted, detail.total), detail: join(people && `waiting: ${people}`, startedPart(detail), waiting) };
+        return { symbol: "◐", word: submittedOf(detail.submitted, detail.total), detail: join(people && `waiting: ${people}`, startedPart(detail), max, waiting) };
       }
       const change = detail.note === "may_change" ? join(version(detail.version), "may change") : null;
       const started = startedOf(detail);

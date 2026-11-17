@@ -900,7 +900,7 @@ def test_finishing_on_old_text_is_running() -> None:
     assert c.annotation.detail.people == (TOM,)
 
 
-def test_partly_assigned_lists_the_working_people() -> None:
+def test_an_open_task_below_the_limit_is_in_progress_with_the_room() -> None:
     c = cells(
         facts(
             per_text=2,
@@ -909,9 +909,39 @@ def test_partly_assigned_lists_the_working_people() -> None:
             annotators_open=(TOM,),
         )
     )
-    assert (c.annotation.state, c.annotation.tone) == ("partly_assigned", "todo")
+    # An open task below the limit: the cell shows the work and waits on the
+    # person; the room for another annotator is "max 2" (lead review, F3).
+    assert (c.annotation.state, c.annotation.tone) == ("in_progress", "running")
     assert (c.annotation.detail.assigned, c.annotation.detail.target) == (1, 2)
+    assert (c.annotation.detail.submitted, c.annotation.detail.total) == (0, 1)
     assert c.annotation.detail.people == (TOM,)
+    # At the limit the cell carries no room.
+    full = cells(
+        facts(
+            per_text=2,
+            annotation_assignments=2,
+            open_annotations=1,
+            annotators_open=(TOM,),
+            annotators_holding=2,
+        )
+    ).annotation
+    assert (full.state, full.detail.target, full.detail.total) == (
+        "in_progress",
+        None,
+        2,
+    )
+    # Nobody at work (one submitted, room for one more): still partly assigned.
+    idle = cells(
+        facts(
+            per_text=2,
+            annotation_assignments=1,
+            missing_final=True,
+            submissions=1,
+            annotators_submitted=(TOM,),
+        )
+    ).annotation
+    assert (idle.state, idle.tone) == ("partly_assigned", "todo")
+    assert (idle.detail.assigned, idle.detail.target) == (1, 2)
 
 
 # One root per target status / newest decision class (keeps the product small).
@@ -1070,6 +1100,13 @@ def test_every_lead_step_has_exactly_one_actionable_cell() -> None:
                 and rule_on
                 and not is_source
                 and status != "accepted"
+            ):
+                continue
+            # Lead review F3: with an annotation open the row waits on its
+            # person (rule 9 first); assigning another annotator stays on
+            # offer while the cell shows the running work.
+            if s.code == "assign_annotation" and (
+                step.open_annotations or step.finishing
             ):
                 continue
             # "rejected" carries the edge of a decision row ("rejected + edge"),
@@ -1270,11 +1307,11 @@ def test_annotation_counts_started_annotations() -> None:
     assert (cell.detail.started, cell.detail.open_tasks) == (0, 1)
     cell = cells(facts(**base, annotate_tasks=1, annotate_started=1)).annotation
     assert (cell.detail.started, cell.detail.open_tasks) == (1, 1)
-    # Partly assigned: the working people carry the count too.
+    # Below the limit: the open task carries the count too.
     cell = cells(
         facts(**base, per_text=2, annotate_tasks=1, annotate_started=0)
     ).annotation
-    assert cell.state == "partly_assigned"
+    assert (cell.state, cell.detail.target) == ("in_progress", 2)
     assert (cell.detail.started, cell.detail.open_tasks) == (0, 1)
     # Nobody at work: nothing to count.
     cell = cells(facts(annotate_tasks=0)).annotation

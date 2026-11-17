@@ -3,12 +3,14 @@
  * - F1: History names who reopened a task, started a round or changed a final result, when and why.
  * - F2: a final result replaced in the text card has the toast with Undo of the bulk "Change final…", the card
  *   stays on its text, and the toast raised while the card is open is visible and its Undo works.
+ * - F3: a text below "Annotators per text" with an open task shows that task and waits on its person, also after
+ *   "Start a round…"; "Assign annotation…" stays the row's step, and the person's row in the card names the round.
  * With SHOTS_DIR set, the states are also saved as screenshots (desktop and phone).
  *
  * Each test builds a fresh project through a scenario route.
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { activityLines, cardPath, documentsReady, documentsScenario, showSegment } from "./documentsHelpers";
+import { activityLines, cardPath, documentsReady, documentsScenario, documentsTab, personRow, rowAction, rowCell, showSegment, textRow } from "./documentsHelpers";
 import { loginExisting } from "./helpers";
 
 test.setTimeout(240_000);
@@ -138,6 +140,68 @@ for (const [width, height, suffix] of SIZES) {
     await expect(lines.nth(3)).toHaveText(new RegExp(`^Finalization: ?${tom} chosen by you, ${WHEN}$`));
     expect(await noHorizontalScroll(page)).toBe(true);
     await shot(page, `f1-final-history-after${suffix}`);
+    expect(errors).toEqual([]);
+  });
+
+  test(`F3: a row with an open task below the limit waits on its person; the card names the round (${width} px)`, async ({ page }) => {
+    const errors = watchErrors(page);
+    await page.setViewportSize({ width, height });
+    const desktop = width > 700;
+    const s = await openDocuments(page, "S336R");
+    // Limit 2. EN100029: only R. Roe is assigned and has not started. EN100022: Tom Reis submitted (your choice).
+    await expect(documentsTab(page, "Needs your decision", 4)).toBeVisible();
+    await expect(documentsTab(page, "To assign", 0)).toBeVisible();
+    const cardOf = (caseId: string) => page.getByRole("list", { name: "Documents", exact: true }).getByRole("listitem").filter({ hasText: caseId });
+    const expectOpenTask = async (caseId: string, person: string) => {
+      if (desktop) {
+        const row = textRow(page, caseId, "en");
+        await expect(rowCell(row, "annotation").locator(".documents-status")).toHaveAttribute("title", `assigned, not started · max 2 · open: ${person}`);
+        await expect(rowCell(row, "finalization")).toContainText("waiting");
+        await expect(rowCell(row, "waiting")).toContainText(person);
+        await expect(rowCell(row, "waiting")).not.toContainText("You");
+      } else {
+        const card = cardOf(caseId);
+        await expect(card).toContainText(`Annotation: 0 of 1 submitted, waiting: ${person}, not started, max 2`);
+        await expect(card).toContainText(new RegExp(`Waiting on: ?${person}`));
+      }
+      // Still reachable: the lead's step of the row.
+      await expect(rowAction(page, "Assign annotation…", caseId, "en")).toBeVisible();
+    };
+    await expectOpenTask("EN100029", "R. Roe");
+
+    await moreAction(page, 8, "Start a round…");
+    const dialog = page.getByRole("dialog", { name: /^Start a round/ });
+    await dialog.getByLabel(/Continue from the submission/).check();
+    await dialog.getByLabel(/^Reason/).fill("Second pass after the guideline update");
+    const apply = dialog.getByRole("button", { name: /^Start \d+/ });
+    await apply.click();
+    await dialog.getByLabel("I understand").check();
+    await apply.click();
+    await expect(dialog).toBeHidden();
+
+    // EN100022 and EN100024 (one annotator of max 2) wait on Tom Reis now, like the rows at the limit.
+    await expectOpenTask("EN100022", "Tom Reis");
+    await expectOpenTask("EN100024", "Tom Reis");
+    await expect(documentsTab(page, "Needs your decision", 0)).toBeVisible();
+    await expect(documentsTab(page, "To assign", 0)).toBeVisible();
+    await expect(documentsTab(page, "In progress", 7)).toBeVisible();
+    expect(await noHorizontalScroll(page)).toBe(true);
+    await page.getByRole("region", { name: "Selection" }).getByRole("button", { name: "Clear selection" }).click();
+    if (!desktop) await cardOf("EN100022").scrollIntoViewIfNeeded();
+    await shot(page, `f3-rows-after-round-after${suffix}`);
+    // The tab lists them, and "Waiting on" finds them by their person.
+    await documentsTab(page, "In progress").click();
+    await expectOpenTask("EN100022", "Tom Reis");
+
+    const card = await openCard(page, s.project, "EN100022");
+    await showSegment(card, "Annotation");
+    await expect(personRow(card, "Annotators", "Tom Reis")).toContainText(/Round 2, started by you \d{1,2} [A-Z][a-z]{2} · assigned/);
+    await expect(card.getByRole("button", { name: "Assign annotators…" })).toBeVisible();
+    expect(await noHorizontalScroll(page)).toBe(true);
+    await shot(page, `f3-card-round-after${suffix}`);
+    const lines = await showHistory(card);
+    await expect(lines.first()).toHaveText(new RegExp(`^Annotation: ?Round 2 for Tom Reis \\(ann-\\d+\\) started by you, ${WHEN}: Second pass after the guideline update$`));
+    await shot(page, `f1-round-history-after${suffix}`);
     expect(errors).toEqual([]);
   });
 }
