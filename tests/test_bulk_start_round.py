@@ -15,6 +15,7 @@ from work_plan_support import (
     submit,
 )
 
+from ontotator.application.bulk_task_actions import SKIP_REASONS
 from ontotator.storage.plan_tables import DiscardedVariantRow
 from ontotator.storage.tables import (
     AssignmentRow,
@@ -371,3 +372,84 @@ def test_a_task_waiting_for_the_translation_review_is_kept(env):
     assert [(k["assignment_id"], k["reason"]) for k in found["kept"]] == [
         (task, "translation_not_accepted")
     ]
+
+
+def _single(env: Any, client: Any, assignment_id: int, **body: Any) -> Any:
+    return client.post(
+        f"/api/v1/assignments/{assignment_id}/rounds",
+        json={
+            "request_id": f"single-{assignment_id}-{body.get('kind')}",
+            "expected_workflow_revision": _task(env, assignment_id).workflow_revision,
+            **body,
+        },
+    )
+
+
+@pytest.mark.parametrize("kind", ["carry_forward", "clean_restart"])
+def test_single_round_refuses_where_the_bulk_action_skips_an_open_consolidation(
+    env, kind
+):
+    """The single call and the bulk action agree: no new round for a
+    submitted annotation while a consolidation of the text is open."""
+    from auth_harness import logged_in
+
+    task = _submitted(env, "c1", "anno", "s1", started=True)
+    other = _submitted(env, "c2", "anno", "s2", started=True)
+    review = assign(env, doc("c1", "en"), "adj", "review")
+    body: dict[str, Any] = {"kind": kind}
+    if kind == "carry_forward":
+        body["source_submission_ids"] = ["s1"]
+    else:
+        body["reason"] = "Guideline changed"
+
+    found = _post(env, kind=kind, preview=True).json()
+    assert [(s["case_id"], s["reason"], s["message"]) for s in found["skipped"]] == [
+        ("c1", "consolidation_open", SKIP_REASONS["consolidation_open"])
+    ]
+    assert [item["assignment_id"] for item in found["changes"]] == [other]
+
+    for client in (env.lead, logged_in(env.app, "anno")):
+        refused = _single(env, client, task, **body)
+        if kind == "clean_restart" and client is not env.lead:
+            # An annotator never restarts on their own.
+            assert refused.status_code == 403, refused.text
+            continue
+        assert refused.status_code == 409, refused.text
+        assert refused.json() == {
+            "code": "CONSOLIDATION_OPEN",
+            "details": "A consolidation is open on this text: finish or withdraw"
+            " it first.",
+        }
+    assert _task(env, task).status == "submitted"
+    assert [kind_ for kind_, _ in _rounds(env, task)] == ["ordinary"]
+
+    # A text without a consolidation takes the round, single as in bulk.
+    if kind == "carry_forward":
+        body["source_submission_ids"] = ["s2"]
+    made = _single(env, env.lead, other, **body)
+    assert made.status_code == 200, made.text
+
+    # Once the consolidation task is withdrawn, the single call works.
+    revoked = env.lead.post(f"/api/v1/assignments/{review}/revoke", json={})
+    assert revoked.status_code == 200, revoked.text
+    if kind == "carry_forward":
+        body["source_submission_ids"] = ["s1"]
+    made = _single(env, env.lead, task, **body)
+    assert made.status_code == 200, made.text
+    assert _rounds(env, task)[-1] == (kind, "editable")
+
+
+def test_single_round_for_unsubmitted_work_ignores_an_open_consolidation(env):
+    """Only a submitted annotation is behind a consolidation: a restart of
+    work that was never submitted takes nothing away from it."""
+    from auth_harness import logged_in
+
+    task = assign(env, doc("c1", "en"), "anno", "annotate")
+    first = logged_in(env.app, "anno").post(
+        f"/api/v1/assignments/{task}/rounds",
+        json={"request_id": "first", "expected_workflow_revision": 0},
+    )
+    assert first.status_code == 200, first.text
+    assign(env, doc("c1", "en"), "adj", "review")
+    made = _single(env, env.lead, task, kind="clean_restart", reason="Start again")
+    assert made.status_code == 200, made.text

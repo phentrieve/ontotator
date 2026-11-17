@@ -358,6 +358,7 @@ What happens to your earlier work:
 - The lead sees your task as not submitted, and a new consolidation cannot start from the replaced submission. The lead can still read it.
 - If the lead had already accepted your earlier submission as the final result, the lead is asked to review that choice.
 - You must [submit](#submit-the-text) the new round to hand in your work again.
+- While a consolidation of the text is open, a new round from your submission is refused: *A consolidation is open on this text: finish or withdraw it first.* Ask your lead.
 
 ## Report a text problem
 

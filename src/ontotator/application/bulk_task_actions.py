@@ -478,6 +478,7 @@ class BulkTaskActionService:
         """
         pid = int(project["id"])
         finals = self._finals(conn, pid, found)
+        # The rule of ``work_rounds.consolidation_open`` (the single round).
         consolidating = {
             RowKey(item["case_id"], item["language"])
             for item in assignments

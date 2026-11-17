@@ -76,6 +76,11 @@ HINTS: dict[str, str] = {
         "The change withdraws tasks or final results (listed above); pass"
         " withdraw_tasks to apply it anyway."
     ),
+    "CONSOLIDATION_OPEN": (
+        "A consolidation is open on this text, and a new round would take away a"
+        " submission it rests on. Have the consolidation finished, or withdraw"
+        " its task (withdraw_task), then repeat the call."
+    ),
     "WORKFLOW_REVISION_CONFLICT": (
         "The task or report changed in the meantime. Run the dry run again and repeat."
     ),
