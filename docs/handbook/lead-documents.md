@@ -198,7 +198,7 @@ What for: read a text with other people's findings or the final result, and comp
 
 1. Open the text view with **Open text** in the text card.
 2. Choose the language and version in **Language and version**.
-3. In **Show**, choose **Text only**, a proposal layer, someone's annotations or the result. Its findings are listed under **Findings**.
+3. In **Show**, choose **Text only**, a proposal layer, someone's annotations or the result. Its findings are listed under **Findings**: beside the text, or below it on a phone, where the text keeps the full width.
 4. Optional: click **Compare** to open a second pane. Each pane has its own **Language and version** and **Show** directly above its text: **Current text** on the left, **Comparison text** on the right, so both texts start at the same height. Tick **Couple scrolling** to scroll both together. Click **Close comparison** to close it.
    - When both panes show texts of the same language, for example v1 and its correction v2, tick **Show changes** to see what changed. The older version strikes through the removed passages, the newer version underlines the added ones; the line above the texts counts them. The marks do not change the texts, the findings or **Couple scrolling**. A change of spaces or line breaks only is not marked or counted. If the two texts have little in common, the line reads *The texts differ too much to show the changes* and nothing is marked.
    - When **Show** has someone's annotations that were carried from an earlier version of the text (after **Carry to v2…** or **Handle text change…**), tick **Show changes since** v1 above the text: changed passages get a dashed frame, added text is underlined, and a **−** marker shows the earlier wording of removed text. **Next ›** and **‹ Previous** step through the passages. The annotator sees the same marks in their task. Not offered while **Compare** is open, which has its own **Show changes**.
@@ -215,6 +215,35 @@ What for: see each version of a translation, its reviews and its origin.
 3. Click **View text** to read a version, or **Translation reviews** to see every review decision. In a reviewer's row, **Reopen…** lets them review the version again and **Remove…** removes their assignment.
    At the newest accepted version, **Correct the translation…** lets you correct it yourself ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)). At the newest version of a translation, **Upload new version…** brings in a text made elsewhere as the next version ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)).
 4. Click **Compare with source** to compare the translation with the source text.
+
+### Find spacing errors and invisible characters
+
+What for: find texts with spacing errors or invisible characters, for example before you assign them.
+
+Ontotator computes typography hints for a text when you ask for them. A hint names a rule and a position in the text. Hints are not stored and never block review, annotation or export; nothing is corrected automatically.
+
+| Rule code | What it finds |
+| --- | --- |
+| `DOUBLE_SPACE` | Two or more spaces inside a line. |
+| `SPACE_BEFORE_PUNCTUATION` | A space before `,` `;` `:` `!` `?` or `.` |
+| `MISSING_SPACE_AFTER_PUNCTUATION` | Punctuation directly between two words, for example *Fieber,Husten*. Numbers, dates, times, abbreviations such as *z.B.* or *e.g.*, web addresses and ellipses are left alone. |
+| `TRAILING_WHITESPACE_LINE` | Spaces or tabs at the end of a line. |
+| `TRAILING_WHITESPACE_TEXT` | Spaces, tabs or more than one line break at the end of the text. A single final line break is no hint. |
+| `TAB` | A tab. |
+| `ZERO_WIDTH_CHARACTER` | A zero-width space or joiner, or a byte order mark. |
+| `SOFT_HYPHEN` | A soft hyphen. |
+| `CONTROL_CHARACTER` | Another control character. |
+
+A non-breaking space is no hint, because it is often correct, for example between a number and its unit. **Show invisible characters** marks it all the same.
+
+There is no page for the hints yet. Read them through the API or the MCP server (token scope `read`):
+
+- One text version: `GET /api/v1/projects/{key}/documents/{document_id}/typography-hints`, or the MCP tool `list_typography_hints` with `document_id`. Each hint has `rule`, `start` and `end`; positions count Unicode code points, as the positions of findings do.
+- The whole project: `GET /api/v1/projects/{key}/typography-hints`, or `list_typography_hints` without `document_id`. It returns the number of hints per rule for each text that has any, 100 texts per page (`limit` up to 200); pass `next_after` as `after` for the next page. Only the newest version of each text is counted unless you ask for `versions=all`.
+
+You get hints for the texts you may read, as with the texts themselves. The MCP tool returns no text; a server started with `ONTOTATOR_MCP_READ_CONTENT=1` can add excerpts with `include_text` ([MCP server guide](../../mcp/README.md)).
+
+To see the characters in a text, a reviewer ticks **Show invisible characters** in the translation review ([Show invisible characters](annotator.md#show-invisible-characters)). To fix them in a translation, correct it ([Request a translation correction](#request-a-translation-correction)).
 
 ### Request a translation correction
 
@@ -350,6 +379,8 @@ What for: let the annotators revise many texts at once, for example after a guid
 Every listed task changes, or none: if the texts changed since the preview, the dialog says *The texts changed since the preview. Check the new preview.* and shows it. Each task is recorded in the audit trail as a single reopen or withdrawal would be, so the history of every text shows it.
 
 **Undo** in the message, for example *Reopened 14 assignments in 12 texts.*, takes the change back: reopened tasks count as submitted again; withdrawn tasks come back with their drafts. Undo is for the lead who made the change, once, within an hour, and only while nothing changed on these texts since: nobody saved a draft, nobody was assigned, the plan, the final result and the text version are the same. Otherwise the message says *Undo is no longer possible: the texts changed since.*
+
+A message never lies over a dialog you open after it. If you open the next dialog while the message is still showing, the message waits; when you close the dialog, it is back with its **Undo** and stays for its full time again. This holds for every message with **Undo**, also in the annotation view.
 
 The same menu holds **Accept agreeing results…** and **Change final…** for the final results of the selected texts: see [Accept or change the final result of several texts](lead-results.md#accept-or-change-the-final-result-of-several-texts).
 

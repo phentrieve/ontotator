@@ -160,6 +160,7 @@ A token can do only what both its scopes and its owner's roles allow. Many tools
 | `project_audit` | read | reads | The project's audit trail: who changed what and with which token, newest first (leads). |
 | `list_jobs` | read | reads | The project's import and export jobs, newest first, with state and error code (leads). |
 | `list_texts` | read | reads | The project's texts with IDs, stage, assigned people and final result. |
+| `list_typography_hints` | read | reads | Spacing errors and invisible characters: of one text version, or counted per text of a project. |
 | `agreement_summary` | read | reads | Agreement of the annotations behind the final results, project-wide. |
 | `start_consolidation` | read, project-admin | adds | Start a consolidation of a text's submissions by a consolidator. |
 | `accept_agreeing_texts` | project-admin | may remove or withdraw | Accept the result of every text whose annotations agree in full. |
@@ -188,6 +189,8 @@ By default no tool puts clinical text or the findings of a submission into the m
 - **Submitted work only.** The tools read immutable states: submissions and imported tool proposals. A draft, an open round or an unfinished consolidation has no ID these tools accept (`VERSION_NOT_FOUND`), and the routes that open a draft need a browser session.
 - **What the token's owner may read.** Each tool returns what its HTTP route returns for the token's owner, no more: a lead reads every submission of a text, anyone else their own submissions and the ones their tasks give them. With **Hide annotator names during consolidation** on, a consolidator's token gets *Annotator A*, *Annotator B* and opaque IDs in place of names and pseudonyms, as in the web interface. The MCP server neither adds nor removes anything there.
 - A token with `read` is enough. Prefer a project token with a short lifetime, and turn the variable on only for the client and the work that need it.
+
+`list_typography_hints` is always available too, and returns no text by default: a hint is a rule code (for example `DOUBLE_SPACE` or `ZERO_WIDTH_CHARACTER`) with `start` and `end` in Unicode code points. With a `document_id` it lists the hints of that version; without one it counts the hints per rule for each text of the project the token's owner may read, one page of texts per call (`next_after`), the newest version of each text unless `all_versions=true`. Only a server started with `ONTOTATOR_MCP_READ_CONTENT=1` offers `include_text`, which adds the characters of each hint (`text`) and 30 code points on each side (`context`); without the variable the argument does not exist. The server computes hints on request; they are not stored and block nothing.
 
 `list_translation_reviews` is always available and follows the same rule: without `include_text` it leaves out `proposed_text` (the full text the reviewer submitted) and `rationale`; with `include_text=true` it returns them. The same two fields are left out of the reviews in `get_text_detail`. Until 0.10.2 `list_translation_reviews` and `get_text_detail` always returned them.
 

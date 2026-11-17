@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from "react";
 import { paragraphStarts } from "../variants/paragraphs";
+import { invisibleNodes } from "./invisibles";
 import { isChecked, type MarkState, type Sentence } from "./sentences";
 import "./translation.css";
 
@@ -10,6 +11,8 @@ export interface SentenceViewProps {
   label: string;
   lang?: string;
   disabled?: boolean;
+  /** Marks spaces, tabs, line ends and other invisible characters (issue 454). */
+  showInvisibles?: boolean;
   /** Toggles one sentence. */
   onToggle: (index: number) => void;
   /** Sets the sentences from `from` to `to` to checked or unchecked. */
@@ -25,7 +28,7 @@ const sentenceOf = (target: EventTarget | null): number | null => {
 };
 
 /** Text nodes with the hidden paragraph markers coupled scrolling reads, and one button per sentence. */
-function sentenceNodes(text: string, sentences: readonly Sentence[], render: (sentence: Sentence) => ReactNode): ReactNode[] {
+function sentenceNodes(text: string, sentences: readonly Sentence[], render: (sentence: Sentence) => ReactNode, invisibles = false): ReactNode[] {
   // Paragraph starts are code-point offsets; sentences use UTF-16 offsets.
   const units: number[] = [];
   let unit = 0;
@@ -33,14 +36,16 @@ function sentenceNodes(text: string, sentences: readonly Sentence[], render: (se
   units.push(unit);
   const points = paragraphStarts(text), starts = points.map(point => units[Math.min(point, units.length - 1)]);
   const nodes: ReactNode[] = [];
-  let paragraph = 0, position = 0;
+  let paragraph = 0, position = 0, gaps = 0;
+  /** The text between two sentences (spaces, line ends). */
+  const between = (from: number, to: number) => { const part = text.slice(from, to); nodes.push(...(invisibles ? invisibleNodes(part, `g${gaps++}`) : [part])); };
   /** Text up to `end`; a marker at `end` comes before the sentence that starts there. */
   const gap = (end: number) => {
     for (; paragraph < starts.length && starts[paragraph] <= end; paragraph++) {
-      if (starts[paragraph] > position) { nodes.push(text.slice(position, starts[paragraph])); position = starts[paragraph]; }
+      if (starts[paragraph] > position) { between(position, starts[paragraph]); position = starts[paragraph]; }
       nodes.push(<span key={`p${paragraph}`} aria-hidden="true" data-paragraph={paragraph} data-paragraph-offset={points[paragraph]} />);
     }
-    if (end > position) { nodes.push(text.slice(position, end)); position = end; }
+    if (end > position) { between(position, end); position = end; }
   };
   for (const sentence of sentences) {
     gap(sentence.start);
@@ -57,7 +62,7 @@ function sentenceNodes(text: string, sentences: readonly Sentence[], render: (se
  * sentence passed to the opposite of the sentence it started on.
  */
 export const SentenceView = forwardRef<HTMLDivElement, SentenceViewProps>(function SentenceView(
-  { text, sentences, states, label, lang, disabled = false, onToggle, onRange }, ref,
+  { text, sentences, states, label, lang, disabled = false, showInvisibles = false, onToggle, onRange }, ref,
 ) {
   const anchor = useRef<number | null>(null);
   const drag = useRef<Drag | null>(null);
@@ -127,9 +132,9 @@ export const SentenceView = forwardRef<HTMLDivElement, SentenceViewProps>(functi
     return <span key={`s${sentence.index}`} className={className} role="button" tabIndex={0} data-sentence={sentence.index}
       aria-pressed={isChecked(state)} aria-disabled={disabled || undefined}
       title={state?.kind === "stale" ? "Changed since checked" : undefined}>
-      {sentence.text}{state?.kind === "stale" && <span className="review-sr-only"> (changed since checked)</span>}</span>;
-  }), [text, sentences, states, low, high, rangeValue, disabled]);
-  return <div ref={ref} className="translation-text translation-sentences" role="region" aria-label={label} lang={lang}
+      {showInvisibles ? invisibleNodes(sentence.text, `s${sentence.index}`) : sentence.text}{state?.kind === "stale" && <span className="review-sr-only"> (changed since checked)</span>}</span>;
+  }, showInvisibles), [text, sentences, states, low, high, rangeValue, disabled, showInvisibles]);
+  return <div ref={ref} className={`translation-text translation-sentences${showInvisibles ? " show-invisibles" : ""}`} role="region" aria-label={label} lang={lang}
     onPointerDown={pointerDown} onPointerMove={pointerMove} onKeyDown={keyDown} onClick={click}>{content}</div>;
 });
 

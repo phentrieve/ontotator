@@ -930,6 +930,8 @@ ul.task-counts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space
   pointer-events: auto;
   animation: toast-in 150ms ease;
 }
+/* A dialog opened after the toast: the toast waits, unseen and out of reach, until the dialog closes (issue 439). */
+.ui-toast-region[data-behind-dialog] > .ui-toast { visibility: hidden; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 /* The buttons stay on the row; a long message wraps instead of being cut (R-6). */
 .ui-toast > * { flex: none; }

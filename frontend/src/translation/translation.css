@@ -268,3 +268,20 @@
 .review-sentence.is-range-mark { background: var(--success-light); text-decoration-color: var(--success); text-decoration-style: dotted; }
 .review-sentence.is-range-unmark { background: transparent; text-decoration-color: var(--border-strong); text-decoration-style: dotted; }
 .review-sentence[aria-disabled="true"] { cursor: default; }
+
+/* Show invisible characters (issue 454). Each mark is generated content drawn over its character: it is never
+   selected or copied, and being absolutely positioned it adds no width, so the text wraps as without the marks. */
+.show-invisibles .invisible-char { position: relative; }
+.show-invisibles .invisible-char::before { position: absolute; top: 0; left: 0; color: var(--text-muted); font-style: normal; font-weight: var(--weight-regular); text-decoration: none; white-space: pre; pointer-events: none; user-select: none; -webkit-user-select: none; }
+/* Space: a middle dot centred on it. */
+.show-invisibles [data-invisible="space"]::before { content: "\00B7"; left: 50%; transform: translateX(-50%); }
+/* Non-breaking space: a degree sign, as word processors show it. */
+.show-invisibles [data-invisible="nbsp"]::before { content: "\00B0"; left: 50%; transform: translateX(-50%); color: var(--warning); }
+.show-invisibles [data-invisible="tab"]::before { content: "\2192"; color: var(--warning); }
+.show-invisibles [data-invisible="line-end"]::before { content: "\00B6"; padding-left: 1px; opacity: 0.7; }
+/* Zero-width characters have no box to draw on: a bar between the two neighbours. */
+.show-invisibles [data-invisible="zero-width"]::before { content: ""; top: 0.2em; bottom: 0.2em; left: -1px; border-left: 2px solid var(--warning); }
+/* Soft hyphen: a raised "not" sign between the two neighbours. */
+.show-invisibles [data-invisible="soft-hyphen"]::before { content: "\00AC"; top: -0.55em; left: 0; transform: translateX(-50%); font-size: 0.75em; color: var(--warning); }
+/* The mark of a line end hangs over the right edge of a full line; it must not make the box scroll sideways. */
+.translation-text.show-invisibles, .translation-review .translation-diff.show-invisibles, .translation-diff.show-invisibles, .translation-editor.show-invisibles { overflow-x: hidden; }
