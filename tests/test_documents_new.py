@@ -129,11 +129,14 @@ def test_own_events_never_make_new(env):
     plan(env, c1_de=REVIEW)
     other = assign(env, doc("c2", "en"), "anno", "annotate")
     submit(env, other, "s-c2")
+    # c1 en waits on the lead whatever is assigned: anno reported a problem.
+    open_report(env, "anno", assign(env, doc("c1", "en"), "anno", "annotate"))
     start_visit(env)
     before = rows(env)
+    assert lead_owned(before[("c1", "en")])
 
     # The lead's own assignment, plan write and final selection.
-    assign(env, doc("c1", "en"), "anno", "annotate")
+    assign(env, doc("c1", "en"), "anno2", "annotate")
     plan_service(env).patch_row(
         "proj",
         "c1",
@@ -143,7 +146,9 @@ def test_own_events_never_make_new(env):
     select_final(env, doc("c2", "en"), "s-c2")
 
     after = rows(env)
-    assert lead_owned(after[("c1", "en")])  # 1 of 2 annotations assigned
+    # Still the lead's row (the open report), now with the lead's own
+    # assignment of the second annotator on it.
+    assert lead_owned(after[("c1", "en")])
     for key, row in after.items():
         assert row["new"] is False, key
         assert activity(row) == activity(before[key]), key
@@ -152,15 +157,43 @@ def test_own_events_never_make_new(env):
 def test_other_leads_assignment_makes_new(env):
     two_annotations_per_text(env)
     _, actor = second_lead(env)
+    # c1 en waits on the lead (anno reported a problem) and has room for a
+    # second annotator; c2 en has nobody yet.
+    open_report(env, "anno", assign(env, doc("c1", "en"), "anno", "annotate"))
     baseline = start_visit(env)
-    assign_as(env, actor, doc("c1", "en"), "anno")
+    assert rows(env)[("c1", "en")]["new"] is False
+    assign_as(env, actor, doc("c1", "en"), "anno2")
     row = rows(env)[("c1", "en")]
-    assert row["next_step"]["kind"] == "assign"
+    assert lead_owned(row), row["next_step"]
+    assert "assign_annotation" not in {step["code"] for step in row["steps"]}
     assert activity(row) is not None and activity(row) > baseline  # type: ignore[operator]
     assert row["new"] is True
     # For the second lead the same assignment is an own event.
     start_visit(env, "lead2")
     assert rows(env, "lead2")[("c1", "en")]["new"] is False
+
+
+def test_other_leads_assignment_below_the_limit_waits_on_the_person(env):
+    """One of two annotators at work: the text waits on that person, not on
+    the lead (the open task comes before the free place), so the other
+    lead's assignment is activity on the row but no NEW; the row is NEW
+    again once it comes back to the lead (the submission)."""
+    two_annotations_per_text(env)
+    _, actor = second_lead(env)
+    baseline = start_visit(env)
+    assert rows(env)[("c1", "en")]["next_step"]["kind"] == "assign"
+    aid = assign_as(env, actor, doc("c1", "en"), "anno")
+    row = rows(env)[("c1", "en")]
+    assert [step["code"] for step in row["steps"]] == [
+        "annotation_in_progress",
+        "assign_annotation",
+    ]
+    assert row["next_step"]["owner"]["kind"] == "person"
+    assert activity(row) is not None and activity(row) > baseline  # type: ignore[operator]
+    assert row["new"] is False
+    submit(env, aid, "s-1")
+    row = rows(env)[("c1", "en")]
+    assert lead_owned(row) and row["new"] is True
 
 
 def _submission(env: Any) -> Callable[[], Key]:
@@ -198,10 +231,11 @@ def _report(env: Any) -> Callable[[], Key]:
 
 
 def _hold(env: Any) -> Callable[[], Key]:
-    # Two annotations per text: the held row still waits for an assignment.
+    # The hold is extended to the second annotator of the reported text:
+    # that row waits on the lead (the open report), with or without the hold.
     two_annotations_per_text(env)
     reported = assign(env, doc("c1", "en"), "anno", "annotate")
-    held = assign(env, doc("c2", "en"), "anno2", "annotate")
+    held = assign(env, doc("c1", "en"), "anno2", "annotate")
     report_id = open_report(env, "anno", reported)
     client, _ = second_lead(env)
 
@@ -217,7 +251,7 @@ def _hold(env: Any) -> Callable[[], Key]:
             },
         )
         assert response.status_code == 200, response.text
-        return ("c2", "en")
+        return ("c1", "en")
 
     return act
 
