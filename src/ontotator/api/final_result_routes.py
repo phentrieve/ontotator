@@ -530,12 +530,17 @@ def undo_bulk_change_final(
         )
     except DomainError as refusal:
         details = refusal.details
-        if not isinstance(details, dict) or "preview" not in details:
+        # Only the stale undo carries a preview (reason ``changed``).
+        if (
+            refusal.code != "BULK_UNDO_STALE"
+            or not isinstance(details, dict)
+            or "preview" not in details
+        ):
             raise
         # The refused preview reads like the answer to ``preview: true``.
         shown = BulkChangeFinalUndoView.model_validate(details["preview"])
         raise DomainError(
-            refusal.code, details | {"preview": shown.model_dump(mode="json")}
+            "BULK_UNDO_STALE", details | {"preview": shown.model_dump(mode="json")}
         ) from None
 
 
