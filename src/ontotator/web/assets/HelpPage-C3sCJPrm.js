@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-DbxlwKC8.js";import{n as a,t as o}from"./lib-CzOquxDc.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-DkFN7Dn3.js";import{n as a,t as o}from"./lib-C98BVZU-.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -1292,7 +1292,7 @@ You assigned a translation review to someone who already reviewed this version, 
 
 ### "A new version cannot be uploaded here any more."
 
-**Upload new version…** was refused when you saved: a newer version of the translation arrived meanwhile, the translation was discarded, or a translation review of the version was assigned. The dialog names the reason. Close it and look at the version list again; your text is not saved, so keep it. See [Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation).
+**Upload a corrected text…** was refused when you saved: a newer version of the translation arrived meanwhile, the translation was discarded, or a translation review of the version was assigned. The dialog names the reason. Close it and look at the version list again; your text is not saved, so keep it. See [Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation).
 
 ### "Fix typos…" did not save
 
@@ -1747,12 +1747,12 @@ Before you start: decide whether the new text replaces the current translation o
 This works without building a bundle. You upload the new text at the version, or it is pasted into a translation review.
 
 1. Open the text card and click **Translation**.
-2. If the current version is accepted: at the version, click **Request correction…**, choose the **Translation reviewer**, enter the **Reason for another review** (say where the new text comes from) and click **Assign correction review**. The reviewer replaces the text, writes the origin into the **Rationale** and submits **Accepted with corrections** ([Request a translation correction](lead-documents.md#request-a-translation-correction)). The corrected text becomes the next version and counts as accepted.
-3. Or, if the current version is accepted, paste the new text yourself: at the version, click **Correct the translation…**. The dialog lists the annotation work that stays on the accepted version. Your corrected text becomes the next version and starts as a correction with review On, so it is reviewed again ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
+2. If the current version is accepted: at the version, click **Ask a reviewer to correct…**, choose the **Translation reviewer**, enter the **Reason for another review** (say where the new text comes from) and click **Ask the reviewer**. The reviewer replaces the text, writes the origin into the **Rationale** and submits **Accepted with corrections** ([Request a translation correction](lead-documents.md#request-a-translation-correction)). The corrected text becomes the next version and counts as accepted.
+3. Or, if the current version is accepted, paste the new text yourself: at the version, click **Correct it myself…**. The dialog lists the annotation work that stays on the accepted version. Your corrected text becomes the next version and starts as a correction with review On, so it is reviewed again ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
 4. If the current version was rejected or queried: click **Resolve…**, then **Correct the translation…**, paste the new text yourself and submit. The corrected text becomes the next version and counts as accepted.
-5. Or, whatever the state of the current version, upload the new text: at the newest version, click **Upload new version…**, paste the text or choose a .txt file, say how the text was made (for a machine translation with its provider and model), check the changes and save. The text becomes the next version, a correction that starts as *Ready for review*; accept it with **Accept this version…** if it was reviewed outside Ontotator ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)).
+5. Or, whatever the state of the current version, upload the new text: at the newest version, click **Upload a corrected text…**, paste the text or choose a .txt file, say how the text was made (for a machine translation with its provider and model), check the changes and save. The text becomes the next version, a correction that starts as *Ready for review*; accept it with **Accept this version…** if it was reviewed outside Ontotator ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)).
 
-**Request correction…** is offered only at an accepted version, **Correct the translation…** at the newest version that is accepted, rejected or queried, and **Upload new version…** at the newest version of every translation that has no open translation review. Only **Upload new version…** has fields for the provider and model of the new text; in a translation review they can only be named in the **Rationale**. A typo, a missing space or a grammar slip needs none of these steps: **Fix typos…** at the newest version fixes it without a review and keeps the status of the text ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
+**Ask a reviewer to correct…** is offered only at an accepted version, **Correct it myself…** at the newest accepted version (for a rejected or queried one it is **Correct the translation…** under **Resolve…**), and **Upload a corrected text…** at the newest version of every translation that has no open translation review. Only **Upload a corrected text…** has fields for the provider and model of the new text; in a translation review they can only be named in the **Rationale**. A typo, a missing space or a grammar slip needs none of these steps: **Fix typos…** at the newest version fixes it without a review and keeps the status of the text ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
 
 ### Replace or add a translation by file
 
@@ -1942,6 +1942,8 @@ The **Documents** page lists every text of the project and what it needs next. O
 
 A task starts with the person's first saved change; opening it is not enough, and neither is ticking checked sentences in a translation review. Until then **Translation** and **Annotation** read *assigned, not started* with the person's name, in the table (*not started* without the name below 1600 px), its tooltip, the narrow cards and the text card, where the person's row shows **Not started**. After the first save they read *in review* or *In progress*. The same holds for a task you reopened, also when you asked a reviewer who had already submitted to correct a translation: it reads *assigned, not started* again until the person saves a change after the reopen. With several people or parallel versions the cell counts them, for example *1 of 2 started*.
 
+A text with fewer annotators than **Annotators per text** shows what its people are doing, not the free place. While someone has an open task, **Annotation** reads for example *assigned, not started · max 2* or *1 of 2 submitted · max 3* (below 1600 px *not started*, *1/2 submitted*; the tooltip has the full state), counted out of the people who hold the text; **Waiting on** names the person, the text is under **In progress**, and **Next step** still offers **Assign annotation…** for another annotator. The same holds after **Start a round…** for a text with one annotator. Only a text nobody is working on reads *1 annotator · max 2* or *Unassigned* and is listed under **To assign** (or under **Needs your decision** once its one annotation is submitted). To give texts in progress another annotator, select them and click **Assign annotation…** in the selection bar: it assigns only where a text still has a free place.
+
 The counts in **Annotation**, for example *0 of 1 submitted*, count only work on the newest version of the text. After a text change, a submission on the old version no longer counts: neither when it was carried to the new version, nor when the new version was started fresh. Carried work counts once it is submitted on the new version.
 
 ### Use the Documents tabs
@@ -2035,7 +2037,11 @@ In the card:
 What for: see what happened to a text and its technical IDs.
 
 1. In the text card footer, click **History** or **Details**. The view's name stands next to **Back** at the top of the card.
-   - **History** lists all activity, newest first, with reviewers' reasons, reassignments and mode changes.
+   - **History** lists all activity, newest first, each line with date and time. A change names who made it and, where one was given, the reason, for example:
+     - *task of R. Roe (ann-0295) reopened by you, 17 Nov, 13:37: Guideline changed* (**Reopen…**, single or for several texts; an Undo adds *reopening of the task of R. Roe (ann-0295) undone by you, …*),
+     - *Round 2 for Tom Reis (ann-0004) started by you, 17 Nov, 13:39: Second pass* (**Start a round…**),
+     - *the result of Tom Reis (ann-0004) chosen by you, …*, *changed from the result of Tom Reis (ann-0004) to the result of R. Roe (ann-0295) by you, …* and, after an Undo, *change undone by you, the result of Tom Reis (ann-0004) is final again, …* (the final result; a consolidation reads *the consolidation by …*),
+     - *withdrawn by you, 17 Nov, 14:02: Wrong text* (**Withdraw final…**), reassignments, and *mode changed by you, now annotated from scratch, …: reason*.
    - **Details** shows the **Plan**, the **Problem reports** and the **Technical details**. Each problem report shows its title, then who reported it, when, its state and the paused tasks, then **Open report**. In the **Technical details**, the lines **Submission ID** and **Round ID** name the person and the version, for example *Submission ID, ann-0004, v1*.
 2. Click **Back** to return to the path.
 
@@ -2060,7 +2066,7 @@ What for: see each version of a translation, its reviews and its origin.
 1. Open the text card and click **Translation**.
 2. The list shows each version with its origin and status, then one row per person who worked on it: the name, the task and the status. Older ones are under **Older versions**; with parallel versions they are grouped by version chain.
 3. Click **View text** to read a version, or **Translation reviews** to see every review decision. In a reviewer's row, **Reopen…** lets them review the version again and **Remove…** removes their assignment.
-   At the newest accepted version, **Correct the translation…** lets you correct it yourself ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)). At the newest version of a translation, **Upload new version…** brings in a text made elsewhere as the next version ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)). **Fix typos…** at the newest version fixes spacing, typos or grammar without a review and keeps the status of the text; a version made this way says *Typo fix* under its name, with the lead and the reason ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
+   The buttons that change the text of a version say who does the work, and a grey line under them says the difference in a few words, for example *Ask a reviewer: a reviewer corrects it in a new review. Correct it myself: you edit it here; it is reviewed again. Fix typos: spacing, typos, grammar; the status stays, no review. Upload: a text made elsewhere becomes the next version.* At an accepted version, **Ask a reviewer to correct…** gives the correction to a translation reviewer ([Request a translation correction](#request-a-translation-correction)). At the newest accepted version, **Correct it myself…** lets you correct it yourself ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)). At the newest version of a translation, **Upload a corrected text…** brings in a text made elsewhere as the next version ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)). **Fix typos…** at the newest version fixes spacing, typos or grammar without a review and keeps the status of the text; a version made this way says *Typo fix* under its name, with the lead and the reason ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
 4. Click **Compare with source** to compare the translation with the source text.
 
 ### Find spacing errors and invisible characters
@@ -2097,9 +2103,9 @@ To see the characters in a text, a reviewer ticks **Show invisible characters** 
 What for: have a translation corrected by a reviewer.
 
 1. Open the text card and click **Translation**.
-2. At the version, click **Request correction…**. It is offered only at an accepted version; for a rejected or queried one, use **Resolve…** ([Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation)).
+2. At the version, click **Ask a reviewer to correct…**. It is offered only at an accepted version; for a rejected or queried one, use **Resolve…** ([Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation)).
 3. Choose the **Translation reviewer** and enter the **Reason for another review**.
-4. Click **Assign correction review**, then **Close**.
+4. Click **Ask the reviewer**, then **Close**. Before that, **Cancel** closes the dialog without asking anyone.
 
 If the reviewer submits **Accepted with corrections**, the corrected text becomes a new text version. While a lead is correcting the same version themselves, the request is refused with *A lead is correcting this version.* ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
 
@@ -2251,7 +2257,7 @@ What for: give submitted annotations a new work round, for many texts at once. E
 
 What happens to the work:
 
-- Each person gets the task back in **My tasks** and must submit again. The earlier submission no longer counts as submitted; it stays in the history and the earlier rounds stay readable under **More** › **Work rounds**.
+- Each person gets the task back in **My tasks** and must submit again. The text waits on that person again (**Waiting on**), and in the text card the person's row names the round, for example *Round 2, started by you 17 Nov · assigned 3 Nov, from scratch*; **History** has the line with your reason. The earlier submission no longer counts as submitted; it stays in the history and the earlier rounds stay readable under **More** › **Work rounds**.
 - After **Restart** the submitted work is set aside: it is not carried into the new round.
 - Every listed task gets its round, or none: if the texts changed since the preview, the dialog says *The texts changed since the preview. Check the new preview.* and shows it. Each round is recorded in the audit trail like a single new round.
 - This action has no undo, and no action on a single text brings back a round that was replaced. To let people only correct a submission in place, use **Reopen…** instead.
@@ -2416,7 +2422,7 @@ What for: choose the final result of a text.
 4. If they differ, the card shows the agreement, for example *Agreement: 5 of 9 findings match, 1 differs in context only*. When matching findings still differ in a note, a text span or a modifier text span, a line below names them, for example *Notes differ on 1 finding: Ataxia*. When people chose a term and its parent or child on the same passage, a line names the pair, for example *Related terms: Seizure / Status epilepticus*; it still counts as a difference. Findings an annotator left **Unresolved** count as differences and are listed with who wrote each note. **How is this counted?** explains the numbers. Open a submission with **Open submission** to read it in the read-only text view. If that work was carried over from an earlier version of the text, tick **Show changes since** v1 above the text to see the changed passages ([See what changed since the earlier version](annotator.md#see-what-changed-since-the-earlier-version)).
 5. Warning: the next action saves at once, without a confirmation. Click **Use as final** in the row of the submission you want (at phone width the submissions are listed one under the other, with their buttons below each). Or [start a consolidation](#start-a-consolidation) instead.
 
-After saving, the card moves on to the next text that needs a decision. The decided row stays in the tab with a *Resolved* badge until you click **Refresh** or change the tab. To undo, [change the final result](#change-a-final-result).
+After saving, the card moves on to the next text that needs a decision. The decided row stays in the tab with a *Resolved* badge until you click **Refresh** or change the tab. To go back, [withdraw the final result](#withdraw-a-final-result) or [change it](#change-a-final-result).
 
 ![The Finalization part comparing two submissions, with the agreement line and Use as final](images/lead-compare-results.png)
 
@@ -2490,7 +2496,9 @@ What for: pick another result after you already chose one.
 
 1. Open the text card at **Finalization**.
 2. Click **Change final…** next to **Open result**.
-3. Click **Use as final** in the row of the result you want.
+3. Click **Use as final** in the row of the result you want. It saves at once; the card stays on this text and says *Final result saved for EN100022 en.*
+
+The message *Final result of EN100022 en changed.* has an **Undo** button, also while the card is open. It brings the earlier final result back (*The earlier final result of EN100022 en is back.*), under the same rules as the Undo of **Change final…** for several texts: for the lead who made the change, once, within an hour, and refused once something the final result rests on changed since ([Accept or change the final result of several texts](#accept-or-change-the-final-result-of-several-texts)). The same message follows **Use the newer result** under *Review changes…*. A first choice of a final result has no Undo: use [Withdraw a final result](#withdraw-a-final-result). **History** in the card lists each change and its Undo.
 
 While a text has a final result, its annotation mode cannot be changed: **Change mode…** is refused (error code \`ANNOTATION_MODE_FINAL_SELECTED\`) ([Change the annotation mode of one text](lead-documents.md#change-the-annotation-mode-of-one-text)). To take the final result back instead, see [Withdraw a final result](#withdraw-a-final-result).
 
@@ -2545,14 +2553,14 @@ What for: decide what happens after a reviewer rejected or queried a translation
 
 What for: fix a queried, rejected or accepted translation without assigning another review.
 
-1. For a queried or rejected translation: in the row, click **Resolve…**, then **Correct the translation…** (or **Continue your correction**). For an accepted translation: open the text card, click **Translation** and, at the newest accepted version, click **Correct the translation…**.
+1. For a queried or rejected translation: in the row, click **Resolve…**, then **Correct the translation…** (or **Continue your correction**). For an accepted translation: open the text card, click **Translation** and, at the newest accepted version, click **Correct it myself…**.
 2. Read the panel: you review the version yourself, and your corrected text becomes the next text version. After a rejection or a query, it counts as accepted. A correction of an accepted version starts as a correction with review On: it is reviewed again before annotation moves to it. If people annotated the accepted version, the dialog says so before you start, for example *Annotation has work on v1. 3 annotations (2 submitted, 1 open) stay on v1. After saving, the row offers Handle text change…*. The dialog also names open consolidations and a final result on that version; they stay on it too. Nothing is carried automatically. If the reviewer rejects or queries your corrected version and you correct it once more, that next version is reviewed again as well; to take it without a review, use **Accept this version…** ([Accept one translation version](#accept-one-translation-version)). If your profile lists languages but not this one, tick *Correct despite missing de in your profile*. Without a qualification in your profile, the panel links to **Add your qualification in your profile**; after saving, **Back to Documents** returns you to the texts.
 3. Click **Open translation review**. The screen says **You are correcting this translation as project lead.** (for an accepted version: **You are correcting this accepted translation as project lead.**)
 4. Correct the translation as described in [Review a translation](annotator.md#review-a-translation). Only **Accepted with corrections** is offered.
 5. Submit with **Submit review…** (or \`Ctrl+Enter\`), then click **Back to Documents**.
 6. After the correction of an accepted version, assign the review of the new version as usual. The annotation work on the old version is handled with **Handle text change…** and *Carry to v2…* ([Handle a text change for open annotation work](#handle-a-text-change-for-open-annotation-work)); with **Annotate only after the translation review is accepted** on, the row offers them once the new version is accepted.
 
-While your correction of an accepted version is open, **Request correction…** for the same version is refused (*A lead is correcting this version.*): submit your correction first, or withdraw it with **Remove…** in your row of the **Translation** part.
+While your correction of an accepted version is open, **Ask a reviewer to correct…** for the same version is refused (*A lead is correcting this version.*): submit your correction first, or withdraw it with **Remove…** in your row of the **Translation** part.
 
 ### Accept a translation that was not reviewed
 
@@ -2571,7 +2579,7 @@ What for: accept exactly one version, for example an imported correction that wa
 
 1. Open the text card and click **Translation**.
 2. At the version, click **Accept this version…**. It is offered at the newest version of a translation that is neither reviewed nor accepted.
-3. Enter a **Reason**, for example *Checked against the DeepL output*. *The acceptance is recorded with your name, the reason and the time.*
+3. Enter a **Reason**, for example *Checked against the DeepL output*. The dialog says how the acceptance will read: *It is recorded as “Accepted: reviewed outside Ontotator”, with your name, the reason and the time: no translation review in Ontotator stands behind this version. Say in the reason how it was checked.* This also holds when you read the changes of your own upload in Ontotator: write that into the reason, for example *Read the changes against v1 myself*.
 4. Click the button that names the version, for example *Accept v2*.
 
 The version then reads like other acceptances, for example *Accepted: reviewed outside Ontotator, Project lead (ann-0002), 14 Nov, 19:40, Checked against the DeepL output*. While a translation review of the version is open, the acceptance is refused: withdraw the review with **Remove…** first.
@@ -2581,7 +2589,7 @@ The version then reads like other acceptances, for example *Accepted: reviewed o
 What for: bring in a text made outside Ontotator, for example a new machine translation, a translation by a person or a version you corrected by hand, as the next version of one translation.
 
 1. Open the text card and click **Translation**.
-2. At the newest version of the translation, click **Upload new version…**. The dialog says which version the text becomes, for example *The text becomes v3, a correction of v2.*
+2. At the newest version of the translation, click **Upload a corrected text…**. The dialog says which version the text becomes, for example *The text becomes v3, a correction of v2.*
 3. Give the text: with **Paste text**, paste the whole text into **New text**; with **Choose file**, choose one UTF-8 text file (.txt). The file only fills the text; its name does not matter.
 4. Under **How was this text made?**, choose **Machine translation**, **Human translation** or *Correction of v2 by hand*. For a machine translation, enter the **Provider** (for example DeepL); **Model or tool** is optional. **Made on**, **Made by** and **Note** are optional as well.
 5. Click **Check changes**. The dialog shows the changes against the current version, for example *Changes to v2 · 2 passages changed*, with added words underlined and removed words struck through. **Back** returns to the text.
@@ -2597,14 +2605,14 @@ The upload is refused in these cases:
 - The text is the same as the current version: *No changes to v2. Nothing is saved.* A line break at the end of a file does not count as a change.
 - The file is not a .txt file, is not UTF-8 or is larger than 1 MB.
 
-A source text has no **Upload new version…**: a corrected source text comes in as an Ontospan bundle ([Corrections and parallel translations in a bundle](lead-documents.md#corrections-and-parallel-translations-in-a-bundle)). The same applies to a parallel translation that should stand beside the current one. An exported Ontospan bundle does not yet carry the provider and model of an uploaded version; they are kept in Ontotator.
+A source text has no **Upload a corrected text…**: a corrected source text comes in as an Ontospan bundle ([Corrections and parallel translations in a bundle](lead-documents.md#corrections-and-parallel-translations-in-a-bundle)). The same applies to a parallel translation that should stand beside the current one. An exported Ontospan bundle does not yet carry the provider and model of an uploaded version; they are kept in Ontotator.
 
 ### Fix a typo in a translation without a review
 
 What for: correct spacing, a typo or grammar in a translation without a translation review. The content of the text stays as it is, and an accepted text stays accepted. Ontotator calls this an editorial correction; the API, the MCP tool and the name of the action in the audit trail use that term.
 
 1. Open the text card and click **Translation**.
-2. At the newest version of the translation, click **Fix typos…**. Unlike **Correct the translation…** and **Upload new version…**, it keeps the status of the text and starts no review.
+2. At the newest version of the translation, click **Fix typos…**. Unlike **Correct it myself…** and **Upload a corrected text…**, it keeps the status of the text and starts no review.
 3. Correct the text under **Corrected text**. It starts with the text of the version. The words you change are marked while you type, and the changes appear below the field with removed text struck through and a count, for example *Changes to v2 · 1 character changed*.
 4. Under **What did you fix?**, click **Spacing**, **Typo** or **Grammar**; you can choose several. **Note** is optional, for example the word you corrected. One of the two is required and is kept with the version.
 5. Read what happens to the work on the version (see below) and the status line, for example *v3 keeps the status of v2: Accepted. No translation review is started.*
