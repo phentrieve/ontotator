@@ -10,6 +10,7 @@ from ontotator.api.assignment_routes import AssignmentView, _views
 from ontotator.api.encoded_routes import EncodedParameterRoute
 from ontotator.api.identity import PrincipalDep
 from ontotator.api.routes import get_access
+from ontotator.application.editorial_corrections import EditorialCorrectionService
 from ontotator.application.translation_reviews import TranslationReviewRecord
 from ontotator.application.translation_workflow import TranslationWorkflowService
 from ontotator.application.version_uploads import UploadMethod, VersionUploadService
@@ -129,6 +130,135 @@ class VersionUploadResult(BaseModel):
     text_sha256: str
 
 
+class EditorialReplacement(BaseModel):
+    """One passage of the text and what replaces it."""
+
+    model_config = ConfigDict(extra="forbid")
+    # Must occur exactly once in the text of the corrected version.
+    old: str = Field(min_length=1, max_length=2000)
+    new: str = Field(max_length=2000)
+
+
+class _EditorialText(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # Either the whole corrected text or the replacements that make it.
+    text: str | None = Field(default=None, min_length=1, max_length=MAX_VERSION_TEXT)
+    replacements: list[EditorialReplacement] | None = Field(
+        default=None, min_length=1, max_length=200
+    )
+
+
+class EditorialCorrectionPreviewRequest(_EditorialText):
+    """Issue 453: the correction to check before it is saved (both fields
+    left out: only whether a correction is possible)."""
+
+    @model_validator(mode="after")
+    def _one_form(self) -> Self:
+        if self.text is not None and self.replacements is not None:
+            raise ValueError("Give either the text or replacements, not both.")
+        return self
+
+
+class EditorialCorrectionRequest(_EditorialText):
+    """Issue 453: an editorial correction of a translation version."""
+
+    # The text hash of the corrected version (from the preview).
+    expected_text_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    reason: str = Field(min_length=1, max_length=2000)
+
+    @model_validator(mode="after")
+    def _one_form(self) -> Self:
+        if (self.text is None) == (self.replacements is None):
+            raise ValueError("Give either the text or replacements.")
+        if not self.reason.strip():
+            raise ValueError("An editorial correction names its reason.")
+        return self
+
+
+class EditorialChange(BaseModel):
+    """A changed passage, in Unicode code points of the old and the new text."""
+
+    old_start: int
+    old_end: int
+    new_start: int
+    new_end: int
+    old_text: str
+    new_text: str
+
+
+class EditorialNumberChange(BaseModel):
+    """A number the correction changes, adds (no ``old``) or removes (no ``new``)."""
+
+    old: str | None
+    new: str | None
+
+
+class EditorialFindings(BaseModel):
+    # Findings of the submitted annotations on the corrected version, and
+    # how many of them the text-change steps cannot place on the new text.
+    submitted: int
+    needs_check: int
+
+
+class EditorialProposals(BaseModel):
+    # Tool proposal sets on the corrected version, the proposals that are
+    # carried to the new text and the ones left for a check.
+    sets: int
+    carried: int
+    needs_check: int
+
+
+class EditorialCorrectionPreview(BaseModel):
+    """What an editorial correction of this version would do (read only)."""
+
+    document_id: str
+    case_id: str
+    language: str
+    version: int
+    next_version: int
+    # The status the new version gets: the one of this version.
+    translation_status: str | None
+    # The hash of this version's text, which the correction names.
+    text_sha256: str
+    available: bool
+    # not_newest, discarded, review_open, and with a text or replacements
+    # that change nothing: unchanged.
+    reason: str | None
+    review_on: bool
+    annotate_accepted_only: bool
+    annotations: LeadCorrectionAnnotationsView
+    open_consolidations: int
+    final_result: bool
+    # Annotation tasks nobody opened: they move to the new version.
+    tasks_following: int
+    # With a text or replacements only.
+    text: str | None
+    previous_text: str | None
+    new_text_sha256: str | None
+    inserted_characters: int | None
+    deleted_characters: int | None
+    changed_characters: int | None
+    # The numbers the correction changes (a notice; nothing is refused).
+    number_changes: list[EditorialNumberChange] | None
+    diff: list[EditorialChange] | None
+    findings: EditorialFindings | None
+    proposals: EditorialProposals | None
+
+
+class EditorialCorrectionResult(BaseModel):
+    case_id: str
+    language: str
+    document_id: str
+    version: int
+    previous_document_id: str
+    previous_version: int
+    translation_status: str | None
+    text_sha256: str
+    inserted_characters: int
+    deleted_characters: int
+    tasks_following: int
+
+
 class SourceObligationView(SourceReviewObligation):
     old_source_text: str
     new_source_text: str
@@ -226,6 +356,50 @@ def upload_version(
             Actor.user(principal.user_id, principal.username),
             key,
             document_id,
+            **body.model_dump(),
+        )
+    )
+
+
+def _editorial(request: Request) -> EditorialCorrectionService:
+    return EditorialCorrectionService(request.app.state.repo.db, request.app.state.jobs)
+
+
+@router.post("/projects/{key}/documents/{doc:path}/editorial-correction/preview")
+def preview_editorial_correction(
+    key: str,
+    doc: str,
+    body: EditorialCorrectionPreviewRequest,
+    request: Request,
+    principal: PrincipalDep,
+) -> EditorialCorrectionPreview:
+    """Issue 453, read only: whether this version can be corrected and, with
+    a text or replacements, the changes, the guards and what follows."""
+    return EditorialCorrectionPreview.model_validate(
+        _editorial(request).preview(
+            Actor.user(principal.user_id, principal.username),
+            key,
+            doc,
+            **body.model_dump(),
+        )
+    )
+
+
+@router.post("/projects/{key}/documents/{doc:path}/editorial-correction")
+def editorial_correction(
+    key: str,
+    doc: str,
+    body: EditorialCorrectionRequest,
+    request: Request,
+    principal: PrincipalDep,
+) -> EditorialCorrectionResult:
+    """Issue 453: save an editorial fix (spacing, typos, grammar) as the next
+    version of this translation, with this version's status."""
+    return EditorialCorrectionResult.model_validate(
+        _editorial(request).correct(
+            Actor.user(principal.user_id, principal.username),
+            key,
+            doc,
             **body.model_dump(),
         )
     )

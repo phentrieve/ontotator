@@ -101,6 +101,18 @@ class VersionUploadView(_View):
     uploaded_by: PersonRefView | None = None
 
 
+class VersionEditorialCorrectionView(_View):
+    """The editorial correction that made this version (issue 453)."""
+
+    reason: str
+    # The version that was corrected; this version has its status.
+    previous_document_id: str
+    inserted_characters: int
+    deleted_characters: int
+    corrected_at: datetime | None = None
+    corrected_by: PersonRefView | None = None
+
+
 class DocumentVersionView(_View):
     document_id: str
     external_id: str
@@ -118,6 +130,7 @@ class DocumentVersionView(_View):
     acceptance: VersionAcceptanceView | None = None
     discarded: VersionDiscardView | None = None
     upload: VersionUploadView | None = None
+    editorial_correction: VersionEditorialCorrectionView | None = None
 
 
 class RowProposalSetView(_View):

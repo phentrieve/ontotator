@@ -61,8 +61,9 @@ class VersionUploadService:
         self.db = db
         self.jobs = jobs
 
+    @staticmethod
     def _target(
-        self, conn: Connection, actor: Actor, project_key: str, document_id: str
+        conn: Connection, actor: Actor, project_key: str, document_id: str
     ) -> tuple[Mapping[Any, Any], VariantInfo, dict[str, VariantInfo], str | None]:
         """The project, the version, the inventory and why no version can be
         uploaded after it (``None``: it can). Takes the project lock."""

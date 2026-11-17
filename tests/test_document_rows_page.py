@@ -359,6 +359,7 @@ VERSION_KEYS = {
     "acceptance",
     "discarded",
     "upload",
+    "editorial_correction",
 }
 WORK_KEYS = {
     "person",

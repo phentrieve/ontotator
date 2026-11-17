@@ -1,6 +1,6 @@
 """Migration 0045 (issue 464): the lead pause of a text, four columns on
-``text_settings``, purely additive. Numbered 0045 because 0043 and 0044 are
-taken by open pull requests; it follows the newest revision before it."""
+``text_settings``, purely additive. It follows 0044 (editorial corrections),
+which follows 0043 (when an assignment was started): one head, 0045."""
 
 from __future__ import annotations
 
@@ -21,6 +21,10 @@ S = "ontotator"
 COLUMNS = {"paused", "pause_reason", "paused_by", "paused_at"}
 
 
+PREVIOUS = "0044"
+BEFORE = "0043"
+
+
 def _previous() -> str:
     revision = ScriptDirectory.from_config(alembic_config()).get_revision(REVISION)
     assert revision is not None and isinstance(revision.down_revision, str)
@@ -39,8 +43,31 @@ def _columns(conn: Connection) -> set[str]:
 
 def test_one_head():
     scripts = ScriptDirectory.from_config(alembic_config())
-    assert scripts.get_heads() == [head_revision()]
-    assert _previous() < REVISION
+    assert scripts.get_heads() == [head_revision()] == [REVISION]
+    assert _previous() == PREVIOUS
+    previous = scripts.get_revision(PREVIOUS)
+    assert previous is not None and previous.down_revision == BEFORE
+
+
+def test_the_chain_walks_up_to_0045_and_back(tmp_path):
+    url = unmigrated_database_url(tmp_path / "lead-pause-chain.db")
+    engine = create_engine(url)
+    try:
+        for step in (BEFORE, PREVIOUS, REVISION):
+            upgrade(url, step)
+            with engine.begin() as conn:
+                assert current_revision(conn) == step
+                assert (_columns(conn) == COLUMNS) is (step == REVISION)
+        for step in (PREVIOUS, BEFORE):
+            with engine.begin() as conn:
+                command.downgrade(alembic_config(conn), step)
+            with engine.begin() as conn:
+                assert (current_revision(conn), _columns(conn)) == (step, set())
+        upgrade(url, REVISION)
+        with engine.begin() as conn:
+            assert (current_revision(conn), _columns(conn)) == (REVISION, COLUMNS)
+    finally:
+        engine.dispose()
 
 
 def test_texts_start_not_paused_and_the_downgrade_drops_the_columns(tmp_path):

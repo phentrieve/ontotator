@@ -9,15 +9,14 @@ a task: a task assigned later is paused as well, until the text is released.
 
 No existing row changes: every text starts not paused.
 
-Numbered 0045: 0044 is taken by an open pull request. Until that is merged
-this revision follows 0043 (when an assignment was started).
+Follows 0044 (editorial corrections of a translation version).
 """
 
 import sqlalchemy as sa
 from alembic import op
 
 revision = "0045"
-down_revision = "0043"
+down_revision = "0044"
 branch_labels = None
 depends_on = None
 SCHEMA = "ontotator"

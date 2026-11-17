@@ -124,6 +124,8 @@ ARCHIVED: tuple[ArchivedTable, ...] = (
     ArchivedTable("discarded_variants"),
     # Uploaded translation versions and how their text was made (issue 341 a).
     ArchivedTable("translation_version_uploads"),
+    # Editorial corrections of translation versions (issue 453).
+    ArchivedTable("translation_editorial_corrections"),
     ArchivedTable("final_selections"),
     ArchivedTable("final_selection_events"),
     ArchivedTable("export_selection_snapshots"),

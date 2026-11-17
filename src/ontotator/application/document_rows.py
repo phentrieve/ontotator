@@ -307,6 +307,9 @@ class RowFacts:
     # document id -> upload record of a version uploaded from the text card
     # (issue 341 a, ``version_uploads.uploads``)
     uploads: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # document id -> record of the editorial correction that made the
+    # version (issue 453, ``editorial_corrections.editorial_corrections``)
+    editorial_corrections: dict[str, dict[str, Any]] = field(default_factory=dict)
     annotations_per_text: int = 1
     rule_on: bool = True  # annotate_accepted_translations_only
     # user id -> PersonRefView fields (lead viewer: display names included)
@@ -1260,6 +1263,11 @@ def load_facts(
     from ontotator.application.version_uploads import uploads as load_uploads
 
     uploads = {} if summary else load_uploads(conn, pid)
+    from ontotator.application.editorial_corrections import (
+        editorial_corrections as load_editorial,
+    )
+
+    editorial = {} if summary else load_editorial(conn, pid)
     versions = _versions(conn, pid)
     assignments = _assignments(conn, pid)
     reports = _reports(conn, pid)
@@ -1287,6 +1295,11 @@ def load_facts(
                     item["uploaded_by"]
                     for item in uploads.values()
                     if item["uploaded_by"]
+                ),
+                *(
+                    item["corrected_by"]
+                    for item in editorial.values()
+                    if item["corrected_by"]
                 ),
                 *(item.reviewer_id for item in latest_reviews.values()),
                 *author_ids.values(),
@@ -1334,6 +1347,7 @@ def load_facts(
         discarded=discarded,
         acceptances=acceptances,
         uploads=uploads,
+        editorial_corrections=editorial,
         annotations_per_text=project.annotations_per_text,
         rule_on=project.annotate_accepted_translations_only,
         people=people_fields,
