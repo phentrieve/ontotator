@@ -15,6 +15,7 @@ import { WorkRoundsDialog } from "./WorkRoundsDialog";
 import { TaskProblemActions } from "./TaskProblemActions";
 import { TaskGuidelines } from "./TaskGuidelines";
 import { notifyTasksChanged } from "./tasksEvents";
+import { LeadReason } from "./LeadReason";
 import { pauseNotice } from "./pauseLabels";
 import { PausedNotice } from "../editor/PausedNotice";
 import { ReportAnswerNotice } from "../problems/ReportAnswerNotice";
@@ -198,7 +199,8 @@ function AnnotationTaskEditor({ assignmentId, user, onNavigate, routeLeaveRef, l
       <ConsolidationScreen projectKey={assignment.project_key} roundId={roundInfo.round_id} assignmentId={assignmentId} practice={!!listed?.practice}
         onNavigate={onNavigate} workspaceView={workspace.read_only ? null : workspace.view} readOnly={assignment.held} onTaskHeld={refreshAssignment}
         notice={<>{assignment.held && <PausedNotice title={pauseNotice(assignment).title} reason={pauseNotice(assignment).reason}
-          kept={`Your decisions so far are kept and can be read. ${pauseNotice(assignment).kept ?? ""}`} />}{guidelines.notice}</>}
+          kept={`Your decisions so far are kept and can be read. ${pauseNotice(assignment).kept ?? ""}`} />}
+          {!workspace.read_only && listed && <LeadReason task={listed} className="lead-reason lead-reason--band" />}{guidelines.notice}</>}
         headerActions={<>{guidelines.button}<HelpLink screen="consolidation" />
           {/* Group commands save at once: nothing to save before a report. */}
           <TaskProblemActions assignment={assignment} textName={listed ? taskText(listed) : undefined} readOnly={workspace.read_only} onSaveBeforeReport={async () => undefined} onRefresh={value => {

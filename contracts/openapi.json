@@ -28765,6 +28765,72 @@
           },
           "checked_sentences": {
             "$ref": "#/components/schemas/CheckedSentences"
+          },
+          "version_origin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VersionOrigin"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "previous_version": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewText"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "second_review_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Second Review At"
+          },
+          "second_review_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Second Review Reason"
+          },
+          "reopened_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reopened At"
+          },
+          "reopen_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reopen Reason"
           }
         },
         "type": "object",
@@ -31691,6 +31757,29 @@
               }
             ],
             "title": "Consolidation Reason"
+          },
+          "second_review_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Second Review At"
+          },
+          "second_review_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Second Review Reason"
           },
           "report_answered": {
             "type": "boolean",
@@ -34739,6 +34828,111 @@
         ],
         "title": "VersionMarkerView",
         "description": "Text cell marker: \"v2 corrected\", \"v2\" or \"{version} translations\"\n(parallel roots: ``version`` is the number of roots)."
+      },
+      "VersionOrigin": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "upload",
+              "review_correction",
+              "lead_correction",
+              "editorial_correction",
+              "correction"
+            ],
+            "title": "Kind"
+          },
+          "previous_version": {
+            "type": "integer",
+            "title": "Previous Version"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "made_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Made On"
+          },
+          "made_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Made By"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "previous_version"
+        ],
+        "title": "VersionOrigin",
+        "description": "How a version after the first was made, for its reviewer.\n\n``upload``: a lead uploaded the text (\"Upload new version\u2026\", with the\nupload record's fields); ``review_correction``: a translation reviewer\ncorrected the previous version; ``lead_correction``: a lead did\n(\"Correct the translation\u2026\"); ``editorial_correction``: a lead fixed\nspacing, typos or grammar without a review (\"Fix typos\u2026\", ``note`` is\nthe recorded reason); ``correction``: no record (an import)."
       },
       "VersionRef": {
         "properties": {

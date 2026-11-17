@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, type TaskSummary } from "../src/api/client";
 import type { RouteLeaveGuard } from "../src/app/router";
 import { TranslationReviewScreen } from "../src/translation/TranslationReviewScreen";
-import { reviewRecord, reviewWorkspace } from "./translationFixtures";
+import { firstVersionWorkspace, reviewRecord, reviewWorkspace } from "./translationFixtures";
 import { decisionConsequences, decisionLabels, decisionOutcomes, issueMessages } from "../src/translation/labels";
 import { ShortcutHelpHost, openShortcutHelp } from "../src/ui/ShortcutHelp";
 import type { ReviewDecisionCode } from "../src/translation/reviewRules";
@@ -67,10 +67,12 @@ it("opens the exact source, inherited run and correction baseline with no defaul
   expect(screen.getByText(/Example MT/)).toBeDefined();
   expect(screen.getByRole("heading", { name: "Automatic translation checks" })).toBeDefined();
   const band = screen.getByRole("region", { name: "Automatic translation checks" });
-  expect(band.textContent).toContain("1 automatic check failed: Units added in translation");
+  // The reviewed version is a correction (v3): the run's failed check is named as one of v1 and asks for nothing.
+  expect(band.textContent).toContain("The automatic checks ran on v1, not on this version (v3). 1 automatic check failed on v1: Units added in translation.");
   expect(screen.queryByText(/A unit changed/)).toBeNull();
   fireEvent.click(within(band).getByRole("button", { name: "Details" }));
-  expect(screen.getAllByText(/A unit changed/)).toHaveLength(2);
+  expect(band.textContent).toContain("Checks of v1: 0 passed, 1 failed");
+  expect(screen.getAllByText(/A unit changed/)).toHaveLength(1);
   expect(screen.getAllByRole("radio").every(n => !(n as HTMLInputElement).checked)).toBe(true);
   expect(submitButton().getAttribute("aria-disabled")).toBe("true");
   expect(screen.getByText("Choose a decision to submit.")).toBeDefined();
@@ -738,7 +740,7 @@ it("preserves raw input on stale-predecessor refusal and never rebases or create
   expect(api.getVariantMetadata).not.toHaveBeenCalled();
 });
 it("always lists Ctrl+Enter in help; it explains a blocked submit and otherwise only opens the confirmation", async () => {
-  const { submit } = setup();
+  const { submit } = setup(firstVersionWorkspace());
   render(<ShortcutHelpHost />);
   await screen.findByRole("textbox", { name: "Translation (de)" });
   act(openShortcutHelp);

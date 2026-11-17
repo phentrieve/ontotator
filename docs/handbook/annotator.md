@@ -430,7 +430,7 @@ Steps:
 1. Open the task. The **Source** is on the left, the **Translation** on the right.
 2. Read the automatic checks band at the top. Click **Details** to see which checks failed and why.
 3. Type your corrections directly in the translation column. Your edits are saved as you type, and the decision switches to **Accepted with corrections**. Use **Show changes** to see your edits and **Couple scrolling** to scroll both columns together. **Show matching paragraph** (`Alt+M`) jumps to the paired paragraph.
-4. Optional: to compare with another text, click **Compare** above the texts. With several texts to compare, it opens a menu.
+4. Optional: to compare with another text, click **Compare** above the texts. With several texts to compare, it opens a menu. In the review of a later version (v2, v3, …), the first entry is the previous version ([Review a later version](#review-a-later-version)).
 5. Under **Your review**, choose a **Decision** (or press `1` to `4`).
 6. Fill in what the decision needs:
    - **Query** and **Rejected** always count as a clinically relevant change: choose at least one category and write a **Rationale**. Put your question for the lead in the rationale.
@@ -443,7 +443,36 @@ On a wide screen, **Your review** is a column on the right. To give the texts mo
 
 A project lead who corrects a translation themselves sees only **Accepted with corrections**. When the lead corrects a translation that was already accepted, the corrected version is reviewed again: it then appears as a new translation review task, usually for you ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
 
-If the source text was updated, **Source updates to review** appears. Open it, compare **Original source** and **Updated source**, and click **Submit review and resolve source update**.
+#### Why the lead asked for this review
+
+When the lead asked for the review with **Request correction…**, or reopened a review you had submitted, the lead's words stand above **Decision**:
+
+- *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.* The same line is under the task name in **My tasks**.
+- *Reopened by the lead on 18 Nov 2026, 10:00: The unit is mg in my copy.* In **My tasks**, click the **Reopened** badge to read it. Without a reason from the lead it ends with *No reason given.*
+
+A reopened review starts again from the text of its version; your earlier decision is listed under **Previous reviews**.
+
+#### Review a later version
+
+What for: review a translation that already has an earlier version, for example a text the lead uploaded with **Upload new version…** or corrected, or a version another reviewer corrected. The text name in **My tasks** and in the task ends with the version, for example *case-0101 de v2 corrected*.
+
+The task shows the version you were given, not the first one:
+
+- **Translation details** says how this version was made: **This version** (for example *Human translation*, *Machine translation, DeepL, deepl-2026-10*, *Corrected by hand*, *Corrected by the project lead*, *Corrected in a translation review* or, after **Fix typos…**, *Typos fixed by the project lead on 17 November 2026 at 10:12* with **What was fixed**), when it was uploaded or corrected, the **Version before** and, for an uploaded text, what the lead recorded about who made it and when. The machine translation run of the first version is listed separately, for example *Translation run of v1*.
+- The line under the translation reads *Same as the version you were given (v2).* Your own edits are underlined against that version, and **Show changes** shows them.
+- **Compare** shows what changed since the version before. Click **Compare** (with several texts to compare, choose *The previous version (v1)*): the third column, *Changes from v1 to v2*, shows this version with the removed passages struck through and the added ones underlined. **Close** hides it again.
+- The automatic checks ran on the first version only. The band says so, for example *The automatic checks ran on v1, not on this version (v2). 1 automatic check failed on v1: Units added in translation.* **Details** lists the checks of v1. A check that failed on v1 is not counted in **My tasks** for this task, and **Accepted unchanged** needs no rationale because of it. Check yourself whether the passage is right in this version.
+
+#### Review a source update
+
+If the source text was updated after the translation was made, **Source updates to review** appears above **Decision**. The **Source** column of the task still shows the original source.
+
+1. Choose **Accepted unchanged** or, after correcting the translation, **Accepted with corrections**, and fill in what the decision needs.
+2. Under **Source updates to review**, click **Review source update**.
+3. Compare **Original source** and **Updated source** with **Current translation**. In the updated source, added text is underlined and removed text is struck through.
+4. Click **Submit review and resolve source update**. This submits your review and resolves the source update.
+
+**Submit review…** alone does not resolve a source update. If you use it with an accepting decision while one is open, the confirmation says so, for example *1 source update is not reviewed.*, and offers **Review source update**, which opens the comparison. **Submit without the source update** accepts the translation against the original source and leaves the update open: the submitted review can then no longer resolve it, and the lead has to assign another review.
 
 ![A translation review: the source on the left, the translation on the right, the failed automatic check above them. On the right, Query is chosen with the category Number or unit and a rationale, above Submit review…](images/annotator-translation-review.png)
 
@@ -458,6 +487,8 @@ What for: keep track of the sentences you have already checked in a long text.
 5. The head of each text shows how many of its sentences are checked. **Next unchecked** jumps to the first unchecked sentence of the translation.
 
 Checked sentences are green. If you edit a checked sentence later, it turns amber, and the head of the text counts it as *changed*. Read it again, then click it to mark it as checked.
+
+A mark belongs to its sentence, not to its wording. When a text repeats a sentence, for example *Unauffällig.*, and you edit the one you had checked, that sentence turns amber where it stands; the same sentence elsewhere in the text stays as it was, unchecked if you had not checked it. When you add or remove text before checked sentences, their marks move with them. A checked sentence you delete loses its mark; if you take an edit back, the sentence is green again.
 
 The marks are only for you. They are saved with your review, so they are kept when you reload, close the tab or the task is paused. With the review open in two tabs, both keep their marks; a tab shows the marks of the other one after your next mark there or after **Reload from server**. They do not change your decision, and the lead and the exports never see them.
 

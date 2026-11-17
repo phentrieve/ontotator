@@ -180,8 +180,82 @@ export function calmCheckText(count: number): string {
   return count === 1 ? "1 automatic check passed." : `All ${count} automatic checks passed.`;
 }
 
-export function allChecksLine(passed: number, failed: number): string {
-  return `All checks: ${passed} passed, ${failed} failed`;
+export function allChecksLine(passed: number, failed: number, ofVersion?: number): string {
+  return `${ofVersion === undefined ? "All checks" : `Checks of v${ofVersion}`}: ${passed} passed, ${failed} failed`;
+}
+
+/**
+ * The checks band of a version after the first: the automatic checks ran on the translation run's text (`checked`,
+ * usually v1), not on the reviewed `version`, so a failed one is named as a check of that version and asks for nothing.
+ */
+export function earlierChecksText(checked: number, version: number, failedCodes: readonly string[]): string {
+  const start = `The automatic checks ran on v${checked}, not on this version (v${version}).`;
+  if (failedCodes.length === 0) return start;
+  const failed = checkBandText(failedCodes).replace(/ failed: /, ` failed on v${checked}: `);
+  return `${start} ${failed}.`;
+}
+
+/** "Submit this review?" while a source update of the translation is open: the ordinary submit does not resolve it. */
+export function sourceUpdatesOpenTitle(count: number): string {
+  return count === 1 ? "1 source update is not reviewed." : `${count} source updates are not reviewed.`;
+}
+export const sourceUpdatesOpenText = "The source text was updated after this translation was made. Submitting here accepts the translation against the original source and leaves the update open; this review can then no longer resolve it, and the lead has to assign another review. To check the translation against the updated source with this review, click Review source update.";
+
+/** What the reviewer's text is compared with: the first version of a machine translation, else the version they were given. */
+export function baselineName(variant: { origin: string }): string {
+  return variant.origin === "machine_translation" ? "the machine translation" : "the version you were given";
+}
+
+/** The note under the translation: what the marks mean, and for a later version where its own changes are shown. */
+export function translationNote(variant: { origin: string; version: number }, state: "changes" | "edited" | "same", previous?: number): string {
+  const baseline = baselineName(variant);
+  if (variant.origin === "machine_translation")
+    return state === "changes" ? `Showing changes against ${baseline}. Turn off Show changes to edit.` : state === "edited" ? `Underlined text differs from ${baseline}.` : `Same as ${baseline}.`;
+  const compare = previous === undefined ? "" : ` Compare shows what changed since v${previous}.`;
+  return state === "changes" ? `Showing your changes against ${baseline} (v${variant.version}). Turn off Show changes to edit.${compare}`
+    : `${state === "edited" ? "Underlined text differs from" : "Same as"} ${baseline} (v${variant.version}).${compare}`;
+}
+
+/** What follows a decision; a corrected text never changes the version it was made from. */
+export function decisionConsequence(decision: ReviewDecisionCode, variant: { origin: string }): string {
+  return decisionConsequences[decision].replace("The machine translation stays", `${baselineName(variant).replace(/^t/, "T")} stays`);
+}
+
+/** "12 November 2026" from a calendar date ("2026-11-12"), without a time zone shift. */
+function calendarDay(value: string): string {
+  const date = new Date(`${value}T00:00:00Z`);
+  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(date);
+}
+
+const uploadMethodWords: Readonly<Record<string, string>> = {
+  machine_translation: "Machine translation", human_translation: "Human translation", manual_correction: "Corrected by hand",
+};
+export interface VersionOriginFacts {
+  kind: "upload" | "review_correction" | "lead_correction" | "editorial_correction" | "correction"; previous_version: number; at?: string | null;
+  method?: string | null; provider?: string | null; model?: string | null; made_on?: string | null; made_by?: string | null; note?: string | null;
+}
+/**
+ * "Translation details" of a version after the first: how this version was made, by whom and when, never the
+ * translation run of the first version. Rows of term and value, in reading order.
+ */
+export function versionOriginRows(origin: VersionOriginFacts): [string, string][] {
+  const rows: [string, string][] = [];
+  if (origin.kind === "upload") {
+    rows.push(["This version", [uploadMethodWords[origin.method ?? ""] ?? "Uploaded text", origin.provider?.trim(), origin.model?.trim()].filter(Boolean).join(", ")]);
+    rows.push(["Uploaded", ["by the project lead", origin.at ? `on ${formatReviewDate(origin.at)}` : null].filter(Boolean).join(" ")]);
+    const made = [origin.made_on ? `on ${calendarDay(origin.made_on)}` : null, origin.made_by?.trim() ? `by ${origin.made_by.trim()}` : null].filter(Boolean).join(" ");
+    if (made) rows.push(["Made", made]);
+    if (origin.note?.trim()) rows.push(["Note", origin.note.trim()]);
+  } else if (origin.kind === "editorial_correction") {
+    // "Fix typos…": spacing, typos or grammar fixed by a lead without a review; the note is the recorded reason.
+    rows.push(["This version", `Typos fixed by the project lead${origin.at ? ` on ${formatReviewDate(origin.at)}` : ""}`]);
+    if (origin.note?.trim()) rows.push(["What was fixed", origin.note.trim()]);
+  } else {
+    rows.push(["This version", origin.kind === "lead_correction" ? "Corrected by the project lead" : origin.kind === "review_correction" ? "Corrected in a translation review" : "Correction"]);
+    if (origin.at) rows.push(["Corrected", `on ${formatReviewDate(origin.at)}`]);
+  }
+  rows.push(["Version before", `v${origin.previous_version}`]);
+  return rows;
 }
 
 /** Translation status of a document after a review, in words. */

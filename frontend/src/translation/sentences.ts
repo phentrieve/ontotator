@@ -99,31 +99,76 @@ export function splitSentences(text: string, lang?: string, { segmenter: useSegm
 }
 
 /**
- * The state of every sentence from the stored marks: a mark whose hash matches the
- * sentence at its index checks it; else the nearest free sentence with that hash
- * (text moved by an edit); else the sentence now at its index is "changed since checked".
+ * The state of every sentence from the stored marks. A mark belongs to the sentence at its index and to no other:
+ * with that sentence's hash it is checked, with another hash the sentence is "changed since checked". A mark is
+ * never moved to a sentence with the same text elsewhere (clinical texts repeat short sentences such as
+ * "Unauffällig."); marks follow an edit through `rebaseMarks` instead.
  */
 export function resolveMarks(sentences: readonly Sentence[], marks: readonly StoredMark[]): MarkState[] {
   const states: MarkState[] = sentences.map(() => null);
-  const rest: StoredMark[] = [];
   for (const mark of marks) {
-    if (sentences[mark.index]?.hash === mark.hash && !states[mark.index]) states[mark.index] = { kind: "checked" };
-    else rest.push(mark);
-  }
-  const unmatched: StoredMark[] = [];
-  for (const mark of rest) {
-    let best = -1;
-    for (const sentence of sentences) {
-      if (sentence.hash !== mark.hash || states[sentence.index]) continue;
-      if (best < 0 || Math.abs(sentence.index - mark.index) < Math.abs(best - mark.index)) best = sentence.index;
-    }
-    if (best >= 0) states[best] = { kind: "checked" };
-    else unmatched.push(mark);
-  }
-  for (const mark of unmatched) {
-    if (mark.index < sentences.length && !states[mark.index]) states[mark.index] = { kind: "stale", hash: mark.hash };
+    const sentence = sentences[mark.index];
+    if (!sentence) continue;
+    if (sentence.hash === mark.hash) states[mark.index] = { kind: "checked" };
+    else if (!states[mark.index]) states[mark.index] = { kind: "stale", hash: mark.hash };
   }
   return states;
+}
+
+/** Length of the common start of two texts, in UTF-16 units. */
+function commonPrefix(a: string, b: string): number {
+  const limit = Math.min(a.length, b.length);
+  let length = 0;
+  while (length < limit && a.charCodeAt(length) === b.charCodeAt(length)) length++;
+  return length;
+}
+
+/** Length of the common end of two texts that does not reach into their first `skip` units. */
+function commonSuffix(a: string, b: string, skip: number): number {
+  const limit = Math.min(a.length, b.length) - skip;
+  let length = 0;
+  while (length < limit && a.charCodeAt(a.length - 1 - length) === b.charCodeAt(b.length - 1 - length)) length++;
+  return length;
+}
+
+/**
+ * The marks after an edit of the text they were made on (`beforeText` to `afterText`, with their sentences).
+ *
+ * A sentence outside the edited passage is the same sentence afterwards, wherever it now stands: its mark moves
+ * with it. A sentence the edit touched keeps its mark at its position, where it now reads "changed since checked"
+ * (its hash differs); the first touched sentence goes with the first sentence of the edited passage, the second
+ * with the second. A mark is dropped when its sentence was removed, and when the edited passage has another
+ * number of sentences and the sentence now at its position reads the same: that may be another sentence.
+ * A mark never goes to an equal sentence elsewhere in the text.
+ */
+export function rebaseMarks(before: readonly Sentence[], beforeText: string, after: readonly Sentence[], afterText: string, marks: readonly StoredMark[]): StoredMark[] {
+  if (beforeText === afterText) return [...marks];
+  const prefix = commonPrefix(beforeText, afterText), suffix = commonSuffix(beforeText, afterText, prefix);
+  const shift = afterText.length - beforeText.length;
+  const byStart = new Map(after.map(sentence => [sentence.start, sentence]));
+  /** Where each untouched sentence stands now; undefined for a sentence the edit touched. */
+  const kept = before.map(sentence => {
+    const offset = sentence.end <= prefix ? 0 : sentence.start >= beforeText.length - suffix ? shift : null;
+    if (offset === null) return undefined;
+    const now = byStart.get(sentence.start + offset);
+    return now && now.end === sentence.end + offset && now.hash === sentence.hash ? now.index : undefined;
+  });
+  const taken = new Set(kept.filter((index): index is number => index !== undefined));
+  const touched = before.filter(sentence => kept[sentence.index] === undefined).map(sentence => sentence.index);
+  const edited = after.filter(sentence => !taken.has(sentence.index)).map(sentence => sentence.index);
+  const position = new Map(touched.map((index, order) => [index, order]));
+  const moved = new Map<number, string>();
+  for (const mark of marks) {
+    if (mark.index >= before.length) continue;
+    let index = kept[mark.index];
+    if (index === undefined) {
+      index = edited[position.get(mark.index) ?? -1];
+      if (index === undefined) continue;
+      if (touched.length !== edited.length && after[index].hash === mark.hash) continue;
+    }
+    moved.set(index, mark.hash);
+  }
+  return [...moved].sort(([a], [b]) => a - b).map(([index, hash]) => ({ index, hash }));
 }
 
 /** The marks to store for these states: checked ones with today's hash, stale ones with the old one. */

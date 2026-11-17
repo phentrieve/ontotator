@@ -82,3 +82,18 @@ it("offers Details whenever the band reports a failure, with a failed count that
   rerender(<ChecksSummary failed={[{ code: "units_added", passed: false }]} all={[{ code: "numbers_changed", passed: true }]} />);
   expect(screen.getByText("All checks: 1 passed, 1 failed")).toBeTruthy();
 });
+it("names the checks of a later version as checks of the first version and asks for nothing", () => {
+  render(<ChecksSummary failed={[]} earlier={{ checked: 1, version: 2 }} all={[
+    { code: "units_added", passed: false, detail: "mg added" }, { code: "numbers_changed", passed: true }]} />);
+  const band = screen.getByRole("region", { name: "Automatic translation checks" });
+  expect(band.textContent).toContain("The automatic checks ran on v1, not on this version (v2). 1 automatic check failed on v1: Units added in translation.");
+  expect(band.className).not.toContain("translation-checks--failed");
+  fireEvent.click(within(band).getByRole("button", { name: "Details" }));
+  expect(band.textContent).toContain("Checks of v1: 1 passed, 1 failed");
+  // No failure block with the "say why in the rationale" guidance: the check is not one of this version.
+  expect(screen.queryByRole("heading", { level: 3 })).toBeNull();
+});
+it("says only where the checks ran when the first version passed them all", () => {
+  render(<ChecksSummary failed={[]} earlier={{ checked: 1, version: 3 }} all={[{ code: "units_added", passed: true }]} />);
+  expect(screen.getByRole("region", { name: "Automatic translation checks" }).textContent).toContain("The automatic checks ran on v1, not on this version (v3).Details");
+});

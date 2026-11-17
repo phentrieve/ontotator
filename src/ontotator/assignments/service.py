@@ -115,6 +115,54 @@ class Assignment:
     annotation_mode: AnnotationMode | None = None
 
 
+def second_review_requests(
+    conn: Connection, rounds: Mapping[int, str | None]
+) -> dict[int, tuple[datetime, str]]:
+    """When and why a lead asked for the review of each assignment with
+    "Request correction…": the ``translation.correction_requested`` audit
+    event of the assignment's current round (``rounds``: assignment id ->
+    active round id). A later round of the task (the lead reopened it, the
+    reviewer started a new one) is not that request any more.
+    """
+    wanted = {str(aid): rid for aid, rid in rounds.items() if rid}
+    if not wanted:
+        return {}
+    events = conn.execute(
+        select(AuditEventRow.target_id, AuditEventRow.at, AuditEventRow.details)
+        .where(
+            AuditEventRow.target_type == "assignment",
+            AuditEventRow.target_id.in_(sorted(wanted)),
+            AuditEventRow.action == "translation.correction_requested",
+        )
+        .order_by(AuditEventRow.id)
+    )
+    found: dict[int, tuple[datetime, str]] = {}
+    for event in events:
+        details = event.details or {}
+        if details.get("round_id") == wanted[event.target_id]:
+            found[int(event.target_id)] = (event.at, str(details.get("reason") or ""))
+    return found
+
+
+def latest_reopen(
+    conn: Connection, assignment_id: int
+) -> tuple[datetime, str | None] | None:
+    """When and why a lead last reopened the task (``assignment.reopen``)."""
+    event = conn.execute(
+        select(AuditEventRow.at, AuditEventRow.details)
+        .where(
+            AuditEventRow.target_type == "assignment",
+            AuditEventRow.target_id == str(assignment_id),
+            AuditEventRow.action == "assignment.reopen",
+        )
+        .order_by(AuditEventRow.id.desc())
+        .limit(1)
+    ).first()
+    if event is None:
+        return None
+    return event.at, (event.details or {}).get("reason") or None
+
+
 @dataclass(frozen=True)
 class TaskSummary:
     assignment_id: int
@@ -139,8 +187,9 @@ class TaskSummary:
     case_id: str | None = None
     version: int | None = None
     origin: str | None = None
-    # Spec A.7: failed automatic checks of the reviewed variant's translation run
-    # (the list ReviewWorkspace.failed_checks shows); None for other tasks.
+    # Spec A.7: failed automatic checks of the reviewed version (the list
+    # ReviewWorkspace.failed_checks shows; 0 for a version after the first, which
+    # was never checked); None for other tasks.
     failed_check_count: int | None = None
     # Spec 2026-10-23 §2: the assignment date and the annotation mode fixed
     # at assignment time (annotate only).
@@ -153,6 +202,11 @@ class TaskSummary:
     # An open consolidation: the lead's reason from the start command (#146);
     # None without one and for other tasks.
     consolidation_reason: str | None = None
+    # A translation review the lead asked for with "Request correction…": when
+    # and why (the ``translation.correction_requested`` audit event of the
+    # task's current round); None for other tasks.
+    second_review_at: datetime | None = None
+    second_review_reason: str | None = None
     # R-26: a lead answered one of the owner's reports on this task since the
     # owner last opened it.
     report_answered: bool = False
@@ -1249,9 +1303,7 @@ class AssignmentService:
 
     def my_tasks(self, user_id: int) -> List[TaskSummary]:
         from ontotator.application.problem_report_views import answered
-        from ontotator.application.translation_reviews import (
-            failed_translation_checks,
-        )
+        from ontotator.application.translation_reviews import version_failed_checks
         from ontotator.authz.visibility import qualifying_assignment
         from ontotator.domain.variants import resolve_translation_lineage
         from ontotator.storage.workflow_tables import (
@@ -1386,6 +1438,14 @@ class AssignmentService:
                     and r["status"] != "submitted"
                 ],
             )
+            second_reviews = second_review_requests(
+                conn,
+                {
+                    r["assignment_id"]: r["active_round_id"]
+                    for r in rows
+                    if r["task"] == "translation_review"
+                },
+            )
             reports = {
                 r.report_id: r
                 for r in conn.execute(
@@ -1497,12 +1557,15 @@ class AssignmentService:
                 failed: int | None = None
                 if row["task"] == "translation_review":
                     project_variants = variants[row["project_key"]]
+                    reviewed = project_variants[row["document_id"]]
                     ancestor, original = resolve_translation_lineage(
-                        project_variants[row["document_id"]], project_variants.get
+                        reviewed, project_variants.get
                     )
                     source, target = original.language, row["language"]
                     try:
-                        failed = len(failed_translation_checks(ancestor.translation))
+                        # Only of the reviewed version itself: a later version
+                        # was never checked automatically.
+                        failed = len(version_failed_checks(reviewed, ancestor))
                     except ValidationError:
                         # A malformed stored run must not hide every task.
                         failed = None
@@ -1510,6 +1573,7 @@ class AssignmentService:
                     row["project_key"], {}
                 )
                 for_lead = (row["project_key"], row["document_id"]) in superseded
+                second = second_reviews.get(row["assignment_id"])
                 result.append(
                     TaskSummary(
                         **_paused(row),
@@ -1534,6 +1598,8 @@ class AssignmentService:
                             if (reopen := reopens.get(str(row["assignment_id"])))
                             else {}
                         ),
+                        second_review_at=second[0] if second else None,
+                        second_review_reason=second[1] if second else None,
                     )
                 )
             return result

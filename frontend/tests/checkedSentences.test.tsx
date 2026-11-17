@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "../src/api/client";
 import type { RouteLeaveGuard } from "../src/app/router";
 import { TranslationReviewScreen } from "../src/translation/TranslationReviewScreen";
-import { resolveMarks, sentenceHash, splitSentences, storedMarks, toggled } from "../src/translation/sentences";
+import { rebaseMarks, resolveMarks, sentenceHash, splitSentences, storedMarks, toggled, type StoredMark } from "../src/translation/sentences";
 import { reviewWorkspace } from "./translationFixtures";
 
 const SOURCE = "First source. Second source! Third source?";
@@ -73,13 +73,87 @@ describe("sentence splitting", () => {
     expect(parts.map(part => part.text)).toEqual(["Kopf", "Erster Satz.", "Zweiter Satz.", "Letzter"]);
     for (const part of parts) expect(text.slice(part.start, part.end)).toBe(part.text);
   });
-  it("matches a moved sentence by hash and makes an edited one stale", () => {
+  it("reads a mark only at its own sentence: an edited one is stale, an equal sentence elsewhere is never checked", () => {
     const before = splitSentences("A one. B two. C three.", "en");
     const marks = storedMarks(before, toggled(toggled(before.map(() => null), 0), 2));
-    const moved = splitSentences("New first. A one. B two. C three.", "en");
-    expect(resolveMarks(moved, marks).map(state => state?.kind ?? null)).toEqual([null, "checked", null, "checked"]);
     const edited = splitSentences("A one. B two. C changed.", "en");
     expect(resolveMarks(edited, marks)).toEqual([{ kind: "checked" }, null, { kind: "stale", hash: sentenceHash("C three.") }]);
+    // The mark of the first "Unauffällig." after that sentence was changed: not the unread second one.
+    const repeated = splitSentences("Herz. Geändert. Lunge. Unauffällig.", "de");
+    expect(resolveMarks(repeated, [{ index: 1, hash: sentenceHash("Unauffällig.") }])).toEqual([null, { kind: "stale", hash: sentenceHash("Unauffällig.") }, null, null]);
+    // A mark beyond the text belongs to no sentence.
+    expect(resolveMarks(repeated, [{ index: 9, hash: sentenceHash("Unauffällig.") }])).toEqual([null, null, null, null]);
+  });
+});
+
+/** The states of `afterText` after the marks made on `beforeText` followed the edit. */
+function afterEdit(beforeText: string, afterText: string, marks: StoredMark[], lang = "de") {
+  const before = splitSentences(beforeText, lang), after = splitSentences(afterText, lang);
+  const rebased = rebaseMarks(before, beforeText, after, afterText, marks);
+  return { marks: rebased, states: resolveMarks(after, rebased).map(state => state?.kind ?? null) };
+}
+const marksAt = (text: string, indexes: number[], lang = "de"): StoredMark[] => {
+  const parts = splitSentences(text, lang);
+  return indexes.map(index => ({ index, hash: parts[index].hash }));
+};
+
+describe("marks follow an edit of the text", () => {
+  const SHORT = "Herz. Unauffällig. Lunge. Unauffällig. Abdomen. Unauffällig.";
+
+  it("splits the fixture into the repeated sentences the tests rely on", () => {
+    expect(splitSentences(SHORT, "de").map(part => part.text)).toEqual(["Herz.", "Unauffällig.", "Lunge.", "Unauffällig.", "Abdomen.", "Unauffällig."]);
+  });
+  it("keeps the mark of a changed sentence at its position as changed and never moves it to an equal sentence", () => {
+    // Only the first "Unauffällig." was read; the reviewer then changes it.
+    const result = afterEdit(SHORT, "Herz. Unauffällig bis auf ein Systolikum. Lunge. Unauffällig. Abdomen. Unauffällig.", marksAt(SHORT, [1]));
+    expect(result.states).toEqual([null, "stale", null, null, null, null]);
+    expect(result.marks).toEqual([{ index: 1, hash: sentenceHash("Unauffällig.") }]);
+  });
+  it("keeps the other equal sentences checked when two of several identical ones are edited one after the other", () => {
+    const all = marksAt(SHORT, [1, 3, 5]);
+    const first = "Herz. Auffällig. Lunge. Unauffällig. Abdomen. Unauffällig.";
+    const one = afterEdit(SHORT, first, all);
+    expect(one.states).toEqual([null, "stale", null, "checked", null, "checked"]);
+    const second = "Herz. Auffällig. Lunge. Unauffällig. Abdomen. Druckschmerz.";
+    expect(afterEdit(first, second, one.marks).states).toEqual([null, "stale", null, "checked", null, "stale"]);
+  });
+  it("handles two of several identical sentences changed in one step", () => {
+    // One change of the whole passage, as "Undo my edits" or a paste makes it.
+    const result = afterEdit(SHORT, "Herz. Auffällig. Lunge. Unauffällig. Abdomen. Druckschmerz.", marksAt(SHORT, [1, 3, 5]));
+    expect(result.states).toEqual([null, "stale", null, "checked", null, "stale"]);
+    // Only the first and the last were read: the middle one stays unread.
+    expect(afterEdit(SHORT, "Herz. Auffällig. Lunge. Unauffällig. Abdomen. Druckschmerz.", marksAt(SHORT, [1, 5])).states).toEqual([null, "stale", null, null, null, "stale"]);
+  });
+  it("moves the marks with their sentences when text is added or removed before them", () => {
+    const marks = marksAt(SHORT, [1, 4]);
+    expect(afterEdit(SHORT, `Neuer Satz. ${SHORT}`, marks).states).toEqual([null, null, "checked", null, null, "checked", null]);
+    expect(afterEdit(SHORT, SHORT.replace("Herz. ", ""), marks).states).toEqual(["checked", null, null, "checked", null]);
+    const english = "A one. B two. C three.";
+    expect(afterEdit(english, "New first. A one. B two. C three.", marksAt(english, [0, 2], "en"), "en").states).toEqual([null, "checked", null, "checked"]);
+  });
+  it("drops the mark of a removed sentence instead of giving it to the equal one after it", () => {
+    // The read first "Unauffällig." is deleted; the second one was never read.
+    expect(afterEdit(SHORT, SHORT.replace("Herz. Unauffällig. ", "Herz. "), marksAt(SHORT, [1])).states).toEqual([null, null, null, null, null]);
+    // Deleting either of two adjacent equal sentences gives the same text: the rest counts as unread.
+    expect(afterEdit("Unauffällig. Unauffällig.", "Unauffällig.", [{ index: 1, hash: sentenceHash("Unauffällig.") }]).states).toEqual([null]);
+  });
+  it("checks a changed sentence again when the edit is taken back", () => {
+    const edited = "Herz. Unauffällig, aber. Lunge. Unauffällig. Abdomen. Unauffällig.";
+    const changed = afterEdit(SHORT, edited, marksAt(SHORT, [1, 3]));
+    expect(changed.states).toEqual([null, "stale", null, "checked", null, null]);
+    expect(afterEdit(edited, SHORT, changed.marks).states).toEqual([null, "checked", null, "checked", null, null]);
+  });
+  it("marks a merged or split sentence as changed, not as checked", () => {
+    const text = "Erster Satz. Zweiter Satz. Dritter Satz.";
+    // Merged: the first two become one sentence, which takes the first mark as changed.
+    expect(afterEdit(text, "Erster Satz und zweiter Satz. Dritter Satz.", marksAt(text, [0, 1, 2])).states).toEqual(["stale", "checked"]);
+    // Split: the second sentence becomes two; the new part is unread.
+    expect(afterEdit(text, "Erster Satz. Zweiter. Satz. Dritter Satz.", marksAt(text, [1, 2])).states).toEqual([null, "stale", null, "checked"]);
+  });
+  it("does not check an equal sentence that takes the place of an edited one when the passage changed its length", () => {
+    // "Lunge. Unauffällig." (read) is replaced by one "Unauffällig." in a passage of another length.
+    const result = afterEdit("Herz. Lunge. Unauffällig. Ende.", "Herz. Unauffällig. Ende.", [{ index: 1, hash: sentenceHash("Unauffällig.") }]);
+    expect(result.states).toEqual([null, null, null]);
   });
 });
 
@@ -194,6 +268,30 @@ describe("Mark checked sentences", () => {
     expect(sentences("Translation (de)")[0].className).toContain("is-stale");
     expect(sentences("Translation (de)")[3].className).toContain("is-checked");
     expect(counter()).toBe("Source: 0 of 3 checked / Translation: 1 of 4 checked · 1 changed");
+  });
+
+  it("an edited checked sentence stays changed at its place; the equal sentence further down is not checked", async () => {
+    const text = "Herz. Unauffällig. Lunge. Unauffällig.";
+    const base = reviewWorkspace();
+    const { saveMarks } = setup({ text, draft: { ...base.draft, text } }, false);
+    const toggle = await screen.findByRole("checkbox", { name: "Mark checked sentences" });
+    fireEvent.click(toggle);
+    click(sentences("Translation (de)")[1]);
+    fireEvent.click(toggle);
+    vi.useFakeTimers();
+    fireEvent.change(screen.getByRole("textbox", { name: "Translation (de)" }), { target: { value: "Herz. Unauffällig bis auf ein Systolikum. Lunge. Unauffällig." } });
+    fireEvent.click(toggle);
+    const items = sentences("Translation (de)");
+    expect(items.map(item => item.className.includes("is-stale"))).toEqual([false, true, false, false]);
+    expect(pressed("Translation (de)")).toEqual([false, false, false, false]);
+    expect(counter()).toBe("Source: 0 of 3 checked / Translation: 0 of 4 checked · 1 changed");
+    // A new sentence before them: the changed mark moves with its sentence and is stored there.
+    fireEvent.click(toggle);
+    fireEvent.change(screen.getByRole("textbox", { name: "Translation (de)" }), { target: { value: "Neu. Herz. Unauffällig bis auf ein Systolikum. Lunge. Unauffällig." } });
+    fireEvent.click(toggle);
+    expect(sentences("Translation (de)").map(item => item.className.includes("is-stale"))).toEqual([false, false, true, false, false]);
+    await act(async () => { await vi.advanceTimersByTimeAsync(700); });
+    expect(saveMarks.mock.calls.at(-1)![1].translation).toEqual([{ index: 2, hash: sentenceHash("Unauffällig.") }]);
   });
 
   it("is not offered on a touch-only device", async () => {

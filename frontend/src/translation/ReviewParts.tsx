@@ -3,7 +3,7 @@ import type { TranslationReviewRecord } from "../api/client";
 import { personLabel } from "../app/identity";
 import { submissionGuidelineLabel } from "../guidelines/submissionLabel";
 import { Button, IconCheck, IconChevronRight, IconWarning, StatusBadge, EmptyValue } from "../ui";
-import { allChecksLine, calmCheckText, categoryLabels, checkBandText, checkDeviationGuidance, checkExplanation, checkLabel, checkNoLocation, decisionConsequences, decisionLabels, formatReviewDate, translationStatusLabel } from "./labels";
+import { allChecksLine, calmCheckText, earlierChecksText, sourceUpdatesOpenText, sourceUpdatesOpenTitle, categoryLabels, checkBandText, checkDeviationGuidance, checkExplanation, checkLabel, checkNoLocation, decisionConsequences, decisionLabels, formatReviewDate, translationStatusLabel } from "./labels";
 import type { ClinicalCategory, ReviewDecisionCode } from "./reviewRules";
 
 type CheckRow = { code: string; passed: boolean; detail: string | null };
@@ -20,7 +20,11 @@ function checkRows(raw: readonly unknown[]): CheckRow[] {
  * Check records carry no position in the text, so failures are described, not linked.
  * The disclosure starts collapsed on every mount and is never stored.
  */
-export function ChecksSummary({ failed, all }: { failed: readonly unknown[]; all: readonly unknown[] | null }): JSX.Element {
+export function ChecksSummary({ failed, all, earlier }: {
+  failed: readonly unknown[]; all: readonly unknown[] | null;
+  /** A version after the first: the checks in `all` ran on version `checked`, not on the reviewed `version`. They are shown as that version's checks and ask for nothing. */
+  earlier?: { checked: number; version: number };
+}): JSX.Element {
   const id = useId();
   const [open, setOpen] = useState(false);
   const failures = checkRows(failed), every = checkRows(all ?? failed);
@@ -33,7 +37,9 @@ export function ChecksSummary({ failed, all }: { failed: readonly unknown[]; all
   return <section className={`translation-checks${failures.length > 0 ? " translation-checks--failed" : ""}`} aria-labelledby={`${id}-heading`}>
     <h2 id={`${id}-heading`} className="review-sr-only">Automatic translation checks</h2>
     <div className="translation-checks-band">
-      {failures.length > 0
+      {earlier && every.length > 0
+        ? <p className="translation-checks-line translation-checks-calm"><span>{earlierChecksText(earlier.checked, earlier.version, every.filter(check => !check.passed).map(check => check.code))}</span></p>
+        : failures.length > 0
         ? <p className="translation-checks-line"><IconWarning /><span><strong>{bandText.slice(0, split + 1)}</strong>{bandText.slice(split + 1)}</span></p>
         : every.length > 0
           ? <p className="translation-checks-line translation-checks-calm"><IconCheck /><span>{calmCheckText(every.length)}</span></p>
@@ -54,7 +60,7 @@ export function ChecksSummary({ failed, all }: { failed: readonly unknown[]; all
             <p>Technical code: <code className="translation-check-code">{check.code}</code></p></details>}
         </section>)}
         <div className="translation-checks-all-line">
-          <span>{allChecksLine(passed, failedCount)}</span>
+          <span>{allChecksLine(passed, failedCount, earlier?.checked)}</span>
           {every.length > 0 && <><details className="translation-checks-all">
             <summary>Show all checks</summary>
             <ul className="translation-check-list">{every.map((check, index) => <li key={index}>
@@ -93,14 +99,20 @@ const excerpt = (text: string, limit = 160) => {
 };
 
 /** Body of the submit confirmation: what is decided and what follows. */
-export function SubmitSummary({ decision, clinical, categories, rationale, failedChecks = [], consequence }: {
+export function SubmitSummary({ decision, clinical, categories, rationale, failedChecks = [], consequence, sourceUpdates }: {
   decision: ReviewDecisionCode; clinical: boolean; categories: readonly ClinicalCategory[]; rationale: string | null | undefined;
   /** Failed automatic checks of an accepted translation (R-12). */
   failedChecks?: readonly string[];
   /** Replaces `decisionConsequences` (a lead correction of an accepted version, issue 341 b). */
   consequence?: string;
+  /** Source updates this submit would leave unreviewed, with the way to the source update dialog. */
+  sourceUpdates?: { count: number; onReview: () => void };
 }): JSX.Element {
   return <div className="review-confirm">
+    {sourceUpdates && <div className="review-confirm-source-update" role="alert">
+      <p><strong>{sourceUpdatesOpenTitle(sourceUpdates.count)}</strong> {sourceUpdatesOpenText}</p>
+      <Button size="sm" onClick={sourceUpdates.onReview}>Review source update</Button>
+    </div>}
     {failedChecks.length > 0 && <p><strong>{checkBandText(failedChecks)}.</strong></p>}
     <dl className="review-summary-list">
       <div><dt>Decision</dt><dd>{decisionLabels[decision]}</dd></div>

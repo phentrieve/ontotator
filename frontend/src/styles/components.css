@@ -771,6 +771,12 @@ ul.task-counts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space
 /* My tasks: failed automatic checks of a translation review, on a second line of the Task cell; icon plus words, not colour alone. */
 .task-hold-reason { display: -webkit-box; margin: var(--space-1) 0 0; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; max-width: 28rem; white-space: normal; }
 .task-check-flag { display: flex; align-items: center; gap: var(--space-1); color: var(--warning); font-size: var(--size-sm); }
+/* The lead's reason for a task (second review, reopen): in My tasks a line under the task name, in the task a quiet note. */
+.task-lead-reason { margin: var(--space-1) 0 0; max-width: 28rem; white-space: normal; overflow-wrap: anywhere; }
+.lead-reason { margin: 0 0 var(--space-3); padding: var(--space-2) var(--space-3); border: 1px solid var(--notice-info-border); border-radius: var(--radius); background: var(--notice-info-fill); color: var(--notice-info-text); font-size: var(--size-md); line-height: var(--leading-md); overflow-wrap: anywhere; }
+.lead-reason p { margin: 0; }
+.lead-reason p + p { margin-top: var(--space-1); }
+.lead-reason--band { margin: var(--space-2) 0 var(--space-3); }
 .task-reopen-info { all: unset; cursor: pointer; border-radius: var(--radius-sm); }
 .task-reopen-info:focus-visible { outline: var(--focus-width) solid var(--focus-ring); outline-offset: 2px; }
 .task-reopen-info .icon { width: 12px; height: 12px; margin-inline-start: 2px; vertical-align: -1px; }
