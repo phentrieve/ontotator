@@ -225,6 +225,8 @@ class TranslationWorkflowService:
                 .where(AssignmentRow.id == assignment.id)
                 .values(
                     status="reopened" if existing else "open",
+                    # Issue 268: not started until the first save from here.
+                    started_at=None,
                     active_round_id=rid,
                     last_submission_id=None,
                     workflow_revision=assignment.workflow_revision + 1,

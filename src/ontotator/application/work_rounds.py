@@ -1014,6 +1014,7 @@ class WorkRoundService:
                 active_round_id=rid,
                 workflow_revision=expected_workflow_revision + 1,
                 status="open",
+                started_at=None,
                 last_submission_id=None,
                 updated_at=now,
             )
