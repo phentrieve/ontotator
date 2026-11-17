@@ -33,6 +33,8 @@ export interface TextVersionsTools {
   onAcceptVersion?: (row: DocumentRowView, version: DocumentVersionView) => void;
   /** The lead: "Upload new version…" on the newest version of a translation (issue 341 a). */
   onUploadVersion?: (row: DocumentRowView, version: DocumentVersionView) => void;
+  /** The lead: "Fix typos…" (an editorial correction) on the newest version of a translation (issue 453). */
+  onEditorialCorrection?: (row: DocumentRowView, version: DocumentVersionView) => void;
 }
 
 /** Issue 341 d: a newest translation version that is neither reviewed nor accepted, not discarded. */
@@ -46,10 +48,13 @@ export function correctableVersion(row: Pick<DocumentRowView, "plan_row">, versi
   return version.is_newest_in_chain && version.translation_status === "accepted" && !isDiscarded(row, version);
 }
 
-/** Issue 341 a: the newest version of a translation the lead may upload a new version after, not discarded. */
+/** Issues 341 a and 453: the newest version of a translation the lead may upload a new version after or correct editorially, not discarded. */
 export function uploadableVersion(row: Pick<DocumentRowView, "plan_row">, version: DocumentVersionView): boolean {
   return version.is_newest_in_chain && version.translation_status != null && !isDiscarded(row, version);
 }
+
+/** What tells "Fix typos…" apart from "Correct the translation…" and "Upload new version…" (the button's tooltip). */
+export const FIX_TYPOS_HINT = "Spacing, typos, grammar. Keeps the status; no review.";
 
 const uploadMethodLabels: Readonly<Record<NonNullable<DocumentVersionView["upload"]>["method"], string>> = {
   machine_translation: "Machine translation", human_translation: "Human translation", manual_correction: "Corrected by hand",
@@ -217,6 +222,8 @@ export const TextVersions = forwardRef<HTMLUListElement, TextVersionsProps>(func
             onClick={() => tools.onCorrectTranslation?.(row, version)}>Correct the translation…</Button>}
           {tools.onAcceptVersion && acceptableVersion(row, version) && <Button size="sm" aria-label={`Accept ${fullName}…`}
             onClick={() => tools.onAcceptVersion?.(row, version)}>Accept this version…</Button>}
+          {tools.onEditorialCorrection && uploadableVersion(row, version) && <Button size="sm" aria-label={`Fix typos in ${fullName}…`} title={FIX_TYPOS_HINT}
+            onClick={() => tools.onEditorialCorrection?.(row, version)}>Fix typos…</Button>}
           {tools.onUploadVersion && uploadableVersion(row, version) && <Button size="sm" aria-label={`Upload new version of ${fullName}…`}
             onClick={() => tools.onUploadVersion?.(row, version)}>Upload new version…</Button>}
           {version.translation_status != null && tools.onShowTranslationReviews && <Button size="sm" aria-label={`Translation reviews for ${name}`} onClick={() => tools.onShowTranslationReviews?.(version.document_id)}>Translation reviews</Button>}
