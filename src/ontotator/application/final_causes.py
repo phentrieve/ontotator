@@ -121,7 +121,11 @@ def latest_review_decisions(
             TranslationReviewRow.id.desc(),
         )
     ).all()
-    return {row.document_id: row.decision for row in rows}
+    # A version made by an editorial correction of a rejected or queried
+    # version counts as that one (issue 453).
+    return work_plan_store.inherited_review_decisions(
+        conn, pid, {row.document_id: row.decision for row in rows}
+    )
 
 
 def corrects_selected_text(status: str | None, decision: str | None) -> bool:

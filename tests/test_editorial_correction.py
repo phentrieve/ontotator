@@ -13,13 +13,11 @@ from test_translation_review_service import review_env as review_env
 from test_version_upload import unreviewed as unreviewed
 from work_plan_support import flags_of, write
 
-from ontotator.application import editorial_corrections as module
 from ontotator.application.editorial_corrections import (
     EditorialCorrectionService,
     apply_replacements,
-    changed_characters_limit,
     changes,
-    digit_sequence,
+    number_changes,
 )
 from ontotator.assignments.service import AssignmentService
 from ontotator.auth.audit import Actor
@@ -59,25 +57,7 @@ def status(env: Any, document_id: str) -> str | None:
     return env.app.state.repo.get_variant("proj", document_id).translation_status
 
 
-# --- the guards, pure ------------------------------------------------------------- #
-
-
-def test_the_size_cap_is_five_percent_between_20_and_200_characters():
-    assert (
-        module.MAX_CHANGED_CHARACTERS,
-        module.MAX_CHANGED_SHARE,
-        module.MIN_CHANGED_CHARACTERS_LIMIT,
-    ) == (200, 0.05, 20)
-    # Never less than 20, 5 % of the text in between, at most 200.
-    assert [changed_characters_limit(n) for n in (0, 9, 400, 401, 1000, 3999)] == [
-        20,
-        20,
-        20,
-        20,
-        50,
-        199,
-    ]
-    assert [changed_characters_limit(n) for n in (4000, 4020, 100_000)] == [200] * 3
+# --- the pure helpers ------------------------------------------------------------- #
 
 
 def test_changes_count_inserted_and_deleted_characters_by_the_text_diff():
@@ -93,11 +73,17 @@ def test_changes_count_inserted_and_deleted_characters_by_the_text_diff():
     assert changes(old, old) == []
 
 
-def test_digits_are_compared_as_one_sequence():
-    assert digit_sequence("38,2 °C am 3.11., 5 mg/m²") == "3823115²"
-    # Moving a space around a number keeps the sequence; a changed dose not.
-    assert digit_sequence("5mg") == digit_sequence("5 mg")
-    assert digit_sequence("15 mg") != digit_sequence("50 mg")
+def test_number_changes_name_changed_added_and_removed_numbers():
+    assert number_changes("15 mg am 3.11.", "50 mg am 3.11.") == [
+        {"old": "15", "new": "50"}
+    ]
+    assert number_changes("Temperatur 38,2 °C", "Temperatur 38,5 °C") == [
+        {"old": "38,2", "new": "38,5"}
+    ]
+    assert number_changes("seit Tagen", "seit 3 Tagen") == [{"old": None, "new": "3"}]
+    assert number_changes("2 mal 5 mg", "5 mg") == [{"old": "2", "new": None}]
+    # Spacing next to a number or other words: no number changes.
+    assert number_changes("5mg, 38,2 °C", "5 mg, 38,2°C und mehr") == []
 
 
 def test_replacements_apply_once_each_and_do_not_overlap():
@@ -240,6 +226,7 @@ def test_an_accepted_text_stays_accepted_without_a_review(accepted):
                 "new_text": ".",
             }
         ],
+        "number_changes": [],
         "tasks_following": 1,
     }
     (moved,) = audits(env, "assignment.follow_correction")
@@ -341,19 +328,46 @@ def test_only_a_lead_corrects(accepted):
             service(env).preview(actor, "proj", "target")
 
 
-def test_a_rejected_version_is_not_corrected_editorially(review_env):
-    """Its text is decided in a translation review or a lead correction."""
+@pytest.mark.parametrize("decision", ["rejected", "query"])
+def test_a_rejected_or_queried_version_keeps_its_status_and_decision(
+    review_env, decision
+):
+    """The new version is rejected or queried like the one it corrects: the
+    row shows it so, and the lead resolves it as before."""
+    from test_lead_correction import start
+
     env = review_env
     AssignmentService(env.db).revoke(HARNESS, env.ids["bob"])
-    decide(env, "rejected")
-    assert refusal(env).details == {"reason": "rejected_or_queried"}
+    decide(env, decision)
+    result = correct(env)
+    child = result["document_id"]
+    assert result["translation_status"] == "reviewed"
+    assert (status(env, child), status(env, "target")) == ("reviewed", "reviewed")
+    client = logged_in(env.app, "leader")
+    page = client.post(
+        f"{BASE}/document-rows/selected",
+        json={"rows": [{"case_id": "case", "language": "de"}]},
+    )
+    assert page.status_code == 200, page.text
+    (row,) = [r for g in page.json()["groups"] for r in g["rows"]]
+    versions = {v["document_id"]: v for v in row["versions"]}
+    assert versions[child]["latest_review_decision"] == decision
+    assert versions[child]["translation_status"] == "reviewed"
+    assert versions[child]["editorial_correction"]["reason"] == REASON
+    # The row still asks the lead to resolve the rejected or queried text.
+    wanted = "resolve_rejected" if decision == "rejected" else "resolve_queried"
+    assert wanted in [step["code"] for step in row["steps"]]
+    # A further editorial correction and the lead's own correction work on it.
+    again = correct(env, child, text="Übersetzt!")
+    assert again["translation_status"] == "reviewed"
+    assignment = start(env, again["document_id"])
+    assert assignment.lead_correction is True
 
 
-def test_content_guards(accepted):
+def test_number_changes_and_large_changes_are_not_refused(accepted):
     env = accepted
+    long = ("Temperatur 38,2 °C, Puls 96/min. " * 13)[:400]
     with env.db.transaction() as conn:
-        # A longer text with numbers: 400 characters, so the cap is 20.
-        long = ("Temperatur 38,2 °C, Puls 96/min. " * 13)[:400]
         import hashlib
 
         from sqlalchemy import update
@@ -363,24 +377,15 @@ def test_content_guards(accepted):
             .where(DocumentRow.document_id == "target")
             .values(text=long, text_sha256=hashlib.sha256(long.encode()).hexdigest())
         )
-    assert changed_characters_limit(len(long)) == 20
-    # A changed number, also when the count of digits stays the same.
-    assert refusal(env, text=long.replace("38,2", "39,2", 1)).details == {
-        "reason": "digits_changed"
-    }
-    assert refusal(env, text=long.replace("96/min", "69/min", 1)).details == {
-        "reason": "digits_changed"
-    }
-    # 21 changed characters: one more than the cap.
-    assert refusal(env, text=long + " " + "x" * 20).details == {
-        "reason": "too_large",
-        "changed_characters": 21,
-        "changed_characters_limit": 20,
-    }
-    assert audits(env, "translation.editorial_correction") == []
-    # Spacing around a number is editorial: the digits stay in order.
-    result = correct(env, text=long.replace("38,2 °C", "38,2°C", 1) + " " + "x" * 18)
-    assert (result["inserted_characters"], result["deleted_characters"]) == (19, 1)
+    fixed = long.replace("96/min", "69/min", 1) + " Danach stationär aufgenommen."
+    preview = service(env).preview(lead(env), "proj", "target", text=fixed)
+    assert (preview["available"], preview["reason"]) == (True, None)
+    assert preview["number_changes"] == [{"old": "96", "new": "69"}]
+    assert preview["changed_characters"] > 30
+    result = correct(env, text=fixed)
+    assert result["version"] == 2
+    (audit,) = audits(env, "translation.editorial_correction")
+    assert audit["number_changes"] == [{"old": "96", "new": "69"}]
 
 
 def test_preview_is_a_dry_run_with_the_diff_and_the_consequences(accepted):
@@ -402,14 +407,13 @@ def test_preview_is_a_dry_run_with_the_diff_and_the_consequences(accepted):
         "open_consolidations": 0,
         "final_result": False,
         "tasks_following": 1,
-        "changed_characters_limit": 20,
         "text": None,
         "previous_text": None,
         "new_text_sha256": None,
         "inserted_characters": None,
         "deleted_characters": None,
         "changed_characters": None,
-        "digits_changed": None,
+        "number_changes": None,
         "diff": None,
         "findings": None,
         "proposals": None,
@@ -432,13 +436,9 @@ def test_preview_is_a_dry_run_with_the_diff_and_the_consequences(accepted):
     # The fixture's annotations are bare task rows: nothing to place.
     assert checked["findings"] == {"submitted": 0, "needs_check": 0}
     assert checked["proposals"] == {"sets": 0, "carried": 0, "needs_check": 0}
-    for text, reason in (
-        ("Übersetzt", "unchanged"),
-        ("Übersetzt 2", "digits_changed"),
-        ("Übersetzt und noch viel mehr dazu", "too_large"),
-    ):
-        refused = service(env).preview(lead(env), "proj", "target", text=text)
-        assert (refused["available"], refused["reason"]) == (False, reason)
+    assert checked["number_changes"] == []
+    refused = service(env).preview(lead(env), "proj", "target", text="Übersetzt")
+    assert (refused["available"], refused["reason"]) == (False, "unchanged")
     with pytest.raises(DomainError) as caught:
         service(env).preview(
             lead(env), "proj", "target", replacements=[{"old": "x", "new": "y"}]
@@ -474,12 +474,9 @@ def test_routes_for_the_lead_only_and_the_row_shows_the_correction(accepted):
         | {"replacements": [{"old": "", "new": "b"}]},
     ):
         assert client.post(PATH, json=wrong).status_code == 422, wrong
-    large = client.post(
-        PATH, json=body | {"text": "Übersetzt, aber ganz anders als es war"}
-    )
-    assert large.status_code == 409, large.text
-    assert large.json()["code"] == CODE
-    assert large.json()["details"]["reason"] == "too_large"
+    same = client.post(PATH, json=body | {"text": "Übersetzt"})
+    assert same.status_code == 409, same.text
+    assert same.json() == {"code": CODE, "details": {"reason": "unchanged"}}
     response = client.post(PATH, json=body)
     assert response.status_code == 200, response.text
     saved = response.json()

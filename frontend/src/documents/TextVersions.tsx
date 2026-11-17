@@ -48,14 +48,9 @@ export function correctableVersion(row: Pick<DocumentRowView, "plan_row">, versi
   return version.is_newest_in_chain && version.translation_status === "accepted" && !isDiscarded(row, version);
 }
 
-/** Issue 341 a: the newest version of a translation the lead may upload a new version after, not discarded. */
+/** Issues 341 a and 453: the newest version of a translation the lead may upload a new version after or correct editorially, not discarded. */
 export function uploadableVersion(row: Pick<DocumentRowView, "plan_row">, version: DocumentVersionView): boolean {
   return version.is_newest_in_chain && version.translation_status != null && !isDiscarded(row, version);
-}
-
-/** Issue 453: the newest version of a translation the lead may fix editorially: not discarded, not rejected or queried. */
-export function editoriallyCorrectableVersion(row: Pick<DocumentRowView, "plan_row">, version: DocumentVersionView): boolean {
-  return uploadableVersion(row, version) && version.translation_status !== "reviewed";
 }
 
 const uploadMethodLabels: Readonly<Record<NonNullable<DocumentVersionView["upload"]>["method"], string>> = {
@@ -224,7 +219,7 @@ export const TextVersions = forwardRef<HTMLUListElement, TextVersionsProps>(func
             onClick={() => tools.onCorrectTranslation?.(row, version)}>Correct the translation…</Button>}
           {tools.onAcceptVersion && acceptableVersion(row, version) && <Button size="sm" aria-label={`Accept ${fullName}…`}
             onClick={() => tools.onAcceptVersion?.(row, version)}>Accept this version…</Button>}
-          {tools.onEditorialCorrection && editoriallyCorrectableVersion(row, version) && <Button size="sm" aria-label={`Editorial correction of ${fullName}…`}
+          {tools.onEditorialCorrection && uploadableVersion(row, version) && <Button size="sm" aria-label={`Editorial correction of ${fullName}…`}
             onClick={() => tools.onEditorialCorrection?.(row, version)}>Editorial correction…</Button>}
           {tools.onUploadVersion && uploadableVersion(row, version) && <Button size="sm" aria-label={`Upload new version of ${fullName}…`}
             onClick={() => tools.onUploadVersion?.(row, version)}>Upload new version…</Button>}

@@ -7557,7 +7557,7 @@
           "translation-workflow"
         ],
         "summary": "Editorial Correction",
-        "description": "Issue 453: save a small editorial fix (spacing, typos, grammar) as the\nnext version of this translation, with this version's status.",
+        "description": "Issue 453: save an editorial fix (spacing, typos, grammar) as the next\nversion of this translation, with this version's status.",
         "operationId": "editorial_correction_api_v1_projects__key__documents__doc__editorial_correction_post",
         "parameters": [
           {
@@ -19271,10 +19271,6 @@
             "type": "integer",
             "title": "Tasks Following"
           },
-          "changed_characters_limit": {
-            "type": "integer",
-            "title": "Changed Characters Limit"
-          },
           "text": {
             "anyOf": [
               {
@@ -19341,16 +19337,19 @@
             ],
             "title": "Changed Characters"
           },
-          "digits_changed": {
+          "number_changes": {
             "anyOf": [
               {
-                "type": "boolean"
+                "items": {
+                  "$ref": "#/components/schemas/EditorialNumberChange"
+                },
+                "type": "array"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Digits Changed"
+            "title": "Number Changes"
           },
           "diff": {
             "anyOf": [
@@ -19404,14 +19403,13 @@
           "open_consolidations",
           "final_result",
           "tasks_following",
-          "changed_characters_limit",
           "text",
           "previous_text",
           "new_text_sha256",
           "inserted_characters",
           "deleted_characters",
           "changed_characters",
-          "digits_changed",
+          "number_changes",
           "diff",
           "findings",
           "proposals"
@@ -19595,6 +19593,39 @@
           "needs_check"
         ],
         "title": "EditorialFindings"
+      },
+      "EditorialNumberChange": {
+        "properties": {
+          "old": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old"
+          },
+          "new": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New"
+          }
+        },
+        "type": "object",
+        "required": [
+          "old",
+          "new"
+        ],
+        "title": "EditorialNumberChange",
+        "description": "A number the correction changes, adds (no ``old``) or removes (no ``new``)."
       },
       "EditorialProposals": {
         "properties": {

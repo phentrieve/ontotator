@@ -3,18 +3,18 @@
 A lead fixes spacing, typos or grammar in the newest version of a
 translation without a translation review. The fix becomes the next version:
 a ``correction`` of the version it fixes with that version's translation
-status, so an accepted text stays accepted. It shares the preconditions of
-"Upload new version…" (issue 341 a) and is guarded against changes of
-content: the digits of the text stay as they are and the change is small
-(``changed_characters_limit``). A larger change belongs in a translation
-review.
+status: an accepted text stays accepted, a rejected one stays rejected. It
+shares the preconditions of "Upload new version…" (issue 341 a). The size
+of the change is reported, and a change of a number is pointed out
+(``number_changes``); neither is refused.
 """
 
 import hashlib
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
-from itertools import pairwise
+from itertools import pairwise, zip_longest
 from typing import Any
 
 from ontospan import canonical_text
@@ -38,31 +38,31 @@ from ontotator.storage.tables import (
     ProjectMembershipRow,
 )
 
-# The size cap of an editorial correction (issue 453): the characters a
-# correction inserts plus the ones it deletes, counted by the text diff
-# (``domain.reanchor.text_map``). The cap is ``MAX_CHANGED_SHARE`` of the
-# corrected text's length, at most ``MAX_CHANGED_CHARACTERS`` and never less
-# than ``MIN_CHANGED_CHARACTERS_LIMIT`` (so a short text can still be fixed).
-MAX_CHANGED_CHARACTERS = 200
-MAX_CHANGED_SHARE = 0.05
-MIN_CHANGED_CHARACTERS_LIMIT = 20
-
 REFUSED = "EDITORIAL_CORRECTION_NOT_AVAILABLE"
+_NUMBER = re.compile(r"\d+(?:[.,]\d+)*")
 
 
-def changed_characters_limit(text_length: int) -> int:
-    """How many characters (inserted plus deleted) a correction of a text of
-    ``text_length`` characters may change."""
-    return max(
-        MIN_CHANGED_CHARACTERS_LIMIT,
-        min(MAX_CHANGED_CHARACTERS, int(text_length * MAX_CHANGED_SHARE)),
-    )
-
-
-def digit_sequence(text: str) -> str:
-    """The digits of ``text`` in order (decimal digits and super- and
-    subscript digits): doses, values and dates an editorial fix leaves alone."""
-    return "".join(char for char in text if char.isdigit())
+def number_changes(old: str, new: str) -> list[dict[str, str | None]]:
+    """The numbers a correction changes, adds (``old`` is ``None``) or removes
+    (``new`` is ``None``), in text order. A notice for the lead, not a guard:
+    typos happen in numbers too."""
+    before, after = _NUMBER.findall(old), _NUMBER.findall(new)
+    start = 0
+    while start < min(len(before), len(after)) and before[start] == after[start]:
+        start += 1
+    end = 0
+    while (
+        end < min(len(before), len(after)) - start
+        and before[-1 - end] == after[-1 - end]
+    ):
+        end += 1
+    # What lies between the equal numbers at both ends, paired in order.
+    return [
+        {"old": was, "new": now}
+        for was, now in zip_longest(
+            before[start : len(before) - end], after[start : len(after) - end]
+        )
+    ]
 
 
 @dataclass(frozen=True)
@@ -156,10 +156,6 @@ class EditorialCorrectionService:
             ).scalars()
         ):
             raise AccessDenied("NOT_ALLOWED", "Only a project lead can do this.")
-        if reason is None and variant.translation_status == "reviewed":
-            # The newest version was rejected or queried: its text is decided
-            # in a translation review or a lead correction, not here.
-            reason = "rejected_or_queried"
         return project, variant, variants, reason
 
     @staticmethod
@@ -180,29 +176,18 @@ class EditorialCorrectionService:
         return proposed
 
     @staticmethod
-    def _guard(previous: str, proposed: str) -> tuple[dict[str, Any], str | None]:
-        """The size of the change and why the guards refuse it (``None``:
-        they do not)."""
+    def _change(previous: str, proposed: str) -> dict[str, Any]:
+        """The changed passages, their size and the numbers that change."""
         found = changes(previous, proposed)
         inserted = sum(len(item.new_text) for item in found)
         deleted = sum(len(item.old_text) for item in found)
-        limit = changed_characters_limit(len(previous))
-        digits_changed = digit_sequence(previous) != digit_sequence(proposed)
-        reason = None
-        if not found:
-            reason = "unchanged"
-        elif digits_changed:
-            reason = "digits_changed"
-        elif inserted + deleted > limit:
-            reason = "too_large"
         return {
             "inserted_characters": inserted,
             "deleted_characters": deleted,
             "changed_characters": inserted + deleted,
-            "changed_characters_limit": limit,
-            "digits_changed": digits_changed,
+            "number_changes": number_changes(previous, proposed),
             "diff": [asdict(item) for item in found],
-        }, reason
+        }
 
     def _consequences(
         self,
@@ -292,14 +277,14 @@ class EditorialCorrectionService:
         """Read only: what an editorial correction of ``document_id`` would do.
 
         ``available`` with the refusal ``reason``: ``not_newest``,
-        ``discarded``, ``review_open``, ``rejected_or_queried`` and, with a
-        text or replacements, ``unchanged``, ``digits_changed`` and
-        ``too_large``. ``text_sha256`` is the hash the correction must name;
-        ``translation_status`` is the status the new version would get (the
-        one of this version). With a text or replacements: the ``text`` that
-        would be stored, the ``previous_text``, the ``diff`` and the size of
-        the change against ``changed_characters_limit``. Replacements that do
-        not apply are refused as in ``correct``.
+        ``discarded``, ``review_open`` and, with a text or replacements that
+        change nothing, ``unchanged``. ``text_sha256`` is the hash the
+        correction must name; ``translation_status`` is the status the new
+        version would get (the one of this version). With a text or
+        replacements: the ``text`` that would be stored, the
+        ``previous_text``, the ``diff``, the size of the change and the
+        numbers it changes (``number_changes``, a notice only). Replacements
+        that do not apply are refused as in ``correct``.
         """
         with self.db.transaction() as conn:
             project, variant, variants, reason = self._target(
@@ -320,14 +305,13 @@ class EditorialCorrectionService:
                 "inserted_characters": None,
                 "deleted_characters": None,
                 "changed_characters": None,
-                "changed_characters_limit": changed_characters_limit(len(previous)),
-                "digits_changed": None,
+                "number_changes": None,
                 "diff": None,
             }
             proposed = None
             if text is not None or replacements is not None:
                 proposed = self._proposed(previous, text, replacements)
-                change, refused = self._guard(previous, proposed)
+                change = self._change(previous, proposed)
                 result.update(
                     change,
                     text=proposed,
@@ -336,7 +320,8 @@ class EditorialCorrectionService:
                         proposed.encode("utf-8")
                     ).hexdigest(),
                 )
-                reason = reason or refused
+                if reason is None and not change["diff"]:
+                    reason = "unchanged"
             result.update(
                 self._consequences(conn, project, variant, previous, proposed),
                 available=reason is None,
@@ -382,15 +367,9 @@ class EditorialCorrectionService:
                 raise DomainError("VARIANT_REVIEW_STALE")
             previous = TranslationReviewService._text(conn, pid, variant)
             proposed = self._proposed(previous, text, replacements)
-            change, refused = self._guard(previous, proposed)
-            if refused is not None:
-                details = {"reason": refused}
-                if refused == "too_large":
-                    details.update(
-                        changed_characters=change["changed_characters"],
-                        changed_characters_limit=change["changed_characters_limit"],
-                    )
-                raise DomainError(REFUSED, details)
+            change = self._change(previous, proposed)
+            if not change["diff"]:
+                raise DomainError(REFUSED, {"reason": "unchanged"})
             sha = hashlib.sha256(proposed.encode("utf-8")).hexdigest()
             child = replace(
                 variant,
@@ -404,7 +383,9 @@ class EditorialCorrectionService:
                 origin="correction",
                 derived_from=variant.document_id,
                 translation=None,
-                # Inherited: an accepted text stays accepted without a review.
+                # Inherited: an accepted text stays accepted without a review,
+                # a rejected or queried one stays so (its decision is read
+                # through ``inherited_review_decisions``).
                 translation_status=variant.translation_status,
                 status_reason="editorial correction",
                 text_sha256=sha,
@@ -464,6 +445,7 @@ class EditorialCorrectionService:
                     "inserted_characters": change["inserted_characters"],
                     "deleted_characters": change["deleted_characters"],
                     "diff": change["diff"],
+                    "number_changes": change["number_changes"],
                     "tasks_following": following,
                 },
                 at=now,

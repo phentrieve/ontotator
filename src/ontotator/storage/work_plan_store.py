@@ -27,6 +27,7 @@ from ontotator.domain.work_plans import (
 from ontotator.storage.final_tables import FinalSelectionRow
 from ontotator.storage.plan_tables import (
     DiscardedVariantRow,
+    EditorialCorrectionRow,
     TranslationAcceptanceRow,
     WorkPlanFlagsRow,
     WorkPlanRow,
@@ -55,6 +56,7 @@ __all__ = [
     "effective_plan",
     "ensure_rows",
     "final_keys",
+    "inherited_review_decisions",
     "language_versions",
     "open_reports",
     "open_tasks",
@@ -79,7 +81,48 @@ def _in_keys(case_col: Any, language_col: Any, keys: Iterable[RowKey]) -> Any:
     return tuple_(case_col, language_col).in_([(k.case_id, k.language) for k in keys])
 
 
+def inherited_review_decisions(
+    conn: Connection, pid: int, decisions: Mapping[str, str]
+) -> dict[str, str]:
+    """``decisions`` (document id -> decision of its latest translation
+    review) plus the versions made by an editorial correction (issue 453) of
+    a rejected or queried version: such a version has no review of its own
+    and the status of the version it corrects, so it counts as rejected or
+    queried like that one."""
+    previous: dict[str, str] = {
+        row.document_id: row.previous_document_id
+        for row in conn.execute(
+            select(
+                EditorialCorrectionRow.document_id,
+                EditorialCorrectionRow.previous_document_id,
+            ).where(EditorialCorrectionRow.project_id == pid)
+        )
+    }
+    result = dict(decisions)
+    if not previous:
+        return result
+    known = result | _review_decisions(
+        conn, pid, sorted(set(previous) | set(previous.values()))
+    )
+    for document_id in previous:
+        current = document_id
+        while current not in known and current in previous:
+            current = previous[current]
+        decision = known.get(current)
+        if current != document_id and decision in ("rejected", "query"):
+            result[document_id] = decision
+    return result
+
+
 def _latest_decisions(
+    conn: Connection, pid: int, document_ids: Sequence[str] | None = None
+) -> dict[str, str]:
+    return inherited_review_decisions(
+        conn, pid, _review_decisions(conn, pid, document_ids)
+    )
+
+
+def _review_decisions(
     conn: Connection, pid: int, document_ids: Sequence[str] | None = None
 ) -> dict[str, str]:
     query = select(

@@ -1,9 +1,10 @@
 /**
  * Issue 453: "Editorial correction…" on the newest version row of a translation.
- * - The lead edits the text in the translation editor and gives a reason; the guards (a number changes, the
- *   change is too large) refuse in words before anything is saved.
+ * - The lead edits the text in the translation editor and gives a reason. A changed number is pointed out in
+ *   the changes step and blocks nothing.
  * - The changes and what happens to the work on the version are shown before saving. The new version is a
- *   correction with the status of the version it corrects: an accepted text stays accepted, without a review.
+ *   correction with the status of the version it corrects: an accepted text stays accepted, a rejected one
+ *   stays rejected, without a review.
  * - An open translation review of the version refuses the correction.
  * Every step is checked at 1440 px and at 390 px for horizontal scroll, and the console stays free of errors.
  */
@@ -64,7 +65,7 @@ async function loginLead(page: Page, s: LeadScenario) {
 
 const correctionDialog = (page: Page, caseId: string) => page.getByRole("dialog", { name: `Editorial correction, ${caseId} de v1`, exact: true });
 
-test("a comma added to an accepted translation becomes an accepted v2; a changed number and a large change are refused in words", async ({ page }) => {
+test("a comma added to an accepted translation becomes an accepted v2; a changed number is pointed out", async ({ page }) => {
   const errors = consoleErrors(page);
   const s = await leadScenario(page, "ACCEPTED_TRANSLATION_FOR_LEAD");
   const caseId = s.cases!.accepted;
@@ -84,7 +85,7 @@ test("a comma added to an accepted translation becomes an accepted v2; a changed
   // The translation editor starts with the text of v1.
   const editor = dialog.getByRole("textbox", { name: "Corrected text", exact: true });
   await expect(editor).toHaveValue(oldText(caseId));
-  await expect(dialog.getByText("Changed words are marked. At most 20 characters may change, and every number stays as it is. A larger change belongs in a translation review.", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("Type the fix directly into the text. Changed words are marked. A change of content belongs in a translation review.", { exact: true })).toBeVisible();
   await evidence(page, "453-dialog-text");
 
   // Nothing changed and no reason: the button says so and a click names what is missing.
@@ -96,24 +97,20 @@ test("a comma added to an accepted translation becomes an accepted v2; a changed
   const reason = dialog.getByLabel(/^Reason/);
   await reason.fill("Comma after the introductory phrase");
 
-  // Guard: the digits of the text stay as they are.
+  // A changed number is pointed out in the changes step; it blocks nothing.
   await editor.fill(oldText(caseId).replace("14-month", "15-month"));
   await check.click();
-  await expect(dialog.getByText("A number would change. An editorial correction leaves every digit as it is; change numbers in a translation review.", { exact: true })).toBeVisible();
-  await evidence(page, "453-dialog-number-refused");
-  // Guard: the size cap.
-  await editor.fill(`${oldText(caseId)} She was admitted to the ward afterwards.`);
-  await expect(dialog.getByText(/A number would change/)).toHaveCount(0);
-  await check.click();
-  await expect(dialog.getByText("This change is too large for an editorial correction (41 characters changed, at most 20 here). Make it in a translation review with Correct the translation… or Request correction….", { exact: true })).toBeVisible();
-  await evidence(page, "453-dialog-size-refused");
-  await expect(dialog.getByRole("button", { name: "Save as v2", exact: true })).toHaveCount(0);
+  await expect(dialog.getByText("Changes a number: 14 → 15. Check that this is intended.", { exact: true })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Save as v2", exact: true })).toBeEnabled();
+  await evidence(page, "453-dialog-number-notice");
+  await dialog.getByRole("button", { name: "Back", exact: true }).click();
 
   // The fix: the changes and what happens to the work on v1, before anything is saved.
   await editor.fill(fixedText(caseId));
   await check.click();
   await expect(dialog.getByText("Changes to v1", { exact: true })).toBeVisible();
-  await expect(dialog).toContainText("1 character changed, at most 20");
+  await expect(dialog).toContainText("Changes to v1 · 1 character changed");
+  await expect(dialog.getByText(/^Changes a number/)).toHaveCount(0);
   const changes = dialog.getByRole("region", { name: "Text changes", exact: true });
   await expect(changes.locator("ins")).toHaveCount(1);
   await expect(changes.locator("ins")).toHaveText(",");
@@ -192,6 +189,34 @@ test("at 390 px: an unreviewed translation is corrected and stays ready for revi
   await expect(newest.getByRole("button", { name: `Accept v2 of ${caseId} de…`, exact: true })).toBeVisible();
   await noHorizontalScroll(page, "row after");
   await evidence(page, "453-phone-row-after");
+  expect(errors).toEqual([]);
+});
+
+test("a rejected translation is corrected and stays rejected", async ({ page }) => {
+  const errors = consoleErrors(page);
+  const s = await leadScenario(page, "REJECTED_TRANSLATION_FOR_LEAD");
+  const caseId = s.cases!.rejected;
+  await loginLead(page, s);
+  const card = await openTextCard(page, caseId, "de");
+  const [v1] = await (await textVersionItems(card, 1)).all();
+  await expect(v1).toContainText("Rejected in review");
+  await evidence(page, "453-rejected-row-before");
+  await v1.getByRole("button", { name: `Editorial correction of v1 of ${caseId} de…`, exact: true }).click();
+  const dialog = correctionDialog(page, caseId);
+  await expect(dialog).toContainText("keeps the status of v1 (Rejected in review)");
+  const editor = dialog.getByRole("textbox", { name: "Corrected text", exact: true });
+  await editor.fill(`${await editor.inputValue()}.`);
+  await dialog.getByLabel(/^Reason/).fill("Full stop at the end");
+  await dialog.getByRole("button", { name: "Check changes", exact: true }).click();
+  await expect(dialog.getByText("v2 keeps the status of v1: Rejected in review. No translation review is started.", { exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: "Save as v2", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator(".ui-toast .ui-toast-message")).toHaveText(`${caseId} de v2 saved as an editorial correction of v1. It stays Rejected in review.`);
+  const items = await textVersionItems(await openTextCard(page, caseId, "de"), 2);
+  const newest = items.filter({ hasText: "Correction of v1" });
+  await expect(newest).toContainText("Rejected in review");
+  await expect(newest).toContainText("Editorial correction by Project Lead");
+  await evidence(page, "453-rejected-row-after");
   expect(errors).toEqual([]);
 });
 

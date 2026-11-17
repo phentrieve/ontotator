@@ -826,15 +826,14 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
 
         Not a translation review: the corrected text becomes the next version
         of the translation with the status of document_id, so an accepted
-        text stays accepted, and the correction is audited with its reason.
-        Only small fixes that leave the content alone: the digits of the text
-        must stay the same, and inserted plus deleted characters may not
-        exceed changed_characters_limit; a larger change belongs in a
-        translation review (request_translation_correction,
-        start_lead_correction). The dry run returns the diff, whether the
-        correction is available (reason if not: not_newest, discarded,
-        review_open, rejected_or_queried, unchanged, digits_changed,
-        too_large) and what follows: tasks_following (annotation tasks nobody
+        text stays accepted (and a rejected or queried one stays so), and the
+        correction is audited with its reason. A change of content belongs
+        in a translation review (request_translation_correction,
+        start_lead_correction). The dry run returns the diff, how many
+        characters change, number_changes (the numbers the fixes change; a
+        notice to check, nothing is refused for it), whether the correction
+        is available (reason if not: not_newest, discarded, review_open,
+        unchanged) and what follows: tasks_following (annotation tasks nobody
         opened move to the new version), the annotation work, open
         consolidations and a final result that stay on the current version
         (handle them with the text-change tools), findings of submitted

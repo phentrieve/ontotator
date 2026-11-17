@@ -1,8 +1,8 @@
-/** Issue 453: "Editorial correction…" (the translation editor, the reason, the guards in words, changes and consequences before saving). */
+/** Issue 453: "Editorial correction…" (the translation editor, the reason, changes with a notice about changed numbers, consequences before saving). */
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api, ApiError, type EditorialCorrectionPreview, type EditorialCorrectionResult, type VariantText } from "../../src/api/client";
-import { editorialConsequences, EditorialCorrectionDialog, editorialRefusal } from "../../src/documents/EditorialCorrectionDialog";
+import { editorialConsequences, EditorialCorrectionDialog, editorialRefusal, numberNotice } from "../../src/documents/EditorialCorrectionDialog";
 import { planRow, stepOf, version } from "./fixtures";
 
 const v2 = version({ document_id: "case-0101-de-v2", version: 2, chain_name: "DeepL", origin: "correction", derived_from: "case-0101-de", translation_status: "accepted" });
@@ -16,13 +16,13 @@ function preview(overrides: Partial<EditorialCorrectionPreview> = {}): Editorial
   return {
     document_id: "case-0101-de-v2", case_id: "case-0101", language: "de", version: 2, next_version: 3, translation_status: "accepted", text_sha256: "sha-v2",
     available: true, reason: null, review_on: true, annotate_accepted_only: false, annotations: { submitted: 0, open: 0 }, open_consolidations: 0, final_result: false,
-    tasks_following: 0, changed_characters_limit: 20, text: null, previous_text: null, new_text_sha256: null, inserted_characters: null, deleted_characters: null,
-    changed_characters: null, digits_changed: null, diff: null, findings: null, proposals: null, ...overrides,
+    tasks_following: 0, text: null, previous_text: null, new_text_sha256: null, inserted_characters: null, deleted_characters: null,
+    changed_characters: null, number_changes: null, diff: null, findings: null, proposals: null, ...overrides,
   };
 }
 
 const checkedPreview = (text: string, overrides: Partial<EditorialCorrectionPreview> = {}) => preview({
-  text, previous_text: OLD, new_text_sha256: "sha-v3", inserted_characters: 0, deleted_characters: 1, changed_characters: 1, digits_changed: false,
+  text, previous_text: OLD, new_text_sha256: "sha-v3", inserted_characters: 0, deleted_characters: 1, changed_characters: 1, number_changes: [],
   diff: [{ old_start: 29, old_end: 30, new_start: 29, new_end: 29, old_text: " ", new_text: "" }],
   findings: { submitted: 0, needs_check: 0 }, proposals: { sets: 0, carried: 0, needs_check: 0 }, ...overrides,
 });
@@ -48,7 +48,7 @@ it("edits the current text, asks for the reason, shows the changes and saves the
   expect(within(dialog).getByText("Fix spacing, typos or grammar. The corrected text becomes v3 and keeps the status of v2 (Accepted); it is not reviewed again.")).toBeTruthy();
   // The editor starts with the text of the version.
   expect(editor.value).toBe(OLD);
-  expect(within(dialog).getByText("Changed words are marked. At most 20 characters may change, and every number stays as it is. A larger change belongs in a translation review.")).toBeTruthy();
+  expect(within(dialog).getByText("Type the fix directly into the text. Changed words are marked. A change of content belongs in a translation review.")).toBeTruthy();
   const check = within(dialog).getByRole("button", { name: "Check changes" });
   fireEvent.click(check);
   expect(within(dialog).getByText("Change the text first.")).toBeTruthy();
@@ -59,7 +59,9 @@ it("edits the current text, asks for the reason, shows the changes and saves the
   fireEvent.click(check);
   await waitFor(() => expect(api.previewEditorialCorrection).toHaveBeenLastCalledWith("p", "case-0101-de-v2", NEW));
   expect(await within(dialog).findByText("Changes to v2")).toBeTruthy();
-  expect(within(dialog).getByText(/1 character changed, at most 20/)).toBeTruthy();
+  expect(within(dialog).getByText(/· 1 character changed$/)).toBeTruthy();
+  // No number changes: no notice.
+  expect(within(dialog).queryByText(/^Changes a number/)).toBeNull();
   expect(within(dialog).getByRole("region", { name: "Text changes" }).querySelector("del")).toBeTruthy();
   expect(within(dialog).getByText(/Space before a comma/)).toBeTruthy();
   expect(within(dialog).getByText("v3 keeps the status of v2: Accepted. No translation review is started.")).toBeTruthy();
@@ -75,28 +77,53 @@ it("edits the current text, asks for the reason, shows the changes and saves the
   expect(api.editorialCorrection).toHaveBeenCalledWith("p", "case-0101-de-v2", { text: NEW, expected_text_sha256: "sha-v2", reason: "Space before a comma" });
 });
 
-it("names the guards' refusals in words and keeps the text", async () => {
+it("points out a changed number in the changes step and still saves", async () => {
+  const text = OLD.replace("38,2", "39,2");
+  vi.mocked(api.previewEditorialCorrection).mockImplementation(async (_key, _id, sent) => (sent === undefined ? preview()
+    : checkedPreview(sent, { changed_characters: 2, inserted_characters: 1, number_changes: [{ old: "38,2", new: "39,2" }] })));
+  const { props, dialog, editor } = await renderDialog();
+  fireEvent.change(editor, { target: { value: text } });
+  fireEvent.change(within(dialog).getByRole("textbox", { name: /^Reason/ }), { target: { value: "Temperature mistyped" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Check changes" }));
+  expect(await within(dialog).findByText("Changes a number: 38,2 → 39,2. Check that this is intended.")).toBeTruthy();
+  expect(within(dialog).getByText(/· 2 characters changed$/)).toBeTruthy();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Save as v3" }));
+  await waitFor(() => expect(props.onCorrected).toHaveBeenCalled());
+  expect(api.editorialCorrection).toHaveBeenCalledWith("p", "case-0101-de-v2", { text, expected_text_sha256: "sha-v2", reason: "Temperature mistyped" });
+  expect(numberNotice([{ old: "15", new: "50" }, { old: null, new: "3" }, { old: "2", new: null }])).toBe("Changes numbers: 15 → 50, adds 3, removes 2. Check that this is intended.");
+  expect(numberNotice([])).toBeNull();
+  expect(numberNotice(null)).toBeNull();
+});
+
+it("says that an unchanged text saves nothing and keeps the text", async () => {
   const { dialog, editor } = await renderDialog();
   fireEvent.change(within(dialog).getByRole("textbox", { name: /^Reason/ }), { target: { value: "Typo" } });
-  const check = within(dialog).getByRole("button", { name: "Check changes" });
-  for (const [text, refused, message] of [
-    [OLD.replace("38,2", "39,2"), { reason: "digits_changed", digits_changed: true },
-      "A number would change. An editorial correction leaves every digit as it is; change numbers in a translation review."],
-    [`${OLD} Der Patient wurde danach stationär aufgenommen.`, { reason: "too_large", changed_characters: 47 },
-      "This change is too large for an editorial correction (47 characters changed, at most 20 here). Make it in a translation review with Correct the translation… or Request correction…."],
-  ] as const) {
-    vi.mocked(api.previewEditorialCorrection).mockResolvedValueOnce(checkedPreview(text, { available: false, ...refused }));
-    fireEvent.change(editor, { target: { value: text } });
-    fireEvent.click(check);
-    expect(await within(dialog).findByText(message)).toBeTruthy();
-    // Still on the text; nothing can be saved.
-    expect(within(dialog).queryByRole("button", { name: "Save as v3" })).toBeNull();
-    expect(editor.value).toBe(text);
-  }
+  // Only white space the server does not keep differs.
+  const text = `${OLD}\r`;
+  vi.mocked(api.previewEditorialCorrection).mockResolvedValueOnce(checkedPreview(text, { available: false, reason: "unchanged" }));
+  fireEvent.change(editor, { target: { value: text } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Check changes" }));
+  expect(await within(dialog).findByText("No changes to v2. Nothing is saved.")).toBeTruthy();
+  expect(within(dialog).queryByRole("button", { name: "Save as v3" })).toBeNull();
   // The message goes when the text changes.
   fireEvent.change(editor, { target: { value: NEW } });
-  expect(within(dialog).queryByText(/too large for an editorial correction/)).toBeNull();
+  expect(within(dialog).queryByText("No changes to v2. Nothing is saved.")).toBeNull();
   expect(api.editorialCorrection).not.toHaveBeenCalled();
+});
+
+it("keeps the status of a rejected version", async () => {
+  const rejected = version({ document_id: "case-0101-de-v2", version: 2, chain_name: "DeepL", origin: "correction", derived_from: "case-0101-de", translation_status: "reviewed", latest_review_decision: "rejected" });
+  const props = { row, version: rejected, projectKey: "p", onCorrected: vi.fn(), onClose: vi.fn() };
+  render(<EditorialCorrectionDialog {...props} />);
+  const dialog = screen.getByRole("dialog", { name: "Editorial correction, case-0101 de v2" });
+  const editor = await within(dialog).findByRole("textbox", { name: "Corrected text" });
+  expect(within(dialog).getByText(/keeps the status of v2 \(Rejected in review\)/)).toBeTruthy();
+  fireEvent.change(editor, { target: { value: NEW } });
+  fireEvent.change(within(dialog).getByRole("textbox", { name: /^Reason/ }), { target: { value: "Typo" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Check changes" }));
+  expect(await within(dialog).findByText("v3 keeps the status of v2: Rejected in review. No translation review is started.")).toBeTruthy();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Save as v3" }));
+  await waitFor(() => expect(props.onCorrected).toHaveBeenCalledWith("case-0101 de v3 saved as an editorial correction of v2. It stays Rejected in review."));
 });
 
 it("says in words why a version cannot be corrected, without the editor", async () => {
@@ -156,9 +183,8 @@ it("lists what follows: tasks that move, work that stays, findings and proposals
 });
 
 it("has words for every refusal reason", () => {
-  for (const reason of ["review_open", "not_newest", "discarded", "rejected_or_queried", "unchanged", "digits_changed", "too_large", "reason_required"]) {
+  for (const reason of ["review_open", "not_newest", "discarded", "unchanged", "reason_required"]) {
     expect(editorialRefusal(reason, "v2"), reason).toBeTruthy();
   }
-  expect(editorialRefusal("too_large", "v2")).toBe("This change is too large for an editorial correction. Make it in a translation review with Correct the translation… or Request correction….");
   expect(editorialRefusal("something_else", "v2")).toBeNull();
 });

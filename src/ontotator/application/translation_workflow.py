@@ -460,7 +460,7 @@ class TranslationWorkflowService:
         """FD3: the newest version of its chain, last decided rejected or
         query or accepted (issue 341 b), with no open translation review of
         someone else."""
-        decision = conn.execute(
+        own = conn.execute(
             select(TranslationReviewRow.decision)
             .where(
                 TranslationReviewRow.project_id == project_id,
@@ -469,6 +469,11 @@ class TranslationWorkflowService:
             .order_by(TranslationReviewRow.id.desc())
             .limit(1)
         ).scalar_one_or_none()
+        # An editorial correction of a rejected or queried version counts as
+        # that one (issue 453).
+        decision = work_plan_store.inherited_review_decisions(
+            conn, project_id, {variant.document_id: own} if own else {}
+        ).get(variant.document_id)
         reason = None
         if variant.version != max(
             v.version
