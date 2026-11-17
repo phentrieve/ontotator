@@ -8,15 +8,15 @@ many characters the correction inserted and deleted. The version itself is an
 ordinary ``correction`` row of ``documents`` with the translation status of
 the version it corrects.
 
-No existing table, column or row changes. Follows 0042 (uploaded translation
-versions).
+No existing table, column or row changes. Follows 0043 (when an assignment
+was started).
 """
 
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0043"
-down_revision = "0042"
+revision = "0044"
+down_revision = "0043"
 branch_labels = None
 depends_on = None
 SCHEMA = "ontotator"

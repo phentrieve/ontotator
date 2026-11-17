@@ -1,6 +1,6 @@
-"""Migration 0043 (issue 453): ``translation_editorial_corrections``, purely
-additive. It follows 0042 (uploaded translation versions): one head,
-0041 → 0042 → 0043."""
+"""Migration 0044 (issue 453): ``translation_editorial_corrections``, purely
+additive. It follows 0043 (``assignments.started_at``), which follows 0042
+(uploaded translation versions): one head, 0042 → 0043 → 0044, up and down."""
 
 from __future__ import annotations
 
@@ -18,9 +18,9 @@ from ontotator.storage.schema import (
     upgrade,
 )
 
-REVISION = "0043"
-PREVIOUS = "0042"
-BEFORE = "0041"
+REVISION = "0044"
+PREVIOUS = "0043"
+BEFORE = "0042"
 S = "ontotator"
 
 
@@ -36,14 +36,14 @@ def _table(conn: Connection) -> int:
 
 def test_one_head_follows_the_version_uploads():
     scripts = ScriptDirectory.from_config(alembic_config())
-    assert scripts.get_heads() == [head_revision()]
+    assert scripts.get_heads() == [head_revision()] == [REVISION]
     revision = scripts.get_revision(REVISION)
     assert revision is not None and revision.down_revision == PREVIOUS
     previous = scripts.get_revision(PREVIOUS)
     assert previous is not None and previous.down_revision == BEFORE
 
 
-def test_the_table_comes_with_0043_and_goes_with_its_downgrade(tmp_path):
+def test_the_table_comes_with_0044_and_goes_with_its_downgrade(tmp_path):
     url = unmigrated_database_url(tmp_path / "editorial-migration.db")
     upgrade(url, BEFORE)
     engine = create_engine(url)
