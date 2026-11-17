@@ -12,7 +12,6 @@ from ontotator.domain.typography import (
 )
 
 NBSP = "\N{NO-BREAK SPACE}"
-NARROW = "\N{NARROW NO-BREAK SPACE}"
 ZWSP = "\N{ZERO WIDTH SPACE}"
 BOM = "\N{ZERO WIDTH NO-BREAK SPACE}"
 SHY = "\N{SOFT HYPHEN}"
@@ -53,11 +52,12 @@ def test_a_clean_text_has_no_hints() -> None:
         ("Fieber \nHusten", [("TRAILING_WHITESPACE_LINE", " ")]),
         ("Fieber \t\r\nHusten", [("TRAILING_WHITESPACE_LINE", " \t"), ("TAB", "\t")]),
         ("Fieber ", [("TRAILING_WHITESPACE_TEXT", " ")]),
-        ("Fieber\n", [("TRAILING_WHITESPACE_TEXT", "\n")]),
+        ("Fieber\n\n", [("TRAILING_WHITESPACE_TEXT", "\n\n")]),
+        ("Fieber \n", [("TRAILING_WHITESPACE_TEXT", " \n")]),
+        ("Fieber\t\r\n", [("TRAILING_WHITESPACE_TEXT", "\t\r\n"), ("TAB", "\t")]),
+        ("Fieber\r\n\r\n", [("TRAILING_WHITESPACE_TEXT", "\r\n\r\n")]),
         ("Fieber \n\n", [("TRAILING_WHITESPACE_TEXT", " \n\n")]),
         ("a\tb", [("TAB", "\t")]),
-        (f"10{NBSP}mg", [("NON_BREAKING_SPACE", NBSP)]),
-        (f"z.{NARROW}B.", [("NON_BREAKING_SPACE", NARROW)]),
         (f"Fie{ZWSP}ber", [("ZERO_WIDTH_CHARACTER", ZWSP)]),
         (f"{BOM}Fieber", [("ZERO_WIDTH_CHARACTER", BOM)]),
         (f"Fie{SHY}ber", [("SOFT_HYPHEN", SHY)]),
@@ -73,6 +73,21 @@ def test_each_rule_reports_the_characters_it_means(
     text: str, expected: list[tuple[str, str]]
 ) -> None:
     assert found(text) == expected
+
+
+@pytest.mark.parametrize("text", ["Fieber\n", "Fieber\r\n", "Fieber.\nHusten.\n"])
+def test_one_final_line_break_is_no_hint(text: str) -> None:
+    assert typography_hints(text) == []
+
+
+@pytest.mark.parametrize(
+    "space",
+    ["\N{NO-BREAK SPACE}", "\N{NARROW NO-BREAK SPACE}", "\N{FIGURE SPACE}"],
+)
+def test_non_breaking_spaces_are_no_hint(space: str) -> None:
+    # They are often correct ("10 mg", "z. B."); the toggle in the review shows them.
+    assert typography_hints(f"10{space}mg und z.{space}B. Fieber") == []
+    assert "NON_BREAKING_SPACE" not in TYPOGRAPHY_RULES
 
 
 def test_every_rule_code_is_produced() -> None:

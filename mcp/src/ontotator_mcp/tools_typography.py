@@ -104,7 +104,7 @@ def register_typography(
 
             Rules: double space, space before punctuation, missing space
             after punctuation, whitespace at the end of a line or of the
-            text, tab, non-breaking space, zero-width character, soft
+            text (a single final line break is fine), tab, zero-width character, soft
             hyphen, control character. A hint is a rule code with 'start'
             and 'end' (Unicode code points, as annotation passages); it
             blocks nothing and is not stored. Without document_id: one page
@@ -128,7 +128,7 @@ def register_typography(
 
             Rules: double space, space before punctuation, missing space
             after punctuation, whitespace at the end of a line or of the
-            text, tab, non-breaking space, zero-width character, soft
+            text (a single final line break is fine), tab, zero-width character, soft
             hyphen, control character. A hint is a rule code with 'start'
             and 'end' (Unicode code points, as annotation passages); it
             blocks nothing and is not stored. Without document_id: one page

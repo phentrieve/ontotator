@@ -228,12 +228,13 @@ Ontotator computes typography hints for a text when you ask for them. A hint nam
 | `SPACE_BEFORE_PUNCTUATION` | A space before `,` `;` `:` `!` `?` or `.` |
 | `MISSING_SPACE_AFTER_PUNCTUATION` | Punctuation directly between two words, for example *Fieber,Husten*. Numbers, dates, times, abbreviations such as *z.B.* or *e.g.*, web addresses and ellipses are left alone. |
 | `TRAILING_WHITESPACE_LINE` | Spaces or tabs at the end of a line. |
-| `TRAILING_WHITESPACE_TEXT` | Spaces, tabs or line breaks at the end of the text. |
+| `TRAILING_WHITESPACE_TEXT` | Spaces, tabs or more than one line break at the end of the text. A single final line break is no hint. |
 | `TAB` | A tab. |
-| `NON_BREAKING_SPACE` | A non-breaking space. |
 | `ZERO_WIDTH_CHARACTER` | A zero-width space or joiner, or a byte order mark. |
 | `SOFT_HYPHEN` | A soft hyphen. |
 | `CONTROL_CHARACTER` | Another control character. |
+
+A non-breaking space is no hint, because it is often correct, for example between a number and its unit. **Show invisible characters** marks it all the same.
 
 There is no page for the hints yet. Read them through the API or the MCP server (token scope `read`):
 

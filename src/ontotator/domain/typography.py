@@ -24,7 +24,6 @@ TypographyRule = Literal[
     "TRAILING_WHITESPACE_LINE",
     "TRAILING_WHITESPACE_TEXT",
     "TAB",
-    "NON_BREAKING_SPACE",
     "ZERO_WIDTH_CHARACTER",
     "SOFT_HYPHEN",
     "CONTROL_CHARACTER",
@@ -41,10 +40,6 @@ class TypographyHint(NamedTuple):
 # One hint per run of the same kind of character.
 _CHARACTER_RULES: tuple[tuple[TypographyRule, re.Pattern[str]], ...] = (
     ("TAB", re.compile(r"\t+")),
-    (
-        "NON_BREAKING_SPACE",
-        re.compile("[\N{NO-BREAK SPACE}\N{NARROW NO-BREAK SPACE}\N{FIGURE SPACE}]+"),
-    ),
     (
         "ZERO_WIDTH_CHARACTER",
         re.compile(
@@ -227,7 +222,8 @@ def typography_hints(text: str) -> list[TypographyHint]:
     hints.extend(_space_before(text))
     hints.extend(_missing_space(text))
     tail_start = len(text.rstrip(_END_WHITESPACE))
-    if tail_start < len(text):
+    # One line break that ends the text is how files end, not an error.
+    if text[tail_start:] not in ("", "\n", "\r\n"):
         hints.append(TypographyHint("TRAILING_WHITESPACE_TEXT", tail_start, len(text)))
     hints.extend(
         TypographyHint("TRAILING_WHITESPACE_LINE", *match.span())
