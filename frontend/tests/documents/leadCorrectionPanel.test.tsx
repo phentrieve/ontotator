@@ -113,7 +113,7 @@ it("lists the annotation work on an accepted version before the correction start
   vi.mocked(api.startLeadCorrection).mockResolvedValue(assignment(43));
   const props = { row: acceptedRow(), projectKey: "p", onNavigate: vi.fn(), onCancel: vi.fn() };
   render(<LeadCorrectionPanel {...props} documentId="case-0101-de" inDialog />);
-  const group = screen.getByRole("group", { name: "Correct the translation, case-0101 de v1" });
+  const group = screen.getByRole("group", { name: "Correct it myself, case-0101 de v1" });
   expect(within(group).queryByRole("heading")).toBeNull();
   expect(within(group).getByText("You correct the accepted v1 yourself in the translation review and submit it as Accepted with corrections. The corrected text becomes v2.")).toBeTruthy();
   expect(await within(group).findByText("Annotation has work on v1.")).toBeTruthy();

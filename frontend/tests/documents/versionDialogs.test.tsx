@@ -25,7 +25,7 @@ function renderDialog() {
 it("requires a reason and accepts exactly this version", async () => {
   vi.mocked(api.acceptVersion).mockResolvedValue({ document_id: "case-0101-de-v2", translation_status: "accepted" } as AcceptVersionResult);
   const { props, dialog } = renderDialog();
-  expect(within(dialog).getByText("The acceptance is recorded with your name, the reason and the time.")).toBeTruthy();
+  expect(within(dialog).getByText("It is recorded as “Accepted: reviewed outside Ontotator”, with your name, the reason and the time: no translation review in Ontotator stands behind this version. Say in the reason how it was checked.")).toBeTruthy();
   const accept = within(dialog).getByRole("button", { name: "Accept v2" });
   expect(accept.getAttribute("aria-disabled")).toBe("true");
   fireEvent.click(accept);

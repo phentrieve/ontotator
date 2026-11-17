@@ -1,6 +1,6 @@
 /**
  * Lead actions on one version row of the Translation part (issue 341):
- * - `CorrectVersionDialog` (b): "Correct the translation…" of an accepted version; the lead correction panel
+ * - `CorrectVersionDialog` (b): "Correct it myself…" of an accepted version; the lead correction panel
  *   lists the annotation work that stays on the version before anything is saved.
  * - `AcceptVersionDialog` (d): "Accept this version…" with a required reason, recorded like the work plan's
  *   acceptance ("Accepted: reviewed outside Ontotator, {lead}, {time}, {reason}"); other chains stay as they are.
@@ -12,7 +12,6 @@ import type { Route } from "../app/router";
 import { ErrorNotice } from "../admin/ErrorNotice";
 import { Button, Dialog, InlineMessage, Textarea } from "../ui";
 import { LeadCorrectionPanel } from "./LeadCorrectionPanel";
-import { ACCEPTANCE_RECORDED } from "./PlanChips";
 import { versionName } from "./labels";
 
 /** "de v2", or "{chain name} v2" with parallel roots. */
@@ -30,7 +29,7 @@ export interface CorrectVersionDialogProps {
 }
 
 export function CorrectVersionDialog({ row, version, projectKey, onNavigate, onClose, returnFocus }: CorrectVersionDialogProps): JSX.Element {
-  return <Dialog open size="md" title={`Correct the translation, ${row.case_id} ${versionLabel(row, version)}, accepted`} onClose={onClose} returnFocus={returnFocus}>
+  return <Dialog open size="md" title={`Correct it myself, ${row.case_id} ${versionLabel(row, version)}, accepted`} onClose={onClose} returnFocus={returnFocus}>
     <LeadCorrectionPanel row={row} projectKey={projectKey} documentId={version.document_id} inDialog
       onNavigate={route => { onClose(); onNavigate(route); }} onCancel={onClose} />
   </Dialog>;
@@ -65,6 +64,9 @@ export interface AcceptVersionDialogProps {
   returnFocus?: () => HTMLElement | null | undefined;
 }
 
+/** How "Accept this version…" is recorded: no translation review in Ontotator stands behind it. */
+export const ACCEPT_VERSION_RECORDED = "It is recorded as “Accepted: reviewed outside Ontotator”, with your name, the reason and the time: no translation review in Ontotator stands behind this version. Say in the reason how it was checked.";
+
 export function AcceptVersionDialog({ row, version, projectKey, onAccepted, onClose, returnFocus }: AcceptVersionDialogProps): JSX.Element {
   const id = useId();
   const writing = useRef(false);
@@ -98,7 +100,8 @@ export function AcceptVersionDialog({ row, version, projectKey, onAccepted, onCl
     </>}>
     <Textarea id={`${id}-reason`} label="Reason" required maxLength={2000} value={reason} disabled={busy}
       onChange={event => setReason(event.target.value)} />
-    <p className="field-hint">{ACCEPTANCE_RECORDED}</p>
+    {/* The wording the acceptance gets in the version list and in History, said before it is saved. */}
+    <p className="field-hint">{ACCEPT_VERSION_RECORDED}</p>
     {missing && tried && <p id={`${id}-missing`} className="action-reason">Enter a reason.</p>}
     {refused ? <InlineMessage tone="warning">{refused}</InlineMessage> : error !== undefined && <ErrorNotice error={error} />}
   </Dialog>;

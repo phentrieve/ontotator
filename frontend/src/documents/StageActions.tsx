@@ -36,8 +36,7 @@ export interface StageActionsProps {
 
 /**
  * Admin actions of the given stage, or of every stage: Annotation "Reassign…" (one direct button per open
- * task, S3) and "Reopen…" of a submitted annotation; Translation "Reopen…" of a submitted review, "Request
- * correction…", "Assign a new review…"; Finalization "Change final…" and "Withdraw final…" of a decided row.
+ * task, S3) and "Reopen…" of a submitted annotation; Translation "Reopen…" of a submitted review, "Ask a reviewer to correct…", "Assign a new review…"; Finalization "Change final…" and "Withdraw final…" of a decided row.
  */
 export function StageActions({ row, stage, onAssign, onRequestCorrection, canRequestCorrection, onChangeFinal, canChangeFinal, onWithdrawFinal, textVersionTools, inCard = false }: StageActionsProps): JSX.Element | null {
   const show = (name: PanelStage) => !stage || stage === name;
@@ -75,7 +74,7 @@ export function StageActions({ row, stage, onAssign, onRequestCorrection, canReq
       {reopening === assignment.id && textVersionTools && <AssignmentActions assignment={assignment} textName={textLabel(row)} members={textVersionTools.members} open="reopen"
         onChanged={textVersionTools.onAssignmentsChanged} onClose={() => setReopening(null)} />}
     </div>)}
-    {correction && <Button size="sm" onClick={() => onRequestCorrection(row)}>Request correction…</Button>}
+    {correction && <Button size="sm" onClick={() => onRequestCorrection(row)}>Ask a reviewer to correct…</Button>}
     {newReview && <Button size="sm" onClick={() => onAssign(row, "translation_review", { newReviewOfAccepted: true })}>Assign a new review…</Button>}
     {changeFinal && <Button size="sm" onClick={() => onChangeFinal(row)}>Change final…</Button>}
     {withdrawFinal && <Button size="sm" onClick={() => onWithdrawFinal(row)}>Withdraw final…</Button>}

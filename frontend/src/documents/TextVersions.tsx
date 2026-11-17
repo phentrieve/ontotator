@@ -27,11 +27,11 @@ export interface TextVersionsTools {
   onShowTranslationReviews?: (documentId: string) => void;
   /** Opens the page's "Request translation correction" dialog for an accepted version (else the inline form). */
   onRequestCorrection?: (row: DocumentRowView, variant: VariantSummary) => void;
-  /** The lead: "Correct the translation…" on the newest accepted version (issue 341 b). */
+  /** The lead: "Correct it myself…" on the newest accepted version (issue 341 b). */
   onCorrectTranslation?: (row: DocumentRowView, version: DocumentVersionView) => void;
   /** The lead: "Accept this version…" on the newest version that is not reviewed or accepted (issue 341 d). */
   onAcceptVersion?: (row: DocumentRowView, version: DocumentVersionView) => void;
-  /** The lead: "Upload new version…" on the newest version of a translation (issue 341 a). */
+  /** The lead: "Upload a corrected text…" on the newest version of a translation (issue 341 a). */
   onUploadVersion?: (row: DocumentRowView, version: DocumentVersionView) => void;
   /** The lead: "Fix typos…" (an editorial correction) on the newest version of a translation (issue 453). */
   onEditorialCorrection?: (row: DocumentRowView, version: DocumentVersionView) => void;
@@ -53,8 +53,28 @@ export function uploadableVersion(row: Pick<DocumentRowView, "plan_row">, versio
   return version.is_newest_in_chain && version.translation_status != null && !isDiscarded(row, version);
 }
 
-/** What tells "Fix typos…" apart from "Correct the translation…" and "Upload new version…" (the button's tooltip). */
+/** What tells "Fix typos…" apart from "Correct it myself…" and "Upload a corrected text…" (the button's tooltip). */
 export const FIX_TYPOS_HINT = "Spacing, typos, grammar. Keeps the status; no review.";
+
+/**
+ * The lead's actions that change the text of a version, named by who does the work, and what tells them apart in a
+ * few words: the hint line under the buttons of a version row (visible, not a tooltip: it must work on a phone).
+ */
+export const VERSION_ACTIONS = {
+  ask: { label: "Ask a reviewer to correct…", hint: ["Ask a reviewer", "a reviewer corrects it in a new review."] },
+  correct: { label: "Correct it myself…", hint: ["Correct it myself", "you edit it here; it is reviewed again."] },
+  typos: { label: "Fix typos…", hint: ["Fix typos", "spacing, typos, grammar; the status stays, no review."] },
+  upload: { label: "Upload a corrected text…", hint: ["Upload", "a text made elsewhere becomes the next version."] },
+} as const;
+export type VersionAction = keyof typeof VERSION_ACTIONS;
+
+/** "Ask a reviewer: … Correct it myself: …" for the actions a version offers; nothing for fewer than two. */
+export function VersionActionsHint({ actions }: { actions: readonly VersionAction[] }): JSX.Element | null {
+  if (actions.length < 2) return null;
+  return <p className="text-version-hint">
+    {actions.map((action, index) => <span key={action}>{index > 0 && " "}<span className="text-version-hint-name">{VERSION_ACTIONS[action].hint[0]}:</span> {VERSION_ACTIONS[action].hint[1]}</span>)}
+  </p>;
+}
 
 const uploadMethodLabels: Readonly<Record<NonNullable<DocumentVersionView["upload"]>["method"], string>> = {
   machine_translation: "Machine translation", human_translation: "Human translation", manual_correction: "Corrected by hand",
@@ -213,19 +233,29 @@ export const TextVersions = forwardRef<HTMLUListElement, TextVersionsProps>(func
       const discarded = isDiscarded(row, version);
       const acceptance = acceptanceOf(version);
       let actions: ReactNode = null;
+      // The actions that change this version's text, in button order (the hint line under the buttons names them).
+      const offered: VersionAction[] = [];
       if (tools) {
+        const ask = !!variant && variant.translation_status === "accepted";
+        const correct = !!tools.onCorrectTranslation && correctableVersion(row, version);
+        const typos = !!tools.onEditorialCorrection && uploadableVersion(row, version);
+        const upload = !!tools.onUploadVersion && uploadableVersion(row, version);
+        if (ask) offered.push("ask");
+        if (correct) offered.push("correct");
+        if (typos) offered.push("typos");
+        if (upload) offered.push("upload");
         actions = <>
           {variant && (tools.onRequestCorrection
-            ? variant.translation_status === "accepted" && <Button size="sm" onClick={() => tools.onRequestCorrection?.(row, variant)}>Request correction…</Button>
+            ? ask && <Button size="sm" aria-label={`Ask a reviewer to correct ${fullName}…`} onClick={() => tools.onRequestCorrection?.(row, variant)}>{VERSION_ACTIONS.ask.label}</Button>
             : <TranslationCorrectionAction projectKey={projectKey} variant={variant} username={tools.username} requiredLanguages={tools.requiredLanguages(version.document_id)} />)}
-          {tools.onCorrectTranslation && correctableVersion(row, version) && <Button size="sm" aria-label={`Correct the translation ${fullName}…`}
-            onClick={() => tools.onCorrectTranslation?.(row, version)}>Correct the translation…</Button>}
+          {correct && <Button size="sm" aria-label={`Correct ${fullName} myself…`}
+            onClick={() => tools.onCorrectTranslation?.(row, version)}>{VERSION_ACTIONS.correct.label}</Button>}
           {tools.onAcceptVersion && acceptableVersion(row, version) && <Button size="sm" aria-label={`Accept ${fullName}…`}
             onClick={() => tools.onAcceptVersion?.(row, version)}>Accept this version…</Button>}
-          {tools.onEditorialCorrection && uploadableVersion(row, version) && <Button size="sm" aria-label={`Fix typos in ${fullName}…`} title={FIX_TYPOS_HINT}
-            onClick={() => tools.onEditorialCorrection?.(row, version)}>Fix typos…</Button>}
-          {tools.onUploadVersion && uploadableVersion(row, version) && <Button size="sm" aria-label={`Upload new version of ${fullName}…`}
-            onClick={() => tools.onUploadVersion?.(row, version)}>Upload new version…</Button>}
+          {typos && <Button size="sm" aria-label={`Fix typos in ${fullName}…`} title={FIX_TYPOS_HINT}
+            onClick={() => tools.onEditorialCorrection?.(row, version)}>{VERSION_ACTIONS.typos.label}</Button>}
+          {upload && <Button size="sm" aria-label={`Upload a corrected text for ${fullName}…`}
+            onClick={() => tools.onUploadVersion?.(row, version)}>{VERSION_ACTIONS.upload.label}</Button>}
           {version.translation_status != null && tools.onShowTranslationReviews && <Button size="sm" aria-label={`Translation reviews for ${name}`} onClick={() => tools.onShowTranslationReviews?.(version.document_id)}>Translation reviews</Button>}
         </>;
       }
@@ -258,6 +288,7 @@ export const TextVersions = forwardRef<HTMLUListElement, TextVersionsProps>(func
           <RouteLink route={view} onNavigate={onNavigate} className="btn btn-secondary btn-sm" aria-label={`View text ${fullName}`}>View text</RouteLink>
           {actions}
         </div>
+        <VersionActionsHint actions={offered} />
       </li>;
   };
   const groups = row.parallel_roots ? chainGroups(older) : [{ chain: "", versions: older }];

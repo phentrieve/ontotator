@@ -1,6 +1,6 @@
 /**
  * Issue 341 b and d: the lead's actions on one version of the Translation part.
- * - b: "Correct the translation…" of an accepted version lists the annotation work that stays on it before the
+ * - b: "Correct it myself…" of an accepted version lists the annotation work that stays on it before the
  *   correction starts; the corrected text becomes v2, a correction that is reviewed again (v1 stays accepted).
  * - d: "Accept this version…" accepts exactly that version with a required reason, recorded like other acceptances.
  */
@@ -51,9 +51,9 @@ test("b: the correction of an accepted version names the annotation work that st
   const card = await openTextCard(page, caseId, "de");
   const [v1] = await (await textVersionItems(card, 1)).all();
   await expect(v1.getByRole("button", { name: "Accept this version…" })).toHaveCount(0);
-  await v1.getByRole("button", { name: `Correct the translation v1 of ${caseId} de…`, exact: true }).click();
+  await v1.getByRole("button", { name: `Correct v1 of ${caseId} de myself…`, exact: true }).click();
 
-  const dialog = page.getByRole("dialog", { name: `Correct the translation, ${caseId} de v1, accepted`, exact: true });
+  const dialog = page.getByRole("dialog", { name: `Correct it myself, ${caseId} de v1, accepted`, exact: true });
   await expect(dialog).toContainText("You correct the accepted v1 yourself in the translation review and submit it as Accepted with corrections. The corrected text becomes v2.");
   await expect(dialog.getByText("Annotation has work on v1.", { exact: true })).toBeVisible();
   await expect(dialog).toContainText("2 annotations (1 submitted, 1 open) stay on v1. After saving, the row offers Handle text change… once v2 is accepted.");
@@ -89,15 +89,15 @@ test("b: the correction of an accepted version names the annotation work that st
   expect(errors).toEqual([]);
 });
 
-test("b: Request correction… is refused while the lead's own correction of the version is open", async ({ page }) => {
+test("b: Ask a reviewer to correct… is refused while the lead's own correction of the version is open", async ({ page }) => {
   const errors = consoleErrors(page);
   const s = await leadScenario(page, "ACCEPTED_TRANSLATION_FOR_LEAD");
   const caseId = s.cases!.accepted;
   await loginLead(page, s);
   const card = await openTextCard(page, caseId, "de");
   const [v1] = await (await textVersionItems(card, 1)).all();
-  await v1.getByRole("button", { name: `Correct the translation v1 of ${caseId} de…`, exact: true }).click();
-  await page.getByRole("dialog", { name: `Correct the translation, ${caseId} de v1, accepted`, exact: true })
+  await v1.getByRole("button", { name: `Correct v1 of ${caseId} de myself…`, exact: true }).click();
+  await page.getByRole("dialog", { name: `Correct it myself, ${caseId} de v1, accepted`, exact: true })
     .getByRole("button", { name: "Open translation review", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Translation (de)", exact: true })).toBeVisible({ timeout: 30_000 });
 
@@ -106,12 +106,12 @@ test("b: Request correction… is refused while the lead's own correction of the
   await documentsReady(page);
   const again = await openTextCard(page, caseId, "de");
   const [version] = await (await textVersionItems(again, 1)).all();
-  await version.getByRole("button", { name: "Request correction…", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: /^Request translation correction/ });
+  await version.getByRole("button", { name: /^Ask a reviewer to correct / }).click();
+  const dialog = page.getByRole("dialog", { name: /^Ask a reviewer to correct, / });
   await dialog.getByLabel("Translation reviewer").selectOption({ index: 1 });
   await dialog.getByLabel("Reason for another review").fill("Dose missing");
-  await dialog.getByRole("button", { name: "Assign correction review", exact: true }).click();
-  await expect(dialog).toContainText("A lead is correcting this version. Request the correction after that correction is submitted");
+  await dialog.getByRole("button", { name: "Ask the reviewer", exact: true }).click();
+  await expect(dialog).toContainText("A lead is correcting this version. Ask a reviewer after that correction is submitted");
   await evidence(page, "341-request-refused");
   // The refusal is an expected 409: the browser logs the failed request, nothing else.
   expect(errors.filter(text => !/409/.test(text))).toEqual([]);
@@ -124,13 +124,13 @@ test("d: Accept this version… accepts exactly that version with a reason", asy
   await loginLead(page, s);
   const card = await openTextCard(page, caseId, "de");
   const [v1] = await (await textVersionItems(card, 1)).all();
-  await expect(v1.getByRole("button", { name: /^Correct the translation/ })).toHaveCount(0);
+  await expect(v1.getByRole("button", { name: /^Correct .* myself/ })).toHaveCount(0);
   await expect(v1.getByRole("link", { name: `View text v1 of ${caseId} de`, exact: true })).toBeVisible();
   await evidence(page, "341-accept-button");
   await v1.getByRole("button", { name: `Accept v1 of ${caseId} de…`, exact: true }).click();
 
   const dialog = page.getByRole("dialog", { name: "Accept de v1", exact: true });
-  await expect(dialog.getByText("The acceptance is recorded with your name, the reason and the time.", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("It is recorded as “Accepted: reviewed outside Ontotator”, with your name, the reason and the time: no translation review in Ontotator stands behind this version. Say in the reason how it was checked.", { exact: true })).toBeVisible();
   const accept = dialog.getByRole("button", { name: "Accept v1", exact: true });
   await expect(accept).toHaveAttribute("aria-disabled", "true");
   const reason = "Checked against the DeepL output";

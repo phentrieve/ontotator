@@ -391,7 +391,7 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
   const [withdrawFor, setWithdrawFor] = useState<DocumentRowView | null>(null);
   /** The row as the page shows it now (after a refused withdrawal the reload brings the new revision). */
   const withdrawRow = withdrawFor ? pageRows.find(entry => rowKeyOf(entry) === rowKeyOf(withdrawFor)) ?? withdrawFor : null;
-  // Issues 341 and 453: the lead's actions on one version row (Correct the translation…, Accept this version…, Fix typos…, Upload new version…).
+  // Issues 341 and 453: the lead's actions on one version row (Correct it myself…, Accept this version…, Fix typos…, Upload a corrected text…).
   const [versionAction, setVersionAction] = useState<{ kind: "correct" | "accept" | "upload" | "editorial"; row: DocumentRowView; version: DocumentVersionView } | null>(null);
   const textVersionTools = useMemo<TextVersionsTools | undefined>(() => {
     if (!inventory) return undefined;
@@ -773,14 +773,16 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
     closePanel(resolveOptions.rowKey);
   }, { allowInInputs: true, enabled: resolveOptions != null });
 
-  // "Request correction…" of an accepted version (the card's versions, the cards' stage popover).
+  // "Ask a reviewer to correct…" of an accepted version (the card's versions, the cards' stage popover).
   /** The accepted newest translation a correction can be requested for (Text versions offers the same). */
   const correctionVariant = (row: DocumentRowView): VariantSummary | null => {
     if (row.is_source || !textVersionTools) return null;
     const newest = row.versions.find(version => version.is_newest_in_chain && version.translation_status === "accepted" && !version.discarded);
     return newest ? textVersionTools.variants.get(newest.document_id) ?? null : null;
   };
-  const closeCorrection = () => { setCorrectionFor(null); reloadAfterAction(); };
+  /** The reviewer was asked: the dialog's one button then reads "Close" ("Cancel" before, as in the neighbour dialogs). */
+  const [correctionDone, setCorrectionDone] = useState(false);
+  const closeCorrection = () => { setCorrectionFor(null); setCorrectionDone(false); reloadAfterAction(); };
 
   const [planFor, setPlanFor] = useState<DocumentRowView | null>(null);
   // A status-column sort of the loaded page (the server sorts by Text and Last activity only).
@@ -975,11 +977,11 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
     {assignDialog && <AssignWorkDialog {...assignDialog} />}
     {textChangeDialog}
     {planDialog}
-    {correctionFor && textVersionTools && <Dialog open title={`Request translation correction: ${rowName(correctionFor.row)}`} size="md"
-      onClose={closeCorrection} footer={<Button onClick={closeCorrection}>Close</Button>}
+    {correctionFor && textVersionTools && <Dialog open title={`Ask a reviewer to correct, ${rowName(correctionFor.row)}`} size="md"
+      onClose={closeCorrection} footer={<Button onClick={closeCorrection}>{correctionDone ? "Close" : "Cancel"}</Button>}
       returnFocus={() => rowElement(rowKeyOf(correctionFor.row), "action") ?? rowElement(rowKeyOf(correctionFor.row), "header")}>
       <TranslationCorrectionAction projectKey={projectKey} variant={correctionFor.variant} username={textVersionTools.username}
-        requiredLanguages={textVersionTools.requiredLanguages(correctionFor.variant.document_id)} defaultOpen inDialog />
+        requiredLanguages={textVersionTools.requiredLanguages(correctionFor.variant.document_id)} defaultOpen inDialog onAssigned={() => setCorrectionDone(true)} />
     </Dialog>}
     {withdrawFor && withdrawRow && <WithdrawFinalDialog projectKey={projectKey} row={withdrawRow} onCancel={() => setWithdrawFor(null)}
       onStale={reloadAfterAction}

@@ -457,7 +457,7 @@ describe("translation part", () => {
     expect(onNavigate).toHaveBeenCalledWith({ name: "projectCase", key: "p", caseId: "case-200", variant: "case-200-de", compare: "case-200-en", documents: query });
   });
 
-  it("after a review: the newest version per chain, older ones collapsed, one Request correction…, submitted reviews under their version", () => {
+  it("after a review: the newest version per chain, older ones collapsed, one Ask a reviewer to correct…, submitted reviews under their version", () => {
     const versions = [
       version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "reviewed", chain_name: "m1", is_newest_in_chain: false }),
       version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "m1", translation_status: "accepted" }),
@@ -485,13 +485,13 @@ describe("translation part", () => {
     const older = within(part).getByText("Older versions (1)").closest("details")!;
     expect(older.open).toBe(false);
     expect(within(older).getByText("m1 v1")).toBeTruthy();
-    expect(within(part).getAllByRole("button", { name: "Request correction…" })).toHaveLength(1);
-    fireEvent.click(within(part).getByRole("button", { name: "Request correction…" }));
+    expect(within(part).getAllByRole("button", { name: "Ask a reviewer to correct m1 v2 of case-200 de…" })).toHaveLength(1);
+    fireEvent.click(within(part).getByRole("button", { name: "Ask a reviewer to correct m1 v2 of case-200 de…" }));
     expect(onRequestCorrection).toHaveBeenCalledWith(row, variant);
-    expect(within(part).queryByRole("button", { name: "Request translation correction" })).toBeNull();
+    expect(within(part).queryByRole("button", { name: "Ask a reviewer to correct…" })).toBeNull();
   });
 
-  it("issue 341: Correct the translation… on the accepted newest version, Accept this version… on the one not reviewed", () => {
+  it("issue 341: Correct it myself… on the accepted newest version, Accept this version… on the one not reviewed", () => {
     const versions = [
       version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "reviewed", chain_name: "m1", is_newest_in_chain: false }),
       version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "m1", translation_status: "accepted" }),
@@ -503,9 +503,11 @@ describe("translation part", () => {
     const row = assignRow({ versions, parallel_roots: true, work: [] });
     renderCard({ row, initialSegment: "translation", textVersionTools });
     const part = within(card()).getByRole("heading", { name: "Translation" }).closest("section")!;
-    const correct = within(part).getAllByText("Correct the translation…");
+    const correct = within(part).getAllByText("Correct it myself…");
     expect(correct).toHaveLength(1);
-    expect(correct[0].getAttribute("aria-label")).toBe("Correct the translation m1 v2 of case-200 de…");
+    expect(correct[0].getAttribute("aria-label")).toBe("Correct m1 v2 of case-200 de myself…");
+    // One action that changes the text: nothing to tell apart, no hint line.
+    expect(part.querySelector(".text-version-hint")).toBeNull();
     fireEvent.click(correct[0]);
     expect(onCorrectTranslation).toHaveBeenCalledWith(row, versions[1]);
     const accept = within(part).getAllByText("Accept this version…");
@@ -543,15 +545,21 @@ describe("translation part", () => {
     // Not on the older version; a rejected newest version can be corrected too.
     const buttons = within(part).getAllByText("Fix typos…");
     expect(buttons.map(button => button.getAttribute("aria-label"))).toEqual(["Fix typos in m1 v2 of case-200 de…", "Fix typos in mt v1 of case-200 de…"]);
-    // The hint tells it apart from "Correct the translation…" and "Upload new version…".
+    // The tooltip tells it apart from "Correct it myself…" and "Upload a corrected text…".
     expect(buttons[0].getAttribute("title")).toBe("Spacing, typos, grammar. Keeps the status; no review.");
     // Next to the other version actions, before the upload.
-    expect(buttons[0].nextElementSibling?.textContent).toBe("Upload new version…");
+    expect(buttons[0].nextElementSibling?.textContent).toBe("Upload a corrected text…");
+    // Lead review F8: one visible hint line under the buttons says what tells the offered actions apart.
+    const hints = [...part.querySelectorAll(".text-version-hint")].map(hint => hint.textContent);
+    expect(hints).toEqual([
+      "Fix typos: spacing, typos, grammar; the status stays, no review. Upload: a text made elsewhere becomes the next version.",
+      "Fix typos: spacing, typos, grammar; the status stays, no review. Upload: a text made elsewhere becomes the next version.",
+    ]);
     fireEvent.click(buttons[0]);
     expect(onEditorialCorrection).toHaveBeenCalledWith(row, versions[1]);
   });
 
-  it("issue 341: Upload new version… on the newest version of each translation, with how an uploaded version was made", () => {
+  it("issue 341: Upload a corrected text… on the newest version of each translation, with how an uploaded version was made", () => {
     const versions = [
       version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "accepted", chain_name: "m1", is_newest_in_chain: false }),
       version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "m1", translation_status: "ready_for_review",
@@ -566,22 +574,22 @@ describe("translation part", () => {
     renderCard({ row, initialSegment: "translation", textVersionTools, now: new Date("2026-11-20T12:00:00") });
     const part = within(card()).getByRole("heading", { name: "Translation" }).closest("section")!;
     // The older version sits under "Older versions" and offers no upload.
-    const upload = within(part).getAllByText("Upload new version…");
-    expect(upload.map(button => button.getAttribute("aria-label"))).toEqual(["Upload new version of m1 v2 of case-200 de…", "Upload new version of mt v1 of case-200 de…"]);
+    const upload = within(part).getAllByText("Upload a corrected text…");
+    expect(upload.map(button => button.getAttribute("aria-label"))).toEqual(["Upload a corrected text for m1 v2 of case-200 de…", "Upload a corrected text for mt v1 of case-200 de…"]);
     fireEvent.click(upload[0]);
     expect(onUploadVersion).toHaveBeenCalledWith(row, versions[1]);
     expect(within(part).getByText("Correction of m1 v1 · Machine translation, DeepL, deepl-2026-10")).toBeTruthy();
     expect(within(part).getByText("Uploaded by Project lead (ann-0002), 16 Nov, 10:12 · Made on 12 Nov 2026 by Dr. Roe · Checked against the source")).toBeTruthy();
   });
 
-  it("issue 341: no Upload new version… on a source text or a discarded translation", () => {
+  it("issue 341: no Upload a corrected text… on a source text or a discarded translation", () => {
     const tools = { username: "lead", members: [], assignments: [], variants: new Map(), requiredLanguages: () => ["de"], onAssignmentsChanged: vi.fn(), onUploadVersion: vi.fn() };
     renderCard({ row: assignRow({ is_source: true, versions: [version({ document_id: "case-200-de" })] }), initialSegment: "translation", textVersionTools: tools });
-    expect(within(card()).queryByText("Upload new version…")).toBeNull();
+    expect(within(card()).queryByText("Upload a corrected text…")).toBeNull();
     cleanup();
     const discarded = { ...version({ document_id: "case-200-de", origin: "machine_translation", translation_status: "ready_for_review" }), discarded: { reason: "Wrong text" } };
     renderCard({ row: assignRow({ versions: [discarded] }), initialSegment: "translation", textVersionTools: tools });
-    expect(within(card()).queryByText("Upload new version…")).toBeNull();
+    expect(within(card()).queryByText("Upload a corrected text…")).toBeNull();
   });
 
   it("calls a native text the source text and a failed check failed", () => {

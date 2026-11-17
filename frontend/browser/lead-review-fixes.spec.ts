@@ -5,6 +5,8 @@
  *   stays on its text, and the toast raised while the card is open is visible and its Undo works.
  * - F3: a text below "Annotators per text" with an open task shows that task and waits on its person, also after
  *   "Start a round…"; "Assign annotation…" stays the row's step, and the person's row in the card names the round.
+ * - F8: the version row's actions say who does the work, with a visible hint line; the request dialog reads
+ *   "Cancel" until the reviewer is asked; "Accept this version…" says how the acceptance will be recorded.
  * With SHOTS_DIR set, the states are also saved as screenshots (desktop and phone).
  *
  * Each test builds a fresh project through a scenario route.
@@ -202,6 +204,71 @@ for (const [width, height, suffix] of SIZES) {
     const lines = await showHistory(card);
     await expect(lines.first()).toHaveText(new RegExp(`^Annotation: ?Round 2 for Tom Reis \\(ann-\\d+\\) started by you, ${WHEN}: Second pass after the guideline update$`));
     await shot(page, `f1-round-history-after${suffix}`);
+    expect(errors).toEqual([]);
+  });
+
+  test(`F8: the translation actions say who does the work, with a hint line; the dialogs follow (${width} px)`, async ({ page }) => {
+    const errors = watchErrors(page);
+    await page.setViewportSize({ width, height });
+    const built = await page.request.post("/__test_lead_workflow__?scenario=ACCEPTED_TRANSLATION_FOR_LEAD");
+    expect(built.ok(), await built.text()).toBeTruthy();
+    const s = (await built.json()) as { project: string; users: Record<string, string> };
+    await loginExisting(page, s.users.lead);
+    const open = async (caseId: string): Promise<Locator> => {
+      await page.goto(`/#/projects/${encodeURIComponent(s.project)}/documents?panel=${encodeURIComponent(`${caseId}:de`)}`);
+      const card = page.getByRole("dialog", { name: `${caseId} de` });
+      await expect(cardPath(card)).toBeVisible();
+      await showSegment(card, "Translation");
+      return card;
+    };
+
+    // case-0101 de v1 is accepted: all four actions, each named by who does the work, and one hint line under them.
+    const card = await open("case-0101");
+    const v1 = card.locator("li.text-version").first();
+    await expect(v1.locator(".text-version-actions").getByRole("button")).toHaveText(["Ask a reviewer to correct…", "Correct it myself…", "Fix typos…", "Upload a corrected text…", "Translation reviews"]);
+    const hint = v1.locator(".text-version-hint");
+    await expect(hint).toHaveText("Ask a reviewer: a reviewer corrects it in a new review. Correct it myself: you edit it here; it is reviewed again. Fix typos: spacing, typos, grammar; the status stays, no review. Upload: a text made elsewhere becomes the next version.");
+    await expect(hint).toBeVisible();
+    // Under the buttons, inside the card.
+    const [actionsBox, hintBox] = [(await v1.locator(".text-version-actions").boundingBox())!, (await hint.boundingBox())!];
+    expect(hintBox.y).toBeGreaterThanOrEqual(actionsBox.y + actionsBox.height - 1);
+    expect(hintBox.x + hintBox.width).toBeLessThanOrEqual(width);
+    expect(await noHorizontalScroll(page)).toBe(true);
+    await hint.scrollIntoViewIfNeeded();
+    await shot(page, `f8-version-actions-after${suffix}`);
+
+    // "Ask a reviewer to correct…": the title names the action; "Cancel" until the reviewer is asked, then "Close".
+    await v1.getByRole("button", { name: "Ask a reviewer to correct v1 of case-0101 de…", exact: true }).click();
+    const ask = page.getByRole("dialog", { name: "Ask a reviewer to correct, case-0101 de", exact: true });
+    await expect(ask.getByRole("button", { name: "Cancel", exact: true })).toBeVisible();
+    await expect(ask.getByRole("button", { name: "Close", exact: true }).and(ask.locator(".modal-actions button"))).toHaveCount(0);
+    await ask.getByLabel("Translation reviewer").selectOption({ index: 1 });
+    await ask.getByLabel("Reason for another review").fill("Dose missing in the second sentence");
+    await shot(page, `f8-ask-reviewer-after${suffix}`);
+    await ask.getByRole("button", { name: "Ask the reviewer", exact: true }).click();
+    await expect(ask.getByText(/was asked to correct the translation\.$/)).toBeVisible();
+    await ask.locator(".modal-actions").getByRole("button", { name: "Close", exact: true }).click();
+    await expect(ask).toBeHidden();
+
+    // "Correct it myself…" and "Upload a corrected text…" open dialogs with the same names (case-0102: no open review).
+    const other = await open("case-0102");
+    const version = other.locator("li.text-version").first();
+    await version.getByRole("button", { name: "Upload a corrected text for v1 of case-0102 de…", exact: true }).click();
+    const upload = page.getByRole("dialog", { name: "Upload a corrected text, case-0102 de v1", exact: true });
+    await expect(upload).toBeVisible();
+    await upload.getByRole("button", { name: "Cancel", exact: true }).click();
+
+    // "Accept this version…" says how the acceptance will be recorded, before it is saved.
+    await version.getByRole("button", { name: "Accept v1 of case-0102 de…", exact: true }).click();
+    const accept = page.getByRole("dialog", { name: "Accept de v1", exact: true });
+    await expect(accept.getByText("It is recorded as “Accepted: reviewed outside Ontotator”, with your name, the reason and the time: no translation review in Ontotator stands behind this version. Say in the reason how it was checked.", { exact: true })).toBeVisible();
+    expect(await noHorizontalScroll(page)).toBe(true);
+    await shot(page, `f8-accept-version-after${suffix}`);
+    await accept.getByLabel(/^Reason/).fill("Read against the source by the lead");
+    await accept.getByRole("button", { name: "Accept v1", exact: true }).click();
+    await expect(page.locator(".ui-toast .ui-toast-message")).toHaveText("case-0102 de v1 accepted as reviewed outside Ontotator.");
+    await showSegment(other, "Translation");
+    await expect(other.locator("li.text-version").first()).toContainText("Accepted: reviewed outside Ontotator");
     expect(errors).toEqual([]);
   });
 }
