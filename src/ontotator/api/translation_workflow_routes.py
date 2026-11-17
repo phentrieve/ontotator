@@ -186,6 +186,13 @@ class EditorialChange(BaseModel):
     new_text: str
 
 
+class EditorialNumberChange(BaseModel):
+    """A number the correction changes, adds (no ``old``) or removes (no ``new``)."""
+
+    old: str | None
+    new: str | None
+
+
 class EditorialFindings(BaseModel):
     # Findings of the submitted annotations on the corrected version, and
     # how many of them the text-change steps cannot place on the new text.
@@ -214,8 +221,8 @@ class EditorialCorrectionPreview(BaseModel):
     # The hash of this version's text, which the correction names.
     text_sha256: str
     available: bool
-    # not_newest, discarded, review_open, rejected_or_queried, and with a
-    # text or replacements: unchanged, digits_changed, too_large.
+    # not_newest, discarded, review_open, and with a text or replacements
+    # that change nothing: unchanged.
     reason: str | None
     review_on: bool
     annotate_accepted_only: bool
@@ -224,8 +231,6 @@ class EditorialCorrectionPreview(BaseModel):
     final_result: bool
     # Annotation tasks nobody opened: they move to the new version.
     tasks_following: int
-    # Inserted plus deleted characters may not exceed this.
-    changed_characters_limit: int
     # With a text or replacements only.
     text: str | None
     previous_text: str | None
@@ -233,7 +238,8 @@ class EditorialCorrectionPreview(BaseModel):
     inserted_characters: int | None
     deleted_characters: int | None
     changed_characters: int | None
-    digits_changed: bool | None
+    # The numbers the correction changes (a notice; nothing is refused).
+    number_changes: list[EditorialNumberChange] | None
     diff: list[EditorialChange] | None
     findings: EditorialFindings | None
     proposals: EditorialProposals | None
@@ -387,8 +393,8 @@ def editorial_correction(
     request: Request,
     principal: PrincipalDep,
 ) -> EditorialCorrectionResult:
-    """Issue 453: save a small editorial fix (spacing, typos, grammar) as the
-    next version of this translation, with this version's status."""
+    """Issue 453: save an editorial fix (spacing, typos, grammar) as the next
+    version of this translation, with this version's status."""
     return EditorialCorrectionResult.model_validate(
         _editorial(request).correct(
             Actor.user(principal.user_id, principal.username),

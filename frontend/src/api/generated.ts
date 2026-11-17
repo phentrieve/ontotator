@@ -2195,8 +2195,8 @@ export interface paths {
         put?: never;
         /**
          * Editorial Correction
-         * @description Issue 453: save a small editorial fix (spacing, typos, grammar) as the
-         *     next version of this translation, with this version's status.
+         * @description Issue 453: save an editorial fix (spacing, typos, grammar) as the next
+         *     version of this translation, with this version's status.
          */
         post: operations["editorial_correction_api_v1_projects__key__documents__doc__editorial_correction_post"];
         delete?: never;
@@ -6397,8 +6397,6 @@ export interface components {
             final_result: boolean;
             /** Tasks Following */
             tasks_following: number;
-            /** Changed Characters Limit */
-            changed_characters_limit: number;
             /** Text */
             text: string | null;
             /** Previous Text */
@@ -6411,8 +6409,8 @@ export interface components {
             deleted_characters: number | null;
             /** Changed Characters */
             changed_characters: number | null;
-            /** Digits Changed */
-            digits_changed: boolean | null;
+            /** Number Changes */
+            number_changes: components["schemas"]["EditorialNumberChange"][] | null;
             /** Diff */
             diff: components["schemas"]["EditorialChange"][] | null;
             findings: components["schemas"]["EditorialFindings"] | null;
@@ -6474,6 +6472,16 @@ export interface components {
             submitted: number;
             /** Needs Check */
             needs_check: number;
+        };
+        /**
+         * EditorialNumberChange
+         * @description A number the correction changes, adds (no ``old``) or removes (no ``new``).
+         */
+        EditorialNumberChange: {
+            /** Old */
+            old: string | null;
+            /** New */
+            new: string | null;
         };
         /** EditorialProposals */
         EditorialProposals: {

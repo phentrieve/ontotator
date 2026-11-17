@@ -411,7 +411,7 @@ async def test_editorial_correction_confirms_with_the_dry_runs_text_hash(
         text="Der Patient",
         previous_text="Der Pat ient",
         changed_characters=1,
-        changed_characters_limit=20,
+        number_changes=[],
         diff=[change],
         tasks_following=2,
         findings={"submitted": 3, "needs_check": 1},
@@ -461,35 +461,40 @@ async def test_editorial_correction_confirms_with_the_dry_runs_text_hash(
     }
 
 
-async def test_editorial_correction_passes_the_guards_refusal_on(
+async def test_editorial_correction_passes_a_refusal_on_and_shows_number_changes(
     fake: FakeApi, mcp_client: Client
 ) -> None:
     route = f"{P}/documents/{{doc}}/editorial-correction"
     fake.on(
         "POST",
-        route,
-        refusal(
-            409,
-            "EDITORIAL_CORRECTION_NOT_AVAILABLE",
-            {
-                "reason": "too_large",
-                "changed_characters": 31,
-                "changed_characters_limit": 20,
-            },
+        f"{route}/preview",
+        build(
+            "EditorialCorrectionPreview",
+            available=True,
+            reason=None,
+            number_changes=[{"old": "15", "new": "50"}],
         ),
     )
-    with pytest.raises(ToolFailed, match="too_large"):
+    args = {
+        "project": "p",
+        "document_id": "d",
+        "replacements": [{"old": "15 mg", "new": "50 mg"}],
+        "reason": "Dose mistyped",
+    }
+    dry = await call(mcp_client, "editorial_correction", args)
+    # A notice in the dry run; the correction stays available.
+    assert dry["plan"]["number_changes"] == [{"old": "15", "new": "50"}]
+    assert dry["plan"]["available"] is True
+    fake.on(
+        "POST",
+        route,
+        refusal(409, "EDITORIAL_CORRECTION_NOT_AVAILABLE", {"reason": "review_open"}),
+    )
+    with pytest.raises(ToolFailed, match="review_open"):
         await call(
             mcp_client,
             "editorial_correction",
-            {
-                "project": "p",
-                "document_id": "d",
-                "replacements": [{"old": "a", "new": "b" * 30}],
-                "reason": "Rewrite",
-                "expected_text_sha256": "b" * 64,
-                "confirm": True,
-            },
+            args | {"expected_text_sha256": "b" * 64, "confirm": True},
         )
     # Replacements need an 'old' passage and a reason.
     for wrong in (

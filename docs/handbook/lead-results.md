@@ -216,13 +216,15 @@ What happens to work on the corrected version:
 - Annotations that were opened or submitted, open consolidations and a final result stay on the corrected version. Handle them with **Handle text change…** and *Carry to v3…* ([Handle a text change for open annotation work](#handle-a-text-change-for-open-annotation-work)).
 - Tool proposals are carried to the new text; a proposal whose marked words were changed waits for a check, as after a corrected translation review.
 
+The answer says how many characters changed. When a number changes, it names the numbers, for example 15 → 50, so that you can check them; nothing is refused for it.
+
 An editorial correction is refused in these cases:
 
-- A number would change. The digits of the text must stay the same, in the same order; a space next to a number may change.
-- The change is too large: inserted and deleted characters together may be at most 5 % of the text, but at least 20 and at most 200 characters. A larger change belongs in a translation review ([Correct a translation yourself](#correct-a-translation-yourself)).
 - A translation review of the version is open, the version is not the newest of its translation or it was discarded.
-- The newest version was rejected or queried. Resolve that first ([Resolve a rejected or queried translation](#resolve-a-rejected-or-queried-translation)).
+- The text is unchanged.
 - The text is a source text. A corrected source text comes in as an Ontospan bundle.
+
+A version that was rejected or queried can be corrected as well. The new version is rejected or queried like the one it corrects, and you resolve it as before ([Resolve a rejected or queried translation](#resolve-a-rejected-or-queried-translation)).
 
 ### Handle a text change for open annotation work
 
