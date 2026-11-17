@@ -846,7 +846,9 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
         Not a translation review: the corrected text becomes the next version
         of the translation with the status of document_id, so an accepted
         text stays accepted (and a rejected or queried one stays so), and the
-        correction is audited with its reason. A change of content belongs
+        correction is audited with its reason. A review assigned afterwards
+        is a review of the corrected version; document_id takes no further
+        review. A change of content belongs
         in a translation review (request_translation_correction,
         start_lead_correction). The dry run returns the diff, how many
         characters change, number_changes (the numbers the fixes change; a

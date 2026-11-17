@@ -564,6 +564,7 @@ def load_others_activity(
 
 def _versions(conn: Connection, pid: int) -> list[rules.Version]:
     decisions = latest_review_decisions(conn, pid)
+    typo_fixes = work_plan_store.counted_typo_fixes(conn, pid)
     return [
         rules.Version(
             document_id=row.document_id,
@@ -577,6 +578,7 @@ def _versions(conn: Connection, pid: int) -> list[rules.Version]:
             translation_status=row.translation_status,
             position=row.position,
             latest_decision=decisions.get(row.document_id),
+            typo_fix_counts=row.document_id in typo_fixes,
         )
         for row in conn.execute(
             select(
