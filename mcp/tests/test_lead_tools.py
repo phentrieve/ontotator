@@ -72,6 +72,34 @@ async def test_a_new_round_is_a_dry_run_until_confirmed(
         await call(mcp_client, "start_new_round", restart | {"confirm": True})
 
 
+async def test_a_new_round_names_an_open_consolidation(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    """The server refuses a round for a submitted annotation while a
+    consolidation of the text is open; the tool passes code and hint on."""
+    fake.on("GET", f"{P}/assignments", [_task()])
+    current = build("WorkRoundView", round_id="r1", kind="ordinary", active=True)
+    fake.on("GET", f"{TASK}/rounds", [current])
+    fake.on(
+        "GET",
+        f"{TASK}/round-sources",
+        [build("RoundSourceView", submission_id="s1")],
+    )
+    message = "A consolidation is open on this text: finish or withdraw it first."
+    fake.on("POST", f"{TASK}/rounds", refusal(409, "CONSOLIDATION_OPEN", message))
+    args: dict[str, Any] = {
+        "project": "p",
+        "assignment_id": 3,
+        "kind": "carry_forward",
+        "confirm": True,
+    }
+    with pytest.raises(ToolFailed) as failed:
+        await call(mcp_client, "start_new_round", args)
+    assert "CONSOLIDATION_OPEN" in str(failed.value)
+    assert message in str(failed.value)
+    assert "withdraw_task" in str(failed.value)
+
+
 async def test_a_mode_change_discards_exactly_what_its_preview_named(
     fake: FakeApi, mcp_client: Client
 ) -> None:

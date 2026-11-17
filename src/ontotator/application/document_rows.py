@@ -649,6 +649,7 @@ def _assignments(conn: Connection, pid: int) -> list[rules.AssignmentFact]:
             annotation_mode=row.annotation_mode,
             submitted_work=row.last_submission_id is not None and row.live_submission,
             unreviewed_translation=str(row.id) in confirmed,
+            saved_since_reopen=row.started_at is not None,
         )
         for row in conn.execute(
             select(
@@ -664,6 +665,7 @@ def _assignments(conn: Connection, pid: int) -> list[rules.AssignmentFact]:
                 AssignmentRow.created_at,
                 AssignmentRow.created_by,
                 AssignmentRow.annotation_mode,
+                AssignmentRow.started_at,
                 AssignmentRow.last_submission_id,
                 live_submission_ref(
                     AssignmentRow.project_id, AssignmentRow.last_submission_id

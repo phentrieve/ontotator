@@ -104,8 +104,9 @@ const SCENARIOS: Record<Exclude<OverviewScenarioName, "WALKTHROUGH">, (RowExpect
     // Source changed: decision colour, but step kind assign (no edge, To assign, VD14).
     { case_id: "case-115", language: "de", translation: { state: "Source changed", who: "" }, annotation: SUBMITTED, finalization: { state: "may be outdated", who: "" }, waiting: "You", action: "Assign review…", edge: false },
   ],
+  // Issue 268: the correction request reopened Ana's submitted review; she saved nothing since.
   S16: [
-    { case_id: "case-116", language: "de", translation: { state: `in review (${ANA})`, who: "" }, annotation: { state: "assigned, not started", who: TOM }, finalization: WAITING, waiting: [ANA, TOM], action: null, edge: false },
+    { case_id: "case-116", language: "de", translation: { state: `assigned, not started (${ANA})`, who: "" }, annotation: { state: "assigned, not started", who: TOM }, finalization: WAITING, waiting: [ANA, TOM], action: null, edge: false },
   ],
   // Issue 420: Ana's v1 submission carried to her on v2 counts nothing on v2 (never "1 of 2 submitted").
   S18: [

@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-CumosBoD.js";import{n as a,t as o}from"./lib-C4V6CU1E.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-UyJ0_2c_.js";import{n as a,t as o}from"./lib-BeOPcNIr.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -424,6 +424,8 @@ The editor has three columns:
 | Middle: the text | The text you annotate. Marked passages are highlighted. |
 | Right: details | The selected finding: **Values**, **Modifiers**, **Note**, its mentions and the term search. With nothing selected, the **New finding** panel opens here when you mark text. |
 
+The findings in the list follow the text: a finding stands where its first marked passage begins, so a finding you add in the middle of the text appears between its neighbours, not at the end. Findings without a text span come last. Carried findings stay at the top of the list, in the order of the earlier round.
+
 To make the findings list wider or narrower, drag the divider between the findings list and the text (**Resize findings column**), or focus it and press \`←\` or \`→\`. On a narrow screen, the tabs **Findings**, **Document** and **Details** switch between the columns; **Back to text** returns to the text.
 
 The toolbar shows the text name, its language and the mode:
@@ -501,6 +503,7 @@ What for: record a term that the text mentions.
 
 1. Select the words in the text with the mouse. With the keyboard: click before the first word (or press Tab until the text has focus), hold Shift and move with the arrow keys.
 2. The panel **New finding** shows the marked text. To adjust it, drag the edge handles at its start and end, or focus a handle and press \`←\` or \`→\`.
+   - On a phone, the text stays where it is and a **New finding** bar appears at the bottom of the screen. Tap **Choose term** to go on to the term search, or **Discard**.
 3. **Search term** is already filled with the marked words, and the hits are listed under **Terms**. Change the words, or type a code such as \`HP:0001250\`, if the right term is not among them.
 4. Press Enter to add the top hit, or click a hit. Enter adds nothing when the top hit is a **Weak match**: click a hit, or choose it with \`↓\` and press Enter.
 5. The finding is created with the project's prefilled values. [Confirm or change them](#set-values-and-confirm-defaults).
@@ -756,6 +759,7 @@ What happens to your earlier work:
 - The lead sees your task as not submitted, and a new consolidation cannot start from the replaced submission. The lead can still read it.
 - If the lead had already accepted your earlier submission as the final result, the lead is asked to review that choice.
 - You must [submit](#submit-the-text) the new round to hand in your work again.
+- While a consolidation of the text is open, a new round from your submission is refused: *A consolidation is open on this text: finish or withdraw it first.* Ask your lead.
 
 ## Report a text problem
 
@@ -848,6 +852,28 @@ The marks are only for you. They are saved with your review, so they are kept wh
 With the keyboard: Tab to a sentence, then press Enter or Space to mark it. Shift+Enter marks the range from the last sentence you marked.
 
 On a touch-only device such as a phone or tablet, **Mark checked sentences** is not offered, because a swipe on the text has to scroll. A review you can only read does not offer it either.
+
+### Show invisible characters
+
+What for: see spacing errors and characters you cannot see otherwise, such as a double space, a tab or a non-breaking space.
+
+1. Tick **Show invisible characters** above the texts. Your choice is remembered in this browser.
+2. Read the marks in all texts:
+
+   | Mark | Character |
+   | --- | --- |
+   | grey dot \`·\` | space; two dots are a double space |
+   | arrow \`→\` | tab |
+   | small circle \`°\` | non-breaking space |
+   | amber bar between two characters | zero-width character, for example a zero-width space |
+   | small \`¬\` above the line | soft hyphen |
+   | \`¶\` | end of a line; a dot before it is a space at the end of the line |
+
+3. Correct the translation as usual. Untick the box to hide the marks again.
+
+The marks only change what you see. They are not part of the text: selecting, copying and saving give the text without them, and the lines break where they broke before. The marks also show with **Show changes** and **Mark checked sentences**.
+
+Ontotator does not correct anything by itself, and a mark never blocks your review.
 
 ## Keyboard shortcuts
 
@@ -1063,7 +1089,7 @@ Groups you changed here are tagged **edited in editor** on the consolidation scr
 
 Consolidators can open the text view of a text they consolidate to read each person's findings side by side. See [Read a text and other people's work in the text view](lead-documents.md#read-a-text-and-other-peoples-work-in-the-text-view).
 
-When a submission was carried over from an earlier version of the text, the text view of it offers **Show changes since** v1 (with the number of that version). It marks the changed passages as described for annotators in [See what changed since the earlier version](annotator.md#see-what-changed-since-the-earlier-version); the consolidation screen itself does not show them.
+When a submission was carried over from an earlier version of the text, the text view of it offers **Show changes since** v1 (with the number of that version). It marks the changed passages as described for annotators in [See what changed since the earlier version](annotator.md#see-what-changed-since-the-earlier-version); the consolidation screen itself does not show them. On a phone, the text view lists the findings of the shown work below the text, which keeps the full width.
 `,ne=`# Frequently asked questions
 
 Short answers to problems people often meet. Each answer links to the chapter with the full steps.
@@ -1266,6 +1292,10 @@ Only you and the members with the **Consolidator** role are listed; the hint und
 
 **Change mode…** is refused while the text has a final result. Withdraw it first: **Withdraw final…** in the text card's **Finalization**, then change the mode. See [Withdraw a final result](lead-results.md#withdraw-a-final-result).
 
+### A new round is refused: a consolidation is open
+
+*A consolidation is open on this text: finish or withdraw it first.* A submitted annotation gets no new round while a consolidation of its text is not submitted: the consolidation works on that submission. As an annotator, ask your lead. As a lead, wait for the consolidation, or withdraw its task in the text card and start the round then. **More actions** › **Start a round…** skips such texts for the same reason. See [Start a new round for several texts](lead-documents.md#start-a-new-round-for-several-texts).
+
 ### The export asks me to tick a box
 
 Some texts still need your decision or have no final result. Either decide them in **Documents** first, or tick the box to export the ready results and leave the others out. See [Export final results](lead-results.md#export-final-results).
@@ -1351,7 +1381,7 @@ The guidelines tell you what to mark and how: which findings count, how much tex
 
 ## 4. Get to know the screen
 
-The editor has three columns: the list of **Findings** on the left, the text in the middle and the details of the selected finding on the right. The toolbar shows the mode, for example **Annotate from scratch**, and the save status. Everything is saved automatically; **Saved** means your work is stored. In a project that records working time, the toolbar also shows a timer with **Pause timer**; see [Working time](annotator.md#working-time). See [The editor screen](annotator.md#the-editor-screen).
+The editor has three columns: the list of **Findings** on the left, in the order of the text, the text in the middle and the details of the selected finding on the right. The toolbar shows the mode, for example **Annotate from scratch**, and the save status. Everything is saved automatically; **Saved** means your work is stored. In a project that records working time, the toolbar also shows a timer with **Pause timer**; see [Working time](annotator.md#working-time). See [The editor screen](annotator.md#the-editor-screen).
 
 ## 5. Mark a finding
 
@@ -1675,7 +1705,7 @@ What stays fixed in every case:
 
 - Texts cannot be deleted. A text you no longer want stays in the project; you take it out of the plan ([Narrow the scope](#narrow-the-scope)).
 - A submission never changes. New work is a new round or a new submission; the earlier one stays in the history.
-- A final result can be replaced with **Change final…** or withdrawn with **Withdraw final…** ([Withdraw a final result](lead-results.md#withdraw-a-final-result)). For many texts, **More actions** › **Change final…** on **Documents** moves the final results to the newest submissions, with **Undo** in the message that follows ([Accept or change the final result of several texts](lead-results.md#accept-or-change-the-final-result-of-several-texts)). While a text has a final result, its annotation mode cannot be changed.
+- A final result can be replaced with **Change final…** or withdrawn with **Withdraw final…** ([Withdraw a final result](lead-results.md#withdraw-a-final-result)). For many texts, **More actions** › **Change final…** on **Documents** moves the final results to the newest submissions ([Accept or change the final result of several texts](lead-results.md#accept-or-change-the-final-result-of-several-texts)). While a text has a final result, its annotation mode cannot be changed.
 - There is no pause button for texts. A task is paused only by a problem report ([Decide on a problem report](lead-results.md#decide-on-a-problem-report)).
 
 ## Use another translation of a text
@@ -1885,7 +1915,7 @@ The **Documents** page lists every text of the project and what it needs next. O
 | **Next step** | A button for the next action on this text, for example **Assign annotation…**, **Accept result…** or, when submissions differ, **Compare results…**. Rows that need your decision also have a coloured left edge. |
 | **Last activity** | When something last happened on the text. |
 
-A task starts with the person's first saved change; opening it is not enough, and neither is ticking checked sentences in a translation review. Until then **Translation** and **Annotation** read *assigned, not started* with the person's name, in the table (*not started* without the name below 1600 px), its tooltip, the narrow cards and the text card, where the person's row shows **Not started**. After the first save they read *in review* or *In progress*. With several people or parallel versions the cell counts them, for example *1 of 2 started*.
+A task starts with the person's first saved change; opening it is not enough, and neither is ticking checked sentences in a translation review. Until then **Translation** and **Annotation** read *assigned, not started* with the person's name, in the table (*not started* without the name below 1600 px), its tooltip, the narrow cards and the text card, where the person's row shows **Not started**. After the first save they read *in review* or *In progress*. The same holds for a task you reopened, also when you asked a reviewer who had already submitted to correct a translation: it reads *assigned, not started* again until the person saves a change after the reopen. With several people or parallel versions the cell counts them, for example *1 of 2 started*.
 
 The counts in **Annotation**, for example *0 of 1 submitted*, count only work on the newest version of the text. After a text change, a submission on the old version no longer counts: neither when it was carried to the new version, nor when the new version was started fresh. Carried work counts once it is submitted on the new version.
 
@@ -1988,7 +2018,7 @@ What for: read a text with other people's findings or the final result, and comp
 
 1. Open the text view with **Open text** in the text card.
 2. Choose the language and version in **Language and version**.
-3. In **Show**, choose **Text only**, a proposal layer, someone's annotations or the result. Its findings are listed under **Findings**.
+3. In **Show**, choose **Text only**, a proposal layer, someone's annotations or the result. Its findings are listed under **Findings**: beside the text, or below it on a phone, where the text keeps the full width.
 4. Optional: click **Compare** to open a second pane. Each pane has its own **Language and version** and **Show** directly above its text: **Current text** on the left, **Comparison text** on the right, so both texts start at the same height. Tick **Couple scrolling** to scroll both together. Click **Close comparison** to close it.
    - When both panes show texts of the same language, for example v1 and its correction v2, tick **Show changes** to see what changed. The older version strikes through the removed passages, the newer version underlines the added ones; the line above the texts counts them. The marks do not change the texts, the findings or **Couple scrolling**. A change of spaces or line breaks only is not marked or counted. If the two texts have little in common, the line reads *The texts differ too much to show the changes* and nothing is marked.
    - When **Show** has someone's annotations that were carried from an earlier version of the text (after **Carry to v2…** or **Handle text change…**), tick **Show changes since** v1 above the text: changed passages get a dashed frame, added text is underlined, and a **−** marker shows the earlier wording of removed text. **Next ›** and **‹ Previous** step through the passages. The annotator sees the same marks in their task. Not offered while **Compare** is open, which has its own **Show changes**.
@@ -2005,6 +2035,35 @@ What for: see each version of a translation, its reviews and its origin.
 3. Click **View text** to read a version, or **Translation reviews** to see every review decision. In a reviewer's row, **Reopen…** lets them review the version again and **Remove…** removes their assignment.
    At the newest accepted version, **Correct the translation…** lets you correct it yourself ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)). At the newest version of a translation, **Upload new version…** brings in a text made elsewhere as the next version ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)).
 4. Click **Compare with source** to compare the translation with the source text.
+
+### Find spacing errors and invisible characters
+
+What for: find texts with spacing errors or invisible characters, for example before you assign them.
+
+Ontotator computes typography hints for a text when you ask for them. A hint names a rule and a position in the text. Hints are not stored and never block review, annotation or export; nothing is corrected automatically.
+
+| Rule code | What it finds |
+| --- | --- |
+| \`DOUBLE_SPACE\` | Two or more spaces inside a line. |
+| \`SPACE_BEFORE_PUNCTUATION\` | A space before \`,\` \`;\` \`:\` \`!\` \`?\` or \`.\` |
+| \`MISSING_SPACE_AFTER_PUNCTUATION\` | Punctuation directly between two words, for example *Fieber,Husten*. Numbers, dates, times, abbreviations such as *z.B.* or *e.g.*, web addresses and ellipses are left alone. |
+| \`TRAILING_WHITESPACE_LINE\` | Spaces or tabs at the end of a line. |
+| \`TRAILING_WHITESPACE_TEXT\` | Spaces, tabs or more than one line break at the end of the text. A single final line break is no hint. |
+| \`TAB\` | A tab. |
+| \`ZERO_WIDTH_CHARACTER\` | A zero-width space or joiner, or a byte order mark. |
+| \`SOFT_HYPHEN\` | A soft hyphen. |
+| \`CONTROL_CHARACTER\` | Another control character. |
+
+A non-breaking space is no hint, because it is often correct, for example between a number and its unit. **Show invisible characters** marks it all the same.
+
+There is no page for the hints yet. Read them through the API or the MCP server (token scope \`read\`):
+
+- One text version: \`GET /api/v1/projects/{key}/documents/{document_id}/typography-hints\`, or the MCP tool \`list_typography_hints\` with \`document_id\`. Each hint has \`rule\`, \`start\` and \`end\`; positions count Unicode code points, as the positions of findings do.
+- The whole project: \`GET /api/v1/projects/{key}/typography-hints\`, or \`list_typography_hints\` without \`document_id\`. It returns the number of hints per rule for each text that has any, 100 texts per page (\`limit\` up to 200); pass \`next_after\` as \`after\` for the next page. Only the newest version of each text is counted unless you ask for \`versions=all\`.
+
+You get hints for the texts you may read, as with the texts themselves. The MCP tool returns no text; a server started with \`ONTOTATOR_MCP_READ_CONTENT=1\` can add excerpts with \`include_text\` ([MCP server guide](../../mcp/README.md)).
+
+To see the characters in a text, a reviewer ticks **Show invisible characters** in the translation review ([Show invisible characters](annotator.md#show-invisible-characters)). To fix them in a translation, correct it ([Request a translation correction](#request-a-translation-correction)).
 
 ### Request a translation correction
 
@@ -2141,7 +2200,9 @@ Every listed task changes, or none: if the texts changed since the preview, the 
 
 **Undo** in the message, for example *Reopened 14 assignments in 12 texts.*, takes the change back: reopened tasks count as submitted again; withdrawn tasks come back with their drafts. Undo is for the lead who made the change, once, within an hour, and only while nothing changed on these texts since: nobody saved a draft, nobody was assigned, the plan, the final result and the text version are the same. Otherwise the message says *Undo is no longer possible: the texts changed since.*
 
-The same menu holds **Accept agreeing results…** and **Change final…** for the final results of the selected texts: see [Accept or change the final result of several texts](lead-results.md#accept-or-change-the-final-result-of-several-texts). The message after **Change final…** has **Undo** as well: it brings the earlier final results back, for the lead who made the change, once, within an hour, and only while nothing changed on these texts since.
+A message never lies over a dialog you open after it. If you open the next dialog while the message is still showing, the message waits; when you close the dialog, it is back with its **Undo** and stays for its full time again. This holds for every message with **Undo**, also in the annotation view.
+
+The same menu holds **Accept agreeing results…** and **Change final…** for the final results of the selected texts: see [Accept or change the final result of several texts](lead-results.md#accept-or-change-the-final-result-of-several-texts).
 
 ### Start a new round for several texts
 
@@ -2153,7 +2214,7 @@ What for: give submitted annotations a new work round, for many texts at once. E
    - **Restart**: the new round has none of the earlier findings. A task from scratch starts empty; a task from tool proposals starts again from the newest proposals, all open.
 3. Read the preview. It names the people with their number of tasks, for example *Continue 7 submitted tasks in a new round · Tom Reis 5, R. Roe 2*; click **Show all** to list every text. Only submitted annotations on the current version of a text get a round. What stays as it is has its own group with the reason:
    - *Skip 1 text · final result chosen: use Withdraw final… first*: the final result rests on a submission ([Withdraw a final result](lead-results.md#withdraw-a-final-result)).
-   - *Skip 1 text · a consolidation is open: finish or withdraw it first*: the consolidation works on the submissions.
+   - *Skip 1 text · a consolidation is open: finish or withdraw it first*: the consolidation works on the submissions. A round for one such task is refused in the same way, in the web interface, through the API and by the MCP tool \`start_new_round\` (error code \`CONSOLIDATION_OPEN\`). **Agree clean restart…** in a problem report still restarts such a task ([Decide on a problem report](lead-results.md#decide-on-a-problem-report)).
    - *Keep 2 open tasks · not submitted yet*: tasks that are assigned, in progress or reopened are not touched.
    - Also kept, each in its own group: a task paused by a problem report, a task on an earlier or discarded version, a task whose person can no longer take it, a task whose translation is not accepted yet and, for **Restart**, submitted work without a work round (older or imported work: use **Reopen…**).
 4. Enter the reason. For **Restart** it is required (**Reason**); for **Continue from the submission** it is optional (**Reason (optional)**). It is recorded with each new round in the audit trail.
@@ -2283,7 +2344,7 @@ What for: choose the final result of a text.
 1. On **Documents**, tab **Needs your decision**, click **Accept result…** or **Compare results…** in the row. The row reads **Accept result…** when there is one result to accept or the submissions agree in full, also on notes and modifier text spans, and **Compare results…** when they differ in anything. The card opens at **Finalization**.
 2. With one submission or a submitted consolidation, check it and click **Accept result**. For a consolidation, the card says how its findings came about, for example *Consolidated by Carla Diaz · 32 matching, 1 decided by Carla, 2 groups left out*. Left-out groups are not in the result. If an annotator left findings **Unresolved**, the card lists them with who wrote each note. Accepting a submission directly keeps the flag and the note in the export; open the submission to check them first.
 3. If all annotations agree, the card says so. Click **Accept result**. A finding an annotator left **Unresolved** never counts as agreed, so that text goes through the next step instead.
-4. If they differ, the card shows the agreement, for example *Agreement: 5 of 9 findings match, 1 differs in context only*. When matching findings still differ in a note, a text span or a modifier text span, a line below names them, for example *Notes differ on 1 finding: Ataxia*. When people chose a term and its parent or child on the same passage, a line names the pair, for example *Related terms: Seizure / Status epilepticus*; it still counts as a difference. Findings an annotator left **Unresolved** count as differences and are listed with who wrote each note. **How is this counted?** explains the numbers. Open a submission with **Open submission** to read it in the read-only text view. If that work was carried over from an earlier version of the text, tick **Show changes since** v1 above the text to see the changed passages ([See what changed since the earlier version](annotator.md#see-what-changed-since-the-earlier-version)).
+4. If they differ, the card shows the agreement, for example *Agreement: 5 of 9 findings match, 1 differs in context only*. When matching findings still differ in a note, a text span or a modifier text span, a line below names them, for example *Notes differ on 1 finding: Ataxia*. When people chose a term and its parent or child on the same passage, a line names the pair, for example *Related terms: Seizure / Status epilepticus*; it still counts as a difference. Findings an annotator left **Unresolved** count as differences and are listed with who wrote each note. **How is this counted?** explains the numbers. Open a submission with **Open submission** to read it in the read-only text view; on a phone, its findings are listed below the text. If that work was carried over from an earlier version of the text, tick **Show changes since** v1 above the text to see the changed passages ([See what changed since the earlier version](annotator.md#see-what-changed-since-the-earlier-version)).
 5. Warning: the next action saves at once, without a confirmation. Click **Use as final** in the row of the submission you want (at phone width the submissions are listed one under the other, with their buttons below each). Or [start a consolidation](#start-a-consolidation) instead.
 
 After saving, the card moves on to the next text that needs a decision. The decided row stays in the tab with a *Resolved* badge until you click **Refresh** or change the tab. To undo, [change the final result](#change-a-final-result).
@@ -2392,10 +2453,7 @@ Every listed text changes, or none: if a text or a final result changed since th
 
 - For texts skipped because the submissions differ, open the text card and compare them, or [start a consolidation](#start-a-consolidation); a submitted consolidation is then the newest submission.
 - Warnings you acknowledged for the earlier final result do not carry over to the new one. Final exports already made stay as they are.
-- **Change final…** can be undone: the message, for example *Changed the final result of 8 texts.*, has an **Undo** button. It brings back the earlier final result of every text, with the lead who had chosen it, the time of that choice and the warnings that lead had acknowledged; the message then reads *The earlier final results of 8 texts are back.* and the change is offered again. Undo is for the lead who made the change, once, within an hour, and it restores every text or none. It is refused when a text changed since: its final result was changed, confirmed again or withdrawn; a version of the text was added, discarded or restored; its work plan changed; a task of the text was assigned, reopened, withdrawn or paused, or got a new round (a decision on a problem report that pauses or restarts a task counts); or something was submitted. The message names the first such text and why, for example *Undo is not possible: 1 of 8 texts changed since (EN100023 en: its final result was changed, confirmed again or withdrawn). Nothing was undone.* Then use **Change final…** in the text card ([Change a final result](#change-a-final-result)).
-- A final export made between the change and its Undo does not stop the Undo. It stays as it is and holds the changed results; the message says so, for example *The earlier final results of 8 texts are back. 1 final export made meanwhile stays as it is, with the changed results.* Export again to get the earlier results. Agreement numbers are not stored: a later export computes them from the restored final results.
-- Undo is recorded as a change of its own: each text gets a new entry in the audit trail, and its final result a new revision.
-- **Accept agreeing results…** has no undo. To go back, use **Withdraw final…** or **Change final…** in the text card ([Withdraw a final result](#withdraw-a-final-result), [Change a final result](#change-a-final-result)).
+- Neither action has an undo. To go back, use **Change final…** or **Withdraw final…** in the text card ([Change a final result](#change-a-final-result), [Withdraw a final result](#withdraw-a-final-result)).
 
 ## Translation and text-change decisions
 

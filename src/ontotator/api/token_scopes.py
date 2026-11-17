@@ -129,6 +129,9 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     ("GET", f"{P}/documents/{{doc:path}}/reanchor-items"): "read",
     ("GET", f"{P}/documents/{{doc:path}}/text"): "read",
     ("GET", f"{P}/documents/{{doc:path}}/variant"): "read",
+    # Typography hints (issue 454): the scope and the rule of the text itself.
+    ("GET", f"{P}/documents/{{doc:path}}/typography-hints"): "read",
+    ("GET", f"{P}/typography-hints"): "read",
     ("GET", f"{P}/documents/{{doc:path}}/submissions"): "read",
     ("GET", f"{P}/documents/{{doc:path}}/submissions/{{submission_id:path}}"): "read",
     ("GET", f"{P}/documents/{{doc:path}}/translation-reviews"): "read",

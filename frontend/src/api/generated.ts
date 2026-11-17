@@ -1140,6 +1140,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{key}/documents/{doc}/typography-hints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Version Typography Hints
+         * @description Spacing errors and invisible characters of one text version.
+         */
+        get: operations["version_typography_hints_api_v1_projects__key__documents__doc__typography_hints_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{key}/typography-hints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Project Typography Hints
+         * @description Hint counts per text, one page of texts at a time (ordered by document ID).
+         *
+         *     Lists the texts the caller may read. The positions of a text's hints are
+         *     read with the route of that version.
+         */
+        get: operations["project_typography_hints_api_v1_projects__key__typography_hints_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users/": {
         parameters: {
             query?: never;
@@ -9035,6 +9078,24 @@ export interface components {
             /** Can Manage */
             can_manage: boolean;
         };
+        /** ProjectTypographyHints */
+        ProjectTypographyHints: {
+            /**
+             * Texts
+             * @description The texts of this page that have at least one hint.
+             */
+            texts: components["schemas"]["TextTypographyCounts"][];
+            /**
+             * Scanned
+             * @description Number of texts this page looked at.
+             */
+            scanned: number;
+            /**
+             * Next After
+             * @description Pass as 'after' for the next page; null on the last page.
+             */
+            next_after: string | null;
+        };
         /** ProjectWorkTimeView */
         ProjectWorkTimeView: {
             /** Record */
@@ -10809,6 +10870,23 @@ export interface components {
             /** Entries */
             entries: components["schemas"]["TextLayerEntry"][];
         };
+        /** TextTypographyCounts */
+        TextTypographyCounts: {
+            /** Document Id */
+            document_id: string;
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Version */
+            version: number;
+            /** Total */
+            total: number;
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+        };
         /** TextWindowView */
         TextWindowView: {
             /** Start */
@@ -11085,6 +11163,24 @@ export interface components {
             parents: components["schemas"]["TreeNode"][];
             /** External Url */
             external_url?: string | null;
+        };
+        /** TypographyHintView */
+        TypographyHintView: {
+            /**
+             * Rule
+             * @enum {string}
+             */
+            rule: "DOUBLE_SPACE" | "SPACE_BEFORE_PUNCTUATION" | "MISSING_SPACE_AFTER_PUNCTUATION" | "TRAILING_WHITESPACE_LINE" | "TRAILING_WHITESPACE_TEXT" | "TAB" | "ZERO_WIDTH_CHARACTER" | "SOFT_HYPHEN" | "CONTROL_CHARACTER";
+            /**
+             * Start
+             * @description First code point of the hint (zero-based, Unicode code points, as annotation spans).
+             */
+            start: number;
+            /**
+             * End
+             * @description Code point after the last one of the hint.
+             */
+            end: number;
         };
         /** UnassignableDocument */
         UnassignableDocument: {
@@ -11406,6 +11502,29 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** VersionTypographyHints */
+        VersionTypographyHints: {
+            /** Document Id */
+            document_id: string;
+            /** Text Sha256 */
+            text_sha256: string;
+            /** Total */
+            total: number;
+            /**
+             * Counts
+             * @description Number of hints per rule code.
+             */
+            counts: {
+                [key: string]: number;
+            };
+            /** Hints */
+            hints: components["schemas"]["TypographyHintView"][];
+            /**
+             * Truncated
+             * @description True when 'hints' holds fewer than 'total'.
+             */
+            truncated: boolean;
         };
         /**
          * VersionUploadPreview
@@ -13978,6 +14097,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VariantSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    version_typography_hints_api_v1_projects__key__documents__doc__typography_hints_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                key: string;
+                doc: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionTypographyHints"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    project_typography_hints_api_v1_projects__key__typography_hints_get: {
+        parameters: {
+            query?: {
+                /** @description 'next_after' of the previous page. */
+                after?: string | null;
+                /** @description Texts to look at per page. */
+                limit?: number;
+                /** @description Only the newest version of each text, or every one. */
+                versions?: "newest" | "all";
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectTypographyHints"];
                 };
             };
             /** @description Validation Error */

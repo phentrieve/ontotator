@@ -1076,7 +1076,8 @@ class AssignmentService:
         conn.execute(
             update(AssignmentRow)
             .where(AssignmentRow.id == assignment_id)
-            .values(status="reopened", updated_at=now)
+            # Issue 268: not started again until the first save from here.
+            .values(status="reopened", started_at=None, updated_at=now)
         )
         if old["task"] == "translation_review":
             cls._restart_review_draft(conn, project["id"], old, now)

@@ -12,6 +12,8 @@ export interface TranslationEditorProps {
   lang?: string;
   readOnly?: boolean;
   disabled?: boolean;
+  /** Marks spaces, tabs, line ends and other invisible characters in the mirror; the textarea keeps its text (issue 454). */
+  showInvisibles?: boolean;
   onChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
   /** Blur, composition start and end of the textarea, so a caller can defer work during IME composition. */
   onBlur?: (event: FocusEvent<HTMLTextAreaElement>) => void;
@@ -26,10 +28,10 @@ export interface TranslationEditorProps {
  * coupled scrolling reads. The mirror never shows text of its own.
  */
 export const TranslationEditor = forwardRef<HTMLDivElement, TranslationEditorProps>(function TranslationEditor(
-  { id, labelledBy, describedBy, machineText, value, lang, readOnly = false, disabled = false, onChange, onBlur, onCompositionStart, onCompositionEnd }, ref,
+  { id, labelledBy, describedBy, machineText, value, lang, readOnly = false, disabled = false, showInvisibles = false, onChange, onBlur, onCompositionStart, onCompositionEnd }, ref,
 ) {
-  const mirror = useMemo(() => paragraphNodes(value, diffText(machineText, value), { deletions: false }), [machineText, value]);
-  return <div ref={ref} className="translation-editor">
+  const mirror = useMemo(() => paragraphNodes(value, diffText(machineText, value), { deletions: false, invisibles: showInvisibles }), [machineText, value, showInvisibles]);
+  return <div ref={ref} className={`translation-editor${showInvisibles ? " show-invisibles" : ""}`}>
     <div className="translation-editor-sizer">
       <div className="translation-editor-mirror" aria-hidden="true">{mirror}{"​"}</div>
       <textarea id={id} className="translation-editor-input" aria-labelledby={labelledBy} aria-describedby={describedBy}

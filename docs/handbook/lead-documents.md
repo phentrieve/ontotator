@@ -95,7 +95,7 @@ The **Documents** page lists every text of the project and what it needs next. O
 | **Next step** | A button for the next action on this text, for example **Assign annotation…**, **Accept result…** or, when submissions differ, **Compare results…**. Rows that need your decision also have a coloured left edge. |
 | **Last activity** | When something last happened on the text. |
 
-A task starts with the person's first saved change; opening it is not enough, and neither is ticking checked sentences in a translation review. Until then **Translation** and **Annotation** read *assigned, not started* with the person's name, in the table (*not started* without the name below 1600 px), its tooltip, the narrow cards and the text card, where the person's row shows **Not started**. After the first save they read *in review* or *In progress*. With several people or parallel versions the cell counts them, for example *1 of 2 started*.
+A task starts with the person's first saved change; opening it is not enough, and neither is ticking checked sentences in a translation review. Until then **Translation** and **Annotation** read *assigned, not started* with the person's name, in the table (*not started* without the name below 1600 px), its tooltip, the narrow cards and the text card, where the person's row shows **Not started**. After the first save they read *in review* or *In progress*. The same holds for a task you reopened, also when you asked a reviewer who had already submitted to correct a translation: it reads *assigned, not started* again until the person saves a change after the reopen. With several people or parallel versions the cell counts them, for example *1 of 2 started*.
 
 The counts in **Annotation**, for example *0 of 1 submitted*, count only work on the newest version of the text. After a text change, a submission on the old version no longer counts: neither when it was carried to the new version, nor when the new version was started fresh. Carried work counts once it is submitted on the new version.
 
@@ -198,7 +198,7 @@ What for: read a text with other people's findings or the final result, and comp
 
 1. Open the text view with **Open text** in the text card.
 2. Choose the language and version in **Language and version**.
-3. In **Show**, choose **Text only**, a proposal layer, someone's annotations or the result. Its findings are listed under **Findings**.
+3. In **Show**, choose **Text only**, a proposal layer, someone's annotations or the result. Its findings are listed under **Findings**: beside the text, or below it on a phone, where the text keeps the full width.
 4. Optional: click **Compare** to open a second pane. Each pane has its own **Language and version** and **Show** directly above its text: **Current text** on the left, **Comparison text** on the right, so both texts start at the same height. Tick **Couple scrolling** to scroll both together. Click **Close comparison** to close it.
    - When both panes show texts of the same language, for example v1 and its correction v2, tick **Show changes** to see what changed. The older version strikes through the removed passages, the newer version underlines the added ones; the line above the texts counts them. The marks do not change the texts, the findings or **Couple scrolling**. A change of spaces or line breaks only is not marked or counted. If the two texts have little in common, the line reads *The texts differ too much to show the changes* and nothing is marked.
    - When **Show** has someone's annotations that were carried from an earlier version of the text (after **Carry to v2…** or **Handle text change…**), tick **Show changes since** v1 above the text: changed passages get a dashed frame, added text is underlined, and a **−** marker shows the earlier wording of removed text. **Next ›** and **‹ Previous** step through the passages. The annotator sees the same marks in their task. Not offered while **Compare** is open, which has its own **Show changes**.
@@ -215,6 +215,35 @@ What for: see each version of a translation, its reviews and its origin.
 3. Click **View text** to read a version, or **Translation reviews** to see every review decision. In a reviewer's row, **Reopen…** lets them review the version again and **Remove…** removes their assignment.
    At the newest accepted version, **Correct the translation…** lets you correct it yourself ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)). At the newest version of a translation, **Upload new version…** brings in a text made elsewhere as the next version ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)).
 4. Click **Compare with source** to compare the translation with the source text.
+
+### Find spacing errors and invisible characters
+
+What for: find texts with spacing errors or invisible characters, for example before you assign them.
+
+Ontotator computes typography hints for a text when you ask for them. A hint names a rule and a position in the text. Hints are not stored and never block review, annotation or export; nothing is corrected automatically.
+
+| Rule code | What it finds |
+| --- | --- |
+| `DOUBLE_SPACE` | Two or more spaces inside a line. |
+| `SPACE_BEFORE_PUNCTUATION` | A space before `,` `;` `:` `!` `?` or `.` |
+| `MISSING_SPACE_AFTER_PUNCTUATION` | Punctuation directly between two words, for example *Fieber,Husten*. Numbers, dates, times, abbreviations such as *z.B.* or *e.g.*, web addresses and ellipses are left alone. |
+| `TRAILING_WHITESPACE_LINE` | Spaces or tabs at the end of a line. |
+| `TRAILING_WHITESPACE_TEXT` | Spaces, tabs or more than one line break at the end of the text. A single final line break is no hint. |
+| `TAB` | A tab. |
+| `ZERO_WIDTH_CHARACTER` | A zero-width space or joiner, or a byte order mark. |
+| `SOFT_HYPHEN` | A soft hyphen. |
+| `CONTROL_CHARACTER` | Another control character. |
+
+A non-breaking space is no hint, because it is often correct, for example between a number and its unit. **Show invisible characters** marks it all the same.
+
+There is no page for the hints yet. Read them through the API or the MCP server (token scope `read`):
+
+- One text version: `GET /api/v1/projects/{key}/documents/{document_id}/typography-hints`, or the MCP tool `list_typography_hints` with `document_id`. Each hint has `rule`, `start` and `end`; positions count Unicode code points, as the positions of findings do.
+- The whole project: `GET /api/v1/projects/{key}/typography-hints`, or `list_typography_hints` without `document_id`. It returns the number of hints per rule for each text that has any, 100 texts per page (`limit` up to 200); pass `next_after` as `after` for the next page. Only the newest version of each text is counted unless you ask for `versions=all`.
+
+You get hints for the texts you may read, as with the texts themselves. The MCP tool returns no text; a server started with `ONTOTATOR_MCP_READ_CONTENT=1` can add excerpts with `include_text` ([MCP server guide](../../mcp/README.md)).
+
+To see the characters in a text, a reviewer ticks **Show invisible characters** in the translation review ([Show invisible characters](annotator.md#show-invisible-characters)). To fix them in a translation, correct it ([Request a translation correction](#request-a-translation-correction)).
 
 ### Request a translation correction
 
@@ -351,6 +380,8 @@ Every listed task changes, or none: if the texts changed since the preview, the 
 
 **Undo** in the message, for example *Reopened 14 assignments in 12 texts.*, takes the change back: reopened tasks count as submitted again; withdrawn tasks come back with their drafts. Undo is for the lead who made the change, once, within an hour, and only while nothing changed on these texts since: nobody saved a draft, nobody was assigned, the plan, the final result and the text version are the same. Otherwise the message says *Undo is no longer possible: the texts changed since.*
 
+A message never lies over a dialog you open after it. If you open the next dialog while the message is still showing, the message waits; when you close the dialog, it is back with its **Undo** and stays for its full time again. This holds for every message with **Undo**, also in the annotation view.
+
 The same menu holds **Accept agreeing results…** and **Change final…** for the final results of the selected texts: see [Accept or change the final result of several texts](lead-results.md#accept-or-change-the-final-result-of-several-texts). The message after **Change final…** has **Undo** as well: it brings the earlier final results back, for the lead who made the change, once, within an hour, and only while nothing changed on these texts since.
 
 ### Start a new round for several texts
@@ -363,7 +394,7 @@ What for: give submitted annotations a new work round, for many texts at once. E
    - **Restart**: the new round has none of the earlier findings. A task from scratch starts empty; a task from tool proposals starts again from the newest proposals, all open.
 3. Read the preview. It names the people with their number of tasks, for example *Continue 7 submitted tasks in a new round · Tom Reis 5, R. Roe 2*; click **Show all** to list every text. Only submitted annotations on the current version of a text get a round. What stays as it is has its own group with the reason:
    - *Skip 1 text · final result chosen: use Withdraw final… first*: the final result rests on a submission ([Withdraw a final result](lead-results.md#withdraw-a-final-result)).
-   - *Skip 1 text · a consolidation is open: finish or withdraw it first*: the consolidation works on the submissions.
+   - *Skip 1 text · a consolidation is open: finish or withdraw it first*: the consolidation works on the submissions. A round for one such task is refused in the same way, in the web interface, through the API and by the MCP tool `start_new_round` (error code `CONSOLIDATION_OPEN`). **Agree clean restart…** in a problem report still restarts such a task ([Decide on a problem report](lead-results.md#decide-on-a-problem-report)).
    - *Keep 2 open tasks · not submitted yet*: tasks that are assigned, in progress or reopened are not touched.
    - Also kept, each in its own group: a task paused by a problem report, a task on an earlier or discarded version, a task whose person can no longer take it, a task whose translation is not accepted yet and, for **Restart**, submitted work without a work round (older or imported work: use **Reopen…**).
 4. Enter the reason. For **Restart** it is required (**Reason**); for **Continue from the submission** it is optional (**Reason (optional)**). It is recorded with each new round in the audit trail.

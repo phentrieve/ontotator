@@ -1413,11 +1413,18 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const pendingCarriedCount = carried.states.filter(state => state.unchecked).length;
   /**
    * Row order of the findings list (spec section 1): carried findings and placeholder rows first, in
-   * round-input order, then every other finding in draft order, including findings on hidden layers
-   * (going there makes their layer visible). The rendered list uses the same order.
+   * round-input order, then every other finding in text order (start of its first segment, findings
+   * without a text span last; issue 436), including findings on hidden layers (going there makes
+   * their layer visible). The rendered list, "Next unchecked" and the attach targets use the same order.
    */
-  const carriedListOrder = useMemo(() => orderCarriedFirst(carried.states,
-    (draft.annotations ?? []).map(snapshot => snapshot.annotation.annotation_id)), [carried.states, draft.annotations]);
+  const carriedListOrder = useMemo(() => {
+    const annotations = draft.annotations ?? [];
+    const starts = new Map(annotations.map(({ annotation }) => {
+      const segments = (annotation.evidence_refs ?? []).flatMap(ref => allEvidenceMap[ref.evidence_id]?.mention.segments ?? []);
+      return [annotation.annotation_id, segments.length ? Math.min(...segments.map(segment => segment.start)) : null] as const;
+    }));
+    return orderCarriedFirst(carried.states, annotations.map(snapshot => snapshot.annotation.annotation_id), id => starts.get(id) ?? null);
+  }, [carried.states, draft.annotations, allEvidenceMap]);
   // Version of the open text: from the round (prop), the case versions or the document list. A text
   // with the source's hash is the source's text, so its version is the source version.
   const currentTextVersion = documentVersion
@@ -3541,6 +3548,29 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     setMobilePane("details");
     setSearchFocusRequest(count => count + 1);
   };
+  // At <=700 px the workspace starts under the header and is one window high, so its bottom edge is below the
+  // fold while the page is unscrolled (issue 452). The "New finding" bar therefore sticks to the bottom of the
+  // window (CSS), and the text does not move when a passage is marked. Only when the bar would lie over the
+  // marked passage does the page scroll, by just that much; the bar stays at the window's bottom meanwhile.
+  const pendingBarShown = panesLayout && !attachActive && pendingIsMarkedSpan && !readOnly && mobilePane === "text";
+  const pendingBarRef = useRef<HTMLDivElement>(null);
+  const pendingBarMark = pendingBarShown ? pendingAnnotation?.evidenceId : undefined;
+  // A passive effect: the text pane has drawn the mark by then (its effects run first).
+  useEffect(() => {
+    const bar = pendingBarRef.current;
+    if (!pendingBarShown || !bar || !pendingBarMark) return;
+    const marks = [...(rootRef.current?.querySelectorAll<HTMLElement>(".text-container .run--marked") ?? [])]
+      .filter(run => (run.dataset.mentions ?? "").split(",").includes(pendingBarMark));
+    if (!marks.length) return;
+    const overlap = Math.max(...marks.map(run => run.getBoundingClientRect().bottom)) - bar.getBoundingClientRect().top;
+    if (overlap <= 0) return;
+    for (let scroller = bar.parentElement; scroller; scroller = scroller.parentElement) {
+      if (scroller.scrollHeight > scroller.clientHeight && /auto|scroll/.test(getComputedStyle(scroller).overflowY)) {
+        scroller.scrollBy({ top: Math.ceil(overlap) + 8 });
+        break;
+      }
+    }
+  }, [pendingBarShown, pendingBarMark]);
 
   const shortcutOptions = { scope: "screen" as const, root: rootRef };
   // Keys that wait for a selection stay in the ? help, marked "not available right now": the finding keys
@@ -4195,15 +4225,6 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
           resyncToken={textResyncToken}
           scrollRequest={textScrollRequest}
         />
-        {/* Above 700 px nothing floats over the text (#21): the New finding panel holds the hint and the one Discard. */}
-        {panesLayout && !attachActive && pendingIsMarkedSpan && !readOnly && mobilePane === "text" && (
-          <div className="pending-bar" role="group" aria-label="New finding">
-            <span className="pending-bar__text">New finding “{quoteSegments(view.document.text, pendingAnnotation!.segments, 40)}”</span>
-            <Button type="button" variant="primary" size="sm" onClick={chooseTerm}>Choose term</Button>
-            <Button type="button" variant="secondary" size="sm" onClick={discardPending}>Discard</Button>
-            <CopyTextButton text={passageRef.current} onAnnounce={announceCarried} compact={narrowBar} />
-          </div>
-        )}
 
         {/* Right: Annotation & Search Panel + Review Actions */}
         <div className="inspector-pane density-compact" ref={inspectorRef}>
@@ -4560,6 +4581,16 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
           />
         )}
       </div>
+      {/* Above 700 px nothing floats over the text (#21): the New finding panel holds the hint and the one Discard.
+          Below the panes, not inside them: the bar sticks to the bottom of the window while the page is unscrolled (issue 452). */}
+      {pendingBarShown && (
+        <div ref={pendingBarRef} className="pending-bar" role="group" aria-label="New finding">
+          <span className="pending-bar__text">New finding “{quoteSegments(view.document.text, pendingAnnotation!.segments, 40)}”</span>
+          <Button type="button" variant="primary" size="sm" onClick={chooseTerm}>Choose term</Button>
+          <Button type="button" variant="secondary" size="sm" onClick={discardPending}>Discard</Button>
+          <CopyTextButton text={passageRef.current} onAnnounce={announceCarried} compact={narrowBar} />
+        </div>
+      )}
       </div>
 
       </>}

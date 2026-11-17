@@ -190,6 +190,11 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
         "list_mode_changes": {"project": "p"},
         "get_text_detail": {"project": "p", "document_id": "c-en-v1"},
         "list_translation_reviews": {"project": "p"},
+        "list_typography_hints": {
+            "project": "p",
+            "document_id": "c-en-v1",
+            "include_text": True,
+        },
         # The content tools (ONTOTATOR_MCP_READ_CONTENT=1), with every route.
         "get_text_version": {
             "project": "p",

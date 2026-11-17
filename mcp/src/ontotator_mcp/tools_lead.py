@@ -139,7 +139,9 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
         The dry run shows the task, its current round and, for
         carry_forward, the submissions it can continue from. With confirm
         the round is created; the current round is superseded
-        (carry_forward) or abandoned with its draft (clean_restart).
+        (carry_forward) or abandoned with its draft (clean_restart). A
+        submitted annotation gets no new round while a consolidation of its
+        text is open (CONSOLIDATION_OPEN): finish or withdraw it first.
         """
         if kind == "clean_restart" and not (reason or "").strip():
             raise OntotatorError("A clean restart needs a reason.")

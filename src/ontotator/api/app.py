@@ -523,6 +523,7 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
                     "HISTORY_NOT_AVAILABLE": 422,
                     "ROUND_ACTIVE": 409,
                     "CONSOLIDATION_ACTIVE": 409,
+                    "CONSOLIDATION_OPEN": 409,
                     "ROUND_ALREADY_EXISTS": 409,
                     "TASK_HELD": 409,
                     "TASK_WAITING_FOR_TRANSLATION_REVIEW": 409,
@@ -593,6 +594,7 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
         return response
 
     from ontotator.api.assignment_routes import router as assignment_router
+    from ontotator.api.typography_routes import router as typography_router
     from ontotator.api.variant_routes import router as variant_router
 
     app.include_router(assignment_router)
@@ -638,6 +640,7 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
     app.include_router(work_time_router)
     app.include_router(submission_history_router)
     app.include_router(variant_router)
+    app.include_router(typography_router)
     app.include_router(admin_router)
     app.include_router(ontology_router)
     app.include_router(archive_router)

@@ -3555,6 +3555,165 @@
         "x-ontotator-project-token": true
       }
     },
+    "/api/v1/projects/{key}/documents/{doc}/typography-hints": {
+      "get": {
+        "tags": [
+          "typography"
+        ],
+        "summary": "Version Typography Hints",
+        "description": "Spacing errors and invisible characters of one text version.",
+        "operationId": "version_typography_hints_api_v1_projects__key__documents__doc__typography_hints_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "doc",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Doc"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 2000,
+              "minimum": 1,
+              "default": 500,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionTypographyHints"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "read",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/typography-hints": {
+      "get": {
+        "tags": [
+          "typography"
+        ],
+        "summary": "Project Typography Hints",
+        "description": "Hint counts per text, one page of texts at a time (ordered by document ID).\n\nLists the texts the caller may read. The positions of a text's hints are\nread with the route of that version.",
+        "operationId": "project_typography_hints_api_v1_projects__key__typography_hints_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "'next_after' of the previous page.",
+              "title": "After"
+            },
+            "description": "'next_after' of the previous page."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "description": "Texts to look at per page.",
+              "default": 100,
+              "title": "Limit"
+            },
+            "description": "Texts to look at per page."
+          },
+          {
+            "name": "versions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "newest",
+                "all"
+              ],
+              "type": "string",
+              "description": "Only the newest version of each text, or every one.",
+              "default": "newest",
+              "title": "Versions"
+            },
+            "description": "Only the newest version of each text, or every one."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectTypographyHints"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "read",
+        "x-ontotator-project-token": true
+      }
+    },
     "/api/v1/admin/users/": {
       "get": {
         "tags": [
@@ -26218,6 +26377,43 @@
         "title": "ProjectSummary",
         "description": "A project on the dashboard, with what the user may do in it."
       },
+      "ProjectTypographyHints": {
+        "properties": {
+          "texts": {
+            "items": {
+              "$ref": "#/components/schemas/TextTypographyCounts"
+            },
+            "type": "array",
+            "title": "Texts",
+            "description": "The texts of this page that have at least one hint."
+          },
+          "scanned": {
+            "type": "integer",
+            "title": "Scanned",
+            "description": "Number of texts this page looked at."
+          },
+          "next_after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next After",
+            "description": "Pass as 'after' for the next page; null on the last page."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "texts",
+          "scanned",
+          "next_after"
+        ],
+        "title": "ProjectTypographyHints"
+      },
       "ProjectWorkTimeView": {
         "properties": {
           "record": {
@@ -31401,6 +31597,48 @@
         ],
         "title": "TextLayers"
       },
+      "TextTypographyCounts": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "document_id",
+          "case_id",
+          "language",
+          "version",
+          "total",
+          "counts"
+        ],
+        "title": "TextTypographyCounts"
+      },
       "TextWindowView": {
         "properties": {
           "start": {
@@ -32154,6 +32392,43 @@
         ],
         "title": "TreeTermDetail",
         "description": "What the detail pane shows for the selected node."
+      },
+      "TypographyHintView": {
+        "properties": {
+          "rule": {
+            "type": "string",
+            "enum": [
+              "DOUBLE_SPACE",
+              "SPACE_BEFORE_PUNCTUATION",
+              "MISSING_SPACE_AFTER_PUNCTUATION",
+              "TRAILING_WHITESPACE_LINE",
+              "TRAILING_WHITESPACE_TEXT",
+              "TAB",
+              "ZERO_WIDTH_CHARACTER",
+              "SOFT_HYPHEN",
+              "CONTROL_CHARACTER"
+            ],
+            "title": "Rule"
+          },
+          "start": {
+            "type": "integer",
+            "title": "Start",
+            "description": "First code point of the hint (zero-based, Unicode code points, as annotation spans)."
+          },
+          "end": {
+            "type": "integer",
+            "title": "End",
+            "description": "Code point after the last one of the hint."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rule",
+          "start",
+          "end"
+        ],
+        "title": "TypographyHintView"
       },
       "UnassignableDocument": {
         "properties": {
@@ -33099,6 +33374,53 @@
           "created_at"
         ],
         "title": "VersionRef"
+      },
+      "VersionTypographyHints": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "text_sha256": {
+            "type": "string",
+            "title": "Text Sha256"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts",
+            "description": "Number of hints per rule code."
+          },
+          "hints": {
+            "items": {
+              "$ref": "#/components/schemas/TypographyHintView"
+            },
+            "type": "array",
+            "title": "Hints"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "description": "True when 'hints' holds fewer than 'total'."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "document_id",
+          "text_sha256",
+          "total",
+          "counts",
+          "hints",
+          "truncated"
+        ],
+        "title": "VersionTypographyHints"
       },
       "VersionUploadPreview": {
         "properties": {
