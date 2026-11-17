@@ -16,6 +16,7 @@ ALLOW_HTTP_VARIABLE = "ONTOTATOR_ALLOW_HTTP"
 TIMEOUT_VARIABLE = "ONTOTATOR_TIMEOUT"
 JOB_TIMEOUT_VARIABLE = "ONTOTATOR_JOB_TIMEOUT"
 FILES_DIR_VARIABLE = "ONTOTATOR_MCP_FILES_DIR"
+READ_CONTENT_VARIABLE = "ONTOTATOR_MCP_READ_CONTENT"
 
 
 class ConfigError(ValueError):
@@ -64,6 +65,19 @@ def _folders(env: Mapping[str, str]) -> tuple[Path, ...]:
     return tuple(folders)
 
 
+def _read_content(env: Mapping[str, str]) -> bool:
+    """``ONTOTATOR_MCP_READ_CONTENT``: only ``1`` turns the content tools on."""
+    raw = env.get(READ_CONTENT_VARIABLE, "").strip()
+    if raw in ("", "0"):
+        return False
+    if raw != "1":
+        raise ConfigError(
+            f"{READ_CONTENT_VARIABLE} must be 1 (the tools that return texts and"
+            " submitted annotations) or unset."
+        )
+    return True
+
+
 @dataclass(frozen=True)
 class Settings:
     """Where the Ontotator instance is and the API token to use there.
@@ -78,6 +92,8 @@ class Settings:
     poll_interval: float = 1.0
     # Folders the tools may read and write local files in; empty means none.
     files_dirs: tuple[Path, ...] = ()
+    # Whether the tools that return text and submitted annotations exist.
+    read_content: bool = False
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
@@ -125,4 +141,5 @@ class Settings:
             timeout=_seconds(env, TIMEOUT_VARIABLE, 60.0),
             job_timeout=_seconds(env, JOB_TIMEOUT_VARIABLE, 900.0),
             files_dirs=_folders(env),
+            read_content=_read_content(env),
         )

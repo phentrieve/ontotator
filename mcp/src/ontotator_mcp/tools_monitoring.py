@@ -18,6 +18,17 @@ DocumentId = Annotated[
 ]
 # Tasks that work in rounds: their rounds name the inputs and submissions.
 ROUND_TASKS = ("annotate", "review")
+# What a reviewer wrote in a translation review: the full corrected text and
+# the free-text rationale. Returned only with include_text.
+REVIEW_CONTENT = ("proposed_text", "rationale")
+
+
+def without_review_content(reviews: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The reviews without the reviewers' text; the text hashes stay."""
+    return [
+        {name: value for name, value in review.items() if name not in REVIEW_CONTENT}
+        for review in reviews
+    ]
 
 
 def register_monitoring(server: MCPServer, api: OntotatorClient) -> None:
@@ -78,8 +89,10 @@ def register_monitoring(server: MCPServer, api: OntotatorClient) -> None:
         Names who worked on the text in which task and state, every round
         of annotation and consolidation with its inputs and submissions,
         every submitted result and every translation review. Findings are
-        not part of it. The rounds come from a route outside the project's
-        path: until project tokens reach it, it needs a personal token.
+        not part of it, nor the text a translation reviewer proposed or
+        their rationale (list_translation_reviews with include_text). The
+        rounds come from a route outside the project's path: until project
+        tokens reach it, it needs a personal token.
         """
         doc = seg(document_id)
         assignments: list[dict[str, Any]] = await api.get(
@@ -123,7 +136,7 @@ def register_monitoring(server: MCPServer, api: OntotatorClient) -> None:
             ],
             "rounds": rounds,
             "submissions": submissions,
-            "translation_reviews": reviews,
+            "translation_reviews": without_review_content(reviews),
         }
 
     @register(server, scopes="read", effect="read")
@@ -132,10 +145,22 @@ def register_monitoring(server: MCPServer, api: OntotatorClient) -> None:
         document_id: Annotated[
             str | None, Field(description="Only reviews of this text version.")
         ] = None,
+        include_text: Annotated[
+            bool,
+            Field(
+                description=(
+                    "Also return each review's 'proposed_text' (the full text"
+                    " the reviewer submitted) and 'rationale'. Off by default:"
+                    " clinical text then stays out of the result."
+                )
+            ),
+        ] = False,
     ) -> list[dict[str, Any]]:
         """Submitted translation reviews: decision, clinical change, categories, reviewer.
 
-        Oldest first. A lead sees every review; anyone else their own.
+        Oldest first. A lead sees every review; anyone else their own. The
+        text a reviewer proposed and their rationale are returned only with
+        include_text; the text hashes always.
         """
         path = (
             project_path(project, "translation-reviews")
@@ -145,4 +170,4 @@ def register_monitoring(server: MCPServer, api: OntotatorClient) -> None:
             )
         )
         reviews: list[dict[str, Any]] = await api.get(path)
-        return reviews
+        return reviews if include_text else without_review_content(reviews)

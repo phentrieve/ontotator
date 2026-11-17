@@ -12,6 +12,7 @@ from ontotator_mcp import __version__
 from ontotator_mcp.client import OntotatorClient
 from ontotator_mcp.config import Settings
 from ontotator_mcp.resources import register_resources
+from ontotator_mcp.tools_content import register_content
 from ontotator_mcp.tools_lead import register_lead
 from ontotator_mcp.tools_monitoring import register_monitoring
 from ontotator_mcp.tools_people import register_people
@@ -47,6 +48,16 @@ that variable; the other tools work without it. Long imports and exports are job
 wait for them by default; get_job polls one.
 """
 
+# Added to the instructions when ONTOTATOR_MCP_READ_CONTENT=1.
+CONTENT_INSTRUCTIONS = """
+One exception to "no tool reads them": this server was started with
+ONTOTATOR_MCP_READ_CONTENT=1, so get_text_version, list_annotation_versions,
+get_annotation_version and get_submission read texts and submitted
+annotations (never drafts, and nothing can be written). They return
+clinical text only with include_text; ask for it only when the task needs
+the wording.
+"""
+
 
 def build_server(
     settings: Settings, *, transport: httpx.AsyncBaseTransport | None = None
@@ -64,7 +75,8 @@ def build_server(
     server = MCPServer(
         "ontotator",
         title="Ontotator",
-        instructions=INSTRUCTIONS,
+        instructions=INSTRUCTIONS
+        + (CONTENT_INSTRUCTIONS if settings.read_content else ""),
         version=__version__,
         lifespan=lifespan,
     )
@@ -74,5 +86,7 @@ def build_server(
     register_status(server, api)
     register_monitoring(server, api)
     register_results(server, api)
+    if settings.read_content:
+        register_content(server, api)
     register_resources(server, api)
     return server
