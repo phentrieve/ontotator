@@ -172,6 +172,13 @@ BULK_TOOLS: list[tuple[str, str, str, dict[str, Any]]] = [
         {"kind": "carry_forward"},
     ),
     (
+        "pause_texts",
+        f"{P}/text-pauses/pause",
+        "TextPauseActionView",
+        {"reason": "Check"},
+    ),
+    ("release_texts", f"{P}/text-pauses/release", "TextPauseActionView", {}),
+    (
         "change_final_results",
         f"{P}/final-selections/bulk-change",
         "BulkChangeFinalView",

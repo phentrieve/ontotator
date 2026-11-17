@@ -338,6 +338,7 @@ ROW_KEYS = {
     "newer_proposal_set",
     "proposal_set_unrecorded",
     "annotations_per_text",
+    "lead_pause",
     "consolidation_progress",
     "unreviewed_translation",
 }
@@ -358,6 +359,7 @@ VERSION_KEYS = {
     "acceptance",
     "discarded",
     "upload",
+    "editorial_correction",
 }
 WORK_KEYS = {
     "person",
@@ -369,6 +371,7 @@ WORK_KEYS = {
     "task",
     "status",
     "held",
+    "pause_causes",
     "round_ordinal",
     "round_state",
     "lead_correction",

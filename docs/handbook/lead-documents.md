@@ -139,6 +139,8 @@ What for: show only texts in a certain state, language or origin, or the texts o
 
 Active filters show as chips above the table. Remove one with its ✕, or click **Clear all**. Options without texts are hidden; click the button below the options, for example *Show 4 empty filters*, to see them.
 
+To list the texts you paused, tick **Paused by lead** under **Flags** ([Pause and release the work on texts](#pause-and-release-the-work-on-texts)).
+
 To find texts with more annotators than **Annotators per text** allows, for example after you lowered the limit, tick **More annotators than the limit** under **Flags**. It counts the unremoved annotation tasks of a text's current version, open and submitted. A text with its own limit ([Assign work for one text](#assign-work-for-one-text)) is measured against that limit, not the project's. To withdraw the extra open tasks, select the texts and use [Withdraw open tasks…](#reopen-or-withdraw-the-tasks-of-several-texts).
 
 ### Sort and page through the table
@@ -213,7 +215,7 @@ What for: see each version of a translation, its reviews and its origin.
 1. Open the text card and click **Translation**.
 2. The list shows each version with its origin and status, then one row per person who worked on it: the name, the task and the status. Older ones are under **Older versions**; with parallel versions they are grouped by version chain.
 3. Click **View text** to read a version, or **Translation reviews** to see every review decision. In a reviewer's row, **Reopen…** lets them review the version again and **Remove…** removes their assignment.
-   At the newest accepted version, **Correct the translation…** lets you correct it yourself ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)). At the newest version of a translation, **Upload new version…** brings in a text made elsewhere as the next version ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)).
+   At the newest accepted version, **Correct the translation…** lets you correct it yourself ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)). At the newest version of a translation, **Upload new version…** brings in a text made elsewhere as the next version ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)). **Fix typos…** at the newest version fixes spacing, typos or grammar without a review and keeps the status of the text; a version made this way says *Typo fix* under its name, with the lead and the reason ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
 4. Click **Compare with source** to compare the translation with the source text.
 
 ### Find spacing errors and invisible characters
@@ -372,7 +374,7 @@ What for: let the annotators revise many texts at once, for example after a guid
 5. Read the preview. It groups the tasks by what happens to them and names the people with their number of tasks, for example *Reopen 9 submitted tasks · Tom Reis 5, R. Roe 4*. Click **Show all** to list every text of a group. What stays as it is has its own group with the reason, for example:
    - *Skip 3 texts · final result chosen: use Change final… first*: texts with a final result are not reopened.
    - *Keep 2 open tasks · not submitted yet*: there is nothing to reopen yet.
-   - *Keep 1 started task · work has begun: tick “Also withdraw started tasks”*: started tasks (unless ticked), tasks paused by a problem report and lead corrections are not withdrawn; each has its own group.
+   - *Keep 1 started task · work has begun: tick “Also withdraw started tasks”*: started tasks (unless ticked), tasks paused by a problem report, tasks on a text paused by a lead and lead corrections are not withdrawn; each has its own group.
 6. Enter the **Reason**. For **Reopen…** it is required: the people see it in **My tasks**. For **Withdraw open tasks…** it is optional (**Reason (optional)**). It is kept in each text's history.
 7. Click the button that names the work, for example *Reopen 14 assignments*. The dialog lists what happens. Tick **I understand** (or **I understand — withdraw the open tasks**) and click the button again.
 
@@ -381,6 +383,8 @@ Every listed task changes, or none: if the texts changed since the preview, the 
 **Undo** in the message, for example *Reopened 14 assignments in 12 texts.*, takes the change back: reopened tasks count as submitted again; withdrawn tasks come back with their drafts. Undo is for the lead who made the change, once, within an hour, and only while nothing changed on these texts since: nobody saved a draft, nobody was assigned, the plan, the final result and the text version are the same. Otherwise the message says *Undo is no longer possible: the texts changed since.* Through the API and the MCP server the same Undo is `POST /api/v1/projects/{key}/bulk-task-actions/undo` with the `undo.id` of the applied action, and the MCP tool `undo_reopen_or_withdraw`; with `preview: true` (the tool's dry run) it lists the tasks that would come back and says what blocks it, and changes nothing.
 
 A message never lies over a dialog you open after it. If you open the next dialog while the message is still showing, the message waits; when you close the dialog, it is back with its **Undo** and stays for its full time again. This holds for every message with **Undo**, also in the annotation view.
+
+Tasks reopened on a text that a lead paused stay paused until the text is released; the dialog says how many ([Pause and release the work on texts](#pause-and-release-the-work-on-texts)).
 
 The same menu holds **Accept agreeing results…** and **Change final…** for the final results of the selected texts: see [Accept or change the final result of several texts](lead-results.md#accept-or-change-the-final-result-of-several-texts). The message after **Change final…** has **Undo** as well: it brings the earlier final results back, for the lead who made the change, once, within an hour, and only while nothing changed on these texts since.
 
@@ -430,6 +434,46 @@ What happens to the work:
 
 - Reopened translation reviews have no Undo: the review starts again from the current text of its version, and the earlier draft cannot be brought back. The dialog says so before you confirm. The submitted decision stays in the history.
 - Undo is recorded as a change of its own. A person who has the task open may be asked to reload it.
+
+### Pause and release the work on texts
+
+What for: stop the work on some texts for a while without taking it away, for example while the source text is clarified with the clinic, and let it go on later.
+
+What a pause does:
+
+- The open tasks of the text stay with their people. In **My tasks** each is marked **Paused by lead** with your reason. The people can read the task, but not save or submit it: annotations, translation reviews and consolidations alike, on every version of the text.
+- The text itself is paused. A task you assign later, reopen or give a new round is paused from the start, until you release the text.
+- Submitted work and final results are untouched. They are compared, accepted and exported as before.
+- A pause from a problem report is separate. Each is released on its own, and a task opens only when neither holds: deciding a report does not release your pause, and releasing the text does not close a report.
+
+To pause:
+
+1. Select the texts, then click **More actions** in the selection bar and choose **Pause texts…**. When every selected text is already paused, the entry is unavailable and says so.
+2. Read the preview. It groups the texts by what happens, for example *Pause 2 texts with 3 open tasks · Tom Reis 2, R. Roe 1* and *Pause 2 texts without open tasks · tasks assigned later are paused from the start*; click **Show all** to list every text. Texts that are already paused have their own group, *Skip 1 text · already paused by a lead*.
+3. Enter the **Reason**. It is required: the people see it in **My tasks** and in the task.
+4. Click the button that names the work, for example *Pause 4 texts*. The dialog says what happens. Tick **I understand — pause the work on these texts** and click the button again.
+
+A person who has the task open when you pause is told with the next thing they do there: a banner *Paused by lead: …* with your reason appears above the text. What they typed and had not saved yet stays in their editor until they leave it.
+
+On **Documents**, a paused text carries the badge **Paused by lead**; point at it to read who paused it, when and why. Its open work is nobody's turn: **Waiting on** does not name the people, and the stage shows the pause sign. To list the paused texts, tick **Paused by lead** under **Flags** in **Filter**. The text card shows a notice **Paused by lead** with who, when and why, and each paused person's row says *Paused by lead*.
+
+To release:
+
+1. Select the texts and choose **More actions** › **Release texts…**. Or click **Release…** in the notice of one text card.
+2. Read the preview, for example *Release 3 texts with 4 open tasks · Tom Reis 2, R. Roe 2*. A task that a problem report pauses as well is named in its own group, *1 task stays paused · paused by a problem report as well: decide the report under Problem reports*. Texts that are not paused are skipped.
+3. A reason is optional (**Reason (optional)**). Click the button, for example *Release 4 texts*, tick **I understand** and click again.
+
+Every listed text is paused or released, or none: if the texts changed since the preview, the dialog says *The texts changed since the preview. Check the new preview.* and shows it. Each text gets its own entry in the audit trail, with the reason. There is no **Undo** in the message: **Release texts…** is the way back from a pause, **Pause texts…** from a release, and neither changes any work.
+
+The other actions on paused texts:
+
+- **Assign…** works; the dialog says that the task starts paused.
+- **Reopen…** and **Start a round…** work for submitted tasks; the dialog says how many of them are on paused texts and stay paused until you release the texts.
+- **Withdraw open tasks…** keeps a paused task, *Keep 1 paused task · paused by a lead: release the text first*. **Remove…** in the text card removes a single one.
+- **Change mode…**, **Accept agreeing results…** and **Change final…** work as on any other text.
+- **Fix typos…** and **Upload new version…** on a version of a paused text work: they are your own actions and change nobody's work in progress. The pause covers every version, so tasks that follow a correction to the new version are still paused there.
+- Correcting a translation yourself is refused while your own earlier review of that version is open and the text is paused: release the text first.
+- **Agree clean restart…** on a problem report is refused while the text is paused: release the text first.
 
 ### Move texts to the front of the queue
 

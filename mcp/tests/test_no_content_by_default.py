@@ -30,6 +30,10 @@ from ontotator_mcp.tools_content import CONTENT_TOOLS
 pytestmark = pytest.mark.anyio
 
 SENTENCE = "The patient had two seizures last week."
+# The one answer that carries text by design: the dry run of
+# editorial_correction returns the diff of the fixes the caller sent (the
+# changed passages with their surroundings), never the whole text (#453).
+BY_DESIGN = [("editorial_correction", False)]
 
 
 async def _answers(
@@ -74,7 +78,7 @@ async def test_no_default_tool_returns_text_content(
     assert ran == set(_arguments(tmp_path)) - set(CONTENT_TOOLS)
     assert len(fake.calls) > len(ran)
     leaking = sorted(key for key, answer in answers.items() if SENTENCE in answer)
-    assert leaking == []
+    assert leaking == BY_DESIGN
 
 
 async def test_the_sentence_comes_back_with_the_opt_in(

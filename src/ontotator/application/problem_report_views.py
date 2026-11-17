@@ -26,6 +26,7 @@ from ontotator.storage.tables import (
     SubmissionRow,
     UserRow,
 )
+from ontotator.storage.text_pause import paused_texts
 from ontotator.storage.workflow_tables import (
     ProblemReportEventRow,
     ProblemReportRow,
@@ -151,6 +152,10 @@ class ProblemReportView(BaseModel):
     holds: list[ReportHoldView] = Field(default_factory=list)
     # Reporter only: a lead acted after the reporter last opened the report.
     answered: bool = False
+    # Issue 464: a lead paused the text of the report. That pause is its own
+    # cause: releasing this report's pauses leaves the text's open tasks
+    # paused until the text is released.
+    text_paused_by_lead: bool = Field(default_factory=lambda: False)
 
 
 def _ids(details: dict[str, Any]) -> list[int]:
@@ -484,6 +489,9 @@ def build_report_view(
         holds=holds,
         answered=viewer_id == reporter_id
         and answered(event_rows, reporter_id, own, row["reporter_seen_at"]),
+        text_paused_by_lead=bool(
+            paused_texts(conn, pid, [(row["case_id"], row["language"])])
+        ),
     )
 
 

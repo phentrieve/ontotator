@@ -114,8 +114,14 @@ class AssignmentView(BaseModel):
     external_id: str | None = None
     active_round_id: str | None = None
     workflow_revision: int = 0
+    # Paused: the task can be read, not saved. ``pause_causes`` names why:
+    # ``report`` (a problem report) and/or ``lead`` (the lead paused the
+    # text, issue 464); the task opens when none remains. ``hold_reason`` is
+    # the report's reason, else the lead's; ``lead_pause_reason`` the lead's.
     held: bool = False
     hold_reason: str | None = None
+    pause_causes: list[Literal["report", "lead"]] = Field(default_factory=list)
+    lead_pause_reason: str | None = None
     active_holds: list[ActiveHoldView] = Field(default_factory=list)
     # FD1: the lead's own translation review of a rejected or queried version.
     lead_correction: bool = False

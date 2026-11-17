@@ -80,6 +80,7 @@ In week six, 80 new letters arrive, one student leaves for a clinical rotation, 
 | Reopen or withdraw the tasks of many texts, with a preview | `POST P/bulk-task-actions/reopen`, `/withdraw` | `project-admin` | `reopen_texts`, `withdraw_open_tasks` (the confirmed answer carries `undo`) | covered (#336) |
 | Undo that reopen or withdrawal: every task comes back, or none | `POST P/bulk-task-actions/undo` (`undo_id` of the apply; `preview: true` lists the tasks and what blocks the undo) | `project-admin` | `undo_reopen_or_withdraw` (dry run, then `confirm`) | covered; until 0.10.2 the route had no tool and the tools dropped `undo` |
 | Start a new round for the submitted annotations of many texts (continue or restart), with a preview | `POST P/bulk-task-actions/start-round` | `project-admin` | `start_rounds` | covered (#336) |
+| Pause the work on many texts and release it again, with a preview; open tasks stay with their people, read-only, also tasks assigned later; submitted work and final results untouched | `POST P/text-pauses/pause`, `/release` | `project-admin` | `pause_texts`, `release_texts` | covered (#464) |
 | Deactivate the account afterwards (sessions end, tokens revoked) | `PATCH /admin/users/{username}` | `admin` | `update_user` | added in this PR |
 | Add a consolidator | `PUT P/members/{username}` (`adjudicator`) | `read`, `project-admin` | `set_member_roles` | covered |
 | Consolidators must not have annotated the text | `PATCH P/settings` (`adjudicator_not_annotator`) | `project-admin` | `update_project_settings` | covered |

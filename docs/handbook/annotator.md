@@ -379,7 +379,7 @@ The menu item reads **Text problems** when there is something to see, for exampl
 
 What for: continue work after a report, or take a report back.
 
-A paused task shows a one-line banner *Task paused: …* above the text with the reason. Click **Show more** to read all of it, **Show less** to fold it again.
+A paused task shows a one-line banner *Task paused: …* above the text with the reason. Click **Show more** to read all of it, **Show less** to fold it again. A term search in a task that was paused while you had it open is answered with the reason of the pause, not with terms.
 
 1. Open **More**, then **Text problems**. Your report card shows its state and your task's state.
 2. Choose one:
@@ -387,6 +387,15 @@ A paused task shows a one-line banner *Task paused: …* above the text with the
    - To take the report back: click **Withdraw report…**, fill in **Why are you withdrawing it?** and click **Withdraw report**. Your task is no longer paused by this report.
 
 When the lead answers, the task shows a banner with **Open the answer**, and **My tasks** shows **Answer to your report**. If a project lead paused the task, only a project lead can release the pause.
+
+### A task paused by the lead
+
+The lead can pause the work on a text, for example while the text is being clarified. Your task stays in **My tasks**, marked **Paused by lead** with the lead's reason. You can open and read it; a banner *Paused by lead: …* above the text gives the reason. You cannot save or submit until the lead releases the text. Then the mark goes away and you continue where you stopped. There is nothing for you to do meanwhile.
+
+- If the pause arrives while you have the task open, the next thing you do there (a term search, a saved change, a submit) is refused and the banner appears. Nothing you saved is lost. What you had typed but not saved stays on the screen until you leave the task; when you leave, the editor asks before it discards it.
+- A task you are assigned on a paused text is paused from the start.
+- A task can be paused by the lead and by a problem report at the same time. **My tasks** then shows **Paused** with the report's reason and **Paused by lead** with the lead's. Each is released on its own, and the task opens when neither is left: after you resume your report, the task may still be **Paused by lead**.
+- Your submitted tasks are not paused.
 
 ## Review a translation
 

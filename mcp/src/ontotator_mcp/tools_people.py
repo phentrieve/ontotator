@@ -114,6 +114,47 @@ def bulk_summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
     )
 
 
+def pause_summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
+    """The preview or result of pausing or releasing texts, lists cut to
+    MAX_BULK_LISTED: per text its tasks in progress and their people."""
+
+    def person(item: dict[str, Any]) -> Any:
+        ref = item.get("person") or {}
+        return ref.get("display_name") or ref.get("pseudonym")
+
+    def text(item: dict[str, Any]) -> dict[str, Any]:
+        tasks = item.get("tasks", [])
+        entry: dict[str, Any] = {
+            "case_id": item.get("case_id"),
+            "language": item.get("language"),
+            "tasks_in_progress": len(tasks),
+            "people": sorted({name for name in map(person, tasks) if name}),
+        }
+        if item.get("pause"):
+            entry["paused_because"] = item["pause"].get("reason")
+        still = sum(1 for task in tasks if task.get("paused_by_report"))
+        if still and found.get("action") == "release":
+            entry["still_paused_by_report"] = still
+        return entry
+
+    changes = [text(item) for item in found.get("changes", [])]
+    skipped = [
+        {key: item.get(key) for key in ("case_id", "language", "message")}
+        for item in found.get("skipped", [])
+    ]
+    return {
+        "applied": applied,
+        "changed" if applied else "would_change": _cut(changes, MAX_BULK_LISTED),
+        "change_count": found.get("change_count", len(changes)),
+        "tasks_in_progress": found.get("task_count", 0),
+        "still_paused_by_report": found.get("still_paused_count", 0),
+        "skipped_texts": _cut(skipped, MAX_BULK_LISTED),
+        "skipped_count": found.get("skipped_count", len(skipped)),
+        **unknown_texts(found, MAX_BULK_LISTED),
+        "preview_token": found.get("preview_token"),
+    }
+
+
 # A copy of ontotator.exchange.spreadsheet (#386): this package is installed on
 # its own and does not depend on the server. Keep the two in step.
 ESCAPED_START = ("=", "+", "-", "@", "\t", "\r", "'")
@@ -836,6 +877,105 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         if reason:
             body["reason"] = reason
         return await _bulk(project, "start-round", body, confirm, preview_token)
+
+    async def _pause(
+        project: str,
+        action: str,
+        body: dict[str, Any],
+        confirm: bool,
+        preview_token: str | None,
+    ) -> dict[str, Any]:
+        """Dry run, or apply with the dry run's token; a stale token answers
+        with the fresh dry run (``stale``)."""
+        path = project_path(project, "text-pauses", action)
+        body = body | {"rows": [text.model_dump() for text in body["rows"]]}
+        if not confirm:
+            preview: dict[str, Any] = await api.post(path, body | {"preview": True})
+            return pause_summary(preview, False)
+        if preview_token is None:
+            raise OntotatorError(
+                "Run the dry run first and pass its preview_token with confirm."
+            )
+        try:
+            applied: dict[str, Any] = await api.post(
+                path, body | {"preview_token": preview_token}
+            )
+        except OntotatorError as exc:
+            fresh = (
+                exc.details.get("preview") if isinstance(exc.details, dict) else None
+            )
+            if exc.code != "PREVIEW_STALE" or not isinstance(fresh, dict):
+                raise
+            return pause_summary(fresh, False) | {
+                "stale": True,
+                "note": "The texts changed since the dry run; nothing was changed."
+                " Check this new dry run and confirm with its preview_token.",
+            }
+        return pause_summary(applied, True)
+
+    @register(server, scopes="project-admin", effect="changes")
+    async def pause_texts(
+        project: Project,
+        texts: Texts,
+        reason: Annotated[
+            str,
+            Field(
+                min_length=1,
+                max_length=2000,
+                description=(
+                    "Why, e.g. 'Source text is being clarified'; the people see"
+                    " it in My tasks and in the task."
+                ),
+            ),
+        ],
+        confirm: Annotated[
+            bool, Field(description="False: dry run. True: pause the listed texts.")
+        ] = False,
+        preview_token: PreviewToken = None,
+    ) -> dict[str, Any]:
+        """Pause the work on many texts, after a dry run.
+
+        A paused text keeps its tasks: the people still see them in My
+        tasks, marked "Paused by lead" with the reason, and can read them,
+        but no task in progress can be saved (annotation, translation review,
+        consolidation). A task assigned, reopened or given a round later is
+        paused from the start. Submitted work and final results are untouched
+        and exported as before. A pause from a problem report is a separate
+        cause and stays as it is. The dry run lists the texts with their
+        tasks in progress, the texts already paused, the texts the project
+        does not have (unknown_texts) and a preview_token;
+        confirm with it: every listed text is paused, or none when anything
+        changed since (a fresh dry run, ``stale``). release_texts is the way
+        back.
+        """
+        return await _pause(
+            project, "pause", {"rows": texts, "reason": reason}, confirm, preview_token
+        )
+
+    @register(server, scopes="project-admin", effect="changes")
+    async def release_texts(
+        project: Project,
+        texts: Texts,
+        reason: Annotated[str | None, Field(max_length=2000)] = None,
+        confirm: Annotated[
+            bool, Field(description="False: dry run. True: release the listed texts.")
+        ] = False,
+        preview_token: PreviewToken = None,
+    ) -> dict[str, Any]:
+        """Release texts a lead paused (pause_texts), after a dry run.
+
+        Their tasks in progress can be saved again. A task that a problem
+        report pauses as well stays paused until that report is decided
+        (``still_paused_by_report``); deciding a report never releases a
+        lead pause. Texts that are not paused are skipped; texts the
+        project does not have are named (unknown_texts). Confirm with the
+        dry run's preview_token: every listed text is released, or none when
+        anything changed since (a fresh dry run, ``stale``).
+        """
+        body: dict[str, Any] = {"rows": texts}
+        if reason:
+            body["reason"] = reason
+        return await _pause(project, "release", body, confirm, preview_token)
 
     @register(server, scopes=("read", "project-admin"), effect="destructive")
     async def hand_over_open_tasks(

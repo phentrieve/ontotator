@@ -6,12 +6,15 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, type ConsolidationAnnotatePayload, type ConsolidationReopenPayload, type ConsolidationResolvePayload, type ConsolidationView, type Draft, type MutationEnvelope, type Submission } from "../api/client";
+import { errorMessage } from "../admin/errors";
 import type { WorkspaceView } from "../app/CaseScreen";
 import { randomId } from "../editor/ids";
 import { notifyTasksChanged } from "../tasks/tasksEvents";
 
 export type GroupOutcome =
   | { kind: "conflict"; onReview: () => void }
+  /** Refused because the task is paused (a problem report, or the lead paused the text): the words for the person. */
+  | { kind: "paused"; message: string }
   | { kind: "error"; onRetry: () => void };
 
 export type AxisWarning = {
@@ -52,8 +55,10 @@ export function axisWarningOf(error: unknown): AxisWarning | null {
 }
 
 const isConflict = (error: unknown) => error instanceof ApiError && error.status === 409;
+const isPaused = (error: unknown) => error instanceof ApiError && error.code === "TASK_HELD";
 
-export function useConsolidation(roundId: string, options: { workspaceView?: WorkspaceView | null } = {}) {
+export function useConsolidation(roundId: string, options: { workspaceView?: WorkspaceView | null; /** A save was refused because the task is paused: the caller reloads the task's state. */ onTaskHeld?: () => void } = {}) {
+  const taskHeld = useRef(options.onTaskHeld); taskHeld.current = options.onTaskHeld;
   const [view, setView] = useState<ConsolidationView | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [refreshError, setRefreshError] = useState<unknown>(null);
@@ -118,7 +123,10 @@ export function useConsolidation(roundId: string, options: { workspaceView?: Wor
           return true;
         } catch (failure) {
           if (!alive.current) return false;
-          const outcome: GroupOutcome = isConflict(failure)
+          // A pause is not a change elsewhere: the message names it, and the screen turns read-only with its banner.
+          if (isPaused(failure)) taskHeld.current?.();
+          const outcome: GroupOutcome = isPaused(failure) ? { kind: "paused", message: errorMessage(failure) }
+            : isConflict(failure)
             ? { kind: "conflict", onReview: () => { setOutcomes({}); reload(); } }
             : { kind: "error", onRetry: () => { void attempt(); } };
           setOutcomes(current => ({ ...current, [groupId]: outcome }));
@@ -184,6 +192,7 @@ export function useConsolidation(roundId: string, options: { workspaceView?: Wor
       } catch (failure) {
         const warning = axisWarningOf(failure);
         if (warning) return { kind: "warning", warning };
+        if (isPaused(failure)) taskHeld.current?.();
         throw failure;
       }
     });

@@ -42,6 +42,7 @@ from ontotator.storage.tables import (
     SubmissionRow,
     UserRow,
 )
+from ontotator.storage.text_pause import pause_columns, task_held
 
 AssignmentStatus = Literal["open", "in_progress", "submitted", "reopened"]
 DocumentStatus = Literal["not_started", "in_progress", "completed"]
@@ -297,9 +298,7 @@ def project_documents(
                 ~assignments
                 if status == "unassigned"
                 else assignments.where(
-                    AssignmentRow.held.is_(True)
-                    if status == "held"
-                    else AssignmentRow.status == status
+                    task_held() if status == "held" else AssignmentRow.status == status
                 )
             )
         rows = conn.execute(
@@ -344,8 +343,8 @@ def project_documents(
                     AssignmentRow.status,
                     AssignmentRow.active_round_id,
                     AssignmentRow.workflow_revision,
-                    AssignmentRow.held,
-                    AssignmentRow.hold_reason,
+                    # Paused by any cause, with the reason shown.
+                    *pause_columns()[:2],
                     UserRow.username,
                     UserRow.pseudonym,
                 )

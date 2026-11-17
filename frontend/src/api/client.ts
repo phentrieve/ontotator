@@ -111,6 +111,10 @@ export type VersionUploadPreview = components["schemas"]["VersionUploadPreview"]
 export type VersionUploadRequest = components["schemas"]["VersionUploadRequest"];
 export type VersionUploadResult = components["schemas"]["VersionUploadResult"];
 export type VersionUploadView = components["schemas"]["VersionUploadView"];
+// Issue 453: "Fix typos…" (an editorial correction) on a translation version
+export type EditorialCorrectionPreview = components["schemas"]["EditorialCorrectionPreview"];
+export type EditorialCorrectionRequest = components["schemas"]["EditorialCorrectionRequest"];
+export type EditorialCorrectionResult = components["schemas"]["EditorialCorrectionResult"];
 // Annotation-mode change after submissions, and its restore
 export type RowChangeView = components["schemas"]["RowChangeView"];
 export type ModeChangeTarget = components["schemas"]["ModeChangeTarget"];
@@ -118,6 +122,10 @@ export type ModeChangeRequest = components["schemas"]["ModeChangeRequest"];
 export type ModeChangePreview = components["schemas"]["ModeChangePreview"];
 export type BulkModeChangeRequest = components["schemas"]["BulkModeChangeRequest"];
 export type BulkModeChangeView = components["schemas"]["BulkModeChangeView"];
+// Lead pause of texts (issue 464)
+export type TextPauseRequest = components["schemas"]["TextPauseRequest"];
+export type TextPauseActionView = components["schemas"]["TextPauseActionView"];
+export type LeadPauseView = components["schemas"]["LeadPauseView"];
 export type ModeChangeView = components["schemas"]["ModeChangeView"];
 export type ModeChangeList = components["schemas"]["ModeChangeList"];
 export type ModeChangeResult = components["schemas"]["ModeChangeResult"];
@@ -687,12 +695,24 @@ export class ApiClient {
     return this.request<VersionUploadResult>(`/api/v1/projects/${encodeURIComponent(key)}/variants/${encodeURIComponent(documentId)}/versions`, { method: "POST", body: JSON.stringify(body) });
   }
 
+  /** Issue 453, read only: whether this version can be corrected editorially and, with a text, the changes, the guards and what follows. */
+  async previewEditorialCorrection(key: string, documentId: string, text?: string): Promise<EditorialCorrectionPreview> {
+    return this.request<EditorialCorrectionPreview>(`/api/v1/projects/${encodeURIComponent(key)}/documents/${encodeURIComponent(documentId)}/editorial-correction/preview`, { method: "POST", body: JSON.stringify(text === undefined ? {} : { text }) });
+  }
+
+  /** Issue 453: save a small editorial fix as the next version of this translation, with this version's status. */
+  async editorialCorrection(key: string, documentId: string, body: EditorialCorrectionRequest): Promise<EditorialCorrectionResult> {
+    return this.request<EditorialCorrectionResult>(`/api/v1/projects/${encodeURIComponent(key)}/documents/${encodeURIComponent(documentId)}/editorial-correction`, { method: "POST", body: JSON.stringify(body) });
+  }
+
   async discardVariant(key: string, documentId: string, body: DiscardRequest): Promise<DiscardResult> {
     return this.request<DiscardResult>(`/api/v1/projects/${encodeURIComponent(key)}/variants/${encodeURIComponent(documentId)}/discard`, { method: "POST", body: JSON.stringify(body) });
   }
 
   /** What changing a locked text's annotation mode discards and revokes (lead only, no write). */
   /** Bulk "Change mode…" of the selected texts: preview, or apply with the preview's token and a reason (lead only, issue 336). */
+  /** Pause or release the work on the selected texts (issue 464): a preview, or apply with the preview's token. */
+  async pauseTexts(key: string, action: "pause" | "release", body: TextPauseRequest, signal?: AbortSignal): Promise<TextPauseActionView> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/text-pauses/${action}`, { method: "POST", body: JSON.stringify(body), signal }); }
   async bulkChangeMode(key: string, body: BulkModeChangeRequest, signal?: AbortSignal): Promise<BulkModeChangeView> { return this.request(`/api/v1/projects/${encodeURIComponent(key)}/annotation-mode-changes/bulk`, { method: "POST", body: JSON.stringify(body), signal }); }
   async previewModeChange(key: string, body: ModeChangeTarget): Promise<ModeChangePreview> {
     return this.request<ModeChangePreview>(`/api/v1/projects/${encodeURIComponent(key)}/annotation-mode-changes/preview`, { method: "POST", body: JSON.stringify(body) });

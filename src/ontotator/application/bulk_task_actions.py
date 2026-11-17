@@ -29,6 +29,12 @@ are skipped. Each round is audited as ``round.create`` with ``via``. A new
 round has no Undo: its draft and inputs are new rows, and the earlier round
 is closed.
 
+Texts a lead paused (issue 464, ``text_pauses``): a paused task is not
+withdrawn here (``paused_by_lead``, as a task paused by a problem report is
+kept); tasks reopened or given a round on a paused text are changed and are
+paused from the start (``text_paused`` on the task, until the text is
+released).
+
 Undo (reopen and withdraw) is kept on the server: apply records one ``project.bulk_task_action``
 audit event with the action, the exact tasks it changed and a digest of the
 state it left, and returns only that event's id. The client cannot choose
@@ -83,6 +89,7 @@ from ontotator.storage.tables import (
     TranslationReviewDraftRow,
     UserRow,
 )
+from ontotator.storage.text_pause import paused_texts
 from ontotator.storage.text_settings import per_text_overrides
 from ontotator.storage.workflow_tables import WorkRoundStateRow
 
@@ -107,6 +114,7 @@ KEEP_REASONS: dict[str, str] = {
     "submitted": "Already submitted; submitted work stays.",
     "started": "Work has started; tick “Also withdraw started tasks” to include it.",
     "paused": "Paused by a problem report; decide the report first.",
+    "paused_by_lead": "Paused by a lead; release the text first.",
     "within_limit": "Within the limit of annotators per text.",
     "lead_correction_task": "A lead correction; remove it in the text card.",
     # Start a round
@@ -352,6 +360,10 @@ class BulkTaskActionService:
         pid = int(project["id"])
         found, assignments = self._rows(conn, pid, rows, lock=lock)
         wanted = set(o.tasks)
+        # Issue 464: texts a lead paused. A paused task is left to the
+        # release (withdraw); work that begins on a paused text (reopen,
+        # start a round) is paused from the start, and the preview says so.
+        paused = paused_texts(conn, pid, [(r.case_id, r.language) for r in found])
         changes: list[RowMapping] = []
         kept: list[tuple[RowMapping, str]] = []
         skipped: list[tuple[RowKey, str]] = []
@@ -393,6 +405,8 @@ class BulkTaskActionService:
                     reason = "lead_correction_task"
                 elif item["held"]:
                     reason = "paused"
+                elif (item["case_id"], item["language"]) in paused:
+                    reason = "paused_by_lead"
                 elif o.over_limit_only and item["id"] in keep_ids:
                     reason = "within_limit"
                 elif item["status"] != "open" and not o.include_started:
@@ -420,6 +434,13 @@ class BulkTaskActionService:
                 ],
                 "kept": [[item["id"], reason] for item, reason in kept],
                 "skipped": [[r.case_id, r.language, why] for r, why in skipped],
+                "paused": sorted(
+                    {
+                        (item["case_id"], item["language"])
+                        for item in changes
+                        if (item["case_id"], item["language"]) in paused
+                    }
+                ),
             }
         )
         known = set(found)
@@ -460,6 +481,7 @@ class BulkTaskActionService:
                 "task": item["task"],
                 "status": item["status"],
                 "person": people[int(item["user_id"])].model_dump(),
+                "text_paused": (item["case_id"], item["language"]) in paused,
             }
 
         result["changes"] = [task(item) for item in changes]

@@ -515,6 +515,42 @@ describe("translation part", () => {
     expect(onAcceptVersion).toHaveBeenCalledWith(row, versions[2]);
   });
 
+  it("issue 453: a version made by an editorial correction names who corrected it and why", () => {
+    const versions = [
+      version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "accepted", chain_name: "m1", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "m1", translation_status: "accepted",
+        editorial_correction: { reason: "Space before the full stop", previous_document_id: "case-200-de", inserted_characters: 0, deleted_characters: 1,
+          corrected_at: "2026-11-17T10:12:00", corrected_by: { pseudonym: "ann-0002", display_name: "Project lead", is_me: false } } }),
+    ];
+    const row = assignRow({ versions, work: [] });
+    renderCard({ row, initialSegment: "translation", now: new Date("2026-11-20T12:00:00") });
+    const part = within(card()).getByRole("heading", { name: "Translation" }).closest("section")!;
+    expect(within(part).getByText("Typo fix by Project lead (ann-0002), 17 Nov, 10:12 · Space before the full stop")).toBeTruthy();
+  });
+
+  it("issue 453: Fix typos… on the newest version of each translation, a rejected one included", () => {
+    const versions = [
+      version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "accepted", chain_name: "m1", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "m1", translation_status: "accepted" }),
+      version({ document_id: "case-200-mt", origin: "machine_translation", derived_from: "case-200-en", chain_name: "mt", translation_status: "reviewed", latest_review_decision: "rejected" }),
+    ];
+    const onEditorialCorrection = vi.fn();
+    const textVersionTools = { username: "lead", members: [], assignments: [], variants: new Map(), requiredLanguages: () => ["de"],
+      onAssignmentsChanged: vi.fn(), onRequestCorrection: vi.fn(), onUploadVersion: vi.fn(), onEditorialCorrection };
+    const row = assignRow({ versions, parallel_roots: true, work: [] });
+    renderCard({ row, initialSegment: "translation", textVersionTools });
+    const part = within(card()).getByRole("heading", { name: "Translation" }).closest("section")!;
+    // Not on the older version; a rejected newest version can be corrected too.
+    const buttons = within(part).getAllByText("Fix typos…");
+    expect(buttons.map(button => button.getAttribute("aria-label"))).toEqual(["Fix typos in m1 v2 of case-200 de…", "Fix typos in mt v1 of case-200 de…"]);
+    // The hint tells it apart from "Correct the translation…" and "Upload new version…".
+    expect(buttons[0].getAttribute("title")).toBe("Spacing, typos, grammar. Keeps the status; no review.");
+    // Next to the other version actions, before the upload.
+    expect(buttons[0].nextElementSibling?.textContent).toBe("Upload new version…");
+    fireEvent.click(buttons[0]);
+    expect(onEditorialCorrection).toHaveBeenCalledWith(row, versions[1]);
+  });
+
   it("issue 341: Upload new version… on the newest version of each translation, with how an uploaded version was made", () => {
     const versions = [
       version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "accepted", chain_name: "m1", is_newest_in_chain: false }),

@@ -83,3 +83,13 @@ class NewUser(_Model):
             " is the consolidator."
         ),
     )
+
+
+class Replacement(_Model):
+    """One passage of a text and what replaces it (``EditorialReplacement``)."""
+
+    old: str = Field(
+        min_length=1,
+        description="The passage as it stands; it must occur exactly once in the text.",
+    )
+    new: str = Field(description="What replaces it (empty: the passage is removed).")

@@ -681,6 +681,8 @@ async def test_wrong_input_is_named_not_ignored(live: dict[str, str]) -> None:
             ("reopen_texts", {"reason": "Check"}),
             ("withdraw_open_tasks", {}),
             ("start_rounds", {"kind": "carry_forward"}),
+            ("pause_texts", {"reason": "Check"}),
+            ("release_texts", {}),
             ("change_final_results", {}),
             ("change_annotation_modes", {"mode": "proposals", "reason": "Check"}),
         ):
