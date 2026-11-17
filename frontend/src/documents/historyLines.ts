@@ -105,7 +105,8 @@ export function historyLines(row: DocumentRowView, submissions: readonly RowSubm
       const round = item.kind === "consolidation" ? null : item.round_ordinal == null ? "Initial submission" : `Round ${item.round_ordinal}`;
       lines.push({
         key: `submission-${item.submission_id}`,
-        stage: "annotation",
+        // A consolidation is Finalization work: its lines stand with the final result, not under Annotation.
+        stage: item.kind === "consolidation" ? "final" : "annotation",
         text: `${SUBMISSION_PREFIX[item.kind] ?? "Annotation"}: ${join(personLabel(item.author_label, item.is_me, item.author), round,
           plural(item.finding_count, "finding"), keptText(item), several && `v${item.version}`, timeText(item.recorded_at, now))}`,
       });
@@ -120,11 +121,11 @@ export function historyLines(row: DocumentRowView, submissions: readonly RowSubm
     if (item.status === "submitted" && submissions && item.moved_to_version == null) continue;
     const status = item.moved_to_version != null ? `moved to v${item.moved_to_version}` : join(labelFor(assignmentStatusLabels, item.status), pausedWord(item));
     const round = item.moved_to_version == null && item.round_ordinal != null ? `Round ${item.round_ordinal}` : null;
-    lines.push({ key: `work-${item.assignment_id}`, stage: "annotation", text: `${workPrefix(item)}: ${join(who(item), round, status)}` });
+    lines.push({ key: `work-${item.assignment_id}`, stage: item.task === "review" ? "final" : "annotation", text: `${workPrefix(item)}: ${join(who(item), round, status)}` });
   }
 
   (options.changes ?? []).forEach((change, index) => {
-    const stage: HistoryStage = change.task === "translation_review" ? "review" : "annotation";
+    const stage: HistoryStage = change.task === "translation_review" ? "review" : change.task === "review" ? "final" : "annotation";
     const prefix = stage === "review" ? "Review" : change.task === "review" ? "Consolidation" : "Annotation";
     const when = timeText(change.at, now);
     const key = `change-${index}`;

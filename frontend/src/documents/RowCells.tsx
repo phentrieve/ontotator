@@ -308,7 +308,8 @@ function rowStageGlyph(row: DocumentRowView, stage: StageName, state: string): {
   const annotation = row.stages?.annotation;
   if (annotation?.state === "consolidating") {
     const { submitted, total } = annotation.detail;
-    if (stage === "final") return { symbol: "◐", tone: "running" };
+    // A paused consolidation: "⏸ consolidating · paused", waiting under a lead pause, the lead's decision under a report.
+    if (stage === "final") return annotation.detail.note === "lead_pause" || annotation.detail.note === "report_pause" ? { symbol: "⏸", tone: annotation.tone } : { symbol: "◐", tone: "running" };
     if (stage === "annotation" && (submitted == null || total == null || submitted >= total)) return { symbol: "✓", tone: "done" };
   }
   if (stage === "final" && state === "waiting") return { symbol: "○", tone: "waiting" };

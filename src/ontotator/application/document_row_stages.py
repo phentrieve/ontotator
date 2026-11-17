@@ -310,10 +310,16 @@ def stage_facts(
     elif step_facts.orphan_pause_assignment_id is not None:
         held = ctx.assignment_by_id.get(step_facts.orphan_pause_assignment_id)
         paused_by = held.user_id if held is not None else None
-    paused_task: Literal["annotate", "translation_review"] | None = None
+    paused_task: Literal["annotate", "translation_review", "consolidation"] | None = (
+        None
+    )
     if held is not None:
         paused_task = (
-            "translation_review" if held.task == "translation_review" else "annotate"
+            "translation_review"
+            if held.task == "translation_review"
+            else "consolidation"
+            if held.task == "review" and consolidating(held)
+            else "annotate"
         )
     reason, reason_text = _review_reason(ctx, reviews, version_of)
     how, from_version = _accepted_how(ctx, targets, version_of)

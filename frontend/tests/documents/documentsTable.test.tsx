@@ -328,7 +328,18 @@ describe("cells", () => {
     const fresh = stagedRow("case-109", "de", {
       stages: { review: cell("accepted", "done", { note: "unchanged" }), annotation: cell("unassigned", "todo"), final: cell("none", "none") },
     });
-    renderTable(page([group("case-106", [consolidating]), group("case-108", [early]), group("case-109", [fresh])]));
+    // Review 2, F2: paused by the lead, the consolidation stays in Finalization.
+    const paused = stagedRow("case-107", "de", {
+      stages: {
+        review: cell("accepted", "done", { note: "unchanged" }),
+        annotation: cell("consolidating", "waiting", { people: [tom], submitted: 2, total: 2, note: "lead_pause" }),
+        final: cell("after_review", "waiting"),
+      },
+    });
+    renderTable(page([group("case-106", [consolidating]), group("case-107", [paused]), group("case-108", [early]), group("case-109", [fresh])]));
+    expect(cellsOf("case-107 de")[3].querySelector<HTMLElement>(".documents-status")!.getAttribute("title")).toBe("2 of 2 submitted");
+    expect(cellsOf("case-107 de")[4].querySelector<HTMLElement>(".documents-status")!.getAttribute("title")).toBe("consolidating · paused");
+    expect(cellsOf("case-107 de")[4].querySelector<HTMLElement>(".documents-status")!.className).toContain("stage-cell--waiting");
     const status = (name: string, index: number) => cellsOf(name)[index].querySelector<HTMLElement>(".documents-status")!;
     expect(status("case-106 de", 3).className).toContain("stage-cell--done");
     expect(status("case-106 de", 3).querySelector(".stage-cell-symbol")!.textContent).toBe("✓");

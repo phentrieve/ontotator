@@ -91,6 +91,8 @@ describe("historyLines", () => {
       "Task paused: ann-0003",
     ]);
     expect(lines.at(-1)?.reportId).toBe("rep-3");
+    // A consolidation is Finalization work (review 2, F2): its lines are not filed under Annotation.
+    expect(lines.map(line => line.stage)).toEqual(["review", "review", "final", "final", "annotation", "annotation"]);
   });
 
   it("is empty for a row without work, records or final", () => {

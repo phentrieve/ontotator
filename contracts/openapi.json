@@ -30776,6 +30776,7 @@
                   "not_exported",
                   "carried_on_submit",
                   "lead_pause",
+                  "report_pause",
                   "v2_not_annotated",
                   "no_target_proposals",
                   "correction",

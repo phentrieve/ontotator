@@ -463,6 +463,8 @@ A person who has the task open when you pause is told with the next thing they d
 
 On **Documents**, a paused text carries the badge **Paused by lead**; point at it to read who paused it, when and why. Its open work is nobody's turn: **Waiting on** does not name the people, and the stage shows the pause sign. To list the paused texts, tick **Paused by lead** under **Flags** in **Filter**. The text card shows a notice **Paused by lead** with who, when and why, and each paused person's row says *Paused by lead*.
 
+A text whose consolidation is open keeps it while paused. The row reads *consolidating · paused* under **Finalization** and its annotations stay *2 of 2 submitted*, because submitted work is not paused. In the text card, **Finalization** keeps the consolidator's row with *Paused by lead*, and **Consolidate…** is not offered: the open consolidation continues after the release. The same holds when the consolidator reported a problem and that report pauses the consolidation; the row then waits for you with **Decide on report…**. In **History**, the lines of a consolidation stand under **Finalization**.
+
 To release:
 
 1. Select the texts and choose **More actions** › **Release texts…**. Or click **Release…** in the notice of one text card.
