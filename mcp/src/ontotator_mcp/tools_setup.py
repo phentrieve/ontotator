@@ -406,7 +406,7 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         )
         return settings
 
-    @register(server, scopes="project-admin", effect="additive")
+    @register(server, scopes=("read", "project-admin"), effect="additive")
     async def publish_guideline(
         project: Project,
         path: Annotated[
@@ -427,14 +427,21 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         the absolute path read. Only files inside the folders of
         ONTOTATOR_MCP_FILES_DIR; without that variable it refuses. Earlier
         versions stay; annotators are asked
-        to read the new one.
+        to read the new one. Refused with GUIDELINE_VERSION_CONFLICT if
+        another version was published meanwhile.
         """
         files = api.local_files([path])
+        listing = await api.get(project_path(project, "guidelines"))
+        latest = listing.get("latest_version")
         summary: dict[str, Any] = await api.upload(
             project_path(project, "guidelines"),
             "file",
             files,
-            data={"change_note": change_note},
+            data={
+                "change_note": change_note,
+                # A form field: empty for a project without a guideline.
+                "expected_latest_version": "" if latest is None else str(latest),
+            },
         )
         return summary | {"local_files": [str(file) for file in files]}
 
@@ -750,6 +757,7 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
             list[str], Field(description="Cases; empty means every case.")
         ] = [],  # noqa: B006
         task: Literal["annotate", "translation_review"] = "annotate",
+        confirm_unreviewed_translation: bool = False,
         confirm: Annotated[
             bool, Field(description="False: dry run. True: assign as previewed.")
         ] = False,
@@ -760,7 +768,10 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         the reason; with confirm the same selection is assigned, or refused
         if the project changed in between. Without case_ids it selects
         every case, at most 2000 (the API's selection limit); a larger
-        project is refused and needs case_ids.
+        project is refused and needs case_ids. Annotation of translations
+        whose review is not accepted (unreviewed_translation in the dry
+        run's targets) is refused with TRANSLATION_NOT_REVIEWED unless
+        confirm_unreviewed_translation.
         """
         body: dict[str, Any] = {
             "task": task,
@@ -783,7 +794,11 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
             return {"assigned": False, "preview": summary}
         result = await api.post(
             project_path(project, "assignments/batch"),
-            body | {"expected_preview_digest": preview["digest"]},
+            body
+            | {
+                "expected_preview_digest": preview["digest"],
+                "confirm_unreviewed_translation": confirm_unreviewed_translation,
+            },
         )
         return {"assigned": True, "preview": summary, "result": result}
 

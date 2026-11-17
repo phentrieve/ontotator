@@ -356,6 +356,16 @@ async def test_hand_over_open_tasks_plans_then_reassigns_in_turn(
     ]
     bodies = [c.json() for c in fake.calls_to("POST", REASSIGN)]
     assert all(body["confirm_started"] is False for body in bodies)
+    assert all(body["confirm_unreviewed_translation"] is False for body in bodies)
+
+    fake.calls.clear()
+    await call(
+        mcp_client,
+        "hand_over_open_tasks",
+        args | {"confirm": True, "confirm_unreviewed_translation": True},
+    )
+    bodies = [c.json() for c in fake.calls_to("POST", REASSIGN)]
+    assert all(body["confirm_unreviewed_translation"] is True for body in bodies)
 
     fake.calls.clear()
     started = await call(
