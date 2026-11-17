@@ -132,8 +132,9 @@ class TaskSummary:
     case_id: str | None = None
     version: int | None = None
     origin: str | None = None
-    # Spec A.7: failed automatic checks of the reviewed variant's translation run
-    # (the list ReviewWorkspace.failed_checks shows); None for other tasks.
+    # Spec A.7: failed automatic checks of the reviewed version (the list
+    # ReviewWorkspace.failed_checks shows; 0 for a version after the first, which
+    # was never checked); None for other tasks.
     failed_check_count: int | None = None
     # Spec 2026-10-23 §2: the assignment date and the annotation mode fixed
     # at assignment time (annotate only).
@@ -1219,9 +1220,7 @@ class AssignmentService:
 
     def my_tasks(self, user_id: int) -> List[TaskSummary]:
         from ontotator.application.problem_report_views import answered
-        from ontotator.application.translation_reviews import (
-            failed_translation_checks,
-        )
+        from ontotator.application.translation_reviews import version_failed_checks
         from ontotator.authz.visibility import qualifying_assignment
         from ontotator.domain.variants import resolve_translation_lineage
         from ontotator.storage.workflow_tables import (
@@ -1468,12 +1467,15 @@ class AssignmentService:
                 failed: int | None = None
                 if row["task"] == "translation_review":
                     project_variants = variants[row["project_key"]]
+                    reviewed = project_variants[row["document_id"]]
                     ancestor, original = resolve_translation_lineage(
-                        project_variants[row["document_id"]], project_variants.get
+                        reviewed, project_variants.get
                     )
                     source, target = original.language, row["language"]
                     try:
-                        failed = len(failed_translation_checks(ancestor.translation))
+                        # Only of the reviewed version itself: a later version
+                        # was never checked automatically.
+                        failed = len(version_failed_checks(reviewed, ancestor))
                     except ValidationError:
                         # A malformed stored run must not hide every task.
                         failed = None

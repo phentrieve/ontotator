@@ -20,7 +20,7 @@ import { ChecksSummary, ReviewSummary, SubmitSummary } from "./ReviewParts";
 import { ReviewForm } from "./ReviewForm";
 import { taskText } from "../app/identity";
 import { autoNoteText, chooseDecision, reactToTextEdit, USER_ORIGIN, type DecisionState } from "./decisionOrigin";
-import { acceptedCorrection, annotateThisTextLabel, categoryLabels, comparisonCountsDiffer, couplingEditingNote, couplingNote, decisionKeyHint, decisionLabels, decisionOutcomes, formatReviewDate, issueMessages, languageName, leadCorrectionKeyHint, leadCorrectionNote, matchingParagraphStatus, nextTaskLabel, paragraphCountChanged, paragraphCountsDiffer, remainingTasksText, reviewIssueMessage, showMatchingLabel, showMatchingShortcut, showMatchingTitle } from "./labels";
+import { acceptedCorrection, annotateThisTextLabel, categoryLabels, comparisonCountsDiffer, couplingEditingNote, couplingNote, decisionConsequence, decisionKeyHint, decisionLabels, decisionOutcomes, formatReviewDate, issueMessages, languageName, leadCorrectionKeyHint, leadCorrectionNote, matchingParagraphStatus, nextTaskLabel, paragraphCountChanged, paragraphCountsDiffer, remainingTasksText, reviewIssueMessage, showMatchingLabel, showMatchingShortcut, showMatchingTitle, translationNote, versionOriginRows } from "./labels";
 import { checkReview, type ClinicalCategory, type ReviewDecisionCode, type ReviewForm as FormValue } from "./reviewRules";
 import { LanguageTag } from "../ui/LanguageTag";
 import { SentenceCount, SentenceView } from "./SentenceMarks";
@@ -166,7 +166,18 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   const detailsRef = useRef<HTMLDetailsElement | null>(null), detailsSummary = useRef<HTMLElement | null>(null);
   /** Submit or its reason when one of them was the last focused element; restored when crossing 1100 px. */
   const focusedControl = useRef<"submit" | "reason" | null>(null);
-  const [comparisonId, setComparisonId] = useState(workspace.comparisons[0]?.variant.document_id ?? "");
+  /**
+   * What "Compare" offers: for a version after the first, first the version before it, shown as the changes from
+   * that version to the reviewed one; then the other translations of the same source.
+   */
+  const previousVersion = workspace.previous_version ?? null;
+  const comparisons = useMemo(() => [
+    ...(previousVersion ? [{ id: previousVersion.variant.document_id, name: `the previous version (v${previousVersion.variant.version})`,
+      title: `Changes from v${previousVersion.variant.version} to v${workspace.variant.version}`, text: workspace.text, before: previousVersion.text as string | undefined, language: workspace.variant.language }] : []),
+    ...workspace.comparisons.map(row => ({ id: row.variant.document_id, name: `${row.variant.external_id} ${row.variant.language}`,
+      title: `${row.variant.external_id} ${row.variant.language}`, text: row.text, before: undefined as string | undefined, language: row.variant.language })),
+  ], [workspace, previousVersion]);
+  const [comparisonId, setComparisonId] = useState(comparisons[0]?.id ?? "");
   // The Comparison pane starts closed (open or closed is remembered per user in this browser).
   const comparisonOpenKey = `ontotator.translationReview.comparisonOpen.v1:${props.username}`;
   const [comparisonOpen, setComparisonOpen] = useState(() => { try { return window.localStorage.getItem(comparisonOpenKey) === "1"; } catch { return false; } });
@@ -265,8 +276,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   };
   const sideCount = (states: readonly MarkState[]) => ({ checked: states.filter(isChecked).length, total: states.length, stale: states.filter(state => state?.kind === "stale").length });
   const form = typedForm(rawForm), issues = form ? checkReview(form, workspace.text, text, workspace.failed_checks.length > 0) : [];
-  const comparison = comparisonOpen ? workspace.comparisons.find(row => row.variant.document_id === comparisonId) : undefined;
-  const comparisonName = (row: ReviewWorkspace["comparisons"][number]) => `${row.variant.external_id} ${row.variant.language}`;
+  const comparison = comparisonOpen ? comparisons.find(row => row.id === comparisonId) : undefined;
   /** The editable translation is shown: it is the fixed leader and its pairing waits for a recompute (spec 2.2, 2.3). */
   const editing = !readOnly && !showChanges && !marking;
   const sourceStarts = useMemo(() => paragraphStarts(workspace.source.text), [workspace.source.text]);
@@ -703,10 +713,18 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
         <details className="translation-details" ref={detailsRef} onKeyDown={closeDetails}>
           <summary ref={detailsSummary}>Translation details</summary>
           <dl>
-            {run?.provider != null && <div><dt>Machine translation</dt><dd>{String(run.provider)}</dd></div>}
-            {run?.model != null && <div><dt>Model</dt><dd>{String(run.model)}</dd></div>}
-            {run?.run_id != null && <div><dt>Run</dt><dd>{String(run.run_id)}</dd></div>}
-            <div><dt>Reviewed version</dt><dd>v{workspace.variant.version}</dd></div>
+            {/* A version after the first says how it itself was made; the run of the first version is named as that. */}
+            {workspace.version_origin ? <>
+              {versionOriginRows(workspace.version_origin).map(([term, value]) => <div key={term}><dt>{term}</dt><dd>{value}</dd></div>)}
+              <div><dt>Reviewed version</dt><dd>v{workspace.variant.version}</dd></div>
+              {run?.provider != null && <div><dt>{`Translation run of v${workspace.translation_ancestor.version}`}</dt>
+                <dd>{[String(run.provider), run.model != null ? `model ${String(run.model)}` : null, run.run_id != null ? `run ${String(run.run_id)}` : null].filter(Boolean).join(", ")}</dd></div>}
+            </> : <>
+              {run?.provider != null && <div><dt>Machine translation</dt><dd>{String(run.provider)}</dd></div>}
+              {run?.model != null && <div><dt>Model</dt><dd>{String(run.model)}</dd></div>}
+              {run?.run_id != null && <div><dt>Run</dt><dd>{String(run.run_id)}</dd></div>}
+              <div><dt>Reviewed version</dt><dd>v{workspace.variant.version}</dd></div>
+            </>}
             <div><dt>Source document</dt><dd>{workspace.source.variant.external_id}</dd></div>
           </dl>
         </details>
@@ -722,7 +740,8 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     </div>
     {/* Under the task header, as in the annotation editor; gone once the review is submitted here. */}
     {!readOnly && props.guidelineNotice}
-    <ChecksSummary failed={workspace.failed_checks} all={allChecks} />
+    <ChecksSummary failed={workspace.failed_checks} all={allChecks}
+      earlier={workspace.variant.document_id !== workspace.translation_ancestor.document_id ? { checked: workspace.translation_ancestor.version, version: workspace.variant.version } : undefined} />
     <div className={`translation-workspace${wide && panelCollapsed ? " translation-workspace--collapsed" : ""}`}
       style={railOpen ? { "--review-panel-width": `${panel.width}px` } as CSSProperties : undefined}>
       <div className="translation-texts">
@@ -735,11 +754,11 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
           <div className="translation-tools-end">
             <Button ref={matchButton} size="sm" title={showMatchingTitle} aria-keyshortcuts="Alt+M" onMouseDown={event => event.preventDefault()} onClick={showMatching}>
               {showMatchingLabel}<span aria-hidden="true"> <Kbd>Alt M</Kbd></span></Button>
-            {!comparison && (workspace.comparisons.length === 1
-              ? <Button size="sm" className="translation-compare-open" title={`Compare with ${comparisonName(workspace.comparisons[0])}`} aria-label={`Compare with ${comparisonName(workspace.comparisons[0])}`}
-                  onClick={() => showComparison(true, workspace.comparisons[0].variant.document_id)}>Compare</Button>
-              : workspace.comparisons.length > 1 && <MenuButton className="translation-compare-open" label="Compare with…" buttonLabel="Compare"
-                items={workspace.comparisons.map(row => ({ id: row.variant.document_id, label: comparisonName(row), onSelect: () => showComparison(true, row.variant.document_id) }))} />)}
+            {!comparison && (comparisons.length === 1
+              ? <Button size="sm" className="translation-compare-open" title={`Compare with ${comparisons[0].name}`} aria-label={`Compare with ${comparisons[0].name}`}
+                  onClick={() => showComparison(true, comparisons[0].id)}>Compare</Button>
+              : comparisons.length > 1 && <MenuButton className="translation-compare-open" label="Compare with…" buttonLabel="Compare"
+                items={comparisons.map(row => ({ id: row.id, label: row.name.replace(/^t/, "T"), onSelect: () => showComparison(true, row.id) }))} />)}
           </div>
           {marksError && marking && <p className="sentence-save-error" role="alert">Checked sentences are not saved. <Button size="sm" variant="quiet" onClick={() => { pendingMarks.current ??= marks; sendMarks(); }}>Retry</Button></p>}
         </div>
@@ -776,19 +795,19 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
                   onCompositionEnd={() => { composing.current = false; scheduleStarts(); }} />}
             <p id="review-translation-note" className="translation-column-note">{marking
               ? "Click a sentence to mark it as checked. Turn off Mark checked sentences to edit."
-              : showChanges
-              ? "Showing changes against the machine translation. Turn off Show changes to edit."
-              : changed ? "Underlined text differs from the machine translation." : "Same as the machine translation."}</p>
+              : translationNote(workspace.variant, showChanges ? "changes" : changed ? "edited" : "same", previousVersion?.variant.version)}</p>
           </div>
           {comparison && <div className="translation-column">
             <div className="translation-column-head density-compact">
-              <h2 className="translation-column-title">Comparison <span className="translation-column-subtitle">{comparisonName(comparison)}</span></h2>
+              <h2 className="translation-column-title">Comparison <span className="translation-column-subtitle">{comparison.title}</span></h2>
               {/* Another comparison is chosen from "Compare" after closing this one. */}
               <div className="translation-column-controls">
               <Button size="sm" className="translation-compare-close" aria-label="Close comparison" onClick={() => showComparison(false)}>Close</Button>
               </div>
             </div>
-            <TextView key={comparisonId} ref={setComparisonElement} text={comparison.text} label="Comparison" lang={comparison.variant.language} showInvisibles={showInvisibles} />
+            {comparison.before !== undefined
+              ? <DiffView key={comparisonId} ref={setComparisonElement} before={comparison.before} after={comparison.text} label="Comparison" lang={comparison.language} showInvisibles={showInvisibles} />
+              : <TextView key={comparisonId} ref={setComparisonElement} text={comparison.text} label="Comparison" lang={comparison.language} showInvisibles={showInvisibles} />}
           </div>}
           {/* One line below the panes spanning the text columns, so the notes never push one pane below the others. */}
           {coupled && <p className="translation-column-hint">
@@ -881,7 +900,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     {form && <ConfirmDialog focusConfirm open={confirming} title="Submit this review?" confirmLabel="Submit review" cancelLabel="Keep editing" busy={busy}
       message={<SubmitSummary decision={form.decision} clinical={form.clinical_change} categories={form.categories ?? []} rationale={form.rationale}
         failedChecks={form.decision === "accepted_unchanged" ? workspace.failed_checks.map(check => check.code) : []}
-        consequence={!correctsAccepted ? undefined : versionAccepted ? acceptedCorrection.consequence : acceptedCorrection.consequenceNotAccepted} />}
+        consequence={!correctsAccepted ? decisionConsequence(form.decision, workspace.variant) : versionAccepted ? acceptedCorrection.consequence : acceptedCorrection.consequenceNotAccepted} />}
       onCancel={() => setConfirming(false)} onConfirm={() => { void submit(); }} />}
     {leave && <Dialog open title={leave.kind === "logout" ? "Unsaved changes" : "Changes not saved"} onClose={busy ? undefined : () => closeLeave(false)} footer={<>
       <Button disabled={busy} onClick={() => closeLeave(false)}>Cancel</Button>

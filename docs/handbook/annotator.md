@@ -420,7 +420,7 @@ Steps:
 1. Open the task. The **Source** is on the left, the **Translation** on the right.
 2. Read the automatic checks band at the top. Click **Details** to see which checks failed and why.
 3. Type your corrections directly in the translation column. Your edits are saved as you type, and the decision switches to **Accepted with corrections**. Use **Show changes** to see your edits and **Couple scrolling** to scroll both columns together. **Show matching paragraph** (`Alt+M`) jumps to the paired paragraph.
-4. Optional: to compare with another text, click **Compare** above the texts. With several texts to compare, it opens a menu.
+4. Optional: to compare with another text, click **Compare** above the texts. With several texts to compare, it opens a menu. In the review of a later version (v2, v3, …), the first entry is the previous version ([Review a later version](#review-a-later-version)).
 5. Under **Your review**, choose a **Decision** (or press `1` to `4`).
 6. Fill in what the decision needs:
    - **Query** and **Rejected** always count as a clinically relevant change: choose at least one category and write a **Rationale**. Put your question for the lead in the rationale.
@@ -432,6 +432,17 @@ Steps:
 On a wide screen, **Your review** is a column on the right. To give the texts more room, drag its left edge (**Resize review panel**), or focus the edge and press `←` or `→`; `Enter` restores the default width. **Collapse review panel** folds it to a narrow strip: the bar at the bottom then shows the decision and **Submit review…**, and **Expand review panel** or **Change ↓** opens it again. Width and folding are remembered in this browser.
 
 A project lead who corrects a translation themselves sees only **Accepted with corrections**. When the lead corrects a translation that was already accepted, the corrected version is reviewed again: it then appears as a new translation review task, usually for you ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
+
+#### Review a later version
+
+What for: review a translation that already has an earlier version, for example a text the lead uploaded with **Upload new version…** or corrected, or a version another reviewer corrected. The text name in **My tasks** and in the task ends with the version, for example *case-0101 de v2 corrected*.
+
+The task shows the version you were given, not the first one:
+
+- **Translation details** says how this version was made: **This version** (for example *Human translation*, *Machine translation, DeepL, deepl-2026-10*, *Corrected by hand*, *Corrected by the project lead* or *Corrected in a translation review*), when it was uploaded or corrected, the **Version before** and, for an uploaded text, what the lead recorded about who made it and when. The machine translation run of the first version is listed separately, for example *Translation run of v1*.
+- The line under the translation reads *Same as the version you were given (v2).* Your own edits are underlined against that version, and **Show changes** shows them.
+- **Compare** shows what changed since the version before. Click **Compare** (with several texts to compare, choose *The previous version (v1)*): the third column, *Changes from v1 to v2*, shows this version with the removed passages struck through and the added ones underlined. **Close** hides it again.
+- The automatic checks ran on the first version only. The band says so, for example *The automatic checks ran on v1, not on this version (v2). 1 automatic check failed on v1: Units added in translation.* **Details** lists the checks of v1. A check that failed on v1 is not counted in **My tasks** for this task, and **Accepted unchanged** needs no rationale because of it. Check yourself whether the passage is right in this version.
 
 If the source text was updated, **Source updates to review** appears. Open it, compare **Original source** and **Updated source**, and click **Submit review and resolve source update**.
 

@@ -9527,6 +9527,8 @@ export interface components {
              */
             reviewed_again: boolean;
             checked_sentences?: components["schemas"]["CheckedSentences"];
+            version_origin?: components["schemas"]["VersionOrigin"] | null;
+            previous_version?: components["schemas"]["ReviewText"] | null;
         };
         /** RevokedAssignmentView */
         RevokedAssignmentView: {
@@ -11485,6 +11487,38 @@ export interface components {
             kind: "corrected" | "version" | "parallel";
             /** Version */
             version: number;
+        };
+        /**
+         * VersionOrigin
+         * @description How a version after the first was made, for its reviewer.
+         *
+         *     ``upload``: a lead uploaded the text ("Upload new version…", with the
+         *     upload record's fields); ``review_correction``: a translation reviewer
+         *     corrected the previous version; ``lead_correction``: a lead did
+         *     ("Correct the translation…"); ``correction``: no record (an import).
+         */
+        VersionOrigin: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "upload" | "review_correction" | "lead_correction" | "correction";
+            /** Previous Version */
+            previous_version: number;
+            /** At */
+            at?: string | null;
+            /** Method */
+            method?: string | null;
+            /** Provider */
+            provider?: string | null;
+            /** Model */
+            model?: string | null;
+            /** Made On */
+            made_on?: string | null;
+            /** Made By */
+            made_by?: string | null;
+            /** Note */
+            note?: string | null;
         };
         /** VersionRef */
         VersionRef: {

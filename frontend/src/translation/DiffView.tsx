@@ -33,9 +33,9 @@ export function paragraphNodes(after: string, parts: readonly TextDiffPart[], { 
   return nodes;
 }
 
-export const DiffView = forwardRef<HTMLDivElement, { before: string; after: string; parts?: readonly TextDiffPart[]; lang?: string; showInvisibles?: boolean }>(function DiffView({ before, after, parts, lang, showInvisibles = false }, ref) {
+export const DiffView = forwardRef<HTMLDivElement, { before: string; after: string; parts?: readonly TextDiffPart[]; lang?: string; showInvisibles?: boolean; label?: string }>(function DiffView({ before, after, parts, lang, showInvisibles = false, label = "Text changes" }, ref) {
   const content = useMemo(() => paragraphNodes(after, parts ?? diffText(before, after), { invisibles: showInvisibles }), [before, after, parts, showInvisibles]);
-  return <div ref={ref} className={`translation-diff${showInvisibles ? " show-invisibles" : ""}`} role="region" aria-label="Text changes" tabIndex={0} lang={lang}>{content}</div>;
+  return <div ref={ref} className={`translation-diff${showInvisibles ? " show-invisibles" : ""}`} role="region" aria-label={label} tabIndex={0} lang={lang}>{content}</div>;
 });
 
 /** Read-only reading text with paragraph markers, without any editing affordance. */
