@@ -428,6 +428,10 @@ test("PUBLISHED: Publish and Discard stay above a long preview and stick while i
   await fileInput(page).setInputFiles({ name: "long.md", mimeType: "text/markdown", buffer: Buffer.from(`# Long guideline\n\n${paragraphs.join("\n\n")}\n`) });
   const preview = page.getByRole("region", { name: "Preview of long.md", exact: true });
   await expect(preview).toBeVisible();
+  // The Markdown renderer is its own chunk: until it has loaded, the preview holds only "Loading guidelines…"
+  // and is too short to scroll under the bar. Measure once the whole text is laid out.
+  await expect(preview.getByText("Paragraph 120:", { exact: false })).toBeAttached();
+  await expect.poll(() => preview.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
   const publishButton = page.getByRole("button", { name: "Publish as v2", exact: true });
   // The consequences come before Publish (#47 A-24); the actions come before the preview.
   const facts = page.getByText(PUBLISH_HINT, { exact: true });
