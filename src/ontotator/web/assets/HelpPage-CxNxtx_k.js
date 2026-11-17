@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-XimxyAN8.js";import{n as a,t as o}from"./lib-zqCFeCOT.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-hYuZyupJ.js";import{n as a,t as o}from"./lib-3cstoSnP.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -851,6 +851,28 @@ The marks are only for you. They are saved with your review, so they are kept wh
 With the keyboard: Tab to a sentence, then press Enter or Space to mark it. Shift+Enter marks the range from the last sentence you marked.
 
 On a touch-only device such as a phone or tablet, **Mark checked sentences** is not offered, because a swipe on the text has to scroll. A review you can only read does not offer it either.
+
+### Show invisible characters
+
+What for: see spacing errors and characters you cannot see otherwise, such as a double space, a tab or a non-breaking space.
+
+1. Tick **Show invisible characters** above the texts. Your choice is remembered in this browser.
+2. Read the marks in all texts:
+
+   | Mark | Character |
+   | --- | --- |
+   | grey dot \`·\` | space; two dots are a double space |
+   | arrow \`→\` | tab |
+   | small circle \`°\` | non-breaking space |
+   | amber bar between two characters | zero-width character, for example a zero-width space |
+   | small \`¬\` above the line | soft hyphen |
+   | \`¶\` | end of a line; a dot before it is a space at the end of the line |
+
+3. Correct the translation as usual. Untick the box to hide the marks again.
+
+The marks only change what you see. They are not part of the text: selecting, copying and saving give the text without them, and the lines break where they broke before. The marks also show with **Show changes** and **Mark checked sentences**.
+
+Ontotator does not correct anything by itself, and a mark never blocks your review.
 
 ## Keyboard shortcuts
 
@@ -2008,6 +2030,35 @@ What for: see each version of a translation, its reviews and its origin.
 3. Click **View text** to read a version, or **Translation reviews** to see every review decision. In a reviewer's row, **Reopen…** lets them review the version again and **Remove…** removes their assignment.
    At the newest accepted version, **Correct the translation…** lets you correct it yourself ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)). At the newest version of a translation, **Upload new version…** brings in a text made elsewhere as the next version ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)).
 4. Click **Compare with source** to compare the translation with the source text.
+
+### Find spacing errors and invisible characters
+
+What for: find texts with spacing errors or invisible characters, for example before you assign them.
+
+Ontotator computes typography hints for a text when you ask for them. A hint names a rule and a position in the text. Hints are not stored and never block review, annotation or export; nothing is corrected automatically.
+
+| Rule code | What it finds |
+| --- | --- |
+| \`DOUBLE_SPACE\` | Two or more spaces inside a line. |
+| \`SPACE_BEFORE_PUNCTUATION\` | A space before \`,\` \`;\` \`:\` \`!\` \`?\` or \`.\` |
+| \`MISSING_SPACE_AFTER_PUNCTUATION\` | Punctuation directly between two words, for example *Fieber,Husten*. Numbers, dates, times, abbreviations such as *z.B.* or *e.g.*, web addresses and ellipses are left alone. |
+| \`TRAILING_WHITESPACE_LINE\` | Spaces or tabs at the end of a line. |
+| \`TRAILING_WHITESPACE_TEXT\` | Spaces, tabs or more than one line break at the end of the text. A single final line break is no hint. |
+| \`TAB\` | A tab. |
+| \`ZERO_WIDTH_CHARACTER\` | A zero-width space or joiner, or a byte order mark. |
+| \`SOFT_HYPHEN\` | A soft hyphen. |
+| \`CONTROL_CHARACTER\` | Another control character. |
+
+A non-breaking space is no hint, because it is often correct, for example between a number and its unit. **Show invisible characters** marks it all the same.
+
+There is no page for the hints yet. Read them through the API or the MCP server (token scope \`read\`):
+
+- One text version: \`GET /api/v1/projects/{key}/documents/{document_id}/typography-hints\`, or the MCP tool \`list_typography_hints\` with \`document_id\`. Each hint has \`rule\`, \`start\` and \`end\`; positions count Unicode code points, as the positions of findings do.
+- The whole project: \`GET /api/v1/projects/{key}/typography-hints\`, or \`list_typography_hints\` without \`document_id\`. It returns the number of hints per rule for each text that has any, 100 texts per page (\`limit\` up to 200); pass \`next_after\` as \`after\` for the next page. Only the newest version of each text is counted unless you ask for \`versions=all\`.
+
+You get hints for the texts you may read, as with the texts themselves. The MCP tool returns no text; a server started with \`ONTOTATOR_MCP_READ_CONTENT=1\` can add excerpts with \`include_text\` ([MCP server guide](../../mcp/README.md)).
+
+To see the characters in a text, a reviewer ticks **Show invisible characters** in the translation review ([Show invisible characters](annotator.md#show-invisible-characters)). To fix them in a translation, correct it ([Request a translation correction](#request-a-translation-correction)).
 
 ### Request a translation correction
 
