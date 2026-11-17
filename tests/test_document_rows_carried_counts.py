@@ -117,12 +117,14 @@ def test_annotation_cell_counts_the_newest_version_only(client, per_text, how):
         if per_text == 1:
             assert (state, detail["total"]) == ("in_progress", None)
         else:
-            # One of two annotators: the second is still to assign.
+            # One of two annotators at work: the cell shows the open task,
+            # out of the one person holding v2, and the room as "max 2".
             assert (state, detail["assigned"], detail["target"]) == (
-                "partly_assigned",
+                "in_progress",
                 1,
                 2,
             )
+            assert (detail["submitted"], detail["total"]) == (0, 1)
         worker = on_target[0]["assignment_id"]
         name = "luc" if how == "other" else "tom"
 

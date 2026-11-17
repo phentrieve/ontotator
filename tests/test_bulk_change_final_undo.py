@@ -494,3 +494,65 @@ def test_statements_do_not_grow_with_every_restored_text(env):
     two = _apply(env, *BOTH)
     assert two["change_count"] == 2
     assert _statements(env, lambda: _undo(env, two, preview=True)) == single
+
+
+def _replace(env: Any, case: str, submission: str, revision: int, who: Any = None):
+    return (who or env.lead).put(
+        f"{BASE}/final-selections",
+        json={
+            "document_id": doc(case, "en"),
+            "submission_id": submission,
+            "expected_revision": revision,
+        },
+    )
+
+
+def test_one_final_replaced_in_the_card_has_the_same_undo(env):
+    """A single choice that replaces a final result records the bulk action's
+    Undo for one text; a first choice and a confirmation have none."""
+    _final(env, "c1")  # the first choice
+    assert len(_audits(env, final_change_undo.APPLIED)) == 0
+    _newer(env, "c1")
+    confirmed = _replace(env, "c1", "c1-a", 1)
+    assert confirmed.status_code == 200, confirmed.text
+    assert confirmed.json()["undo"] is None
+    before = _selection(env, "c1")
+
+    replaced = _replace(env, "c1", "c1-b", 2)
+    assert replaced.status_code == 200, replaced.text
+    handle = replaced.json()["undo"]
+    assert set(handle) == {"id", "expires_at"}
+    [record] = _audits(env, final_change_undo.APPLIED)
+    assert record["rule"] == "single"
+    assert [(t["case_id"], t["submission_id"]) for t in record["texts"]] == [
+        ("c1", "c1-b")
+    ]
+
+    # Another lead cannot undo it; the lead who changed it can, once.
+    second = logged_in(env.app, "lead2", projects={"proj": ["lead"]}, assignments=[])
+    assert second.post(UNDO, json={"undo_id": handle["id"]}).status_code == 409
+    undone = env.lead.post(UNDO, json={"undo_id": handle["id"]})
+    assert undone.status_code == 200, undone.text
+    assert undone.json()["restore_count"] == 1
+    after = _selection(env, "c1")
+    assert (after.submission_id, after.selected_at, after.revision) == (
+        "c1-a",
+        before.selected_at,
+        4,
+    )
+    again = env.lead.post(UNDO, json={"undo_id": handle["id"]})
+    assert again.json()["details"]["reason"] == "already_undone"
+
+
+def test_the_undo_of_one_replaced_final_is_refused_once_it_changed_again(env):
+    _final_then_newer(env, "c1")
+    replaced = _replace(env, "c1", "c1-b", 1)
+    back = _replace(env, "c1", "c1-a", 2)
+    assert back.status_code == 200, back.text
+    refused = env.lead.post(UNDO, json={"undo_id": replaced.json()["undo"]["id"]})
+    assert refused.status_code == 409
+    assert refused.json()["code"] == "BULK_UNDO_STALE"
+    assert [b["reason"] for b in refused.json()["details"]["preview"]["blocked"]] == [
+        "final"
+    ]
+    assert _selection(env, "c1").submission_id == "c1-a"

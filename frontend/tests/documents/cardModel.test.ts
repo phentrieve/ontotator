@@ -1,6 +1,7 @@
 // @vitest-environment node
 /** The text card's path states (U3, state table). */
 import { describe, expect, it } from "vitest";
+import { roundLine } from "../../src/documents/textCard/AnnotationPart";
 import { annotationState, cardSegments, defaultSegment, finalizationState, personVersion, translationState } from "../../src/documents/textCard/cardModel";
 import { annotateItem, cardRow } from "./cardFixtures";
 import { final, version, work } from "./fixtures";
@@ -52,6 +53,15 @@ describe("Annotation", () => {
   });
   it("in progress counts the submissions", () => {
     expect(annotationState(cardRow({ annotation: cell("in_progress", "running", { submitted: 1, total: 2 }) }))).toEqual({ state: "1 of 2 submitted", tone: "now" });
+  });
+  it("an open task below the limit comes first, the limit follows as max (lead review F3)", () => {
+    const one = [annotateItem({ assignment_id: 1, status: "open" })];
+    expect(annotationState(cardRow({ annotation: cell("in_progress", "running", { people: [ana], submitted: 0, total: 1, assigned: 1, target: 2, started: 0, open_tasks: 1 }) }, { work: one })))
+      .toEqual({ state: "assigned, not started · max 2", tone: "now" });
+    expect(annotationState(cardRow({ annotation: cell("in_progress", "running", { people: [ana], submitted: 1, total: 2, assigned: 2, target: 3, started: 1, open_tasks: 1 }) })))
+      .toEqual({ state: "1 of 2 submitted · max 3", tone: "now" });
+    // At the limit there is no room to name.
+    expect(annotationState(cardRow({ annotation: cell("in_progress", "running", { submitted: 1, total: 2, assigned: 2, target: 2 }) })).state).toBe("1 of 2 submitted");
   });
   it("in progress before the first save reads not started (issue 258)", () => {
     const one = [annotateItem({ assignment_id: 1, status: "open" })];
@@ -184,5 +194,21 @@ describe("the version of a person's task (issue 445)", () => {
     expect(personVersion({ versions: [v1, v2], parallel_roots: true }, { document_id: "d2", version: 2 })).toBe("DeepL v2");
     // A version the row does not list (never expected) still reads "v3".
     expect(personVersion({ versions: [v1, v2], parallel_roots: true }, { document_id: "gone", version: 3 })).toBe("v3");
+  });
+});
+
+describe("roundLine: a person's open task in a new round (lead review F3)", () => {
+  const lead = { pseudonym: "lead-1", display_name: "Carla Diaz", is_me: true };
+  const tom = { pseudonym: "ann-4", display_name: "Tom Reis", is_me: false };
+  const started = { kind: "round_started" as const, at: "2026-11-17T13:39:00", task: "annotate", assignment_id: 7, round_ordinal: 2, by: lead, to_person: tom };
+  it("names the round, who started it and the day", () => {
+    expect(roundLine({ assignment_id: 7, round_ordinal: 2 }, [started])).toBe("Round 2, started by you 17 Nov");
+    expect(roundLine({ assignment_id: 7, round_ordinal: 2 }, [{ ...started, by: tom }])).toBe("Round 2, started by Tom Reis 17 Nov");
+  });
+  it("is the round alone without the change, and nothing in the first round", () => {
+    expect(roundLine({ assignment_id: 7, round_ordinal: 2 }, null)).toBe("Round 2");
+    expect(roundLine({ assignment_id: 8, round_ordinal: 2 }, [started])).toBe("Round 2");
+    expect(roundLine({ assignment_id: 7, round_ordinal: 1 }, [started])).toBeNull();
+    expect(roundLine({ assignment_id: 7, round_ordinal: null }, [started])).toBeNull();
   });
 });

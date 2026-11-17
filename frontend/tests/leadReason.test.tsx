@@ -18,7 +18,7 @@ it("names a reopen only while the task is reopened, with or without a reason", (
     .toBe(`Reopened by the lead on ${formatDateTime(reopened)}: The unit is mg in my copy.`);
   expect(reopenedText({ status: "reopened", reopened_at: reopened })).toBe(`Reopened by the lead on ${formatDateTime(reopened)}. No reason given.`);
   expect(reopenedText({ status: "submitted", reopened_at: reopened, reopen_reason: "x" })).toBeNull();
-  // "Request correction…" to the reviewer who had submitted sets the status without a reopen of its own.
+  // "Ask a reviewer to correct…" to the reviewer who had submitted sets the status without a reopen of its own.
   expect(reopenedText({ status: "reopened", second_review_at: requested, second_review_reason: "x" })).toBeNull();
 });
 

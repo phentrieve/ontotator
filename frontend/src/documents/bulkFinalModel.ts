@@ -119,10 +119,11 @@ export function finalConsequences(preview: FinalPreview): string[] {
 /**
  * "The earlier final results of 8 texts are back.", and for final exports made between the change and its Undo
  * " 1 final export made meanwhile stays as it is, with the changed results." (one message: it wraps on a phone).
+ * `name`: the one text of a change made in the text card ("The earlier final result of EN100022 en is back.").
  */
-export function finalUndoneText(view: Pick<BulkChangeFinalUndoView, "restore_count" | "exports_since">): string {
+export function finalUndoneText(view: Pick<BulkChangeFinalUndoView, "restore_count" | "exports_since">, name?: string): string {
   const { restore_count: count, exports_since: exports } = view;
-  const back = `The earlier final ${count === 1 ? "result" : "results"} of ${plural(count, "text")} ${count === 1 ? "is" : "are"} back.`;
+  const back = `The earlier final ${count === 1 ? "result" : "results"} of ${name ?? plural(count, "text")} ${count === 1 ? "is" : "are"} back.`;
   return exports ? `${back} ${plural(exports, "final export")} made meanwhile ${exports === 1 ? "stays as it is" : "stay as they are"}, with the changed results.` : back;
 }
 

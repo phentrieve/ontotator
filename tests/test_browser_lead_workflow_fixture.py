@@ -263,7 +263,7 @@ def test_accepted_translation_for_lead_builds(client):
     assert work == [("annotate", "open"), ("annotate", "submitted")]
     (unreviewed,) = rows[(cases["unreviewed"], "de")]["versions"]
     assert unreviewed["translation_status"] not in ("accepted", "reviewed")
-    # Issue 341 a: an open translation review refuses "Upload new version…".
+    # Issue 341 a: an open translation review refuses "Upload a corrected text…".
     in_review = rows[(cases["in_review"], "de")]
     assert [
         (w["task"], w["status"])

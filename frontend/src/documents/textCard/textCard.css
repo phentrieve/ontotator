@@ -173,6 +173,9 @@
 /* An uploaded version names how it was made after its origin, which can be long (issue 341 a). */
 .text-version-origin { min-width: 0; overflow-wrap: anywhere; }
 .text-version-actions a { white-space: nowrap; }
+/* What tells the correction actions apart, under the buttons (visible on a phone too; never a tooltip only). */
+.text-version-hint { margin: 0; color: var(--text-muted); font-size: var(--size-sm); line-height: var(--leading-sm); overflow-wrap: anywhere; }
+.text-version-hint-name { color: var(--text); }
 .text-version-older > details > summary { color: var(--text-muted); cursor: pointer; }
 .text-version-older > details > .text-versions,
 .text-version-group { margin-top: var(--space-3); }

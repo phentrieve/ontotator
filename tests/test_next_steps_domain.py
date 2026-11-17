@@ -221,17 +221,23 @@ def test_choose_final_does_not_wait_for_annotations_per_text():
 
 
 def test_two_annotations_per_text_counts_assigned():
-    [step, *_] = derive_steps(
-        facts(
-            annotate=True,
-            is_source=True,
-            translation_statuses=(None,),
-            per_text=2,
-            annotation_assignments=1,
-            open_annotations=1,
-        )
+    below = facts(
+        annotate=True,
+        is_source=True,
+        translation_statuses=(None,),
+        per_text=2,
+        annotation_assignments=1,
+        open_annotations=1,
     )
+    # An open task comes first: the row waits on its person; assigning the
+    # second annotator is the lead's secondary step (lead review, F3).
+    first, step = derive_steps(below)
+    assert (first.code, segment_of(first)) == ("annotation_in_progress", "progress")
     assert (step.code, step.assigned, step.target) == ("assign_annotation", 1, 2)
+    # Nobody assigned yet: assigning is the next step.
+    [step] = derive_steps(replace(below, annotation_assignments=0, open_annotations=0))
+    assert (step.code, step.assigned, step.target) == ("assign_annotation", 0, 2)
+    assert segment_of(step) == "assign"
 
 
 def test_parallel_roots_use_each_newest_version():

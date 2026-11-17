@@ -384,6 +384,31 @@ describe("decided", () => {
     expect(api.selectFinalResult).toHaveBeenCalledWith("p", expect.objectContaining({ submission_id: "case-120-s2", expected_revision: 4, acknowledged_cause_ids: [] }));
   });
 
+  it("after Change final… the block stays on its text and hands the Undo of the replaced final to the page", async () => {
+    panels[rowKey("case-122", "de")] = { ...comparePanel("case-122", "de"), label_rule: "accept", accept_submission_id: "case-122-s1" };
+    panels[rowKey("case-123", "de")] = acceptPanel("case-123", "de");
+    const decided = decidedRow("case-122");
+    const waiting = chooseRow("case-123", "de");
+    vi.mocked(api.selectFinalResult).mockResolvedValue({ case_id: "case-122", language: "de", document_id: "case-122-de", submission_id: "case-122-s2", revision: 5, undo: { id: 31, expires_at: "2026-10-21T13:00:00Z" } });
+    afterDecision = page([group("case-122", [{ ...decided, final: final({ case_id: "case-122", language: "de", document_id: "case-122-de", submission_id: "case-122-s2", author_label: "ann-0004", revision: 5 }) }]), group("case-123", [waiting])]);
+    const onDecided = vi.fn<(key: string, undo?: { id: number } | null) => void>();
+    const onAdvance = vi.fn();
+    function Page(): JSX.Element {
+      const [current, setCurrent] = useState(page([group("case-122", [decided]), group("case-123", [waiting])]));
+      return <DecisionBlock projectKey="p" rowKey="case-122:de" page={current} query={{}} now={now} changeFinal onClose={vi.fn()} onAdvance={onAdvance} onReload={vi.fn()} onNavigate={vi.fn()}
+        onDecided={(key, undo) => { onDecided(key, undo); setCurrent(afterDecision!); }} />;
+    }
+    render(<Page />);
+    const table = await screen.findByRole("table", { name: "Submissions, case-122 de" });
+    const tomRow = within(table).getAllByRole("row").find(entry => entry.textContent?.includes("Tom Reis"))!;
+    fireEvent.click(within(tomRow).getByRole("button", { name: "Use as final" }));
+    expect(await screen.findByText("Final result saved for case-122 de.")).toBeTruthy();
+    expect(onDecided).toHaveBeenCalledWith("case-122:de", { id: 31, expires_at: "2026-10-21T13:00:00Z" });
+    // case-123 waits for a decision, but the lead came to change this text: no jump.
+    expect(onAdvance).not.toHaveBeenCalled();
+    await waitFor(() => expect(liveRegion().textContent).toBe("Final result saved for case-122 de."));
+  });
+
   it("opens on the compare content with changeFinal", async () => {
     panels[rowKey("case-121", "de")] = comparePanel("case-121", "de");
     renderPanel("case-121:de", page([group("case-121", [decidedRow("case-121")])]), { changeFinal: true });

@@ -101,7 +101,8 @@ export function annotationState(row: DocumentRowView, compact = false): State {
       const assigned = detail.assigned ?? 0;
       return { state: target > 1 ? annotatorCount(assigned, target) : assigned === 0 ? "Unassigned" : `${assigned} assigned`, tone: "now" };
     }
-    case "in_progress": return { state: running, tone: "now" };
+    // Below "annotators per text" the open work comes first; the limit follows as an upper bound ("· max 2").
+    case "in_progress": return { state: detail.target != null && (detail.assigned ?? 0) < detail.target ? `${running} · max ${detail.target}` : running, tone: "now" };
     // Issue 464: the lead paused the text; the count stays ("paused by lead, 1 of 2 submitted").
     case "paused": return detail.note !== "lead_pause" ? { state: submitted, tone: "now" }
       : { state: compact ? submitted : total > 0 ? `paused by lead, ${submitted}` : "paused by lead", tone: "later" };

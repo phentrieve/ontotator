@@ -1,5 +1,5 @@
 """The lead's reason reaches the reviewer (user review 2026-11): the reason of
-"Request correction…" and of "Reopen…" is in My tasks and in the review."""
+"Ask a reviewer to correct…" and of "Reopen…" is in My tasks and in the review."""
 
 from typing import Any
 

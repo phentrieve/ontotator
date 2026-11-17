@@ -139,7 +139,7 @@ test("S0 synthetic-accepted: the final is on old text after v2 corrected it; en 
   await closeCard(card);
 
   const history = await openCardHistory(page, caseId, "de");
-  await expect(activityLines(history).filter({ hasText: /^Finalization: chosen/ })).toHaveCount(1);
+  await expect(activityLines(history).filter({ hasText: /^Finalization: .*chosen by/ })).toHaveCount(1);
   await history.getByRole("button", { name: "Back", exact: true }).click();
   await expect(await textVersionItems(history, 2)).toHaveText([/^v2\s*Correction of v1\s*Ready for review/, /^v1\s*Machine translation/]);
   await closeCard(history);
@@ -211,7 +211,7 @@ test("S1 case-0042: two submissions and a final result, nothing to do", async ({
   // History: both submissions and the final choice (the Submissions table is in the decision block, V6).
   const card = await openCardHistory(page, caseId, "en");
   await expect(activityLines(card).filter({ hasText: /^Annotation: .*Round 1/ })).toHaveCount(2);
-  await expect(activityLines(card).filter({ hasText: /^Finalization: chosen/ })).toHaveCount(1);
+  await expect(activityLines(card).filter({ hasText: /^Finalization: .*chosen by/ })).toHaveCount(1);
   await closeCard(card);
 
   // "Final result: none" (FD11 link parameter, a chip): nothing matches.

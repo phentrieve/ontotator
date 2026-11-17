@@ -68,8 +68,8 @@ test("a comma added to an accepted translation becomes an accepted v2 on one pag
   const card = await openTextCard(page, caseId, "de");
   const [v1] = await (await textVersionItems(card, 1)).all();
   // Next to the other version actions of the newest version, with a hint that tells it apart.
-  await expect(v1.getByRole("button", { name: `Correct the translation v1 of ${caseId} de…`, exact: true })).toBeVisible();
-  await expect(v1.getByRole("button", { name: `Upload new version of v1 of ${caseId} de…`, exact: true })).toBeVisible();
+  await expect(v1.getByRole("button", { name: `Correct v1 of ${caseId} de myself…`, exact: true })).toBeVisible();
+  await expect(v1.getByRole("button", { name: `Upload a corrected text for v1 of ${caseId} de…`, exact: true })).toBeVisible();
   const open = fixAction(v1, caseId);
   await expect(open).toHaveText("Fix typos…");
   await expect(open).toHaveAttribute("title", "Spacing, typos, grammar. Keeps the status; no review.");

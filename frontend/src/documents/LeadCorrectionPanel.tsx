@@ -169,7 +169,7 @@ export function LeadCorrectionPanel({ row, projectKey, onNavigate, onCancel, hea
   const next = preview?.next_version ?? version + 1;
   const consequences = preview ? correctionConsequences(preview) : [];
   const annotated = preview ? preview.annotations.submitted + preview.annotations.open > 0 : false;
-  return <div className="documents-resolve" role="group" aria-labelledby={inDialog ? undefined : `${id}-title`} aria-label={inDialog ? `Correct the translation, ${textLabel(row)} v${version}` : undefined}>
+  return <div className="documents-resolve" role="group" aria-labelledby={inDialog ? undefined : `${id}-title`} aria-label={inDialog ? `Correct it myself, ${textLabel(row)} v${version}` : undefined}>
     {!inDialog && <Heading id={`${id}-title`} ref={heading} tabIndex={-1} className="inline-confirm-title">{`Correct the translation, ${textLabel(row)}`}</Heading>}
     {accepted
       ? <p>{`You correct the accepted v${version} yourself in the translation review and submit it as Accepted with corrections. The corrected text becomes v${next}.`}</p>

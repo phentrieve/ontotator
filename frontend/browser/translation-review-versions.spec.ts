@@ -146,7 +146,7 @@ for (const [name, viewport] of sizes) {
     await submitReview(page, failed, REJECTED);
     await page.context().clearCookies();
     await loginScenarioUser(page, s, "lead");
-    // "Request correction…" of the accepted version, to the reviewer who accepted it; "Reopen…" of the rejected one.
+    // "Ask a reviewer to correct…" of the accepted version, to the reviewer who accepted it; "Reopen…" of the rejected one.
     await call(page, `${project(s)}/documents/${encodeURIComponent(accepted.variant.document_id)}/translation-correction-assignment`, "POST",
       { username: s.users.ana, expected_text_sha256: accepted.variant.text_sha256, reason: CORRECTION_REASON });
     await call(page, `/api/v1/assignments/${failed}/reopen`, "POST", { reason: REOPEN_REASON });

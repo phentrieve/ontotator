@@ -1,6 +1,6 @@
 import { textLabel } from "../../app/identity";
 import { useId, useRef, type ReactNode } from "react";
-import type { DocumentRowView, RowProposalSetView, RowSubmissionView } from "../../api/client";
+import type { DocumentRowView, RowChangeView, RowProposalSetView, RowSubmissionView } from "../../api/client";
 import { plural } from "../../app/labels";
 import { pausedWord } from "../labels";
 import type { ProjectDocumentsQuery, Route } from "../../app/router";
@@ -17,6 +17,20 @@ import { assignedLine, workerName, WorkPersonRow } from "./WorkPersonRow";
 
 const NO_PROPOSALS = "This text has no tool proposals, so it is annotated from scratch.";
 const MODE_TEXT = { proposals: "from proposals", scratch: "from scratch" } as const;
+
+/**
+ * An open task in a round after the first: "Round 2, started by you 17 Nov" (the lead or the person who started it,
+ * from the row's changes), "Round 2" while they are not loaded; null in the first round.
+ */
+export function roundLine(item: Pick<CardWorkItem, "assignment_id" | "round_ordinal">, changes: readonly RowChangeView[] | null | undefined): string | null {
+  const ordinal = item.round_ordinal ?? 0;
+  if (ordinal < 2) return null;
+  const started = [...(changes ?? [])].reverse().find(change => change.kind === "round_started" && change.assignment_id === item.assignment_id && change.round_ordinal === ordinal);
+  if (!started) return `Round ${ordinal}`;
+  const by = started.by ? ` by ${started.by.is_me ? "you" : shortName(started.by)}` : "";
+  const day = dayMonth(started.at);
+  return `Round ${ordinal}, started${by}${day ? ` ${day}` : ""}`;
+}
 
 /** "2026-11-10": the local day a proposal set was imported (337-A). */
 export function setDate(iso: string): string {
@@ -68,12 +82,14 @@ function ordered(people: readonly CardWorkItem[]): CardWorkItem[] {
  * "Assign annotators…" that opens the assign dialog (also for another person beside the current ones; the lead can
  * pick themselves there).
  */
-export function AnnotationPart({ row, projectKey, query, submissions, canManage, onAssign, onNavigate, onChanged, tools, now, planControl, steps, actions }: {
+export function AnnotationPart({ row, projectKey, query, submissions, changes, canManage, onAssign, onNavigate, onChanged, tools, now, planControl, steps, actions }: {
   row: DocumentRowView;
   projectKey: string;
   query: ProjectDocumentsQuery;
   /** The row's submissions ("Open annotation" opens the person's layer); null while loading. */
   submissions: readonly RowSubmissionView[] | null;
+  /** The row's changes (with the submissions): who started a person's new round, and when. */
+  changes?: readonly RowChangeView[] | null;
   canManage: boolean;
   onAssign: (row: DocumentRowView, task: "annotate") => void;
   onNavigate: (route: Route) => void;
@@ -149,11 +165,14 @@ export function AnnotationPart({ row, projectKey, query, submissions, canManage,
         const submittedText = layer ? `Submitted${day ? ` ${day}` : ""}, ${plural(layer.finding_count, "finding")}` : null;
         // "Assigned 18 Oct by you, from proposals · v2"; "Submitted 22 Oct, 14 findings · assigned 15 Oct · v1" (the
         // version only when the text has several, issue 445).
-        const assignedText = assignedLine(item, now, !submittedText && !item.held);
+        // A new round of submitted work (issue: lead review F3): "Round 2, started by you 17 Nov" before the assignment.
+        const roundText = item.status !== "submitted" ? roundLine(item, changes) : null;
+        const assignedText = assignedLine(item, now, !submittedText && !item.held && !roundText);
         const modeText = item.status !== "submitted" && item.annotation_mode ? MODE_TEXT[item.annotation_mode] : null;
         const details = joined([
           pausedWord(item),
           submittedText,
+          roundText,
           assignedText ? <>{assignedText}{modeText && `, ${modeText}`}</> : modeText,
           personVersion(row, item),
           personSetText(item, row.proposal_set),

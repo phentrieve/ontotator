@@ -196,7 +196,12 @@ async def test_set_final_result_replaces_or_confirms_with_the_revision(
             args | {"confirm": True, "expected_revision": 2},
         )
     assert _writes(fake) == []
-    await call(mcp_client, "set_final_result", args | {"confirm": True})
+    # The server answers a replaced final result with its Undo handle.
+    handle = {"id": 31, "expires_at": "2026-11-17T15:00:00Z"}
+    fake.on("PUT", f"{P}/final-selections", _final("s2", 4) | {"undo": handle})
+    done = await call(mcp_client, "set_final_result", args | {"confirm": True})
+    assert done["applied"] is True and done["undo"] == handle
+    assert "undo" not in done["final"]
     [replaced] = fake.calls_to("PUT", f"{P}/final-selections")
     assert replaced.json() == {
         "document_id": "c-en-v1",
@@ -206,7 +211,10 @@ async def test_set_final_result_replaces_or_confirms_with_the_revision(
     }
     fake.calls.clear()
     args["submission_id"] = "s1"
-    await call(mcp_client, "set_final_result", args | {"confirm": True})
+    # A confirmation replaces nothing: no undo in the answer.
+    fake.on("PUT", f"{P}/final-selections", _final("s1", 5) | {"undo": None})
+    again = await call(mcp_client, "set_final_result", args | {"confirm": True})
+    assert again["applied"] is True and "undo" not in again
     [confirmed] = fake.calls_to("PUT", f"{P}/final-selections")
     assert confirmed.json()["acknowledged_cause_ids"] == ["k1"]
     with pytest.raises(ToolFailed, match="is not a submission"):

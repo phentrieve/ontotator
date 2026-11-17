@@ -62,13 +62,13 @@ describe("StagePopover", () => {
 
   it("shows the stage's admin actions and Open full details", () => {
     const onOpenDetails = vi.fn();
-    render(<Harness stage="review" onOpenDetails={onOpenDetails} actions={<button type="button">Request correction…</button>} />);
+    render(<Harness stage="review" onOpenDetails={onOpenDetails} actions={<button type="button">Ask a reviewer to correct…</button>} />);
     openPopover();
     const dialog = screen.getByRole("dialog", { name: "Translation activity, case-108 de" });
     // Review lines need no submissions.
     expect(within(dialog).getAllByRole("listitem")[0].textContent).toContain("Ana Weber");
     expect(api.getRowSubmissions).not.toHaveBeenCalled();
-    expect(within(dialog).getByRole("button", { name: "Request correction…" })).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "Ask a reviewer to correct…" })).toBeTruthy();
     fireEvent.click(within(dialog).getByRole("button", { name: "Open full details" }));
     expect(onOpenDetails).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("dialog")).toBeNull();

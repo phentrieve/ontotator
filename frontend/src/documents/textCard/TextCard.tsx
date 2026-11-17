@@ -240,7 +240,7 @@ export function TextCard(props: TextCardProps): JSX.Element {
       {segment === "translation" && <TranslationPart key={rowKeyOf(row)} row={row} projectKey={projectKey} query={query} canManage={canManage}
         onAssign={props.onAssign} onNavigate={onNavigate} onChanged={props.onChanged} textVersionTools={props.textVersionTools} now={now}
         planControl={plannable ? props.planControl?.("review") : undefined} {...partProps("translation", "review")} />}
-      {segment === "annotation" && <AnnotationPart key={rowKeyOf(row)} row={row} projectKey={projectKey} query={query} submissions={list} canManage={canManage}
+      {segment === "annotation" && <AnnotationPart key={rowKeyOf(row)} row={row} projectKey={projectKey} query={query} submissions={list} changes={submissions.data?.changes} canManage={canManage}
         onAssign={props.onAssign} onNavigate={onNavigate} onChanged={props.onChanged} tools={props.textVersionTools} now={now}
         planControl={plannable ? props.planControl?.("annotation") : undefined} {...partProps("annotation", "annotation")} />}
       {segment === "finalization" && <FinalizationPart row={row} projectKey={projectKey} query={query} decision={props.decision} onNavigate={onNavigate} now={now}

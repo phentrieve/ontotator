@@ -124,7 +124,7 @@ ACCEPTED_BY_REVIEW_HINT = (
     "This version has no acceptance by a lead or an import override (it was"
     " accepted by a translation review or in its package). Ask for its new review"
     " (a correction or a second opinion) with request_translation_correction"
-    " (in the web interface: Request correction... at the accepted version)."
+    " (in the web interface: Ask a reviewer to correct... at the accepted version)."
 )
 
 OPEN_STATES = ("open", "in_progress", "reopened")

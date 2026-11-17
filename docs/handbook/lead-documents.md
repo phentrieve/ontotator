@@ -97,6 +97,8 @@ The **Documents** page lists every text of the project and what it needs next. O
 
 A task starts with the person's first saved change; opening it is not enough, and neither is ticking checked sentences in a translation review. Until then **Translation** and **Annotation** read *assigned, not started* with the person's name, in the table (*not started* without the name below 1600 px), its tooltip, the narrow cards and the text card, where the person's row shows **Not started**. After the first save they read *in review* or *In progress*. The same holds for a task you reopened, also when you asked a reviewer who had already submitted to correct a translation: it reads *assigned, not started* again until the person saves a change after the reopen. With several people or parallel versions the cell counts them, for example *1 of 2 started*.
 
+A text with fewer annotators than **Annotators per text** shows what its people are doing, not the free place. While someone has an open task, **Annotation** reads for example *assigned, not started · max 2* or *1 of 2 submitted · max 3* (below 1600 px *not started*, *1/2 submitted*; the tooltip has the full state), counted out of the people who hold the text; **Waiting on** names the person, the text is under **In progress**, and **Next step** still offers **Assign annotation…** for another annotator. The same holds after **Start a round…** for a text with one annotator. Only a text nobody is working on reads *1 annotator · max 2* or *Unassigned* and is listed under **To assign** (or under **Needs your decision** once its one annotation is submitted). To give texts in progress another annotator, select them and click **Assign annotation…** in the selection bar: it assigns only where a text still has a free place.
+
 The counts in **Annotation**, for example *0 of 1 submitted*, count only work on the newest version of the text. After a text change, a submission on the old version no longer counts: neither when it was carried to the new version, nor when the new version was started fresh. Carried work counts once it is submitted on the new version.
 
 ### Use the Documents tabs
@@ -190,7 +192,11 @@ In the card:
 What for: see what happened to a text and its technical IDs.
 
 1. In the text card footer, click **History** or **Details**. The view's name stands next to **Back** at the top of the card.
-   - **History** lists all activity, newest first, with reviewers' reasons, reassignments and mode changes.
+   - **History** lists all activity, newest first, each line with date and time. A change names who made it and, where one was given, the reason, for example:
+     - *task of R. Roe (ann-0295) reopened by you, 17 Nov, 13:37: Guideline changed* (**Reopen…**, single or for several texts; an Undo adds *reopening of the task of R. Roe (ann-0295) undone by you, …*),
+     - *Round 2 for Tom Reis (ann-0004) started by you, 17 Nov, 13:39: Second pass* (**Start a round…**),
+     - *the result of Tom Reis (ann-0004) chosen by you, …*, *changed from the result of Tom Reis (ann-0004) to the result of R. Roe (ann-0295) by you, …* and, after an Undo, *change undone by you, the result of Tom Reis (ann-0004) is final again, …* (the final result; a consolidation reads *the consolidation by …*),
+     - *withdrawn by you, 17 Nov, 14:02: Wrong text* (**Withdraw final…**), reassignments, and *mode changed by you, now annotated from scratch, …: reason*.
    - **Details** shows the **Plan**, the **Problem reports** and the **Technical details**. Each problem report shows its title, then who reported it, when, its state and the paused tasks, then **Open report**. In the **Technical details**, the lines **Submission ID** and **Round ID** name the person and the version, for example *Submission ID, ann-0004, v1*.
 2. Click **Back** to return to the path.
 
@@ -215,7 +221,7 @@ What for: see each version of a translation, its reviews and its origin.
 1. Open the text card and click **Translation**.
 2. The list shows each version with its origin and status, then one row per person who worked on it: the name, the task and the status. Older ones are under **Older versions**; with parallel versions they are grouped by version chain.
 3. Click **View text** to read a version, or **Translation reviews** to see every review decision. In a reviewer's row, **Reopen…** lets them review the version again and **Remove…** removes their assignment.
-   At the newest accepted version, **Correct the translation…** lets you correct it yourself ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)). At the newest version of a translation, **Upload new version…** brings in a text made elsewhere as the next version ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)). **Fix typos…** at the newest version fixes spacing, typos or grammar without a review and keeps the status of the text; a version made this way says *Typo fix* under its name, with the lead and the reason ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
+   The buttons that change the text of a version say who does the work, and a grey line under them says the difference in a few words, for example *Ask a reviewer: a reviewer corrects it in a new review. Correct it myself: you edit it here; it is reviewed again. Fix typos: spacing, typos, grammar; the status stays, no review. Upload: a text made elsewhere becomes the next version.* At an accepted version, **Ask a reviewer to correct…** gives the correction to a translation reviewer ([Request a translation correction](#request-a-translation-correction)). At the newest accepted version, **Correct it myself…** lets you correct it yourself ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)). At the newest version of a translation, **Upload a corrected text…** brings in a text made elsewhere as the next version ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)). **Fix typos…** at the newest version fixes spacing, typos or grammar without a review and keeps the status of the text; a version made this way says *Typo fix* under its name, with the lead and the reason ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
 4. Click **Compare with source** to compare the translation with the source text.
 
 ### Find spacing errors and invisible characters
@@ -252,9 +258,9 @@ To see the characters in a text, a reviewer ticks **Show invisible characters** 
 What for: have a translation corrected by a reviewer.
 
 1. Open the text card and click **Translation**.
-2. At the version, click **Request correction…**. It is offered only at an accepted version; for a rejected or queried one, use **Resolve…** ([Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation)).
+2. At the version, click **Ask a reviewer to correct…**. It is offered only at an accepted version; for a rejected or queried one, use **Resolve…** ([Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation)).
 3. Choose the **Translation reviewer** and enter the **Reason for another review**. The reviewer reads it under the task in **My tasks** and above **Decision** in the review (*Second review requested by the lead on …*), so say what to look at.
-4. Click **Assign correction review**, then **Close**.
+4. Click **Ask the reviewer**, then **Close**. Before that, **Cancel** closes the dialog without asking anyone.
 
 If the reviewer submits **Accepted with corrections**, the corrected text becomes a new text version. While a lead is correcting the same version themselves, the request is refused with *A lead is correcting this version.* ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
 
@@ -406,7 +412,7 @@ What for: give submitted annotations a new work round, for many texts at once. E
 
 What happens to the work:
 
-- Each person gets the task back in **My tasks** and must submit again. The earlier submission no longer counts as submitted; it stays in the history and the earlier rounds stay readable under **More** › **Work rounds**.
+- Each person gets the task back in **My tasks** and must submit again. The text waits on that person again (**Waiting on**), and in the text card the person's row names the round, for example *Round 2, started by you 17 Nov · assigned 3 Nov, from scratch*; **History** has the line with your reason. The earlier submission no longer counts as submitted; it stays in the history and the earlier rounds stay readable under **More** › **Work rounds**.
 - After **Restart** the submitted work is set aside: it is not carried into the new round.
 - Every listed task gets its round, or none: if the texts changed since the preview, the dialog says *The texts changed since the preview. Check the new preview.* and shows it. Each round is recorded in the audit trail like a single new round.
 - This action has no undo, and no action on a single text brings back a round that was replaced. To let people only correct a submission in place, use **Reopen…** instead.
@@ -471,7 +477,7 @@ The other actions on paused texts:
 - **Reopen…** and **Start a round…** work for submitted tasks; the dialog says how many of them are on paused texts and stay paused until you release the texts.
 - **Withdraw open tasks…** keeps a paused task, *Keep 1 paused task · paused by a lead: release the text first*. **Remove…** in the text card removes a single one.
 - **Change mode…**, **Accept agreeing results…** and **Change final…** work as on any other text.
-- **Fix typos…** and **Upload new version…** on a version of a paused text work: they are your own actions and change nobody's work in progress. The pause covers every version, so tasks that follow a correction to the new version are still paused there.
+- **Fix typos…** and **Upload a corrected text…** on a version of a paused text work: they are your own actions and change nobody's work in progress. The pause covers every version, so tasks that follow a correction to the new version are still paused there.
 - Correcting a translation yourself is refused while your own earlier review of that version is open and the text is paused: release the text first.
 - **Agree clean restart…** on a problem report is refused while the text is paused: release the text first.
 

@@ -29,7 +29,7 @@ import { plural } from "../app/labels";
 import { Button, Checkbox, IconSortDown, InlineConfirm, InlineMessage, MenuButton, type ToastMessage } from "../ui";
 import { ACTION_LABELS, appliedText, unavailableReason, type BulkAction } from "./bulkActionModel";
 import { BulkFinalDialog } from "./BulkFinalDialog";
-import { finalAppliedText, finalUnavailableReason, finalUndoneText, finalUndoRefusal, FINAL_ACTION_LABELS, type FinalAction, type FinalPreview } from "./bulkFinalModel";
+import { finalAppliedText, finalUnavailableReason, FINAL_ACTION_LABELS, type FinalAction, type FinalPreview } from "./bulkFinalModel";
 import { BulkModeDialog } from "./BulkModeDialog";
 import { modeAppliedText, modeUnavailableReason, MODE_ACTION_LABEL } from "./bulkModeModel";
 import { BulkPauseDialog } from "./BulkPauseDialog";
@@ -37,6 +37,7 @@ import { pauseAppliedText, pauseUnavailableReason, PAUSE_ACTION_LABELS, type Pau
 import { BulkTaskDialog } from "./BulkTaskDialog";
 import { PLAN_CHANGED_MESSAGE, UNDO_WITHDRAWN_NOTE, undoneToast, WITHDRAW_CHECKBOX, withdrawnSummary } from "./PlanChips";
 import { PlanDialog } from "./PlanDialog";
+import { finalUndoAction } from "./finalUndo";
 import { runPlanUndo } from "./planUndo";
 import { useFloatingBar } from "./useFloatingBar";
 import { caseOfTextKey, rowRefOf } from "./useTextSelection";
@@ -297,21 +298,11 @@ export function SelectionBar({
       ...(undoToken ? {
         actionLabel: "Undo",
         undo: true,
-        onAction: () => {
-          latest.current.onAnnounce("Saving…");
-          api.bulkChangeFinalUndo(projectKey, undoToken.id).then(view => {
-            const done = finalUndoneText(view);
-            latest.current.onAnnounce(done);
-            // The note on exports made meanwhile stays until dismissed.
-            latest.current.showToast({ message: done, ...(view.exports_since ? { persist: true } : {}) });
-            latest.current.onChanged();
-          }, (failure: unknown) => {
-            // All or nothing: the refusal names the first text that changed since.
-            const text = finalUndoRefusal(failure) ?? errorMessage(failure);
-            latest.current.onAnnounce(text);
-            latest.current.showToast({ message: text, persist: true });
-          });
-        },
+        onAction: finalUndoAction(projectKey, undoToken.id, {
+          onAnnounce: message => latest.current.onAnnounce(message),
+          showToast: next => latest.current.showToast(next),
+          onChanged: () => latest.current.onChanged(),
+        }),
       } : {}),
     });
     latest.current.onChanged();

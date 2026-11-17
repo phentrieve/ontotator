@@ -70,7 +70,7 @@ export function memberHint(members: Pick<ProjectSummary, "name" | "roles">[]): s
 
 const answerRoute = (task: TaskSummary, reportId: string): Route => ({ name: "projectProblemReport", key: task.project_key, reportId });
 
-/** Why a task reads "Reopened": the lead's reopen, or for a review reopened by "Request correction…" that request. */
+/** Why a task reads "Reopened": the lead's reopen, or for a review reopened by "Ask a reviewer to correct…" that request. */
 const reopenedNotice = (task: TaskSummary): string | null =>
   task.status === "reopened" && !reopenedText(task) ? secondReviewText(task) ?? reopenNotice(task) : reopenNotice(task);
 

@@ -4266,6 +4266,7 @@
           "final-results"
         ],
         "summary": "Select Final",
+        "description": "Choose, confirm again or replace the final result of one text.\n\nA choice that replaces another final result returns ``undo`` (``id``,\n``expires_at``), the handle of ``final-selections/bulk-change/undo``:\nthe lead who made the change can take it back once, within 60 minutes\nand while nothing the final result rests on changed since. A first\nchoice and a result confirmed again have no Undo (``undo`` is null).",
         "operationId": "select_final_api_v1_projects__key__final_selections_put",
         "parameters": [
           {
@@ -21332,6 +21333,16 @@
               }
             ],
             "title": "Adjudicator Not Annotator"
+          },
+          "undo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BulkUndoView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -29183,7 +29194,13 @@
               "reassigned",
               "mode_changed",
               "mode_restored",
-              "final_withdrawn"
+              "final_withdrawn",
+              "reopened",
+              "reopen_undone",
+              "round_started",
+              "final_chosen",
+              "final_changed",
+              "final_restored"
             ],
             "title": "Kind"
           },
@@ -29202,6 +29219,38 @@
               }
             ],
             "title": "Task"
+          },
+          "by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonRefView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "assignment_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignment Id"
+          },
+          "round_ordinal": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Round Ordinal"
           },
           "from_person": {
             "anyOf": [
@@ -29245,6 +29294,26 @@
             ],
             "title": "To Mode"
           },
+          "from_result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RowResultRefView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "to_result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RowResultRefView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "reason": {
             "anyOf": [
               {
@@ -29264,7 +29333,7 @@
           "at"
         ],
         "title": "RowChangeView",
-        "description": "A change of who works on a row, or how: its History line. A withdrawn\nfinal result (#343) names the lead in ``from_person``."
+        "description": "A change of who works on a row, how, or of its final result: its\nHistory line, with who did it, when and (where one was given) why.\n\n``by`` is the person who made the change; a withdrawn final result\n(#343) names the lead in ``from_person`` instead. ``reopened``,\n``reopen_undone`` and ``round_started`` name the task and its person\n(``assignment_id``, ``to_person``); the ``final_*`` kinds name the\nresults (``from_result`` the one replaced, ``to_result`` the one final\nafterwards; null when the submission is no longer among the row's)."
       },
       "RowItemView": {
         "properties": {
@@ -29518,6 +29587,25 @@
           "language"
         ],
         "title": "RowRefView"
+      },
+      "RowResultRefView": {
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/PersonRefView"
+          },
+          "consolidation": {
+            "type": "boolean",
+            "title": "Consolidation",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "author"
+        ],
+        "title": "RowResultRefView",
+        "description": "A submission named as a final result in a History line: its author,\nand whether it is a consolidation."
       },
       "RowRoundView": {
         "properties": {

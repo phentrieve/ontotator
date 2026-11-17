@@ -1,4 +1,4 @@
-/** Issue 341 a: "Upload new version…" (paste or one .txt file, how the text was made, changes before saving). */
+/** Issue 341 a: "Upload a corrected text…" (paste or one .txt file, how the text was made, changes before saving). */
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api, ApiError, type VersionUploadPreview, type VersionUploadResult } from "../../src/api/client";
@@ -30,7 +30,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 async function renderDialog() {
   const props = { row, version: v2, projectKey: "p", onUploaded: vi.fn(), onClose: vi.fn() };
   render(<UploadVersionDialog {...props} />);
-  const dialog = screen.getByRole("dialog", { name: "Upload new version, case-0101 de v2" });
+  const dialog = screen.getByRole("dialog", { name: "Upload a corrected text, case-0101 de v2" });
   await waitFor(() => expect(api.previewVersionUpload).toHaveBeenCalledWith("p", "case-0101-de-v2"));
   return { props, dialog };
 }

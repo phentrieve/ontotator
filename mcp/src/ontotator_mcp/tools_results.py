@@ -316,7 +316,8 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
             Field(
                 ge=1,
                 description=(
-                    "``undo.id`` of the confirmed change_final_results answer."
+                    "``undo.id`` of the confirmed change_final_results or"
+                    " set_final_result answer."
                 ),
             ),
         ],

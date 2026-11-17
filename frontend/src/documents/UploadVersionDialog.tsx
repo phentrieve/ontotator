@@ -1,5 +1,5 @@
 /**
- * "Upload new version…" on the newest version row of a translation (issue 341 a): the lead brings in a text
+ * "Upload a corrected text…" on the newest version row of a translation (issue 341 a): the lead brings in a text
  * made elsewhere. Two steps in one dialog: the text (pasted, or one UTF-8 .txt file that only fills the text)
  * with how it was made, then the changes against the current version ("Show changes" marks) before it is
  * saved. The new version is always a correction of this version, ready for review with review On; accepting
@@ -89,7 +89,7 @@ export function UploadVersionDialog({ row, version, projectKey, onUploaded, onCl
   const id = useId();
   const writing = useRef(false);
   const short = versionName(version.version, version.chain_name, row.parallel_roots);
-  const title = `Upload new version, ${row.case_id} ${row.language} ${short}`;
+  const title = `Upload a corrected text, ${row.case_id} ${row.language} ${short}`;
   /** What the server says before any text is known: availability and the work on this version. */
   const [state, setState] = useState<VersionUploadPreview | null>(null);
   const [loadError, setLoadError] = useState<unknown>();

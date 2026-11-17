@@ -166,22 +166,22 @@ test("step 5: Tom submits (Luc keeps a draft)", async () => {
 });
 
 test("step 6: the lead requests a correction, Ana corrects → v2", async () => {
-  // The text card's Translation part: "Request correction…" opens the correction dialog.
+  // The text card's Translation part: "Ask a reviewer to correct…" opens the correction dialog.
   // A double click on the text name opens the card (R-4); one activation.
   await clicks.count(textName(page, CASE, "de"), { clickCount: 2 });
   const area = textCard(page, CASE, "de");
   await expect(area).toBeVisible();
   const translation = area.getByRole("navigation", { name: "Text path", exact: true }).getByRole("button", { name: /^Translation / });
   if ((await translation.getAttribute("aria-current")) !== "step") await clicks.count(translation);
-  await clicks.count(area.getByRole("button", { name: "Request correction…", exact: true }).first());
-  const correction = page.getByRole("dialog", { name: /^Request translation correction/ });
-  const form = correction.getByRole("region", { name: "Request translation correction", exact: true });
+  await clicks.count(area.getByRole("button", { name: /^Ask a reviewer to correct / }).first());
+  const correction = page.getByRole("dialog", { name: /^Ask a reviewer to correct, / });
+  const form = correction.getByRole("region", { name: "Ask a reviewer to correct", exact: true });
   const reviewer = form.getByLabel("Translation reviewer", { exact: true });
   await expect(reviewer.locator("option", { hasText: ANA })).toHaveCount(1);
   if ((await reviewer.inputValue()) === "") await chooseOption(reviewer, ANA);
   await form.getByLabel("Reason for another review", { exact: true }).fill("Dosis prüfen");
-  await clicks.count(form.getByRole("button", { name: "Assign correction review", exact: true }));
-  await expect(form.getByText(/^Translation correction assigned to/)).toBeVisible();
+  await clicks.count(form.getByRole("button", { name: "Ask the reviewer", exact: true }));
+  await expect(form.getByText(/was asked to correct the translation\.$/)).toBeVisible();
   await correction.getByRole("button", { name: "Close", exact: true }).first().click();
 
   await act({ actor: "ana", action: "correct_translation" });

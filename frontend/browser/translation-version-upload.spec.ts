@@ -1,5 +1,5 @@
 /**
- * Issue 341 a: "Upload new version…" on the newest version row of a translation (decisions 341a-A to 341a-H).
+ * Issue 341 a: "Upload a corrected text…" on the newest version row of a translation (decisions 341a-A to 341a-H).
  * - The text is pasted or read from one UTF-8 .txt file; how it was made is asked (provider only for a machine
  *   translation); the changes against the current version are shown before anything is saved.
  * - The new version is a correction of the current one, ready for review with review On; "Accept this version…"
@@ -57,7 +57,7 @@ async function loginLead(page: Page, s: LeadScenario) {
   await documentsReady(page);
 }
 
-const uploadDialog = (page: Page, caseId: string) => page.getByRole("dialog", { name: `Upload new version, ${caseId} de v1`, exact: true });
+const uploadDialog = (page: Page, caseId: string) => page.getByRole("dialog", { name: `Upload a corrected text, ${caseId} de v1`, exact: true });
 
 test("a pasted machine translation becomes v2, a correction that is ready for review and accepted by its own step", async ({ page }) => {
   const errors = consoleErrors(page);
@@ -67,9 +67,9 @@ test("a pasted machine translation becomes v2, a correction that is ready for re
   const card = await openTextCard(page, caseId, "de");
   const [v1] = await (await textVersionItems(card, 1)).all();
   // 341a-A: next to the other version actions of the newest version.
-  await expect(v1.getByRole("button", { name: `Correct the translation v1 of ${caseId} de…`, exact: true })).toBeVisible();
-  const open = v1.getByRole("button", { name: `Upload new version of v1 of ${caseId} de…`, exact: true });
-  await expect(open).toHaveText("Upload new version…");
+  await expect(v1.getByRole("button", { name: `Correct v1 of ${caseId} de myself…`, exact: true })).toBeVisible();
+  const open = v1.getByRole("button", { name: `Upload a corrected text for v1 of ${caseId} de…`, exact: true });
+  await expect(open).toHaveText("Upload a corrected text…");
   await evidence(page, "341a-row-before");
   await open.click();
 
@@ -123,8 +123,8 @@ test("a pasted machine translation becomes v2, a correction that is ready for re
   await expect(newest).toContainText(new RegExp(`Uploaded by Project Lead \\(${esc(s.pseudonyms.lead)}, you\\), ${TIME} · Made on 12 Nov 2026 by Dr\\. Roe · Checked against the source`));
   await expect(items.filter({ hasNotText: "Correction of v1" })).toContainText("Accepted");
   // The older version offers no upload any more.
-  await expect(items.filter({ hasNotText: "Correction of v1" }).getByRole("button", { name: /^Upload new version/ })).toHaveCount(0);
-  await expect(newest.getByRole("button", { name: `Upload new version of v2 of ${caseId} de…`, exact: true })).toBeVisible();
+  await expect(items.filter({ hasNotText: "Correction of v1" }).getByRole("button", { name: /^Upload a corrected text/ })).toHaveCount(0);
+  await expect(newest.getByRole("button", { name: `Upload a corrected text for v2 of ${caseId} de…`, exact: true })).toBeVisible();
   await evidence(page, "341a-row-after");
 
   // Accepting is the separate, audited step on the same row.
@@ -149,7 +149,7 @@ test("at 390 px: a .txt file fills the text; a text without changes saves nothin
   const [v1] = await (await textVersionItems(card, 1)).all();
   await page.setViewportSize(PHONE);
   await noHorizontalScroll(page, "row");
-  const open = v1.getByRole("button", { name: `Upload new version of v1 of ${caseId} de…`, exact: true });
+  const open = v1.getByRole("button", { name: `Upload a corrected text for v1 of ${caseId} de…`, exact: true });
   await open.scrollIntoViewIfNeeded();
   await open.click();
 
@@ -215,7 +215,7 @@ test("an open translation review refuses the upload", async ({ page }) => {
   // 341a-G: the same rule and words as correcting and accepting.
   const card = await openTextCard(page, caseId, "de");
   const [v1] = await (await textVersionItems(card, 1)).all();
-  await v1.getByRole("button", { name: `Upload new version of v1 of ${caseId} de…`, exact: true }).click();
+  await v1.getByRole("button", { name: `Upload a corrected text for v1 of ${caseId} de…`, exact: true }).click();
   const dialog = uploadDialog(page, caseId);
   await expect(dialog.getByText("A translation review of this version is open. Withdraw it with Remove… in the reviewer’s row of the Translation part before you upload a new version.", { exact: true })).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Check changes", exact: true })).toHaveCount(0);
