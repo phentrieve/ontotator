@@ -54,7 +54,10 @@ def test_a_clean_text_has_no_hints() -> None:
         ("Fieber ", [("TRAILING_WHITESPACE_TEXT", " ")]),
         ("Fieber\n\n", [("TRAILING_WHITESPACE_TEXT", "\n\n")]),
         ("Fieber \n", [("TRAILING_WHITESPACE_TEXT", " \n")]),
-        ("Fieber\t\r\n", [("TRAILING_WHITESPACE_TEXT", "\t\r\n"), ("TAB", "\t")]),
+        (
+            "Fieber\t\r\n",
+            [("TAB", "\t"), ("TRAILING_WHITESPACE_TEXT", "\t\r\n")],
+        ),
         ("Fieber\r\n\r\n", [("TRAILING_WHITESPACE_TEXT", "\r\n\r\n")]),
         ("Fieber \n\n", [("TRAILING_WHITESPACE_TEXT", " \n\n")]),
         ("a\tb", [("TAB", "\t")]),

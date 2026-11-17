@@ -11063,7 +11063,7 @@ export interface components {
              * Rule
              * @enum {string}
              */
-            rule: "DOUBLE_SPACE" | "SPACE_BEFORE_PUNCTUATION" | "MISSING_SPACE_AFTER_PUNCTUATION" | "TRAILING_WHITESPACE_LINE" | "TRAILING_WHITESPACE_TEXT" | "TAB" | "NON_BREAKING_SPACE" | "ZERO_WIDTH_CHARACTER" | "SOFT_HYPHEN" | "CONTROL_CHARACTER";
+            rule: "DOUBLE_SPACE" | "SPACE_BEFORE_PUNCTUATION" | "MISSING_SPACE_AFTER_PUNCTUATION" | "TRAILING_WHITESPACE_LINE" | "TRAILING_WHITESPACE_TEXT" | "TAB" | "ZERO_WIDTH_CHARACTER" | "SOFT_HYPHEN" | "CONTROL_CHARACTER";
             /**
              * Start
              * @description First code point of the hint (zero-based, Unicode code points, as annotation spans).

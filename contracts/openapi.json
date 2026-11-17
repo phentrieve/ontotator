@@ -32144,7 +32144,6 @@
               "TRAILING_WHITESPACE_LINE",
               "TRAILING_WHITESPACE_TEXT",
               "TAB",
-              "NON_BREAKING_SPACE",
               "ZERO_WIDTH_CHARACTER",
               "SOFT_HYPHEN",
               "CONTROL_CHARACTER"
