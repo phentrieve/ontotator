@@ -28,6 +28,7 @@ from browser_documents_scenarios import (
 )
 from fastapi import FastAPI, HTTPException
 from sqlalchemy import select as sa_select
+from sqlalchemy import update as sa_update
 
 from ontotator.storage.tables import JobRow, ProjectRow
 
@@ -366,7 +367,110 @@ def build_s12(app: FastAPI) -> dict[str, Any]:
     )
 
 
+def build_s464(app: FastAPI) -> dict[str, Any]:
+    """Lead pause (issue 464): six en texts EN100022 to EN100027, two
+    annotators per text; nothing is paused yet. Tom Reis has started 22
+    (R. Roe submitted it) and is assigned, not started, on 23, as R. Roe is.
+    Tom Reis's submission is the final result of 24 and the only work on 25.
+    R. Roe has started 26 and reported a problem there (the task is paused
+    by the report). Nobody works on 27. Both submitted 28 with one finding
+    each, and Kim Lang's consolidation of it is open. Ana Weber is an
+    annotator without tasks; Carla Diaz is the lead."""
+    from datetime import UTC, datetime
+
+    from t1_builders import native_unit
+
+    from ontotator.assignments.service import AssignmentService
+    from ontotator.auth.audit import Actor
+    from ontotator.storage.tables import AssignmentRow
+
+    scenario = new_project(app, "S464")
+    cases = [f"EN1000{number}" for number in range(22, 29)]
+    docs = import_texts(
+        scenario,
+        [
+            native_unit(case, "en", f"{SYNTHETIC} {case}", case_id=case)
+            for case in cases
+        ],
+    )
+    doc = {case: docs[(case, "en", 1)] for case in cases}
+    with scenario.db.transaction() as conn:
+        conn.execute(
+            sa_update(ProjectRow)
+            .where(ProjectRow.project_key == scenario.key)
+            .values(annotations_per_text=2)
+        )
+    add_user(scenario, "lead", ["lead"])
+    add_user(scenario, "kim", ["adjudicator"])
+    for name, display in (
+        ("lead", "Carla Diaz"),
+        ("kim", "Kim Lang"),
+        ("tom", "Tom Reis"),
+        ("roe", "R. Roe"),
+        ("ana", "Ana Weber"),
+    ):
+        if name not in ("lead", "kim"):
+            add_user(scenario, name, ["annotator"])
+        app.state.accounts.update_profile(
+            Actor.cli(), scenario.users[name], display_name=display
+        )
+    started = in_progress(scenario, doc["EN100022"], "tom")
+    submit(scenario, doc["EN100022"], "roe")
+    waiting = {
+        name: assign(scenario, doc["EN100023"], name, "annotate")
+        for name in ("tom", "roe")
+    }
+    final = submit(scenario, doc["EN100024"], "tom")
+    select(scenario, doc["EN100024"], final["submission_id"])
+    submit(scenario, doc["EN100025"], "tom")
+    reported = in_progress(scenario, doc["EN100026"], "roe")
+    # Both started tasks have saved work, as after a first change in the editor.
+    with scenario.db.transaction() as conn:
+        conn.execute(
+            sa_update(AssignmentRow)
+            .where(
+                AssignmentRow.id.in_(
+                    [started["assignment_id"], reported["assignment_id"]]
+                )
+            )
+            .values(status="in_progress", updated_at=datetime.now(UTC))
+        )
+    from browser_documents_scenarios import start_round
+    from browser_overview_scenarios import assign_and_annotate
+
+    inputs = [
+        assign_and_annotate(scenario, doc["EN100028"], name, [term])["submission_id"]
+        for name, term in (("tom", "HP:0001250"), ("roe", "HP:0001252"))
+    ]
+    consolidation = assign(scenario, doc["EN100028"], "kim", "review")
+    start_round(
+        scenario, consolidation, "kim", kind="consolidation", sources=inputs, by="lead"
+    )
+    opened = report(
+        scenario,
+        "roe",
+        reported["assignment_id"],
+        reported["round_id"],
+        "The last sentence of the text is cut off.",
+    )
+    with scenario.db.transaction() as conn:
+        assert AssignmentService._get(conn, reported["assignment_id"]).held
+    return result(
+        scenario,
+        [(case, "en") for case in cases],
+        documents=doc,
+        assignments={
+            "started": started["assignment_id"],
+            "waiting_tom": waiting["tom"],
+            "reported": reported["assignment_id"],
+            "consolidation": consolidation,
+        },
+        report_id=opened.report_id,
+    )
+
+
 BUILDERS: dict[str, Builder] = {
+    "S464": build_s464,
     "S6": build_s6,
     "S7": build_s7,
     "S9": build_s9,

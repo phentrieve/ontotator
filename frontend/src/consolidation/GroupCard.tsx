@@ -230,6 +230,7 @@ export function GroupCard(props: GroupCardProps): JSX.Element {
   const outcomeBlock = outcome?.kind === "conflict"
     ? <InlineConfirm title="Decision not saved" message="" confirmLabel="Save" onConfirm={() => undefined} onCancel={props.onDismissOutcome} outcome={outcome}
       conflictMessage="This consolidation changed elsewhere (another tab, a reopened submission, a new text version or a new assignment). Nothing was saved. Review the current state." />
+    : outcome?.kind === "paused" ? <div className="cons-failure" role="alert"><p>Decision not saved. {outcome.message}</p></div>
     : outcome?.kind === "error" ? <div className="cons-failure" role="alert">
       <p>Could not save. Nothing changed.</p>
       <Button onClick={outcome.onRetry} loading={busy}>Retry</Button>

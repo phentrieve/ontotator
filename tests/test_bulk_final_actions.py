@@ -76,8 +76,13 @@ def test_preview_of_a_mixed_selection_names_changes_and_skips(env):
     select_final(env, doc("c2", "en"), "c2-a")
     body = preview(env, ("c2", "en"), ("c1", "en"), ("c1", "de"), ("nope", "en"))
     assert body["applied"] is False and body["rule"] == "newest_submission"
-    # Texts the project does not have are left out.
+    # Texts the project does not have are left out, and named.
     assert (body["texts"], body["change_count"], body["skipped_count"]) == (3, 1, 2)
+    assert body["unknown_rows"] == [{"case_id": "nope", "language": "en"}]
+    # Another letter case or language is another text; also in the summary.
+    wrong = preview(env, ("C1", "en"), ("c1", "xx"), ("c1", "en"), summary_only=True)
+    assert wrong["texts"] == 1
+    assert wrong["unknown_rows"] == rows(("C1", "en"), ("c1", "xx"))
     [change] = body["changes"]
     assert change == {
         "case_id": "c1",

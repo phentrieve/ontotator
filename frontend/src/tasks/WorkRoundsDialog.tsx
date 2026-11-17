@@ -3,7 +3,7 @@ import { api, type AssignmentView, type CreateRoundRequest, type RoundSourceView
 import { Button, Dialog, InlineMessage } from "../ui";
 import { ErrorNotice } from "../admin/ErrorNotice";
 import { useSessionRestored } from "../app/useSessionRestored";
-import { WorkRoundActions, carryAvailability, replaceableRoundCandidate, useRoundStart } from "./WorkRoundActions";
+import { WorkRoundActions, carryAvailability, carryRefusedByConsolidation, replaceableRoundCandidate, useRoundStart } from "./WorkRoundActions";
 
 const noSources: readonly RoundSourceView[] = [];
 
@@ -38,7 +38,7 @@ export function WorkRoundsDialog({ assignment, onClose, onCreate, onOpen, onRelo
   useSessionRestored(() => { if (error !== undefined) setRetry(value => value + 1); });
   const sources = data?.sources ?? noSources;
   const control = useRoundStart(assignment, sources, onCreate);
-  const available = data !== null && carryAvailability(assignment, data.rounds, data.sources, data.untouchedRoundId).kind === "available";
+  const available = data !== null && !carryRefusedByConsolidation(control.error) && carryAvailability(assignment, data.rounds, data.sources, data.untouchedRoundId).kind === "available";
   const title = documentLabel ? `Work rounds: ${documentLabel}` : "Work rounds";
   // No preselection: the source stays a deliberate choice. Until then the button stays focusable and names why.
   const reasonId = `${useId()}-continue-reason`;

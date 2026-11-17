@@ -656,6 +656,31 @@ describe("copying the text of a finding", () => {
     expect(copyOn(note).setData).toHaveBeenCalledWith("text/plain", "alpha gamma");
   });
 
+  it("Ctrl+C copies the passage of a selected tool proposal by the same rules (review F4)", () => {
+    const view = reviewView([]);
+    // "alpha beta gamma": the proposal's mention covers "alpha" and "gamma".
+    view.available_inputs![0].evidence[0].mention.segments = [{ start: 0, end: 5 }, { start: 11, end: 16 }];
+    const { container } = render(<CaseScreen view={view} workspaceId="ws" onClose={vi.fn()} />);
+    expect(copyOn(document.body)).toMatchObject({ notPrevented: true });
+
+    fireEvent.click(container.querySelector<HTMLElement>('[data-list-key^="target:"]')!);
+    const copied = copyOn(document.body);
+    expect(copied.setData).toHaveBeenCalledWith("text/plain", "alpha gamma");
+    expect(copied.notPrevented).toBe(false);
+    expect(within(container.querySelector<HTMLElement>(".review-actions__proposal")!).getByRole("button", { name: "Copy text" })).toBeDefined();
+
+    // The reviewer note with its own selection copies that selection; without one, the proposal's passage.
+    const note = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Reviewer note" });
+    fireEvent.change(note, { target: { value: "my note" } });
+    note.focus();
+    note.setSelectionRange(0, 2);
+    const own = copyOn(note);
+    expect(own.setData).not.toHaveBeenCalled();
+    expect(own.notPrevented).toBe(true);
+    note.setSelectionRange(2, 2);
+    expect(copyOn(note).setData).toHaveBeenCalledWith("text/plain", "alpha gamma");
+  });
+
   it("'Copy text' at a mention puts its text on the clipboard and says so", async () => {
     const writeText = vi.fn(async () => undefined);
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });

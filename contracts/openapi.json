@@ -4430,7 +4430,7 @@
           "final-results"
         ],
         "summary": "Bulk Change Final",
-        "description": "Change the final result of many texts by a rule (issue 336).\n\nRule ``newest_submission``: each selected text that has a final result\ngets its newest submission instead (of the submissions the final panel\noffers on the current version), when that one was submitted after the\nfinal result was chosen and is a consolidation, the text's only\nsubmission, or an annotation that agrees in full with the text's other\nsubmissions (the rule of ``accept-agreeing``). ``preview: true`` lists\nthe texts that would change, with the result each one gets, the texts\nskipped and why (no final result, open work, nothing submitted, already\nthe newest, nothing submitted since the final was chosen, your own\nresult where the project forbids it, submissions that differ) and a\n``preview_token``.\nApplying sends that token: every listed text changes, or none (409\n``PREVIEW_STALE`` with a fresh ``preview`` in the details when anything\nchanged, also a final result changed meanwhile). Each text is audited\nlike a single change (``via: bulk_change_final``). An applied action\nreturns ``undo``; ``final-selections/bulk-change/undo`` takes its ``id``.",
+        "description": "Change the final result of many texts by a rule (issue 336).\n\nRule ``newest_submission``: each selected text that has a final result\ngets its newest submission instead (of the submissions the final panel\noffers on the current version), when that one was submitted after the\nfinal result was chosen and is a consolidation, the text's only\nsubmission, or an annotation that agrees in full with the text's other\nsubmissions (the rule of ``accept-agreeing``). ``preview: true`` lists\nthe texts that would change, with the result each one gets, the texts\nskipped and why (no final result, open work, nothing submitted, already\nthe newest, nothing submitted since the final was chosen, your own\nresult where the project forbids it, submissions that differ), the\nselected texts the project does not have (``unknown_rows``) and a\n``preview_token``.\nApplying sends that token: every listed text changes, or none (409\n``PREVIEW_STALE`` with a fresh ``preview`` in the details when anything\nchanged, also a final result changed meanwhile). Each text is audited\nlike a single change (``via: bulk_change_final``). An applied action\nreturns ``undo``; ``final-selections/bulk-change/undo`` takes its ``id``.",
         "operationId": "bulk_change_final_api_v1_projects__key__final_selections_bulk_change_post",
         "parameters": [
           {
@@ -5232,7 +5232,8 @@
                   "items": {
                     "enum": [
                       "guidelines_unclear",
-                      "over_limit"
+                      "over_limit",
+                      "lead_paused"
                     ],
                     "type": "string"
                   }
@@ -5832,7 +5833,8 @@
                   "items": {
                     "enum": [
                       "guidelines_unclear",
-                      "over_limit"
+                      "over_limit",
+                      "lead_paused"
                     ],
                     "type": "string"
                   }
@@ -6875,7 +6877,7 @@
           "bulk-task-actions"
         ],
         "summary": "Bulk Reopen",
-        "description": "Reopen the submitted tasks of many texts (issue 336).\n\n``preview: true`` lists the tasks that would be reopened, the tasks kept\nand why, the texts skipped (a final result is chosen) and a\n``preview_token``. Applying sends that token and a ``reason``: every\nlisted task is reopened, or none (409 ``PREVIEW_STALE`` with a fresh\n``preview`` in the details when anything changed). Each task is audited\nlike a single reopen (``via: bulk_reopen``).",
+        "description": "Reopen the submitted tasks of many texts (issue 336).\n\n``preview: true`` lists the tasks that would be reopened, the tasks kept\nand why, the texts skipped (a final result is chosen), the selected\ntexts the project does not have (``unknown_rows``) and a\n``preview_token``. Applying sends that token and a ``reason``: every\nlisted task is reopened, or none (409 ``PREVIEW_STALE`` with a fresh\n``preview`` in the details when anything changed). Each task is audited\nlike a single reopen (``via: bulk_reopen``).",
         "operationId": "bulk_reopen_api_v1_projects__key__bulk_task_actions_reopen_post",
         "parameters": [
           {
@@ -7040,7 +7042,7 @@
           "bulk-task-actions"
         ],
         "summary": "Bulk Undo",
-        "description": "Undo a bulk reopen or withdrawal by the ``undo.id`` of its apply.\n\nThe server keeps what the action changed; the request names only that\nrecord. It works once, for the lead who applied the action, before\n``undo.expires_at``, and only while the texts are exactly as the action\nleft them (tasks, drafts, review drafts, rounds, final results, plan,\nversions); otherwise 409 ``BULK_UNDO_STALE`` and nothing is undone.\nReopened tasks are submitted again; withdrawn tasks come back with their\ndrafts. An action that reopened a translation review has no Undo.",
+        "description": "Undo a bulk reopen or withdrawal by the ``undo.id`` of its apply.\n\nThe server keeps what the action changed; the request names only that\nrecord. It works once, for the lead who applied the action, before\n``undo.expires_at``, and only while the texts are exactly as the action\nleft them (tasks, drafts, review drafts, rounds, final results, plan,\nversions); otherwise 409 ``BULK_UNDO_STALE`` and nothing is undone.\nReopened tasks are submitted again; withdrawn tasks come back with their\ndrafts. An action that reopened a translation review has no Undo.\n``preview: true`` changes nothing: it lists the tasks the Undo would\nbring back (``tasks``) and, in ``blocked``, why it cannot run now\n(``changed``, ``not_in_plan``, ``person_unavailable``); a record that is\nunknown, expired or already undone is refused in a preview too.",
         "operationId": "bulk_undo_api_v1_projects__key__bulk_task_actions_undo_post",
         "parameters": [
           {
@@ -7345,7 +7347,7 @@
           "annotation-mode-changes"
         ],
         "summary": "Bulk Change Mode",
-        "description": "Change the annotation mode of many texts (issue 336, step 4).\n\nEach text is changed as ``POST annotation-mode-changes`` changes one: its\nlive submissions are marked discarded, its live annotate and review\nassignments are revoked and the mode is stored. ``preview: true`` lists,\nper text, the submissions and assignments with their people, the texts\nleft as they are with the reason (the single change's refusals; a text\nwith a final result: withdraw it first) and a ``preview_token``. Applying\nsends that token and a ``reason``: every listed text changes, or none\n(409 ``PREVIEW_STALE`` with a fresh ``preview`` in the details when\nanything changed). Each text is audited like a single change\n(``annotation_mode.change``, ``via: bulk_change_mode``) and can be\nrestored on its own (``.../{change_id}/restore``); there is no bulk undo.",
+        "description": "Change the annotation mode of many texts (issue 336, step 4).\n\nEach text is changed as ``POST annotation-mode-changes`` changes one: its\nlive submissions are marked discarded, its live annotate and review\nassignments are revoked and the mode is stored. ``preview: true`` lists,\nper text, the submissions and assignments with their people, the texts\nleft as they are with the reason (the single change's refusals; a text\nwith a final result: withdraw it first), the selected texts the project\ndoes not have (``unknown_rows``) and a ``preview_token``. Applying\nsends that token and a ``reason``: every listed text changes, or none\n(409 ``PREVIEW_STALE`` with a fresh ``preview`` in the details when\nanything changed). Each text is audited like a single change\n(``annotation_mode.change``, ``via: bulk_change_mode``) and can be\nrestored on its own (``.../{change_id}/restore``); there is no bulk undo.",
         "operationId": "bulk_change_mode_api_v1_projects__key__annotation_mode_changes_bulk_post",
         "parameters": [
           {
@@ -7375,6 +7377,116 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/BulkModeChangeView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/text-pauses/pause": {
+      "post": {
+        "tags": [
+          "text-pauses"
+        ],
+        "summary": "Pause Texts",
+        "description": "Pause the work on many texts (issue 464).\n\nA paused text keeps its tasks: the people see them in My tasks, marked\n\"Paused by lead\" with the ``reason``, and can read them, but no task in\nprogress can be saved (409 ``TASK_HELD`` with ``causes: [\"lead\"]``):\nannotation, translation review and consolidation, on every version of\nthe text. A task assigned, reopened or given a new round later is paused\nfrom the start. Submitted work and final results are untouched and\nexported as before. The pause from a problem report is a separate cause\nand stays as it is.\n\n``preview: true`` lists the texts that would be paused with their tasks\nin progress, the texts skipped (already paused) and a ``preview_token``.\nApplying sends that token and a ``reason``: every listed text is paused,\nor none (409 ``PREVIEW_STALE`` with a fresh ``preview`` in the details\nwhen anything changed). Each text is audited (``text.pause``, ``via:\nbulk_pause_texts``). The way back is ``text-pauses/release``.",
+        "operationId": "pause_texts_api_v1_projects__key__text_pauses_pause_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextPauseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TextPauseActionView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/text-pauses/release": {
+      "post": {
+        "tags": [
+          "text-pauses"
+        ],
+        "summary": "Release Texts",
+        "description": "Release paused texts (issue 464).\n\nEnds the lead pause of the selected texts: their tasks in progress can\nbe saved again. A task that a problem report pauses as well stays paused\nuntil that report is decided (``paused_by_report``,\n``still_paused_count``); deciding a report never releases the lead\npause. Texts that are not paused are skipped. Preview and apply as\n``text-pauses/pause``; ``reason`` is optional. Each text is audited\n(``text.release``, ``via: bulk_release_texts``).",
+        "operationId": "release_texts_api_v1_projects__key__text_pauses_release_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextPauseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TextPauseActionView"
                 }
               }
             }
@@ -7682,6 +7794,134 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/VersionUploadResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/documents/{doc}/editorial-correction/preview": {
+      "post": {
+        "tags": [
+          "translation-workflow"
+        ],
+        "summary": "Preview Editorial Correction",
+        "description": "Issue 453, read only: whether this version can be corrected and, with\na text or replacements, the changes, the guards and what follows.",
+        "operationId": "preview_editorial_correction_api_v1_projects__key__documents__doc__editorial_correction_preview_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "doc",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Doc"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditorialCorrectionPreviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EditorialCorrectionPreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/documents/{doc}/editorial-correction": {
+      "post": {
+        "tags": [
+          "translation-workflow"
+        ],
+        "summary": "Editorial Correction",
+        "description": "Issue 453: save an editorial fix (spacing, typos, grammar) as the next\nversion of this translation, with this version's status.",
+        "operationId": "editorial_correction_api_v1_projects__key__documents__doc__editorial_correction_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "doc",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Doc"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditorialCorrectionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EditorialCorrectionResult"
                 }
               }
             }
@@ -13582,6 +13822,28 @@
             ],
             "title": "Hold Reason"
           },
+          "pause_causes": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "report",
+                "lead"
+              ]
+            },
+            "type": "array",
+            "title": "Pause Causes"
+          },
+          "lead_pause_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead Pause Reason"
+          },
           "lead_correction": {
             "type": "boolean",
             "title": "Lead Correction",
@@ -13900,6 +14162,28 @@
               }
             ],
             "title": "Hold Reason"
+          },
+          "pause_causes": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "report",
+                "lead"
+              ]
+            },
+            "type": "array",
+            "title": "Pause Causes"
+          },
+          "lead_pause_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead Pause Reason"
           },
           "active_holds": {
             "items": {
@@ -14855,6 +15139,13 @@
             "type": "integer",
             "title": "Texts"
           },
+          "unknown_rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowRefView"
+            },
+            "type": "array",
+            "title": "Unknown Rows"
+          },
           "change_count": {
             "type": "integer",
             "title": "Change Count"
@@ -14958,6 +15249,10 @@
           "person": {
             "$ref": "#/components/schemas/PersonRefView"
           },
+          "text_paused": {
+            "type": "boolean",
+            "title": "Text Paused"
+          },
           "reason": {
             "type": "string",
             "title": "Reason"
@@ -15060,6 +15355,13 @@
           "texts": {
             "type": "integer",
             "title": "Texts"
+          },
+          "unknown_rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowRefView"
+            },
+            "type": "array",
+            "title": "Unknown Rows"
           },
           "change_count": {
             "type": "integer",
@@ -15583,6 +15885,13 @@
             "type": "integer",
             "title": "Texts"
           },
+          "unknown_rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowRefView"
+            },
+            "type": "array",
+            "title": "Unknown Rows"
+          },
           "change_count": {
             "type": "integer",
             "title": "Change Count"
@@ -15689,6 +15998,10 @@
           },
           "person": {
             "$ref": "#/components/schemas/PersonRefView"
+          },
+          "text_paused": {
+            "type": "boolean",
+            "title": "Text Paused"
           }
         },
         "type": "object",
@@ -15704,12 +16017,39 @@
         ],
         "title": "BulkTaskView"
       },
+      "BulkUndoBlock": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": [
+              "changed",
+              "not_in_plan",
+              "person_unavailable"
+            ],
+            "title": "Reason"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason",
+          "message"
+        ],
+        "title": "BulkUndoBlock"
+      },
       "BulkUndoRequest": {
         "properties": {
           "undo_id": {
             "type": "integer",
             "minimum": 1.0,
             "title": "Undo Id"
+          },
+          "preview": {
+            "type": "boolean",
+            "title": "Preview"
           }
         },
         "additionalProperties": false,
@@ -15724,6 +16064,69 @@
           "undone": {
             "type": "integer",
             "title": "Undone"
+          },
+          "applied": {
+            "type": "boolean",
+            "title": "Applied"
+          },
+          "undo_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undo Id"
+          },
+          "action": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "reopen",
+                  "withdraw"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "task_count": {
+            "type": "integer",
+            "title": "Task Count"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/BulkUndoTaskView"
+            },
+            "type": "array",
+            "title": "Tasks"
+          },
+          "blocked": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BulkUndoBlock"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -15731,6 +16134,59 @@
           "undone"
         ],
         "title": "BulkUndoResult"
+      },
+      "BulkUndoTaskView": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "assignment_id": {
+            "type": "integer",
+            "title": "Assignment Id"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "task": {
+            "type": "string",
+            "enum": [
+              "annotate",
+              "review",
+              "translation_review"
+            ],
+            "title": "Task"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "in_progress",
+              "submitted",
+              "reopened"
+            ],
+            "title": "Status"
+          },
+          "person": {
+            "$ref": "#/components/schemas/PersonRefView"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "assignment_id",
+          "document_id",
+          "task",
+          "status",
+          "person"
+        ],
+        "title": "BulkUndoTaskView"
       },
       "BulkUndoView": {
         "properties": {
@@ -18307,7 +18763,8 @@
                 "type": "string",
                 "enum": [
                   "guidelines_unclear",
-                  "over_limit"
+                  "over_limit",
+                  "lead_paused"
                 ]
               },
               {
@@ -18315,7 +18772,8 @@
                   "type": "string",
                   "enum": [
                     "guidelines_unclear",
-                    "over_limit"
+                    "over_limit",
+                    "lead_paused"
                   ]
                 },
                 "type": "array"
@@ -18717,6 +19175,16 @@
               }
             ]
           },
+          "lead_pause": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LeadPauseView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "consolidation_progress": {
             "anyOf": [
               {
@@ -18929,6 +19397,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/VersionUploadView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "editorial_correction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VersionEditorialCorrectionView"
               },
               {
                 "type": "null"
@@ -19326,6 +19804,522 @@
         ],
         "title": "EditorProposal",
         "description": "Editor projection; producer metadata never changes snapshot hashes."
+      },
+      "EditorialChange": {
+        "properties": {
+          "old_start": {
+            "type": "integer",
+            "title": "Old Start"
+          },
+          "old_end": {
+            "type": "integer",
+            "title": "Old End"
+          },
+          "new_start": {
+            "type": "integer",
+            "title": "New Start"
+          },
+          "new_end": {
+            "type": "integer",
+            "title": "New End"
+          },
+          "old_text": {
+            "type": "string",
+            "title": "Old Text"
+          },
+          "new_text": {
+            "type": "string",
+            "title": "New Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "old_start",
+          "old_end",
+          "new_start",
+          "new_end",
+          "old_text",
+          "new_text"
+        ],
+        "title": "EditorialChange",
+        "description": "A changed passage, in Unicode code points of the old and the new text."
+      },
+      "EditorialCorrectionPreview": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "next_version": {
+            "type": "integer",
+            "title": "Next Version"
+          },
+          "translation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translation Status"
+          },
+          "text_sha256": {
+            "type": "string",
+            "title": "Text Sha256"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "review_on": {
+            "type": "boolean",
+            "title": "Review On"
+          },
+          "annotate_accepted_only": {
+            "type": "boolean",
+            "title": "Annotate Accepted Only"
+          },
+          "annotations": {
+            "$ref": "#/components/schemas/LeadCorrectionAnnotationsView"
+          },
+          "open_consolidations": {
+            "type": "integer",
+            "title": "Open Consolidations"
+          },
+          "final_result": {
+            "type": "boolean",
+            "title": "Final Result"
+          },
+          "tasks_following": {
+            "type": "integer",
+            "title": "Tasks Following"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "previous_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Text"
+          },
+          "new_text_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Text Sha256"
+          },
+          "inserted_characters": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inserted Characters"
+          },
+          "deleted_characters": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted Characters"
+          },
+          "changed_characters": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changed Characters"
+          },
+          "number_changes": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EditorialNumberChange"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number Changes"
+          },
+          "diff": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EditorialChange"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diff"
+          },
+          "findings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EditorialFindings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proposals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EditorialProposals"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "case_id",
+          "language",
+          "version",
+          "next_version",
+          "translation_status",
+          "text_sha256",
+          "available",
+          "reason",
+          "review_on",
+          "annotate_accepted_only",
+          "annotations",
+          "open_consolidations",
+          "final_result",
+          "tasks_following",
+          "text",
+          "previous_text",
+          "new_text_sha256",
+          "inserted_characters",
+          "deleted_characters",
+          "changed_characters",
+          "number_changes",
+          "diff",
+          "findings",
+          "proposals"
+        ],
+        "title": "EditorialCorrectionPreview",
+        "description": "What an editorial correction of this version would do (read only)."
+      },
+      "EditorialCorrectionPreviewRequest": {
+        "properties": {
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "replacements": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EditorialReplacement"
+                },
+                "type": "array",
+                "maxItems": 200,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replacements"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EditorialCorrectionPreviewRequest",
+        "description": "Issue 453: the correction to check before it is saved (both fields\nleft out: only whether a correction is possible)."
+      },
+      "EditorialCorrectionRequest": {
+        "properties": {
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "replacements": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EditorialReplacement"
+                },
+                "type": "array",
+                "maxItems": 200,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replacements"
+          },
+          "expected_text_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Text Sha256"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_text_sha256",
+          "reason"
+        ],
+        "title": "EditorialCorrectionRequest",
+        "description": "Issue 453: an editorial correction of a translation version."
+      },
+      "EditorialCorrectionResult": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "previous_document_id": {
+            "type": "string",
+            "title": "Previous Document Id"
+          },
+          "previous_version": {
+            "type": "integer",
+            "title": "Previous Version"
+          },
+          "translation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translation Status"
+          },
+          "text_sha256": {
+            "type": "string",
+            "title": "Text Sha256"
+          },
+          "inserted_characters": {
+            "type": "integer",
+            "title": "Inserted Characters"
+          },
+          "deleted_characters": {
+            "type": "integer",
+            "title": "Deleted Characters"
+          },
+          "tasks_following": {
+            "type": "integer",
+            "title": "Tasks Following"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "document_id",
+          "version",
+          "previous_document_id",
+          "previous_version",
+          "translation_status",
+          "text_sha256",
+          "inserted_characters",
+          "deleted_characters",
+          "tasks_following"
+        ],
+        "title": "EditorialCorrectionResult"
+      },
+      "EditorialFindings": {
+        "properties": {
+          "submitted": {
+            "type": "integer",
+            "title": "Submitted"
+          },
+          "needs_check": {
+            "type": "integer",
+            "title": "Needs Check"
+          }
+        },
+        "type": "object",
+        "required": [
+          "submitted",
+          "needs_check"
+        ],
+        "title": "EditorialFindings"
+      },
+      "EditorialNumberChange": {
+        "properties": {
+          "old": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old"
+          },
+          "new": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New"
+          }
+        },
+        "type": "object",
+        "required": [
+          "old",
+          "new"
+        ],
+        "title": "EditorialNumberChange",
+        "description": "A number the correction changes, adds (no ``old``) or removes (no ``new``)."
+      },
+      "EditorialProposals": {
+        "properties": {
+          "sets": {
+            "type": "integer",
+            "title": "Sets"
+          },
+          "carried": {
+            "type": "integer",
+            "title": "Carried"
+          },
+          "needs_check": {
+            "type": "integer",
+            "title": "Needs Check"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sets",
+          "carried",
+          "needs_check"
+        ],
+        "title": "EditorialProposals"
+      },
+      "EditorialReplacement": {
+        "properties": {
+          "old": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Old"
+          },
+          "new": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "New"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "old",
+          "new"
+        ],
+        "title": "EditorialReplacement",
+        "description": "One passage of the text and what replaces it."
       },
       "EvidenceMention": {
         "properties": {
@@ -21820,6 +22814,37 @@
         ],
         "title": "LeadCorrectionRequest"
       },
+      "LeadPauseView": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "paused_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonRefView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "paused_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Paused At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason",
+          "paused_at"
+        ],
+        "title": "LeadPauseView",
+        "description": "A lead paused the work on the text: its tasks in progress cannot be\nsaved, also tasks assigned later, until a lead releases the text.\nSubmitted work and final results are untouched."
+      },
       "LoginRequest": {
         "properties": {
           "username": {
@@ -23650,6 +24675,59 @@
         ],
         "title": "PauseCandidate"
       },
+      "PausedTaskView": {
+        "properties": {
+          "assignment_id": {
+            "type": "integer",
+            "title": "Assignment Id"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "task": {
+            "type": "string",
+            "enum": [
+              "annotate",
+              "review",
+              "translation_review"
+            ],
+            "title": "Task"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "in_progress",
+              "reopened"
+            ],
+            "title": "Status"
+          },
+          "person": {
+            "$ref": "#/components/schemas/PersonRefView"
+          },
+          "paused_by_report": {
+            "type": "boolean",
+            "title": "Paused By Report"
+          }
+        },
+        "type": "object",
+        "required": [
+          "assignment_id",
+          "document_id",
+          "version",
+          "task",
+          "status",
+          "person",
+          "paused_by_report"
+        ],
+        "title": "PausedTaskView",
+        "description": "A task in progress on the text: what a pause stops and a release opens."
+      },
       "PendingReanchorRef": {
         "properties": {
           "proposal_set_id": {
@@ -25044,6 +26122,10 @@
             "type": "boolean",
             "title": "Answered",
             "default": false
+          },
+          "text_paused_by_lead": {
+            "type": "boolean",
+            "title": "Text Paused By Lead"
           }
         },
         "additionalProperties": false,
@@ -28069,6 +29151,18 @@
             "type": "integer",
             "title": "Finding Count",
             "default": 0
+          },
+          "refused_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "CONSOLIDATION_OPEN"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refused By"
           }
         },
         "type": "object",
@@ -29593,6 +30687,7 @@
                   "may_change",
                   "not_exported",
                   "carried_on_submit",
+                  "lead_pause",
                   "v2_not_annotated",
                   "no_target_proposals",
                   "correction",
@@ -30513,6 +31608,28 @@
               }
             ],
             "title": "Hold Reason"
+          },
+          "pause_causes": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "report",
+                "lead"
+              ]
+            },
+            "type": "array",
+            "title": "Pause Causes"
+          },
+          "lead_pause_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead Pause Reason"
           },
           "source_language": {
             "anyOf": [
@@ -31685,6 +32802,240 @@
           "entries"
         ],
         "title": "TextLayers"
+      },
+      "TextPauseActionView": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "pause",
+              "release"
+            ],
+            "title": "Action"
+          },
+          "applied": {
+            "type": "boolean",
+            "title": "Applied"
+          },
+          "texts": {
+            "type": "integer",
+            "title": "Texts"
+          },
+          "unknown_rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowRefView"
+            },
+            "type": "array",
+            "title": "Unknown Rows"
+          },
+          "change_count": {
+            "type": "integer",
+            "title": "Change Count"
+          },
+          "skipped_count": {
+            "type": "integer",
+            "title": "Skipped Count"
+          },
+          "task_count": {
+            "type": "integer",
+            "title": "Task Count"
+          },
+          "still_paused_count": {
+            "type": "integer",
+            "title": "Still Paused Count"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/TextPauseChangeView"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/TextPauseSkippedView"
+            },
+            "type": "array",
+            "title": "Skipped"
+          },
+          "preview_token": {
+            "type": "string",
+            "title": "Preview Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action",
+          "applied",
+          "texts",
+          "change_count",
+          "skipped_count",
+          "task_count",
+          "still_paused_count",
+          "changes",
+          "skipped",
+          "preview_token"
+        ],
+        "title": "TextPauseActionView"
+      },
+      "TextPauseChangeView": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "pause": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TextPauseInfoView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/PausedTaskView"
+            },
+            "type": "array",
+            "title": "Tasks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "tasks"
+        ],
+        "title": "TextPauseChangeView"
+      },
+      "TextPauseInfoView": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "paused_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonRefView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "paused_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Paused At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason",
+          "paused_at"
+        ],
+        "title": "TextPauseInfoView"
+      },
+      "TextPauseRequest": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowRefView"
+            },
+            "type": "array",
+            "maxItems": 200000,
+            "minItems": 1,
+            "title": "Rows"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "preview": {
+            "type": "boolean",
+            "title": "Preview"
+          },
+          "summary_only": {
+            "type": "boolean",
+            "title": "Summary Only"
+          },
+          "preview_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Token"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rows"
+        ],
+        "title": "TextPauseRequest",
+        "description": "Pause or release the selected texts. ``reason`` is required to apply a\npause (the people see it in My tasks and in the task) and optional for a\nrelease."
+      },
+      "TextPauseSkippedView": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "already_paused",
+              "not_paused"
+            ],
+            "title": "Reason"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "pause": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TextPauseInfoView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "reason",
+          "message"
+        ],
+        "title": "TextPauseSkippedView"
       },
       "TextTypographyCounts": {
         "properties": {
@@ -33401,6 +34752,58 @@
         "title": "VersionDiscardView",
         "description": "Discard record of a text version (lead workflow)."
       },
+      "VersionEditorialCorrectionView": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "previous_document_id": {
+            "type": "string",
+            "title": "Previous Document Id"
+          },
+          "inserted_characters": {
+            "type": "integer",
+            "title": "Inserted Characters"
+          },
+          "deleted_characters": {
+            "type": "integer",
+            "title": "Deleted Characters"
+          },
+          "corrected_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corrected At"
+          },
+          "corrected_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonRefView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason",
+          "previous_document_id",
+          "inserted_characters",
+          "deleted_characters"
+        ],
+        "title": "VersionEditorialCorrectionView",
+        "description": "The editorial correction that made this version (issue 453)."
+      },
       "VersionMarkerView": {
         "properties": {
           "kind": {
@@ -34157,6 +35560,17 @@
           "held": {
             "type": "boolean",
             "title": "Held"
+          },
+          "pause_causes": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "report",
+                "lead"
+              ]
+            },
+            "type": "array",
+            "title": "Pause Causes"
           },
           "round_ordinal": {
             "anyOf": [

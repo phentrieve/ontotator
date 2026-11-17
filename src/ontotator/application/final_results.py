@@ -577,7 +577,7 @@ class FinalResultService:
         chose the final result never replaces it: that choice was made
         knowing it. Every other selected text is skipped
         with the reason. ``rows`` the project does not have are left out
-        (``texts`` counts the ones found). The number of statements does not
+        (``texts`` counts the ones found) and named in ``unknown_rows``. The number of statements does not
         grow with the number of texts.
         """
         assert self.actor.user_id is not None
@@ -705,6 +705,12 @@ class FinalResultService:
             "project": key,
             "rule": "newest_submission",
             "texts": len(found),
+            # Selected texts the project does not have, as they were given.
+            "unknown_rows": [
+                {"case_id": row.case_id, "language": row.language}
+                for row in dict.fromkeys(rows)
+                if (row.case_id, row.language) not in ctx.by_row
+            ],
             "change_count": len(changes),
             "skipped_count": len(skipped),
             "skipped_by_reason": dict(

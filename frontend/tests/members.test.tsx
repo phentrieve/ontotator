@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError } from "../src/api/client";
-import { MembersSection, roleChangeText } from "../src/admin/MembersSection";
+import { MembersSection, removalText, roleChangeText } from "../src/admin/MembersSection";
 import { deferred, members } from "./projectFixtures";
 
 beforeEach(() => {
@@ -100,6 +100,29 @@ describe("project members", () => {
     fireEvent.click(await screen.findByRole("checkbox", { name: "lead: Lead" }));
     const dialog = await screen.findByRole("dialog", { name: "Remove Lead from the project?" });
     expect(dialog.textContent).toContain("The project API tokens Lead created for this project are revoked, unless Lead is a system administrator.");
+  });
+
+  it("warns a system administrator that the project will have no lead, and tells them what holds for their own row", async () => {
+    // The server lets only an administrator remove the last lead (authz/memberships.py); the fixture has one lead.
+    render(<MembersSection projectKey="p" currentUser={{ username: "lead", is_system_admin: true }} />);
+    fireEvent.click(await screen.findByRole("checkbox", { name: "lead: Lead" }));
+    const dialog = await screen.findByRole("dialog", { name: "Remove Lead from the project?" });
+    expect(dialog.querySelector("p")?.textContent).toBe("This project will have no lead. You can still manage it as system administrator. This logs Lead out of Ontotator on all devices; they can log in again right away.");
+  });
+
+  it("words the removal for each viewer", () => {
+    const lead = { username: "lead", name: "Lead", roles: [], removed: "lead", lead: true };
+    const tokens = "The project API tokens Lead created for this project are revoked, unless Lead is a system administrator.";
+    const logout = "This logs Lead out of Ontotator on all devices; they can log in again right away.";
+    // An administrator removes someone else who is the last lead: that person may well lose access.
+    expect(removalText(lead, true, { username: "root", is_system_admin: true })).toBe(`Lead loses access to this project. This project will have no lead. You can still manage it as system administrator. ${logout} ${tokens}`);
+    // Another lead stays: no warning; the administrator's own row still names no lost access.
+    expect(removalText(lead, false, { username: "root", is_system_admin: true })).toBe(`Lead loses access to this project. ${logout} ${tokens}`);
+    expect(removalText(lead, false, { username: "lead", is_system_admin: true })).toBe(`You can still manage it as system administrator. ${logout}`);
+    expect(removalText({ ...lead, roles: ["annotator"] }, true, { username: "lead", is_system_admin: true })).toBe(`Lead keeps the other roles in this project. This project will have no lead. You can still manage it as system administrator. ${logout}`);
+    // A lead who is no administrator is refused by the server (LAST_LEAD); the dialog stays as it was.
+    expect(removalText(lead, true, { username: "lead", is_system_admin: false })).toBe(`Lead loses access to this project. ${logout} ${tokens}`);
+    expect(removalText(lead, true, undefined)).toBe(`Lead loses access to this project. ${logout} ${tokens}`);
   });
 
   it("suggests matching people to a lead from three typed letters on", async () => {

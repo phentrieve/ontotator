@@ -235,6 +235,12 @@ export interface CaseScreenProps {
   guidelines?: GuidelinesPanel | null;
   held?: boolean;
   holdReason?: string | null;
+  /** The paused banner's title: "Paused by lead" when the lead paused the text (issue 464); default "Task paused". */
+  holdTitle?: string;
+  /** What stays available while paused; default: saved work is readable, local input is kept. */
+  holdKept?: string;
+  /** A save was refused because the task is paused (it was paused while the editor was open): the caller reloads the task's state. */
+  onTaskHeld?: () => void;
   saveBeforeReportRef?: React.MutableRefObject<(() => Promise<void>) | null>;
   roundInputs?: readonly import("../api/client").RoundInputView[];
   roundKind?: import("../api/client").WorkRoundView["kind"];
@@ -272,7 +278,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   onSubmitted,
   annotatorName,
   leaveGuardRef,
-  readOnly: serverReadOnly = false, routeLeaveRef, assignmentNavigation, onReadonlyRequired, versionContext, menuItems = [], userPseudonym, guidelineNotice, guidelines = null, held = false, holdReason, saveBeforeReportRef, roundInputs = NO_ROUND_INPUTS, roundKind, roundActive = true, roundBadge, roundTitle, documentVersion, roundOrdinal, headerTimer, onEdit, changesSource,
+  readOnly: serverReadOnly = false, routeLeaveRef, assignmentNavigation, onReadonlyRequired, versionContext, menuItems = [], userPseudonym, guidelineNotice, guidelines = null, held = false, holdReason, holdTitle, holdKept, onTaskHeld, saveBeforeReportRef, roundInputs = NO_ROUND_INPUTS, roundKind, roundActive = true, roundBadge, roundTitle, documentVersion, roundOrdinal, headerTimer, onEdit, changesSource,
 }) => {
   const versionIdentity = JSON.stringify([versionContext?.username, versionContext?.assignmentId, versionContext?.canBrowseVersions, workspaceId, view.key]);
   const [acceptedSubmission, setAcceptedSubmission] = useState<{ identity: string; value: Submission } | null>(null);
@@ -473,6 +479,9 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const searchManager = useMemo(() => new SearchManager(api), []);
   // "+ Add modifier…" searches on its own, so an open "Change term" search keeps its hits.
   const modifierSearchManager = useMemo(() => new SearchManager(api), []);
+  // A search refused because the task was paused meanwhile (issue 464): the caller reloads the task's state.
+  const taskHeld = useRef(onTaskHeld); taskHeld.current = onTaskHeld;
+  useEffect(() => { searchManager.onTaskHeld = modifierSearchManager.onTaskHeld = () => taskHeld.current?.(); }, [searchManager, modifierSearchManager]);
   const modifierLayerIds = new Set(view.modifier_layer_ids ?? []);
   const infoFor = (layerId: string) => (termId: string) => termLabel.info(layerId, termId);
   useEffect(() => {
@@ -786,6 +795,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
       readOnlyRef.current = true;
       onReadonlyRequired?.();
     }
+    // Paused while this editor was open (issue 464): the banner names the cause; the local input stays.
+    if (error instanceof ApiError && error.code === "TASK_HELD") onTaskHeld?.();
     throw error;
   };
   const reportError = (error: unknown) => {
@@ -2282,12 +2293,17 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   }, [followAnnotationId]);
 
   // Ctrl+C (Cmd+C) with nothing else selected copies the active passage, to look it up elsewhere: the marked
-  // text of a new finding, else the selected (or first) mention of the selected finding. Several segments are
-  // joined by a space, as a web search reads them. A selection of its own (a field, the page) copies as usual.
+  // text of a new finding, else the selected (or first) mention of the selected finding or, in a task from
+  // proposals, of the selected tool proposal. Several segments are joined by a space, as a web search reads them.
+  // A selection of its own (a field, the page) copies as usual.
   const passageRef = useRef("");
   const passageRefs = selectedAnnotation?.annotation.evidence_refs ?? [];
+  const targetEvidence = selectedTarget && !selectedAnnotation ? targetSnapshot?.evidence ?? [] : [];
+  const targetMention = targetEvidence.find(ev => selectedTarget
+    && `target:${selectedTarget.annotation_id}:${selectedTarget.version}:${ev.mention.evidence_id}:${ev.version}` === selectedEvidenceId) ?? targetEvidence[0];
   const passageSegments = pendingAnnotation?.segments?.length ? pendingAnnotation.segments
-    : allEvidenceMap[(passageRefs.find(ref => ref.evidence_id === selectedEvidenceId) ?? passageRefs[0])?.evidence_id ?? ""]?.mention.segments;
+    : allEvidenceMap[(passageRefs.find(ref => ref.evidence_id === selectedEvidenceId) ?? passageRefs[0])?.evidence_id ?? ""]?.mention.segments
+      ?? targetMention?.mention.segments;
   passageRef.current = passageSegments?.length ? quoteOf(view.document.text, passageSegments, " ") : "";
   useEffect(() => {
     const copyPassage = (event: ClipboardEvent) => {
@@ -3920,7 +3936,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
         </div>
       </Toolbar>
 
-      {held && <PausedNotice reason={holdReason} kept="Saved work remains readable. Your local input is kept." />}
+      {held && <PausedNotice title={holdTitle} reason={holdReason} kept={`Saved work remains readable. Your local input is kept.${holdKept ? ` ${holdKept}` : ""}`} />}
       {!!versionError && <><ErrorNotice error={versionError} /><Button onClick={retryVersions}>Retry version list</Button></>}
       {display && <InlineMessage tone="info"><span>Viewing {display.label} (read-only)</span>
         <Button disabled={versionBusy} onClick={() => { void chooseAnnotationVersion("draft"); }}>Back to my draft</Button>
@@ -4418,6 +4434,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
               onDeselect={handleDeselectAll}
               onRepeatDecision={outcome => { repeatDecision(selectedTarget, outcome); }}
               onMoveMention={proposalCopyCanMove(selectedTarget) ? index => { void moveProposalMention(selectedTarget, index).catch(reportError); } : undefined}
+              onCopyAnnounce={announceCarried}
               onShowMention={ev => {
                 const evidenceId = `target:${selectedTarget.annotation_id}:${selectedTarget.version}:${ev.mention.evidence_id}:${ev.version}`;
                 setSelectedEvidenceId(evidenceId);

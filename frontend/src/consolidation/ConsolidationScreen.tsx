@@ -46,6 +46,8 @@ export interface ConsolidationScreenProps {
   workspaceView?: WorkspaceView | null;
   /** Task actions next to the title (the task's guidelines and "Report a text problem"). */
   headerActions?: ReactNode;
+  /** A save was refused because the task is paused (it was paused while this screen was open): the caller reloads the task's state. */
+  onTaskHeld?: () => void;
   /** The task's one-time guidelines notice, shown under the header (inside the screen's padding, as in CaseScreen). */
   notice?: ReactNode;
   /** "Back to documents" target of the lead's read-only view (the Documents page with its row panel). */
@@ -107,7 +109,7 @@ const nextOpenAfter = (groups: readonly ConsolidationGroupView[], groupId: strin
 };
 
 export function ConsolidationScreen(props: ConsolidationScreenProps): JSX.Element {
-  const data = useConsolidation(props.roundId, { workspaceView: props.workspaceView });
+  const data = useConsolidation(props.roundId, { workspaceView: props.workspaceView, onTaskHeld: props.onTaskHeld });
   const view = data.view;
   const wide = useMediaQuery("(min-width: 1100px)");
   const medium = useMediaQuery("(min-width: 700px)");

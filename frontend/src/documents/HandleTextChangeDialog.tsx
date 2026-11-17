@@ -5,7 +5,7 @@ import { errorMessage } from "../admin/errors";
 import { personName } from "../admin/assignSummary";
 import { Button, ConfirmDialog, Dialog } from "../ui";
 import {
-  CHECKING, finishDescription, finishingMessage, finishLabel, handleTitle, heldLine, moveDescription, movedMessage, moveLabel, nextAfterWithdrawLine,
+  CHECKING, finishDescription, finishingMessage, finishLabel, handleTitle, heldLine, leadPausedLine, moveDescription, movedMessage, moveLabel, nextAfterWithdrawLine,
   CHOOSE_WITHDRAW, noTargetOptionLine, noTargetProposalsLine, notNewerLine, openWorkLine, RELOADED_MESSAGE, unplacedLine, WITHDRAW_LABEL, withdrawDescription, withdrawnMessage,
 } from "./textChangeText";
 
@@ -67,6 +67,8 @@ export function HandleTextChangeDialog(props: HandleTextChangeDialogProps): JSX.
   const from = `v${item?.version ?? 1}`;
   const to = `v${target?.version ?? (item?.version ?? 1) + 1}`;
   const held = item?.held ?? false;
+  // A report is decided first; a lead pause alone (issue 464) is ended by releasing the text.
+  const byReport = !(item?.pause_causes ?? []).includes("lead") || (item?.pause_causes ?? []).includes("report");
   const assignmentId = step.assignment_id ?? item?.assignment_id ?? null;
   const targetId = step.document_id ?? target?.document_id ?? "";
 
@@ -166,8 +168,8 @@ export function HandleTextChangeDialog(props: HandleTextChangeDialogProps): JSX.
         <p>{nextAfterWithdrawLine(to)}</p>
       </>}
       {held ? <p className="text-change-held">
-        {heldLine(person)}{" "}
-        {props.onDecideReport && <Button size="sm" onClick={props.onDecideReport}>Decide on report…</Button>}
+        {byReport ? heldLine(person) : leadPausedLine(person)}{" "}
+        {byReport && props.onDecideReport && <Button size="sm" onClick={props.onDecideReport}>Decide on report…</Button>}
       </p> : <fieldset className="text-change-options">
         <legend className="visually-hidden">How to continue</legend>
         {options.map(option => {

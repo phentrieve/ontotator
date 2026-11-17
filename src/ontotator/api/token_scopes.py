@@ -115,6 +115,9 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     ("POST", f"{P}/bulk-task-actions/withdraw"): "project-admin",
     ("POST", f"{P}/bulk-task-actions/undo"): "project-admin",
     ("POST", f"{P}/bulk-task-actions/start-round"): "project-admin",
+    # Lead pause (issue 464).
+    ("POST", f"{P}/text-pauses/pause"): "project-admin",
+    ("POST", f"{P}/text-pauses/release"): "project-admin",
     ("GET", f"{P}/document-rows/{{case_id:path}}/{{language}}/submissions"): "read",
     ("GET", f"{P}/document-rows/{{case_id:path}}/{{language}}/final-panel"): "read",
     ("GET", f"{P}/documents/summary"): "read",
@@ -144,6 +147,14 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     ("POST", f"{P}/documents/{{doc:path}}/lead-correction"): "project-admin",
     # Issue 341 b: what the lead correction would start (read only).
     ("GET", f"{P}/documents/{{doc:path}}/lead-correction"): "read",
+    # Issue 453: an editorial correction changes a text; a lead's project
+    # work, as the lead correction above.
+    ("POST", f"{P}/documents/{{doc:path}}/editorial-correction"): "project-admin",
+    # Its dry run: only a token that may correct needs it.
+    (
+        "POST",
+        f"{P}/documents/{{doc:path}}/editorial-correction/preview",
+    ): "project-admin",
     ("POST", f"{P}/variants/{{document_id:path}}/discard"): "project-admin",
     # Issue 341 d: accept exactly one version, as the discard above.
     ("POST", f"{P}/variants/{{document_id:path}}/accept"): "project-admin",

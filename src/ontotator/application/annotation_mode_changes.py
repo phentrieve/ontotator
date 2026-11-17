@@ -324,7 +324,8 @@ class AnnotationModeChangeService:
     ) -> dict[str, Any]:
         """What changing ``rows`` to ``mode`` would do now: per text the
         preview of a single change, and the texts left as they are with the
-        single change's refusal as the reason. Pure reads under the caller's
+        single change's refusal as the reason; selected texts the project
+        does not have are named in ``unknown_rows``. Pure reads under the caller's
         lock; the number of queries does not grow with the number of texts."""
         wanted = list(dict.fromkeys(rows))
         pairs = [(row.case_id, row.language) for row in wanted]
@@ -410,6 +411,12 @@ class AnnotationModeChangeService:
         result: dict[str, Any] = {
             "mode": mode,
             "texts": len(found),
+            # Selected texts the project does not have, as they were given.
+            "unknown_rows": [
+                {"case_id": row.case_id, "language": row.language}
+                for row in wanted
+                if row not in versions
+            ],
             "change_count": len(changing),
             "skipped_count": len(skipped),
             "skipped_by_reason": reasons,

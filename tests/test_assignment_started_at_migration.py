@@ -74,7 +74,8 @@ def _column(conn: Connection) -> bool:
 
 def test_one_head_follows_the_version_uploads():
     scripts = ScriptDirectory.from_config(alembic_config())
-    assert scripts.get_heads() == [head_revision()] == [REVISION]
+    # One head; 0044 (editorial corrections) and 0045 (the lead pause) follow.
+    assert scripts.get_heads() == [head_revision()]
     revision = scripts.get_revision(REVISION)
     assert revision is not None and revision.down_revision == PREVIOUS
 

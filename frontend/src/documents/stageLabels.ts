@@ -174,6 +174,8 @@ function reviewText(cell: StageCellView, context: StageContext): StageText {
 function pausedText(cell: StageCellView): StageText {
   const person = names(cell.detail.people);
   const excerpt = quoted(cell.detail.excerpt);
+  // Issue 464: the lead paused the text; the person named is that lead, the excerpt the reason.
+  if (cell.detail.note === "lead_pause") return { symbol: "⏸", word: "Paused by lead", detail: person && excerpt ? `${person}: ${excerpt}` : person || excerpt || "" };
   return { symbol: "⏸", word: "Paused", detail: person && excerpt ? `${person}: ${excerpt}` : person || excerpt || "" };
 }
 

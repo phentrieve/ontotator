@@ -161,6 +161,30 @@ describe("My tasks component", () => {
     expect(screen.getByText("Reopened")).toBeDefined();
   });
 
+  it("on a narrow screen stacks text, task and status with its reason beside the action (review F6)", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: query === "(max-width: 700px)", addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    vi.mocked(api.listMyTasks).mockResolvedValue([
+      { ...task(4, "reopened"), reopened_at: "2026-10-26T09:00:00Z", reopen_reason: "Check the onset." },
+      { ...task(5, "in_progress"), held: true, hold_reason: "The text names two doses." },
+      { ...task(2, "open", "q", "Project Q"), consolidation_reason: "Assertion differs" }]);
+    try {
+      render(<MyTasks projects={[]} onNavigate={vi.fn()} />);
+      const rows = await screen.findAllByTestId("task-row");
+      expect(screen.getAllByRole("columnheader").map(cell => cell.textContent)).toEqual(["Task", "Action"]);
+      expect(rows.map(row => row.querySelectorAll("td").length)).toEqual([2, 2, 2]);
+      const [reopened, paused, consolidation] = rows.map(row => row.querySelector("td")!.textContent);
+      // The reopen reason is written out; there is no badge to tap.
+      expect(reopened).toMatch(/doc-4.*Project P.*Annotation.*Reopened.*The project lead reopened this task on .+\. Reason: Check the onset\./);
+      expect(screen.queryByRole("button", { name: "Reopened, why" })).toBeNull();
+      expect(paused).toMatch(/In progress.*Paused.*The text names two doses\./);
+      // Two projects are listed: each row names its project.
+      expect(consolidation).toMatch(/doc-2.*Project Q \(q\).*Consolidation.*Reason from the lead: Assertion differs.*Open/);
+      expect(within(rows[0]).getByRole("link", { name: "Continue" })).toBeDefined();
+      expect(within(rows[1]).getByRole("link", { name: "View paused task" })).toBeDefined();
+      expect(within(rows[2]).getByRole("link", { name: "Start" })).toBeDefined();
+    } finally { vi.unstubAllGlobals(); }
+  });
+
   it("names when and why the lead reopened a task under its status (#34)", async () => {
     vi.mocked(api.listMyTasks).mockResolvedValue([
       { ...task(4, "reopened"), reopened_at: "2026-10-26T09:00:00Z", reopen_reason: "Check the onset." }, task(5, "reopened"), task(3, "open")]);
@@ -196,6 +220,25 @@ describe("My tasks component", () => {
     // The request set the status "Reopened"; the badge never says "No reason given." beside the reason.
     fireEvent.click(within(rows[0]).getByRole("button", { name: "Reopened, why" }));
     expect((await screen.findByRole("dialog", { name: "Why reopened" })).textContent).toMatch(/^Second review requested by the lead on .+: Check the dose in paragraph 2\.$/);
+  });
+
+  it("marks a task whose text a lead paused, and names both causes when a report pauses it too (issue 464)", async () => {
+    vi.mocked(api.listMyTasks).mockResolvedValue([
+      { ...task(21, "in_progress"), held: true, hold_reason: "Clinic is checking", pause_causes: ["lead"], lead_pause_reason: "Clinic is checking" },
+      { ...task(22, "open"), held: true, hold_reason: "Text is cut off", pause_causes: ["report", "lead"], lead_pause_reason: "Clinic is checking" },
+    ]);
+    render(<MyTasks projects={[]} onNavigate={vi.fn()} />);
+    const rows = await screen.findAllByTestId("task-row");
+    expect(within(rows[0]).getByText("Paused by lead")).toBeDefined();
+    expect(within(rows[0]).queryByText("Paused")).toBeNull();
+    expect(within(rows[0]).getByText("Clinic is checking")).toBeDefined();
+    expect(within(rows[0]).getByRole("link", { name: "View paused task" })).toBeDefined();
+    // Report first, then the lead: each cause with its own reason.
+    expect(within(rows[1]).getByText("Paused")).toBeDefined();
+    expect(within(rows[1]).getByText("Text is cut off")).toBeDefined();
+    expect(within(rows[1]).getByText("Paused by lead")).toBeDefined();
+    expect(within(rows[1]).getByText("Clinic is checking")).toBeDefined();
+    expect(tabNames()).toEqual(["To do, 2", "Paused, 2", "Submitted, 0", "All, 2"]);
   });
 
   it("shows pauses alongside underlying status and keeps saved work accessible", async () => {

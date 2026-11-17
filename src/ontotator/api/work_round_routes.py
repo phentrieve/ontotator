@@ -1,6 +1,7 @@
 """Round navigation and exact-input transitions."""
 
 from datetime import datetime
+from typing import Literal
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, ConfigDict, Field
@@ -25,6 +26,7 @@ from ontotator.application.round_reads import (
 from ontotator.application.work_rounds import (
     RoundInputResolutionService,
     WorkRoundService,
+    consolidation_open,
 )
 from ontotator.assignments.service import AssignmentService
 from ontotator.auth.audit import Actor
@@ -212,6 +214,10 @@ class RoundSourceView(BaseModel):
     round_ordinal: int | None = None
     recorded_at: datetime | None = None
     finding_count: int = 0
+    # The refusal a carry-forward from this submission would get right now,
+    # so the task owner is told before trying. Only the fact: never who
+    # consolidates (blinding).
+    refused_by: Literal["CONSOLIDATION_OPEN"] | None = None
 
 
 @router.get("/assignments/{assignment_id}/round-sources")
@@ -295,8 +301,17 @@ def round_sources(
         facts = enrich_sources(
             repo, assignment.project_key, [r.submission_id for r in result]
         )
+        # The rule of WorkRoundService.create for carry_forward.
+        refused_by = (
+            "CONSOLIDATION_OPEN"
+            if result
+            and assignment.status == "submitted"
+            and consolidation_open(conn, pid, assignment.document_id)
+            else None
+        )
     result = [
-        item.model_copy(update=fact) for item, fact in zip(result, facts, strict=True)
+        item.model_copy(update={**fact, "refused_by": refused_by})
+        for item, fact in zip(result, facts, strict=True)
     ]
     return sorted(
         result, key=lambda item: (item.version, item.submission_id), reverse=True

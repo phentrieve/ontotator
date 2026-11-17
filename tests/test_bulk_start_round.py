@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import pytest
@@ -439,6 +440,35 @@ def test_single_round_refuses_where_the_bulk_action_skips_an_open_consolidation(
     assert _rounds(env, task)[-1] == (kind, "editable")
 
 
+def test_round_sources_say_that_an_open_consolidation_refuses_the_carry(env):
+    """The owner is told before trying: the sources of a submitted annotation
+    name the refusal while a consolidation of the text is open, and nothing
+    about who consolidates."""
+    from auth_harness import logged_in
+
+    task = _submitted(env, "c1", "anno", "s1", started=True)
+    other = _submitted(env, "c2", "anno", "s2", started=True)
+    review = assign(env, doc("c1", "en"), "adj", "review")
+    owner = logged_in(env.app, "anno")
+
+    def sources(client, assignment_id: int) -> list[dict[str, Any]]:
+        answer = client.get(f"/api/v1/assignments/{assignment_id}/round-sources")
+        assert answer.status_code == 200, answer.text
+        return list(answer.json())
+
+    for client in (owner, env.lead):
+        listed = sources(client, task)
+        assert [(s["submission_id"], s["refused_by"]) for s in listed] == [
+            ("s1", "CONSOLIDATION_OPEN")
+        ]
+        assert "adj" not in json.dumps(listed)
+    assert [s["refused_by"] for s in sources(owner, other)] == [None]
+
+    revoked = env.lead.post(f"/api/v1/assignments/{review}/revoke", json={})
+    assert revoked.status_code == 200, revoked.text
+    assert [s["refused_by"] for s in sources(owner, task)] == [None]
+
+
 def test_single_round_for_unsubmitted_work_ignores_an_open_consolidation(env):
     """Only a submitted annotation is behind a consolidation: a restart of
     work that was never submitted takes nothing away from it."""
@@ -453,3 +483,14 @@ def test_single_round_for_unsubmitted_work_ignores_an_open_consolidation(env):
     assign(env, doc("c1", "en"), "adj", "review")
     made = _single(env, env.lead, task, kind="clean_restart", reason="Start again")
     assert made.status_code == 200, made.text
+
+
+def test_texts_the_project_does_not_have_are_named(env):
+    wrong = [{"case_id": "nope", "language": "en"}, {"case_id": "C1", "language": "en"}]
+    found = env.lead.post(
+        START,
+        json={"rows": [ROWS[0], *wrong], "kind": "carry_forward", "preview": True},
+    )
+    assert found.status_code == 200, found.text
+    assert found.json()["texts"] == 1
+    assert found.json()["unknown_rows"] == wrong

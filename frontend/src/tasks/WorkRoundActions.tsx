@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useId, useRef, useState } from "react";
-import type { AssignmentView, CreateRoundRequest, RoundSourceView, WorkRoundView } from "../api/client";
-import { Button, DataTable, IconChevronRight, useMediaQuery, type Column } from "../ui";
+import { ApiError, type AssignmentView, type CreateRoundRequest, type RoundSourceView, type WorkRoundView } from "../api/client";
+import { Button, DataTable, IconChevronRight, InlineMessage, useMediaQuery, type Column } from "../ui";
 import { ErrorNotice } from "../admin/ErrorNotice";
 import { carriedCell, carryUnavailableReason, roundStartingPoint, roundStateLabel, sourceOptionLabel, submissionCell } from "../editor/rounds/roundLabels";
 import { notifyTasksChanged } from "./tasksEvents";
@@ -62,6 +62,14 @@ export type CarryAvailability =
   | { kind: "unknown" }
   | { kind: "none" };
 
+/** The task owner's wording of the refusal CONSOLIDATION_OPEN: an annotator can neither finish nor withdraw a consolidation. */
+export const CARRY_CONSOLIDATED = "Your submission is being consolidated, so you cannot continue from it now. Ask your project lead.";
+/** The round sources never list a submission of a task from proposals; a lead can start such a round ("Start a round…"). */
+export const CARRY_FROM_PROPOSALS = "In a task from tool proposals you cannot continue from a submission yourself. Ask your project lead to start a new round.";
+
+/** The server refused "Continue from" because a consolidation of the text is open (it opened after the dialog loaded). */
+export const carryRefusedByConsolidation = (error: unknown): boolean => error instanceof ApiError && error.code === "CONSOLIDATION_OPEN";
+
 const openRoundOf = (ordered: readonly WorkRoundView[]) => ordered.find(round => round.state === "editable" && round.active) ?? ordered.find(round => round.state === "editable");
 
 /**
@@ -82,11 +90,13 @@ export function replaceableRoundCandidate(assignment: AssignmentView, rounds: re
  */
 export function carryAvailability(assignment: AssignmentView, rounds: readonly WorkRoundView[], sources: readonly RoundSourceView[], untouchedRoundId?: string | null): CarryAvailability {
   if (assignment.task !== "annotate") return { kind: "none" };
+  if (assignment.annotation_mode === "proposals" && !assignment.held && !sources.length) return { kind: "unavailable", reason: CARRY_FROM_PROPOSALS };
   const ordered = orderedRounds(rounds);
   const untouched = Boolean(untouchedRoundId) && replaceableRoundCandidate(assignment, rounds, sources)?.round_id === untouchedRoundId;
   const open = untouched ? undefined : openRoundOf(ordered);
   const reason = carryUnavailableReason({ held: assignment.held, openRoundOrdinal: open?.round_ordinal ?? null, sourceCount: sources.length });
-  if (reason === null) return { kind: "available" };
+  // Known when the dialog opens: the owner is told before choosing, not by a refusal afterwards.
+  if (reason === null) return sources.some(value => value.refused_by === "CONSOLIDATION_OPEN") ? { kind: "unavailable", reason: CARRY_CONSOLIDATED } : { kind: "available" };
   if (!sources.length && !assignment.held && !open) {
     const submitted = Boolean(assignment.last_submission_id) || rounds.some(round => round.submission_count > 0 || round.latest_submission_id);
     if (submitted) return { kind: "unknown" };
@@ -113,7 +123,15 @@ export function WorkRoundActions({ assignment, rounds, sources, control, current
   const narrow = useMediaQuery("(max-width: 700px)");
   const ordered = orderedRounds(rounds);
   const legendId = useId(), radioName = useId();
-  const availability = carryAvailability(assignment, rounds, sources, untouchedRoundId);
+  const consolidated = carryRefusedByConsolidation(control.error);
+  const availability: CarryAvailability = consolidated ? { kind: "unavailable", reason: CARRY_CONSOLIDATED } : carryAvailability(assignment, rounds, sources, untouchedRoundId);
+  // A refusal appears below the choices: on a phone that is under the dialog's footer, so it is brought into view and focused.
+  const refusal = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (control.error === undefined) return;
+    refusal.current?.focus();
+    refusal.current?.scrollIntoView?.({ block: "nearest" });
+  }, [control.error]);
   const selected = sources.find(value => value.submission_id === control.source);
   const name = (round: WorkRoundView) => `Round ${round.round_ordinal}`;
   const here = <span className="work-rounds__here" aria-current="true"><IconChevronRight className="work-rounds__here-icon" />You are here</span>;
@@ -171,13 +189,16 @@ export function WorkRoundActions({ assignment, rounds, sources, control, current
           ? "Your earlier submission is then marked as replaced and no longer counts as submitted: the project lead sees your task as not submitted, and a new consolidation cannot start from it. If the lead already chose it as the final result, the lead is asked to review that choice. Submit the new round to hand in your work again."
           : "Submit the new round to hand in your work."}</p>
       </>}
-      {availability.kind === "unavailable" && <p className="work-rounds__reason">{availability.reason}</p>}
+      {availability.kind === "unavailable" && (consolidated
+        // Reloading the task cannot change this refusal, so it is not offered.
+        ? <div ref={refusal} tabIndex={-1} className="work-rounds__error"><InlineMessage tone="error">{availability.reason}</InlineMessage></div>
+        : <p className="work-rounds__reason">{availability.reason}</p>)}
       {availability.kind === "unknown" && <>
         <p className="work-rounds__reason">No submission can be continued right now.</p>
         <Button disabled={control.busy} onClick={onReload}>Reload task state</Button>
       </>}
     </section>}
-    {control.error !== undefined && <div className="work-rounds__error">
+    {control.error !== undefined && !consolidated && <div ref={refusal} tabIndex={-1} className="work-rounds__error">
       <ErrorNotice error={control.error} />
       <Button disabled={control.busy} onClick={onReload}>Reload task state</Button>
     </div>}

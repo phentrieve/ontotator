@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import stat
 from pathlib import Path
 from typing import Any
@@ -534,6 +535,129 @@ async def test_reopen_texts_dry_run_then_confirm_with_the_token(
     )
     assert done["applied"] is True and done["change_count"] == 1
     assert fake.calls_to("POST", BULK_REOPEN)[-1].json()["preview_token"] == "sha256:a"
+    # Nothing to undo (the server sent none): no ``undo`` in the answer.
+    assert "undo" not in done and "undo" not in dry
+
+
+BULK_UNDO = f"{P}/bulk-task-actions/undo"
+UNDO = {"id": 41, "expires_at": "2026-11-17T12:00:00Z"}
+
+
+def _undo_view(**fields: object) -> dict[str, object]:
+    task = build(
+        "BulkUndoTaskView",
+        case_id="c1",
+        language="en",
+        assignment_id=7,
+        task="annotate",
+        status="reopened",
+        person=build("PersonRefView", display_name="Tom Reis"),
+    )
+    return build(
+        "BulkUndoResult",
+        undone=0,
+        applied=False,
+        undo_id=41,
+        action="reopen",
+        expires_at=UNDO["expires_at"],
+        task_count=1,
+        tasks=[task],
+        blocked=None,
+    ) | dict(fields)
+
+
+@pytest.mark.parametrize(
+    ("tool", "route", "extra"),
+    [
+        ("reopen_texts", BULK_REOPEN, {"reason": "Guideline 2.3"}),
+        ("withdraw_open_tasks", BULK_WITHDRAW, {}),
+    ],
+)
+async def test_an_applied_reopen_or_withdrawal_keeps_its_undo(
+    fake: FakeApi, mcp_client: Client, tool: str, route: str, extra: dict[str, str]
+) -> None:
+    """The server's ``undo`` reaches the caller (review finding F1)."""
+    action = "reopen" if tool == "reopen_texts" else "withdraw"
+    fake.on("POST", route, _bulk(action, "sha256:a", applied=True, undo=UNDO))
+    done = await call(
+        mcp_client,
+        tool,
+        {
+            "project": "p",
+            "texts": [{"case_id": "c1", "language": "en"}],
+            "confirm": True,
+            "preview_token": "sha256:a",
+        }
+        | extra,
+    )
+    assert done["applied"] is True
+    assert done["undo"] == UNDO
+
+
+async def test_undo_reopen_or_withdraw_dry_run_then_confirm(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    fake.on("POST", BULK_UNDO, _undo_view())
+    dry = await call(
+        mcp_client, "undo_reopen_or_withdraw", {"project": "p", "undo_id": 41}
+    )
+    assert dry["applied"] is False and dry["blocked"] is None
+    assert (dry["action"], dry["task_count"]) == ("reopen", 1)
+    assert dry["would_restore"] == [
+        {
+            "case_id": "c1",
+            "language": "en",
+            "assignment_id": 7,
+            "task": "annotate",
+            "status": "reopened",
+            "person": "Tom Reis",
+        }
+    ]
+    [post] = fake.calls_to("POST", BULK_UNDO)
+    assert post.json() == {"undo_id": 41, "preview": True}
+
+    def answer(request: httpx.Request) -> dict[str, object]:
+        if json.loads(request.content).get("preview"):
+            return _undo_view()
+        done = _undo_view(undone=1, applied=True)
+        done["tasks"][0]["status"] = "submitted"  # type: ignore[index]
+        return done
+
+    fake.on("POST", BULK_UNDO, answer)
+    done = await call(
+        mcp_client,
+        "undo_reopen_or_withdraw",
+        {"project": "p", "undo_id": 41, "confirm": True},
+    )
+    assert done["applied"] is True
+    assert done["restored"][0]["status"] == "submitted"
+    assert fake.calls_to("POST", BULK_UNDO)[-1].json() == {"undo_id": 41}
+
+
+async def test_undo_reopen_or_withdraw_changes_nothing_when_blocked(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    blocked = {"reason": "changed", "message": "A task changed since the action."}
+    fake.on("POST", BULK_UNDO, _undo_view(blocked=blocked))
+    result = await call(
+        mcp_client,
+        "undo_reopen_or_withdraw",
+        {"project": "p", "undo_id": 41, "confirm": True},
+    )
+    assert result["applied"] is False and result["refused"] is True
+    assert result["blocked"] == blocked
+    # Only previews were sent: nothing was applied.
+    assert all(c.json().get("preview") for c in fake.calls_to("POST", BULK_UNDO))
+
+
+async def test_undo_reopen_or_withdraw_names_a_used_or_expired_undo(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    fake.on("POST", BULK_UNDO, refusal(409, "BULK_UNDO_STALE", {"reason": "expired"}))
+    with pytest.raises(ToolFailed, match="BULK_UNDO_STALE/expired"):
+        await call(
+            mcp_client, "undo_reopen_or_withdraw", {"project": "p", "undo_id": 41}
+        )
 
 
 async def test_withdraw_open_tasks_answers_a_stale_token_with_a_fresh_dry_run(
@@ -595,3 +719,120 @@ async def test_start_rounds_dry_run_confirm_and_stale_token(
     fake.on("POST", BULK_START_ROUND, refusal(409, "PREVIEW_STALE", {"preview": fresh}))
     stale = await call(mcp_client, "start_rounds", confirmed)
     assert stale["stale"] is True and stale["preview_token"] == "sha256:b"
+
+
+PAUSE_TEXTS = f"{P}/text-pauses/pause"
+RELEASE_TEXTS = f"{P}/text-pauses/release"
+
+
+def _pause(action: str, token: str, *, applied: bool = False) -> dict[str, Any]:
+    task = {
+        "assignment_id": 7,
+        "document_id": "c1-en",
+        "version": 1,
+        "task": "annotate",
+        "status": "in_progress",
+        "person": {"pseudonym": "ann-0001", "display_name": "Tom Reis"},
+        "paused_by_report": action == "release",
+    }
+    pause = {"reason": "Clinic is checking", "paused_by": None, "paused_at": "t"}
+    return {
+        "action": action,
+        "applied": applied,
+        "texts": 2,
+        "change_count": 1,
+        "skipped_count": 1,
+        "task_count": 1,
+        "still_paused_count": 1 if action == "release" else 0,
+        "changes": [
+            {
+                "case_id": "c1",
+                "language": "en",
+                "pause": pause if action == "release" else None,
+                "tasks": [task],
+            }
+        ],
+        "skipped": [
+            {
+                "case_id": "c2",
+                "language": "en",
+                "reason": "already_paused" if action == "pause" else "not_paused",
+                "message": "Already paused by a lead.",
+                "pause": None,
+            }
+        ],
+        "preview_token": token,
+    }
+
+
+async def test_pause_texts_dry_run_confirm_and_stale_token(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    """Issue 464: pause on the dry-run, then confirm pattern."""
+    texts = [{"case_id": "c1", "language": "en"}, {"case_id": "c2", "language": "en"}]
+    args = {"project": "p", "texts": texts, "reason": "Clinic is checking"}
+    fake.on("POST", PAUSE_TEXTS, _pause("pause", "sha256:a"))
+    dry = await call(mcp_client, "pause_texts", args)
+    assert dry["applied"] is False and dry["preview_token"] == "sha256:a"
+    assert dry["would_change"] == [
+        {
+            "case_id": "c1",
+            "language": "en",
+            "tasks_in_progress": 1,
+            "people": ["Tom Reis"],
+        }
+    ]
+    assert dry["skipped_texts"][0]["message"] == "Already paused by a lead."
+    [post] = fake.calls_to("POST", PAUSE_TEXTS)
+    assert post.json() == {
+        "rows": texts,
+        "reason": "Clinic is checking",
+        "preview": True,
+    }
+    # Not confirmed without the dry run's token.
+    with pytest.raises(ToolFailed):
+        await call(mcp_client, "pause_texts", args | {"confirm": True})
+    assert len(fake.calls_to("POST", PAUSE_TEXTS)) == 1
+    confirmed = args | {"confirm": True, "preview_token": "sha256:a"}
+    fake.on("POST", PAUSE_TEXTS, _pause("pause", "sha256:a", applied=True))
+    done = await call(mcp_client, "pause_texts", confirmed)
+    assert done["applied"] is True and done["changed"][0]["case_id"] == "c1"
+    assert fake.calls_to("POST", PAUSE_TEXTS)[-1].json() == {
+        "rows": texts,
+        "reason": "Clinic is checking",
+        "preview_token": "sha256:a",
+    }
+    fresh = _pause("pause", "sha256:b")
+    fake.on("POST", PAUSE_TEXTS, refusal(409, "PREVIEW_STALE", {"preview": fresh}))
+    stale = await call(mcp_client, "pause_texts", confirmed)
+    assert stale["stale"] is True and stale["preview_token"] == "sha256:b"
+
+
+async def test_release_texts_names_tasks_a_report_still_pauses(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    texts = [{"case_id": "c1", "language": "en"}]
+    fake.on("POST", RELEASE_TEXTS, _pause("release", "sha256:a"))
+    dry = await call(mcp_client, "release_texts", {"project": "p", "texts": texts})
+    assert dry["still_paused_by_report"] == 1
+    assert dry["would_change"][0] == {
+        "case_id": "c1",
+        "language": "en",
+        "tasks_in_progress": 1,
+        "people": ["Tom Reis"],
+        "paused_because": "Clinic is checking",
+        "still_paused_by_report": 1,
+    }
+    [post] = fake.calls_to("POST", RELEASE_TEXTS)
+    assert post.json() == {"rows": texts, "preview": True}
+    fake.on("POST", RELEASE_TEXTS, _pause("release", "sha256:a", applied=True))
+    done = await call(
+        mcp_client,
+        "release_texts",
+        {"project": "p", "texts": texts, "confirm": True, "preview_token": "sha256:a"},
+    )
+    assert done["applied"] is True
+    assert fake.calls_to("POST", RELEASE_TEXTS)[-1].json() == {
+        "rows": texts,
+        "preview_token": "sha256:a",
+    }

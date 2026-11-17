@@ -17,7 +17,7 @@ Want to try first? A private practice project with invented texts lets you do ev
 After login you see **My tasks**. Leads and administrators see **Projects** the first time.
 
 1. Click **My tasks** in the sidebar.
-2. On the tab **To do**, find a row whose **Task** is *Annotation, from scratch* or *Annotation, from proposals*.
+2. On the tab **To do**, find a row whose **Task** is *Annotation, from scratch* or *Annotation, from proposals*. On a phone, the task and its status stand under the name of the text.
 3. Click **Start**. A task marked **Waiting for translation review** cannot be started yet; it opens by itself once the translation review is accepted.
 
 The editor opens. If you have no task, you see **No texts are assigned to you yet.**; ask your lead.
@@ -89,6 +89,8 @@ Details: [Submit the text](annotator.md#submit-the-text).
 If you notice a mistake after submitting: open the task, choose **More** › **Work rounds** and click **Continue from this submission** ([Start a new work round](annotator.md#start-a-new-work-round)). Fix the finding, check the carried findings and submit again.
 
 If something is wrong with the text itself (cut off, wrong patient, unreadable): **More** › **Report a text problem…** ([Report a text problem](annotator.md#report-a-text-problem)).
+
+If a task in **My tasks** is marked **Paused by lead**: the lead stopped the work on that text for now and says why. You can read the task; it opens again when the lead releases the text ([A task paused by the lead](annotator.md#a-task-paused-by-the-lead)).
 
 ## If you were given a translation review
 
