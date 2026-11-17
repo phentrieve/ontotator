@@ -6254,7 +6254,7 @@ export interface components {
             /** Waiting On */
             waiting_on?: string | string[] | null;
             /** Flags */
-            flags?: ("guidelines_unclear" | "over_limit" | "lead_paused") | ("guidelines_unclear" | "over_limit" | "lead_paused")[] | null;
+            flags?: ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator") | ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator")[] | null;
             /** Proposals */
             proposals?: ("with" | "without") | ("with" | "without")[] | null;
         };
@@ -15483,7 +15483,7 @@ export interface operations {
                 final_state?: ("none" | "after_annotation" | "after_review" | "choose" | "confirm" | "old_text" | "may_be_outdated" | "final")[] | null;
                 /** @description "me" or a pseudonym */
                 waiting_on?: string[] | null;
-                flags?: ("guidelines_unclear" | "over_limit" | "lead_paused")[] | null;
+                flags?: ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator")[] | null;
                 proposals?: ("with" | "without")[] | null;
             };
             header?: never;
@@ -15543,7 +15543,7 @@ export interface operations {
                 final_state?: ("none" | "after_annotation" | "after_review" | "choose" | "confirm" | "old_text" | "may_be_outdated" | "final")[] | null;
                 /** @description "me" or a pseudonym */
                 waiting_on?: string[] | null;
-                flags?: ("guidelines_unclear" | "over_limit" | "lead_paused")[] | null;
+                flags?: ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator")[] | null;
                 proposals?: ("with" | "without")[] | null;
             };
             header?: never;

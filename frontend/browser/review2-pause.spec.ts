@@ -4,12 +4,14 @@
  *   pauses the text ("consolidating · paused", the consolidator's row with "Paused by lead", no second "Consolidate…").
  * - F3: an annotator whose editor was open before the pause reads the reason in the New finding panel at 390 px,
  *   where the banner above the panes is out of view; at 1440 px the banner is in view and the panel has no second line.
+ * - F4: a text whose first annotator is at work and that can take another keeps "· max 2" in its row at 1440 px, the
+ *   empty "To assign" tab says where such texts are, and Filter › Annotation › "Can take another annotator" lists them.
  * With SHOTS_DIR set, the states are also saved as screenshots.
  *
  * Builds fresh projects through ``POST /__test_documents__`` (scenario S464).
  */
 import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
-import { activityLines, cellUnder, documentsReady, documentsScenario, openTextCard, personRow, rowBox, showSegment, STAGE_HEADERS, textCard, textRow, type DocumentsScenario } from "./documentsHelpers";
+import { activityLines, cellUnder, documentsReady, documentsScenario, documentsTab, filterChip, openFilters, openTextCard, personRow, rowBox, showSegment, STAGE_HEADERS, textCard, textRow, type DocumentsScenario } from "./documentsHelpers";
 import { authenticatedRequest, loginExisting, selectText } from "./helpers";
 
 test.setTimeout(300_000);
@@ -162,5 +164,70 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
     await shot(tom, `f3-refused${suffix}`);
     expect(errors).toEqual([]);
     await tom.context().close();
+  });
+
+  test(`F4: a text with a free place while its first annotator works can be found (${width} px)`, async ({ page }) => {
+    const errors: string[] = [];
+    watch(page, errors);
+    await page.setViewportSize(size);
+    const s = await documentsScenario(page, "S464") as Scenario;
+    await loginExisting(page, s.users.lead);
+    await page.goto(`/#/projects/${encodeURIComponent(s.project)}/documents`);
+    await documentsReady(page);
+
+    // The limit is 2 and nobody works on EN100027: the lead assigns Ana Weber alone.
+    const card = await openCard(page, "EN100027");
+    await showSegment(card, "Annotation");
+    await card.getByRole("button", { name: /^Assign annotat/ }).first().click();
+    const assign = page.getByRole("dialog", { name: /^Assign/ }).last();
+    await assign.getByRole("checkbox", { name: /Ana Weber/ }).check();
+    await assign.getByRole("button", { name: /^Assign 1/ }).click();
+    await expect(assign).toBeHidden();
+    await page.keyboard.press("Escape");
+    await expect(card).toBeHidden();
+
+    // The row is in progress and still says that a place is free.
+    const row = rowOf(page, "EN100027");
+    if (phone) {
+      await expect(row).toContainText("max 2");
+    } else {
+      const status = cellUnder(row, STAGE_HEADERS.annotation).locator(".documents-status");
+      await expect(status).toHaveAttribute("title", "assigned, not started · max 2 · open: Ana Weber");
+      const short = status.locator(".stage-state-narrow");
+      await expect(short).toBeVisible();
+      await expect(short).toHaveText("0/1 · max 2");
+      // Not cut: the cell shows the whole short state.
+      expect(await status.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+      // A fully staffed text that nobody started reads as before.
+      await expect(cellUnder(rowOf(page, "EN100023"), STAGE_HEADERS.annotation).locator(".stage-state-narrow")).toHaveText("not started");
+    }
+    await row.scrollIntoViewIfNeeded();
+    await shot(page, `f4-row${suffix}`);
+
+    // "To assign" is empty now and says where the texts with a free place are.
+    await documentsTab(page, "To assign", 0).click();
+    await expect(page.getByRole("heading", { name: "No text waits for an assignment" })).toBeVisible();
+    await expect(page.getByText("A text that someone already works on can still take another annotator, up to the limit.")).toBeVisible();
+    expect(await noHorizontalScroll(page)).toBe(true);
+    await shot(page, `f4-to-assign-empty${suffix}`);
+    await page.getByRole("link", { name: "Show texts that can take another annotator" }).click();
+    await documentsReady(page);
+    await expect(filterChip(page, "Can take another annotator")).toBeVisible();
+    await expect(rowBox(page, "EN100027", "en")).toBeVisible();
+    await expect(rowBox(page, "EN100023", "en")).toHaveCount(0);
+
+    // The same filter under Annotation in the popover, with its count; with "In progress" it lists the text.
+    const filters = await openFilters(page);
+    const option = filters.getByRole("checkbox", { name: /^Can take another annotator, \d+ texts?$/ });
+    await expect(option).toBeChecked();
+    expect(await noHorizontalScroll(page)).toBe(true);
+    await shot(page, `f4-filter${suffix}`);
+    if (phone) await page.getByRole("button", { name: /^Show \d+ text/ }).click(); else await page.keyboard.press("Escape");
+    await documentsTab(page, "In progress").click();
+    await documentsReady(page);
+    await expect(rowBox(page, "EN100027", "en")).toBeVisible();
+    await expect(rowBox(page, "EN100022", "en")).toHaveCount(0);
+    await shot(page, `f4-in-progress-filtered${suffix}`);
+    expect(errors).toEqual([]);
   });
 }

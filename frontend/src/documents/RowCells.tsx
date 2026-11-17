@@ -317,6 +317,18 @@ function rowStageGlyph(row: DocumentRowView, stage: StageName, state: string): {
 }
 
 /**
+ * Below 1600 px, an Annotation cell with an open task and a free place keeps the limit in view: "0/1 · max 2"
+ * (0 of 1 submitted, up to 2 annotators) where "not started" or "0/1 submitted" read like a fully staffed text
+ * (review 2, F4). The server sends `target` on an in-progress cell only while the text can take another annotator.
+ */
+function roomNarrowState(row: DocumentRowView, stage: StageName): string | null {
+  const cell = stage === "annotation" && isActiveRow(row) ? row.stages?.annotation : undefined;
+  const detail = cell?.detail;
+  if (cell?.state !== "in_progress" || detail?.target == null || (detail.assigned ?? 0) >= detail.target) return null;
+  return `${detail.submitted ?? 0}/${detail.total ?? Math.max(detail.assigned ?? 1, 1)} · max ${detail.target}`;
+}
+
+/**
  * One stage cell of the row on one line: glyph, the card's short state and a short "who" in grey, cut with an
  * ellipsis; `title` holds the full text. Rows outside the plan are muted (VD1). The Annotation cell adds the robot icon.
  */
@@ -331,7 +343,7 @@ export function RowStageCell({ row, stage }: { row: DocumentRowView; stage: Stag
   const suffix = !who ? "" : stage === "annotation" ? ` · open: ${who}` : ` (${who})`;
   const full = state + suffix;
   // Below 1600 px (issues 248, 279) a shorter state where the full one would be cut.
-  const narrow = narrowStageState(state);
+  const narrow = roomNarrowState(row, stage) ?? narrowStageState(state);
   const className = ["documents-status", "stage-cell", `stage-cell--${tone}`, !isActiveRow(row) && "stage-cell--muted"].filter(Boolean).join(" ");
   return <span className="documents-status-cell">
     <span className={className} title={full}>

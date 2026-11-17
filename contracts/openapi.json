@@ -5234,7 +5234,8 @@
                     "enum": [
                       "guidelines_unclear",
                       "over_limit",
-                      "lead_paused"
+                      "lead_paused",
+                      "can_take_annotator"
                     ],
                     "type": "string"
                   }
@@ -5835,7 +5836,8 @@
                     "enum": [
                       "guidelines_unclear",
                       "over_limit",
-                      "lead_paused"
+                      "lead_paused",
+                      "can_take_annotator"
                     ],
                     "type": "string"
                   }
@@ -18765,7 +18767,8 @@
                 "enum": [
                   "guidelines_unclear",
                   "over_limit",
-                  "lead_paused"
+                  "lead_paused",
+                  "can_take_annotator"
                 ]
               },
               {
@@ -18774,7 +18777,8 @@
                   "enum": [
                     "guidelines_unclear",
                     "over_limit",
-                    "lead_paused"
+                    "lead_paused",
+                    "can_take_annotator"
                   ]
                 },
                 "type": "array"
