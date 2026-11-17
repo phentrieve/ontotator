@@ -570,7 +570,7 @@ def test_document_the_caller_cannot_see_is_refused(env):
 @pytest.mark.parametrize(
     "extra",
     [
-        {"source_submission_ids": [f"sub-{i}" for i in range(21)]},
+        {"source_submission_ids": [f"sub-{i}" for i in range(41)]},
         {"reason": "x" * 2001},
     ],
 )

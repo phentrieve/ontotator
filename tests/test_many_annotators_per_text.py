@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from sqlalchemy import event, update
+from sqlalchemy import event, select, update
 from test_final_panel_api import (
     HYPOTONIA,
     SEIZURE,
@@ -28,7 +28,10 @@ from test_final_tables import final_archive, rows
 from work_plan_support import BASE, _user, doc, plan_env, select_final
 
 from ontotator.application.consolidation_blinding import letters
-from ontotator.domain.annotation_limits import MAX_ANNOTATIONS_PER_TEXT
+from ontotator.domain.annotation_limits import (
+    MAX_ANNOTATIONS_PER_TEXT,
+    MAX_CONSOLIDATION_SOURCES,
+)
 from ontotator.storage.tables import ProjectRow
 
 LIMIT = MAX_ANNOTATIONS_PER_TEXT
@@ -206,6 +209,72 @@ def test_one_text_takes_as_many_annotators_as_the_limit(tmp_path, count):
     assert [p["lane"] for p in people] == [1, 2, 3] + [4] * (count - 3)
     seizure = max(view.json()["groups"], key=lambda g: len(g["members"]))
     assert len(seizure["members"]) == count
+
+
+def _start(env: Any, target: str, reviewer: str, sources: list[str]) -> Any:
+    return env.lead.post(
+        f"{BASE}/consolidations",
+        json={
+            "document_id": target,
+            "reviewer": reviewer,
+            "source_submission_ids": sources,
+            "reason": None,
+            "confirm_language": True,
+            "request_id": f"start-{reviewer}-{len(sources)}",
+            "expected_workflow_revision": None,
+        },
+    )
+
+
+def test_a_consolidation_takes_21_sources_and_refuses_41(tmp_path):
+    """A text at the limit of 20 with a submitted consolidation has 21
+    eligible submissions; one consolidation merges all of them (the bound of
+    sources was 20 and is 40)."""
+    from test_consolidation_submit_gating import submit_acknowledged
+
+    from ontotator.storage.tables import DraftRow
+
+    assert MAX_CONSOLIDATION_SOURCES == 40
+    env = plan_env(tmp_path)
+    target, _names, tasks = _full_text(env, LIMIT)
+    sids = _submit_all(env, target, tasks)
+    # The 21st: the lead consolidates the first two, who agree, and submits.
+    first = _start(env, target, "leader", sids[:2])
+    assert first.status_code == 200, first.text
+    round_id = first.json()["round"]["round_id"]
+    view = env.lead.get(f"/api/v1/rounds/{round_id}/consolidation").json()
+    assert {kind for g in view["groups"] for kind in g["kinds"]} == {"match"}
+    with env.db.transaction() as conn:
+        revision = conn.execute(
+            select(DraftRow.revision).where(
+                DraftRow.project_id == env.pid,
+                DraftRow.draft_key.contains(round_id),
+            )
+        ).scalar_one()
+    submitted = submit_acknowledged(env.lead, view["workspace_id"], int(revision))
+    assert submitted.status_code == 200, submitted.text
+    eligible = [s["submission_id"] for s in panel(env)["submissions"] if s["eligible"]]
+    assert len(eligible) == LIMIT + 1
+    assert set(sids) < set(eligible)
+
+    started = _start(env, target, "adj", eligible)
+    assert started.status_code == 200, started.text
+    second = started.json()["round"]["round_id"]
+    from auth_harness import logged_in
+
+    consolidator = logged_in(env.app, "adj", assignments=[])
+    shown = consolidator.get(f"/api/v1/rounds/{second}/consolidation")
+    assert shown.status_code == 200, shown.text
+    assert len(shown.json()["people"]) == LIMIT + 1
+
+    # 41 sources are no body, whatever they name.
+    over = [f"sub-{number}" for number in range(MAX_CONSOLIDATION_SOURCES + 1)]
+    refused = _start(env, target, "adj", over)
+    assert refused.status_code == 422, refused.text
+    assert [e["type"] for e in refused.json()["detail"]] == ["too_long"]
+    # 40 pass the body; the command then refuses what they name.
+    at_bound = _start(env, target, "adj", over[:MAX_CONSOLIDATION_SOURCES])
+    assert "detail" not in at_bound.json(), at_bound.text
 
 
 def test_documents_reads_20_annotators_in_as_many_statements_as_2(tmp_path):

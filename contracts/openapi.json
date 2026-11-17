@@ -29085,7 +29085,7 @@
               "type": "string"
             },
             "type": "array",
-            "maxItems": 20,
+            "maxItems": 40,
             "minItems": 2,
             "title": "Source Submission Ids"
           },
