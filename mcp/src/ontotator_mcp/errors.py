@@ -79,6 +79,15 @@ HINTS: dict[str, str] = {
     "WORKFLOW_REVISION_CONFLICT": (
         "The task or report changed in the meantime. Run the dry run again and repeat."
     ),
+    "DOCUMENT_NOT_FOUND": (
+        "No such text version in this project, or the token's owner may not read"
+        " it. list_texts names the document_id of each text."
+    ),
+    "VERSION_NOT_FOUND": (
+        "No such submission or annotation version of this text, or the token's"
+        " owner may not read it. list_annotation_versions and get_text_detail"
+        " name the ones on offer; drafts cannot be read."
+    ),
     "GUIDELINE_VERSION_CONFLICT": (
         "Another guideline version was published meanwhile; check the guideline"
         " and repeat."

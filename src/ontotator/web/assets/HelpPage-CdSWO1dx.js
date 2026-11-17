@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-cy7q0r16.js";import{n as a,t as o}from"./lib-C4Bi37b0.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-EjJngTEr.js";import{n as a,t as o}from"./lib-Bu-HJ8iH.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -507,6 +507,8 @@ What for: record a term that the text mentions.
 
 To drop a mark without adding a finding, click **Discard** or press Esc.
 
+To look the marked words up elsewhere, for example in a web search, click **Copy text** or press \`Ctrl+C\` (\`Cmd+C\` on a Mac). Both copy the marked text of the new finding, or the selected (otherwise the first) mention of the selected finding; parts of a mention with words in between are joined by a space. Text you have selected in a field is copied as usual. **Copy text** is also at each mention under **Mentions**.
+
 ## Search a term
 
 What for: find the right ontology term quickly.
@@ -532,6 +534,8 @@ What for: pick a broader or narrower term than the one you have.
 2. Click a term in the tree. Its **Synonyms**, **Translated names** and other parents (**Also under**) are shown.
 3. Click **Use this term** to give the selected finding this term.
 4. Click **Close tree**.
+
+The tree follows your work: select another finding and it opens at that finding's term. After **Use this term** it stays open and marks the new term as the current one. While you search a term for a new finding it steps aside and comes back afterwards. Select a proposal or a reference, or clear the selection, and it closes.
 
 ## Set values and confirm defaults
 
@@ -937,7 +941,7 @@ The screen is read-only after you submitted, when the task is no longer yours, w
 
 What for: see who marked what and work through the differences in order.
 
-1. The **Clinical text** shows one underline per person. The legend below says which line style belongs to whom. There are four line styles: with more than four people, the fourth (double) line stands for everyone from the fourth person on, and the legend lists them, for example *Line 4 (double): +5: …*. The table of a group still has every person. Kept findings are shaded; the selected group is framed.
+1. The **Clinical text** shows one underline per person. The legend below says which line style belongs to whom. Kept findings are shaded; the selected group is framed.
 2. Beside it, the list **Groups** holds the groups in text order, each with its passage and [its state](#groups-and-their-states).
 3. One group is open at a time. Click a group, or a marked passage in the text, to open it.
 4. Press \`j\` for the next open group and \`k\` for the previous one, or click **Next open group** on the progress card.
@@ -948,7 +952,7 @@ On a smaller screen, use **Hide text** and **Show text** to make room. On a phon
 
 What for: decide a group by choosing, per row, the value that is right.
 
-1. Open a group. The table has one column per person. A robot icon marks findings from a tool proposal. With many people the table is wider than its box: scroll it sideways; the row names on the left stay in view.
+1. Open a group. The table has one column per person. A robot icon marks findings from a tool proposal.
 2. The rows are **Term**, one row per value field (for example the assertion), **Text**, **Modifiers** (only if someone used modifiers) and **Note**. Rows where people disagree come first and are highlighted; *(all agree)* marks rows that need no choice. You can mix: take the term from one person and a value from another.
 3. In each highlighted row, click the ✓ next to the value you want. Its button is named after the value, for example *Take Hypotonia … for Term*.
 4. Read the result line below the table. It starts with "Result:" and lists what is still not chosen, for example *Term not chosen yet* or *text not chosen yet*. Once the term is chosen, **Not taken:** lists other people's terms that are not in the result.
@@ -1348,7 +1352,7 @@ The editor has three columns: the list of **Findings** on the left, the text in 
 ## 5. Mark a finding
 
 1. Read the text from the start. When it names a finding, for example "seizures", select the words with the mouse.
-2. The panel **New finding** opens. **Search term** already holds the marked words, and the hits are listed under **Terms**.
+2. The panel **New finding** opens. **Search term** already holds the marked words, and the hits are listed under **Terms**. **Copy text** under the marked words copies them, for example to look them up in a web search; see [Mark text and add a finding](annotator.md#mark-text-and-add-a-finding).
 3. Read the hits before you choose: the search matches words, not meaning, and only a term whose name or synonym equals your words is sure to be on top. If the top hit is the right term, press Enter; a hit tagged **Weak match** is added only after you choose it with \`↓\`. Otherwise, click another hit, or try another word or a synonym in **Search term**.
 
 ![The New finding panel with the marked text and the term search open](images/annotator-new-finding.png)
@@ -1959,6 +1963,7 @@ In the card:
 - Your steps stand where they act. An open problem report is a notice above the path with **Open** and **Decide on report…**. Other steps stand at the top of their part under *Next step*, for example **Resolve…** in **Translation** or **Carry to v2…** in **Annotation**. A part's other actions share its action row, for example **Open result**, **Change final…** and **Withdraw final…** in **Finalization**.
 - Every person's remove action is **Remove…**. Its dialog says what happens: an unsubmitted annotation is removed with its draft; other work is revoked and stays in the history.
 - In **Annotation**, a text with tool proposals names the proposal set its annotators work on, for example *Proposals set 2026-10-02 (phentrieve 1.4), 24 proposals*. When a newer set was imported for the text and a task still works on an older one, the line names the older set and *Newer set available: 2026-11-10* follows, with **How to use it** ([Work from new tool proposals](lead-change-course.md#work-from-new-tool-proposals)); it goes away once every task of the text is on the newest set. Tasks that started before sets were recorded show *set not recorded*. A person's row names the set only when it differs from the text's, for example *newest set*.
+- When a text has more than one version (for example after a translation correction), each person's row in **Annotation** ends with the version their task or submission is on, for example *Submitted 22 Oct, 14 findings · assigned 15 Oct · v1* and *Assigned 18 Oct by you, from proposals · v2*; the row of a running consolidation in **Finalization** names it the same way. With parallel versions the row names the version chain too, for example *DeepL v2*. A text with one version shows no version in these rows. A translation reviewer's row always says *Review of v2*.
 - In **Finalization**, **Open consolidation** opens your own running consolidation as your task; a submitted one opens read-only.
 - In **Finalization**, when submissions differ, the agreement line is followed by the findings that differ in detail; a term and its parent or child on the same passage are named as *Related terms: …* (see [Accept a result or compare results](lead-results.md#accept-a-result-or-compare-results)).
 - ✕ or Esc closes the card.
@@ -1969,7 +1974,7 @@ What for: see what happened to a text and its technical IDs.
 
 1. In the text card footer, click **History** or **Details**. The view's name stands next to **Back** at the top of the card.
    - **History** lists all activity, newest first, with reviewers' reasons, reassignments and mode changes.
-   - **Details** shows the **Plan**, the **Problem reports** and the **Technical details**. Each problem report shows its title, then who reported it, when, its state and the paused tasks, then **Open report**.
+   - **Details** shows the **Plan**, the **Problem reports** and the **Technical details**. Each problem report shows its title, then who reported it, when, its state and the paused tasks, then **Open report**. In the **Technical details**, the lines **Submission ID** and **Round ID** name the person and the version, for example *Submission ID, ann-0004, v1*.
 2. Click **Back** to return to the path.
 
 ### Read a text and other people's work in the text view
@@ -2199,9 +2204,7 @@ What for: assign a single review or annotation.
 2. Tick the people. To annotate yourself without the Annotator role, click **Add me as annotator**.
 3. Click the assign button, for example *Assign 2 people*.
 
-With more than five people on a text, the line *Assigned:* names the first five and how many more there are, for example *and 3 more*; the list marks each of them *Already assigned*.
-
-To change the limit of annotators per text from here, click the info button (i) next to the limit and enter the number (1 to 20):
+To change the limit of annotators per text from here, click the info button (i) next to the limit and enter the number:
 
 - **Only for the selected text** (with several texts: **Only for the selected texts**) gives these texts their own limit, for example 4 annotators on one text for a method comparison in a project with 1. Click the button that names the number of texts, for example *Change for 1 text*. The text keeps its own value for every version, also a corrected one; the project setting and the other texts stay as they are. Entering the project's number again returns the text to the project setting. The popover then explains *Sets the most annotators for this text only (project: 1)*, and for a text that already has its own value its title reads, for example, *Up to 4 annotators for this text (project: 1)*.
 - **For all texts** changes the project setting. Click **Change for all texts**. Texts with their own value keep it.
@@ -2312,7 +2315,7 @@ After the start:
 - If you chose someone else: Ontotator sends no e-mail. Tell the person that a consolidation is waiting in their **My tasks**.
 - If you chose yourself: you get the Consolidator role for this project. Click **Open consolidation** in the text card or **Open my task** in the text's row on **Documents**. Each opens your task, where you decide and submit.
 
-While the consolidation runs, the card shows the consolidator and how many groups are still open. What the consolidator does is in the [consolidator chapter](consolidator.md).
+While the consolidation runs, the card shows the consolidator and how many groups are still open. When the text has more than one version, the consolidator's row also names the version the consolidation runs on, for example *2 of 5 groups open · assigned 18 Oct by you · v1*. What the consolidator does is in the [consolidator chapter](consolidator.md).
 
 ### Read a submitted consolidation
 
@@ -2792,7 +2795,7 @@ A text's own plan can override this until work on it starts.
 What for: decide how many people annotate each text and who may consolidate.
 
 1. Open **Settings**, tab **Workflow**, card **Annotation and consolidation**.
-2. Set **Annotators per text** (1 to 20). It is an upper limit; fewer is fine. A single text can have its own number, also 1 to 20 ([Assign work to the selected texts](lead-documents.md#assign-work-to-the-selected-texts)). The agreement compares every two annotators of a text, so a text with 20 annotators adds 190 pairs to agreement.csv.
+2. Set **Annotators per text** (1 to 5). It is an upper limit; fewer is fine.
 3. Tick **Annotate only after the translation review is accepted** if translations must be reviewed before annotation. Nobody can then annotate a translation that is not accepted; you can still assign annotators while the review is underway ([Assign work to the selected texts](lead-documents.md#assign-work-to-the-selected-texts)).
 4. Tick **Consolidator must not be one of the text's annotators** if annotators may not consolidate their own texts.
 5. Tick **Hide annotator names during consolidation** if consolidators should decide without knowing who marked what. Off by default.

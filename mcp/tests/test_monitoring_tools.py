@@ -112,3 +112,43 @@ async def test_list_translation_reviews_of_the_project_or_one_text(
         ("GET", f"{P}/translation-reviews"),
         ("GET", f"{P}/documents/{{doc}}/translation-reviews"),
     ]
+
+
+def _review_with_text() -> dict[str, object]:
+    return build(
+        "TranslationReviewRecord",
+        id=5,
+        decision="accepted_corrected",
+        rationale="The dose was missing: 5 mg.",
+        proposed_text="Die Patientin erhielt 5 mg.",
+        proposed_text_sha256="a" * 64,
+    )
+
+
+async def test_list_translation_reviews_returns_the_reviewers_text_only_on_request(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    fake.on("GET", f"{P}/translation-reviews", [_review_with_text()])
+    [plain] = await call(mcp_client, "list_translation_reviews", {"project": "p"})
+    assert "proposed_text" not in plain and "rationale" not in plain
+    # The decision and the hashes stay: what changed is still identifiable.
+    assert plain["decision"] == "accepted_corrected"
+    assert plain["proposed_text_sha256"] == "a" * 64
+    [full] = await call(
+        mcp_client, "list_translation_reviews", {"project": "p", "include_text": True}
+    )
+    assert full["proposed_text"] == "Die Patientin erhielt 5 mg."
+    assert full["rationale"] == "The dose was missing: 5 mg."
+    assert full == _review_with_text()
+
+
+async def test_get_text_detail_leaves_the_reviewers_text_out(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    fake.on("GET", f"{P}/documents/{{doc}}/translation-reviews", [_review_with_text()])
+    detail = await call(
+        mcp_client, "get_text_detail", {"project": "p", "document_id": DOC}
+    )
+    [review] = detail["translation_reviews"]
+    assert (review["id"], review["decision"]) == (5, "accepted_corrected")
+    assert "proposed_text" not in review and "rationale" not in review

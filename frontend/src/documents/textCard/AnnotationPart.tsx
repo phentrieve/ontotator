@@ -10,7 +10,7 @@ import { StatusBadge } from "../../ui/StatusBadge";
 import { RouteLink } from "../RowCells";
 import { shortName } from "../stageLabels";
 import type { TextVersionsTools } from "../TextVersions";
-import { dayMonth, textViewRoute, type CardWorkItem } from "./cardModel";
+import { dayMonth, personVersion, textViewRoute, type CardWorkItem } from "./cardModel";
 import { PersonList, PersonRow, useFocusAfterRemoval } from "./PersonRow";
 import { assignedLine, workerName, WorkPersonRow } from "./WorkPersonRow";
 
@@ -146,13 +146,15 @@ export function AnnotationPart({ row, projectKey, query, submissions, canManage,
         const layer = item.status === "submitted" ? layerOf(item.author_label, item.document_id) : undefined;
         const day = layer ? dayMonth(layer.recorded_at) : null;
         const submittedText = layer ? `Submitted${day ? ` ${day}` : ""}, ${plural(layer.finding_count, "finding")}` : null;
-        // "Assigned 18 Oct by you, from proposals"; "Submitted 22 Oct, 14 findings · assigned 15 Oct".
+        // "Assigned 18 Oct by you, from proposals · v2"; "Submitted 22 Oct, 14 findings · assigned 15 Oct · v1" (the
+        // version only when the text has several, issue 445).
         const assignedText = assignedLine(item, now, !submittedText && !item.held);
         const modeText = item.status !== "submitted" && item.annotation_mode ? MODE_TEXT[item.annotation_mode] : null;
         const details = joined([
           item.held && "Paused",
           submittedText,
           assignedText ? <>{assignedText}{modeText && `, ${modeText}`}</> : modeText,
+          personVersion(row, item),
           personSetText(item, row.proposal_set),
         ]);
         return <WorkPersonRow key={item.assignment_id} item={item} caseId={row.case_id} textName={textLabel(row)} details={details} canManage={canManage} tools={tools}
@@ -164,7 +166,7 @@ export function AnnotationPart({ row, projectKey, query, submissions, canManage,
         const revoked = tools?.assignments.find(entry => entry.pseudonym === layer.author_label && entry.document_id === layer.document_id && entry.revoked_at)?.revoked_at;
         const submittedDay = dayMonth(layer.recorded_at);
         return <PersonRow key={layer.submission_id} name={name} pseudonym={layer.author_label} removed status={{ tone: "neutral", label: "Removed" }}
-          details={joined([revoked ? `Removed ${dayMonth(revoked)}` : "Assignment removed", `${submittedDay ? `submitted ${submittedDay}` : "submitted"}, kept in the history`])}>
+          details={joined([revoked ? `Removed ${dayMonth(revoked)}` : "Assignment removed", `${submittedDay ? `submitted ${submittedDay}` : "submitted"}, kept in the history`, personVersion(row, layer)])}>
           {openLayer(name, layer.document_id, layer.submission_id, true)}
         </PersonRow>;
       })}
