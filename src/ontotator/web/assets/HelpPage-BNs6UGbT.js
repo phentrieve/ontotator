@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-DP3pFBUy.js";import{n as a,t as o}from"./lib-D3dXysdU.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-Cd4aknRk.js";import{n as a,t as o}from"./lib-J3MJnuO0.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -1246,6 +1246,10 @@ You assigned a translation review to someone who already reviewed this version, 
 
 **Accept this version…** was refused: the version was accepted or reviewed meanwhile, a newer version exists, it was discarded, or a translation review of it is open. The dialog names the reason. Close it and look at the version list again. See [Accept one translation version](lead-results.md#accept-one-translation-version).
 
+### "A new version cannot be uploaded here any more."
+
+**Upload new version…** was refused when you saved: a newer version of the translation arrived meanwhile, the translation was discarded, or a translation review of the version was assigned. The dialog names the reason. Close it and look at the version list again; your text is not saved, so keep it. See [Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation).
+
 ### A task is still paused after I closed the report
 
 Closing a report does not always release the pause. The row shows **Resume task…**; click it and release the pause. See [Decide on a problem report](lead-results.md#decide-on-a-problem-report).
@@ -1685,14 +1689,15 @@ Before you start: decide whether the new text replaces the current translation o
 
 ### Replace the translation in the app
 
-This works without a file. The new text is pasted into a translation review.
+This works without building a bundle. You upload the new text at the version, or it is pasted into a translation review.
 
 1. Open the text card and click **Translation**.
 2. If the current version is accepted: at the version, click **Request correction…**, choose the **Translation reviewer**, enter the **Reason for another review** (say where the new text comes from) and click **Assign correction review**. The reviewer replaces the text, writes the origin into the **Rationale** and submits **Accepted with corrections** ([Request a translation correction](lead-documents.md#request-a-translation-correction)). The corrected text becomes the next version and counts as accepted.
 3. Or, if the current version is accepted, paste the new text yourself: at the version, click **Correct the translation…**. The dialog lists the annotation work that stays on the accepted version. Your corrected text becomes the next version and starts as a correction with review On, so it is reviewed again ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
 4. If the current version was rejected or queried: click **Resolve…**, then **Correct the translation…**, paste the new text yourself and submit. The corrected text becomes the next version and counts as accepted.
+5. Or, whatever the state of the current version, upload the new text: at the newest version, click **Upload new version…**, paste the text or choose a .txt file, say how the text was made (for a machine translation with its provider and model), check the changes and save. The text becomes the next version, a correction that starts as *Ready for review*; accept it with **Accept this version…** if it was reviewed outside Ontotator ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)).
 
-**Request correction…** is offered only at an accepted version, and **Correct the translation…** at the newest version that is accepted, rejected or queried. The provider or model of the new text can only be named in the **Rationale**; Ontotator has no field for it.
+**Request correction…** is offered only at an accepted version, **Correct the translation…** at the newest version that is accepted, rejected or queried, and **Upload new version…** at the newest version of every translation that has no open translation review. Only **Upload new version…** has fields for the provider and model of the new text; in a translation review they can only be named in the **Rationale**.
 
 ### Replace or add a translation by file
 
@@ -1998,7 +2003,7 @@ What for: see each version of a translation, its reviews and its origin.
 1. Open the text card and click **Translation**.
 2. The list shows each version with its origin and status, then one row per person who worked on it: the name, the task and the status. Older ones are under **Older versions**; with parallel versions they are grouped by version chain.
 3. Click **View text** to read a version, or **Translation reviews** to see every review decision. In a reviewer's row, **Reopen…** lets them review the version again and **Remove…** removes their assignment.
-   At the newest accepted version, **Correct the translation…** lets you correct it yourself ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)).
+   At the newest accepted version, **Correct the translation…** lets you correct it yourself ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)). At the newest version of a translation, **Upload new version…** brings in a text made elsewhere as the next version ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)).
 4. Click **Compare with source** to compare the translation with the source text.
 
 ### Request a translation correction
@@ -2437,6 +2442,29 @@ What for: accept exactly one version, for example an imported correction that wa
 4. Click the button that names the version, for example *Accept v2*.
 
 The version then reads like other acceptances, for example *Accepted: reviewed outside Ontotator, Project lead (ann-0002), 14 Nov, 19:40, Checked against the DeepL output*. While a translation review of the version is open, the acceptance is refused: withdraw the review with **Remove…** first.
+
+### Upload a new version of a translation
+
+What for: bring in a text made outside Ontotator, for example a new machine translation, a translation by a person or a version you corrected by hand, as the next version of one translation.
+
+1. Open the text card and click **Translation**.
+2. At the newest version of the translation, click **Upload new version…**. The dialog says which version the text becomes, for example *The text becomes v3, a correction of v2.*
+3. Give the text: with **Paste text**, paste the whole text into **New text**; with **Choose file**, choose one UTF-8 text file (.txt). The file only fills the text; its name does not matter.
+4. Under **How was this text made?**, choose **Machine translation**, **Human translation** or *Correction of v2 by hand*. For a machine translation, enter the **Provider** (for example DeepL); **Model or tool** is optional. **Made on**, **Made by** and **Note** are optional as well.
+5. Click **Check changes**. The dialog shows the changes against the current version, for example *Changes to v2 · 2 passages changed*, with added words underlined and removed words struck through. **Back** returns to the text.
+6. Click the button that names the new version, for example *Save as v3*.
+
+The new version is always a correction of the version you started from. It starts as *Ready for review* and sets **Review** to **On** for the text; nothing is accepted by the upload. Assign a translation review as usual, or accept the version with **Accept this version…** if it was reviewed outside Ontotator ([Accept one translation version](#accept-one-translation-version)). The version row then shows how the text was made and who uploaded it, for example *Correction of v2 · Machine translation, DeepL, deepl-2026-10* and *Uploaded by Project lead (ann-0002), 16 Nov, 10:12 · Made on 12 Nov 2026 by Dr. Roe · Checked against the source*.
+
+If people worked on the current version, the dialog says so before you save, for example *Annotation has work on v2. 3 annotations (2 submitted, 1 open) stay on v2. After saving, the row offers Handle text change…*. Open consolidations and a final result stay on that version too. Handle them afterwards with **Handle text change…** and *Carry to v3…* ([Handle a text change for open annotation work](#handle-a-text-change-for-open-annotation-work)).
+
+The upload is refused in these cases:
+
+- A translation review of the version is open: *A translation review of this version is open.* Withdraw it with **Remove…** in the reviewer's row of the **Translation** part first.
+- The text is the same as the current version: *No changes to v2. Nothing is saved.* A line break at the end of a file does not count as a change.
+- The file is not a .txt file, is not UTF-8 or is larger than 1 MB.
+
+A source text has no **Upload new version…**: a corrected source text comes in as an Ontospan bundle ([Corrections and parallel translations in a bundle](lead-documents.md#corrections-and-parallel-translations-in-a-bundle)). The same applies to a parallel translation that should stand beside the current one. An exported Ontospan bundle does not yet carry the provider and model of an uploaded version; they are kept in Ontotator.
 
 ### Handle a text change for open annotation work
 
