@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-CQJPfwFe.js";import{n as a,t as o}from"./lib-DZMK_VWn.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-wewfPr8d.js";import{n as a,t as o}from"./lib-DpF5Y7ak.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -224,7 +224,7 @@ What for: check what was changed on an account and by whom.
 
 1. On **Users**, click **More…** in the row and choose **History**. For anonymised accounts, click the **History** button in the row.
 2. Read the table: **When**, **By**, **What**, **Whom**, **Project**, **Details**. **What** names the change in plain words, for example *Project settings changed*, *Final result withdrawn*, *Final export created* or *Phenopackets created*. Research exports are listed too, for example *Edit log exported* or *Working time exported*. A text given its own number of annotators reads *Annotators per text changed for one text*, with the text, the old and new value and the project value under **Details**.
-3. Changes made with an API token name it under **Details** (*Via API token*); the single requests a token made are left out here. The dialog shows the newest 200 entries. For the whole trail, use the command \`ontotator admin audit\`, see [Server operations](../operations.md#users-ontologies-and-projects). An editorial correction of a translation is recorded as *Typo fix in a translation*; its details carry the reason and the changed passages.
+3. Changes made with an API token name it under **Details** (*Via API token*); the single requests a token made are left out here. The dialog shows the newest 200 entries. For the whole trail, use the command \`ontotator admin audit\`, see [Server operations](../operations.md#users-ontologies-and-projects).
 
 ## Anonymise a deactivated account
 
@@ -759,6 +759,7 @@ What happens to your earlier work:
 - The lead sees your task as not submitted, and a new consolidation cannot start from the replaced submission. The lead can still read it.
 - If the lead had already accepted your earlier submission as the final result, the lead is asked to review that choice.
 - You must [submit](#submit-the-text) the new round to hand in your work again.
+- While a consolidation of the text is open, a new round from your submission is refused: *A consolidation is open on this text: finish or withdraw it first.* Ask your lead.
 
 ## Report a text problem
 
@@ -1275,10 +1276,6 @@ You assigned a translation review to someone who already reviewed this version, 
 
 **Upload new version…** was refused when you saved: a newer version of the translation arrived meanwhile, the translation was discarded, or a translation review of the version was assigned. The dialog names the reason. Close it and look at the version list again; your text is not saved, so keep it. See [Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation).
 
-### An editorial correction was refused
-
-The version cannot be corrected any more: a newer version arrived, a translation review of it is open, or it was discarded. Or the text is the same as before. The answer names the reason. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
-
 ### A task is still paused after I closed the report
 
 Closing a report does not always release the pause. The row shows **Resume task…**; click it and release the pause. See [Decide on a problem report](lead-results.md#decide-on-a-problem-report).
@@ -1294,6 +1291,10 @@ Only you and the members with the **Consolidator** role are listed; the hint und
 ### "A final result was chosen for this text, so its annotation mode stays."
 
 **Change mode…** is refused while the text has a final result. Withdraw it first: **Withdraw final…** in the text card's **Finalization**, then change the mode. See [Withdraw a final result](lead-results.md#withdraw-a-final-result).
+
+### A new round is refused: a consolidation is open
+
+*A consolidation is open on this text: finish or withdraw it first.* A submitted annotation gets no new round while a consolidation of its text is not submitted: the consolidation works on that submission. As an annotator, ask your lead. As a lead, wait for the consolidation, or withdraw its task in the text card and start the round then. **More actions** › **Start a round…** skips such texts for the same reason. See [Start a new round for several texts](lead-documents.md#start-a-new-round-for-several-texts).
 
 ### The export asks me to tick a box
 
@@ -1704,7 +1705,7 @@ What stays fixed in every case:
 
 - Texts cannot be deleted. A text you no longer want stays in the project; you take it out of the plan ([Narrow the scope](#narrow-the-scope)).
 - A submission never changes. New work is a new round or a new submission; the earlier one stays in the history.
-- A final result can be replaced with **Change final…** or withdrawn with **Withdraw final…** ([Withdraw a final result](lead-results.md#withdraw-a-final-result)). For many texts, **More actions** › **Change final…** on **Documents** moves the final results to the newest submissions ([Accept or change the final result of several texts](lead-results.md#accept-or-change-the-final-result-of-several-texts)). While a text has a final result, its annotation mode cannot be changed.
+- A final result can be replaced with **Change final…** or withdrawn with **Withdraw final…** ([Withdraw a final result](lead-results.md#withdraw-a-final-result)). For many texts, **More actions** › **Change final…** on **Documents** moves the final results to the newest submissions, with **Undo** in the message that follows ([Accept or change the final result of several texts](lead-results.md#accept-or-change-the-final-result-of-several-texts)). While a text has a final result, its annotation mode cannot be changed.
 - There is no pause button for texts. A task is paused only by a problem report ([Decide on a problem report](lead-results.md#decide-on-a-problem-report)).
 
 ## Use another translation of a text
@@ -1726,7 +1727,7 @@ This works without building a bundle. You upload the new text at the version, or
 4. If the current version was rejected or queried: click **Resolve…**, then **Correct the translation…**, paste the new text yourself and submit. The corrected text becomes the next version and counts as accepted.
 5. Or, whatever the state of the current version, upload the new text: at the newest version, click **Upload new version…**, paste the text or choose a .txt file, say how the text was made (for a machine translation with its provider and model), check the changes and save. The text becomes the next version, a correction that starts as *Ready for review*; accept it with **Accept this version…** if it was reviewed outside Ontotator ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)).
 
-**Request correction…** is offered only at an accepted version, **Correct the translation…** at the newest version that is accepted, rejected or queried, and **Upload new version…** at the newest version of every translation that has no open translation review. Only **Upload new version…** has fields for the provider and model of the new text; in a translation review they can only be named in the **Rationale**. A typo, a missing space or a grammar slip needs none of these steps: an editorial correction fixes it without a review and keeps the status of the text ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
+**Request correction…** is offered only at an accepted version, **Correct the translation…** at the newest version that is accepted, rejected or queried, and **Upload new version…** at the newest version of every translation that has no open translation review. Only **Upload new version…** has fields for the provider and model of the new text; in a translation review they can only be named in the **Rationale**.
 
 ### Replace or add a translation by file
 
@@ -1914,7 +1915,7 @@ The **Documents** page lists every text of the project and what it needs next. O
 | **Next step** | A button for the next action on this text, for example **Assign annotation…**, **Accept result…** or, when submissions differ, **Compare results…**. Rows that need your decision also have a coloured left edge. |
 | **Last activity** | When something last happened on the text. |
 
-A task starts with the person's first saved change; opening it is not enough, and neither is ticking checked sentences in a translation review. Until then **Translation** and **Annotation** read *assigned, not started* with the person's name, in the table (*not started* without the name below 1600 px), its tooltip, the narrow cards and the text card, where the person's row shows **Not started**. After the first save they read *in review* or *In progress*. With several people or parallel versions the cell counts them, for example *1 of 2 started*.
+A task starts with the person's first saved change; opening it is not enough, and neither is ticking checked sentences in a translation review. Until then **Translation** and **Annotation** read *assigned, not started* with the person's name, in the table (*not started* without the name below 1600 px), its tooltip, the narrow cards and the text card, where the person's row shows **Not started**. After the first save they read *in review* or *In progress*. The same holds for a task you reopened, also when you asked a reviewer who had already submitted to correct a translation: it reads *assigned, not started* again until the person saves a change after the reopen. With several people or parallel versions the cell counts them, for example *1 of 2 started*.
 
 The counts in **Annotation**, for example *0 of 1 submitted*, count only work on the newest version of the text. After a text change, a submission on the old version no longer counts: neither when it was carried to the new version, nor when the new version was started fresh. Carried work counts once it is submitted on the new version.
 
@@ -2032,7 +2033,7 @@ What for: see each version of a translation, its reviews and its origin.
 1. Open the text card and click **Translation**.
 2. The list shows each version with its origin and status, then one row per person who worked on it: the name, the task and the status. Older ones are under **Older versions**; with parallel versions they are grouped by version chain.
 3. Click **View text** to read a version, or **Translation reviews** to see every review decision. In a reviewer's row, **Reopen…** lets them review the version again and **Remove…** removes their assignment.
-   At the newest accepted version, **Correct the translation…** lets you correct it yourself ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)). At the newest version of a translation, **Upload new version…** brings in a text made elsewhere as the next version ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)). A version made by an editorial correction says so under its name, with the lead and the reason ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
+   At the newest accepted version, **Correct the translation…** lets you correct it yourself ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)). At the newest version of a translation, **Upload new version…** brings in a text made elsewhere as the next version ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)).
 4. Click **Compare with source** to compare the translation with the source text.
 
 ### Find spacing errors and invisible characters
@@ -2201,7 +2202,7 @@ Every listed task changes, or none: if the texts changed since the preview, the 
 
 A message never lies over a dialog you open after it. If you open the next dialog while the message is still showing, the message waits; when you close the dialog, it is back with its **Undo** and stays for its full time again. This holds for every message with **Undo**, also in the annotation view.
 
-The same menu holds **Accept agreeing results…** and **Change final…** for the final results of the selected texts: see [Accept or change the final result of several texts](lead-results.md#accept-or-change-the-final-result-of-several-texts).
+The same menu holds **Accept agreeing results…** and **Change final…** for the final results of the selected texts: see [Accept or change the final result of several texts](lead-results.md#accept-or-change-the-final-result-of-several-texts). The message after **Change final…** has **Undo** as well: it brings the earlier final results back, for the lead who made the change, once, within an hour, and only while nothing changed on these texts since.
 
 ### Start a new round for several texts
 
@@ -2213,7 +2214,7 @@ What for: give submitted annotations a new work round, for many texts at once. E
    - **Restart**: the new round has none of the earlier findings. A task from scratch starts empty; a task from tool proposals starts again from the newest proposals, all open.
 3. Read the preview. It names the people with their number of tasks, for example *Continue 7 submitted tasks in a new round · Tom Reis 5, R. Roe 2*; click **Show all** to list every text. Only submitted annotations on the current version of a text get a round. What stays as it is has its own group with the reason:
    - *Skip 1 text · final result chosen: use Withdraw final… first*: the final result rests on a submission ([Withdraw a final result](lead-results.md#withdraw-a-final-result)).
-   - *Skip 1 text · a consolidation is open: finish or withdraw it first*: the consolidation works on the submissions.
+   - *Skip 1 text · a consolidation is open: finish or withdraw it first*: the consolidation works on the submissions. A round for one such task is refused in the same way, in the web interface, through the API and by the MCP tool \`start_new_round\` (error code \`CONSOLIDATION_OPEN\`). **Agree clean restart…** in a problem report still restarts such a task ([Decide on a problem report](lead-results.md#decide-on-a-problem-report)).
    - *Keep 2 open tasks · not submitted yet*: tasks that are assigned, in progress or reopened are not touched.
    - Also kept, each in its own group: a task paused by a problem report, a task on an earlier or discarded version, a task whose person can no longer take it, a task whose translation is not accepted yet and, for **Restart**, submitted work without a work round (older or imported work: use **Reopen…**).
 4. Enter the reason. For **Restart** it is required (**Reason**); for **Continue from the submission** it is optional (**Reason (optional)**). It is recorded with each new round in the audit trail.
@@ -2452,7 +2453,10 @@ Every listed text changes, or none: if a text or a final result changed since th
 
 - For texts skipped because the submissions differ, open the text card and compare them, or [start a consolidation](#start-a-consolidation); a submitted consolidation is then the newest submission.
 - Warnings you acknowledged for the earlier final result do not carry over to the new one. Final exports already made stay as they are.
-- Neither action has an undo. To go back, use **Change final…** or **Withdraw final…** in the text card ([Change a final result](#change-a-final-result), [Withdraw a final result](#withdraw-a-final-result)).
+- **Change final…** can be undone: the message, for example *Changed the final result of 8 texts.*, has an **Undo** button. It brings back the earlier final result of every text, with the lead who had chosen it, the time of that choice and the warnings that lead had acknowledged; the message then reads *The earlier final results of 8 texts are back.* and the change is offered again. Undo is for the lead who made the change, once, within an hour, and it restores every text or none. It is refused when a text changed since: its final result was changed, confirmed again or withdrawn; a version of the text was added, discarded or restored; its work plan changed; a task of the text was assigned, reopened, withdrawn or paused, or got a new round (a decision on a problem report that pauses or restarts a task counts); or something was submitted. The message names the first such text and why, for example *Undo is not possible: 1 of 8 texts changed since (EN100023 en: its final result was changed, confirmed again or withdrawn). Nothing was undone.* Then use **Change final…** in the text card ([Change a final result](#change-a-final-result)).
+- A final export made between the change and its Undo does not stop the Undo. It stays as it is and holds the changed results; the message says so, for example *The earlier final results of 8 texts are back. 1 final export made meanwhile stays as it is, with the changed results.* Export again to get the earlier results. Agreement numbers are not stored: a later export computes them from the restored final results.
+- Undo is recorded as a change of its own: each text gets a new entry in the audit trail, and its final result a new revision.
+- **Accept agreeing results…** has no undo. To go back, use **Withdraw final…** or **Change final…** in the text card ([Withdraw a final result](#withdraw-a-final-result), [Change a final result](#change-a-final-result)).
 
 ## Translation and text-change decisions
 
@@ -2525,30 +2529,6 @@ The upload is refused in these cases:
 - The file is not a .txt file, is not UTF-8 or is larger than 1 MB.
 
 A source text has no **Upload new version…**: a corrected source text comes in as an Ontospan bundle ([Corrections and parallel translations in a bundle](lead-documents.md#corrections-and-parallel-translations-in-a-bundle)). The same applies to a parallel translation that should stand beside the current one. An exported Ontospan bundle does not yet carry the provider and model of an uploaded version; they are kept in Ontotator.
-
-### Fix a typo in a translation without a review
-
-What for: correct spacing, a typo or grammar in a translation without a translation review. This is an editorial correction: the content of the text stays as it is, and an accepted text stays accepted.
-
-An editorial correction is made with the MCP tool \`editorial_correction\` ([MCP server guide](../../mcp/README.md)) or with \`POST /api/v1/projects/{key}/documents/{document_id}/editorial-correction\`, both with a project token of a lead that has the scope *Project administration*. The tool takes the passages to replace, each with its replacement, and a reason. Without \`confirm\` it changes nothing and returns the changed passages and what would follow.
-
-The corrected text becomes the next version of the translation, a correction of the version it fixes with that version's status: the correction of an accepted v2 is an accepted v3, and v2 stays accepted as well. The version row names the correction, for example *Typo fix by Project lead (ann-0002), 17 Nov, 10:12 · Space before the full stop*. The audit log records who corrected the text, the changed passages and the reason.
-
-What happens to work on the corrected version:
-
-- Annotation tasks nobody opened move to the new version.
-- Annotations that were opened or submitted, open consolidations and a final result stay on the corrected version. Handle them with **Handle text change…** and *Carry to v3…* ([Handle a text change for open annotation work](#handle-a-text-change-for-open-annotation-work)).
-- Tool proposals are carried to the new text; a proposal whose marked words were changed waits for a check, as after a corrected translation review.
-
-The answer says how many characters changed. When a number changes, it names the numbers, for example 15 → 50, so that you can check them; nothing is refused for it.
-
-An editorial correction is refused in these cases:
-
-- A translation review of the version is open, the version is not the newest of its translation or it was discarded.
-- The text is unchanged.
-- The text is a source text. A corrected source text comes in as an Ontospan bundle.
-
-A version that was rejected or queried can be corrected as well. The new version is rejected or queried like the one it corrects, and you resolve it as before ([Resolve a rejected or queried translation](#resolve-a-rejected-or-queried-translation)).
 
 ### Handle a text change for open annotation work
 

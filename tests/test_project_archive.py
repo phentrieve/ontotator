@@ -1006,6 +1006,9 @@ def test_an_uploaded_translation_version_round_trips(
     app: Any = source.app
     lead = app.state.accounts.get_by_username(scenario.users["lead"])
     previous = app.state.repo.get_variant(scenario.key, built["translation_id"])
+    # The test runs the re-anchoring job itself. The server's own worker polls
+    # the queue too and would otherwise claim the job first now and then.
+    app.state.job_worker.stop()
     saved = VersionUploadService(_db(source), app.state.jobs).upload(
         Actor.user(lead.id, lead.username),
         scenario.key,
@@ -1023,9 +1026,9 @@ def test_an_uploaded_translation_version_round_trips(
             select(JobRow.id).where(JobRow.kind == "reanchor")
         ).scalars()
     jobs = app.state.jobs
-    assert jobs.run(jobs.claim(job_id, "archive-test"), "archive-test").status == (
-        "succeeded"
-    )
+    claimed = jobs.claim(job_id, "archive-test")
+    assert claimed is not None
+    assert jobs.run(claimed, "archive-test").status == "succeeded"
     data = _export(source, scenario.key, tmp_path)
 
     result = project_archive.import_archive(_db(target), OPERATOR, data)

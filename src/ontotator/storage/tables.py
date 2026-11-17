@@ -977,6 +977,9 @@ class AssignmentRow(Base):
     # FD1: the lead's own translation review of a rejected or queried version.
     lead_correction: Mapped[bool] = mapped_column(server_default=text("false"))
     annotation_mode: Mapped[str | None]
+    # Issue 268: the first saved change since the assignment was given or
+    # last reopened; None until then (a reopen or a new round clears it).
+    started_at: Mapped[datetime | None]
 
 
 class TranslationReviewRow(Base):

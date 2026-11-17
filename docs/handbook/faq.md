@@ -204,6 +204,10 @@ Only you and the members with the **Consolidator** role are listed; the hint und
 
 **Change mode…** is refused while the text has a final result. Withdraw it first: **Withdraw final…** in the text card's **Finalization**, then change the mode. See [Withdraw a final result](lead-results.md#withdraw-a-final-result).
 
+### A new round is refused: a consolidation is open
+
+*A consolidation is open on this text: finish or withdraw it first.* A submitted annotation gets no new round while a consolidation of its text is not submitted: the consolidation works on that submission. As an annotator, ask your lead. As a lead, wait for the consolidation, or withdraw its task in the text card and start the round then. **More actions** › **Start a round…** skips such texts for the same reason. See [Start a new round for several texts](lead-documents.md#start-a-new-round-for-several-texts).
+
 ### The export asks me to tick a box
 
 Some texts still need your decision or have no final result. Either decide them in **Documents** first, or tick the box to export the ready results and leave the others out. See [Export final results](lead-results.md#export-final-results).

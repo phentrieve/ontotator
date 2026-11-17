@@ -758,6 +758,130 @@ async def test_change_final_results_stale_token_returns_a_fresh_dry_run(
     assert (result["would_change"], result["preview_token"]) == ([], "sha256:two")
 
 
+UNDO_CHANGE = f"{CHANGE}/undo"
+
+
+def _undo_preview(**fields: Any) -> dict[str, Any]:
+    restore = build(
+        "FinalRestore",
+        case_id="c1",
+        language="en",
+        document_id="c1-en",
+        submission_id="s1",
+        version=1,
+        from_document_id="c1-en",
+        from_submission_id="s2",
+        from_version=1,
+        selected_by=build("PersonRefView", pseudonym="ann-0001", display_name="Mia"),
+        selected_at="2026-11-17T09:00:00Z",
+    )
+    return (
+        build(
+            "BulkChangeFinalUndoView",
+            project="p",
+            undo_id=41,
+            applied=False,
+            expires_at="2026-11-17T12:00:00Z",
+            texts=1,
+            restore_count=1,
+            blocked_count=0,
+            restores=[restore],
+            blocked=[],
+            exports_since=0,
+        )
+        | fields
+    )
+
+
+async def test_a_confirmed_change_of_final_results_names_its_undo(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    handle = {"id": 41, "expires_at": "2026-11-17T12:00:00Z"}
+    fake.on("POST", CHANGE, _change_preview())
+    dry = await call(
+        mcp_client, "change_final_results", {"project": "p", "texts": TEXTS}
+    )
+    assert "undo" not in dry
+    fake.on("POST", CHANGE, _change_preview(applied=True, undo=handle))
+    done = await call(
+        mcp_client,
+        "change_final_results",
+        {
+            "project": "p",
+            "texts": TEXTS,
+            "confirm": True,
+            "preview_token": "sha256:one",
+        },
+    )
+    assert done["undo"] == handle
+
+
+async def test_undo_change_final_results_dry_run_then_confirm(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    fake.on("POST", UNDO_CHANGE, _undo_preview(exports_since=1))
+    args: dict[str, Any] = {"project": "p", "undo_id": 41}
+    dry = await call(mcp_client, "undo_change_final_results", args)
+    [request] = fake.calls_to("POST", UNDO_CHANGE)
+    assert request.json() == {"undo_id": 41, "preview": True}
+    assert dry["applied"] is False and dry["exports_since"] == 1
+    assert dry["would_restore"] == [
+        {
+            "case_id": "c1",
+            "language": "en",
+            "submission_id": "s1",
+            "version": 1,
+            "replaces_submission_id": "s2",
+            "chosen_by": "Mia",
+            "chosen_at": "2026-11-17T09:00:00Z",
+        }
+    ]
+    assert (dry["restore_count"], dry["blocked"], dry["blocked_count"]) == (1, [], 0)
+
+    fake.on("POST", UNDO_CHANGE, _undo_preview(applied=True))
+    done = await call(mcp_client, "undo_change_final_results", args | {"confirm": True})
+    assert fake.calls_to("POST", UNDO_CHANGE)[-1].json() == {"undo_id": 41}
+    assert done["applied"] is True
+    assert [item["submission_id"] for item in done["restored"]] == ["s1"]
+    assert not fake.calls_to("PUT", f"{P}/final-selections")
+
+
+async def test_a_refused_undo_of_final_results_lists_the_texts_in_the_way(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    block = build(
+        "FinalRestoreBlock",
+        case_id="c1",
+        language="en",
+        reason="tasks",
+        message="A task of the text changed since.",
+    )
+    fresh = _undo_preview(
+        restores=[], restore_count=0, blocked=[block], blocked_count=1
+    )
+    fake.on(
+        "POST",
+        UNDO_CHANGE,
+        refusal(409, "BULK_UNDO_STALE", {"reason": "changed", "preview": fresh}),
+    )
+    args: dict[str, Any] = {"project": "p", "undo_id": 41, "confirm": True}
+    result = await call(mcp_client, "undo_change_final_results", args)
+    assert result["applied"] is False and result["refused"] is True
+    assert result["blocked"] == [
+        {
+            "case_id": "c1",
+            "language": "en",
+            "reason": "tasks",
+            "message": "A task of the text changed since.",
+        }
+    ]
+    assert result["would_restore"] == []
+    # Expired, used up, or another lead's: the server's refusal as it is.
+    fake.on("POST", UNDO_CHANGE, refusal(409, "BULK_UNDO_STALE", {"reason": "expired"}))
+    with pytest.raises(ToolFailed, match="BULK_UNDO_STALE"):
+        await call(mcp_client, "undo_change_final_results", args)
+
+
 def _agreement_text(case_id: str) -> dict[str, Any]:
     summary = build("AgreementSummary")
     return build(

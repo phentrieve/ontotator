@@ -478,6 +478,7 @@ class BulkTaskActionService:
         """
         pid = int(project["id"])
         finals = self._finals(conn, pid, found)
+        # The rule of ``work_rounds.consolidation_open`` (the single round).
         consolidating = {
             RowKey(item["case_id"], item["language"])
             for item in assignments
@@ -803,7 +804,11 @@ class BulkTaskActionService:
                     conn.execute(
                         update(AssignmentRow)
                         .where(AssignmentRow.id == row["id"])
-                        .values(status="submitted", updated_at=now)
+                        .values(
+                            status="submitted",
+                            started_at=func.coalesce(AssignmentRow.started_at, now),
+                            updated_at=now,
+                        )
                     )
                     if row["active_round_id"] is not None:
                         conn.execute(

@@ -1,9 +1,9 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { api, ApiError, type AcceptAgreeingView, type BulkChangeFinalView, type BulkTaskActionView, type SelectionSummary } from "../../src/api/client";
+import { api, ApiError, type AcceptAgreeingView, type BulkChangeFinalUndoView, type BulkChangeFinalView, type BulkTaskActionView, type SelectionSummary } from "../../src/api/client";
 import { BulkFinalDialog } from "../../src/documents/BulkFinalDialog";
-import { finalAppliedText, finalConsequences, finalGroups, finalSummaryText, finalUnavailableReason } from "../../src/documents/bulkFinalModel";
+import { finalAppliedText, finalConsequences, finalGroups, finalSummaryText, finalUnavailableReason, finalUndoneText, finalUndoRefusal } from "../../src/documents/bulkFinalModel";
 import { SelectionBar } from "../../src/documents/SelectionBar";
 import { Toast, useToast } from "../../src/ui";
 
@@ -78,13 +78,35 @@ it("groups Accept agreeing results…: accepted, skipped by reason, already fina
   expect(finalAppliedText({ action: "accept", data: acceptPreview() })).toBe("Accepted the results of 2 texts.");
 });
 
-it("the consequences say that there is no Undo", () => {
+it("the consequences say how to go back: Undo in the message for Change final…, none for Accept agreeing results…", () => {
   const lines = finalConsequences({ action: "change", data: changePreview() });
   expect(lines[0]).toBe("5 texts get the newest submission as final result. The earlier final result stays in each text's history.");
   expect(lines).toHaveLength(3);
   expect(lines.some(line => line.includes("without comparing"))).toBe(false);
-  expect(lines.at(-1)).toBe("This cannot be undone here; Change final… in a text card sets one text back.");
+  expect(lines.at(-1)).toBe("Undo in the message brings the earlier final results back while nothing else changed on the texts.");
   expect(finalConsequences({ action: "accept", data: acceptPreview() }).at(-1)).toBe("This cannot be undone here; use Withdraw final… or Change final… in a text card.");
+});
+
+const undoView = (overrides: Partial<BulkChangeFinalUndoView> = {}): BulkChangeFinalUndoView => ({
+  project: "p", undo_id: 41, applied: true, expires_at: "2026-11-17T12:00:00Z", texts: 5, restore_count: 5, blocked_count: 0, restores: [], blocked: [], exports_since: 0, ...overrides,
+});
+
+it("words the Undo: what came back, exports made meanwhile, and the texts in the way of a refused one", () => {
+  expect(finalUndoneText(undoView())).toBe("The earlier final results of 5 texts are back.");
+  expect(finalUndoneText(undoView({ restore_count: 1 }))).toBe("The earlier final result of 1 text is back.");
+  expect(finalUndoneText(undoView({ exports_since: 1 }))).toBe("The earlier final results of 5 texts are back. 1 final export made meanwhile stays as it is, with the changed results.");
+  expect(finalUndoneText(undoView({ exports_since: 2 }))).toBe("The earlier final results of 5 texts are back. 2 final exports made meanwhile stay as they are, with the changed results.");
+  const blocked = [
+    { case_id: "EN100023", language: "en", reason: "tasks" as const, message: "Server words." },
+    { case_id: "EN100024", language: "en", reason: "final" as const, message: "Server words." },
+  ];
+  const refused = new ApiError(409, "stale", "BULK_UNDO_STALE", { reason: "changed", preview: undoView({ applied: false, restore_count: 3, blocked_count: 2, blocked }) });
+  expect(finalUndoRefusal(refused)).toBe(
+    "Undo is not possible: 2 of 5 texts changed since (EN100023 en: a task was assigned, reopened, withdrawn or paused, or got a new round; and 1 more text). Nothing was undone.",
+  );
+  // Expired, used or another lead's: the general message.
+  expect(finalUndoRefusal(new ApiError(409, "stale", "BULK_UNDO_STALE", { reason: "expired" }))).toBeNull();
+  expect(finalUndoRefusal(new Error("offline"))).toBeNull();
 });
 
 it("a menu entry that does nothing names the reason (decision 336-C)", () => {
@@ -185,4 +207,43 @@ it("More actions lists the final actions, applies Accept agreeing results… and
   expect(api.acceptAgreeing).toHaveBeenLastCalledWith("p", { rows, preview_token: "sha256:a" }, undefined);
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+});
+
+async function applyChangeFinal(): Promise<void> {
+  vi.spyOn(api, "selectionSummary").mockResolvedValue(summary);
+  render(<Harness />);
+  await waitFor(() => expect(api.bulkChangeFinal).toHaveBeenCalled());
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+  fireEvent.click(within(screen.getByRole("menu", { name: "More actions" })).getByRole("menuitem", { name: /^Change final…/ }));
+  const dialog = await screen.findByRole("dialog", { name: "Change final: 8 texts" });
+  fireEvent.click(await within(dialog).findByRole("button", { name: "Change 5 final results" }));
+  fireEvent.click(within(dialog).getByLabelText("I understand"));
+  vi.mocked(api.bulkChangeFinal).mockResolvedValueOnce(changePreview({ applied: true, undo: { id: 41, expires_at: "2026-11-17T12:00:00Z" } }));
+  fireEvent.click(within(dialog).getByRole("button", { name: "Change 5 final results" }));
+  expect(await screen.findByText("Changed the final result of 5 texts.")).toBeTruthy();
+}
+
+it("after Change final… the message offers Undo, which restores the earlier final results by the record's id", async () => {
+  const undo = vi.spyOn(api, "bulkChangeFinalUndo").mockResolvedValue(undoView({ exports_since: 1 }));
+  await applyChangeFinal();
+  fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+  expect(await screen.findByText("The earlier final results of 5 texts are back. 1 final export made meanwhile stays as it is, with the changed results.")).toBeTruthy();
+  expect(undo).toHaveBeenCalledWith("p", 41);
+  expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+});
+
+it("a refused Undo of Change final… names the texts that changed since and undoes nothing", async () => {
+  const blocked = [{ case_id: "EN100023", language: "en", reason: "final" as const, message: "Server words." }];
+  vi.spyOn(api, "bulkChangeFinalUndo").mockRejectedValue(new ApiError(409, "stale", "BULK_UNDO_STALE", { reason: "changed", preview: undoView({ applied: false, restore_count: 4, blocked_count: 1, blocked }) }));
+  await applyChangeFinal();
+  fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+  expect(await screen.findByText("Undo is not possible: 1 of 5 texts changed since (EN100023 en: its final result was changed, confirmed again or withdrawn). Nothing was undone.")).toBeTruthy();
+  expect(screen.queryByText(/are back/)).toBeNull();
+});
+
+it("an expired Undo of Change final… says so in the general words", async () => {
+  vi.spyOn(api, "bulkChangeFinalUndo").mockRejectedValue(new ApiError(409, "stale", "BULK_UNDO_STALE", { reason: "expired" }));
+  await applyChangeFinal();
+  fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+  expect(await screen.findByText("Undo is no longer possible: the texts changed since.")).toBeTruthy();
 });

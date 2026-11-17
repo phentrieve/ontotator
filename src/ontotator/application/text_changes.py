@@ -793,7 +793,10 @@ class TextChangeService:
                     conn.execute(
                         update(AssignmentRow)
                         .where(AssignmentRow.id == created.id)
-                        .values(status="in_progress")
+                        .values(
+                            status="in_progress",
+                            started_at=old["started_at"] or now,
+                        )
                     )
             revoke_assignments(conn, actor, pid, [dict(old)], now, reason=MOVED_REASON)
             self._record(
