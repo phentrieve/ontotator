@@ -65,6 +65,10 @@ export function LeadStatePanel({ report, final, reportLink }: {
           </p>)}
         </dd>
       </div>)}
+      {report.text_paused_by_lead && <div>
+        <dt>Text</dt>
+        <dd><StatusBadge tone="warning">Paused by lead</StatusBadge><p className="lead-other-pause">Its open tasks stay paused until the text is released, whatever is decided here.</p></dd>
+      </div>}
       <div>
         <dt>Final result</dt>
         <dd>

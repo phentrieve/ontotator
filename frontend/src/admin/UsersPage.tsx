@@ -80,6 +80,7 @@ const auditActions: Readonly<Record<string, string>> = {
   "text_change.resolve": "Text change resolved",
   "translation.accept_external_review": "External translation review accepted",
   "translation.correction_requested": "Translation correction requested",
+  "translation.editorial_correction": "Typo fix in a translation",
   "translation.lead_correction_started": "Lead correction of a translation started",
   "translation.review": "Translation reviewed",
   "translation.source_reviewed": "Source text reviewed",
@@ -411,7 +412,7 @@ function UsersContent({ currentUser, routeLeaveRef }: UsersPageProps): JSX.Eleme
     {confirmation && <ConfirmDialog open title={confirmation.kind === "admin" ? "Change administrator role" : `Deactivate ${confirmation.username}`} message={confirmation.kind === "deactivate" ? "This logs the user out everywhere and revokes their API tokens."
       : confirmation.change.is_system_admin ? "This logs the user out everywhere. Their API tokens keep working."
       : "This logs the user out everywhere and revokes their system tokens and their project tokens for projects they do not lead. Their personal tokens keep working with their remaining roles."} confirmLabel={confirmation.kind === "admin" ? "Save changes" : "Deactivate"} tone={confirmation.kind === "deactivate" ? "danger" : "primary"} busy={busy} onCancel={() => setConfirmation(null)} onConfirm={() => { void update(confirmation.username, confirmation.change, confirmation.fromEdit); }} />}
-    {reissue && <ConfirmDialog open title={`Issue a new ${reissue.setup_pending ? "setup" : "reset"} code for ${reissue.display_name || reissue.username}?`} message={reissue.setup_pending ? "The current setup code stops working." : "Any unused code stops working. The current password keeps working until the new code is used."} confirmLabel={codeLabel(reissue)} busy={busy} onCancel={() => setReissue(null)} onConfirm={() => { void issueReset(reissue); }} />}
+    {reissue && <ConfirmDialog open title={`Issue a new ${reissue.setup_pending ? "setup" : "reset"} code for ${reissue.display_name || reissue.username}?`} message={reissue.setup_pending ? "The current setup code stops working. Any API tokens of the person are revoked." : "Any unused code stops working. This logs the person out everywhere and revokes their API tokens. The current password keeps working until the new code is used."} confirmLabel={codeLabel(reissue)} busy={busy} onCancel={() => setReissue(null)} onConfirm={() => { void issueReset(reissue); }} />}
     {code && <CodeOnceDialog open {...code} onClose={closeCode} />}
     {history && <Dialog open title={`History of ${history.username}`} size="lg" className="audit-history-dialog" onClose={() => setHistory(null)} closeOnBackdrop>
       {history.events === null ? <InlineMessage tone="info">Loading history…</InlineMessage> : history.error !== undefined ? <ErrorNotice error={history.error} /> :

@@ -128,6 +128,8 @@ class AssignmentFact:
     document_id: str
     task: str
     status: str
+    # Paused by any cause: a problem report, or the lead paused the text
+    # while the task is not submitted (issue 464; ``lead_paused`` below).
     held: bool
     revoked: bool
     pseudonym: str
@@ -149,6 +151,10 @@ class AssignmentFact:
     # Issue 268: a change was saved since the assignment was given or last
     # reopened (``assignments.started_at``).
     saved_since_reopen: bool = False
+    # The lead paused the text and this task is not submitted (issue 464).
+    lead_paused: bool = False
+    # Held by a problem report (the other cause of ``held``).
+    report_held: bool = False
 
 
 def base_chain_name(root: Version) -> str:

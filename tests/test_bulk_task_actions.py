@@ -156,9 +156,33 @@ def test_reopen_preview_groups_apply_all_or_nothing_audit_and_undo(env):
     # The Undo is the server's record: the client gets its id only.
     assert set(result["undo"]) == {"id", "expires_at"}
 
+    # A preview of the Undo lists the task and changes nothing.
+    preview = env.lead.post(
+        UNDO, json={"undo_id": result["undo"]["id"], "preview": True}
+    )
+    assert preview.status_code == 200, preview.text
+    listed = preview.json()
+    assert (listed["applied"], listed["undone"], listed["blocked"]) == (False, 0, None)
+    assert (listed["action"], listed["task_count"]) == ("reopen", 1)
+    assert listed["undo_id"] == result["undo"]["id"]
+    [task] = listed["tasks"]
+    assert (task["case_id"], task["language"], task["assignment_id"]) == (
+        "c1",
+        "en",
+        a1,
+    )
+    assert (task["task"], task["status"]) == ("annotate", "reopened")
+    assert task["person"]["display_name"]
+    assert _status(env, a1) == ("reopened", False)
+    assert _audits(env, "assignment.reopen_undone") == []
+
     undone = _undo(env, result)
     assert undone.status_code == 200, undone.text
-    assert undone.json() == {"undone": 1}
+    done = undone.json()
+    assert (done["undone"], done["applied"], done["blocked"]) == (1, True, None)
+    assert [(t["assignment_id"], t["status"]) for t in done["tasks"]] == [
+        (a1, "submitted")
+    ]
     assert _status(env, a1) == ("submitted", False)
     assert [d["via"] for _, d in _audits(env, "assignment.reopen_undone")] == [
         "bulk_reopen_undo"
@@ -167,6 +191,10 @@ def test_reopen_preview_groups_apply_all_or_nothing_audit_and_undo(env):
     again = _undo(env, result)
     assert again.status_code == 409
     assert again.json()["code"] == "BULK_UNDO_STALE"
+    # ... also in a preview.
+    late = env.lead.post(UNDO, json={"undo_id": result["undo"]["id"], "preview": True})
+    assert late.status_code == 409
+    assert late.json()["details"] == {"reason": "already_undone"}
 
 
 def test_undo_is_refused_once_the_texts_changed(env):
@@ -177,6 +205,14 @@ def test_undo_is_refused_once_the_texts_changed(env):
     assert _status(env, a1) == ("open", True)
     # Someone else is assigned in the meantime.
     assign(env, doc("c1", "en"), "anno2", "annotate")
+    # The preview says so, names the task and leaves it withdrawn.
+    preview = env.lead.post(
+        UNDO, json={"undo_id": result["undo"]["id"], "preview": True}
+    ).json()
+    assert preview["blocked"]["reason"] == "changed"
+    assert preview["blocked"]["message"]
+    assert [t["assignment_id"] for t in preview["tasks"]] == [a1]
+    assert (preview["applied"], preview["action"]) == (False, "withdraw")
     refused = _undo(env, result)
     assert refused.status_code == 409
     assert refused.json()["code"] == "BULK_UNDO_STALE"
@@ -347,7 +383,7 @@ def test_undo_touches_only_the_tasks_the_action_changed(env):
         },
     )
     assert forged.status_code == 422
-    assert _undo(env, result).json() == {"undone": 1}
+    assert _undo(env, result).json()["undone"] == 1
     assert _status(env, a1) == ("submitted", False)
     assert _status(env, a2) == ("reopened", False)
 
@@ -394,7 +430,7 @@ def test_an_undo_keeps_its_action_its_lead_and_its_time(env, monkeypatch):
     )
     assert _undo(env, late).json()["details"] == {"reason": "expired"}
     monkeypatch.undo()
-    assert _undo(env, result).json() == {"undone": 1}
+    assert _undo(env, result).json()["undone"] == 1
     assert _status(env, a1) == ("open", False)
     assert _status(env, other) == ("reopened", True)
 
@@ -460,6 +496,10 @@ def test_undo_is_refused_after_a_save_a_plan_change_or_other_work(env):
     b1 = assign(env, doc("c2", "en"), "anno", "annotate")
     withdrawn = _apply(env, WITHDRAW, rows=[{"case_id": "c2", "language": "en"}])
     write(env, {RowKey("c2", "en"): PlanFlags(False, False)})
+    blocked = env.lead.post(
+        UNDO, json={"undo_id": withdrawn["undo"]["id"], "preview": True}
+    ).json()["blocked"]
+    assert blocked["reason"] == "changed"
     assert _undo(env, withdrawn).status_code == 409
     assert _status(env, b1) == ("open", True)
 
@@ -496,3 +536,32 @@ def test_summary_only_preview_and_a_flat_number_of_queries(env):
 
     # Two tasks or four: the same number of statements.
     assert statements(ROWS[:1]) == statements(ROWS)
+
+
+def test_texts_the_project_does_not_have_are_named(env):
+    """A wrong case ID, letter case or language is in ``unknown_rows`` of the
+    preview, of the summary and of the applied answer (reopen, withdraw)."""
+    _limit(env, 2)
+    a1 = assign(env, doc("c1", "en"), "anno", "annotate")
+    wrong = [
+        {"case_id": "nope", "language": "en"},
+        {"case_id": "C1", "language": "en"},
+        {"case_id": "c1", "language": "xx"},
+    ]
+    rows = [ROWS[0], *wrong, wrong[0]]
+    for url in (REOPEN, WITHDRAW):
+        found = env.lead.post(url, json={"rows": rows, "preview": True}).json()
+        assert found["texts"] == 1
+        assert found["unknown_rows"] == wrong
+        brief = env.lead.post(
+            url, json={"rows": rows, "preview": True, "summary_only": True}
+        ).json()
+        assert brief["unknown_rows"] == wrong
+        assert brief["preview_token"] == found["preview_token"]
+    assert _post(env, WITHDRAW, preview=True).json()["unknown_rows"] == []
+    applied = env.lead.post(
+        WITHDRAW, json={"rows": rows, "preview_token": found["preview_token"]}
+    )
+    assert applied.status_code == 200, applied.text
+    assert applied.json()["unknown_rows"] == wrong
+    assert _status(env, a1) == ("open", True)

@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { api, onSessionRestored, type ProjectSummary, type TaskSummary } from "../api/client";
 import { routeHref, type NavigateOptions, type Route, type TaskStatusTab } from "../app/router";
 import { ErrorNotice } from "../admin/ErrorNotice";
@@ -14,6 +14,7 @@ import { annotationTaskName } from "../editor/modes";
 import { PracticeCard, PracticeGroup } from "../practice/PracticeOnMyTasks";
 import { usePractice } from "../practice/usePractice";
 import { notifyTasksChanged } from "./tasksEvents";
+import { pauseMarks } from "./pauseLabels";
 
 export interface MyTasksProps {
   project?: string;
@@ -209,7 +210,7 @@ export function MyTasks({ project, status, projects, onNavigate, username }: MyT
         if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
         event.preventDefault(); onNavigate(answerRoute(task, task.answered_report_id!));
       }}><StatusBadge tone="info">Answer to your report</StatusBadge></a> : <StatusBadge tone="info">Answer to your report</StatusBadge>)}
-      {task.held && <><StatusBadge tone="warning">Paused</StatusBadge><p className="task-hold-reason" title={task.hold_reason ?? undefined}>{task.hold_reason ?? "A project problem needs attention."}</p></>}
+      {task.held && pauseMarks(task).map(mark => <Fragment key={mark.cause}><StatusBadge tone="warning">{mark.badge}</StatusBadge><p className="task-hold-reason" title={mark.reason}>{mark.reason}</p></Fragment>)}
     </> },
     { id: "assigned", header: "Assigned", cell: task => <AssignedDate at={task.assigned_at} /> },
     { id: "changed", header: "Last change", cell: task => <time dateTime={task.updated_at}>{formatDateTime(task.updated_at)}</time> },

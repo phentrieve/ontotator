@@ -322,6 +322,7 @@ def stage_facts(
         facts.latest_reviews[decided.document_id] if decided is not None else None
     )
     warnings = ctx.warnings.get(key, [])
+    lead_pause = facts.lead_pauses.get(key)
     return StageFacts(
         step=step_facts,
         review_people=_unique([item.user_id for item in reviews]),
@@ -355,6 +356,9 @@ def stage_facts(
         paused_by=paused_by,
         paused_excerpt=paused_excerpt,
         paused_task=paused_task,
+        lead_paused=lead_pause is not None,
+        lead_pause_by=lead_pause.paused_by if lead_pause is not None else None,
+        lead_pause_reason=lead_pause.reason if lead_pause is not None else None,
         correction_waiting=facts.rule_on
         and any(
             v.origin == "correction" and v.translation_status == "ready_for_review"

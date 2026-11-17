@@ -86,8 +86,10 @@ export function ReporterReportCard({ report, assignment, confirm, onConfirmChang
       const value = await api.actOnProblemReport(report.report_id, {
         request_id, expected_revision: report.revision, action: kind, reason, assignment_ids: kind === "resume" ? [assignment.id] : [],
       });
-      const still = otherPauses.length > 0;
-      const stillBy = leadPauses.length > 0 ? "a project lead" : "another of your reports";
+      // Issue 464: the lead pause of the text is its own cause; it stays when this report's pause ends.
+      const textPaused = (assignment.pause_causes ?? []).includes("lead");
+      const still = otherPauses.length > 0 || textPaused;
+      const stillBy = leadPauses.length > 0 || textPaused ? "a project lead" : "another of your reports";
       setMessage(kind === "resume"
         ? still ? `Resumed. Your task is still paused by ${stillBy}.` : open ? "Resumed. The report stays open." : "Resumed."
         : still ? `Withdrawn. Your task is still paused by ${stillBy}.` : "Withdrawn. Your task is no longer paused by this report.");

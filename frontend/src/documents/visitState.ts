@@ -117,6 +117,8 @@ export function recordDecision(projectKey: string, rowKeyValue: string): void {
 export function changeReason(snapshot: RowSnapshot, current: DocumentRowView): string {
   const before = new Map(snapshot.work.map(item => [item.assignment_id, item.held]));
   if (current.work.some(item => !before.has(item.assignment_id))) return "Work assigned";
+  // Issue 464: the lead paused or released the text.
+  if (current.work.some(item => item.held && item.pause_causes?.includes("lead") && before.get(item.assignment_id) === false)) return "Text paused";
   if (current.work.some(item => item.held && before.get(item.assignment_id) === false)) return "Task paused";
   if (current.work.some(item => !item.held && before.get(item.assignment_id) === true)) return "Task resumed";
   const final = current.final ? { submission_id: current.final.submission_id, revision: current.final.revision } : null;

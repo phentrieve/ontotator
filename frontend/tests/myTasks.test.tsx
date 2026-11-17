@@ -208,6 +208,25 @@ describe("My tasks component", () => {
     expect(within(rows[1]).queryByText(/^Reason from the lead/)).toBeNull();
   });
 
+  it("marks a task whose text a lead paused, and names both causes when a report pauses it too (issue 464)", async () => {
+    vi.mocked(api.listMyTasks).mockResolvedValue([
+      { ...task(21, "in_progress"), held: true, hold_reason: "Clinic is checking", pause_causes: ["lead"], lead_pause_reason: "Clinic is checking" },
+      { ...task(22, "open"), held: true, hold_reason: "Text is cut off", pause_causes: ["report", "lead"], lead_pause_reason: "Clinic is checking" },
+    ]);
+    render(<MyTasks projects={[]} onNavigate={vi.fn()} />);
+    const rows = await screen.findAllByTestId("task-row");
+    expect(within(rows[0]).getByText("Paused by lead")).toBeDefined();
+    expect(within(rows[0]).queryByText("Paused")).toBeNull();
+    expect(within(rows[0]).getByText("Clinic is checking")).toBeDefined();
+    expect(within(rows[0]).getByRole("link", { name: "View paused task" })).toBeDefined();
+    // Report first, then the lead: each cause with its own reason.
+    expect(within(rows[1]).getByText("Paused")).toBeDefined();
+    expect(within(rows[1]).getByText("Text is cut off")).toBeDefined();
+    expect(within(rows[1]).getByText("Paused by lead")).toBeDefined();
+    expect(within(rows[1]).getByText("Clinic is checking")).toBeDefined();
+    expect(tabNames()).toEqual(["To do, 2", "Paused, 2", "Submitted, 0", "All, 2"]);
+  });
+
   it("shows pauses alongside underlying status and keeps saved work accessible", async () => {
     vi.mocked(api.listMyTasks).mockResolvedValue([
       { ...task(11, "open"), held: true, hold_reason: "Source evidence needs clarification" },

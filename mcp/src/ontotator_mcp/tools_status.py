@@ -23,6 +23,17 @@ def _newest(row: dict[str, Any]) -> dict[str, Any] | None:
     return chosen[-1] if chosen else None
 
 
+def _lead_pause(pause: dict[str, Any] | None) -> dict[str, Any] | None:
+    """A lead paused the text: why, who (pseudonym) and when; else None."""
+    if not pause:
+        return None
+    return {
+        "reason": pause.get("reason"),
+        "paused_by": (pause.get("paused_by") or {}).get("pseudonym"),
+        "paused_at": pause.get("paused_at"),
+    }
+
+
 def text_summary(row: dict[str, Any]) -> dict[str, Any]:
     """One row of the Documents table, without the display-only parts."""
     version = _newest(row) or {}
@@ -49,9 +60,11 @@ def text_summary(row: dict[str, Any]) -> dict[str, Any]:
                 "document_id": item.get("document_id"),
                 "person": (item.get("person") or {}).get("pseudonym")
                 or item.get("author_label"),
+                "paused_by": item.get("pause_causes", []),
             }
             for item in row.get("work", [])
         ],
+        "lead_pause": _lead_pause(row.get("lead_pause")),
         "final": None
         if final is None
         else {
@@ -143,6 +156,9 @@ def register_status(server: MCPServer, api: OntotatorClient) -> None:
             str | None, Field(description="Part of a case or text ID, or 'case-1 de'.")
         ] = None,
         proposals: Literal["with", "without"] | None = None,
+        paused_by_lead: Annotated[
+            bool, Field(description="Only texts a lead paused (pause_texts).")
+        ] = False,
         page: Annotated[
             int | None,
             Field(ge=1, description="One page of cases; None returns every page."),
@@ -151,13 +167,16 @@ def register_status(server: MCPServer, api: OntotatorClient) -> None:
         """The project's texts with IDs, stage, assigned people and final result.
 
         Gives the document_id of each text's newest version, which
-        assign_texts and start_consolidation need.
+        assign_texts and start_consolidation need. 'lead_pause' says a lead
+        paused the text (pause_texts), with the reason; each task's
+        'paused_by' names what pauses it: 'report' and/or 'lead'.
         """
         filters: dict[str, Any] = {
             "language": language,
             "stage": stage,
             "q": query,
             "proposals": [proposals] if proposals else None,
+            "flags": ["lead_paused"] if paused_by_lead else None,
         }
         if page is None:
             found, header = await rows(api, project, **filters)

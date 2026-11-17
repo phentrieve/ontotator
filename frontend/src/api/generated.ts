@@ -1483,7 +1483,8 @@ export interface paths {
          *     the texts that would change, with the result each one gets, the texts
          *     skipped and why (no final result, open work, nothing submitted, already
          *     the newest, nothing submitted since the final was chosen, your own
-         *     result where the project forbids it, submissions that differ) and a
+         *     result where the project forbids it, submissions that differ), the
+         *     selected texts the project does not have (``unknown_rows``) and a
          *     ``preview_token``.
          *     Applying sends that token: every listed text changes, or none (409
          *     ``PREVIEW_STALE`` with a fresh ``preview`` in the details when anything
@@ -1969,7 +1970,8 @@ export interface paths {
          * @description Reopen the submitted tasks of many texts (issue 336).
          *
          *     ``preview: true`` lists the tasks that would be reopened, the tasks kept
-         *     and why, the texts skipped (a final result is chosen) and a
+         *     and why, the texts skipped (a final result is chosen), the selected
+         *     texts the project does not have (``unknown_rows``) and a
          *     ``preview_token``. Applying sends that token and a ``reason``: every
          *     listed task is reopened, or none (409 ``PREVIEW_STALE`` with a fresh
          *     ``preview`` in the details when anything changed). Each task is audited
@@ -2061,6 +2063,10 @@ export interface paths {
          *     versions); otherwise 409 ``BULK_UNDO_STALE`` and nothing is undone.
          *     Reopened tasks are submitted again; withdrawn tasks come back with their
          *     drafts. An action that reopened a translation review has no Undo.
+         *     ``preview: true`` changes nothing: it lists the tasks the Undo would
+         *     bring back (``tasks``) and, in ``blocked``, why it cannot run now
+         *     (``changed``, ``not_in_plan``, ``person_unavailable``); a record that is
+         *     unknown, expired or already undone is refused in a preview too.
          */
         post: operations["bulk_undo_api_v1_projects__key__bulk_task_actions_undo_post"];
         delete?: never;
@@ -2143,7 +2149,8 @@ export interface paths {
          *     assignments are revoked and the mode is stored. ``preview: true`` lists,
          *     per text, the submissions and assignments with their people, the texts
          *     left as they are with the reason (the single change's refusals; a text
-         *     with a final result: withdraw it first) and a ``preview_token``. Applying
+         *     with a final result: withdraw it first), the selected texts the project
+         *     does not have (``unknown_rows``) and a ``preview_token``. Applying
          *     sends that token and a ``reason``: every listed text changes, or none
          *     (409 ``PREVIEW_STALE`` with a fresh ``preview`` in the details when
          *     anything changed). Each text is audited like a single change
@@ -2151,6 +2158,70 @@ export interface paths {
          *     restored on its own (``.../{change_id}/restore``); there is no bulk undo.
          */
         post: operations["bulk_change_mode_api_v1_projects__key__annotation_mode_changes_bulk_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{key}/text-pauses/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pause Texts
+         * @description Pause the work on many texts (issue 464).
+         *
+         *     A paused text keeps its tasks: the people see them in My tasks, marked
+         *     "Paused by lead" with the ``reason``, and can read them, but no task in
+         *     progress can be saved (409 ``TASK_HELD`` with ``causes: ["lead"]``):
+         *     annotation, translation review and consolidation, on every version of
+         *     the text. A task assigned, reopened or given a new round later is paused
+         *     from the start. Submitted work and final results are untouched and
+         *     exported as before. The pause from a problem report is a separate cause
+         *     and stays as it is.
+         *
+         *     ``preview: true`` lists the texts that would be paused with their tasks
+         *     in progress, the texts skipped (already paused) and a ``preview_token``.
+         *     Applying sends that token and a ``reason``: every listed text is paused,
+         *     or none (409 ``PREVIEW_STALE`` with a fresh ``preview`` in the details
+         *     when anything changed). Each text is audited (``text.pause``, ``via:
+         *     bulk_pause_texts``). The way back is ``text-pauses/release``.
+         */
+        post: operations["pause_texts_api_v1_projects__key__text_pauses_pause_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{key}/text-pauses/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Release Texts
+         * @description Release paused texts (issue 464).
+         *
+         *     Ends the lead pause of the selected texts: their tasks in progress can
+         *     be saved again. A task that a problem report pauses as well stays paused
+         *     until that report is decided (``paused_by_report``,
+         *     ``still_paused_count``); deciding a report never releases the lead
+         *     pause. Texts that are not paused are skipped. Preview and apply as
+         *     ``text-pauses/pause``; ``reason`` is optional. Each text is audited
+         *     (``text.release``, ``via: bulk_release_texts``).
+         */
+        post: operations["release_texts_api_v1_projects__key__text_pauses_release_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2234,6 +2305,48 @@ export interface paths {
          *     correction of this version, ready for review, with Review on.
          */
         post: operations["upload_version_api_v1_projects__key__variants__document_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{key}/documents/{doc}/editorial-correction/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Editorial Correction
+         * @description Issue 453, read only: whether this version can be corrected and, with
+         *     a text or replacements, the changes, the guards and what follows.
+         */
+        post: operations["preview_editorial_correction_api_v1_projects__key__documents__doc__editorial_correction_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{key}/documents/{doc}/editorial-correction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Editorial Correction
+         * @description Issue 453: save an editorial fix (spacing, typos, grammar) as the next
+         *     version of this translation, with this version's status.
+         */
+        post: operations["editorial_correction_api_v1_projects__key__documents__doc__editorial_correction_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4402,6 +4515,10 @@ export interface components {
             held: boolean;
             /** Hold Reason */
             hold_reason?: string | null;
+            /** Pause Causes */
+            pause_causes?: ("report" | "lead")[];
+            /** Lead Pause Reason */
+            lead_pause_reason?: string | null;
             /**
              * Lead Correction
              * @default false
@@ -4530,6 +4647,10 @@ export interface components {
             held: boolean;
             /** Hold Reason */
             hold_reason?: string | null;
+            /** Pause Causes */
+            pause_causes?: ("report" | "lead")[];
+            /** Lead Pause Reason */
+            lead_pause_reason?: string | null;
             /** Active Holds */
             active_holds?: components["schemas"]["ActiveHoldView"][];
             /**
@@ -4896,6 +5017,8 @@ export interface components {
             applied: boolean;
             /** Texts */
             texts: number;
+            /** Unknown Rows */
+            unknown_rows?: components["schemas"]["RowRefView"][];
             /** Change Count */
             change_count: number;
             /** Skipped Count */
@@ -4935,6 +5058,8 @@ export interface components {
              */
             status: "open" | "in_progress" | "submitted" | "reopened";
             person: components["schemas"]["PersonRefView"];
+            /** Text Paused */
+            text_paused?: boolean;
             /** Reason */
             reason: string;
             /** Message */
@@ -4973,6 +5098,8 @@ export interface components {
             applied: boolean;
             /** Texts */
             texts: number;
+            /** Unknown Rows */
+            unknown_rows?: components["schemas"]["RowRefView"][];
             /** Change Count */
             change_count: number;
             /** Skipped Count */
@@ -5151,6 +5278,8 @@ export interface components {
             applied: boolean;
             /** Texts */
             texts: number;
+            /** Unknown Rows */
+            unknown_rows?: components["schemas"]["RowRefView"][];
             /** Change Count */
             change_count: number;
             /** Kept Count */
@@ -5190,16 +5319,65 @@ export interface components {
              */
             status: "open" | "in_progress" | "submitted" | "reopened";
             person: components["schemas"]["PersonRefView"];
+            /** Text Paused */
+            text_paused?: boolean;
+        };
+        /** BulkUndoBlock */
+        BulkUndoBlock: {
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "changed" | "not_in_plan" | "person_unavailable";
+            /** Message */
+            message: string;
         };
         /** BulkUndoRequest */
         BulkUndoRequest: {
             /** Undo Id */
             undo_id: number;
+            /** Preview */
+            preview?: boolean;
         };
         /** BulkUndoResult */
         BulkUndoResult: {
             /** Undone */
             undone: number;
+            /** Applied */
+            applied?: boolean;
+            /** Undo Id */
+            undo_id?: number | null;
+            /** Action */
+            action?: ("reopen" | "withdraw") | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Task Count */
+            task_count?: number;
+            /** Tasks */
+            tasks?: components["schemas"]["BulkUndoTaskView"][];
+            blocked?: components["schemas"]["BulkUndoBlock"] | null;
+        };
+        /** BulkUndoTaskView */
+        BulkUndoTaskView: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Assignment Id */
+            assignment_id: number;
+            /** Document Id */
+            document_id: string;
+            /**
+             * Task
+             * @enum {string}
+             */
+            task: "annotate" | "review" | "translation_review";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "in_progress" | "submitted" | "reopened";
+            person: components["schemas"]["PersonRefView"];
         };
         /**
          * BulkUndoView
@@ -6067,7 +6245,7 @@ export interface components {
             /** Waiting On */
             waiting_on?: string | string[] | null;
             /** Flags */
-            flags?: ("guidelines_unclear" | "over_limit") | ("guidelines_unclear" | "over_limit")[] | null;
+            flags?: ("guidelines_unclear" | "over_limit" | "lead_paused") | ("guidelines_unclear" | "over_limit" | "lead_paused")[] | null;
             /** Proposals */
             proposals?: ("with" | "without") | ("with" | "without")[] | null;
         };
@@ -6193,6 +6371,7 @@ export interface components {
             /** Proposal Set Unrecorded */
             proposal_set_unrecorded?: boolean;
             annotations_per_text?: components["schemas"]["AnnotationsPerTextView"] | null;
+            lead_pause?: components["schemas"]["LeadPauseView"] | null;
             consolidation_progress?: components["schemas"]["ConsolidationProgressView"] | null;
             /**
              * Unreviewed Translation
@@ -6252,6 +6431,7 @@ export interface components {
             acceptance?: components["schemas"]["VersionAcceptanceView"] | null;
             discarded?: components["schemas"]["VersionDiscardView"] | null;
             upload?: components["schemas"]["VersionUploadView"] | null;
+            editorial_correction?: components["schemas"]["VersionEditorialCorrectionView"] | null;
         };
         /**
          * DocumentsSummaryView
@@ -6412,6 +6592,163 @@ export interface components {
             proposal_set_id?: number | null;
             /** Notes */
             notes?: string[];
+        };
+        /**
+         * EditorialChange
+         * @description A changed passage, in Unicode code points of the old and the new text.
+         */
+        EditorialChange: {
+            /** Old Start */
+            old_start: number;
+            /** Old End */
+            old_end: number;
+            /** New Start */
+            new_start: number;
+            /** New End */
+            new_end: number;
+            /** Old Text */
+            old_text: string;
+            /** New Text */
+            new_text: string;
+        };
+        /**
+         * EditorialCorrectionPreview
+         * @description What an editorial correction of this version would do (read only).
+         */
+        EditorialCorrectionPreview: {
+            /** Document Id */
+            document_id: string;
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Version */
+            version: number;
+            /** Next Version */
+            next_version: number;
+            /** Translation Status */
+            translation_status: string | null;
+            /** Text Sha256 */
+            text_sha256: string;
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason: string | null;
+            /** Review On */
+            review_on: boolean;
+            /** Annotate Accepted Only */
+            annotate_accepted_only: boolean;
+            annotations: components["schemas"]["LeadCorrectionAnnotationsView"];
+            /** Open Consolidations */
+            open_consolidations: number;
+            /** Final Result */
+            final_result: boolean;
+            /** Tasks Following */
+            tasks_following: number;
+            /** Text */
+            text: string | null;
+            /** Previous Text */
+            previous_text: string | null;
+            /** New Text Sha256 */
+            new_text_sha256: string | null;
+            /** Inserted Characters */
+            inserted_characters: number | null;
+            /** Deleted Characters */
+            deleted_characters: number | null;
+            /** Changed Characters */
+            changed_characters: number | null;
+            /** Number Changes */
+            number_changes: components["schemas"]["EditorialNumberChange"][] | null;
+            /** Diff */
+            diff: components["schemas"]["EditorialChange"][] | null;
+            findings: components["schemas"]["EditorialFindings"] | null;
+            proposals: components["schemas"]["EditorialProposals"] | null;
+        };
+        /**
+         * EditorialCorrectionPreviewRequest
+         * @description Issue 453: the correction to check before it is saved (both fields
+         *     left out: only whether a correction is possible).
+         */
+        EditorialCorrectionPreviewRequest: {
+            /** Text */
+            text?: string | null;
+            /** Replacements */
+            replacements?: components["schemas"]["EditorialReplacement"][] | null;
+        };
+        /**
+         * EditorialCorrectionRequest
+         * @description Issue 453: an editorial correction of a translation version.
+         */
+        EditorialCorrectionRequest: {
+            /** Text */
+            text?: string | null;
+            /** Replacements */
+            replacements?: components["schemas"]["EditorialReplacement"][] | null;
+            /** Expected Text Sha256 */
+            expected_text_sha256: string;
+            /** Reason */
+            reason: string;
+        };
+        /** EditorialCorrectionResult */
+        EditorialCorrectionResult: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Document Id */
+            document_id: string;
+            /** Version */
+            version: number;
+            /** Previous Document Id */
+            previous_document_id: string;
+            /** Previous Version */
+            previous_version: number;
+            /** Translation Status */
+            translation_status: string | null;
+            /** Text Sha256 */
+            text_sha256: string;
+            /** Inserted Characters */
+            inserted_characters: number;
+            /** Deleted Characters */
+            deleted_characters: number;
+            /** Tasks Following */
+            tasks_following: number;
+        };
+        /** EditorialFindings */
+        EditorialFindings: {
+            /** Submitted */
+            submitted: number;
+            /** Needs Check */
+            needs_check: number;
+        };
+        /**
+         * EditorialNumberChange
+         * @description A number the correction changes, adds (no ``old``) or removes (no ``new``).
+         */
+        EditorialNumberChange: {
+            /** Old */
+            old: string | null;
+            /** New */
+            new: string | null;
+        };
+        /** EditorialProposals */
+        EditorialProposals: {
+            /** Sets */
+            sets: number;
+            /** Carried */
+            carried: number;
+            /** Needs Check */
+            needs_check: number;
+        };
+        /**
+         * EditorialReplacement
+         * @description One passage of the text and what replaces it.
+         */
+        EditorialReplacement: {
+            /** Old */
+            old: string;
+            /** New */
+            new: string;
         };
         /**
          * EvidenceMention
@@ -7345,6 +7682,22 @@ export interface components {
              */
             confirm_language: boolean;
         };
+        /**
+         * LeadPauseView
+         * @description A lead paused the work on the text: its tasks in progress cannot be
+         *     saved, also tasks assigned later, until a lead releases the text.
+         *     Submitted work and final results are untouched.
+         */
+        LeadPauseView: {
+            /** Reason */
+            reason: string;
+            paused_by?: components["schemas"]["PersonRefView"] | null;
+            /**
+             * Paused At
+             * Format: date-time
+             */
+            paused_at: string;
+        };
         /** LoginRequest */
         LoginRequest: {
             /** Username */
@@ -8004,6 +8357,31 @@ export interface components {
             /** Reporter Task */
             reporter_task: boolean;
         };
+        /**
+         * PausedTaskView
+         * @description A task in progress on the text: what a pause stops and a release opens.
+         */
+        PausedTaskView: {
+            /** Assignment Id */
+            assignment_id: number;
+            /** Document Id */
+            document_id: string;
+            /** Version */
+            version: number;
+            /**
+             * Task
+             * @enum {string}
+             */
+            task: "annotate" | "review" | "translation_review";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "in_progress" | "reopened";
+            person: components["schemas"]["PersonRefView"];
+            /** Paused By Report */
+            paused_by_report: boolean;
+        };
         /** PendingReanchorRef */
         PendingReanchorRef: {
             /** Proposal Set Id */
@@ -8504,6 +8882,8 @@ export interface components {
              * @default false
              */
             answered: boolean;
+            /** Text Paused By Lead */
+            text_paused_by_lead?: boolean;
         };
         /** Profile */
         Profile: {
@@ -10159,7 +10539,7 @@ export interface components {
             /** Reason */
             reason?: string | null;
             /** Note */
-            note?: ("machine_translation" | "review_only" | "translation_rejected" | "translation_queried" | "translation_not_accepted" | "unchanged" | "with_corrections" | "in_package" | "outside" | "review_off" | "text_change_waiting" | "may_change" | "not_exported" | "carried_on_submit" | "v2_not_annotated" | "no_target_proposals" | "correction" | "new_review" | "source_changed" | "round" | "consolidation") | null;
+            note?: ("machine_translation" | "review_only" | "translation_rejected" | "translation_queried" | "translation_not_accepted" | "unchanged" | "with_corrections" | "in_package" | "outside" | "review_off" | "text_change_waiting" | "may_change" | "not_exported" | "carried_on_submit" | "lead_pause" | "v2_not_annotated" | "no_target_proposals" | "correction" | "new_review" | "source_changed" | "round" | "consolidation") | null;
             /** Matching */
             matching?: number | null;
             /** Compared */
@@ -10485,6 +10865,10 @@ export interface components {
             held: boolean;
             /** Hold Reason */
             hold_reason?: string | null;
+            /** Pause Causes */
+            pause_causes?: ("report" | "lead")[];
+            /** Lead Pause Reason */
+            lead_pause_reason?: string | null;
             /** Source Language */
             source_language?: string | null;
             /** Target Language */
@@ -10871,6 +11255,88 @@ export interface components {
         TextLayers: {
             /** Entries */
             entries: components["schemas"]["TextLayerEntry"][];
+        };
+        /** TextPauseActionView */
+        TextPauseActionView: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "pause" | "release";
+            /** Applied */
+            applied: boolean;
+            /** Texts */
+            texts: number;
+            /** Unknown Rows */
+            unknown_rows?: components["schemas"]["RowRefView"][];
+            /** Change Count */
+            change_count: number;
+            /** Skipped Count */
+            skipped_count: number;
+            /** Task Count */
+            task_count: number;
+            /** Still Paused Count */
+            still_paused_count: number;
+            /** Changes */
+            changes: components["schemas"]["TextPauseChangeView"][];
+            /** Skipped */
+            skipped: components["schemas"]["TextPauseSkippedView"][];
+            /** Preview Token */
+            preview_token: string;
+        };
+        /** TextPauseChangeView */
+        TextPauseChangeView: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            pause?: components["schemas"]["TextPauseInfoView"] | null;
+            /** Tasks */
+            tasks: components["schemas"]["PausedTaskView"][];
+        };
+        /** TextPauseInfoView */
+        TextPauseInfoView: {
+            /** Reason */
+            reason: string;
+            paused_by?: components["schemas"]["PersonRefView"] | null;
+            /**
+             * Paused At
+             * Format: date-time
+             */
+            paused_at: string;
+        };
+        /**
+         * TextPauseRequest
+         * @description Pause or release the selected texts. ``reason`` is required to apply a
+         *     pause (the people see it in My tasks and in the task) and optional for a
+         *     release.
+         */
+        TextPauseRequest: {
+            /** Rows */
+            rows: components["schemas"]["RowRefView"][];
+            /** Reason */
+            reason?: string | null;
+            /** Preview */
+            preview?: boolean;
+            /** Summary Only */
+            summary_only?: boolean;
+            /** Preview Token */
+            preview_token?: string | null;
+        };
+        /** TextPauseSkippedView */
+        TextPauseSkippedView: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "already_paused" | "not_paused";
+            /** Message */
+            message: string;
+            pause?: components["schemas"]["TextPauseInfoView"] | null;
         };
         /** TextTypographyCounts */
         TextTypographyCounts: {
@@ -11475,6 +11941,23 @@ export interface components {
             discarded_by?: components["schemas"]["PersonRefView"] | null;
         };
         /**
+         * VersionEditorialCorrectionView
+         * @description The editorial correction that made this version (issue 453).
+         */
+        VersionEditorialCorrectionView: {
+            /** Reason */
+            reason: string;
+            /** Previous Document Id */
+            previous_document_id: string;
+            /** Inserted Characters */
+            inserted_characters: number;
+            /** Deleted Characters */
+            deleted_characters: number;
+            /** Corrected At */
+            corrected_at?: string | null;
+            corrected_by?: components["schemas"]["PersonRefView"] | null;
+        };
+        /**
          * VersionMarkerView
          * @description Text cell marker: "v2 corrected", "v2" or "{version} translations"
          *     (parallel roots: ``version`` is the number of roots).
@@ -11712,6 +12195,8 @@ export interface components {
             status: "open" | "in_progress" | "submitted" | "reopened";
             /** Held */
             held: boolean;
+            /** Pause Causes */
+            pause_causes?: ("report" | "lead")[];
             /** Round Ordinal */
             round_ordinal: number | null;
             /** Round State */
@@ -14913,7 +15398,7 @@ export interface operations {
                 final_state?: ("none" | "after_annotation" | "after_review" | "choose" | "confirm" | "old_text" | "may_be_outdated" | "final")[] | null;
                 /** @description "me" or a pseudonym */
                 waiting_on?: string[] | null;
-                flags?: ("guidelines_unclear" | "over_limit")[] | null;
+                flags?: ("guidelines_unclear" | "over_limit" | "lead_paused")[] | null;
                 proposals?: ("with" | "without")[] | null;
             };
             header?: never;
@@ -14973,7 +15458,7 @@ export interface operations {
                 final_state?: ("none" | "after_annotation" | "after_review" | "choose" | "confirm" | "old_text" | "may_be_outdated" | "final")[] | null;
                 /** @description "me" or a pseudonym */
                 waiting_on?: string[] | null;
-                flags?: ("guidelines_unclear" | "over_limit")[] | null;
+                flags?: ("guidelines_unclear" | "over_limit" | "lead_paused")[] | null;
                 proposals?: ("with" | "without")[] | null;
             };
             header?: never;
@@ -15903,6 +16388,76 @@ export interface operations {
             };
         };
     };
+    pause_texts_api_v1_projects__key__text_pauses_pause_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TextPauseRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TextPauseActionView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    release_texts_api_v1_projects__key__text_pauses_release_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TextPauseRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TextPauseActionView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     assign_correction_api_v1_projects__key__documents__doc__translation_correction_assignment_post: {
         parameters: {
             query?: never;
@@ -16066,6 +16621,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VersionUploadResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_editorial_correction_api_v1_projects__key__documents__doc__editorial_correction_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                doc: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditorialCorrectionPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EditorialCorrectionPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    editorial_correction_api_v1_projects__key__documents__doc__editorial_correction_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                doc: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditorialCorrectionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EditorialCorrectionResult"];
                 };
             };
             /** @description Validation Error */

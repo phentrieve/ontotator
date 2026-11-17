@@ -2,6 +2,7 @@ import { textLabel } from "../../app/identity";
 import { useId, useRef, type ReactNode } from "react";
 import type { DocumentRowView, RowProposalSetView, RowSubmissionView } from "../../api/client";
 import { plural } from "../../app/labels";
+import { pausedWord } from "../labels";
 import type { ProjectDocumentsQuery, Route } from "../../app/router";
 import { annotationTaskName } from "../../editor/modes";
 import { helpHref } from "../../help/sections";
@@ -151,7 +152,7 @@ export function AnnotationPart({ row, projectKey, query, submissions, canManage,
         const assignedText = assignedLine(item, now, !submittedText && !item.held);
         const modeText = item.status !== "submitted" && item.annotation_mode ? MODE_TEXT[item.annotation_mode] : null;
         const details = joined([
-          item.held && "Paused",
+          pausedWord(item),
           submittedText,
           assignedText ? <>{assignedText}{modeText && `, ${modeText}`}</> : modeText,
           personVersion(row, item),

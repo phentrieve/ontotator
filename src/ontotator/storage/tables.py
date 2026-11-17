@@ -59,6 +59,7 @@ APPEND_ONLY_TABLES = (
     "translation_acceptances",
     "discarded_variants",
     "translation_version_uploads",
+    "translation_editorial_corrections",
     "text_change_resolutions",
     "draft_snapshots",
     "guideline_versions",

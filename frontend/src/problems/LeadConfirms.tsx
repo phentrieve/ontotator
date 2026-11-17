@@ -14,6 +14,8 @@ const ACTIONS: Record<Intent, ProblemActionRequest["action"]> = {
 const plural = (n: number, one: string, many: string): string => (n === 1 ? one : many);
 /** Sent when the lead leaves the answer of "Close and resume" empty: the server records a reason for every action. */
 export const DEFAULT_RESUME_ANSWER = "Report closed; your task can continue.";
+/** The default answer while a lead pause of the text stands (issue 464): the task does not open yet. */
+export const PAUSED_RESUME_ANSWER = "Report closed. Your task stays paused by the project lead until the text is released.";
 const errorCode = (failure: unknown): string | undefined => failure instanceof ApiError ? failure.code : undefined;
 function detailNumber(failure: unknown, key: string): number | null {
   if (!(failure instanceof ApiError) || !failure.details || typeof failure.details !== "object") return null;
@@ -84,7 +86,7 @@ export function LeadConfirm({ intent, report, finalText, preselect = [], lead, r
   const submit = async () => {
     if (writing.current) return;
     if (unavailable) return;
-    const text = reason.trim() || (intent === "resume_close" ? DEFAULT_RESUME_ANSWER : "");
+    const text = reason.trim() || (intent === "resume_close" ? (report.text_paused_by_lead ? PAUSED_RESUME_ANSWER : DEFAULT_RESUME_ANSWER) : "");
     const chosen = ids();
     let invalid = false;
     if ((intent === "release" || intent === "pause") && !chosen.length) { setSelectionError("Choose at least one task."); invalid = true; }
@@ -121,6 +123,11 @@ export function LeadConfirm({ intent, report, finalText, preselect = [], lead, r
         setOutcome({ kind: "conflict", changedBy: newest ? personLabel(newest.actor_label, newest.actor_label === fresh?.viewer_label, newest.actor) : null, changedAt: newest?.created_at ?? null,
           // The inline "Close and resume" form lets go of the page after a review: it shows again only while possible.
           onReview: () => { setOutcome(null); void lead.reload(); if (intent === "resume_close") onCancel(); } });
+      } else if (code === "TASK_HELD" && failure instanceof ApiError && typeof failure.details === "object" && failure.details !== null
+        && Array.isArray(failure.details.causes) && failure.details.causes.includes("lead")) {
+        // Issue 464: the text is paused by a lead; new work on it (a restart) waits for the release.
+        const task = detailNumber(failure, "assignment_id") ?? report.assignment_id;
+        setNotice(`${upperFirst(taskRefOf(report, task))} is on a text paused by a lead. Nothing changed. Release the text first (Documents, More actions, Release texts…), or resume the task here and restart it later.`);
       } else if (code === "TASK_HELD") {
         const task = detailNumber(failure, "assignment_id") ?? report.assignment_id;
         // The other pause may be newer than this page: read it from a fresh view.
