@@ -84,6 +84,10 @@ HINTS: dict[str, str] = {
     "WORKFLOW_REVISION_CONFLICT": (
         "The task or report changed in the meantime. Run the dry run again and repeat."
     ),
+    "EDITORIAL_CORRECTION_NOT_AVAILABLE": (
+        "The reason says why (the dry run shows it too). A replacement that is"
+        " not found, ambiguous or overlapping names its index."
+    ),
     "DOCUMENT_NOT_FOUND": (
         "No such text version in this project, or the token's owner may not read"
         " it. list_texts names the document_id of each text."

@@ -296,6 +296,14 @@ class UploadProducer(BaseModel):
     upload_id: StrictInt = Field(gt=0)
 
 
+class EditorialProducer(BaseModel):
+    """An editorial correction of a version by a lead (issue 453)."""
+
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["editorial_correction"] = "editorial_correction"
+    correction_id: StrictInt = Field(gt=0)
+
+
 class CorrectionPair(BaseModel):
     model_config = ConfigDict(extra="forbid")
     old_document_id: str = Field(min_length=1)
@@ -305,7 +313,8 @@ class CorrectionPair(BaseModel):
 class ReanchorPayload(CorrectionPair):
     project: str = Field(min_length=1)
     producer: Annotated[
-        ImportProducer | ReviewProducer | UploadProducer, Field(discriminator="kind")
+        ImportProducer | ReviewProducer | UploadProducer | EditorialProducer,
+        Field(discriminator="kind"),
     ]
 
 
@@ -417,6 +426,31 @@ def enqueue_upload_pair(
     )
 
 
+def enqueue_editorial_pair(
+    jobs: JobQueue,
+    project: str,
+    project_id: int,
+    old: str,
+    new: str,
+    correction_id: int,
+    actor: Actor,
+) -> int:
+    payload = ReanchorPayload(
+        project=project,
+        old_document_id=old,
+        new_document_id=new,
+        producer=EditorialProducer(correction_id=correction_id),
+    )
+    # Part of the saved correction: never refused for the queue limit.
+    return jobs.enqueue(
+        "reanchor",
+        payload.model_dump(mode="json"),
+        project_id=project_id,
+        actor=actor,
+        queue_limit=False,
+    )
+
+
 @dataclass(frozen=True)
 class PairJob:
     job_id: int
@@ -511,6 +545,33 @@ def _authority(conn: Connection, pair: PairJob, project_id: int) -> None:
             )
         ):
             raise DomainError("REANCHOR_PRODUCER_INVALID")
+        require_project_management(
+            conn, actor, payload.project, project_id, Action.IMPORT_DOCUMENTS
+        )
+    elif isinstance(payload.producer, EditorialProducer):
+        from ontotator.storage.plan_tables import EditorialCorrectionRow
+
+        correction = conn.execute(
+            select(
+                EditorialCorrectionRow.project_id,
+                EditorialCorrectionRow.previous_document_id,
+                EditorialCorrectionRow.document_id,
+                EditorialCorrectionRow.corrected_by,
+            ).where(EditorialCorrectionRow.id == payload.producer.correction_id)
+        ).one_or_none()
+        if (
+            correction is None
+            or actor.user_id is None
+            or tuple(correction)
+            != (
+                project_id,
+                payload.old_document_id,
+                payload.new_document_id,
+                actor.user_id,
+            )
+        ):
+            raise DomainError("REANCHOR_PRODUCER_INVALID")
+        # The correction added a text to the project, as an upload does.
         require_project_management(
             conn, actor, payload.project, project_id, Action.IMPORT_DOCUMENTS
         )
