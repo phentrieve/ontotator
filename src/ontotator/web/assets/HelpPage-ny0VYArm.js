@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-wewfPr8d.js";import{n as a,t as o}from"./lib-DpF5Y7ak.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-CIl8RH37.js";import{n as a,t as o}from"./lib-BTvnduUf.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -191,7 +191,11 @@ What for: a code expired, got lost, or someone forgot their password.
 
 1. On **Users**, click **More…** in the person's row.
 2. Choose **New setup code** (setup still pending) or **Reset code** (password already set).
-3. Confirm with **New setup code** or **Reset code**. Any earlier unused code stops working. With a reset code, the current password keeps working until the new code is used.
+3. Confirm with **New setup code** or **Reset code**. The dialog says what follows:
+   - Any earlier unused code stops working.
+   - A reset code logs the person out on all devices at once, not only when the code is used. Someone in the middle of a task sees *Your session has ended. Please log in again.* at their next click, so issue a reset code only when the person asked for one or the account may be in the wrong hands.
+   - All API tokens of the person are revoked, with a reset code and with a new setup code alike.
+   - With a reset code, the current password keeps working until the new code is used: the person can log in again right away.
 4. [Hand over the code](#hand-over-a-setup-or-reset-code).
 
 Deactivated accounts get no new code. Activate the account first.
@@ -391,7 +395,7 @@ What for: see every API token of the server, stop one, or create a system token 
 1. Click **Server settings** under **Administration**.
 2. Go to **API tokens**. The table shows each token's **Kind** (*Personal*, *Project* or *System*), **Owner**, **Project**, **Scopes**, expiry, last use and **Status**.
 3. To stop a token, click **Revoke…** in its row, then **Revoke token**. A token the server revoked by itself says why next to **Revoked**, for example *project role removed* or *password changed*.
-4. To create a system token, click **New system token…**, enter a **Token name**, tick its scopes and click **Create token**. Copy the token from the dialog; it is shown only once.
+4. To create a system token, click **New system token…**, enter a **Token name**, tick its scopes and click **Create token**. Copy the token from the dialog with **Copy token**; it is shown only once. Tick **I have stored the token**, then click **Close**; the dialog cannot be closed before.
 
 Only a system token may hold the **System administration** scope, for ontology and translation uploads and user accounts. It acts as you and is revoked when you are no longer a system administrator, when you change your password and when your account is deactivated. Token creation, revocation and every change made with a token are in the audit trail.
 
@@ -1690,11 +1694,12 @@ What for: let a script or another program read or export your projects without y
 3. Enter a **Token name** that says what uses it.
 4. Tick the scopes the program needs: **Read**, **Import**, **Export** or **Project administration**.
 5. Set **Valid for (days)**: 1 to 365, 90 by default.
-6. Click **Create token**. The dialog shows the token once. Click **Copy token** and store it, for example in your password manager, then click **Close**.
+6. Click **Create token**. The dialog, titled with the name of the token (*New token “Laptop script”*), shows the token once. Click **Copy token** and store it, for example in your password manager.
+7. Tick **I have stored the token**, then click **Close**. Until the box is ticked, the dialog cannot be closed, not with **Close** and not with the Escape key.
 
 The program sends the token in the header \`Authorization: Bearer <token>\`. It acts as you: it can do only what its scopes allow and what you may do yourself. Annotation, review and translation review work always needs the browser, and a token cannot create other tokens. Every change made with a token is in the audit trail with the token's name.
 
-An AI assistant that speaks MCP, such as Claude Desktop, can use a token too: the Ontotator MCP server lets it set up a project, follow progress and download exports for you. Installing and configuring it is described in the [MCP server guide](../../mcp/README.md). Prefer a project token with a short lifetime for it.
+An AI assistant that speaks MCP, such as Claude Desktop, can use a token too: the Ontotator MCP server lets it set up a project, follow progress and download exports for you. Installing and configuring it is described in the [MCP server guide](../../mcp/README.md). Prefer a project token with a short lifetime for it. The line *Also for the Ontotator MCP server (AI assistant): see the handbook.* under your tokens opens this section.
 
 To stop a token, click **Revoke…** in its row, then **Revoke token**. Every program that uses it stops working at once. All your tokens are also revoked when you change your password, when an administrator issues you a reset code and when your account is deactivated. Losing a project role does not revoke a personal token, but the token at once loses what the role allowed: it can only ever do what you may do yourself right now.
 `,m=`# Lead: change course in a running project
@@ -2935,6 +2940,8 @@ What for: give or take away a role.
 
 A project needs at least one lead: **Add another project lead before removing the last lead.**
 
+The exception is a system administrator, who may take away the last lead, their own lead role included, for example to hand a project over. The dialog then says *This project will have no lead. You can still manage it as system administrator.* On their own row it does not speak of lost access or revoked tokens, because an administrator keeps both. A project without a lead shows "–" under **Lead** on **Projects** and can only be managed by an administrator until one is added ([Add a member](#add-a-member)).
+
 ## Remove a member
 
 What for: take someone off the project.
@@ -2953,11 +2960,12 @@ What for: let a script import, export or read this project, for example a nightl
 1. Open **Settings**, tab **People**.
 2. Under **Project API tokens**, click **New token…**.
 3. Enter a **Token name**, tick the scopes it needs (**Read**, **Import**, **Export**, **Project administration**) and set **Valid for (days)**.
-4. Click **Create token**. Copy the token from the dialog with **Copy token** and store it; it is shown only once.
+4. Click **Create token**. The dialog, titled with the name of the token (*New token “Progress report script”*), shows the token; it is shown only once. Click **Copy token** and store it, for example in your password manager.
+5. Tick **I have stored the token**, then click **Close**. Until the box is ticked, the dialog cannot be closed, not with **Close** and not with the Escape key.
 
 A project token works in this project only and acts as you, the lead who created it. It is revoked when you leave the project or lose the lead role (unless you are a system administrator), when you change your password and when your account is deactivated. Every lead of the project sees its tokens and can stop one with **Revoke…** and **Revoke token**. Changes made with a token are in the audit trail with the token's name.
 
-A project token is also the safest kind for the Ontotator MCP server, which lets an AI assistant set up and run the project for you ([MCP server guide](../../mcp/README.md)).
+A project token is also the safest kind for the Ontotator MCP server, which lets an AI assistant set up and run the project for you ([MCP server guide](../../mcp/README.md)). The line *Also for the Ontotator MCP server (AI assistant): see the handbook.* under the tokens opens this section.
 
 ## Publish the first or a new guideline version
 
