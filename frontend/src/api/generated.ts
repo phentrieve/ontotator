@@ -1445,9 +1445,43 @@ export interface paths {
          *     Applying sends that token: every listed text changes, or none (409
          *     ``PREVIEW_STALE`` with a fresh ``preview`` in the details when anything
          *     changed, also a final result changed meanwhile). Each text is audited
-         *     like a single change (``via: bulk_change_final``). There is no undo.
+         *     like a single change (``via: bulk_change_final``). An applied action
+         *     returns ``undo``; ``final-selections/bulk-change/undo`` takes its ``id``.
          */
         post: operations["bulk_change_final_api_v1_projects__key__final_selections_bulk_change_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{key}/final-selections/bulk-change/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo Bulk Change Final
+         * @description Undo a bulk Change final… by the ``undo.id`` of its apply.
+         *
+         *     The server keeps the final result each text had; the request names only
+         *     that record. It works once, for the lead who applied the action, before
+         *     ``undo.expires_at`` (otherwise 409 ``BULK_UNDO_STALE`` with ``reason``
+         *     ``not_found``, ``already_undone`` or ``expired``). ``preview: true``
+         *     lists the final result each text would get back (``restores``) and the
+         *     texts that changed since the action, with the reason (``blocked``): the
+         *     final result, the text's versions, its plan row, a task of the text or
+         *     its submissions. Applying restores every text, or none: with a blocked
+         *     text it answers 409 ``BULK_UNDO_STALE`` (``reason`` ``changed``) with
+         *     that ``preview`` in the details. Final exports made since the action do
+         *     not block; they stay as they are and ``exports_since`` counts them. Each
+         *     text is audited like a single change (``via: bulk_change_final_undo``).
+         */
+        post: operations["undo_bulk_change_final_api_v1_projects__key__final_selections_bulk_change_undo_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4773,6 +4807,39 @@ export interface components {
             /** Preview Token */
             preview_token?: string | null;
         };
+        /** BulkChangeFinalUndoRequest */
+        BulkChangeFinalUndoRequest: {
+            /** Undo Id */
+            undo_id: number;
+            /** Preview */
+            preview?: boolean;
+        };
+        /** BulkChangeFinalUndoView */
+        BulkChangeFinalUndoView: {
+            /** Project */
+            project: string;
+            /** Undo Id */
+            undo_id: number;
+            /** Applied */
+            applied: boolean;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Texts */
+            texts: number;
+            /** Restore Count */
+            restore_count: number;
+            /** Blocked Count */
+            blocked_count: number;
+            /** Restores */
+            restores: components["schemas"]["FinalRestore"][];
+            /** Blocked */
+            blocked: components["schemas"]["FinalRestoreBlock"][];
+            /** Exports Since */
+            exports_since: number;
+        };
         /** BulkChangeFinalView */
         BulkChangeFinalView: {
             /** Project */
@@ -4800,6 +4867,7 @@ export interface components {
             skipped: components["schemas"]["FinalChangeSkip"][];
             /** Preview Token */
             preview_token: string;
+            undo?: components["schemas"]["BulkUndoView"] | null;
         };
         /** BulkKeptTaskView */
         BulkKeptTaskView: {
@@ -6526,6 +6594,45 @@ export interface components {
              * @default 0
              */
             planned_out_texts: number;
+        };
+        /** FinalRestore */
+        FinalRestore: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Document Id */
+            document_id: string;
+            /** Submission Id */
+            submission_id: string;
+            /** Version */
+            version?: number | null;
+            /** From Document Id */
+            from_document_id: string;
+            /** From Submission Id */
+            from_submission_id: string;
+            /** From Version */
+            from_version?: number | null;
+            selected_by?: components["schemas"]["PersonRefView"] | null;
+            /**
+             * Selected At
+             * Format: date-time
+             */
+            selected_at: string;
+        };
+        /** FinalRestoreBlock */
+        FinalRestoreBlock: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "final" | "versions" | "plan" | "tasks" | "submissions";
+            /** Message */
+            message: string;
         };
         /** FinalSelectionRequest */
         FinalSelectionRequest: {
@@ -14408,6 +14515,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BulkChangeFinalView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    undo_bulk_change_final_api_v1_projects__key__final_selections_bulk_change_undo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkChangeFinalUndoRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkChangeFinalUndoView"];
                 };
             };
             /** @description Validation Error */

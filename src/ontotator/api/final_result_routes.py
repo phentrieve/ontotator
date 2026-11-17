@@ -6,6 +6,7 @@ from typing import Any, Literal, Self
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from ontotator.api.bulk_task_action_routes import BulkUndoView
 from ontotator.api.identity import PrincipalDep
 from ontotator.api.person_views import PersonRefView
 from ontotator.api.routes import get_access
@@ -16,6 +17,7 @@ from ontotator.api.work_plan_routes import (
 )
 from ontotator.application.final_results import FinalResultService
 from ontotator.auth.audit import Actor
+from ontotator.domain.errors import DomainError
 from ontotator.domain.work_plans import RowKey
 from ontotator.exchange.archive import expire_archive_files
 
@@ -203,6 +205,63 @@ class BulkChangeFinalView(BaseModel):
     changes: list[FinalChange]
     skipped: list[FinalChangeSkip]
     preview_token: str
+    # After apply with changes: send its ``id`` to
+    # ``final-selections/bulk-change/undo``. None for a preview or when
+    # nothing changed.
+    undo: BulkUndoView | None = None
+
+
+class BulkChangeFinalUndoRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # ``undo.id`` of the apply.
+    undo_id: int = Field(ge=1)
+    # True: only list what would be restored and what blocks the Undo.
+    preview: bool = Field(default_factory=lambda: False)
+
+
+class FinalRestore(BaseModel):
+    case_id: str
+    language: str
+    # The final result the text gets back, as it was before the action.
+    document_id: str
+    submission_id: str
+    version: int | None = None
+    # The final result the action chose (the text's final result now).
+    from_document_id: str
+    from_submission_id: str
+    from_version: int | None = None
+    # Who had chosen the earlier final result, and when.
+    selected_by: PersonRefView | None = None
+    selected_at: datetime
+
+
+class FinalRestoreBlock(BaseModel):
+    case_id: str
+    language: str
+    # What changed since the action: the final result (``final``), the
+    # text's versions (``versions``), its plan row (``plan``), a task
+    # (``tasks``) or its submissions (``submissions``).
+    reason: Literal["final", "versions", "plan", "tasks", "submissions"]
+    message: str
+
+
+class BulkChangeFinalUndoView(BaseModel):
+    project: str
+    undo_id: int
+    # False: a preview; True: every text in ``restores`` has its earlier
+    # final result again.
+    applied: bool
+    expires_at: datetime
+    # Texts the action changed.
+    texts: int
+    restore_count: int
+    blocked_count: int
+    restores: list[FinalRestore]
+    # Texts that changed since the action; one is enough to refuse the Undo.
+    blocked: list[FinalRestoreBlock]
+    # Final exports made since the action: they stay as they are and hold
+    # the results the action chose.
+    exports_since: int
 
 
 class FinalWarning(BaseModel):
@@ -429,7 +488,8 @@ def bulk_change_final(
     Applying sends that token: every listed text changes, or none (409
     ``PREVIEW_STALE`` with a fresh ``preview`` in the details when anything
     changed, also a final result changed meanwhile). Each text is audited
-    like a single change (``via: bulk_change_final``). There is no undo.
+    like a single change (``via: bulk_change_final``). An applied action
+    returns ``undo``; ``final-selections/bulk-change/undo`` takes its ``id``.
     """
     return _service(request, principal).change_finals(
         key,
@@ -438,6 +498,45 @@ def bulk_change_final(
         preview_token=body.preview_token,
         summary_only=body.summary_only,
     )
+
+
+@router.post(
+    "/final-selections/bulk-change/undo", response_model=BulkChangeFinalUndoView
+)
+def undo_bulk_change_final(
+    key: str,
+    body: BulkChangeFinalUndoRequest,
+    principal: PrincipalDep,
+    request: Request,
+) -> dict[str, Any]:
+    """Undo a bulk Change final… by the ``undo.id`` of its apply.
+
+    The server keeps the final result each text had; the request names only
+    that record. It works once, for the lead who applied the action, before
+    ``undo.expires_at`` (otherwise 409 ``BULK_UNDO_STALE`` with ``reason``
+    ``not_found``, ``already_undone`` or ``expired``). ``preview: true``
+    lists the final result each text would get back (``restores``) and the
+    texts that changed since the action, with the reason (``blocked``): the
+    final result, the text's versions, its plan row, a task of the text or
+    its submissions. Applying restores every text, or none: with a blocked
+    text it answers 409 ``BULK_UNDO_STALE`` (``reason`` ``changed``) with
+    that ``preview`` in the details. Final exports made since the action do
+    not block; they stay as they are and ``exports_since`` counts them. Each
+    text is audited like a single change (``via: bulk_change_final_undo``).
+    """
+    try:
+        return _service(request, principal).undo_change_finals(
+            key, body.undo_id, preview=body.preview
+        )
+    except DomainError as refusal:
+        details = refusal.details
+        if not isinstance(details, dict) or "preview" not in details:
+            raise
+        # The refused preview reads like the answer to ``preview: true``.
+        shown = BulkChangeFinalUndoView.model_validate(details["preview"])
+        raise DomainError(
+            refusal.code, details | {"preview": shown.model_dump(mode="json")}
+        ) from None
 
 
 @router.get("/workflow-warnings", response_model=FinalPreflight)

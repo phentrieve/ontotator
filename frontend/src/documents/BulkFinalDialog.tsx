@@ -25,7 +25,8 @@ const STALE = "The texts changed since the preview. Check the new preview.";
  * then the consequences step with "I understand", then the action. Applying sends the preview's token: every listed
  * text changes or none; when the texts changed meanwhile the dialog shows the new preview. "Accept agreeing results…"
  * only takes texts without a final result; "Change final…" replaces existing final results by the rule "newest
- * submission". Neither has an Undo (the consequences step says how to go back). Below 700 px a full-screen sheet.
+ * submission"; the message after it offers Undo (`SelectionBar`). "Accept agreeing results…" has no Undo (its
+ * consequences step says how to go back). Below 700 px a full-screen sheet.
  */
 export function BulkFinalDialog({ projectKey, action, rows, onClose, onApplied }: BulkFinalDialogProps): JSX.Element {
   const ids = useId().replace(/:/g, "");

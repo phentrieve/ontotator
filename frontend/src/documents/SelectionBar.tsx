@@ -12,7 +12,8 @@
  * "Accept agreeing results…" (texts without a final result; issues 354, 339) and "Change final…" (the newest
  * submission replaces the final result; issue 336 step 2); an entry that does nothing for the selection stays in the
  * menu, unavailable, with its reason. The task actions open `BulkTaskDialog`; after one applies, the toast offers Undo
- * while the texts stay unchanged. The final actions open `BulkFinalDialog`; they have no Undo. "Start a round…"
+ * while the texts stay unchanged. The final actions open `BulkFinalDialog`; after "Change final…" the toast offers Undo
+ * too (the server restores every text's earlier final result, or none and says which text is in the way). "Start a round…"
  * (issue 336 step 3) gives the submitted annotations a new work round in `BulkTaskDialog`, also without Undo.
  * "Change mode…" (step 4) changes the annotation mode of the texts in `BulkModeDialog`; each text is restored in its card.
  * The bar floats at the bottom of the viewport over the content (`useFloatingBar`): its arrival never moves the
@@ -26,7 +27,7 @@ import { plural } from "../app/labels";
 import { Button, Checkbox, IconSortDown, InlineConfirm, InlineMessage, MenuButton, type ToastMessage } from "../ui";
 import { ACTION_LABELS, appliedText, unavailableReason, type BulkAction } from "./bulkActionModel";
 import { BulkFinalDialog } from "./BulkFinalDialog";
-import { finalAppliedText, finalUnavailableReason, FINAL_ACTION_LABELS, type FinalAction, type FinalPreview } from "./bulkFinalModel";
+import { finalAppliedText, finalUnavailableReason, finalUndoneText, finalUndoRefusal, FINAL_ACTION_LABELS, type FinalAction, type FinalPreview } from "./bulkFinalModel";
 import { BulkModeDialog } from "./BulkModeDialog";
 import { modeAppliedText, modeUnavailableReason, MODE_ACTION_LABEL } from "./bulkModeModel";
 import { BulkTaskDialog } from "./BulkTaskDialog";
@@ -278,12 +279,34 @@ export function SelectionBar({
     latest.current.onChanged();
   };
 
-  /** After a bulk action on final results: the message (no Undo), refetch, the selection stays. */
+  /** After a bulk action on final results: the message (with Undo after "Change final…"), refetch, the selection stays. */
   const finalApplied = (result: FinalPreview) => {
     setFinalAction(null);
     const message = finalAppliedText(result);
     latest.current.onAnnounce(message);
-    latest.current.showToast({ message });
+    const undoToken = result.action === "change" ? result.data.undo : null;
+    latest.current.showToast({
+      message,
+      ...(undoToken ? {
+        actionLabel: "Undo",
+        undo: true,
+        onAction: () => {
+          latest.current.onAnnounce("Saving…");
+          api.bulkChangeFinalUndo(projectKey, undoToken.id).then(view => {
+            const done = finalUndoneText(view);
+            latest.current.onAnnounce(done);
+            // The note on exports made meanwhile stays until dismissed.
+            latest.current.showToast({ message: done, ...(view.exports_since ? { persist: true } : {}) });
+            latest.current.onChanged();
+          }, (failure: unknown) => {
+            // All or nothing: the refusal names the first text that changed since.
+            const text = finalUndoRefusal(failure) ?? errorMessage(failure);
+            latest.current.onAnnounce(text);
+            latest.current.showToast({ message: text, persist: true });
+          });
+        },
+      } : {}),
+    });
     latest.current.onChanged();
   };
 

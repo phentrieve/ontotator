@@ -377,6 +377,21 @@ def clear_restored(conn: Connection, project_id: int, key: RowKey) -> None:
     )
 
 
+def set_restored(conn: Connection, project_id: int, key: RowKey, revision: int) -> None:
+    """Put the row's PLAN_RESTORED marker back; the plan revision stays as it
+    is. For the Undo of a bulk change of final results: the final result the
+    warning was about is the text's final result again."""
+    conn.execute(
+        update(WorkPlanFlagsRow)
+        .where(
+            WorkPlanFlagsRow.project_id == project_id,
+            WorkPlanFlagsRow.case_id == key.case_id,
+            WorkPlanFlagsRow.language == key.language,
+        )
+        .values(restored_revision=revision)
+    )
+
+
 def _bump(conn: Connection, project_id: int, case_ids: Iterable[str]) -> dict[str, int]:
     upsert = insert(WorkPlanRow).values(
         [
