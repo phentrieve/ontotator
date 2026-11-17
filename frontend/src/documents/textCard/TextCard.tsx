@@ -4,7 +4,7 @@
  * actions. History and Text details open inside the card with Back. ‹ › (J / K) step through the table
  * order; Esc and ✕ close it without changing the selection. Below 700 px it is a full-width sheet.
  */
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { DocumentRowView, NextStepView } from "../../api/client";
 import { plural } from "../../app/labels";
 import type { PanelStage, ProjectDocumentsQuery, Route } from "../../app/router";
@@ -16,7 +16,9 @@ import { LanguageTag } from "../../ui/LanguageTag";
 import { useShortcut } from "../../ui/shortcuts";
 import { StagePath } from "../../ui/StagePath";
 import { useMediaQuery } from "../../ui/useMediaQuery";
+import { BulkPauseDialog } from "../BulkPauseDialog";
 import { historyLines } from "../historyLines";
+import { leadPauseLine } from "../labels";
 import { leadSteps, stepLabel } from "../nextStepLabels";
 import { isActiveRow } from "../stageLabels";
 import { RouteLink, rowKeyOf } from "../RowCells";
@@ -115,14 +117,25 @@ function OtherLanguages({ row, rows, canManage, onOpenText, onChangePlan }: Pick
 }
 
 /** Banners above the path: open problem reports (with "Decide on report…") and findings flagged "guidelines unclear" (X5). Each is a notice with its title and a button row. */
-function Banners({ row, projectKey, query, reportRoute, onNavigate, steps }: Pick<TextCardProps, "row" | "projectKey" | "query" | "reportRoute" | "onNavigate"> & { steps: readonly CardStep[] }): JSX.Element | null {
+function Banners({ row, projectKey, query, reportRoute, onNavigate, steps, canManage, onChanged }: Pick<TextCardProps, "row" | "projectKey" | "query" | "reportRoute" | "onNavigate" | "canManage" | "onChanged"> & { steps: readonly CardStep[] }): JSX.Element | null {
   const id = useId();
+  const [releasing, setReleasing] = useState(false);
   const open = (row.problem_reports ?? []).filter(report => report.state === "open");
   const flagged = row.flagged_unclear ?? 0;
-  if (!open.length && flagged <= 0) return null;
+  const pause = row.lead_pause;
+  if (!open.length && flagged <= 0 && !pause) return null;
   const name = `${row.case_id} ${row.language}`;
   const roundId = row.flagged_round_id;
   return <div className="text-card-banners">
+    {/* Issue 464: who paused the text, when and why; "Release…" opens the bulk dialog for this text. */}
+    {pause && <div className="text-card-banner" role="group" aria-labelledby={`${id}-pause`}>
+      <p id={`${id}-pause`} className="text-card-banner-title">Paused by lead</p>
+      <p className="text-card-banner-text">{leadPauseLine(pause)}</p>
+      <p className="text-card-banner-text text-card-muted">Open tasks cannot be saved, also tasks assigned now. Submitted work and the final result are untouched.</p>
+      {canManage && <div className="text-card-actions"><Button size="sm" aria-label={`Release…, ${name}`} onClick={() => setReleasing(true)}>Release…</Button></div>}
+      {releasing && <BulkPauseDialog projectKey={projectKey} action="release" rows={[{ case_id: row.case_id, language: row.language }]}
+        onClose={() => setReleasing(false)} onApplied={() => { setReleasing(false); onChanged(); }} />}
+    </div>}
     {open.length > 0 && <div className="text-card-banner" role="group" aria-labelledby={`${id}-report`}>
       <p id={`${id}-report`} className="text-card-banner-title">{plural(open.length, "open problem report")}{open.length === 1 && `: ${open[0].title}`}</p>
       <div className="text-card-actions">

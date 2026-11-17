@@ -595,3 +595,120 @@ async def test_start_rounds_dry_run_confirm_and_stale_token(
     fake.on("POST", BULK_START_ROUND, refusal(409, "PREVIEW_STALE", {"preview": fresh}))
     stale = await call(mcp_client, "start_rounds", confirmed)
     assert stale["stale"] is True and stale["preview_token"] == "sha256:b"
+
+
+PAUSE_TEXTS = f"{P}/text-pauses/pause"
+RELEASE_TEXTS = f"{P}/text-pauses/release"
+
+
+def _pause(action: str, token: str, *, applied: bool = False) -> dict[str, Any]:
+    task = {
+        "assignment_id": 7,
+        "document_id": "c1-en",
+        "version": 1,
+        "task": "annotate",
+        "status": "in_progress",
+        "person": {"pseudonym": "ann-0001", "display_name": "Tom Reis"},
+        "paused_by_report": action == "release",
+    }
+    pause = {"reason": "Clinic is checking", "paused_by": None, "paused_at": "t"}
+    return {
+        "action": action,
+        "applied": applied,
+        "texts": 2,
+        "change_count": 1,
+        "skipped_count": 1,
+        "task_count": 1,
+        "still_paused_count": 1 if action == "release" else 0,
+        "changes": [
+            {
+                "case_id": "c1",
+                "language": "en",
+                "pause": pause if action == "release" else None,
+                "tasks": [task],
+            }
+        ],
+        "skipped": [
+            {
+                "case_id": "c2",
+                "language": "en",
+                "reason": "already_paused" if action == "pause" else "not_paused",
+                "message": "Already paused by a lead.",
+                "pause": None,
+            }
+        ],
+        "preview_token": token,
+    }
+
+
+async def test_pause_texts_dry_run_confirm_and_stale_token(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    """Issue 464: pause on the dry-run, then confirm pattern."""
+    texts = [{"case_id": "c1", "language": "en"}, {"case_id": "c2", "language": "en"}]
+    args = {"project": "p", "texts": texts, "reason": "Clinic is checking"}
+    fake.on("POST", PAUSE_TEXTS, _pause("pause", "sha256:a"))
+    dry = await call(mcp_client, "pause_texts", args)
+    assert dry["applied"] is False and dry["preview_token"] == "sha256:a"
+    assert dry["would_change"] == [
+        {
+            "case_id": "c1",
+            "language": "en",
+            "tasks_in_progress": 1,
+            "people": ["Tom Reis"],
+        }
+    ]
+    assert dry["skipped_texts"][0]["message"] == "Already paused by a lead."
+    [post] = fake.calls_to("POST", PAUSE_TEXTS)
+    assert post.json() == {
+        "rows": texts,
+        "reason": "Clinic is checking",
+        "preview": True,
+    }
+    # Not confirmed without the dry run's token.
+    with pytest.raises(ToolFailed):
+        await call(mcp_client, "pause_texts", args | {"confirm": True})
+    assert len(fake.calls_to("POST", PAUSE_TEXTS)) == 1
+    confirmed = args | {"confirm": True, "preview_token": "sha256:a"}
+    fake.on("POST", PAUSE_TEXTS, _pause("pause", "sha256:a", applied=True))
+    done = await call(mcp_client, "pause_texts", confirmed)
+    assert done["applied"] is True and done["changed"][0]["case_id"] == "c1"
+    assert fake.calls_to("POST", PAUSE_TEXTS)[-1].json() == {
+        "rows": texts,
+        "reason": "Clinic is checking",
+        "preview_token": "sha256:a",
+    }
+    fresh = _pause("pause", "sha256:b")
+    fake.on("POST", PAUSE_TEXTS, refusal(409, "PREVIEW_STALE", {"preview": fresh}))
+    stale = await call(mcp_client, "pause_texts", confirmed)
+    assert stale["stale"] is True and stale["preview_token"] == "sha256:b"
+
+
+async def test_release_texts_names_tasks_a_report_still_pauses(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    texts = [{"case_id": "c1", "language": "en"}]
+    fake.on("POST", RELEASE_TEXTS, _pause("release", "sha256:a"))
+    dry = await call(mcp_client, "release_texts", {"project": "p", "texts": texts})
+    assert dry["still_paused_by_report"] == 1
+    assert dry["would_change"][0] == {
+        "case_id": "c1",
+        "language": "en",
+        "tasks_in_progress": 1,
+        "people": ["Tom Reis"],
+        "paused_because": "Clinic is checking",
+        "still_paused_by_report": 1,
+    }
+    [post] = fake.calls_to("POST", RELEASE_TEXTS)
+    assert post.json() == {"rows": texts, "preview": True}
+    fake.on("POST", RELEASE_TEXTS, _pause("release", "sha256:a", applied=True))
+    done = await call(
+        mcp_client,
+        "release_texts",
+        {"project": "p", "texts": texts, "confirm": True, "preview_token": "sha256:a"},
+    )
+    assert done["applied"] is True
+    assert fake.calls_to("POST", RELEASE_TEXTS)[-1].json() == {
+        "rows": texts,
+        "preview_token": "sha256:a",
+    }

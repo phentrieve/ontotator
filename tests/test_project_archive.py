@@ -1109,3 +1109,52 @@ def test_a_text_keeps_its_own_annotations_per_text(
             .where(ProjectRow.project_key == scenario.key)
         ).one()
     assert setter == annotator
+
+
+def test_a_lead_pause_travels_with_the_archive(
+    servers: tuple[TestClient, TestClient], tmp_path: Path
+) -> None:
+    """Issue 464: a paused text is paused on the target as well, with the
+    reason, the time and the person who paused it mapped to their account;
+    its task in progress stays paused there."""
+    from datetime import UTC, datetime
+
+    from sqlalchemy import update
+
+    from ontotator.storage.plan_tables import TextSettingRow
+    from ontotator.storage.tables import AssignmentRow
+    from ontotator.storage.text_pause import paused_texts, task_held, write_pause
+
+    source, target = servers
+    scenario = _simple_project(source.app)  # type: ignore[arg-type]
+    at = datetime(2026, 11, 17, 9, 30, tzinfo=UTC)
+    with _db(source).transaction() as conn:
+        pid, user = conn.execute(
+            select(AssignmentRow.project_id, AssignmentRow.user_id)
+            .join(ProjectRow, ProjectRow.id == AssignmentRow.project_id)
+            .where(ProjectRow.project_key == scenario.key)
+        ).one()
+        write_pause(
+            conn, pid, CASE, "en", reason="Clinic is checking", actor_id=user, at=at
+        )
+        conn.execute(update(AssignmentRow).values(status="in_progress"))
+    data = _export(source, scenario.key, tmp_path)
+
+    result = project_archive.import_archive(_db(target), OPERATOR, data)
+
+    assert result["verification"]["ok"]
+    with _db(target).snapshot() as conn:
+        pid = conn.execute(
+            select(ProjectRow.id).where(ProjectRow.project_key == scenario.key)
+        ).scalar_one()
+        pauses = paused_texts(conn, pid)
+        pause = pauses[(CASE, "en")]
+        assert list(pauses) == [(CASE, "en")]
+        assert (pause.reason, pause.paused_at) == ("Clinic is checking", at)
+        annotator, held = conn.execute(
+            select(AssignmentRow.user_id, task_held()).where(
+                AssignmentRow.project_id == pid
+            )
+        ).one()
+        assert pause.paused_by == annotator and held is True
+        assert conn.execute(select(TextSettingRow.paused)).scalars().all() == [True]

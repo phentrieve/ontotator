@@ -5232,7 +5232,8 @@
                   "items": {
                     "enum": [
                       "guidelines_unclear",
-                      "over_limit"
+                      "over_limit",
+                      "lead_paused"
                     ],
                     "type": "string"
                   }
@@ -5832,7 +5833,8 @@
                   "items": {
                     "enum": [
                       "guidelines_unclear",
-                      "over_limit"
+                      "over_limit",
+                      "lead_paused"
                     ],
                     "type": "string"
                   }
@@ -7375,6 +7377,116 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/BulkModeChangeView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/text-pauses/pause": {
+      "post": {
+        "tags": [
+          "text-pauses"
+        ],
+        "summary": "Pause Texts",
+        "description": "Pause the work on many texts (issue 464).\n\nA paused text keeps its tasks: the people see them in My tasks, marked\n\"Paused by lead\" with the ``reason``, and can read them, but no task in\nprogress can be saved (409 ``TASK_HELD`` with ``causes: [\"lead\"]``):\nannotation, translation review and consolidation, on every version of\nthe text. A task assigned, reopened or given a new round later is paused\nfrom the start. Submitted work and final results are untouched and\nexported as before. The pause from a problem report is a separate cause\nand stays as it is.\n\n``preview: true`` lists the texts that would be paused with their tasks\nin progress, the texts skipped (already paused) and a ``preview_token``.\nApplying sends that token and a ``reason``: every listed text is paused,\nor none (409 ``PREVIEW_STALE`` with a fresh ``preview`` in the details\nwhen anything changed). Each text is audited (``text.pause``, ``via:\nbulk_pause_texts``). The way back is ``text-pauses/release``.",
+        "operationId": "pause_texts_api_v1_projects__key__text_pauses_pause_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextPauseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TextPauseActionView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/text-pauses/release": {
+      "post": {
+        "tags": [
+          "text-pauses"
+        ],
+        "summary": "Release Texts",
+        "description": "Release paused texts (issue 464).\n\nEnds the lead pause of the selected texts: their tasks in progress can\nbe saved again. A task that a problem report pauses as well stays paused\nuntil that report is decided (``paused_by_report``,\n``still_paused_count``); deciding a report never releases the lead\npause. Texts that are not paused are skipped. Preview and apply as\n``text-pauses/pause``; ``reason`` is optional. Each text is audited\n(``text.release``, ``via: bulk_release_texts``).",
+        "operationId": "release_texts_api_v1_projects__key__text_pauses_release_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextPauseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TextPauseActionView"
                 }
               }
             }
@@ -13710,6 +13822,28 @@
             ],
             "title": "Hold Reason"
           },
+          "pause_causes": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "report",
+                "lead"
+              ]
+            },
+            "type": "array",
+            "title": "Pause Causes"
+          },
+          "lead_pause_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead Pause Reason"
+          },
           "lead_correction": {
             "type": "boolean",
             "title": "Lead Correction",
@@ -14028,6 +14162,28 @@
               }
             ],
             "title": "Hold Reason"
+          },
+          "pause_causes": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "report",
+                "lead"
+              ]
+            },
+            "type": "array",
+            "title": "Pause Causes"
+          },
+          "lead_pause_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead Pause Reason"
           },
           "active_holds": {
             "items": {
@@ -15086,6 +15242,10 @@
           "person": {
             "$ref": "#/components/schemas/PersonRefView"
           },
+          "text_paused": {
+            "type": "boolean",
+            "title": "Text Paused"
+          },
           "reason": {
             "type": "string",
             "title": "Reason"
@@ -15817,6 +15977,10 @@
           },
           "person": {
             "$ref": "#/components/schemas/PersonRefView"
+          },
+          "text_paused": {
+            "type": "boolean",
+            "title": "Text Paused"
           }
         },
         "type": "object",
@@ -18435,7 +18599,8 @@
                 "type": "string",
                 "enum": [
                   "guidelines_unclear",
-                  "over_limit"
+                  "over_limit",
+                  "lead_paused"
                 ]
               },
               {
@@ -18443,7 +18608,8 @@
                   "type": "string",
                   "enum": [
                     "guidelines_unclear",
-                    "over_limit"
+                    "over_limit",
+                    "lead_paused"
                   ]
                 },
                 "type": "array"
@@ -18839,6 +19005,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/AnnotationsPerTextView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lead_pause": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LeadPauseView"
               },
               {
                 "type": "null"
@@ -22474,6 +22650,37 @@
         ],
         "title": "LeadCorrectionRequest"
       },
+      "LeadPauseView": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "paused_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonRefView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "paused_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Paused At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason",
+          "paused_at"
+        ],
+        "title": "LeadPauseView",
+        "description": "A lead paused the work on the text: its tasks in progress cannot be\nsaved, also tasks assigned later, until a lead releases the text.\nSubmitted work and final results are untouched."
+      },
       "LoginRequest": {
         "properties": {
           "username": {
@@ -24304,6 +24511,59 @@
         ],
         "title": "PauseCandidate"
       },
+      "PausedTaskView": {
+        "properties": {
+          "assignment_id": {
+            "type": "integer",
+            "title": "Assignment Id"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "task": {
+            "type": "string",
+            "enum": [
+              "annotate",
+              "review",
+              "translation_review"
+            ],
+            "title": "Task"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "in_progress",
+              "reopened"
+            ],
+            "title": "Status"
+          },
+          "person": {
+            "$ref": "#/components/schemas/PersonRefView"
+          },
+          "paused_by_report": {
+            "type": "boolean",
+            "title": "Paused By Report"
+          }
+        },
+        "type": "object",
+        "required": [
+          "assignment_id",
+          "document_id",
+          "version",
+          "task",
+          "status",
+          "person",
+          "paused_by_report"
+        ],
+        "title": "PausedTaskView",
+        "description": "A task in progress on the text: what a pause stops and a release opens."
+      },
       "PendingReanchorRef": {
         "properties": {
           "proposal_set_id": {
@@ -25698,6 +25958,10 @@
             "type": "boolean",
             "title": "Answered",
             "default": false
+          },
+          "text_paused_by_lead": {
+            "type": "boolean",
+            "title": "Text Paused By Lead"
           }
         },
         "additionalProperties": false,
@@ -30181,6 +30445,7 @@
                   "may_change",
                   "not_exported",
                   "carried_on_submit",
+                  "lead_pause",
                   "v2_not_annotated",
                   "no_target_proposals",
                   "correction",
@@ -31101,6 +31366,28 @@
               }
             ],
             "title": "Hold Reason"
+          },
+          "pause_causes": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "report",
+                "lead"
+              ]
+            },
+            "type": "array",
+            "title": "Pause Causes"
+          },
+          "lead_pause_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead Pause Reason"
           },
           "source_language": {
             "anyOf": [
@@ -32250,6 +32537,233 @@
           "entries"
         ],
         "title": "TextLayers"
+      },
+      "TextPauseActionView": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "pause",
+              "release"
+            ],
+            "title": "Action"
+          },
+          "applied": {
+            "type": "boolean",
+            "title": "Applied"
+          },
+          "texts": {
+            "type": "integer",
+            "title": "Texts"
+          },
+          "change_count": {
+            "type": "integer",
+            "title": "Change Count"
+          },
+          "skipped_count": {
+            "type": "integer",
+            "title": "Skipped Count"
+          },
+          "task_count": {
+            "type": "integer",
+            "title": "Task Count"
+          },
+          "still_paused_count": {
+            "type": "integer",
+            "title": "Still Paused Count"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/TextPauseChangeView"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/TextPauseSkippedView"
+            },
+            "type": "array",
+            "title": "Skipped"
+          },
+          "preview_token": {
+            "type": "string",
+            "title": "Preview Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action",
+          "applied",
+          "texts",
+          "change_count",
+          "skipped_count",
+          "task_count",
+          "still_paused_count",
+          "changes",
+          "skipped",
+          "preview_token"
+        ],
+        "title": "TextPauseActionView"
+      },
+      "TextPauseChangeView": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "pause": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TextPauseInfoView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/PausedTaskView"
+            },
+            "type": "array",
+            "title": "Tasks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "tasks"
+        ],
+        "title": "TextPauseChangeView"
+      },
+      "TextPauseInfoView": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "paused_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonRefView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "paused_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Paused At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason",
+          "paused_at"
+        ],
+        "title": "TextPauseInfoView"
+      },
+      "TextPauseRequest": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowRefView"
+            },
+            "type": "array",
+            "maxItems": 200000,
+            "minItems": 1,
+            "title": "Rows"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "preview": {
+            "type": "boolean",
+            "title": "Preview"
+          },
+          "summary_only": {
+            "type": "boolean",
+            "title": "Summary Only"
+          },
+          "preview_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Token"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rows"
+        ],
+        "title": "TextPauseRequest",
+        "description": "Pause or release the selected texts. ``reason`` is required to apply a\npause (the people see it in My tasks and in the task) and optional for a\nrelease."
+      },
+      "TextPauseSkippedView": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "already_paused",
+              "not_paused"
+            ],
+            "title": "Reason"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "pause": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TextPauseInfoView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "reason",
+          "message"
+        ],
+        "title": "TextPauseSkippedView"
       },
       "TextTypographyCounts": {
         "properties": {
@@ -34670,6 +35184,17 @@
           "held": {
             "type": "boolean",
             "title": "Held"
+          },
+          "pause_causes": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "report",
+                "lead"
+              ]
+            },
+            "type": "array",
+            "title": "Pause Causes"
           },
           "round_ordinal": {
             "anyOf": [

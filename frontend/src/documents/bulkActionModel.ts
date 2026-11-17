@@ -61,6 +61,7 @@ const KEEP: Readonly<Record<string, readonly [string, string]>> = {
   submitted: ["submitted task", "submitted work stays"],
   started: ["started task", "work has begun: tick “Also withdraw started tasks”"],
   paused: ["paused task", "paused by a problem report: decide the report first"],
+  paused_by_lead: ["paused task", "paused by a lead: release the text first"],
   within_limit: ["annotation", "within the limit of annotators per text"],
   lead_correction_task: ["lead correction", "remove it in the text card"],
   not_current_version: ["task", "not on the current version of the text: use the text card"],
@@ -117,8 +118,24 @@ export function applyLabel(action: BulkAction, tasks: number): string {
   return `${action === "reopen" ? "Reopen" : "Withdraw"} ${plural(tasks, "assignment")}`;
 }
 
+/**
+ * Issue 464: tasks reopened or given a round on a text a lead paused are paused from the start. Null when no changed
+ * task is on a paused text.
+ */
+export function pausedTextsLine(preview: BulkTaskActionView): string | null {
+  const paused = preview.changes.filter(item => item.text_paused);
+  if (!paused.length) return null;
+  const texts = textsOf(paused).length;
+  return `${plural(paused.length, "task")} ${paused.length === 1 ? "is" : "are"} on ${plural(texts, "text")} paused by a lead: ${paused.length === 1 ? "it stays" : "they stay"} paused, marked “Paused by lead” in My tasks, until you release the ${texts === 1 ? "text" : "texts"}.`;
+}
+
 /** The consequences step (step 2, as in the Work plan dialog): what the people notice. */
 export function consequenceLines(preview: BulkTaskActionView): string[] {
+  const paused = pausedTextsLine(preview);
+  return [...actionConsequences(preview), ...(paused ? [paused] : [])];
+}
+
+function actionConsequences(preview: BulkTaskActionView): string[] {
   const people = new Set(preview.changes.map(item => item.person.pseudonym)).size;
   const who = plural(people, "person", "people");
   if (preview.action === "start_round") {

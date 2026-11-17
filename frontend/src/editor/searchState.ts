@@ -1,4 +1,5 @@
-import type { ApiClient, SearchCandidate, SearchRequest } from "../api/client";
+import { errorMessage } from "../admin/errors";
+import { ApiError, type ApiClient, type SearchCandidate, type SearchRequest } from "../api/client";
 import type { components } from "../api/generated";
 
 export type WorkspaceKey = components["schemas"]["WorkspaceKey"];
@@ -20,12 +21,20 @@ export interface SearchState {
   candidates: SearchCandidate[];
   isLoading: boolean;
   error: string | null;
+  /**
+   * The search was refused because the task is paused (a problem report, or the lead paused the text, issue 464): the
+   * words for the person. The pause may have landed while the editor was open; Retry cannot help.
+   */
+  pausedMessage?: string | null;
   requestId: number;
 }
 
 export type SearchListener = (state: SearchState) => void;
 
 export class SearchManager {
+  /** Called when a search is refused because the task is paused: the editor reloads the task's state. */
+  onTaskHeld?: () => void;
+
   private state: SearchState = {
     searchId: null,
     query: "",
@@ -183,11 +192,14 @@ export class SearchManager {
         this.currentLayerId === targetLayerId
       ) {
         const message = err instanceof Error ? err.message : String(err);
+        const paused = err instanceof ApiError && err.code === "TASK_HELD";
         this.updateState({
           candidates: [],
           isLoading: false,
           error: message,
+          pausedMessage: paused ? errorMessage(err) : null,
         });
+        if (paused) this.onTaskHeld?.();
       }
       return [];
     }

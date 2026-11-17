@@ -36,7 +36,8 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
     await bar.getByRole("button", { name: "More actions" }).click();
     let menu = page.getByRole("menu", { name: "More actions" });
     const entry = menu.getByRole("menuitem", { name: /^Change mode…/ });
-    await expect(menu.getByRole("menuitem").last()).toHaveText("Change mode…");
+    // "Pause texts…" and "Release texts…" (issue 464) follow it.
+    await expect(menu.getByRole("menuitem").nth(5)).toHaveText("Change mode…");
     await expect(entry).not.toHaveAttribute("aria-disabled", "true");
     expect(await noHorizontalScroll(page)).toBe(true);
     await shot(page, `336-mode-menu-after${suffix}`);

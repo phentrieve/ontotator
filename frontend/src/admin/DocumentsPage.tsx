@@ -572,7 +572,7 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
     const caseIds = [...selection.cases];
     if (!caseIds.length) return;
     setAssignDialog({
-      mode: "cases", projectKey, caseIds, sort: batchSort(request.sort), filters, me: assignMe,
+      mode: "cases", projectKey, caseIds, rows: selectedRows, sort: batchSort(request.sort), filters, me: assignMe,
       onClose: () => setAssignDialog(null),
       onLimitChanged: () => { void refreshAll(); },
       onAssigned: (message, skipped) => {
