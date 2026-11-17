@@ -38,6 +38,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Translation review: after **Retry corrected version metadata** succeeded, the error of the failed attempt stayed on the screen beside *A corrected version v2 was created.*; it now disappears (#170).
 - Navigation: an address that changed between the first display of the app after logging in and the moment the app starts following the address was written back to the page first shown, so the page stayed on My tasks. The app now reads the address again when it starts following it (#380). Browser specs that logged in on their own now use the shared log-in helper, which waits for that moment.
 - Tests: browser specs cover the project settings forms (General, Prefilled values, Values annotators can choose, the Workflow cards, Remove… and the revoke dialog of People), Administration › Users (Edit, the administrator role, Reset code, Deactivate…, Activate, History, Anonymise…), the retry paths of the translation review (**Reload source updates**, **Retry corrected version metadata**) and a move to a newer ontology release with the rewritten draft terms (#170).
 - Consolidation: after **Reopen all decisions…** the first open group in text order opens, not the group that was first open before the reopen (#375).

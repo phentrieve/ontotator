@@ -493,7 +493,9 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   const reload = async () => { if (await guard() && alive.current) onReload(); };
   const loadCreated = async (value: TranslationReviewRecord) => {
     if (!value.created_variant_id) return;
-    try { const variant = await api.getVariantMetadata(workspace.assignment.project_key, value.created_variant_id); if (alive.current) setCreatedVersion(variant.version); }
+    // A retry that passes also takes the failed attempt's error away.
+    try { const variant = await api.getVariantMetadata(workspace.assignment.project_key, value.created_variant_id);
+      if (alive.current) { setCreatedVersion(variant.version); setError(null); } }
     catch (failure) { if (alive.current) setError(failure); }
   };
   /** After a successful submit: a fresh My tasks list, so a task assigned meanwhile counts. */

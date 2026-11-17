@@ -89,6 +89,7 @@ test("Retry corrected version metadata: the submitted correction names its new v
   await expect(review.getByText("Review submitted", { exact: true })).toBeVisible();
   await expect(page.getByText(/^A corrected version v\d+ was created\.$/)).toHaveCount(0);
   expect(refused).toBe(1);
+  await expect(review.getByRole("alert")).toBeVisible();
   await expect(translation(page)).toHaveAttribute("readonly", "");
 
   // A retry that fails again keeps the button; one that passes names the version and removes it.
@@ -100,5 +101,7 @@ test("Retry corrected version metadata: the submitted correction names its new v
   await retry.click();
   await expect(page.getByText("A corrected version v2 was created.", { exact: true })).toBeVisible();
   await expect(retry).toHaveCount(0);
+  // The error of the failed attempts goes with it.
+  await expect(review.getByRole("alert")).toHaveCount(0);
   expect(refused).toBe(2);
 });
