@@ -18,8 +18,9 @@ export async function openTasksHome(page: Page) {
 /**
  * The app shell follows the address only once its effects have run: they stamp the history entry with
  * `ontotatorRouteIndex` (src/App.tsx) and start listening to `hashchange`. The shell is visible a moment
- * earlier. A `goto("/#/…")` in that moment is lost, because the stamp writes the address the shell was
- * rendered with back over it: the page stays on My tasks. Nobody types an address that fast; a test does.
+ * earlier. Until issue 380 a `goto("/#/…")` in that moment was lost (the stamp wrote the address the shell
+ * was rendered with back over it); the app now reads the address again there. Waiting for the stamp still
+ * gives every spec the same starting point: a router that is listening.
  */
 export async function routerReady(page: Page) {
   await page.waitForFunction(() => typeof window.history.state?.ontotatorRouteIndex === "number");
@@ -31,22 +32,39 @@ export const TEST_PASSWORD = "browser test passphrase";
 /** The username of a test user: the pseudonym, lower-cased, other characters as "-". */
 export const usernameFor = (pseudonym: string) => pseudonym.toLowerCase().replace(/[^a-z0-9._-]/g, "-");
 
-/** Log in an already provisioned ordinary account without adding any roles/work. */
-export async function loginExisting(page: Page, username: string) {
-  await openTasksHome(page);
+/**
+ * The one log-in through the login screen every helper and spec uses. ``shown`` is what the shell
+ * shows for the user (display name or pseudonym). By default the log-in starts on My tasks "All".
+ * With ``landing`` it starts at "#/", so the landing (F8) applies; ``lastProject`` also remembers that
+ * project as last used first. The caller then waits for the page the landing opens. Returns once the router follows the address
+ * (``routerReady``), so a ``goto("/#/…")`` right after it is never lost.
+ */
+export async function loginThroughForm(page: Page, username: string, shown?: string, options: { lastProject?: string; landing?: boolean } = {}) {
+  const lastProject = options.lastProject;
+  if (lastProject === undefined && !options.landing) await openTasksHome(page);
+  else {
+    await page.goto(LAUNCH_URL);
+    if (lastProject !== undefined) await page.evaluate(([key, value]) => window.localStorage.setItem(key, value), [`ontotator.lastProject.v1:${username}`, lastProject]);
+  }
   const form = page.getByRole("form", { name: "Log in to Ontotator" });
   await form.getByLabel("Username", { exact: true }).fill(username);
   await form.getByLabel("Password", { exact: true }).fill(TEST_PASSWORD);
   await form.getByRole("button", { name: "Log in", exact: true }).click();
+  if (shown === undefined) await expect(page.getByTestId("current-user")).toBeVisible();
+  else await expect(page.getByTestId("current-user")).toContainText(shown);
+  await routerReady(page);
+}
+
+/** Log in an already provisioned ordinary account without adding any roles/work. */
+export async function loginExisting(page: Page, username: string) {
+  await loginThroughForm(page, username);
   // The shell shows "Display name (pseudonym)", never the username (D1); the
   // session itself must belong to ``username``.
-  await expect(page.getByTestId("current-user")).toBeVisible();
   const me = await page.request.get("/api/v1/auth/me");
   expect(me.ok()).toBeTruthy();
   const identity = await me.json() as { username: string; pseudonym: string };
   expect(identity.username).toBe(username);
   await expect(page.getByTestId("current-user")).toContainText(identity.pseudonym);
-  await routerReady(page);
 }
 
 /** Current page cookies and freshly read CSRF token; never a second actor context. */
@@ -71,13 +89,7 @@ export async function loginAs(page: Page, pseudonym: string, projects: string[] 
   if (options.proposals) query.set("proposals", "true");
   const created = await page.request.post(`/__test_user__?${query.toString()}`);
   expect(created.ok()).toBeTruthy();
-  await openTasksHome(page);
-  const form = page.getByRole("form", { name: "Log in to Ontotator" });
-  await form.getByLabel("Username").fill(username);
-  await form.getByLabel("Password").fill(TEST_PASSWORD);
-  await form.getByRole("button", { name: "Log in", exact: true }).click();
-  await expect(page.getByTestId("current-user")).toContainText(pseudonym);
-  await routerReady(page);
+  await loginThroughForm(page, username, pseudonym);
 }
 
 /** Open an actual assigned task, retaining the server's row order. */

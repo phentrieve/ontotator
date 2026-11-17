@@ -10,7 +10,7 @@ import { resolve } from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { documentsReady, documentsTab, rowBox, textCard, textName, textNamePattern, textRow } from "./documentsHelpers";
-import { TEST_PASSWORD } from "./helpers";
+import { loginThroughForm } from "./helpers";
 import { leadScenario, type LeadScenario } from "./leadWorkflowHelpers";
 
 test.setTimeout(180_000);
@@ -29,13 +29,7 @@ async function evidence(page: Page, name: string, part?: Locator) {
 /** Build ``ROWS`` and log in as its lead, who used the project last: the landing (F8) opens its Documents. */
 async function openRows(page: Page): Promise<LeadScenario> {
   const s = await leadScenario(page, "ROWS");
-  await page.goto("/");
-  await page.evaluate(([key, value]) => window.localStorage.setItem(key, value), [`ontotator.lastProject.v1:${s.users.lead}`, s.project]);
-  const form = page.getByRole("form", { name: "Log in to Ontotator" });
-  await form.getByLabel("Username", { exact: true }).fill(s.users.lead);
-  await form.getByLabel("Password", { exact: true }).fill(TEST_PASSWORD);
-  await form.getByRole("button", { name: "Log in", exact: true }).click();
-  await expect(page.getByTestId("current-user")).toContainText(s.display_names.lead);
+  await loginThroughForm(page, s.users.lead, s.display_names.lead, { lastProject: s.project });
   await expect(page).toHaveURL(new RegExp(`#/projects/${esc(s.project)}/documents`));
   await documentsReady(page);
   // The landing opens "Needs your decision" (VD7); these checks use every row (All).
