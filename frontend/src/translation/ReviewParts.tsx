@@ -3,7 +3,7 @@ import type { TranslationReviewRecord } from "../api/client";
 import { personLabel } from "../app/identity";
 import { submissionGuidelineLabel } from "../guidelines/submissionLabel";
 import { Button, IconCheck, IconChevronRight, IconWarning, StatusBadge, EmptyValue } from "../ui";
-import { allChecksLine, calmCheckText, earlierChecksText, categoryLabels, checkBandText, checkDeviationGuidance, checkExplanation, checkLabel, checkNoLocation, decisionConsequences, decisionLabels, formatReviewDate, translationStatusLabel } from "./labels";
+import { allChecksLine, calmCheckText, earlierChecksText, sourceUpdatesOpenText, sourceUpdatesOpenTitle, categoryLabels, checkBandText, checkDeviationGuidance, checkExplanation, checkLabel, checkNoLocation, decisionConsequences, decisionLabels, formatReviewDate, translationStatusLabel } from "./labels";
 import type { ClinicalCategory, ReviewDecisionCode } from "./reviewRules";
 
 type CheckRow = { code: string; passed: boolean; detail: string | null };
@@ -99,14 +99,20 @@ const excerpt = (text: string, limit = 160) => {
 };
 
 /** Body of the submit confirmation: what is decided and what follows. */
-export function SubmitSummary({ decision, clinical, categories, rationale, failedChecks = [], consequence }: {
+export function SubmitSummary({ decision, clinical, categories, rationale, failedChecks = [], consequence, sourceUpdates }: {
   decision: ReviewDecisionCode; clinical: boolean; categories: readonly ClinicalCategory[]; rationale: string | null | undefined;
   /** Failed automatic checks of an accepted translation (R-12). */
   failedChecks?: readonly string[];
   /** Replaces `decisionConsequences` (a lead correction of an accepted version, issue 341 b). */
   consequence?: string;
+  /** Source updates this submit would leave unreviewed, with the way to the source update dialog. */
+  sourceUpdates?: { count: number; onReview: () => void };
 }): JSX.Element {
   return <div className="review-confirm">
+    {sourceUpdates && <div className="review-confirm-source-update" role="alert">
+      <p><strong>{sourceUpdatesOpenTitle(sourceUpdates.count)}</strong> {sourceUpdatesOpenText}</p>
+      <Button size="sm" onClick={sourceUpdates.onReview}>Review source update</Button>
+    </div>}
     {failedChecks.length > 0 && <p><strong>{checkBandText(failedChecks)}.</strong></p>}
     <dl className="review-summary-list">
       <div><dt>Decision</dt><dd>{decisionLabels[decision]}</dd></div>

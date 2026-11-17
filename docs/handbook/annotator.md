@@ -453,7 +453,16 @@ The task shows the version you were given, not the first one:
 - **Compare** shows what changed since the version before. Click **Compare** (with several texts to compare, choose *The previous version (v1)*): the third column, *Changes from v1 to v2*, shows this version with the removed passages struck through and the added ones underlined. **Close** hides it again.
 - The automatic checks ran on the first version only. The band says so, for example *The automatic checks ran on v1, not on this version (v2). 1 automatic check failed on v1: Units added in translation.* **Details** lists the checks of v1. A check that failed on v1 is not counted in **My tasks** for this task, and **Accepted unchanged** needs no rationale because of it. Check yourself whether the passage is right in this version.
 
-If the source text was updated, **Source updates to review** appears. Open it, compare **Original source** and **Updated source**, and click **Submit review and resolve source update**.
+#### Review a source update
+
+If the source text was updated after the translation was made, **Source updates to review** appears above **Decision**. The **Source** column of the task still shows the original source.
+
+1. Choose **Accepted unchanged** or, after correcting the translation, **Accepted with corrections**, and fill in what the decision needs.
+2. Under **Source updates to review**, click **Review source update**.
+3. Compare **Original source** and **Updated source** with **Current translation**. In the updated source, added text is underlined and removed text is struck through.
+4. Click **Submit review and resolve source update**. This submits your review and resolves the source update.
+
+**Submit review…** alone does not resolve a source update. If you use it with an accepting decision while one is open, the confirmation says so, for example *1 source update is not reviewed.*, and offers **Review source update**, which opens the comparison. **Submit without the source update** accepts the translation against the original source and leaves the update open: the submitted review can then no longer resolve it, and the lead has to assign another review.
 
 ![A translation review: the source on the left, the translation on the right, the failed automatic check above them. On the right, Query is chosen with the category Number or unit and a rationale, above Submit review…](images/annotator-translation-review.png)
 

@@ -7,7 +7,7 @@
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { authenticatedRequest, TASKS_HOME } from "./helpers";
+import { authenticatedRequest, loginThroughForm, TASKS_HOME } from "./helpers";
 import { loginScenarioUser, reviewFlowScenario, type ReviewFlowScenario } from "./reviewFlowHelpers";
 
 test.setTimeout(180_000);
@@ -182,6 +182,52 @@ for (const [name, viewport] of sizes) {
     await leadReason(page).scrollIntoViewIfNeeded();
     await noPageScroll(page);
     await shot(page, `f2-reopened-${name}`);
+    expect(errors).toEqual([]);
+  });
+}
+
+for (const [name, viewport] of sizes) {
+  test(`an open source update is named when the review is submitted, and its dialog marks the differences (${name})`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const errors = watchErrors(page);
+    const response = await page.request.post("/__test_translation_review__?assignment=target&source_update=true");
+    expect(response.ok()).toBeTruthy();
+    const s = await response.json() as { users: { reviewer: string }; assignment_id: number };
+    await loginThroughForm(page, s.users.reviewer);
+    await page.goto(`/#/tasks/${s.assignment_id}`);
+    await expect(target(page)).toBeVisible();
+    const updates = page.getByRole("region", { name: "Source updates to review", exact: true });
+    await expect(updates.getByRole("button", { name: /^Review source update to / })).toBeVisible();
+    await page.getByRole("radio", { name: "Accepted unchanged", exact: true }).check();
+    await expect(page.locator(".translation-save-status")).toHaveText("Saved");
+    // The ordinary submit names the open source update and leads to it; it is no longer the focused default.
+    await page.getByRole("button", { name: "Submit review…", exact: true }).click();
+    const confirm = page.getByRole("dialog", { name: "Submit this review?", exact: true });
+    const warning = confirm.getByRole("alert");
+    await expect(warning).toContainText("1 source update is not reviewed.");
+    await expect(warning).toContainText("leaves the update open");
+    await expect(confirm.getByRole("button", { name: "Submit without the source update", exact: true })).not.toBeFocused();
+    await noPageScroll(page);
+    await shot(page, `f3-submit-dialog-${name}`);
+    await warning.getByRole("button", { name: "Review source update", exact: true }).click();
+    await expect(confirm).toHaveCount(0);
+    const dialog = page.getByRole("dialog", { name: "Review source update", exact: true });
+    await expect(dialog).toBeVisible();
+    // The updated source marks what the update added with the review's word diff.
+    const updated = dialog.getByRole("region", { name: "Updated source", exact: true });
+    await expect(updated.locator("ins")).toContainText(["Updated source: additional clinical detail."]);
+    await expect(dialog).toContainText("In the updated source, added text is underlined and removed text is struck through.");
+    await updated.locator("ins").first().scrollIntoViewIfNeeded();
+    await noPageScroll(page);
+    await shot(page, `f3-source-update-dialog-${name}`);
+    await dialog.getByRole("button", { name: "Submit review and resolve source update", exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    // The submit leaves the task (next task or My tasks); then look at the submitted review.
+    await page.waitForURL(url => !url.hash.endsWith(`/tasks/${s.assignment_id}`));
+    // Resolved with this review: nothing is left that "cannot be resolved" afterwards.
+    await page.goto(`/#/tasks/${s.assignment_id}`);
+    await expect(page.getByText("Submitted review", { exact: true })).toBeVisible();
+    await expect(page.getByText("This submitted review cannot resolve another source update.", { exact: false })).toHaveCount(0);
     expect(errors).toEqual([]);
   });
 }

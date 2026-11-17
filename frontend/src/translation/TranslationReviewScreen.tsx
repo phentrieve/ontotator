@@ -162,6 +162,9 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   const nextTaskButton = useRef<HTMLButtonElement | null>(null);
   const [serverIssues, setServerIssues] = useState<string[]>([]);
   const [showChanges, setShowChanges] = useState(false), [confirming, setConfirming] = useState(false);
+  /** Source updates of this translation that are not reviewed; the ordinary submit names them (it does not resolve one). */
+  const [pendingSourceUpdates, setPendingSourceUpdates] = useState(0);
+  const openSourceUpdate = useRef<(() => void) | null>(null);
   const decisionHeading = useRef<HTMLHeadingElement | null>(null), submitReason = useRef<HTMLDivElement | null>(null);
   const screenRoot = useRef<HTMLElement | null>(null), submitControl = useRef<HTMLButtonElement | null>(null);
   const detailsRef = useRef<HTMLDetailsElement | null>(null), detailsSummary = useRef<HTMLElement | null>(null);
@@ -689,6 +692,8 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   const navigateLink = (route: Route, label: ReactNode, className?: string) => <a className={className} href={routeHref(route)} onClick={event => { if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); props.onNavigate(route); }}>{label}</a>;
   const paneNames: Record<string, string> = { source: "Source", target: "Translation", comparison: "Comparison" };
   const reasonShown = submitBlocker !== null || issues.length > 0;
+  /** An accepting review would leave a source update open: the confirmation says so and leads to it. */
+  const sourceUpdateOpen = pendingSourceUpdates > 0 && !!form && (form.decision === "accepted_unchanged" || form.decision === "accepted_corrected");
   /** Reason, key hint and Submit: in the rail footer when wide, in the pinned bar otherwise; one of each in the DOM. */
   const listedIssues = issues.length > 0 && !busy;
   /** Pinned bar: one line (first issue or blocker, "and n more"); the full list then stays in the decision form. */
@@ -837,7 +842,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
           <LeadReason task={{ ...workspace, status: record ? "submitted" : workspace.assignment.status }} />
           <SourceObligationReview assignmentId={props.assignmentId} username={props.username} documentId={workspace.variant.document_id}
             translationText={text} canResolve={canSubmit && !!form && ['accepted_unchanged', 'accepted_corrected'].includes(form.decision)}
-            busy={busy} readOnly={readOnly} error={error} onResolve={submit} />
+            busy={busy} readOnly={readOnly} error={error} onResolve={submit} onPending={setPendingSourceUpdates} openRef={openSourceUpdate} />
           {submitted && <InlineMessage tone="success" title="Review submitted"><p>{correctsAccepted && submitted.decision === "accepted_corrected" ? acceptedCorrection.outcome : decisionOutcomes[submitted.decision]}</p>
             {createdVersion !== null && <p>A corrected version v{createdVersion} was created.</p>}
             {submitted.created_variant_id && createdVersion === null && <Button size="sm" onClick={() => { void loadCreated(submitted); }}>Retry corrected version metadata</Button>}</InlineMessage>}
@@ -900,8 +905,8 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
       {submitReasonElement}
       {submitButton}
     </div>}
-    {form && <ConfirmDialog focusConfirm open={confirming} title="Submit this review?" confirmLabel="Submit review" cancelLabel="Keep editing" busy={busy}
-      message={<SubmitSummary decision={form.decision} clinical={form.clinical_change} categories={form.categories ?? []} rationale={form.rationale}
+    {form && <ConfirmDialog focusConfirm={!sourceUpdateOpen} open={confirming} title="Submit this review?" confirmLabel={sourceUpdateOpen ? "Submit without the source update" : "Submit review"} cancelLabel="Keep editing" busy={busy}
+      message={<SubmitSummary sourceUpdates={sourceUpdateOpen ? { count: pendingSourceUpdates, onReview: () => { setConfirming(false); openSourceUpdate.current?.(); } } : undefined} decision={form.decision} clinical={form.clinical_change} categories={form.categories ?? []} rationale={form.rationale}
         failedChecks={form.decision === "accepted_unchanged" ? workspace.failed_checks.map(check => check.code) : []}
         consequence={!correctsAccepted ? decisionConsequence(form.decision, workspace.variant) : versionAccepted ? acceptedCorrection.consequence : acceptedCorrection.consequenceNotAccepted} />}
       onCancel={() => setConfirming(false)} onConfirm={() => { void submit(); }} />}

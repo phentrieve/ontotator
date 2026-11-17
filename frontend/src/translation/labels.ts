@@ -195,6 +195,12 @@ export function earlierChecksText(checked: number, version: number, failedCodes:
   return `${start} ${failed}.`;
 }
 
+/** "Submit this review?" while a source update of the translation is open: the ordinary submit does not resolve it. */
+export function sourceUpdatesOpenTitle(count: number): string {
+  return count === 1 ? "1 source update is not reviewed." : `${count} source updates are not reviewed.`;
+}
+export const sourceUpdatesOpenText = "The source text was updated after this translation was made. Submitting here accepts the translation against the original source and leaves the update open; this review can then no longer resolve it, and the lead has to assign another review. To check the translation against the updated source with this review, click Review source update.";
+
 /** What the reviewer's text is compared with: the first version of a machine translation, else the version they were given. */
 export function baselineName(variant: { origin: string }): string {
   return variant.origin === "machine_translation" ? "the machine translation" : "the version you were given";
