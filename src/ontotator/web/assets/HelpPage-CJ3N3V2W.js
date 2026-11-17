@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-YuXV4H14.js";import{n as a,t as o}from"./lib-BZbEZxEn.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-DdQyR4P5.js";import{n as a,t as o}from"./lib-8rnNhxET.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -1252,7 +1252,7 @@ You assigned a translation review to someone who already reviewed this version, 
 
 ### An editorial correction was refused
 
-The correction would change a number, is larger than the cap (5 % of the text, at least 20 and at most 200 characters), or the version cannot be corrected any more: a newer version arrived, a translation review of it is open, it was rejected or queried, or it was discarded. The answer names the reason. A change of content belongs in a translation review. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
+The version cannot be corrected any more: a newer version arrived, a translation review of it is open, or it was discarded. Or the text is the same as before. The answer names the reason. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
 
 ### A task is still paused after I closed the report
 
@@ -2484,13 +2484,15 @@ What happens to work on the corrected version:
 - Annotations that were opened or submitted, open consolidations and a final result stay on the corrected version. Handle them with **Handle text change…** and *Carry to v3…* ([Handle a text change for open annotation work](#handle-a-text-change-for-open-annotation-work)).
 - Tool proposals are carried to the new text; a proposal whose marked words were changed waits for a check, as after a corrected translation review.
 
+The answer says how many characters changed. When a number changes, it names the numbers, for example 15 → 50, so that you can check them; nothing is refused for it.
+
 An editorial correction is refused in these cases:
 
-- A number would change. The digits of the text must stay the same, in the same order; a space next to a number may change.
-- The change is too large: inserted and deleted characters together may be at most 5 % of the text, but at least 20 and at most 200 characters. A larger change belongs in a translation review ([Correct a translation yourself](#correct-a-translation-yourself)).
 - A translation review of the version is open, the version is not the newest of its translation or it was discarded.
-- The newest version was rejected or queried. Resolve that first ([Resolve a rejected or queried translation](#resolve-a-rejected-or-queried-translation)).
+- The text is unchanged.
 - The text is a source text. A corrected source text comes in as an Ontospan bundle.
+
+A version that was rejected or queried can be corrected as well. The new version is rejected or queried like the one it corrects, and you resolve it as before ([Resolve a rejected or queried translation](#resolve-a-rejected-or-queried-translation)).
 
 ### Handle a text change for open annotation work
 
