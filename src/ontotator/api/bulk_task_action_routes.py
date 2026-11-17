@@ -141,6 +141,9 @@ class BulkTaskActionView(BaseModel):
     applied: bool
     # Selected texts found.
     texts: int
+    # Selected texts the project does not have (another spelling, letter
+    # case or language), as they were sent; also with ``summary_only``.
+    unknown_rows: list[RowRefView] = Field(default_factory=list)
     # Counts of the three lists below; the lists are empty with
     # ``summary_only``.
     change_count: int
@@ -160,10 +163,45 @@ class BulkUndoRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     # ``undo.id`` of the apply.
     undo_id: int = Field(ge=1)
+    # True: only list the tasks the Undo would bring back and what blocks it.
+    preview: bool = Field(default_factory=lambda: False)
+
+
+class BulkUndoTaskView(BaseModel):
+    case_id: str
+    language: str
+    assignment_id: int
+    document_id: str
+    task: Task
+    # The task's status now: in a preview before the Undo, else after it.
+    status: Literal["open", "in_progress", "submitted", "reopened"]
+    person: PersonRefView
+
+
+class BulkUndoBlock(BaseModel):
+    # What stands in the way: the texts changed since the action
+    # (``changed``), a text no longer plans the task or its version was
+    # discarded (``not_in_plan``), a person left (``person_unavailable``).
+    reason: Literal["changed", "not_in_plan", "person_unavailable"]
+    message: str
 
 
 class BulkUndoResult(BaseModel):
+    # Tasks brought back; 0 in a preview.
     undone: int
+    # False: a preview; True: every task in ``tasks`` is back.
+    applied: bool = Field(default_factory=lambda: True)
+    undo_id: int | None = None
+    # The action undone: ``reopen`` (the tasks are submitted again) or
+    # ``withdraw`` (the tasks come back with their drafts).
+    action: Literal["reopen", "withdraw"] | None = None
+    expires_at: datetime | None = None
+    # Tasks the action changed, and those of them that still exist.
+    task_count: int = Field(default_factory=lambda: 0)
+    tasks: list[BulkUndoTaskView] = Field(default_factory=list)
+    # A preview only: why the Undo cannot run now; null when it can.
+    # Applying then answers 409 ``BULK_UNDO_STALE`` with this ``reason``.
+    blocked: BulkUndoBlock | None = None
 
 
 def _service(request: Request, key: str, principal: Any) -> BulkTaskActionService:
@@ -188,7 +226,8 @@ def bulk_reopen(
     """Reopen the submitted tasks of many texts (issue 336).
 
     ``preview: true`` lists the tasks that would be reopened, the tasks kept
-    and why, the texts skipped (a final result is chosen) and a
+    and why, the texts skipped (a final result is chosen), the selected
+    texts the project does not have (``unknown_rows``) and a
     ``preview_token``. Applying sends that token and a ``reason``: every
     listed task is reopened, or none (409 ``PREVIEW_STALE`` with a fresh
     ``preview`` in the details when anything changed). Each task is audited
@@ -274,5 +313,11 @@ def bulk_undo(
     versions); otherwise 409 ``BULK_UNDO_STALE`` and nothing is undone.
     Reopened tasks are submitted again; withdrawn tasks come back with their
     drafts. An action that reopened a translation review has no Undo.
+    ``preview: true`` changes nothing: it lists the tasks the Undo would
+    bring back (``tasks``) and, in ``blocked``, why it cannot run now
+    (``changed``, ``not_in_plan``, ``person_unavailable``); a record that is
+    unknown, expired or already undone is refused in a preview too.
     """
-    return _service(request, key, principal).undo(key, body.undo_id)
+    return _service(request, key, principal).undo(
+        key, body.undo_id, preview=body.preview
+    )

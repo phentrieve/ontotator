@@ -148,6 +148,9 @@ class BulkModeChangeView(BaseModel):
     applied: bool
     # Selected texts found.
     texts: int
+    # Selected texts the project does not have (another spelling, letter
+    # case or language), as they were sent; also with ``summary_only``.
+    unknown_rows: list[RowRefView] = Field(default_factory=list)
     change_count: int
     skipped_count: int
     skipped_by_reason: dict[str, int]
@@ -234,7 +237,8 @@ def bulk_change_mode(
     assignments are revoked and the mode is stored. ``preview: true`` lists,
     per text, the submissions and assignments with their people, the texts
     left as they are with the reason (the single change's refusals; a text
-    with a final result: withdraw it first) and a ``preview_token``. Applying
+    with a final result: withdraw it first), the selected texts the project
+    does not have (``unknown_rows``) and a ``preview_token``. Applying
     sends that token and a ``reason``: every listed text changes, or none
     (409 ``PREVIEW_STALE`` with a fresh ``preview`` in the details when
     anything changed). Each text is audited like a single change

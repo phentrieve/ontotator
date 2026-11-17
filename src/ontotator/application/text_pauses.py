@@ -146,6 +146,7 @@ class TextPauseService:
         caller's lock; the number of queries does not grow with the texts."""
         found, assignments = self._frame._rows(conn, pid, rows, lock=False)
         paused = paused_texts(conn, pid, [(r.case_id, r.language) for r in found])
+        known = set(found)
         changing: list[RowKey] = []
         skipped: list[tuple[RowKey, str]] = []
         for row in found:
@@ -186,6 +187,12 @@ class TextPauseService:
         result: dict[str, Any] = {
             "action": action,
             "texts": len(found),
+            # Selected texts the project does not have, as they were given.
+            "unknown_rows": [
+                {"case_id": row.case_id, "language": row.language}
+                for row in dict.fromkeys(rows)
+                if row not in known
+            ],
             "change_count": len(changing),
             "skipped_count": len(skipped),
             "task_count": len(in_progress),

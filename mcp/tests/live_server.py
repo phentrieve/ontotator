@@ -3,7 +3,11 @@
 Runs in the main project's environment (``uv run --project <repo>``), never
 in the MCP server's. Creates a system administrator, two annotators and two
 API tokens, prints one JSON line with the address and the tokens on stdout,
-then serves until stdin closes and drops its databases. The database is a
+then serves until stdin closes and drops its databases. ``POST
+/__test_scenario__?name=...`` builds one of the browser tests' scenario
+projects (submitted annotations, final results, translation reviews: work
+that only people in the web interface can make) and returns it with a
+personal API token of its lead. The database is a
 copy of the test template on the server named by ``ONTOTATOR_TEST_PG_URL``;
 ``PYTEST_XDIST_WORKER`` must be unique, so that only this process's
 databases are created and dropped (``tests/pg_harness.py``).
@@ -23,12 +27,43 @@ sys.path.insert(0, str(ROOT / "tests"))
 
 import uvicorn  # noqa: E402
 from auth_harness import ensure_user  # noqa: E402
+from fastapi import FastAPI, HTTPException, Query  # noqa: E402
 from ontotator.api.app import create_app  # noqa: E402
 from ontotator.auth.audit import Actor  # noqa: E402
 from ontotator.config import AppConfig  # noqa: E402
 from pg_harness import database_url_for, reset  # noqa: E402
 
 ALL_SCOPES = ["read", "import", "export", "project-admin", "admin"]
+LEAD_SCOPES = ["read", "import", "export", "project-admin"]
+
+
+def register_scenario_route(app: FastAPI) -> None:
+    """``POST /__test_scenario__``: a fresh scenario project and a token of
+    its lead. ``consolidation`` is the two-annotator text with findings of
+    ``browser_consolidation_scenarios``; every other name is a Documents
+    scenario (``browser_documents_scenarios.registry``)."""
+
+    @app.post("/__test_scenario__")
+    def scenario(name: str = Query(...)) -> dict[str, object]:
+        import browser_consolidation_scenarios as consolidation
+        from browser_documents_scenarios import registry
+
+        if name == "consolidation":
+            built = consolidation.build(app, started=False)
+        elif name in registry():
+            built = registry()[name](app)
+        else:
+            raise HTTPException(404, f"Unknown scenario {name!r}")
+        issued = app.state.api_tokens.create(
+            Actor.cli(),
+            built["users"]["lead"],
+            name="mcp integration lead",
+            scopes=LEAD_SCOPES,
+            lifetime_days=1,
+        )
+        return {**built, "token": issued.secret}
+
+    app.router.routes.insert(0, app.router.routes.pop())
 
 
 def _free_port() -> int:
@@ -49,6 +84,7 @@ def main() -> None:
                 port=port,
             )
         )
+        register_scenario_route(app)
         try:
             ensure_user(app, "root", system_admin=True)
             for name in ("ann1", "ann2"):

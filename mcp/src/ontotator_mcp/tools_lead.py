@@ -19,10 +19,10 @@ from pydantic import Field
 
 from ontotator_mcp.client import OntotatorClient, project_path, seg
 from ontotator_mcp.errors import OntotatorError
-from ontotator_mcp.models import Replacement
+from ontotator_mcp.models import Replacement, TextRef
 from ontotator_mcp.tooling import register
 from ontotator_mcp.tools_people import assignment_summary
-from ontotator_mcp.tools_setup import _cut
+from ontotator_mcp.tools_setup import _cut, unknown_texts
 from ontotator_mcp.tools_status import rows
 
 Project = Annotated[str, Field(description="Project key, e.g. 'ward-7'.")]
@@ -244,7 +244,7 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
     async def change_annotation_modes(
         project: Project,
         texts: Annotated[
-            list[dict[str, str]],
+            list[TextRef],
             Field(
                 min_length=1,
                 max_length=10000,
@@ -286,13 +286,19 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
         withdrawn. The dry run names, per text, whose submissions and whose
         unsubmitted tasks, and the texts left as they are with the reason
         (final result chosen: withdraw it first; no work yet; already in
-        this mode; no proposals). Confirm with its preview_token: every
+        this mode; no proposals), and the texts the project does not have
+        (unknown_texts: another spelling, letter case or language). Confirm with its preview_token: every
         listed text changes, or none when anything changed since (a fresh
-        dry run, ``stale``). There is no bulk undo; restore_annotation_mode
-        brings back one text while no new work started on it.
+        dry run, ``stale``). THERE IS NO UNDO for the call as a whole: the
+        answer has no ``undo`` and no tool takes it. restore_annotation_mode
+        brings back one text at a time (its mode, submissions and tasks),
+        and only while no new work started on that text.
         """
         path = project_path(project, "annotation-mode-changes/bulk")
-        body: dict[str, Any] = {"rows": texts, "mode": mode}
+        body: dict[str, Any] = {
+            "rows": [text.model_dump() for text in texts],
+            "mode": mode,
+        }
 
         def summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
             def people(items: list[dict[str, Any]], key: str) -> list[str]:
@@ -334,6 +340,7 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
                 "withdrawn_task_count": found.get("assignment_count"),
                 "skipped_texts": _cut(skipped, 50),
                 "skipped_by_reason": found.get("skipped_by_reason", {}),
+                **unknown_texts(found),
                 "preview_token": found.get("preview_token"),
             }
 

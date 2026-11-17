@@ -23,9 +23,9 @@ from pydantic import Field
 
 from ontotator_mcp.client import OntotatorClient, project_path, seg
 from ontotator_mcp.errors import OntotatorError
-from ontotator_mcp.models import NewUser
+from ontotator_mcp.models import NewUser, TextRef
 from ontotator_mcp.tooling import register
-from ontotator_mcp.tools_setup import OPEN_STATES, _cut
+from ontotator_mcp.tools_setup import OPEN_STATES, _cut, unknown_texts
 
 Project = Annotated[str, Field(description="Project key, e.g. 'ward-7'.")]
 CodesPath = Annotated[
@@ -45,7 +45,7 @@ HANDOVER_TASKS = ("annotate", "translation_review")
 MAX_BULK_LISTED = 50
 TaskKind = Literal["annotate", "translation_review", "review"]
 Texts = Annotated[
-    list[dict[str, str]],
+    list[TextRef],
     Field(
         min_length=1,
         max_length=10000,
@@ -77,7 +77,10 @@ PreviewToken = Annotated[
 
 
 def bulk_summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
-    """A bulk action's preview or result, lists cut to MAX_BULK_LISTED."""
+    """A bulk action's preview or result, lists cut to MAX_BULK_LISTED, with
+    the selected texts the project does not have (``unknown_texts``). An
+    applied reopen or withdrawal keeps the server's ``undo`` (id and
+    expires_at), which undo_reopen_or_withdraw takes."""
 
     def brief(item: dict[str, Any]) -> dict[str, Any]:
         person = item.get("person") or {}
@@ -96,15 +99,19 @@ def bulk_summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
         {key: item.get(key) for key in ("case_id", "language", "message")}
         for item in found.get("skipped", [])
     ]
-    return {
-        "applied": applied,
-        "changed" if applied else "would_change": _cut(changes, MAX_BULK_LISTED),
-        "change_count": found.get("change_count", len(changes)),
-        "kept": _cut(kept, MAX_BULK_LISTED),
-        "kept_count": found.get("kept_count", len(kept)),
-        "skipped_texts": _cut(skipped, MAX_BULK_LISTED),
-        "preview_token": found.get("preview_token"),
-    }
+    return (
+        {
+            "applied": applied,
+            "changed" if applied else "would_change": _cut(changes, MAX_BULK_LISTED),
+            "change_count": found.get("change_count", len(changes)),
+            "kept": _cut(kept, MAX_BULK_LISTED),
+            "kept_count": found.get("kept_count", len(kept)),
+            "skipped_texts": _cut(skipped, MAX_BULK_LISTED),
+        }
+        | unknown_texts(found, MAX_BULK_LISTED)
+        | {"preview_token": found.get("preview_token")}
+        | ({"undo": found["undo"]} if applied and found.get("undo") else {})
+    )
 
 
 def pause_summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
@@ -143,6 +150,7 @@ def pause_summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
         "still_paused_by_report": found.get("still_paused_count", 0),
         "skipped_texts": _cut(skipped, MAX_BULK_LISTED),
         "skipped_count": found.get("skipped_count", len(skipped)),
+        **unknown_texts(found, MAX_BULK_LISTED),
         "preview_token": found.get("preview_token"),
     }
 
@@ -642,6 +650,7 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         """Dry run, or apply with the dry run's token; a stale token answers
         with the fresh dry run (``stale``)."""
         path = project_path(project, "bulk-task-actions", action)
+        body = body | {"rows": [text.model_dump() for text in body["rows"]]}
         if not confirm:
             preview: dict[str, Any] = await api.post(path, body | {"preview": True})
             return bulk_summary(preview, False)
@@ -688,10 +697,16 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
 
         Like reopen_task for each task: its person gets it back in My tasks
         with the reason. Texts with a final result are skipped (change it
-        first); unsubmitted tasks are kept. The dry run lists both and a
+        first); unsubmitted tasks are kept. The dry run lists both, the
+        texts the project does not have (unknown_texts: another spelling,
+        letter case or language; nothing happens to them) and a
         preview_token; confirm with it: every listed task is reopened, or
         none when anything changed since (then the answer is a fresh dry run,
-        ``stale``).
+        ``stale``). The confirmed answer carries ``undo`` (id and
+        expires_at): undo_reopen_or_withdraw takes that id and submits the
+        tasks again, for 60 minutes and while nothing else changed on the
+        texts. There is no ``undo`` when a translation review was reopened
+        (its draft restarted from the current text) or nothing changed.
         """
         body = {"rows": texts, "reason": reason} | ({"tasks": tasks} if tasks else {})
         return await _bulk(project, "reopen", body, confirm, preview_token)
@@ -725,9 +740,13 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
 
         Like withdraw_task for each task: it leaves the person's list; drafts
         and submitted work stay. By default only tasks not yet started;
-        paused tasks and lead corrections are kept. Confirm with the dry
+        paused tasks and lead corrections are kept; texts the project does
+        not have are named (unknown_texts). Confirm with the dry
         run's preview_token: all listed tasks are withdrawn, or none when
-        anything changed since (a fresh dry run, ``stale``).
+        anything changed since (a fresh dry run, ``stale``). The confirmed
+        answer carries ``undo`` (id and expires_at): undo_reopen_or_withdraw
+        takes that id and brings the tasks back with their drafts, for 60
+        minutes and while nothing else changed on the texts.
         """
         body: dict[str, Any] = {
             "rows": texts,
@@ -739,6 +758,82 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         if reason:
             body["reason"] = reason
         return await _bulk(project, "withdraw", body, confirm, preview_token)
+
+    @register(server, scopes="project-admin", effect="changes")
+    async def undo_reopen_or_withdraw(
+        project: Project,
+        undo_id: Annotated[
+            int,
+            Field(
+                ge=1,
+                description=(
+                    "``undo.id`` of the confirmed reopen_texts or"
+                    " withdraw_open_tasks answer."
+                ),
+            ),
+        ],
+        confirm: Annotated[
+            bool,
+            Field(description="False: dry run. True: bring the tasks back."),
+        ] = False,
+    ) -> dict[str, Any]:
+        """Undo a reopen_texts or withdraw_open_tasks, after a dry run.
+
+        The server kept which tasks the action changed; this names only that
+        record. It works once, with the token of the lead who applied the
+        action, within 60 minutes. The dry run lists the tasks that would
+        come back (would_restore): reopened tasks are submitted again,
+        withdrawn tasks return to their people with their drafts. It also
+        says what is in the way (blocked, with the reason): something
+        changed on the texts since (a task, draft, round, final result, plan
+        row or version), a text no longer plans the task, or a person left
+        the project. With confirm every task comes back, or none: a blocked
+        undo changes nothing (the answer is then the dry run, ``refused``).
+        An undo that is unknown, expired or already used is refused with
+        BULK_UNDO_STALE. start_rounds and a reopened translation review
+        have no undo.
+        """
+        path = project_path(project, "bulk-task-actions", "undo")
+
+        def summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
+            tasks = [
+                {
+                    key: item.get(key)
+                    for key in ("case_id", "language", "assignment_id", "task")
+                }
+                | {
+                    "status": item.get("status"),
+                    "person": (item.get("person") or {}).get("display_name")
+                    or (item.get("person") or {}).get("pseudonym"),
+                }
+                for item in found.get("tasks", [])
+            ]
+            return {
+                "applied": applied,
+                "undo_id": found.get("undo_id"),
+                "action": found.get("action"),
+                "expires_at": found.get("expires_at"),
+                "restored" if applied else "would_restore": _cut(
+                    tasks, MAX_BULK_LISTED
+                ),
+                "task_count": found.get("task_count", len(tasks)),
+                "blocked": found.get("blocked"),
+            }
+
+        preview: dict[str, Any] = await api.post(
+            path, {"undo_id": undo_id, "preview": True}
+        )
+        if not confirm:
+            return summary(preview, False)
+        if preview.get("blocked"):
+            return summary(preview, False) | {
+                "refused": True,
+                "note": "The texts changed since the action (blocked); nothing"
+                " was restored. reopen_task, withdraw_task and assign_texts"
+                " change one task.",
+            }
+        applied: dict[str, Any] = await api.post(path, {"undo_id": undo_id})
+        return summary(applied, True)
 
     @register(server, scopes="project-admin", effect="destructive")
     async def start_rounds(
@@ -770,9 +865,11 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         submission no longer counts. Only submitted annotations on a text's
         current version take a round; texts with a final result or an open
         consolidation are skipped, other tasks are kept (the dry run says
-        why). Confirm with the dry run's preview_token: every listed task
+        why); texts the project does not have are named (unknown_texts).
+        Confirm with the dry run's preview_token: every listed task
         gets its round, or none when anything changed since (a fresh dry
-        run, ``stale``).
+        run, ``stale``). No tool takes a round back: the answer has no
+        ``undo``, and undo_reopen_or_withdraw does not apply.
         """
         if confirm and kind == "clean_restart" and not (reason or "").strip():
             raise OntotatorError("A clean_restart needs a reason.")
@@ -791,6 +888,7 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         """Dry run, or apply with the dry run's token; a stale token answers
         with the fresh dry run (``stale``)."""
         path = project_path(project, "text-pauses", action)
+        body = body | {"rows": [text.model_dump() for text in body["rows"]]}
         if not confirm:
             preview: dict[str, Any] = await api.post(path, body | {"preview": True})
             return pause_summary(preview, False)
@@ -844,7 +942,8 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         paused from the start. Submitted work and final results are untouched
         and exported as before. A pause from a problem report is a separate
         cause and stays as it is. The dry run lists the texts with their
-        tasks in progress, the texts already paused, and a preview_token;
+        tasks in progress, the texts already paused, the texts the project
+        does not have (unknown_texts) and a preview_token;
         confirm with it: every listed text is paused, or none when anything
         changed since (a fresh dry run, ``stale``). release_texts is the way
         back.
@@ -868,7 +967,8 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         Their tasks in progress can be saved again. A task that a problem
         report pauses as well stays paused until that report is decided
         (``still_paused_by_report``); deciding a report never releases a
-        lead pause. Texts that are not paused are skipped. Confirm with the
+        lead pause. Texts that are not paused are skipped; texts the
+        project does not have are named (unknown_texts). Confirm with the
         dry run's preview_token: every listed text is released, or none when
         anything changed since (a fresh dry run, ``stale``).
         """
