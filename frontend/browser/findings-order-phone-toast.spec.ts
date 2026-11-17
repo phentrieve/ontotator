@@ -249,3 +249,74 @@ for (const size of [PHONE, { width: 375, height: 667 }, DESKTOP]) {
     expect(errors).toEqual([]);
   });
 }
+
+// ---- Issue 439 ------------------------------------------------------------------------------------------------
+
+for (const size of [DESKTOP, PHONE]) {
+  test(`issue 439: a toast with Undo never covers the next dialog and is back when it closes (${size.width} px)`, async ({ page }) => {
+    const errors = consoleErrors(page);
+    await page.setViewportSize(size);
+    const s = await documentsScenario(page, "S336");
+    await loginExisting(page, s.users.lead);
+    await page.goto(`/#/projects/${encodeURIComponent(s.project)}/documents`);
+    await documentsReady(page);
+
+    await page.getByRole("checkbox", { name: "Select all 8 filtered texts" }).click();
+    const bar = page.getByRole("region", { name: "Selection" });
+    const openAction = async (name: string) => {
+      await bar.getByRole("button", { name: "More actions" }).click();
+      await page.getByRole("menu", { name: "More actions" }).getByRole("menuitem", { name }).click();
+    };
+    await openAction("Reopen…");
+    const reopen = page.getByRole("dialog", { name: "Reopen: 8 texts" });
+    await reopen.getByLabel(/^Reason/).fill("Guideline 2.3 changed for vital signs");
+    await reopen.getByRole("button", { name: "Reopen 8 assignments" }).click();
+    await reopen.getByLabel("I understand").check();
+    await reopen.getByRole("button", { name: "Reopen 8 assignments" }).click();
+    await expect(reopen).toBeHidden();
+    const toast = page.locator(".ui-toast");
+    const status = page.getByRole("status").filter({ has: toast });
+    // The announcement: the toast is in a polite live region.
+    await expect(status).toHaveAttribute("aria-live", "polite");
+    await expect(status).toContainText("Reopened 8 assignments in 6 texts.");
+    await expect(toast.getByRole("button", { name: "Undo" })).toBeVisible();
+
+    // The next dialog, opened right away while the toast is showing.
+    await openAction("Withdraw open tasks…");
+    const withdraw = page.getByRole("dialog", { name: /^Withdraw open tasks: 8 texts/ });
+    await expect(withdraw).toBeVisible();
+    await expect(withdraw.getByRole("list", { name: "Preview" })).toBeVisible();
+    await shot(page, `439-dialog-with-toast-${size.width}`);
+
+    // The toast does not lie over any part of the dialog, and every control of the dialog is on top and clickable.
+    const overlap = await page.evaluate(() => {
+      const dialog = document.querySelector('[role="dialog"]')!.getBoundingClientRect();
+      const element = document.querySelector<HTMLElement>(".ui-toast");
+      if (!element || getComputedStyle(element).visibility === "hidden") return false;
+      const box = element.getBoundingClientRect();
+      return box.width > 0 && box.left < dialog.right && box.right > dialog.left && box.top < dialog.bottom && box.bottom > dialog.top;
+    });
+    expect(overlap, "the toast overlaps the dialog").toBe(false);
+    const controls = withdraw.locator("button, input, textarea, select");
+    const count = await controls.count();
+    expect(count).toBeGreaterThan(2);
+    for (let index = 0; index < count; index++) {
+      const control = controls.nth(index);
+      await control.scrollIntoViewIfNeeded();
+      expect(await onTop(control), `dialog control ${index} is not covered`).toBe(true);
+      await control.click({ trial: true });
+    }
+    // The announcement is not taken away: the message is still in the live region.
+    await expect(status).toContainText("Reopened 8 assignments in 6 texts.");
+
+    // Closing the dialog without acting: the Undo is still valid and reachable, and it works.
+    await withdraw.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(withdraw).toBeHidden();
+    await expect(toast.getByRole("button", { name: "Undo" })).toBeVisible();
+    await shot(page, `439-toast-after-dialog-${size.width}`);
+    await toast.getByRole("button", { name: "Undo" }).click();
+    await expect(toast).toContainText("The reopened tasks are submitted again.");
+    expect(await noSidewaysScroll(page)).toBe(true);
+    expect(errors).toEqual([]);
+  });
+}
