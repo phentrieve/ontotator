@@ -146,6 +146,9 @@ class AssignmentFact:
     # Assigned before the translation review was accepted, confirmed by the
     # lead (audit ``assignment.unreviewed_translation``, spec 2026-10-25 §2).
     unreviewed_translation: bool = False
+    # Issue 268: a change was saved since the assignment was given or last
+    # reopened (``assignments.started_at``).
+    saved_since_reopen: bool = False
 
 
 def base_chain_name(root: Version) -> str:

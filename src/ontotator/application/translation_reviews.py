@@ -578,6 +578,8 @@ class TranslationReviewService:
                     status="in_progress"
                     if assignment.status == "open"
                     else assignment.status,
+                    # Issue 268: the first save since given or reopened.
+                    started_at=func.coalesce(AssignmentRow.started_at, now),
                     updated_at=now,
                 )
             )
@@ -777,6 +779,7 @@ class TranslationReviewService:
                 .values(
                     status="submitted",
                     last_submission_id=f"tr-{record_id}",
+                    started_at=func.coalesce(AssignmentRow.started_at, now),
                     updated_at=now,
                 )
             )

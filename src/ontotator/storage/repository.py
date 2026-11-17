@@ -3096,9 +3096,18 @@ class Repository:
             ).values(
                 status="submitted",
                 last_submission_id=result.submission_id,
+                started_at=func.coalesce(AssignmentRow.started_at, at),
                 updated_at=at,
             )
         else:
+            # Issue 268: the first save since the task was given or reopened.
+            # A reopened task keeps its status and ``updated_at``.
+            conn.execute(
+                statement.where(
+                    AssignmentRow.status.in_(["open", "in_progress", "reopened"]),
+                    AssignmentRow.started_at.is_(None),
+                ).values(started_at=at)
+            )
             statement = statement.where(AssignmentRow.status == "open").values(
                 status="in_progress", updated_at=at
             )

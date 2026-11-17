@@ -523,6 +523,7 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
                     "HISTORY_NOT_AVAILABLE": 422,
                     "ROUND_ACTIVE": 409,
                     "CONSOLIDATION_ACTIVE": 409,
+                    "CONSOLIDATION_OPEN": 409,
                     "ROUND_ALREADY_EXISTS": 409,
                     "TASK_HELD": 409,
                     "TASK_WAITING_FOR_TRANSLATION_REVIEW": 409,
