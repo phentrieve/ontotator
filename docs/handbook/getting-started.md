@@ -119,6 +119,8 @@ Each row is one task. The **Task** column says what to do, for example **Annotat
 - **Waiting for translation review**: the lead assigned the annotation ahead, and the translation is still being reviewed. You cannot start yet; the **Action** column says **Opens once a translation is accepted**. Once it is accepted, the task shows **Start** by itself. A rejected review keeps the task waiting. If the review leads to a corrected version, the task opens on that version.
 - **Waiting for the project lead**: the text of this task was corrected and the task cannot follow by itself. You cannot start it; the lead decides how it continues, and it may leave your list.
 
+On a phone, each row has two parts: under **Task** the text, what to do and the status below each other, and beside it the **Action**. The reason of a **Paused** or **Reopened** task is written out in full under its badge, so there is no badge to tap. The project is shown under the text when the list mixes several projects; the dates **Assigned** and **Last change** are left out. Nothing needs to be swiped sideways.
+
 If the project has guidelines, a link such as *Project guidelines v2* appears above the table. Read them before you start: they say what to mark and how.
 
 If you see **No texts are assigned to you yet.**, wait until your lead assigns texts to you.
