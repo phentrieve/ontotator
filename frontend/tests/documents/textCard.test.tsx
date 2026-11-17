@@ -8,7 +8,7 @@ import { formatTime } from "../../src/app/submissionLabels";
 import { TextCard, type TextCardProps } from "../../src/documents/textCard/TextCard";
 import type { SegmentId } from "../../src/documents/textCard/cardModel";
 import { annotateItem, cardRow } from "./cardFixtures";
-import { final, stepOf, submission, submissions, version, work } from "./fixtures";
+import { final, round, stepOf, submission, submissions, version, work } from "./fixtures";
 import { ana, cell, luc, tom } from "./tableFixtures";
 import type { TextVersionsTools } from "../../src/documents/TextVersions";
 
@@ -338,6 +338,41 @@ describe("annotation part", () => {
     expect(plain.textContent).toBe("Ana Weber ann-0003Assignment removed · submitted 18 Oct, kept in the historyRemovedOpen annotation");
   });
 
+  it("names the version of each person's task when the text has several versions (issue 445)", async () => {
+    // v1 carries Ana's submission and Luc's removed one, Tom is assigned on the correction v2.
+    vi.mocked(api.getRowSubmissions).mockImplementation(async (_key, caseId, language) => submissions(caseId, language, {
+      submissions: [
+        submission({ submission_id: "s-ana", document_id: "case-200-de", author_label: "ann-0003", author: ana }),
+        submission({ submission_id: "s-luc", document_id: "case-200-de", author_label: "ann-0005", author: luc, recorded_at: "2026-10-17T10:00:00Z" }),
+      ],
+    }));
+    const versions = [
+      version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", chain_name: "Translation", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "Translation" }),
+    ];
+    const people = [
+      annotateItem({ assignment_id: 2, person: ana, author_label: "ann-0003", status: "submitted", assigned_at: "2026-10-12T09:00:00" }),
+      annotateItem({ assignment_id: 1, person: tom, author_label: "ann-0004", document_id: "case-200-de-v2", version: 2, assigned_at: "2026-10-14T09:00:00" }),
+    ];
+    renderCard({ row: assignRow({ versions, work: people }) });
+    const list = within(card()).getByRole("list", { name: "Annotators" });
+    await within(list).findByRole("link", { name: "Open annotation of Ana Weber" });
+    const rows = within(list).getAllByRole("listitem").map(item => item.querySelector(".person-row-details")?.textContent);
+    expect(rows).toEqual(["Assigned 14 Oct, from proposals · v2", "Submitted 18 Oct, 3 findings · assigned 12 Oct · v1", "Assignment removed · submitted 17 Oct, kept in the history · v1"]);
+    cleanup();
+    // Parallel roots: the chain name, as in the submissions table.
+    renderCard({ row: assignRow({ versions, work: people, parallel_roots: true }) });
+    const parallel = within(card()).getByRole("list", { name: "Annotators" });
+    await within(parallel).findByRole("link", { name: "Open annotation of Ana Weber" });
+    expect(within(parallel).getAllByRole("listitem")[0].textContent).toContain("Assigned 14 Oct, from proposals · Translation v2");
+    cleanup();
+    // One version: no version in the rows.
+    renderCard({ row: assignRow({ work: [people[0]] }) });
+    const single = within(card()).getByRole("list", { name: "Annotators" });
+    await within(single).findByRole("link", { name: "Open annotation of Ana Weber" });
+    expect(within(single).getAllByRole("listitem")[0].querySelector(".person-row-details")?.textContent).toBe("Submitted 18 Oct, 3 findings · assigned 12 Oct");
+  });
+
   it("after removing a person, focus moves to the next person's first button, else to Assign annotators…", async () => {
     vi.spyOn(api, "removeAssignment").mockResolvedValue({} as Awaited<ReturnType<typeof api.removeAssignment>>);
     renderCard({ initialSegment: "annotation" });
@@ -554,6 +589,23 @@ describe("footer", () => {
     expect(within(card()).getByRole("heading", { level: 3, name: "Details" })).toBeTruthy();
     fireEvent.click(within(card()).getByRole("button", { name: "Back" }));
     expect(within(card()).getByRole("navigation", { name: "Text path" })).toBeTruthy();
+  });
+
+  it("the technical details name the version of each submission and open round (issue 445)", async () => {
+    vi.mocked(api.getRowSubmissions).mockImplementation(async (_key, caseId, language) => submissions(caseId, language, {
+      submissions: [submission({ submission_id: "s-ana", document_id: "case-200-de", author_label: "ann-0003", author: ana, round_id: "r-ana" })],
+      rounds: [
+        round({ round_id: "r-ana", assignment_id: 2, document_id: "case-200-de", author_label: "ann-0003" }),
+        round({ round_id: "r-tom", assignment_id: 1, document_id: "case-200-de-v2", version: 2, chain_name: "Translation", author_label: "ann-0004", state: "open", submitted: false }),
+      ],
+    }));
+    renderCard({ initialView: "details" });
+    await within(card()).findByText("Submission ID, ann-0003, v1");
+    const terms = Array.from(card().querySelectorAll(".technical-details dt")).map(term => `${term.textContent}: ${term.nextElementSibling?.textContent}`);
+    expect(terms).toContain("Submission ID, ann-0003, v1: s-ana, round r-ana, Annotate from scratch");
+    expect(terms).toContain("Round ID, ann-0004, v2: r-tom, Annotate from scratch");
+    // The submitted round is not listed again.
+    expect(terms.filter(term => term.startsWith("Round ID"))).toHaveLength(1);
   });
 
   it("no Change plan… in the footer; a text outside the plan offers Add to plan… (the dialog)", () => {

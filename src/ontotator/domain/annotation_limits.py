@@ -9,6 +9,16 @@ project setting.
 
 from collections.abc import Mapping
 
+# The bounds of "Annotators per text", for the project setting and for a
+# text's own value (issue 447: the upper bound was 5). The check constraints
+# of ``projects`` and ``text_settings`` (migration 0041) carry the same bounds.
+MIN_ANNOTATIONS_PER_TEXT = 1
+MAX_ANNOTATIONS_PER_TEXT = 20
+# The most submissions one consolidation merges: twice the annotators of a
+# text, so a text at the limit can also take its submitted consolidations and
+# the annotations of an earlier setting as sources (the bound was 20).
+MAX_CONSOLIDATION_SOURCES = 40
+
 
 def effective_annotation_limit(
     project_limit: int,

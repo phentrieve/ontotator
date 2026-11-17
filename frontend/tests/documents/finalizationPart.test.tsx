@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FinalizationPart } from "../../src/documents/textCard/FinalizationPart";
-import { row, stageCell, stages, work } from "./fixtures";
+import { row, stageCell, stages, version, work } from "./fixtures";
 
 afterEach(cleanup);
 
@@ -29,6 +29,13 @@ it("shows the open groups and offers the lead only removal of someone else's run
   expect(within(person).getAllByRole("button").map(button => button.getAttribute("aria-label"))).toEqual(["Remove Carla Consolidator’s consolidation assignment"]);
   fireEvent.click(screen.getByRole("button", { name: "Remove Carla Consolidator’s consolidation assignment" }));
   expect(screen.getByRole("dialog", { name: /Remove assignment/ })).toBeTruthy();
+});
+
+it("names the version a consolidation runs on when the text has several versions (issue 445)", () => {
+  const item = work({ assignment_id: 9, document_id: "doc-w07", author_label: "ann-0007", task: "review", status: "in_progress", person: carla });
+  const versions = [version({ document_id: "doc-w07", is_newest_in_chain: false }), version({ document_id: "doc-w07-v2", version: 2, origin: "correction", derived_from: "doc-w07", chain_id: "doc-w07" })];
+  render(<FinalizationPart row={consolidating({ consolidation_progress: { round_id: "r-7", open: 2, total: 3 }, work: [item], versions })} projectKey="p" query={{}} onNavigate={vi.fn()} now={now} />);
+  expect(within(screen.getByRole("list", { name: "Consolidators" })).getByRole("listitem").textContent).toBe("Carla Consolidator ann-00072 of 3 groups open · v1Consolidating");
 });
 
 it("opens the running consolidation for its consolidator", () => {

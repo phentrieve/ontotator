@@ -8,6 +8,11 @@ spec's 8 groups: 4 match (kept automatically), 1 value, 1 span, 1 partial,
 already started the consolidation as consolidator (self-grant, start command).
 ``people=3`` adds ann-0003 (ann-0001's findings, but "hypotonia" as another
 term), so the hypotonia group is a three-way term and assertion conflict.
+``people=4`` to ``20`` (issue 447) adds ann-0004 … in turn with the findings
+of ann-0001, ann-0002 and ann-0003, and sets "Annotators per text" to that
+number, so the text is full ("n of n annotators"). ``open_people=n`` assigns
+n more annotators who have not started, and ``limit`` sets "Annotators per
+text" itself ("9 of 12 annotators assigned"; not with ``started``).
 
 ``scenario=modifiers`` (modifiers plan M2) builds instead a project pinned
 with ``MOD_PIN`` whose ``MOD_TEXT`` has two submissions (Ana Weber, Ben Roth)
@@ -300,6 +305,8 @@ def build(
     people: int = 2,
     blind: bool = False,
     consolidator: Literal["lead", "adj"] = "lead",
+    open_people: int = 0,
+    limit: int | None = None,
 ) -> dict[str, Any]:
     from t1_builders import native_unit
 
@@ -310,19 +317,32 @@ def build(
     add_user(scenario, "ann-0001", ["annotator"])
     add_user(scenario, "ann-0002", ["annotator"])
     findings = dict(FINDINGS)
-    if people == 3:
-        add_user(scenario, "ann-0003", ["annotator"])
-        findings["ann-0003"] = THIRD
+    if people >= 3:
+        variants = [FINDINGS["ann-0001"], FINDINGS["ann-0002"], THIRD]
+        for number in range(3, people + 1):
+            add_user(scenario, f"ann-{number:04d}", ["annotator"])
+            # ann-0003 has THIRD; the further people take the three in turn.
+            findings[f"ann-{number:04d}"] = variants[(number - 1) % 3]
         with scenario.db.transaction() as conn:
             conn.execute(
                 update(ProjectRow)
                 .where(ProjectRow.project_key == scenario.key)
-                .values(annotations_per_text=3)
+                .values(annotations_per_text=people)
+            )
+    if limit is not None:
+        with scenario.db.transaction() as conn:
+            conn.execute(
+                update(ProjectRow)
+                .where(ProjectRow.project_key == scenario.key)
+                .values(annotations_per_text=limit)
             )
     sources = [
         _annotate(scenario, name, document_id, items)
         for name, items in findings.items()
     ]
+    for number in range(people + 1, people + open_people + 1):
+        add_user(scenario, f"ann-{number:04d}", ["annotator"])
+        assign(scenario, document_id, f"ann-{number:04d}", "annotate")
     ids: dict[str, Any] = {}
     if blind:
         consolidator = "adj"
@@ -364,14 +384,16 @@ def register_consolidation_scenario_route(app: FastAPI) -> None:
     @app.post("/__test_consolidation__")
     def consolidation_scenario(
         started: bool = Query(False),
-        people: int = Query(2, ge=2, le=3),
+        people: int = Query(2, ge=2, le=20),
         scenario: Literal["default", "modifiers"] = Query("default"),
         blind: bool = Query(False),
         standalone: bool = Query(False),
         consolidator: Literal["lead", "adj"] = Query("lead"),
+        open_people: int = Query(0, ge=0, le=18),
+        limit: int | None = Query(None, ge=1, le=20),
     ) -> dict[str, Any]:
         if scenario == "modifiers":
             return build_modifiers(app, started, standalone)
-        return build(app, started, people, blind, consolidator)
+        return build(app, started, people, blind, consolidator, open_people, limit)
 
     app.router.routes.insert(0, app.router.routes.pop())

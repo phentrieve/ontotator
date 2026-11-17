@@ -183,7 +183,7 @@ class TextSettingRow(Base):
     __table_args__ = (
         UniqueConstraint("project_id", "case_id", "language"),
         CheckConstraint(
-            "annotations_per_text BETWEEN 1 AND 5", name="annotations_per_text"
+            "annotations_per_text BETWEEN 1 AND 20", name="annotations_per_text"
         ),
     )
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)

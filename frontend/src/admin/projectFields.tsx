@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { api, type OntologyInfo, type ProjectPin, type ProjectSettings, type TaskProfile } from "../api/client";
 import { Checkbox, InlineMessage, Select, TextInput } from "../ui";
 import { helpHref } from "../help/sections";
+import { MAX_ANNOTATORS_PER_TEXT } from "./assignSummary";
 import { ErrorNotice } from "./ErrorNotice";
 import { SettingsCard } from "./SettingsCard";
 
@@ -184,7 +185,7 @@ export function WorkflowFields({ projectKey, value, saved, onChange, disabled }:
 }): JSX.Element {
   const prefix = useId().replace(/:/g, "");
   const target = value.annotations_per_text;
-  const lowered = Number.isInteger(target) && target >= 1 && target <= 5 && target < saved.annotations_per_text;
+  const lowered = Number.isInteger(target) && target >= 1 && target <= MAX_ANNOTATORS_PER_TEXT && target < saved.annotations_per_text;
   const [over, setOver] = useState<{ target: number; rows: number } | null>(null);
   useEffect(() => {
     if (!lowered) return;
@@ -217,7 +218,7 @@ export function WorkflowFields({ projectKey, value, saved, onChange, disabled }:
     <SettingsCard title="Annotation and consolidation" hint="Checked when you assign."
       why={<><p>Native source texts are never held back by the translation review; the Assign dialog can override this for one assignment.</p><p>The consolidator rule is checked when you assign consolidation.</p><p>Hidden names apply to every consolidation the next time it opens.</p></>}>
       <div className="settings-card-row">
-        <TextInput id={`${prefix}-annotations`} label="Annotators per text" type="number" min={1} max={5} step={1} required hint="Upper limit; fewer is fine." value={Number.isFinite(target) ? String(target) : ""} disabled={disabled}
+        <TextInput id={`${prefix}-annotations`} label="Annotators per text" type="number" min={1} max={MAX_ANNOTATORS_PER_TEXT} step={1} required hint={`1 to ${MAX_ANNOTATORS_PER_TEXT}. Upper limit; fewer is fine.`} value={Number.isFinite(target) ? String(target) : ""} disabled={disabled}
           onChange={event => onChange({ ...value, annotations_per_text: event.target.value === "" ? Number.NaN : Number(event.target.value) })} />
         <div>
           <Checkbox id={`${prefix}-translation-gate`} label="Annotate only after the translation review is accepted"

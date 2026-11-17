@@ -271,15 +271,15 @@ def test_export_names_texts_taken_out_of_the_plan_and_why(env):
 
 
 def test_project_settings_round_trip(env):
-    for value in range(1, 6):
+    for value in range(1, 21):  # issue 447: 1 to 20
         saved = env.lead.patch(f"{BASE}/settings", json={"annotations_per_text": value})
         assert saved.status_code == 200, saved.text
         assert saved.json()["annotations_per_text"] == value
-    refused = env.lead.patch(f"{BASE}/settings", json={"annotations_per_text": 6})
+    refused = env.lead.patch(f"{BASE}/settings", json={"annotations_per_text": 21})
     assert refused.status_code == 422, refused.text
-    assert env.lead.get(f"{BASE}/settings").json()["annotations_per_text"] == 5
+    assert env.lead.get(f"{BASE}/settings").json()["annotations_per_text"] == 20
     plan = env.lead.patch(f"{BASE}/settings", json={"import_plan": "nothing"})
     assert plan.status_code == 200, plan.text
     current = env.lead.get(f"{BASE}/settings").json()
     assert current["import_plan"] == "nothing"
-    assert current["annotations_per_text"] == 5
+    assert current["annotations_per_text"] == 20

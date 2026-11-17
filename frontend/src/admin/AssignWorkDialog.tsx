@@ -10,7 +10,7 @@ import { IconInfo } from "../ui/icons";
 import { DistributionDialog } from "./DistributionDialog";
 import { ErrorNotice } from "./ErrorNotice";
 import { errorMessage } from "./errors";
-import { leftLines, memberReason, memberUnavailable, onePersonSummary, partlyAssignedLines, personName, resultMessage, skippedLines, stepLabel, stepName, stepShortLabel, stepsOverview } from "./assignSummary";
+import { holdersLine, leftLines, MAX_ANNOTATORS_PER_TEXT, memberReason, memberUnavailable, onePersonSummary, partlyAssignedLines, personName, resultMessage, skippedLines, stepLabel, stepName, stepShortLabel, stepsOverview } from "./assignSummary";
 
 export type AssignWorkTask = "translation_review" | "annotate";
 export type AssignWorkDialogProps =
@@ -83,7 +83,7 @@ function LimitInfo({ projectKey, current, project, texts, textName, onSaved, onF
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
   const target = Number(value);
-  const valid = Number.isInteger(target) && target >= 1 && target <= 5;
+  const valid = Number.isInteger(target) && target >= 1 && target <= MAX_ANNOTATORS_PER_TEXT;
   const forTexts = scope === "texts" && texts.length > 0;
   // Texts with different limits: no single "current" value; each text is compared with its own.
   const mixed = texts.some(text => text.limit !== current);
@@ -135,7 +135,7 @@ function LimitInfo({ projectKey, current, project, texts, textName, onSaved, onF
           : <p>This is a <strong>project setting</strong>: the most annotators any text can get. Fewer is fine.</p>}
         {/* R-11: a compact inline number field, as high as the small buttons. */}
         <p className="assign-limit-field"><label htmlFor={`${id}-per-text`}>Annotators per text</label>
-          <input id={`${id}-per-text`} className="form-control assign-limit-input" type="number" min={1} max={5} step={1} required value={value} disabled={busy}
+          <input id={`${id}-per-text`} className="form-control assign-limit-input" type="number" min={1} max={MAX_ANNOTATORS_PER_TEXT} step={1} required value={value} disabled={busy}
             onChange={event => setValue(event.target.value)}
             onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); void save(); } }} /></p>
         {texts.length > 0 && <div role="radiogroup" aria-label="Change it for" className="assign-limit-scope">
@@ -491,7 +491,7 @@ function AssignWorkEditor(props: AssignWorkDialogProps): JSX.Element {
   /** One status line: mode, who holds the task (of the limit), the limit. */
   const status = [
     textMode && (textMode.mode === "proposals" ? "From proposals" : `From scratch${textMode.source === "no_proposals" ? " (no tool proposals)" : ""}`),
-    holders.length ? `Assigned: ${holders.join("; ")}` : "Nobody assigned yet",
+    holders.length ? `Assigned: ${holdersLine(holders)}` : "Nobody assigned yet",
   ].filter(Boolean).join(" · ");
   /** Parallel roots of one text share its label: name the chain. */
   const rootLabel = (item: { case_id: string; language: string; document_id: string }) => {
