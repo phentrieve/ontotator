@@ -628,6 +628,7 @@ class ProblemReportService:
                             expected_workflow_revision=current.workflow_revision,
                             kind="clean_restart",
                             reason=reason,
+                            report_restart=True,
                         )
             elif action == "withdraw":
                 own = raw["assignment_id"]

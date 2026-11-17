@@ -111,8 +111,15 @@ def _open(item: rules.AssignmentFact) -> bool:
 
 def _started(items: Sequence[rules.AssignmentFact]) -> int:
     """Started (issue 258): the assignment left ``open``, which only its
-    first saved change does; opening the task leaves it open."""
-    return sum(1 for item in items if item.status != "open")
+    first saved change does; opening the task leaves it open. A reopened
+    assignment (issue 268) is started again with the first change saved
+    since the reopen."""
+    return sum(
+        1
+        for item in items
+        if item.status != "open"
+        and (item.status != "reopened" or item.saved_since_reopen)
+    )
 
 
 def _review_reason(

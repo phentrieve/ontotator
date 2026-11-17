@@ -13,7 +13,7 @@ import {
   documentsReady, documentsTab, moreMarker, notInPlanSwitch, openDecisionBlock, rowBox, openFilters, openTextCard, rowAction, rowCell, textCard, textName, textNamePattern,
   textRow, textVersionItems,
 } from "./documentsHelpers";
-import { authenticatedRequest, openTasksHome, TEST_PASSWORD } from "./helpers";
+import { authenticatedRequest, loginThroughForm } from "./helpers";
 import { leadScenario, pasteCaseIds, type LeadPerson, type LeadScenario } from "./leadWorkflowHelpers";
 
 test.setTimeout(240_000);
@@ -54,14 +54,7 @@ const person = (s: LeadScenario, name: LeadPerson) => `${s.display_names[name]} 
  * the landing (F8) opens that project.
  */
 async function login(page: Page, s: LeadScenario, name: LeadPerson, remember?: string) {
-  if (remember === undefined) await openTasksHome(page);
-  else await page.goto("/");
-  if (remember !== undefined) await page.evaluate(([key, value]) => window.localStorage.setItem(key, value), [`ontotator.lastProject.v1:${s.users[name]}`, remember]);
-  const form = page.getByRole("form", { name: "Log in to Ontotator" });
-  await form.getByLabel("Username", { exact: true }).fill(s.users[name]);
-  await form.getByLabel("Password", { exact: true }).fill(TEST_PASSWORD);
-  await form.getByRole("button", { name: "Log in", exact: true }).click();
-  await expect(page.getByTestId("current-user")).toContainText(s.display_names[name]);
+  await loginThroughForm(page, s.users[name], s.display_names[name], { lastProject: remember });
 }
 
 /** Log in as the lead, who used the project last: the landing opens its Documents (F8). */
@@ -556,13 +549,7 @@ async function twoProjectLead(page: Page) {
   expect(created.ok(), await created.text()).toBeTruthy();
   /** Log in at "#/" (the landing applies); `remember` seeds the last-used project first. */
   const loginDana = async (remember?: string) => {
-    await page.goto("/");
-    if (remember !== undefined) await page.evaluate(([key, value]) => window.localStorage.setItem(key, value), [`ontotator.lastProject.v1:${username}`, remember]);
-    const form = page.getByRole("form", { name: "Log in to Ontotator" });
-    await form.getByLabel("Username", { exact: true }).fill(username);
-    await form.getByLabel("Password", { exact: true }).fill(TEST_PASSWORD);
-    await form.getByRole("button", { name: "Log in", exact: true }).click();
-    await expect(page.getByTestId("current-user")).toContainText("Dana Lead");
+    await loginThroughForm(page, username, "Dana Lead", { landing: true, lastProject: remember });
   };
   return { a: a.project, b: b.project, username, loginDana };
 }

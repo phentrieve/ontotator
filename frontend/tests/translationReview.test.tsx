@@ -110,6 +110,20 @@ it("autosaves exact raw data once in StrictMode and submits with the actual conf
   expect(screen.getByText("Review submitted")).toBeDefined();
   expect(screen.getByText("A corrected version v7 was created.")).toBeDefined();
 });
+it("Retry corrected version metadata: a retry that passes names the version and removes the error of the failed attempt", async () => {
+  setup();
+  vi.mocked(api.getVariantMetadata).mockRejectedValueOnce(new Error("The project is busy right now."));
+  await edited(); await clock();
+  await act(async () => { fireEvent.click(submitButton()); });
+  await act(async () => { fireEvent.click(within(screen.getByRole("dialog", { name: "Submit this review?" })).getByRole("button", { name: "Submit review" })); });
+  expect(screen.getByText("Review submitted")).toBeDefined();
+  expect(screen.queryByText("A corrected version v7 was created.")).toBeNull();
+  expect(screen.getByRole("alert").textContent).toContain("The project is busy right now.");
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Retry corrected version metadata" })); });
+  expect(screen.getByText("A corrected version v7 was created.")).toBeDefined();
+  expect(screen.queryByRole("button", { name: "Retry corrected version metadata" })).toBeNull();
+  expect(screen.queryByRole("alert")).toBeNull();
+});
 it("hides the guidelines notice once the review is submitted here and lists the guideline stamp", async () => {
   const { submit } = setup(undefined, false, undefined, undefined, <p>Guidelines updated to v2</p>);
   submit.mockResolvedValue(reviewRecord({ guideline_version: 2 }));

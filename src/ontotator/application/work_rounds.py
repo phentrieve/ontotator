@@ -9,7 +9,8 @@ from typing import Any, Literal
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import Connection, func, insert, select, update
+from sqlalchemy import Connection, and_, func, insert, select, update
+from sqlalchemy.orm import aliased
 
 from ontotator.application.workflow_guards import require_task_writable
 from ontotator.assignments.eligibility import require_annotation_gate
@@ -234,6 +235,43 @@ def proposal_carry_plan(
     return plan, targets
 
 
+def consolidation_open(conn: Connection, pid: int, document_id: str) -> bool:
+    """Whether the text of ``document_id`` (its case and language, every
+    version) has a consolidation task that is not submitted. The rule of the
+    bulk "Start a round…" (``bulk_task_actions._round_plan``)."""
+    text = aliased(DocumentRow)
+    version = aliased(DocumentRow)
+    return (
+        conn.execute(
+            select(AssignmentRow.id)
+            .join(
+                version,
+                and_(
+                    version.project_id == AssignmentRow.project_id,
+                    version.document_id == AssignmentRow.document_id,
+                ),
+            )
+            .join(
+                text,
+                and_(
+                    text.project_id == version.project_id,
+                    text.case_id == version.case_id,
+                    text.language == version.language,
+                ),
+            )
+            .where(
+                text.project_id == pid,
+                text.document_id == document_id,
+                AssignmentRow.task == "review",
+                AssignmentRow.status != "submitted",
+                AssignmentRow.revoked_at.is_(None),
+            )
+            .limit(1)
+        ).first()
+        is not None
+    )
+
+
 def require_independent(
     conn: Connection,
     pid: int,
@@ -409,7 +447,10 @@ class WorkRoundService:
         kind: RoundKind = "ordinary",
         source_submission_ids: list[str] | None = None,
         reason: str | None = None,
+        report_restart: bool = False,
     ) -> WorkRoundView:
+        """``report_restart``: the restart a lead agreed to in a problem
+        report; it may take a submission away from an open consolidation."""
         sources = list(source_submission_ids or [])
         if len(sources) != len(set(sources)):
             raise DomainError("ROUND_INPUT_INVALID", "Repeated source submission")
@@ -470,6 +511,22 @@ class WorkRoundService:
                 # Only the text-change operations create these rounds; they
                 # record the lead's decision with the round (TextChangeService).
                 raise DomainError("ROUND_KIND_INVALID")
+            if (
+                # A restart without the lead keeps its own refusal (create_in).
+                (kind == "carry_forward" or (kind == "clean_restart" and lead))
+                and not report_restart
+                and assignment["task"] == "annotate"
+                and assignment["status"] == "submitted"
+                and consolidation_open(conn, pid, assignment["document_id"])
+            ):
+                # As the bulk "Start a round…" skips such a text: the round
+                # would take away the submission the consolidation rests on.
+                # A problem report about that submission still restarts it.
+                raise DomainError(
+                    "CONSOLIDATION_OPEN",
+                    "A consolidation is open on this text: finish or withdraw"
+                    " it first.",
+                )
             owner = conn.execute(
                 select(UserRow.pseudonym).where(UserRow.id == assignment["user_id"])
             ).scalar_one()
@@ -1014,6 +1071,7 @@ class WorkRoundService:
                 active_round_id=rid,
                 workflow_revision=expected_workflow_revision + 1,
                 status="open",
+                started_at=None,
                 last_submission_id=None,
                 updated_at=now,
             )
