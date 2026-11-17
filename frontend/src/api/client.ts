@@ -111,7 +111,7 @@ export type VersionUploadPreview = components["schemas"]["VersionUploadPreview"]
 export type VersionUploadRequest = components["schemas"]["VersionUploadRequest"];
 export type VersionUploadResult = components["schemas"]["VersionUploadResult"];
 export type VersionUploadView = components["schemas"]["VersionUploadView"];
-// Issue 453: "Editorial correction…" on a translation version
+// Issue 453: "Fix typos…" (an editorial correction) on a translation version
 export type EditorialCorrectionPreview = components["schemas"]["EditorialCorrectionPreview"];
 export type EditorialCorrectionRequest = components["schemas"]["EditorialCorrectionRequest"];
 export type EditorialCorrectionResult = components["schemas"]["EditorialCorrectionResult"];

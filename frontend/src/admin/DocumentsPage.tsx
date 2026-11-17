@@ -390,7 +390,7 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
   const [withdrawFor, setWithdrawFor] = useState<DocumentRowView | null>(null);
   /** The row as the page shows it now (after a refused withdrawal the reload brings the new revision). */
   const withdrawRow = withdrawFor ? pageRows.find(entry => rowKeyOf(entry) === rowKeyOf(withdrawFor)) ?? withdrawFor : null;
-  // Issues 341 and 453: the lead's actions on one version row (Correct the translation…, Accept this version…, Editorial correction…, Upload new version…).
+  // Issues 341 and 453: the lead's actions on one version row (Correct the translation…, Accept this version…, Fix typos…, Upload new version…).
   const [versionAction, setVersionAction] = useState<{ kind: "correct" | "accept" | "upload" | "editorial"; row: DocumentRowView; version: DocumentVersionView } | null>(null);
   const textVersionTools = useMemo<TextVersionsTools | undefined>(() => {
     if (!inventory) return undefined;
