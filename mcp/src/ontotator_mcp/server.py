@@ -56,7 +56,8 @@ ONTOTATOR_MCP_READ_CONTENT=1, so get_text_version, list_annotation_versions,
 get_annotation_version and get_submission read texts and submitted
 annotations (never drafts, and nothing can be written). They return
 clinical text only with include_text; ask for it only when the task needs
-the wording.
+the wording. The same holds for include_text of list_translation_reviews
+and list_typography_hints, which exists only on this server.
 """
 
 
@@ -85,7 +86,7 @@ def build_server(
     register_people(server, api)
     register_lead(server, api)
     register_status(server, api)
-    register_monitoring(server, api)
+    register_monitoring(server, api, read_content=settings.read_content)
     register_typography(server, api, read_content=settings.read_content)
     register_results(server, api)
     if settings.read_content:

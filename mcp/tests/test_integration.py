@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import threading
@@ -24,6 +25,7 @@ from mcp import Client
 
 from ontotator_mcp.config import Settings
 from ontotator_mcp.server import build_server
+from ontotator_mcp.tooling import TOOL_SCOPES
 
 REPO = Path(__file__).resolve().parents[2]
 FIXTURES = REPO / "tests" / "fixtures"
@@ -113,6 +115,22 @@ def _server(
         read_content=read_content,
     )
     return build_server(settings)
+
+
+def _scenario(info: dict[str, str], name: str) -> dict[str, Any]:
+    """A fresh scenario project of the browser tests and its lead's token."""
+    made = httpx.post(
+        f"{info['url']}/__test_scenario__", params={"name": name}, timeout=300
+    )
+    made.raise_for_status()
+    built: dict[str, Any] = made.json()
+    return built
+
+
+def _whole(result: Any) -> str:
+    """Everything a client receives of a tool result, as one string."""
+    text = "".join(getattr(part, "text", "") for part in result.content)
+    return text + json.dumps(result.structured_content, ensure_ascii=False)
 
 
 @pytest.mark.anyio
@@ -362,3 +380,143 @@ async def test_setup_import_status_and_export(
         ):
             with pytest.raises(ToolFailed, match="VERSION_NOT_FOUND"):
                 await call(reader, tool, about | extra)
+
+
+# Read tools that name something other than a project or one of its texts.
+OTHER_ARGUMENTS: dict[str, dict[str, Any]] = {
+    "find_people": {"query": "ann"},
+    "annotation_target_preview": {"annotations_per_text": 1},
+    "get_upload": {"upload_id": 1},
+    "get_job": {"job_id": 1},
+    "get_problem_report": {"report_id": "none"},
+}
+# Refused for a lead's personal token or for an ID nothing has; every other
+# read tool must answer.
+MAY_REFUSE = {
+    "list_users",
+    "list_ontology_files",
+    "get_upload",
+    "get_job",
+    "get_problem_report",
+}
+
+
+def _needles(text: str) -> list[str]:
+    """The sentences of a text, and its first words."""
+    sentences = [part.strip() for part in re.split(r"[.]", text)]
+    return [text[:30]] + [part for part in sentences if len(part) > 12]
+
+
+@pytest.mark.anyio
+async def test_no_default_tool_returns_text_of_a_project(
+    live: dict[str, str],
+) -> None:
+    """A known sentence and the annotated passages of a project are in no
+    answer of a server started without ONTOTATOR_MCP_READ_CONTENT (review
+    finding F2). Two projects: two submitted annotations with findings, and
+    a translation with submitted translation reviews."""
+    annotated = _scenario(live, "consolidation")
+    reviewed = _scenario(live, "S3")
+    for made in (annotated, reviewed):
+        project = made["project"]
+        # What must not come back, read with the opt-in: the text of every
+        # version, each annotated passage, each reviewer's text.
+        needles: list[str] = []
+        opted_in = _server(live, made["token"], read_content=True)
+        async with Client(opted_in) as content:
+            listed = await call(content, "list_texts", {"project": project})
+            rows = listed["texts"]
+            documents = sorted(
+                {row["document_id"] for row in rows}
+                | set((made.get("documents") or {}).values())
+            )
+            for document_id in documents:
+                about = {"project": project, "document_id": document_id}
+                version = await call(
+                    content, "get_text_version", about | {"include_text": True}
+                )
+                needles += _needles(version["text"])
+                for offered in await call(content, "list_annotation_versions", about):
+                    found = await call(
+                        content,
+                        "get_annotation_version",
+                        about
+                        | {
+                            "kind": offered["kind"],
+                            "version_id": offered["id"],
+                            "include_text": True,
+                        },
+                    )
+                    needles += [
+                        segment["text"]
+                        for evidence in found["evidence"]
+                        for segment in evidence["mention"]["segments"]
+                        if " " in segment["text"]
+                    ]
+            reviews = await call(
+                content,
+                "list_translation_reviews",
+                {"project": project, "include_text": True},
+            )
+            needles += [n for r in reviews for n in _needles(r["proposed_text"])]
+        needles = sorted(set(needles))
+        assert len(needles) >= 3, needles
+        if made is annotated:
+            assert "muscular hypotonia" in needles
+        else:
+            assert reviews and "Erste Korrektur" in needles
+
+        default = _server(live, made["token"])
+        leaks: list[tuple[str, dict[str, Any], list[str]]] = []
+        refused: set[str] = set()
+        async with Client(default) as client:
+            tools = (await client.list_tools()).tools
+            calls: list[tuple[str, dict[str, Any]]] = []
+            for tool in tools:
+                properties = tool.input_schema.get("properties", {})
+                assert "include_text" not in properties, tool.name
+                if TOOL_SCOPES[tool.name].effect != "read":
+                    continue
+                arguments = dict(OTHER_ARGUMENTS.get(tool.name, {}))
+                if "project" in properties:
+                    arguments["project"] = project
+                if "document_id" not in properties:
+                    calls.append((tool.name, arguments))
+                    continue
+                # Per text version; where the text is optional, also without.
+                if "document_id" not in tool.input_schema.get("required", []):
+                    calls.append((tool.name, arguments))
+                calls += [
+                    (tool.name, arguments | {"document_id": document_id})
+                    for document_id in documents
+                ]
+            # Dry runs of write tools read state too.
+            first = rows[0]
+            text = {"case_id": first["case_id"], "language": first["language"]}
+            calls += [
+                ("set_final_result", {"project": project} | text),
+                ("accept_agreeing_texts", {"project": project}),
+                ("change_final_results", {"project": project, "texts": [text]}),
+                (
+                    "reopen_texts",
+                    {"project": project, "texts": [text], "reason": "Check"},
+                ),
+                ("withdraw_open_tasks", {"project": project, "texts": [text]}),
+            ]
+            for name, arguments in calls:
+                result = await client.call_tool(name, arguments)
+                # A dry run may be refused (nothing to choose from); a read
+                # tool may not, or the check would pass on refusals.
+                if result.is_error and TOOL_SCOPES[name].effect == "read":
+                    refused.add(name)
+                answer = _whole(result)
+                found = [needle for needle in needles if needle in answer]
+                if found:
+                    leaks.append((name, arguments, found))
+            settings = await client.read_resource(
+                f"ontotator://projects/{project}/settings"
+            )
+            answer = str(settings.contents)
+            assert not [needle for needle in needles if needle in answer]
+        assert leaks == []
+        assert refused <= MAY_REFUSE, refused
