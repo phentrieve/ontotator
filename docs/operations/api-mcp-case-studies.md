@@ -34,7 +34,7 @@ Dr. Weber sets up `nephro-2027`: HPO with German translations, a guideline, five
 | Create the project with pins | `POST /projects/` | `admin` | `create_project` | covered (system token only, as in the web interface) |
 | Settings: two annotators per text, consolidator not an annotator, working time | `PATCH P/settings` | `project-admin` | `update_project_settings` | covered |
 | Task profile from a file | `PUT P/profile` | `project-admin` | `set_task_profile` | covered |
-| Publish the guideline | `POST P/guidelines` | `project-admin` | `publish_guideline` | covered |
+| Publish the guideline, or a further version of it | `GET P/guidelines`, `POST P/guidelines` (with `expected_latest_version`) | `read`, `project-admin` | `publish_guideline` | covered |
 | Withdraw a guideline published by mistake | `GET P/guidelines`, `POST P/guidelines/{version}/withdraw` | `read`, `project-admin` | `withdraw_guideline` | added in this PR |
 | Accounts for five people, with setup codes | `GET /admin/users/`, `POST /admin/users/` | `admin` | `create_users` | added in this PR |
 | Hand the setup codes over | none: the server sends no mail | | `create_users` with `codes_path` writes a private CSV | remaining gap (by design) |
@@ -116,7 +116,7 @@ HPO publishes a new release in month four. The data warehouse later also wants t
 | Which projects use which file; who froze translations | `GET /admin/ontologies/` | `admin` | `list_ontology_files` | covered |
 | Dry run of the move: pins, draft terms rewritten or flagged, submitted work counted | `POST P/pins/preview` | `project-admin` | `set_ontology_pins` without `confirm` | covered |
 | Apply exactly that dry run | `POST P/pins/apply` (with `report_sha256`) | `project-admin` | `set_ontology_pins` with `confirm` | covered |
-| Move to the newest translations | `POST P/translations/refresh` | `project-admin` | `refresh_translations` | covered |
+| Later, when a newer translation file is uploaded: move the project to it | `POST P/translations/refresh` | `project-admin` | `refresh_translations` | covered. Not a step of the release move: applying the pins ends the project's frozen translations, its first term search then takes the newest files, and until that search the call answers 409 `TRANSLATIONS_NOT_FROZEN`. It applies to a project that froze its translations earlier |
 | Choose another export: annotations, edit log, working time, translation reviews | `POST P/exports`, `POST P/exports/translation-reviews` | `export` | `start_export` (`kind`) | covered (a translation review export started with a token runs as the token's job) |
 | The accepted results as GA4GH Phenopackets | `POST P/exports/final/preflight`, `POST P/exports/final` (`format: phenopacket`) | `export` | `start_export` (`kind: phenopackets`) | covered (#322); `request_id` added in this PR |
 | Close the project: withdraw the open tasks | `POST /assignments/{id}/revoke` | `project-admin` | `withdraw_task`, `hand_over_open_tasks` | added in this PR |
