@@ -67,6 +67,9 @@ export function useTermLabels(projectKey: string, terms: TermLookup[]) {
       if (requestGeneration !== generation.current) return;
       for (const term of missing) requested.current.delete(keyOf(term));
       if (missing.some((term) => (attempts.current.get(keyOf(term)) ?? 0) < 3)) {
+        // One timer at a time: a second failed lookup would otherwise overwrite the first timer,
+        // which then outlives the component because nothing can clear it any more.
+        if (retryTimer.current) clearTimeout(retryTimer.current);
         retryTimer.current = setTimeout(() => {
           retryTimer.current = null;
           setRetryTick((current) => current + 1);
