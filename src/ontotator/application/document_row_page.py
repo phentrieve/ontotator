@@ -225,6 +225,22 @@ def _upload(facts: RowFacts, document_id: str) -> dict[str, Any] | None:
     }
 
 
+def _editorial_correction(facts: RowFacts, document_id: str) -> dict[str, Any] | None:
+    """The editorial correction that made a version (issue 453)."""
+    record = facts.editorial_corrections.get(document_id)
+    if record is None:
+        return None
+    corrected_by = record["corrected_by"]
+    return {
+        "reason": record["reason"],
+        "previous_document_id": record["previous_document_id"],
+        "inserted_characters": record["inserted_characters"],
+        "deleted_characters": record["deleted_characters"],
+        "corrected_at": record["corrected_at"],
+        "corrected_by": facts.people.get(corrected_by) if corrected_by else None,
+    }
+
+
 def _report(facts: RowFacts, report_id: str | None) -> dict[str, Any] | None:
     fact = facts.reports.get(report_id) if report_id is not None else None
     if fact is None:
@@ -556,6 +572,7 @@ def _build_row(ctx: _Context, case_id: str, language: str) -> dict[str, Any]:
                 "acceptance": _acceptance(facts, v.document_id),
                 "discarded": _discard(facts, v.document_id),
                 "upload": _upload(facts, v.document_id),
+                "editorial_correction": _editorial_correction(facts, v.document_id),
             }
             for chain in chains
             for v in chain.versions

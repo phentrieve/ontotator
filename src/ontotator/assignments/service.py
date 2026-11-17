@@ -281,6 +281,21 @@ def source_obligation_documents(
     )
 
 
+def unopened_tasks(project_id: int, document_id: str) -> tuple[Any, ...]:
+    """The annotation tasks on a version that ``move_waiting_tasks`` moves:
+    nobody ever opened them, they are not paused and not from proposals."""
+    return (
+        AssignmentRow.project_id == project_id,
+        AssignmentRow.document_id == document_id,
+        AssignmentRow.task == "annotate",
+        AssignmentRow.revoked_at.is_(None),
+        AssignmentRow.status == "open",
+        AssignmentRow.held.is_(False),
+        AssignmentRow.active_round_id.is_(None),
+        AssignmentRow.annotation_mode != "proposals",
+    )
+
+
 def move_waiting_tasks(
     conn: Connection,
     actor: Actor,
@@ -288,9 +303,15 @@ def move_waiting_tasks(
     from_document_id: str,
     to_document_id: str,
     now: datetime,
+    *,
+    waiting_only: bool = True,
 ) -> None:
     """Waiting tasks follow a correction of their version, so that they open
     on the accepted text without a lead step (issue 213).
+
+    With ``waiting_only=False`` (an editorial correction, issue 453) every
+    task nobody opened follows, also on an accepted version: the new version
+    has the status of the one it corrects, so nothing waits for a review.
 
     Only tasks nobody ever opened: no draft or round exists to carry, so the
     assignment itself moves and keeps its id. Started work, paused tasks and
@@ -298,26 +319,20 @@ def move_waiting_tasks(
     R10) stay with the lead's "Handle text change". The caller holds the
     project lock and has written the status of ``from_document_id``.
     """
-    rule_on = conn.execute(
-        select(ProjectRow.annotate_accepted_translations_only).where(
-            ProjectRow.id == project_id
-        )
-    ).scalar_one()
-    variants = load_variants(conn, project_id, from_document_id)
-    if not rule_on or not annotation_waits(variants[from_document_id], variants.get):
-        return
+    if waiting_only:
+        rule_on = conn.execute(
+            select(ProjectRow.annotate_accepted_translations_only).where(
+                ProjectRow.id == project_id
+            )
+        ).scalar_one()
+        variants = load_variants(conn, project_id, from_document_id)
+        if not rule_on or not annotation_waits(
+            variants[from_document_id], variants.get
+        ):
+            return
     moved = conn.execute(
         update(AssignmentRow)
-        .where(
-            AssignmentRow.project_id == project_id,
-            AssignmentRow.document_id == from_document_id,
-            AssignmentRow.task == "annotate",
-            AssignmentRow.revoked_at.is_(None),
-            AssignmentRow.status == "open",
-            AssignmentRow.held.is_(False),
-            AssignmentRow.active_round_id.is_(None),
-            AssignmentRow.annotation_mode != "proposals",
-        )
+        .where(*unopened_tasks(project_id, from_document_id))
         .values(
             document_id=to_document_id,
             workflow_revision=AssignmentRow.workflow_revision + 1,

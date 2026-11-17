@@ -277,6 +277,14 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "expected_previous_sha256": "a" * 64,
             "confirm": True,
         },
+        "editorial_correction": {
+            "project": "p",
+            "document_id": "d",
+            "replacements": [{"old": "Pat ient", "new": "Patient"}],
+            "reason": "Space inside a word",
+            "expected_text_sha256": "a" * 64,
+            "confirm": True,
+        },
         "discard_translation": {
             "project": "p",
             "document_id": "d",

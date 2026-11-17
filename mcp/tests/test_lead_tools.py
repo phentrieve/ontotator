@@ -384,6 +384,127 @@ async def test_accept_translation_version_confirms_with_the_dry_runs_text_hash(
     assert sent.json() == {"reason": "Checked", "expected_text_sha256": "b" * 64}
 
 
+async def test_editorial_correction_confirms_with_the_dry_runs_text_hash(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    """Issue 453: replacements go to the server, which builds the text; the
+    dry run returns the diff and the consequences, not the texts."""
+    route = f"{P}/documents/{{doc}}/editorial-correction"
+    change = build(
+        "EditorialChange",
+        old_start=7,
+        old_end=8,
+        new_start=7,
+        new_end=7,
+        old_text=" ",
+        new_text="",
+    )
+    preview = build(
+        "EditorialCorrectionPreview",
+        document_id="d",
+        version=2,
+        next_version=3,
+        translation_status="accepted",
+        available=True,
+        reason=None,
+        text_sha256="b" * 64,
+        text="Der Patient",
+        previous_text="Der Pat ient",
+        changed_characters=1,
+        changed_characters_limit=20,
+        diff=[change],
+        tasks_following=2,
+        findings={"submitted": 3, "needs_check": 1},
+        proposals={"sets": 1, "carried": 4, "needs_check": 0},
+    )
+    fake.on("POST", f"{route}/preview", preview)
+    replacements = [{"old": "Pat ient", "new": "Patient"}]
+    args = {
+        "project": "p",
+        "document_id": "d",
+        "replacements": replacements,
+        "reason": "Space inside a word",
+    }
+    dry = await call(mcp_client, "editorial_correction", args)
+    assert dry["applied"] is False
+    plan = dry["plan"]
+    assert (plan["available"], plan["next_version"]) == (True, 3)
+    assert plan["translation_status"] == "accepted"
+    assert plan["text_sha256"] == "b" * 64
+    # The diff and the consequences, not the texts.
+    assert plan["diff"] == [change]
+    assert plan["tasks_following"] == 2
+    assert plan["findings"] == {"submitted": 3, "needs_check": 1}
+    assert plan["proposals"] == {"sets": 1, "carried": 4, "needs_check": 0}
+    assert "text" not in plan and "previous_text" not in plan
+    assert (plan["text_characters"], plan["previous_text_characters"]) == (11, 12)
+    [checked] = fake.calls_to("POST", f"{route}/preview")
+    assert checked.json() == {"replacements": replacements}
+    assert not fake.calls_to("POST", route)
+    # A stale dry run cannot be confirmed: the hash is required.
+    with pytest.raises(ToolFailed, match="expected_text_sha256"):
+        await call(mcp_client, "editorial_correction", args | {"confirm": True})
+    assert not fake.calls_to("POST", route)
+    done = await call(
+        mcp_client,
+        "editorial_correction",
+        args | {"confirm": True, "expected_text_sha256": "b" * 64},
+    )
+    assert done["applied"] is True
+    # The hash is the dry run's, not re-read at confirm.
+    assert len(fake.calls_to("POST", f"{route}/preview")) == 1
+    [sent] = fake.calls_to("POST", route)
+    assert sent.json() == {
+        "replacements": replacements,
+        "reason": "Space inside a word",
+        "expected_text_sha256": "b" * 64,
+    }
+
+
+async def test_editorial_correction_passes_the_guards_refusal_on(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    route = f"{P}/documents/{{doc}}/editorial-correction"
+    fake.on(
+        "POST",
+        route,
+        refusal(
+            409,
+            "EDITORIAL_CORRECTION_NOT_AVAILABLE",
+            {
+                "reason": "too_large",
+                "changed_characters": 31,
+                "changed_characters_limit": 20,
+            },
+        ),
+    )
+    with pytest.raises(ToolFailed, match="too_large"):
+        await call(
+            mcp_client,
+            "editorial_correction",
+            {
+                "project": "p",
+                "document_id": "d",
+                "replacements": [{"old": "a", "new": "b" * 30}],
+                "reason": "Rewrite",
+                "expected_text_sha256": "b" * 64,
+                "confirm": True,
+            },
+        )
+    # Replacements need an 'old' passage and a reason.
+    for wrong in (
+        {"replacements": [{"old": "", "new": "x"}], "reason": "r"},
+        {"replacements": [], "reason": "r"},
+        {"replacements": [{"old": "a", "new": "b"}], "reason": ""},
+    ):
+        with pytest.raises(ToolFailed):
+            await call(
+                mcp_client,
+                "editorial_correction",
+                {"project": "p", "document_id": "d"} | wrong,
+            )
+
+
 async def test_upload_translation_version_confirms_with_the_dry_runs_text_hash(
     fake: FakeApi, mcp_client: Client
 ) -> None:

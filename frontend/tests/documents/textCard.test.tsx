@@ -515,6 +515,19 @@ describe("translation part", () => {
     expect(onAcceptVersion).toHaveBeenCalledWith(row, versions[2]);
   });
 
+  it("issue 453: a version made by an editorial correction names who corrected it and why", () => {
+    const versions = [
+      version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "accepted", chain_name: "m1", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "m1", translation_status: "accepted",
+        editorial_correction: { reason: "Space before the full stop", previous_document_id: "case-200-de", inserted_characters: 0, deleted_characters: 1,
+          corrected_at: "2026-11-17T10:12:00", corrected_by: { pseudonym: "ann-0002", display_name: "Project lead", is_me: false } } }),
+    ];
+    const row = assignRow({ versions, work: [] });
+    renderCard({ row, initialSegment: "translation", now: new Date("2026-11-20T12:00:00") });
+    const part = within(card()).getByRole("heading", { name: "Translation" }).closest("section")!;
+    expect(within(part).getByText("Editorial correction by Project lead (ann-0002), 17 Nov, 10:12 · Space before the full stop")).toBeTruthy();
+  });
+
   it("issue 341: Upload new version… on the newest version of each translation, with how an uploaded version was made", () => {
     const versions = [
       version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "accepted", chain_name: "m1", is_newest_in_chain: false }),

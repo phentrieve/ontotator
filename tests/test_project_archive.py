@@ -929,6 +929,68 @@ def _text_overrides(db: Any, key: str) -> list[tuple[Any, ...]]:
         ]
 
 
+def test_an_editorial_correction_round_trips(
+    servers: tuple[TestClient, TestClient], tmp_path: Path
+) -> None:
+    """Issue 453: the corrected version and its record (the reason, and the
+    lead mapped to their account) travel with the archive."""
+    from ontotator.application.editorial_corrections import (
+        EditorialCorrectionService,
+        editorial_corrections,
+    )
+    from ontotator.storage.tables import JobRow, UserRow
+
+    source, target = servers
+    built = _consolidation_project(source.app)  # type: ignore[arg-type]
+    scenario: Scenario = built["scenario"]
+    app: Any = source.app
+    lead = app.state.accounts.get_by_username(scenario.users["lead"])
+    previous = app.state.repo.get_variant(scenario.key, built["translation_id"])
+    saved = EditorialCorrectionService(_db(source), app.state.jobs).correct(
+        Actor.user(lead.id, lead.username),
+        scenario.key,
+        previous.document_id,
+        text=GERMAN + ".",
+        expected_text_sha256=previous.text_sha256,
+        reason="Full stop was missing",
+    )
+    # The correction queued the re-anchoring of proposals; an archive waits.
+    with _db(source).snapshot() as conn:
+        (job_id,) = conn.execute(
+            select(JobRow.id).where(JobRow.kind == "reanchor")
+        ).scalars()
+    jobs = app.state.jobs
+    assert jobs.run(jobs.claim(job_id, "archive-test"), "archive-test").status == (
+        "succeeded"
+    )
+    data = _export(source, scenario.key, tmp_path)
+
+    result = project_archive.import_archive(_db(target), OPERATOR, data)
+
+    assert result["verification"]["ok"], result["verification"]
+    assert _counts(_db(target), scenario.key) == _counts(_db(source), scenario.key)
+
+    def record(client: TestClient) -> tuple[Any, ...]:
+        with _db(client).snapshot() as conn:
+            pid = conn.execute(
+                select(ProjectRow.id).where(ProjectRow.project_key == scenario.key)
+            ).scalar_one()
+            row = editorial_corrections(conn, pid)[saved["document_id"]]
+            lead_pseudonym = conn.execute(
+                select(UserRow.pseudonym).where(UserRow.id == row["corrected_by"])
+            ).scalar_one()
+        return (
+            row["reason"],
+            row["previous_document_id"],
+            row["inserted_characters"],
+            row["corrected_at"],
+            lead_pseudonym,
+        )
+
+    assert record(target) == record(source)
+    assert record(target)[:3] == ("Full stop was missing", previous.document_id, 1)
+
+
 def test_an_uploaded_translation_version_round_trips(
     servers: tuple[TestClient, TestClient], tmp_path: Path
 ) -> None:

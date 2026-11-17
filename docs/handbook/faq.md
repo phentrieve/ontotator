@@ -184,6 +184,10 @@ You assigned a translation review to someone who already reviewed this version, 
 
 **Upload new version…** was refused when you saved: a newer version of the translation arrived meanwhile, the translation was discarded, or a translation review of the version was assigned. The dialog names the reason. Close it and look at the version list again; your text is not saved, so keep it. See [Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation).
 
+### An editorial correction was refused
+
+The correction would change a number, is larger than the cap (5 % of the text, at least 20 and at most 200 characters), or the version cannot be corrected any more: a newer version arrived, a translation review of it is open, it was rejected or queried, or it was discarded. The answer names the reason. A change of content belongs in a translation review. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
+
 ### A task is still paused after I closed the report
 
 Closing a report does not always release the pause. The row shows **Resume task…**; click it and release the pause. See [Decide on a problem report](lead-results.md#decide-on-a-problem-report).

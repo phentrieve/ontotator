@@ -7487,6 +7487,134 @@
         "x-ontotator-project-token": true
       }
     },
+    "/api/v1/projects/{key}/documents/{doc}/editorial-correction/preview": {
+      "post": {
+        "tags": [
+          "translation-workflow"
+        ],
+        "summary": "Preview Editorial Correction",
+        "description": "Issue 453, read only: whether this version can be corrected and, with\na text or replacements, the changes, the guards and what follows.",
+        "operationId": "preview_editorial_correction_api_v1_projects__key__documents__doc__editorial_correction_preview_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "doc",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Doc"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditorialCorrectionPreviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EditorialCorrectionPreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/documents/{doc}/editorial-correction": {
+      "post": {
+        "tags": [
+          "translation-workflow"
+        ],
+        "summary": "Editorial Correction",
+        "description": "Issue 453: save a small editorial fix (spacing, typos, grammar) as the\nnext version of this translation, with this version's status.",
+        "operationId": "editorial_correction_api_v1_projects__key__documents__doc__editorial_correction_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "doc",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Doc"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditorialCorrectionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EditorialCorrectionResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
     "/api/v1/translation-reviews/{assignment_id}/source-obligations": {
       "get": {
         "tags": [
@@ -18626,6 +18754,16 @@
                 "type": "null"
               }
             ]
+          },
+          "editorial_correction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VersionEditorialCorrectionView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -19018,6 +19156,491 @@
         ],
         "title": "EditorProposal",
         "description": "Editor projection; producer metadata never changes snapshot hashes."
+      },
+      "EditorialChange": {
+        "properties": {
+          "old_start": {
+            "type": "integer",
+            "title": "Old Start"
+          },
+          "old_end": {
+            "type": "integer",
+            "title": "Old End"
+          },
+          "new_start": {
+            "type": "integer",
+            "title": "New Start"
+          },
+          "new_end": {
+            "type": "integer",
+            "title": "New End"
+          },
+          "old_text": {
+            "type": "string",
+            "title": "Old Text"
+          },
+          "new_text": {
+            "type": "string",
+            "title": "New Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "old_start",
+          "old_end",
+          "new_start",
+          "new_end",
+          "old_text",
+          "new_text"
+        ],
+        "title": "EditorialChange",
+        "description": "A changed passage, in Unicode code points of the old and the new text."
+      },
+      "EditorialCorrectionPreview": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "next_version": {
+            "type": "integer",
+            "title": "Next Version"
+          },
+          "translation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translation Status"
+          },
+          "text_sha256": {
+            "type": "string",
+            "title": "Text Sha256"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "review_on": {
+            "type": "boolean",
+            "title": "Review On"
+          },
+          "annotate_accepted_only": {
+            "type": "boolean",
+            "title": "Annotate Accepted Only"
+          },
+          "annotations": {
+            "$ref": "#/components/schemas/LeadCorrectionAnnotationsView"
+          },
+          "open_consolidations": {
+            "type": "integer",
+            "title": "Open Consolidations"
+          },
+          "final_result": {
+            "type": "boolean",
+            "title": "Final Result"
+          },
+          "tasks_following": {
+            "type": "integer",
+            "title": "Tasks Following"
+          },
+          "changed_characters_limit": {
+            "type": "integer",
+            "title": "Changed Characters Limit"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "previous_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Text"
+          },
+          "new_text_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Text Sha256"
+          },
+          "inserted_characters": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inserted Characters"
+          },
+          "deleted_characters": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted Characters"
+          },
+          "changed_characters": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changed Characters"
+          },
+          "digits_changed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Digits Changed"
+          },
+          "diff": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EditorialChange"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diff"
+          },
+          "findings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EditorialFindings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proposals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EditorialProposals"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "case_id",
+          "language",
+          "version",
+          "next_version",
+          "translation_status",
+          "text_sha256",
+          "available",
+          "reason",
+          "review_on",
+          "annotate_accepted_only",
+          "annotations",
+          "open_consolidations",
+          "final_result",
+          "tasks_following",
+          "changed_characters_limit",
+          "text",
+          "previous_text",
+          "new_text_sha256",
+          "inserted_characters",
+          "deleted_characters",
+          "changed_characters",
+          "digits_changed",
+          "diff",
+          "findings",
+          "proposals"
+        ],
+        "title": "EditorialCorrectionPreview",
+        "description": "What an editorial correction of this version would do (read only)."
+      },
+      "EditorialCorrectionPreviewRequest": {
+        "properties": {
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "replacements": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EditorialReplacement"
+                },
+                "type": "array",
+                "maxItems": 200,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replacements"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EditorialCorrectionPreviewRequest",
+        "description": "Issue 453: the correction to check before it is saved (both fields\nleft out: only whether a correction is possible)."
+      },
+      "EditorialCorrectionRequest": {
+        "properties": {
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "replacements": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EditorialReplacement"
+                },
+                "type": "array",
+                "maxItems": 200,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replacements"
+          },
+          "expected_text_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Text Sha256"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_text_sha256",
+          "reason"
+        ],
+        "title": "EditorialCorrectionRequest",
+        "description": "Issue 453: an editorial correction of a translation version."
+      },
+      "EditorialCorrectionResult": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "previous_document_id": {
+            "type": "string",
+            "title": "Previous Document Id"
+          },
+          "previous_version": {
+            "type": "integer",
+            "title": "Previous Version"
+          },
+          "translation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translation Status"
+          },
+          "text_sha256": {
+            "type": "string",
+            "title": "Text Sha256"
+          },
+          "inserted_characters": {
+            "type": "integer",
+            "title": "Inserted Characters"
+          },
+          "deleted_characters": {
+            "type": "integer",
+            "title": "Deleted Characters"
+          },
+          "tasks_following": {
+            "type": "integer",
+            "title": "Tasks Following"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "document_id",
+          "version",
+          "previous_document_id",
+          "previous_version",
+          "translation_status",
+          "text_sha256",
+          "inserted_characters",
+          "deleted_characters",
+          "tasks_following"
+        ],
+        "title": "EditorialCorrectionResult"
+      },
+      "EditorialFindings": {
+        "properties": {
+          "submitted": {
+            "type": "integer",
+            "title": "Submitted"
+          },
+          "needs_check": {
+            "type": "integer",
+            "title": "Needs Check"
+          }
+        },
+        "type": "object",
+        "required": [
+          "submitted",
+          "needs_check"
+        ],
+        "title": "EditorialFindings"
+      },
+      "EditorialProposals": {
+        "properties": {
+          "sets": {
+            "type": "integer",
+            "title": "Sets"
+          },
+          "carried": {
+            "type": "integer",
+            "title": "Carried"
+          },
+          "needs_check": {
+            "type": "integer",
+            "title": "Needs Check"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sets",
+          "carried",
+          "needs_check"
+        ],
+        "title": "EditorialProposals"
+      },
+      "EditorialReplacement": {
+        "properties": {
+          "old": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Old"
+          },
+          "new": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "New"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "old",
+          "new"
+        ],
+        "title": "EditorialReplacement",
+        "description": "One passage of the text and what replaces it."
       },
       "EvidenceMention": {
         "properties": {
@@ -32776,6 +33399,58 @@
         "type": "object",
         "title": "VersionDiscardView",
         "description": "Discard record of a text version (lead workflow)."
+      },
+      "VersionEditorialCorrectionView": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "previous_document_id": {
+            "type": "string",
+            "title": "Previous Document Id"
+          },
+          "inserted_characters": {
+            "type": "integer",
+            "title": "Inserted Characters"
+          },
+          "deleted_characters": {
+            "type": "integer",
+            "title": "Deleted Characters"
+          },
+          "corrected_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corrected At"
+          },
+          "corrected_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonRefView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason",
+          "previous_document_id",
+          "inserted_characters",
+          "deleted_characters"
+        ],
+        "title": "VersionEditorialCorrectionView",
+        "description": "The editorial correction that made this version (issue 453)."
       },
       "VersionMarkerView": {
         "properties": {

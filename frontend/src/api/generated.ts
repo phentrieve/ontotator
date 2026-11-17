@@ -2163,6 +2163,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{key}/documents/{doc}/editorial-correction/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Editorial Correction
+         * @description Issue 453, read only: whether this version can be corrected and, with
+         *     a text or replacements, the changes, the guards and what follows.
+         */
+        post: operations["preview_editorial_correction_api_v1_projects__key__documents__doc__editorial_correction_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{key}/documents/{doc}/editorial-correction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Editorial Correction
+         * @description Issue 453: save a small editorial fix (spacing, typos, grammar) as the
+         *     next version of this translation, with this version's status.
+         */
+        post: operations["editorial_correction_api_v1_projects__key__documents__doc__editorial_correction_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/translation-reviews/{assignment_id}/source-obligations": {
         parameters: {
             query?: never;
@@ -6141,6 +6183,7 @@ export interface components {
             acceptance?: components["schemas"]["VersionAcceptanceView"] | null;
             discarded?: components["schemas"]["VersionDiscardView"] | null;
             upload?: components["schemas"]["VersionUploadView"] | null;
+            editorial_correction?: components["schemas"]["VersionEditorialCorrectionView"] | null;
         };
         /**
          * DocumentsSummaryView
@@ -6301,6 +6344,155 @@ export interface components {
             proposal_set_id?: number | null;
             /** Notes */
             notes?: string[];
+        };
+        /**
+         * EditorialChange
+         * @description A changed passage, in Unicode code points of the old and the new text.
+         */
+        EditorialChange: {
+            /** Old Start */
+            old_start: number;
+            /** Old End */
+            old_end: number;
+            /** New Start */
+            new_start: number;
+            /** New End */
+            new_end: number;
+            /** Old Text */
+            old_text: string;
+            /** New Text */
+            new_text: string;
+        };
+        /**
+         * EditorialCorrectionPreview
+         * @description What an editorial correction of this version would do (read only).
+         */
+        EditorialCorrectionPreview: {
+            /** Document Id */
+            document_id: string;
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Version */
+            version: number;
+            /** Next Version */
+            next_version: number;
+            /** Translation Status */
+            translation_status: string | null;
+            /** Text Sha256 */
+            text_sha256: string;
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason: string | null;
+            /** Review On */
+            review_on: boolean;
+            /** Annotate Accepted Only */
+            annotate_accepted_only: boolean;
+            annotations: components["schemas"]["LeadCorrectionAnnotationsView"];
+            /** Open Consolidations */
+            open_consolidations: number;
+            /** Final Result */
+            final_result: boolean;
+            /** Tasks Following */
+            tasks_following: number;
+            /** Changed Characters Limit */
+            changed_characters_limit: number;
+            /** Text */
+            text: string | null;
+            /** Previous Text */
+            previous_text: string | null;
+            /** New Text Sha256 */
+            new_text_sha256: string | null;
+            /** Inserted Characters */
+            inserted_characters: number | null;
+            /** Deleted Characters */
+            deleted_characters: number | null;
+            /** Changed Characters */
+            changed_characters: number | null;
+            /** Digits Changed */
+            digits_changed: boolean | null;
+            /** Diff */
+            diff: components["schemas"]["EditorialChange"][] | null;
+            findings: components["schemas"]["EditorialFindings"] | null;
+            proposals: components["schemas"]["EditorialProposals"] | null;
+        };
+        /**
+         * EditorialCorrectionPreviewRequest
+         * @description Issue 453: the correction to check before it is saved (both fields
+         *     left out: only whether a correction is possible).
+         */
+        EditorialCorrectionPreviewRequest: {
+            /** Text */
+            text?: string | null;
+            /** Replacements */
+            replacements?: components["schemas"]["EditorialReplacement"][] | null;
+        };
+        /**
+         * EditorialCorrectionRequest
+         * @description Issue 453: an editorial correction of a translation version.
+         */
+        EditorialCorrectionRequest: {
+            /** Text */
+            text?: string | null;
+            /** Replacements */
+            replacements?: components["schemas"]["EditorialReplacement"][] | null;
+            /** Expected Text Sha256 */
+            expected_text_sha256: string;
+            /** Reason */
+            reason: string;
+        };
+        /** EditorialCorrectionResult */
+        EditorialCorrectionResult: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Document Id */
+            document_id: string;
+            /** Version */
+            version: number;
+            /** Previous Document Id */
+            previous_document_id: string;
+            /** Previous Version */
+            previous_version: number;
+            /** Translation Status */
+            translation_status: string | null;
+            /** Text Sha256 */
+            text_sha256: string;
+            /** Inserted Characters */
+            inserted_characters: number;
+            /** Deleted Characters */
+            deleted_characters: number;
+            /** Tasks Following */
+            tasks_following: number;
+        };
+        /** EditorialFindings */
+        EditorialFindings: {
+            /** Submitted */
+            submitted: number;
+            /** Needs Check */
+            needs_check: number;
+        };
+        /** EditorialProposals */
+        EditorialProposals: {
+            /** Sets */
+            sets: number;
+            /** Carried */
+            carried: number;
+            /** Needs Check */
+            needs_check: number;
+        };
+        /**
+         * EditorialReplacement
+         * @description One passage of the text and what replaces it.
+         */
+        EditorialReplacement: {
+            /** Old */
+            old: string;
+            /** New */
+            new: string;
         };
         /**
          * EvidenceMention
@@ -11270,6 +11462,23 @@ export interface components {
             discarded_by?: components["schemas"]["PersonRefView"] | null;
         };
         /**
+         * VersionEditorialCorrectionView
+         * @description The editorial correction that made this version (issue 453).
+         */
+        VersionEditorialCorrectionView: {
+            /** Reason */
+            reason: string;
+            /** Previous Document Id */
+            previous_document_id: string;
+            /** Inserted Characters */
+            inserted_characters: number;
+            /** Deleted Characters */
+            deleted_characters: number;
+            /** Corrected At */
+            corrected_at?: string | null;
+            corrected_by?: components["schemas"]["PersonRefView"] | null;
+        };
+        /**
          * VersionMarkerView
          * @description Text cell marker: "v2 corrected", "v2" or "{version} translations"
          *     (parallel roots: ``version`` is the number of roots).
@@ -15731,6 +15940,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VersionUploadResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_editorial_correction_api_v1_projects__key__documents__doc__editorial_correction_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                doc: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditorialCorrectionPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EditorialCorrectionPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    editorial_correction_api_v1_projects__key__documents__doc__editorial_correction_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                doc: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditorialCorrectionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EditorialCorrectionResult"];
                 };
             };
             /** @description Validation Error */
