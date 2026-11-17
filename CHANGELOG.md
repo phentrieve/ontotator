@@ -38,6 +38,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Navigation: an address that changed between the first display of the app after logging in and the moment the app starts following the address was written back to the page first shown, so the page stayed on My tasks. The app now reads the address again when it starts following it (#380). Browser specs that logged in on their own now use the shared log-in helper, which waits for that moment.
+- Tests: browser specs cover the project settings forms (General, Prefilled values, Values annotators can choose, the Workflow cards, Remove… and the revoke dialog of People), Administration › Users (Edit, the administrator role, Reset code, Deactivate…, Activate, History, Anonymise…), the retry paths of the translation review (**Reload source updates**, **Retry corrected version metadata**) and a move to a newer ontology release with the rewritten draft terms (#170).
 - Consolidation: after **Reopen all decisions…** the first open group in text order opens, not the group that was first open before the reopen (#375).
 - Text-change dialogs: in **Handle text change…** a Retry while the new version has no proposals keeps the reason, the disabled **Move** and **Finish** and the current choice until the answer arrives, so **Move** no longer flashes selected; Retry shows busy and keeps focus. In **Carry to v2…** the footer Retry after a failed **Assign** keeps focus in the dialog (on the busy **Assign**, then on the new Retry) (#419).
 - Documents: a regression test covers **Select all N filtered texts** with a filter and hidden texts not in plan; it counts and selects only the rows the table can show (#379, fixed in 0.10.0 by #383).

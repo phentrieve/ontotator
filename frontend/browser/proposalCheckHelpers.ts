@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
-import { openTasksHome, TEST_PASSWORD, routerReady } from "./helpers";
+import { loginThroughForm } from "./helpers";
 
 /** Scenarios of ``POST /__test_proposal_check__`` (tests/browser_proposal_check_scenarios.py). */
 export type ProposalCheckScenarioName = "FRESH" | "ONE_ASSIGNED" | "CHECKED" | "CONSOLIDATING" | "CONSOLIDATING_ALI" | "NEWER_SET";
@@ -33,13 +33,7 @@ export async function proposalCheckScenario(page: Page, name: ProposalCheckScena
 
 /** Log in as scenario person ``name`` through the login form (as ``loginOverviewUser``). */
 export async function loginScenarioUser(page: Page, scenario: Pick<ProposalCheckScenario, "users" | "display_names">, name: ProposalCheckPerson): Promise<void> {
-  await openTasksHome(page);
-  const form = page.getByRole("form", { name: "Log in to Ontotator" });
-  await form.getByLabel("Username", { exact: true }).fill(scenario.users[name]);
-  await form.getByLabel("Password", { exact: true }).fill(TEST_PASSWORD);
-  await form.getByRole("button", { name: "Log in", exact: true }).click();
-  await expect(page.getByTestId("current-user")).toContainText(scenario.display_names[name]);
-  await routerReady(page);
+  await loginThroughForm(page, scenario.users[name], scenario.display_names[name]);
 }
 
 /** The text card dialog of one text. */

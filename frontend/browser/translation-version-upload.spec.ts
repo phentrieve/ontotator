@@ -12,7 +12,7 @@ import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { documentsReady, openTextCard, textCard, textVersionItems } from "./documentsHelpers";
-import { TEST_PASSWORD } from "./helpers";
+import { loginThroughForm } from "./helpers";
 import { leadScenario, type LeadScenario } from "./leadWorkflowHelpers";
 
 test.setTimeout(240_000);
@@ -52,13 +52,7 @@ function consoleErrors(page: Page): string[] {
 }
 
 async function loginLead(page: Page, s: LeadScenario) {
-  await page.goto("/");
-  await page.evaluate(([key, value]) => window.localStorage.setItem(key, value), [`ontotator.lastProject.v1:${s.users.lead}`, s.project]);
-  const form = page.getByRole("form", { name: "Log in to Ontotator" });
-  await form.getByLabel("Username", { exact: true }).fill(s.users.lead);
-  await form.getByLabel("Password", { exact: true }).fill(TEST_PASSWORD);
-  await form.getByRole("button", { name: "Log in", exact: true }).click();
-  await expect(page.getByTestId("current-user")).toContainText(s.display_names.lead);
+  await loginThroughForm(page, s.users.lead, s.display_names.lead, { lastProject: s.project });
   await expect(page).toHaveURL(new RegExp(`#/projects/${esc(s.project)}/documents`));
   await documentsReady(page);
 }
