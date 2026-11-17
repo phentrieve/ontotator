@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-EjJngTEr.js";import{n as a,t as o}from"./lib-Bu-HJ8iH.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-DP3pFBUy.js";import{n as a,t as o}from"./lib-D3dXysdU.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -941,7 +941,7 @@ The screen is read-only after you submitted, when the task is no longer yours, w
 
 What for: see who marked what and work through the differences in order.
 
-1. The **Clinical text** shows one underline per person. The legend below says which line style belongs to whom. Kept findings are shaded; the selected group is framed.
+1. The **Clinical text** shows one underline per person. The legend below says which line style belongs to whom. There are four line styles: with more than four people, the fourth (double) line stands for everyone from the fourth person on, and the legend lists them, for example *Line 4 (double): +5: …*. The table of a group still has every person. Kept findings are shaded; the selected group is framed.
 2. Beside it, the list **Groups** holds the groups in text order, each with its passage and [its state](#groups-and-their-states).
 3. One group is open at a time. Click a group, or a marked passage in the text, to open it.
 4. Press \`j\` for the next open group and \`k\` for the previous one, or click **Next open group** on the progress card.
@@ -952,7 +952,7 @@ On a smaller screen, use **Hide text** and **Show text** to make room. On a phon
 
 What for: decide a group by choosing, per row, the value that is right.
 
-1. Open a group. The table has one column per person. A robot icon marks findings from a tool proposal.
+1. Open a group. The table has one column per person. A robot icon marks findings from a tool proposal. With many people the table is wider than its box: scroll it sideways; the row names on the left stay in view.
 2. The rows are **Term**, one row per value field (for example the assertion), **Text**, **Modifiers** (only if someone used modifiers) and **Note**. Rows where people disagree come first and are highlighted; *(all agree)* marks rows that need no choice. You can mix: take the term from one person and a value from another.
 3. In each highlighted row, click the ✓ next to the value you want. Its button is named after the value, for example *Take Hypotonia … for Term*.
 4. Read the result line below the table. It starts with "Result:" and lists what is still not chosen, for example *Term not chosen yet* or *text not chosen yet*. Once the term is chosen, **Not taken:** lists other people's terms that are not in the result.
@@ -2204,7 +2204,9 @@ What for: assign a single review or annotation.
 2. Tick the people. To annotate yourself without the Annotator role, click **Add me as annotator**.
 3. Click the assign button, for example *Assign 2 people*.
 
-To change the limit of annotators per text from here, click the info button (i) next to the limit and enter the number:
+With more than five people on a text, the line *Assigned:* names the first five and how many more there are, for example *and 3 more*; the list marks each of them *Already assigned*.
+
+To change the limit of annotators per text from here, click the info button (i) next to the limit and enter the number (1 to 20):
 
 - **Only for the selected text** (with several texts: **Only for the selected texts**) gives these texts their own limit, for example 4 annotators on one text for a method comparison in a project with 1. Click the button that names the number of texts, for example *Change for 1 text*. The text keeps its own value for every version, also a corrected one; the project setting and the other texts stay as they are. Entering the project's number again returns the text to the project setting. The popover then explains *Sets the most annotators for this text only (project: 1)*, and for a text that already has its own value its title reads, for example, *Up to 4 annotators for this text (project: 1)*.
 - **For all texts** changes the project setting. Click **Change for all texts**. Texts with their own value keep it.
@@ -2795,7 +2797,7 @@ A text's own plan can override this until work on it starts.
 What for: decide how many people annotate each text and who may consolidate.
 
 1. Open **Settings**, tab **Workflow**, card **Annotation and consolidation**.
-2. Set **Annotators per text** (1 to 5). It is an upper limit; fewer is fine.
+2. Set **Annotators per text** (1 to 20). It is an upper limit; fewer is fine. A single text can have its own number, also 1 to 20 ([Assign work to the selected texts](lead-documents.md#assign-work-to-the-selected-texts)). The agreement compares every two annotators of a text, so a text with 20 annotators adds 190 pairs to agreement.csv.
 3. Tick **Annotate only after the translation review is accepted** if translations must be reviewed before annotation. Nobody can then annotate a translation that is not accepted; you can still assign annotators while the review is underway ([Assign work to the selected texts](lead-documents.md#assign-work-to-the-selected-texts)).
 4. Tick **Consolidator must not be one of the text's annotators** if annotators may not consolidate their own texts.
 5. Tick **Hide annotator names during consolidation** if consolidators should decide without knowing who marked what. Off by default.

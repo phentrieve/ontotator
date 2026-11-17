@@ -419,7 +419,9 @@ What for: assign a single review or annotation.
 2. Tick the people. To annotate yourself without the Annotator role, click **Add me as annotator**.
 3. Click the assign button, for example *Assign 2 people*.
 
-To change the limit of annotators per text from here, click the info button (i) next to the limit and enter the number:
+With more than five people on a text, the line *Assigned:* names the first five and how many more there are, for example *and 3 more*; the list marks each of them *Already assigned*.
+
+To change the limit of annotators per text from here, click the info button (i) next to the limit and enter the number (1 to 20):
 
 - **Only for the selected text** (with several texts: **Only for the selected texts**) gives these texts their own limit, for example 4 annotators on one text for a method comparison in a project with 1. Click the button that names the number of texts, for example *Change for 1 text*. The text keeps its own value for every version, also a corrected one; the project setting and the other texts stay as they are. Entering the project's number again returns the text to the project setting. The popover then explains *Sets the most annotators for this text only (project: 1)*, and for a text that already has its own value its title reads, for example, *Up to 4 annotators for this text (project: 1)*.
 - **For all texts** changes the project setting. Click **Change for all texts**. Texts with their own value keep it.

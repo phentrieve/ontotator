@@ -803,8 +803,8 @@ describe("workflow settings", () => {
     fireEvent.click(within(group).getByRole("radio", { name: "Plan nothing; I plan texts on Documents" }));
     const count = within(form).getByRole("spinbutton", { name: /Annotators per text/ });
     expect(count).toHaveProperty("min", "1");
-    expect(count).toHaveProperty("max", "5");
-    expect(within(form).getByText("Upper limit; fewer is fine.")).toBeTruthy();
+    expect(count).toHaveProperty("max", "20");
+    expect(within(form).getByText("1 to 20. Upper limit; fewer is fine.")).toBeTruthy();
     fireEvent.change(count, { target: { value: "3" } });
     vi.mocked(api.updateProjectSettings).mockResolvedValue({ ...settings, import_plan: "nothing", annotations_per_text: 3 });
     fireEvent.click(within(form).getByRole("button", { name: "Save changes" }));

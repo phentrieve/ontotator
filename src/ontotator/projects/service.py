@@ -16,6 +16,10 @@ from ontotator.auth.audit import Actor, record_audit
 from ontotator.authz.memberships import grant_roles
 from ontotator.authz.policy import Action
 from ontotator.authz.project_authority import require_project_management
+from ontotator.domain.annotation_limits import (
+    MAX_ANNOTATIONS_PER_TEXT,
+    MIN_ANNOTATIONS_PER_TEXT,
+)
 from ontotator.domain.annotation_modes import AnnotationMode
 from ontotator.domain.canonical import canonical_hash
 from ontotator.domain.documents import Document
@@ -163,7 +167,9 @@ class ProjectSettingsChange(BaseModel):
     hidden_axis_values: HiddenValues = Field(default_factory=dict)
     creation_defaults: CreationDefaults = Field(default_factory=dict)
     # ``None`` keeps the stored value (the settings page sends full replaces).
-    annotations_per_text: int | None = Field(None, ge=1, le=5)
+    annotations_per_text: int | None = Field(
+        None, ge=MIN_ANNOTATIONS_PER_TEXT, le=MAX_ANNOTATIONS_PER_TEXT
+    )
     import_plan: ImportPlanSetting | None = None
     tool_proposal_mode: AnnotationMode | None = None
 

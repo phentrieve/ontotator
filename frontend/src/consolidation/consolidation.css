@@ -217,6 +217,8 @@
 
 .cons-legend-swatch {
   display: inline-block;
+  /* A long line (many people on line 4, issue 447) wraps; the swatch keeps its width. */
+  flex: none;
   width: 24px;
   height: 16px;
   background-repeat: no-repeat;
@@ -381,8 +383,17 @@
   vertical-align: middle;
 }
 
+/* Many people (issue 447): the table scrolls sideways inside its box; the row labels stay in view. */
+.cons-compare tbody th,
+.cons-compare thead td:first-child {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background: var(--surface-raised);
+}
+
 .cons-row--conflict td,
-.cons-row--conflict th {
+.cons-compare .cons-row--conflict th {
   background: var(--warning-light);
 }
 
@@ -579,6 +590,11 @@
 /* Related terms (#303): which term is the parent, one line under the Term row, read as part of it. */
 .cons-compare tr:has(+ .cons-row-hint) > * {
   border-bottom-color: transparent;
+}
+
+/* The sticky row label paints its own border: above a hint line it takes the conflict row's colour. */
+.cons-compare .cons-row--conflict:has(+ .cons-row-hint) > th {
+  border-bottom-color: var(--warning-light);
 }
 
 .cons-row-hint td {

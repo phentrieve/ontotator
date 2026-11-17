@@ -71,7 +71,13 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
         ],
         source_submission_ids: Annotated[
             list[str] | None,
-            Field(description="Submissions to merge; None: every eligible one."),
+            Field(
+                description=(
+                    "Submissions to merge (2 to 40, the API's bound); None:"
+                    " every eligible one."
+                ),
+                max_length=40,
+            ),
         ] = None,
         reason: str | None = None,
         confirm_language: bool = False,

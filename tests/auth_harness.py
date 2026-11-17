@@ -75,11 +75,11 @@ def grant(
 
 
 # Texts whose "annotations per text" count the harness lifts past the stored
-# maximum (5, a DB CHECK) for the assignment it wraps: (project id, document).
+# maximum (20, a DB CHECK) for the assignment it wraps: (project id, document).
 _LIFTED: ContextVar[frozenset[tuple[int, str]]] = ContextVar(
     "harness_lifted", default=frozenset()
 )
-MAX_PER_TEXT = 5
+MAX_PER_TEXT = 20
 
 
 def _install_lift() -> None:

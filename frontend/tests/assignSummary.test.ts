@@ -1,11 +1,18 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { memberReason, onePersonSummary, partlyAssignedLines, resultMessage, skippedLines, stepLabel } from "../src/admin/assignSummary";
+import { holdersLine, MAX_ANNOTATORS_PER_TEXT, memberReason, onePersonSummary, partlyAssignedLines, resultMessage, skippedLines, stepLabel } from "../src/admin/assignSummary";
 
 const ana = { pseudonym: "ann-0004", display_name: "Ana Weber" };
 const ben = { pseudonym: "ann-0007", display_name: "Ben Roth" };
 
 describe("assign summary", () => {
+  it("names up to five holders, then the first five and how many more (issue 447)", () => {
+    const names = Array.from({ length: MAX_ANNOTATORS_PER_TEXT }, (_, index) => `Person ${index + 1}`);
+    expect(holdersLine(names.slice(0, 5))).toBe("Person 1; Person 2; Person 3; Person 4; Person 5");
+    expect(holdersLine(names.slice(0, 6))).toBe("Person 1; Person 2; Person 3; Person 4; Person 5; and 1 more (marked “Already assigned” below)");
+    expect(holdersLine(names)).toBe("Person 1; Person 2; Person 3; Person 4; Person 5; and 15 more (marked “Already assigned” below)");
+  });
+
   it("summarises one person", () => {
     expect(onePersonSummary({ person: ana, gets: 20, task: "translation_review", language: "de", openBefore: 3, openAfter: 23 }))
       .toBe("Ana Weber gets 20 translation reviews (de). Open tasks: 3 → 23.");
