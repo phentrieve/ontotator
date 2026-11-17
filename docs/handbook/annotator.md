@@ -478,6 +478,8 @@ What for: keep track of the sentences you have already checked in a long text.
 
 Checked sentences are green. If you edit a checked sentence later, it turns amber, and the head of the text counts it as *changed*. Read it again, then click it to mark it as checked.
 
+A mark belongs to its sentence, not to its wording. When a text repeats a sentence, for example *Unauffällig.*, and you edit the one you had checked, that sentence turns amber where it stands; the same sentence elsewhere in the text stays as it was, unchecked if you had not checked it. When you add or remove text before checked sentences, their marks move with them. A checked sentence you delete loses its mark; if you take an edit back, the sentence is green again.
+
 The marks are only for you. They are saved with your review, so they are kept when you reload, close the tab or the task is paused. With the review open in two tabs, both keep their marks; a tab shows the marks of the other one after your next mark there or after **Reload from server**. They do not change your decision, and the lead and the exports never see them.
 
 With the keyboard: Tab to a sentence, then press Enter or Space to mark it. Shift+Enter marks the range from the last sentence you marked.

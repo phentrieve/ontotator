@@ -25,7 +25,7 @@ import { acceptedCorrection, annotateThisTextLabel, categoryLabels, comparisonCo
 import { checkReview, type ClinicalCategory, type ReviewDecisionCode, type ReviewForm as FormValue } from "./reviewRules";
 import { LanguageTag } from "../ui/LanguageTag";
 import { SentenceCount, SentenceView } from "./SentenceMarks";
-import { isChecked, resolveMarks, splitSentences, storedMarks, toggled, withRange, type MarkState, type Side, type StoredMarks } from "./sentences";
+import { isChecked, rebaseMarks, resolveMarks, splitSentences, storedMarks, toggled, withRange, type MarkState, type Sentence, type Side, type StoredMarks } from "./sentences";
 
 export interface TranslationReviewScreenProps {
   assignmentId: number; username: string; onNavigate: (route: Route) => void;
@@ -257,8 +257,9 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     void api.saveCheckedSentences(props.assignmentId, value, marksSaving.current?.value ?? baseMarks.current, { keepalive: true })
       .catch(() => { pendingMarks.current ??= value; });
   };
+  const marksRef = useRef(marks); marksRef.current = marks;
   const changeMarks = (next: StoredMarks) => {
-    setMarks(next); pendingMarks.current = next;
+    marksRef.current = next; setMarks(next); pendingMarks.current = next;
     window.clearTimeout(marksTimer.current); marksTimer.current = window.setTimeout(sendMarks, 600);
   };
   const sendMarksRef = useRef(sendMarks); sendMarksRef.current = sendMarks;
@@ -589,9 +590,25 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     edit({ ...current, form: withClinicalDefault(chooseDecision(current.form, option)) });
     decisionStateRef.current = USER_ORIGIN; setDecisionState(USER_ORIGIN);
   };
+  /**
+   * The translation marks follow an edit of the translation: an untouched sentence keeps its mark wherever it now
+   * stands, an edited one keeps it at its position as "changed since checked". Stored like every change of the marks.
+   */
+  const markedText = useRef<{ text: string; sentences: Sentence[] } | null>(null);
+  const rebaseTranslationMarks = (beforeText: string, afterText: string) => {
+    const current = marksRef.current;
+    if (current.translation.length === 0 || beforeText === afterText) return;
+    const language = workspace.variant.language;
+    const before = markedText.current?.text === beforeText ? markedText.current.sentences : splitSentences(beforeText, language);
+    const after = splitSentences(afterText, language);
+    markedText.current = { text: afterText, sentences: after };
+    const translation = rebaseMarks(before, beforeText, after, afterText, current.translation);
+    if (JSON.stringify(translation) !== JSON.stringify(current.translation)) changeMarks({ ...current, translation });
+  };
   const editText = (nextText: string) => {
     if (readOnlyRef.current || operation.current) return;
     const current = draftRef.current;
+    rebaseTranslationMarks(current.text, nextText);
     const result = reactToTextEdit(decisionStateRef.current, current.form, workspace.text, nextText);
     // The whole returned form, so undoing an automatic selection can remove the decision again.
     edit({ text: nextText, form: result.form === current.form ? result.form : withClinicalDefault(result.form) });

@@ -231,3 +231,48 @@ for (const [name, viewport] of sizes) {
     expect(errors).toEqual([]);
   });
 }
+
+for (const [name, viewport] of sizes) {
+  test(`a changed checked sentence stays marked as changed at its place; the equal sentence after it is not checked (${name})`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const errors = watchErrors(page);
+    const s = await reviewFlowScenario(page, "REVIEW_FLOW");
+    const review = s.assignments["second-translation"];
+    await loginScenarioUser(page, s, "ana");
+    await page.goto(`/#/tasks/${review}`);
+    await expect(target(page)).toBeVisible();
+    const marking = page.getByRole("checkbox", { name: "Mark checked sentences", exact: true });
+    const translation = page.getByRole("region", { name: "Translation (de)", exact: true });
+    const sentence = (index: number) => translation.locator(`[data-sentence="${index}"]`);
+    // "Absatz 1. Dosis 5 mg." is one sentence; then the text repeats one sentence many times.
+    await marking.check();
+    await expect(sentence(1)).toHaveText(/^Die Patientin beschreibt Symptome und die Ärztin prüft jede Angabe\./);
+    await expect(sentence(2)).toHaveText(/^Die Patientin beschreibt Symptome und die Ärztin prüft jede Angabe\./);
+    await sentence(1).click();
+    await expect(sentence(1)).toHaveAttribute("aria-pressed", "true");
+    // Change the checked sentence (the first of the equal ones).
+    await marking.uncheck();
+    const text = await target(page).inputValue();
+    await target(page).fill(text.replace("Die Patientin beschreibt Symptome", "Die Patientin beschreibt keine Symptome"));
+    await marking.check();
+    await expect(sentence(1)).toHaveText(/^Die Patientin beschreibt keine Symptome/);
+    await expect(sentence(1)).toHaveClass(/is-stale/);
+    await expect(sentence(1)).toContainText("changed since checked");
+    await expect(sentence(2)).toHaveAttribute("aria-pressed", "false");
+    await expect(sentence(2)).not.toHaveClass(/is-checked|is-stale/);
+    await expect(translation.locator(".is-checked")).toHaveCount(0);
+    await expect(page.locator(".sentence-count").last()).toContainText("0 of");
+    await expect(page.locator(".sentence-count").last()).toContainText("1 changed");
+    await sentence(1).scrollIntoViewIfNeeded();
+    await noPageScroll(page);
+    await shot(page, `f4-changed-sentence-${name}`);
+    // Stored that way: the same after a reload.
+    await expect(page.locator(".translation-save-status")).toHaveText("Saved");
+    await page.waitForTimeout(900);
+    await page.reload();
+    await expect(sentence(1)).toHaveClass(/is-stale/);
+    await expect(sentence(2)).toHaveAttribute("aria-pressed", "false");
+    await expect(translation.locator(".is-checked")).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+}
