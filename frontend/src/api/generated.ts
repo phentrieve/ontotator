@@ -9629,15 +9629,22 @@ export interface components {
         };
         /**
          * RowChangeView
-         * @description A change of who works on a row, or how: its History line. A withdrawn
-         *     final result (#343) names the lead in ``from_person``.
+         * @description A change of who works on a row, how, or of its final result: its
+         *     History line, with who did it, when and (where one was given) why.
+         *
+         *     ``by`` is the person who made the change; a withdrawn final result
+         *     (#343) names the lead in ``from_person`` instead. ``reopened``,
+         *     ``reopen_undone`` and ``round_started`` name the task and its person
+         *     (``assignment_id``, ``to_person``); the ``final_*`` kinds name the
+         *     results (``from_result`` the one replaced, ``to_result`` the one final
+         *     afterwards; null when the submission is no longer among the row's).
          */
         RowChangeView: {
             /**
              * Kind
              * @enum {string}
              */
-            kind: "reassigned" | "mode_changed" | "mode_restored" | "final_withdrawn";
+            kind: "reassigned" | "mode_changed" | "mode_restored" | "final_withdrawn" | "reopened" | "reopen_undone" | "round_started" | "final_chosen" | "final_changed" | "final_restored";
             /**
              * At
              * Format: date-time
@@ -9645,12 +9652,19 @@ export interface components {
             at: string;
             /** Task */
             task?: string | null;
+            by?: components["schemas"]["PersonRefView"] | null;
+            /** Assignment Id */
+            assignment_id?: number | null;
+            /** Round Ordinal */
+            round_ordinal?: number | null;
             from_person?: components["schemas"]["PersonRefView"] | null;
             to_person?: components["schemas"]["PersonRefView"] | null;
             /** From Mode */
             from_mode?: string | null;
             /** To Mode */
             to_mode?: string | null;
+            from_result?: components["schemas"]["RowResultRefView"] | null;
+            to_result?: components["schemas"]["RowResultRefView"] | null;
             /** Reason */
             reason?: string | null;
         };
@@ -9727,6 +9741,19 @@ export interface components {
             case_id: string;
             /** Language */
             language: string;
+        };
+        /**
+         * RowResultRefView
+         * @description A submission named as a final result in a History line: its author,
+         *     and whether it is a consolidation.
+         */
+        RowResultRefView: {
+            author: components["schemas"]["PersonRefView"];
+            /**
+             * Consolidation
+             * @default false
+             */
+            consolidation: boolean;
         };
         /** RowRoundView */
         RowRoundView: {

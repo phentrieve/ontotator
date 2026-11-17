@@ -2,8 +2,10 @@
  * Activity lines of the row panel (acceptance fixes WP-A): one line per review, submission or open
  * task, then pauses and the final choice, oldest first, each with its stage, e.g.
  * "Review: Ana Weber (ann-0003), Accepted unchanged, 20 Oct, 22:09",
- * "Annotation: Tom Reis (ann-0004), Round 1, 1 finding, 22:15", "Final: chosen by you, 20 Oct, 22:20"; a consolidation
- * adds "4 kept automatically (all matched)" (U14).
+ * "Annotation: Tom Reis (ann-0004), Round 1, 1 finding, 21 Oct, 22:15"; a consolidation adds "4 kept automatically (all
+ * matched)" (U14). A change by a lead or an annotator reads "what by whom, date time: reason": "Annotation: task of
+ * Tom Reis (ann-0004) reopened by you, 21 Oct, 22:40: Guideline 2.3", "Final: changed from the result of Tom Reis
+ * (ann-0004) to the result of R. Roe (ann-0007) by you, 21 Oct, 22:50", "Final: change undone by you, …".
  */
 import type { DocumentRowView, RowChangeView, RowSubmissionView } from "../api/client";
 import { assignmentStatusLabels, labelFor, plural } from "../app/labels";
@@ -36,13 +38,25 @@ type WorkItem = DocumentRowView["work"][number];
 
 const join = (...parts: (string | null | undefined | false)[]): string => parts.filter(Boolean).join(", ");
 
-/** "22:15" on the day of `now`, else "20 Oct, 22:09" (the stage cells' rule). */
+/** Always date and time, "20 Oct, 22:09" (the year outside the current one): a line is read days later too. */
 function timeText(iso: string, now: Date): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  if (date.toDateString() === now.toDateString()) return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
   return formatTime(date, { now });
 }
+
+type ChangePerson = RowChangeView["by"];
+const named = (person: ChangePerson): string => personLabel(person?.pseudonym ?? "", !!person?.is_me, person ?? undefined);
+/** " by you" / " by Carla Diaz (lead-0002)"; nothing for a change made without an account (the admin CLI). */
+const byText = (person: ChangePerson): string => (person ? ` by ${person.is_me ? "you" : named(person)}` : "");
+/** "what by whom, date time: reason" - the pattern of every change line. */
+const changeText = (what: string, when: string, reason?: string | null): string => `${what}, ${when}${reason?.trim() ? `: ${reason.trim()}` : ""}`;
+/** A submission as a final result: "the result of Tom Reis (ann-0004)", "the consolidation by Ana Weber (ann-0003)". */
+function resultName(result: RowChangeView["from_result"]): string {
+  if (!result) return "another result";
+  return `${result.consolidation ? "the consolidation by" : "the result of"} ${named(result.author)}`;
+}
+const FINAL_KINDS: ReadonlySet<RowChangeView["kind"]> = new Set(["final_chosen", "final_changed", "final_restored"]);
 
 const SUBMISSION_PREFIX: Readonly<Record<RowSubmissionView["kind"], string>> = {
   annotation: "Annotation", carry_forward: "Annotation", consolidation: "Consolidation", proposal_check: "Annotation",
@@ -110,17 +124,42 @@ export function historyLines(row: DocumentRowView, submissions: readonly RowSubm
 
   (options.changes ?? []).forEach((change, index) => {
     const stage: HistoryStage = change.task === "translation_review" ? "review" : "annotation";
+    const prefix = stage === "review" ? "Review" : change.task === "review" ? "Consolidation" : "Annotation";
     const when = timeText(change.at, now);
     const key = `change-${index}`;
-    if (change.kind === "reassigned") {
-      const name = (person: RowChangeView["from_person"]) => personLabel(person?.pseudonym ?? "", !!person?.is_me, person ?? undefined);
-      lines.push({ key, stage, text: `${stage === "review" ? "Review" : change.task === "review" ? "Consolidation" : "Annotation"}: ${join(`reassigned from ${name(change.from_person)} to ${name(change.to_person)}`, when)}` });
-    } else if (change.kind === "final_withdrawn") {
-      const by = change.from_person ? personLabel(change.from_person.pseudonym, !!change.from_person.is_me, change.from_person) : null;
-      lines.push({ key, stage: "final", text: `Final: ${join(by ? `withdrawn by ${by}` : "withdrawn", change.reason, when)}` });
-    } else {
-      const mode = change.to_mode === "proposals" || change.to_mode === "scratch" ? MODE_WORDS[change.to_mode] : change.to_mode;
-      lines.push({ key, stage, text: `Annotation: ${join(`${change.kind === "mode_restored" ? "mode restored" : "mode changed"}, now annotated ${mode}`, change.reason, when)}` });
+    const push = (lineStage: HistoryStage, text: string) => lines.push({ key, stage: lineStage, text });
+    switch (change.kind) {
+      case "reassigned":
+        push(stage, `${prefix}: ${changeText(`reassigned from ${named(change.from_person)} to ${named(change.to_person)}`, when)}`);
+        break;
+      case "reopened":
+        push(stage, `${prefix}: ${changeText(`task of ${named(change.to_person)} reopened${byText(change.by)}`, when, change.reason)}`);
+        break;
+      case "reopen_undone":
+        push(stage, `${prefix}: ${changeText(`reopening of the task of ${named(change.to_person)} undone${byText(change.by)}`, when)}`);
+        break;
+      case "round_started": {
+        const own = !!change.by && change.by.pseudonym === change.to_person?.pseudonym;
+        const round = `Round ${change.round_ordinal ?? "?"}`;
+        push(stage, `${prefix}: ${changeText(own ? `${round} started by ${named(change.by)}` : `${round} for ${named(change.to_person)} started${byText(change.by)}`, when, change.reason)}`);
+        break;
+      }
+      case "final_chosen":
+        push("final", `Final: ${changeText(`${resultName(change.to_result)} chosen${byText(change.by)}`, when)}`);
+        break;
+      case "final_changed":
+        push("final", `Final: ${changeText(`changed from ${resultName(change.from_result)} to ${resultName(change.to_result)}${byText(change.by)}`, when)}`);
+        break;
+      case "final_restored":
+        push("final", `Final: ${changeText(`change undone${byText(change.by)}, ${resultName(change.to_result)} is final again`, when)}`);
+        break;
+      case "final_withdrawn":
+        push("final", `Final: ${changeText(`withdrawn${byText(change.from_person)}`, when, change.reason)}`);
+        break;
+      default: {
+        const mode = change.to_mode === "proposals" || change.to_mode === "scratch" ? MODE_WORDS[change.to_mode] : change.to_mode;
+        push(stage, `Annotation: ${changeText(`${change.kind === "mode_restored" ? "mode restored" : "mode changed"}${byText(change.by)}, now annotated ${mode}`, when, change.reason)}`);
+      }
     }
   });
 
@@ -130,8 +169,10 @@ export function historyLines(row: DocumentRowView, submissions: readonly RowSubm
     lines.push({ key: `hold-${entry.cause_id}`, stage: "annotation", text: `Task paused${entry.author_label ? `: ${entry.author_label}` : ""}`, reportId: entry.report_id ?? null });
   }
 
+  // The final result: its event lines above say which result, who and when. Without them (the submissions are not
+  // loaded yet, or a project imported without its event log) one line names the lead who chose it.
   const chosen = row.final;
-  if (chosen) {
+  if (chosen && !(options.changes ?? []).some(change => FINAL_KINDS.has(change.kind))) {
     const by = chosen.selected_by ? (options.me && chosen.selected_by === options.me ? "you" : chosen.selected_by) : null;
     lines.push({ key: "final", stage: "final", text: `Final: ${join(by ? `chosen by ${by}` : "chosen", chosen.selected_at && timeText(chosen.selected_at, now))}` });
   }

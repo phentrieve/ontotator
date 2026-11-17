@@ -29,7 +29,7 @@ describe("historyLines", () => {
     const lines = historyLines(walkthroughRow(), [tomSubmission], { me: "lead-0002", now });
     expect(lines.map(line => line.text)).toEqual([
       "Review: Ana Weber (ann-0003), Accepted unchanged, 20 Oct, 22:09",
-      "Annotation: Tom Reis (ann-0004), Round 1, 1 finding, 22:15",
+      "Annotation: Tom Reis (ann-0004), Round 1, 1 finding, 21 Oct, 22:15",
       "Annotation: Luc Martin (ann-0005), Round 1, In progress",
       "Final: chosen by you, 20 Oct, 22:20",
     ]);
@@ -85,7 +85,7 @@ describe("historyLines", () => {
     expect(lines.map(line => line.text)).toEqual([
       "Review: Ana Weber (ann-0003), Accepted with corrections, v1 → v2",
       "Review: Accepted: reviewed outside Ontotator, Checked",
-      "Consolidation: Ana Weber (ann-0003), 3 findings, v2, 09:00",
+      "Consolidation: Ana Weber (ann-0003), 3 findings, v2, 21 Oct, 09:00",
       "Consolidation: Ana Weber (ann-0003), Open, Paused",
       "Annotation: Luc Martin (ann-0005), moved to v2",
       "Task paused: ann-0003",
@@ -101,7 +101,7 @@ describe("historyLines", () => {
     const consolidation = (kept: number) => submission({ submission_id: `c-${kept}`, document_id: "case-201-de", author_label: "rev-0005", author: luc,
       kind: "consolidation", round_ordinal: null, finding_count: 6, recorded_at: "2026-10-21T22:30:00", kept_automatically: kept });
     const four = historyLines(walkthroughRow(), [consolidation(4)], { now }).find(line => line.key === "submission-c-4")!;
-    expect(four.text).toBe("Consolidation: Luc Martin (ann-0005), 6 findings, 4 kept automatically (all matched), 22:30");
+    expect(four.text).toBe("Consolidation: Luc Martin (ann-0005), 6 findings, 4 kept automatically (all matched), 21 Oct, 22:30");
     const none = historyLines(walkthroughRow(), [consolidation(0)], { now }).find(line => line.key === "submission-c-0")!;
     expect(none.text).not.toContain("kept automatically");
   });
@@ -116,18 +116,55 @@ describe("reassignments and mode changes", () => {
     const lines = historyLines(emptyRow, [], { now, changes: [
       { kind: "reassigned", at: "2026-10-31T10:00:00", task: "annotate", from_person: anna, to_person: ben },
       { kind: "reassigned", at: "2026-10-31T10:05:00", task: "translation_review", from_person: ben, to_person: anna },
-      { kind: "mode_changed", at: "2026-10-31T10:10:00", from_mode: "proposals", to_mode: "scratch", reason: "The tool proposals were wrong" },
+      { kind: "mode_changed", at: "2026-10-31T10:10:00", from_mode: "proposals", to_mode: "scratch", reason: "The tool proposals were wrong", by: { ...anna, is_me: true } },
     ] });
     expect(lines.map(line => [line.stage, line.text])).toEqual([
-      ["annotation", "Annotation: reassigned from Anna Early (ann-1) to Ben Roth (ann-2), 10:00"],
-      ["review", "Review: reassigned from Ben Roth (ann-2) to Anna Early (ann-1), 10:05"],
-      ["annotation", "Annotation: mode changed, now annotated from scratch, The tool proposals were wrong, 10:10"],
+      ["annotation", "Annotation: reassigned from Anna Early (ann-1) to Ben Roth (ann-2), 31 Oct, 10:00"],
+      ["review", "Review: reassigned from Ben Roth (ann-2) to Anna Early (ann-1), 31 Oct, 10:05"],
+      ["annotation", "Annotation: mode changed by you, now annotated from scratch, 31 Oct, 10:10: The tool proposals were wrong"],
     ]);
   });
   it("lists a withdrawn final result with the lead and the reason (issue 343)", () => {
     const lines = historyLines(emptyRow, [], { now, changes: [
       { kind: "final_withdrawn", at: "2026-10-31T10:20:00", from_person: { ...anna, is_me: true }, reason: "Re-annotation" },
     ] });
-    expect(lines.map(line => [line.stage, line.text])).toEqual([["final", "Final: withdrawn by Anna Early (ann-1, you), Re-annotation, 10:20"]]);
+    expect(lines.map(line => [line.stage, line.text])).toEqual([["final", "Final: withdrawn by you, 31 Oct, 10:20: Re-annotation"]]);
+  });
+  it("names who reopened a task or started a round, when and why", () => {
+    const lead = { pseudonym: "lead-1", display_name: "Carla Diaz", is_me: true };
+    const lines = historyLines(emptyRow, [], { now, changes: [
+      { kind: "reopened", at: "2026-10-30T09:00:00", task: "annotate", assignment_id: 7, by: lead, to_person: ben, reason: "Guideline changed" },
+      { kind: "reopen_undone", at: "2026-10-30T09:02:00", task: "annotate", assignment_id: 7, by: lead, to_person: ben },
+      { kind: "reopened", at: "2026-10-30T09:05:00", task: "translation_review", assignment_id: 8, by: { ...lead, is_me: false }, to_person: anna, reason: null },
+      { kind: "round_started", at: "2026-10-30T09:10:00", task: "annotate", assignment_id: 7, round_ordinal: 2, by: lead, to_person: ben, reason: "Second pass" },
+      { kind: "round_started", at: "2026-10-30T09:20:00", task: "annotate", assignment_id: 7, round_ordinal: 3, by: ben, to_person: ben, reason: null },
+    ] });
+    expect(lines.map(line => [line.stage, line.text])).toEqual([
+      ["annotation", "Annotation: task of Ben Roth (ann-2) reopened by you, 30 Oct, 09:00: Guideline changed"],
+      ["annotation", "Annotation: reopening of the task of Ben Roth (ann-2) undone by you, 30 Oct, 09:02"],
+      ["review", "Review: task of Anna Early (ann-1) reopened by Carla Diaz (lead-1), 30 Oct, 09:05"],
+      ["annotation", "Annotation: Round 2 for Ben Roth (ann-2) started by you, 30 Oct, 09:10: Second pass"],
+      ["annotation", "Annotation: Round 3 started by Ben Roth (ann-2), 30 Oct, 09:20"],
+    ]);
+  });
+  it("names the final result when it is chosen, replaced and when a change is undone; the summary line goes", () => {
+    const lead = { pseudonym: "lead-1", display_name: "Carla Diaz", is_me: true };
+    const a = { author: anna, consolidation: false };
+    const b = { author: ben, consolidation: true };
+    const row = { ...emptyRow, final: { selected_by: "lead-1", selected_at: "2026-10-29T08:00:00" } } as unknown as Parameters<typeof historyLines>[0];
+    const lines = historyLines(row, [], { now, me: "lead-1", changes: [
+      { kind: "final_chosen", at: "2026-10-29T08:00:00", by: { ...lead, is_me: false }, to_result: a },
+      { kind: "final_changed", at: "2026-10-30T13:35:00", by: lead, from_result: a, to_result: b },
+      { kind: "final_restored", at: "2026-10-30T13:36:00", by: lead, from_result: b, to_result: a },
+      { kind: "final_changed", at: "2026-10-30T13:40:00", by: lead, from_result: a, to_result: null },
+    ] });
+    expect(lines.map(line => [line.stage, line.text])).toEqual([
+      ["final", "Final: the result of Anna Early (ann-1) chosen by Carla Diaz (lead-1), 29 Oct, 08:00"],
+      ["final", "Final: changed from the result of Anna Early (ann-1) to the consolidation by Ben Roth (ann-2) by you, 30 Oct, 13:35"],
+      ["final", "Final: change undone by you, the result of Anna Early (ann-1) is final again, 30 Oct, 13:36"],
+      ["final", "Final: changed from the result of Anna Early (ann-1) to another result by you, 30 Oct, 13:40"],
+    ]);
+    // Without the events (not loaded yet) the one line of the row stays.
+    expect(historyLines(row, null, { now, me: "lead-1" }).map(line => line.text)).toEqual(["Final: chosen by you, 29 Oct, 08:00"]);
   });
 });
