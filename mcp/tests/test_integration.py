@@ -520,3 +520,126 @@ async def test_no_default_tool_returns_text_of_a_project(
             assert not [needle for needle in needles if needle in answer]
         assert leaks == []
         assert refused <= MAY_REFUSE, refused
+
+
+async def _statuses(client: Client, project: str) -> dict[int, str]:
+    """Status of every task of the project that is not withdrawn, by its ID."""
+    listed = await call(client, "list_assignments", {"project": project, "limit": 500})
+    return {item["id"]: item["status"] for item in listed["assignments"]}
+
+
+@pytest.mark.anyio
+async def test_a_bulk_reopen_and_a_withdrawal_can_be_undone(
+    live: dict[str, str],
+) -> None:
+    """reopen_texts and withdraw_open_tasks hand on the server's ``undo``,
+    and undo_reopen_or_withdraw takes it (review finding F1)."""
+    made = _scenario(live, "S336")
+    project = made["project"]
+    async with Client(_server(live, made["token"])) as client:
+        before = await _statuses(client, project)
+        # EN100022 and EN100023: three submitted annotations.
+        reopen = {
+            "project": project,
+            "texts": made["rows"][:2],
+            "reason": "Guideline 2.3 changed",
+        }
+        dry = await call(client, "reopen_texts", reopen)
+        assert dry["change_count"] == 3 and "undo" not in dry
+        done = await call(
+            client,
+            "reopen_texts",
+            reopen | {"confirm": True, "preview_token": dry["preview_token"]},
+        )
+        assert done["applied"] is True
+        undo_id = done["undo"]["id"]
+        assert done["undo"]["expires_at"]
+        changed = [item["assignment_id"] for item in done["changed"]]
+        reopened = await _statuses(client, project)
+        assert [reopened[i] for i in changed] == ["reopened"] * 3
+
+        undo = {"project": project, "undo_id": undo_id}
+        would = await call(client, "undo_reopen_or_withdraw", undo)
+        assert would["applied"] is False and would["blocked"] is None
+        assert would["action"] == "reopen" and would["task_count"] == 3
+        assert sorted(t["assignment_id"] for t in would["would_restore"]) == sorted(
+            changed
+        )
+        assert {t["person"] for t in would["would_restore"]} == {"Tom Reis", "R. Roe"}
+        # The dry run changed nothing.
+        assert await _statuses(client, project) == reopened
+        undone = await call(client, "undo_reopen_or_withdraw", undo | {"confirm": True})
+        assert undone["applied"] is True
+        assert {t["status"] for t in undone["restored"]} == {"submitted"}
+        assert await _statuses(client, project) == before
+        with pytest.raises(ToolFailed, match="BULK_UNDO_STALE/already_undone"):
+            await call(client, "undo_reopen_or_withdraw", undo | {"confirm": True})
+
+        # R. Roe's two tasks that are not started (EN100024, EN100029).
+        withdraw = {
+            "project": project,
+            "texts": [made["rows"][2], made["rows"][7]],
+        }
+        dry = await call(client, "withdraw_open_tasks", withdraw)
+        assert dry["change_count"] == 2
+        gone = await call(
+            client,
+            "withdraw_open_tasks",
+            withdraw | {"confirm": True, "preview_token": dry["preview_token"]},
+        )
+        withdrawn = {item["assignment_id"] for item in gone["changed"]}
+        assert not withdrawn & set(await _statuses(client, project))
+        back = await call(
+            client,
+            "undo_reopen_or_withdraw",
+            {"project": project, "undo_id": gone["undo"]["id"], "confirm": True},
+        )
+        assert back["applied"] is True and back["action"] == "withdraw"
+        assert await _statuses(client, project) == before
+
+        # Withdrawn again; then one of the texts gets another task: the undo
+        # is blocked, says why and changes nothing.
+        dry = await call(client, "withdraw_open_tasks", withdraw)
+        gone = await call(
+            client,
+            "withdraw_open_tasks",
+            withdraw | {"confirm": True, "preview_token": dry["preview_token"]},
+        )
+        await call(
+            client,
+            "assign_texts",
+            {
+                "project": project,
+                "assignments": [
+                    {
+                        "document_id": made["documents"]["EN100029"],
+                        "username": made["users"]["roe"],
+                    }
+                ],
+                "confirm_language": True,
+            },
+        )
+        state = await _statuses(client, project)
+        blocked = {"project": project, "undo_id": gone["undo"]["id"]}
+        would = await call(client, "undo_reopen_or_withdraw", blocked)
+        assert would["blocked"]["reason"] == "changed"
+        refused = await call(
+            client, "undo_reopen_or_withdraw", blocked | {"confirm": True}
+        )
+        assert refused["applied"] is False and refused["refused"] is True
+        assert await _statuses(client, project) == state
+
+        # A new round has no undo.
+        rounds = {
+            "project": project,
+            "texts": made["rows"][:1],
+            "kind": "carry_forward",
+        }
+        dry = await call(client, "start_rounds", rounds)
+        started = await call(
+            client,
+            "start_rounds",
+            rounds | {"confirm": True, "preview_token": dry["preview_token"]},
+        )
+        assert started["applied"] is True and started["change_count"] == 1
+        assert "undo" not in started

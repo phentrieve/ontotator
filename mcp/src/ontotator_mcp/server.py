@@ -28,8 +28,9 @@ in clinical texts), acting as the owner of the configured API token.
 Covers project setup (ontologies, projects, settings, guidelines, text and
 machine-proposal imports, accounts, people, assignments, work plan), changes
 while a project runs (reassigning, withdrawing or reopening tasks, handing a
-leaving person's tasks on, new rounds, annotation mode changes, work plan
-undo, translation corrections, text changes, problem report decisions),
+leaving person's tasks on, new rounds, annotation mode changes, undo of a
+work plan change or of a bulk reopen or withdrawal, translation corrections,
+text changes, problem report decisions),
 status (progress, agreement, problem reports) and results (consolidation
 start, accepting agreeing texts, choosing a final result, exports and
 downloads). Annotation, review and translation review work stay in the web

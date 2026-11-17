@@ -36,7 +36,9 @@ the action or the tasks of an Undo. ``undo`` works for the lead who applied
 the action, in that project, once, within ``UNDO_MINUTES``, and only while
 the texts are exactly as the action left them. A reopened translation review
 restarts its draft from the current text, which cannot be brought back: an
-action that reopened one has no Undo.
+action that reopened one has no Undo. A preview of the Undo (``undo`` with
+``preview``) lists the tasks it would bring back and, when the texts changed
+since, what blocks it; it changes nothing.
 """
 
 from __future__ import annotations
@@ -166,6 +168,16 @@ def _availability(conn: Connection, project: RowMapping) -> Any:
         return may_take[who]
 
     return available
+
+
+# Why an Undo cannot run although its record is valid, with the words the
+# MCP tool shows; the refusal carries the same reason.
+UNDO_BLOCKS: dict[str, str] = {
+    "changed": "A task, draft, round, final result, plan row or version of these"
+    " texts changed since the action.",
+    "not_in_plan": "A text no longer plans the task, or its version was discarded.",
+    "person_unavailable": "A person is no longer an active member with this role.",
+}
 
 
 def _stale(reason: str) -> DomainError:
@@ -730,7 +742,7 @@ class BulkTaskActionService:
         ).scalar_one()
         return {"id": int(event_id), "expires_at": expires}
 
-    def undo(self, key: str, undo_id: int) -> dict[str, Any]:
+    def undo(self, key: str, undo_id: int, *, preview: bool = False) -> dict[str, Any]:
         """Undo an applied bulk action while its texts are unchanged since.
 
         ``undo_id`` names the server's record of the action (``_record``):
@@ -743,12 +755,18 @@ class BulkTaskActionService:
         their drafts, if their text still takes the task. Each is audited
         (``assignment.reopen_undone``, ``assignment.restore``).
 
+        ``preview`` changes nothing: it lists the tasks the Undo would bring
+        back and, in ``blocked``, why it cannot run now (the texts changed, a
+        text no longer plans the task, a person left). A record that is
+        unknown, another lead's, not undoable, expired or already undone is
+        refused in a preview too.
+
         The Undo is a change of its own: ``updated_at`` moves on, and the
         round and workflow revisions of a reopened task are two higher than
         before the action, so a client holding older revisions reloads.
         """
         with self.db.transaction() as conn:
-            project = self._lock(conn, key, exclusive=True)
+            project = self._lock(conn, key, exclusive=not preview)
             pid = int(project["id"])
             event = conn.execute(
                 select(AuditEventRow).where(
@@ -778,29 +796,69 @@ class BulkTaskActionService:
                 raise _stale("already_undone")
             action: BulkAction = record["action"]
             ids = [int(i) for i in record["assignment_ids"]]
-            rows = list(
-                conn.execute(
-                    select(AssignmentRow, DocumentRow.case_id, DocumentRow.language)
-                    .join(
-                        DocumentRow,
-                        and_(
-                            DocumentRow.project_id == AssignmentRow.project_id,
-                            DocumentRow.document_id == AssignmentRow.document_id,
-                        ),
-                    )
-                    .where(AssignmentRow.project_id == pid, AssignmentRow.id.in_(ids))
-                    .order_by(AssignmentRow.id)
-                    .with_for_update(key_share=True, of=AssignmentRow)
-                ).mappings()
+            query = (
+                select(AssignmentRow, DocumentRow.case_id, DocumentRow.language)
+                .join(
+                    DocumentRow,
+                    and_(
+                        DocumentRow.project_id == AssignmentRow.project_id,
+                        DocumentRow.document_id == AssignmentRow.document_id,
+                    ),
+                )
+                .where(AssignmentRow.project_id == pid, AssignmentRow.id.in_(ids))
+                .order_by(AssignmentRow.id)
             )
+            if not preview:
+                query = query.with_for_update(key_share=True, of=AssignmentRow)
+            rows = list(conn.execute(query).mappings())
+            blocked: str | None = None
             if len(rows) != len(ids) or record["state"] != _after_state(conn, pid, ids):
-                raise _stale("changed")
-            if action == "withdraw":
-                self._require_restorable(conn, project, rows)
+                blocked = "changed"
+            elif action == "reopen":
+                if any(
+                    row["revoked_at"] is not None or row["status"] != "reopened"
+                    for row in rows
+                ):
+                    blocked = "changed"
+            elif any(row["revoked_at"] is None for row in rows):
+                blocked = "changed"
+            else:
+                blocked = self._restore_refusal(conn, project, rows)
+            people = person_refs(
+                conn,
+                {int(row["user_id"]) for row in rows},
+                viewer_id=self.actor.user_id or 0,
+                viewer_is_lead=True,
+            )
+            view: dict[str, Any] = {
+                "undone": 0,
+                "applied": False,
+                "undo_id": undo_id,
+                "action": action,
+                "expires_at": record["expires_at"],
+                "task_count": len(ids),
+                "tasks": [
+                    {
+                        "case_id": row["case_id"],
+                        "language": row["language"],
+                        "assignment_id": int(row["id"]),
+                        "document_id": row["document_id"],
+                        "task": row["task"],
+                        "status": row["status"],
+                        "person": people[int(row["user_id"])].model_dump(),
+                    }
+                    for row in rows
+                ],
+                "blocked": None
+                if blocked is None
+                else {"reason": blocked, "message": UNDO_BLOCKS[blocked]},
+            }
+            if preview:
+                return view
+            if blocked is not None:
+                raise _stale(blocked)
             for row in rows:
                 if action == "reopen":
-                    if row["revoked_at"] is not None or row["status"] != "reopened":
-                        raise _stale("changed")
                     conn.execute(
                         update(AssignmentRow)
                         .where(AssignmentRow.id == row["id"])
@@ -828,8 +886,6 @@ class BulkTaskActionService:
                         )
                     name = "assignment.reopen_undone"
                 else:
-                    if row["revoked_at"] is None:
-                        raise _stale("changed")
                     conn.execute(
                         update(AssignmentRow)
                         .where(AssignmentRow.id == row["id"])
@@ -860,16 +916,27 @@ class BulkTaskActionService:
                 details={"undo_of": undo_id, "action": action, "assignment_ids": ids},
                 at=now,
             )
-            return {"undone": len(rows)}
+            # The tasks as the Undo left them.
+            status = "submitted" if action == "reopen" else None
+            return view | {
+                "undone": len(rows),
+                "applied": True,
+                "tasks": [
+                    task | ({"status": status} if status else {})
+                    for task in view["tasks"]
+                ],
+            }
 
     @staticmethod
-    def _require_restorable(
+    def _restore_refusal(
         conn: Connection, project: RowMapping, rows: Sequence[RowMapping]
-    ) -> None:
-        """A withdrawn task comes back only where a new one could be given:
-        its person can still take it, its text plans the task and its version
-        is not discarded. The limit of annotators is not asked again: the
-        state digest says the text has exactly the tasks it had."""
+    ) -> str | None:
+        """Why withdrawn tasks cannot come back (None: they can): a new task
+        could not be given there now. The person can no longer take it
+        (``person_unavailable``), or its text does not plan the task or its
+        version is discarded (``not_in_plan``). The limit of annotators is
+        not asked again: the state digest says the text has exactly the
+        tasks it had."""
         pid = int(project["id"])
         plan = plan_for(
             conn, pid, {RowKey(row["case_id"], row["language"]) for row in rows}
@@ -891,16 +958,17 @@ class BulkTaskActionService:
                 flags.review if row["task"] == "translation_review" else flags.annotate
             )
             if not planned or row["document_id"] in discarded:
-                raise _stale("not_in_plan")
+                return "not_in_plan"
             who = (int(row["user_id"]), str(row["task"]))
             if who not in checked:
                 try:
                     AssignmentService._require_target(
                         conn, project, who[0], cast(Task, who[1])
                     )
-                except DomainError as refusal:
-                    raise _stale("person_unavailable") from refusal
+                except DomainError:
+                    return "person_unavailable"
                 checked.add(who)
+        return None
 
 
 def _current_versions(

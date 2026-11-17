@@ -170,6 +170,7 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "confirm": True,
             "preview_token": "sha256:x",
         },
+        "undo_reopen_or_withdraw": {"project": "p", "undo_id": 7, "confirm": True},
         "start_rounds": {
             "project": "p",
             "texts": [{"case_id": "c", "language": "en"}],

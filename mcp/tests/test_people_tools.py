@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import stat
 from pathlib import Path
 from typing import Any
@@ -534,6 +535,129 @@ async def test_reopen_texts_dry_run_then_confirm_with_the_token(
     )
     assert done["applied"] is True and done["change_count"] == 1
     assert fake.calls_to("POST", BULK_REOPEN)[-1].json()["preview_token"] == "sha256:a"
+    # Nothing to undo (the server sent none): no ``undo`` in the answer.
+    assert "undo" not in done and "undo" not in dry
+
+
+BULK_UNDO = f"{P}/bulk-task-actions/undo"
+UNDO = {"id": 41, "expires_at": "2026-11-17T12:00:00Z"}
+
+
+def _undo_view(**fields: object) -> dict[str, object]:
+    task = build(
+        "BulkUndoTaskView",
+        case_id="c1",
+        language="en",
+        assignment_id=7,
+        task="annotate",
+        status="reopened",
+        person=build("PersonRefView", display_name="Tom Reis"),
+    )
+    return build(
+        "BulkUndoResult",
+        undone=0,
+        applied=False,
+        undo_id=41,
+        action="reopen",
+        expires_at=UNDO["expires_at"],
+        task_count=1,
+        tasks=[task],
+        blocked=None,
+    ) | dict(fields)
+
+
+@pytest.mark.parametrize(
+    ("tool", "route", "extra"),
+    [
+        ("reopen_texts", BULK_REOPEN, {"reason": "Guideline 2.3"}),
+        ("withdraw_open_tasks", BULK_WITHDRAW, {}),
+    ],
+)
+async def test_an_applied_reopen_or_withdrawal_keeps_its_undo(
+    fake: FakeApi, mcp_client: Client, tool: str, route: str, extra: dict[str, str]
+) -> None:
+    """The server's ``undo`` reaches the caller (review finding F1)."""
+    action = "reopen" if tool == "reopen_texts" else "withdraw"
+    fake.on("POST", route, _bulk(action, "sha256:a", applied=True, undo=UNDO))
+    done = await call(
+        mcp_client,
+        tool,
+        {
+            "project": "p",
+            "texts": [{"case_id": "c1", "language": "en"}],
+            "confirm": True,
+            "preview_token": "sha256:a",
+        }
+        | extra,
+    )
+    assert done["applied"] is True
+    assert done["undo"] == UNDO
+
+
+async def test_undo_reopen_or_withdraw_dry_run_then_confirm(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    fake.on("POST", BULK_UNDO, _undo_view())
+    dry = await call(
+        mcp_client, "undo_reopen_or_withdraw", {"project": "p", "undo_id": 41}
+    )
+    assert dry["applied"] is False and dry["blocked"] is None
+    assert (dry["action"], dry["task_count"]) == ("reopen", 1)
+    assert dry["would_restore"] == [
+        {
+            "case_id": "c1",
+            "language": "en",
+            "assignment_id": 7,
+            "task": "annotate",
+            "status": "reopened",
+            "person": "Tom Reis",
+        }
+    ]
+    [post] = fake.calls_to("POST", BULK_UNDO)
+    assert post.json() == {"undo_id": 41, "preview": True}
+
+    def answer(request: httpx.Request) -> dict[str, object]:
+        if json.loads(request.content).get("preview"):
+            return _undo_view()
+        done = _undo_view(undone=1, applied=True)
+        done["tasks"][0]["status"] = "submitted"  # type: ignore[index]
+        return done
+
+    fake.on("POST", BULK_UNDO, answer)
+    done = await call(
+        mcp_client,
+        "undo_reopen_or_withdraw",
+        {"project": "p", "undo_id": 41, "confirm": True},
+    )
+    assert done["applied"] is True
+    assert done["restored"][0]["status"] == "submitted"
+    assert fake.calls_to("POST", BULK_UNDO)[-1].json() == {"undo_id": 41}
+
+
+async def test_undo_reopen_or_withdraw_changes_nothing_when_blocked(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    blocked = {"reason": "changed", "message": "A task changed since the action."}
+    fake.on("POST", BULK_UNDO, _undo_view(blocked=blocked))
+    result = await call(
+        mcp_client,
+        "undo_reopen_or_withdraw",
+        {"project": "p", "undo_id": 41, "confirm": True},
+    )
+    assert result["applied"] is False and result["refused"] is True
+    assert result["blocked"] == blocked
+    # Only previews were sent: nothing was applied.
+    assert all(c.json().get("preview") for c in fake.calls_to("POST", BULK_UNDO))
+
+
+async def test_undo_reopen_or_withdraw_names_a_used_or_expired_undo(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    fake.on("POST", BULK_UNDO, refusal(409, "BULK_UNDO_STALE", {"reason": "expired"}))
+    with pytest.raises(ToolFailed, match="BULK_UNDO_STALE/expired"):
+        await call(
+            mcp_client, "undo_reopen_or_withdraw", {"project": "p", "undo_id": 41}
+        )
 
 
 async def test_withdraw_open_tasks_answers_a_stale_token_with_a_fresh_dry_run(

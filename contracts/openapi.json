@@ -7040,7 +7040,7 @@
           "bulk-task-actions"
         ],
         "summary": "Bulk Undo",
-        "description": "Undo a bulk reopen or withdrawal by the ``undo.id`` of its apply.\n\nThe server keeps what the action changed; the request names only that\nrecord. It works once, for the lead who applied the action, before\n``undo.expires_at``, and only while the texts are exactly as the action\nleft them (tasks, drafts, review drafts, rounds, final results, plan,\nversions); otherwise 409 ``BULK_UNDO_STALE`` and nothing is undone.\nReopened tasks are submitted again; withdrawn tasks come back with their\ndrafts. An action that reopened a translation review has no Undo.",
+        "description": "Undo a bulk reopen or withdrawal by the ``undo.id`` of its apply.\n\nThe server keeps what the action changed; the request names only that\nrecord. It works once, for the lead who applied the action, before\n``undo.expires_at``, and only while the texts are exactly as the action\nleft them (tasks, drafts, review drafts, rounds, final results, plan,\nversions); otherwise 409 ``BULK_UNDO_STALE`` and nothing is undone.\nReopened tasks are submitted again; withdrawn tasks come back with their\ndrafts. An action that reopened a translation review has no Undo.\n``preview: true`` changes nothing: it lists the tasks the Undo would\nbring back (``tasks``) and, in ``blocked``, why it cannot run now\n(``changed``, ``not_in_plan``, ``person_unavailable``); a record that is\nunknown, expired or already undone is refused in a preview too.",
         "operationId": "bulk_undo_api_v1_projects__key__bulk_task_actions_undo_post",
         "parameters": [
           {
@@ -15704,12 +15704,39 @@
         ],
         "title": "BulkTaskView"
       },
+      "BulkUndoBlock": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": [
+              "changed",
+              "not_in_plan",
+              "person_unavailable"
+            ],
+            "title": "Reason"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason",
+          "message"
+        ],
+        "title": "BulkUndoBlock"
+      },
       "BulkUndoRequest": {
         "properties": {
           "undo_id": {
             "type": "integer",
             "minimum": 1.0,
             "title": "Undo Id"
+          },
+          "preview": {
+            "type": "boolean",
+            "title": "Preview"
           }
         },
         "additionalProperties": false,
@@ -15724,6 +15751,69 @@
           "undone": {
             "type": "integer",
             "title": "Undone"
+          },
+          "applied": {
+            "type": "boolean",
+            "title": "Applied"
+          },
+          "undo_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undo Id"
+          },
+          "action": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "reopen",
+                  "withdraw"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "task_count": {
+            "type": "integer",
+            "title": "Task Count"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/BulkUndoTaskView"
+            },
+            "type": "array",
+            "title": "Tasks"
+          },
+          "blocked": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BulkUndoBlock"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -15731,6 +15821,59 @@
           "undone"
         ],
         "title": "BulkUndoResult"
+      },
+      "BulkUndoTaskView": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "assignment_id": {
+            "type": "integer",
+            "title": "Assignment Id"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "task": {
+            "type": "string",
+            "enum": [
+              "annotate",
+              "review",
+              "translation_review"
+            ],
+            "title": "Task"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "in_progress",
+              "submitted",
+              "reopened"
+            ],
+            "title": "Status"
+          },
+          "person": {
+            "$ref": "#/components/schemas/PersonRefView"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "assignment_id",
+          "document_id",
+          "task",
+          "status",
+          "person"
+        ],
+        "title": "BulkUndoTaskView"
       },
       "BulkUndoView": {
         "properties": {

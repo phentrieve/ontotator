@@ -287,8 +287,10 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
         (final result chosen: withdraw it first; no work yet; already in
         this mode; no proposals). Confirm with its preview_token: every
         listed text changes, or none when anything changed since (a fresh
-        dry run, ``stale``). There is no bulk undo; restore_annotation_mode
-        brings back one text while no new work started on it.
+        dry run, ``stale``). THERE IS NO UNDO for the call as a whole: the
+        answer has no ``undo`` and no tool takes it. restore_annotation_mode
+        brings back one text at a time (its mode, submissions and tasks),
+        and only while no new work started on that text.
         """
         path = project_path(project, "annotation-mode-changes/bulk")
         body: dict[str, Any] = {"rows": texts, "mode": mode}

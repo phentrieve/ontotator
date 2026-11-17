@@ -2061,6 +2061,10 @@ export interface paths {
          *     versions); otherwise 409 ``BULK_UNDO_STALE`` and nothing is undone.
          *     Reopened tasks are submitted again; withdrawn tasks come back with their
          *     drafts. An action that reopened a translation review has no Undo.
+         *     ``preview: true`` changes nothing: it lists the tasks the Undo would
+         *     bring back (``tasks``) and, in ``blocked``, why it cannot run now
+         *     (``changed``, ``not_in_plan``, ``person_unavailable``); a record that is
+         *     unknown, expired or already undone is refused in a preview too.
          */
         post: operations["bulk_undo_api_v1_projects__key__bulk_task_actions_undo_post"];
         delete?: never;
@@ -5191,15 +5195,62 @@ export interface components {
             status: "open" | "in_progress" | "submitted" | "reopened";
             person: components["schemas"]["PersonRefView"];
         };
+        /** BulkUndoBlock */
+        BulkUndoBlock: {
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "changed" | "not_in_plan" | "person_unavailable";
+            /** Message */
+            message: string;
+        };
         /** BulkUndoRequest */
         BulkUndoRequest: {
             /** Undo Id */
             undo_id: number;
+            /** Preview */
+            preview?: boolean;
         };
         /** BulkUndoResult */
         BulkUndoResult: {
             /** Undone */
             undone: number;
+            /** Applied */
+            applied?: boolean;
+            /** Undo Id */
+            undo_id?: number | null;
+            /** Action */
+            action?: ("reopen" | "withdraw") | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Task Count */
+            task_count?: number;
+            /** Tasks */
+            tasks?: components["schemas"]["BulkUndoTaskView"][];
+            blocked?: components["schemas"]["BulkUndoBlock"] | null;
+        };
+        /** BulkUndoTaskView */
+        BulkUndoTaskView: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Assignment Id */
+            assignment_id: number;
+            /** Document Id */
+            document_id: string;
+            /**
+             * Task
+             * @enum {string}
+             */
+            task: "annotate" | "review" | "translation_review";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "in_progress" | "submitted" | "reopened";
+            person: components["schemas"]["PersonRefView"];
         };
         /**
          * BulkUndoView

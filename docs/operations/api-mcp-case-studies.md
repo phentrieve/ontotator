@@ -77,7 +77,8 @@ In week six, 80 new letters arrive, one student leaves for a clinical rotation, 
 | Hand the open tasks to two others in turn, dry run first | `GET P/assignments`, `POST /assignments/{id}/reassign` | `read`, `project-admin` | `hand_over_open_tasks` | added in this PR |
 | Same with a project token | `POST /assignments/{id}/reassign` | `project-admin` (project token now allowed; another project's task gets `ASSIGNMENT_NOT_FOUND`, #351) | `reassign_task` | added in this PR (route rule and tool) |
 | Withdraw, remove or reopen a single task | `POST /assignments/{id}/revoke`, `/remove`, `/reopen` | `project-admin` | `withdraw_task`, `remove_task`, `reopen_task` | added in this PR |
-| Reopen or withdraw the tasks of many texts, with a preview | `POST P/bulk-task-actions/reopen`, `/withdraw`, `/undo` | `project-admin` | `reopen_texts`, `withdraw_open_tasks` | covered (#336) |
+| Reopen or withdraw the tasks of many texts, with a preview | `POST P/bulk-task-actions/reopen`, `/withdraw` | `project-admin` | `reopen_texts`, `withdraw_open_tasks` (the confirmed answer carries `undo`) | covered (#336) |
+| Undo that reopen or withdrawal: every task comes back, or none | `POST P/bulk-task-actions/undo` (`undo_id` of the apply; `preview: true` lists the tasks and what blocks the undo) | `project-admin` | `undo_reopen_or_withdraw` (dry run, then `confirm`) | covered; until 0.10.2 the route had no tool and the tools dropped `undo` |
 | Start a new round for the submitted annotations of many texts (continue or restart), with a preview | `POST P/bulk-task-actions/start-round` | `project-admin` | `start_rounds` | covered (#336) |
 | Deactivate the account afterwards (sessions end, tokens revoked) | `PATCH /admin/users/{username}` | `admin` | `update_user` | added in this PR |
 | Add a consolidator | `PUT P/members/{username}` (`adjudicator`) | `read`, `project-admin` | `set_member_roles` | covered |
