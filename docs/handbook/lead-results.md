@@ -260,6 +260,8 @@ What for: answer a report and let the work go on.
 
 A final result is never changed here. If a task is still paused after the report was closed, the row shows **Resume task…**; click it and release the pause.
 
+If a lead paused the text of the report ([Pause and release the work on texts](lead-documents.md#pause-and-release-the-work-on-texts)), the page shows **Paused by lead** under *Text*. That pause is separate: after you close the report and release its pause, the task stays paused, marked **Paused by lead** for its person, until the text is released; the message after your decision says so. **Agree clean restart…** is refused while the text is paused.
+
 ## Export
 
 ### Export final results

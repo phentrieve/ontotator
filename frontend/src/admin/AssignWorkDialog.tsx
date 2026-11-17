@@ -1,11 +1,11 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
-import { api, ApiError, type BatchAssignRequest, type BatchPersonView, type BatchPreview, type BatchSkipView, type DocumentRowFilters, type DocumentRowView } from "../api/client";
+import { api, ApiError, type BatchAssignRequest, type BatchPersonView, type BatchPreview, type BatchSkipView, type DocumentRowFilters, type DocumentRowView, type RowRefView } from "../api/client";
 import { personLabel, textLabel } from "../app/identity";
 import { assignedText } from "../app/assignedDate";
 import { plural } from "../app/labels";
 import { versionName } from "../documents/labels";
 import { reopenableReviews, workPersonName } from "../documents/reviewReason";
-import { Button, Checkbox, Dialog, IconButton, InlineConfirm, Popover, Select, StatusBadge, Textarea } from "../ui";
+import { Button, Checkbox, Dialog, IconButton, InlineConfirm, InlineMessage, Popover, Select, StatusBadge, Textarea } from "../ui";
 import { IconInfo } from "../ui/icons";
 import { DistributionDialog } from "./DistributionDialog";
 import { ErrorNotice } from "./ErrorNotice";
@@ -21,9 +21,21 @@ export type AssignWorkDialogProps =
     consolidatorRule?: boolean;
     onClose: () => void; onAssigned: (message: string) => void; onLimitChanged?: () => void }
   | { mode: "cases"; projectKey: string; caseIds: readonly string[]; sort: "case" | "import" | "activity"; filters: DocumentRowFilters;
+    /** The selected texts: the dialog says how many of them a lead paused (issue 464). */
+    rows?: readonly RowRefView[];
     /** The lead: without the annotator role their row offers "Add me as annotator". */
     me?: { username: string; name: string };
     onClose: () => void; onAssigned: (message: string, skipped: readonly string[]) => void; onLimitChanged?: () => void };
+
+/**
+ * Issue 464: assigning on a text a lead paused stays possible; the task is paused from the start. "This text is paused by a
+ * lead …" for one text, "2 of the selected texts are paused by a lead …" for a selection.
+ */
+export function pausedAssignText(texts: number, single: boolean): string {
+  const tail = "paused from the start (“Paused by lead” in My tasks) until";
+  return single ? `This text is paused by a lead. A task assigned now is ${tail} you release the text.`
+    : `${texts === 1 ? "1 of the selected texts is" : `${texts} of the selected texts are`} paused by a lead. Tasks assigned there are ${tail} you release ${texts === 1 ? "the text" : "the texts"}.`;
+}
 
 type Preview = BatchPreview;
 /** `later`: annotation that becomes assignable once the review of its text is assigned; shown, not yet walked to. */
@@ -207,6 +219,18 @@ async function leftUnassigned(props: CasesProps) {
 function AssignWorkEditor(props: AssignWorkDialogProps): JSX.Element {
   const id = useId();
   const isRow = props.mode === "row";
+  // Issue 464: how many of the texts a lead paused; their new tasks are paused from the start.
+  const selectedRows = props.mode === "cases" ? props.rows : undefined;
+  const [pausedSelected, setPausedSelected] = useState(0);
+  useEffect(() => {
+    if (!selectedRows?.length) return;
+    let active = true;
+    // A release preview counts the paused texts of the selection; without it the note is left out.
+    api.pauseTexts(props.projectKey, "release", { rows: [...selectedRows], preview: true, summary_only: true }).then(found => { if (active) setPausedSelected(found.change_count); }, () => undefined);
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the dialog is keyed by its selection
+  }, []);
+  const pausedTexts = props.mode === "row" ? (props.row.lead_pause ? 1 : 0) : pausedSelected;
   const [steps, setSteps] = useState<Step[] | null>(isRow ? [] : null);
   const [stepsError, setStepsError] = useState<unknown>();
   const [stepsRetry, setStepsRetry] = useState(0);
@@ -566,6 +590,7 @@ function AssignWorkEditor(props: AssignWorkDialogProps): JSX.Element {
       ? (picked ? `Assign ${picked === 1 ? "1 person" : `${picked} people`}` : "Assign") : !count || (isRow && !usernames.length) ? "Assign" : `Assign ${count}`}</Button>
   </>}>
     <div className="assign-dialog">
+      {pausedTexts > 0 && <InlineMessage tone="info">{pausedAssignText(pausedTexts, props.mode === "row")}</InlineMessage>}
       {props.mode === "row" && <div className="assign-context">
         <p><strong>{textLabel({ case_id: props.row.case_id, language: props.row.language, version: newest?.version }, { withVersion: (newest?.version ?? 1) > 1 })}</strong></p>
         {task === "translation_review" && openBy.length > 0 && <p>{`${stepName(task)} of ${textLabel(props.row)} is assigned to ${openBy.map(person => personLabel(person.person)).join(", ")}. Assign it to someone else?`}</p>}

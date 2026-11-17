@@ -12,7 +12,7 @@ from __future__ import annotations
 from builtins import list as List
 from collections import Counter
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal, cast
 
@@ -75,6 +75,7 @@ from ontotator.storage.tables import (
     UserLanguageRow,
     UserRow,
 )
+from ontotator.storage.text_pause import PauseCause, pause_causes, pause_columns
 from ontotator.storage.text_settings import effective_per_text
 
 TASK_FOR_MODE: dict[WorkspaceMode, Task] = {
@@ -102,8 +103,12 @@ class Assignment:
     external_id: str | None = None
     active_round_id: str | None = None
     workflow_revision: int = 0
+    # Paused by any cause (``storage.text_pause``); ``pause_causes`` names
+    # them, ``hold_reason`` is the report's reason, else the lead's.
     held: bool = False
     hold_reason: str | None = None
+    pause_causes: tuple[PauseCause, ...] = field(default_factory=tuple)
+    lead_pause_reason: str | None = None
     # FD1: the lead's own translation review of a rejected or queried version.
     lead_correction: bool = False
     # Fixed at creation for task ``annotate`` (plan P3); None for other tasks.
@@ -125,6 +130,8 @@ class TaskSummary:
     workflow_revision: int = 0
     held: bool = False
     hold_reason: str | None = None
+    pause_causes: tuple[PauseCause, ...] = field(default_factory=tuple)
+    lead_pause_reason: str | None = None
     source_language: str | None = None
     target_language: str | None = None
     # The text label's case ID (spec "Text label"), and the version and its
@@ -185,8 +192,7 @@ def _assignments() -> Select[tuple[object, ...]]:
             AssignmentRow.last_submission_id,
             AssignmentRow.active_round_id,
             AssignmentRow.workflow_revision,
-            AssignmentRow.held,
-            AssignmentRow.hold_reason,
+            *pause_columns(),
             AssignmentRow.lead_correction,
             AssignmentRow.annotation_mode,
             DocumentRow.external_id,
@@ -201,8 +207,17 @@ def _assignments() -> Select[tuple[object, ...]]:
     )
 
 
+def _paused(row: RowMapping) -> dict[str, Any]:
+    """A row read with ``pause_columns`` as the fields of ``Assignment`` and
+    ``TaskSummary``."""
+    values = dict(row)
+    values["pause_causes"] = tuple(pause_causes(values))
+    del values["report_held"], values["lead_paused"]
+    return values
+
+
 def _assignment(row: RowMapping) -> Assignment:
-    return Assignment(**row)
+    return Assignment(**_paused(row))
 
 
 ReviewReason = Literal["source_changed"]
@@ -1235,8 +1250,7 @@ class AssignmentService:
                 AssignmentRow.id.label("assignment_id"),
                 AssignmentRow.active_round_id,
                 AssignmentRow.workflow_revision,
-                AssignmentRow.held,
-                AssignmentRow.hold_reason,
+                *pause_columns(),
                 ProjectRow.project_key,
                 ProjectRow.name.label("project_name"),
                 AssignmentRow.document_id,
@@ -1483,7 +1497,7 @@ class AssignmentService:
                 for_lead = (row["project_key"], row["document_id"]) in superseded
                 result.append(
                     TaskSummary(
-                        **row,
+                        **_paused(row),
                         waiting_for_translation_review=waiting and not for_lead,
                         waiting_for_lead=waiting and for_lead,
                         translation_finished=row["task"] == "annotate"

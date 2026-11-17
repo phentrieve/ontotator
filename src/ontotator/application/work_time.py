@@ -30,6 +30,7 @@ from ontotator.authz.visibility import qualifying_assignment
 from ontotator.domain.errors import DomainError
 from ontotator.storage.database import Database, advisory_lock_id
 from ontotator.storage.tables import AssignmentRow, ProjectRow, UserRow
+from ontotator.storage.text_pause import task_held
 from ontotator.storage.work_time_tables import (
     WORK_TIME_TASKS,
     WorkIntervalRow,
@@ -183,7 +184,7 @@ class WorkTimeService:
                 AssignmentRow.document_id,
                 AssignmentRow.task,
                 AssignmentRow.status,
-                AssignmentRow.held,
+                task_held().label("held"),
                 AssignmentRow.annotation_mode,
                 ProjectRow.record_working_time,
             )

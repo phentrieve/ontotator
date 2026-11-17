@@ -37,7 +37,8 @@ FACET_GROUPS: tuple[FacetGroup, ...] = (
 # submitted consolidation of the current version has a flagged finding.
 # "More annotators than the limit" (issue 339 b): a current version of the
 # row has more unrevoked annotate tasks than "annotators per text".
-FlagFilter = Literal["guidelines_unclear", "over_limit"]
+# "Paused by lead" (issue 464): a lead paused the work on the text.
+FlagFilter = Literal["guidelines_unclear", "over_limit", "lead_paused"]
 # Facet "Tool proposals" (spec 2026-10-23 §2b).
 ProposalValue = Literal["with", "without"]
 Key = TypeVar("Key")
@@ -60,6 +61,7 @@ def flag_values(row: Mapping[str, Any]) -> tuple[str, ...]:
     return (
         *(("guidelines_unclear",) if row.get("flagged_unclear") else ()),
         *(("over_limit",) if row.get("over_limit") else ()),
+        *(("lead_paused",) if row.get("lead_pause") else ()),
     )
 
 

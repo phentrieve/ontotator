@@ -151,7 +151,10 @@ class WorkItemView(_View):
     is_me: bool
     task: Task
     status: AssignmentStatus
+    # Paused by any cause; ``pause_causes`` names them: ``report`` (a problem
+    # report) and/or ``lead`` (the lead paused the text, issue 464).
     held: bool
+    pause_causes: list[Literal["report", "lead"]] = Field(default_factory=list)
     round_ordinal: int | None
     round_state: str | None
     # Lead workflow (D1): the assignee as a person reference.
@@ -390,6 +393,17 @@ class ConsolidationProgressView(_View):
     total: int
 
 
+class LeadPauseView(_View):
+    """A lead paused the work on the text: its tasks in progress cannot be
+    saved, also tasks assigned later, until a lead releases the text.
+    Submitted work and final results are untouched."""
+
+    reason: str
+    # None: paused through an API token or by an account since erased.
+    paused_by: PersonRefView | None = None
+    paused_at: datetime
+
+
 class DocumentRowView(_View):
     case_id: str
     language: str
@@ -455,6 +469,9 @@ class DocumentRowView(_View):
     proposal_set_unrecorded: bool = Field(default_factory=lambda: False)
     # Issue 422: the text's "Annotations per text" (None in older fixtures).
     annotations_per_text: AnnotationsPerTextView | None = None
+    # Issue 464: the lead paused the work on the text (filter
+    # flags=lead_paused); None: not paused.
+    lead_pause: LeadPauseView | None = None
     consolidation_progress: ConsolidationProgressView | None = None
     # Spec 2026-10-25 §2: the rule is off and the translation is not accepted,
     # so annotating it needs an explicit acknowledgement.

@@ -37,6 +37,10 @@ export interface TranslationReviewScreenProps {
   guidelineNotice?: ReactNode;
   held?: boolean;
   holdReason?: string | null;
+  /** The paused banner's title: "Paused by lead" when the lead paused the text (issue 464); default "Task paused". */
+  holdTitle?: string;
+  /** A save was refused because the task is paused: the caller reloads the task's state. */
+  onTaskHeld?: () => void;
   saveBeforeReportRef?: MutableRefObject<(() => Promise<void>) | null>;
   /**
    * The post-submit flow of annotation tasks (M2 M-6, issue 125): after a submit (not a lead correction) the caller
@@ -411,6 +415,9 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   };
   /** The rail with its footer is shown; collapsed (or below 1100 px) the pinned bar keeps the decision and Submit reachable. */
   const railOpen = wide && !panelCollapsed;
+  /** Paused while this screen was open (issue 464): the caller reloads the task, so the banner names the cause; the input stays. */
+  const onTaskHeld = useRef(props.onTaskHeld); onTaskHeld.current = props.onTaskHeld;
+  const notePause = (failure: unknown) => { if (failure instanceof ApiError && failure.code === "TASK_HELD") onTaskHeld.current?.(); };
   type Leave = { kind: "leave" | "logout"; resolve?: (allowed: boolean) => void; proceed?: () => void };
   const [leave, setLeave] = useState<Leave | null>(null);
   const pendingLeave = useRef<Leave | null>(null), leavePromise = useRef<Promise<boolean> | null>(null);
@@ -421,7 +428,8 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
       const instance = createDraftSaver<RawDraft>({ initialRevision: workspace.draft.revision,
         save: async (value, expected_revision) => {
           if (!alive.current || readOnlyRef.current) throw new Error("This review is read-only.");
-          return (await api.saveTranslationReviewDraft(props.assignmentId, { ...value, expected_revision })).revision;
+          try { return (await api.saveTranslationReviewDraft(props.assignmentId, { ...value, expected_revision })).revision; }
+          catch (failure) { notePause(failure); throw failure; }
         }, onStateChange: () => { if (alive.current && saver.current === instance) refresh(n => n + 1); } });
       saver.current = instance;
       if (normaliseOnOpen) instance.update(draftRef.current);
@@ -555,7 +563,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
       return true;
     } catch (failure) {
       if (!alive.current) return false;
-      setError(failure);
+      setError(failure); notePause(failure);
       if (failure instanceof ApiError && failure.code === "REVIEW_INVALID" && typeof failure.details === "object" && Array.isArray(failure.details.issues)) setServerIssues(failure.details.issues.filter((value): value is string => typeof value === "string"));
       if (failure instanceof ApiError && failure.code === "QUALIFICATION_REQUIRED") {
         setQualification(null);
@@ -694,7 +702,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     aria-disabled={canSubmit ? undefined : true} loading={busy} onClick={requestSubmit}>Submit review…</Button>;
 
   return <section className="translation-review" aria-label="Translation review" ref={screenRoot}>
-    {held && <PausedNotice reason={props.holdReason ?? workspace.assignment.hold_reason} kept="Your local translation and review input are kept." />}
+    {held && <PausedNotice title={props.holdTitle} reason={props.holdReason ?? workspace.assignment.hold_reason} kept="Your local translation and review input are kept." />}
     <Button className="translation-skip" onClick={focusDecision}>Skip to decision</Button>
     <div className="translation-review-bar density-compact">
       <h1>{label}</h1>

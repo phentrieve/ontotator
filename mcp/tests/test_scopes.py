@@ -178,6 +178,19 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "confirm": True,
             "preview_token": "sha256:x",
         },
+        "pause_texts": {
+            "project": "p",
+            "texts": [{"case_id": "c", "language": "en"}],
+            "reason": "Clinic is checking",
+            "confirm": True,
+            "preview_token": "sha256:x",
+        },
+        "release_texts": {
+            "project": "p",
+            "texts": [{"case_id": "c", "language": "en"}],
+            "confirm": True,
+            "preview_token": "sha256:x",
+        },
         "hand_over_open_tasks": {
             "project": "p",
             "from_username": "leaving",

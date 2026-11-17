@@ -635,6 +635,7 @@ def _build_row(ctx: _Context, case_id: str, language: str) -> dict[str, Any]:
             "project": facts.annotations_per_text,
             "override": facts.per_text_overrides.get(key),
         },
+        "lead_pause": _lead_pause(ctx, key),
         "consolidation_progress": None,
         "unreviewed_translation": steps_rules.unreviewed_translation(
             ctx.step_facts[key]
@@ -806,6 +807,28 @@ def _consolidation_flags(facts: RowFacts, live: Sequence[rules.Chain]) -> str | 
     return None
 
 
+def _pause_causes(item: rules.AssignmentFact) -> list[str]:
+    """Why the task is paused (``held``): ``report`` and/or ``lead``."""
+    report = item.held and (item.report_held or not item.lead_paused)
+    return [
+        *(("report",) if report else ()),
+        *(("lead",) if item.lead_paused else ()),
+    ]
+
+
+def _lead_pause(ctx: _Context, key: RowKey) -> dict[str, Any] | None:
+    """The lead pause of the text (issue 464): why, who and when."""
+    pause = ctx.facts.lead_pauses.get(key)
+    if pause is None:
+        return None
+    return {
+        "reason": pause.reason,
+        # None: paused through an API token, or by an account since erased.
+        "paused_by": ctx.facts.people.get(pause.paused_by or 0),
+        "paused_at": pause.paused_at,
+    }
+
+
 def _work_item(
     ctx: _Context,
     item: rules.AssignmentFact,
@@ -824,6 +847,7 @@ def _work_item(
         "task": item.task,
         "status": item.status,
         "held": item.held,
+        "pause_causes": _pause_causes(item),
         "lead_correction": item.lead_correction,
         "round_ordinal": (
             ctx.ordinals.get(item.active_round_id)
@@ -1338,8 +1362,15 @@ def _row_steps(
                 if ordinal is not None
                 else _detail("annotations_submitted", submitted=submitted, total=total)
             )
+        # A task the lead paused is nobody's turn (issue 464).
         owner = _owner(
-            ctx, step.kind, in_progress_work if step.kind == "in_progress" else work
+            ctx,
+            step.kind,
+            [
+                item
+                for item in (in_progress_work if step.kind == "in_progress" else work)
+                if not item.lead_paused
+            ],
         )
         if not views:
             ctx.owners[key] = frozenset(
@@ -1431,8 +1462,13 @@ _PAUSABLE = frozenset({"annotate", "review"})
 
 
 def is_paused(row: Mapping[str, Any]) -> bool:
-    """The row has a held annotate or review task (filter ``paused``)."""
-    return any(item["held"] and item["task"] in _PAUSABLE for item in row["work"])
+    """The row has an annotate or review task held by a problem report
+    (filter ``paused``). A lead pause is the row's own state (``lead_pause``,
+    flag ``lead_paused``)."""
+    return any(
+        "report" in item["pause_causes"] and item["task"] in _PAUSABLE
+        for item in row["work"]
+    )
 
 
 def _row_level_matches(ctx: _Context, row: Mapping[str, Any], query: RowQuery) -> bool:

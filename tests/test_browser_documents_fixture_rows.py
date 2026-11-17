@@ -202,3 +202,25 @@ def test_s12_orphan_pause_and_extended_hold_note(client):
     en = rows[("case-0512", "en")]
     assert "OPEN_PROBLEM_REPORT" in codes(en["issues"])
     assert page["bar"]["report_or_pause"] == 2
+
+
+def test_s464_work_in_progress_a_report_pause_and_nothing_paused_by_a_lead(client):
+    """Issue 464: the lead pause spec starts from texts no lead has paused."""
+    body = scenario(client, "S464")
+    assert len(body["rows"]) == 6 and set(body["users"]) == {
+        "lead",
+        "tom",
+        "roe",
+        "ana",
+    }
+    (page,) = lead_pages(client, body)
+    rows = {key[0]: row for key, row in rows_of(page).items()}
+    assert all(row["lead_pause"] is None for row in rows.values())
+    causes = {
+        case: sorted(cause for item in row["work"] for cause in item["pause_causes"])
+        for case, row in rows.items()
+    }
+    assert causes["EN100026"] == ["report"]
+    assert not any(found for case, found in causes.items() if case != "EN100026")
+    assert rows["EN100024"]["final"] is not None
+    assert rows["EN100027"]["work"] == []

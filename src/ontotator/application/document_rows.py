@@ -71,6 +71,7 @@ from ontotator.storage.tables import (
     TranslationReviewRow,
     UserRow,
 )
+from ontotator.storage.text_pause import TextPause, paused_texts
 from ontotator.storage.text_settings import per_text_overrides
 from ontotator.storage.workflow_tables import (
     ProblemReportEventRow,
@@ -360,6 +361,8 @@ class RowFacts:
     discarded_counts: dict[str, int] = field(default_factory=dict)
     # Issue 422: texts whose "Annotations per text" overrides the project's.
     per_text_overrides: dict[tuple[str, str], int] = field(default_factory=dict)
+    # Issue 464: texts a lead paused, with the reason, the lead and the time.
+    lead_pauses: dict[tuple[str, str], TextPause] = field(default_factory=dict)
     # Issue 337: the newest imported proposal set per document and the facts
     # of these sets and of the sets the rounds started from.
     newest_sets: dict[str, int] = field(default_factory=dict)
@@ -632,13 +635,20 @@ def _assignments(conn: Connection, pid: int) -> list[rules.AssignmentFact]:
             )
         ).scalars()
     )
+    paused = paused_texts(conn, pid)
+
+    def by_lead(row: Any) -> bool:
+        return row.status != "submitted" and (row.case_id, row.language) in paused
+
     return [
         rules.AssignmentFact(
             assignment_id=row.id,
             document_id=row.document_id,
             task=row.task,
             status=row.status,
-            held=row.held,
+            held=row.held or by_lead(row),
+            lead_paused=by_lead(row),
+            report_held=row.held,
             revoked=row.revoked_at is not None,
             pseudonym=row.pseudonym,
             user_id=row.user_id,
@@ -671,8 +681,17 @@ def _assignments(conn: Connection, pid: int) -> list[rules.AssignmentFact]:
                     AssignmentRow.project_id, AssignmentRow.last_submission_id
                 ).label("live_submission"),
                 UserRow.pseudonym,
+                DocumentRow.case_id,
+                DocumentRow.language,
             )
             .join(UserRow, UserRow.id == AssignmentRow.user_id)
+            .join(
+                DocumentRow,
+                and_(
+                    DocumentRow.project_id == AssignmentRow.project_id,
+                    DocumentRow.document_id == AssignmentRow.document_id,
+                ),
+            )
             .where(AssignmentRow.project_id == pid)
             .order_by(AssignmentRow.id)
         )
@@ -1247,6 +1266,7 @@ def load_facts(
     selected = _selected_submissions(conn, pid)
     latest_reviews = {} if lean else _latest_reviews(conn, pid)
     author_ids = _user_ids(conn, (item.annotator_id for item in selected.values()))
+    lead_pauses = paused_texts(conn, pid)
     people = (
         {}
         if summary
@@ -1270,6 +1290,7 @@ def load_facts(
                 ),
                 *(item.reviewer_id for item in latest_reviews.values()),
                 *author_ids.values(),
+                *(item.paused_by for item in lead_pauses.values() if item.paused_by),
             ],
             viewer_id=viewer_user_id,
             viewer_is_lead=True,  # Documents is lead-only
@@ -1349,6 +1370,7 @@ def load_facts(
         annotation_submissions=_annotation_submissions(conn, pid),
         discarded_counts=_discarded_counts(conn, pid),
         per_text_overrides=per_text_overrides(conn, pid),
+        lead_pauses=lead_pauses,
         **_proposal_set_facts(conn, pid, summary=summary),
     )
 

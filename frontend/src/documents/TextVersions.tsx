@@ -7,7 +7,7 @@ import { formatTime } from "../app/submissionLabels";
 import { Button, StatusBadge, type StatusTone } from "../ui";
 import { TranslationCorrectionAction } from "../variants/TranslationCorrectionAction";
 import { originLabels } from "../admin/variantMetadata";
-import { statusBadgeText, versionName } from "./labels";
+import { pausedWord, statusBadgeText, versionName } from "./labels";
 import { RouteLink, rowName } from "./RowCells";
 import type { CardWorkItem } from "./textCard/cardModel";
 import { PersonList, PersonRow, useFocusAfterRemoval } from "./textCard/PersonRow";
@@ -231,7 +231,7 @@ export const TextVersions = forwardRef<HTMLUListElement, TextVersionsProps>(func
         {discarded && discardLabel(version, now) !== "Discarded" && <p className="text-version-record">{discardLabel(version, now)}</p>}
         {work.length > 0 && <PersonList label={`Assignments on ${name}`}>
           {work.map(item => {
-            const details = <>{labelFor(taskLabels, item.task)}{item.held && " · Paused"}</>;
+            const details = <>{labelFor(taskLabels, item.task)}{item.held && ` · ${pausedWord(item)}`}</>;
             // Moved work is history; annotations carry their actions in the Annotation part (text card).
             const plain = item.moved_to_version != null || (hideOpenWork && item.task === "annotate");
             return plain
