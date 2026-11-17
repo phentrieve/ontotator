@@ -207,6 +207,24 @@ def _discard(facts: RowFacts, document_id: str) -> dict[str, Any] | None:
     }
 
 
+def _upload(facts: RowFacts, document_id: str) -> dict[str, Any] | None:
+    """The upload record of a version uploaded from the text card (341 a)."""
+    record = facts.uploads.get(document_id)
+    if record is None:
+        return None
+    uploaded_by = record["uploaded_by"]
+    return {
+        "method": record["method"],
+        "provider": record["provider"],
+        "model": record["model"],
+        "made_on": record["made_on"],
+        "made_by": record["made_by"],
+        "note": record["note"],
+        "uploaded_at": record["uploaded_at"],
+        "uploaded_by": facts.people.get(uploaded_by) if uploaded_by else None,
+    }
+
+
 def _report(facts: RowFacts, report_id: str | None) -> dict[str, Any] | None:
     fact = facts.reports.get(report_id) if report_id is not None else None
     if fact is None:
@@ -537,6 +555,7 @@ def _build_row(ctx: _Context, case_id: str, language: str) -> dict[str, Any]:
                 "last_activity_at": version_activity[v.document_id],
                 "acceptance": _acceptance(facts, v.document_id),
                 "discarded": _discard(facts, v.document_id),
+                "upload": _upload(facts, v.document_id),
             }
             for chain in chains
             for v in chain.versions

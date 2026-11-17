@@ -49,6 +49,7 @@ import { SelectionBar } from "../documents/SelectionBar";
 import { documentsGroupId, documentsRowId, isPlainClick, type DocumentsRowPart, type OpenTextCard, RouteLink, rowKeyOf, rowName } from "../documents/RowCells";
 import type { TextVersionsTools } from "../documents/TextVersions";
 import { AcceptVersionDialog, CorrectVersionDialog } from "../documents/VersionDialogs";
+import { UploadVersionDialog } from "../documents/UploadVersionDialog";
 import { workText } from "../documents/labels";
 import { isActiveRow } from "../documents/stageLabels";
 import { caseOfTextKey, languageOfTextKey, MAX_SELECTION_CASES as MAX_SELECTION, rowRefOf, textKeyOf, useTextSelection } from "../documents/useTextSelection";
@@ -388,8 +389,8 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
   const [withdrawFor, setWithdrawFor] = useState<DocumentRowView | null>(null);
   /** The row as the page shows it now (after a refused withdrawal the reload brings the new revision). */
   const withdrawRow = withdrawFor ? pageRows.find(entry => rowKeyOf(entry) === rowKeyOf(withdrawFor)) ?? withdrawFor : null;
-  // Issue 341: the lead's actions on one version row (Correct the translation…, Accept this version…).
-  const [versionAction, setVersionAction] = useState<{ kind: "correct" | "accept"; row: DocumentRowView; version: DocumentVersionView } | null>(null);
+  // Issue 341: the lead's actions on one version row (Correct the translation…, Accept this version…, Upload new version…).
+  const [versionAction, setVersionAction] = useState<{ kind: "correct" | "accept" | "upload"; row: DocumentRowView; version: DocumentVersionView } | null>(null);
   const textVersionTools = useMemo<TextVersionsTools | undefined>(() => {
     if (!inventory) return undefined;
     const variants = new Map<string, VariantSummary>(inventory.cases.flatMap(item => item.variants).map(variant => [variant.document_id, variant]));
@@ -405,6 +406,7 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
       ...(canOverrideTranslationStatus ? {
         onCorrectTranslation: (row: DocumentRowView, version: DocumentVersionView) => setVersionAction({ kind: "correct", row, version }),
         onAcceptVersion: (row: DocumentRowView, version: DocumentVersionView) => setVersionAction({ kind: "accept", row, version }),
+        onUploadVersion: (row: DocumentRowView, version: DocumentVersionView) => setVersionAction({ kind: "upload", row, version }),
       } : {}),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refreshAll only uses rows.reload and state setters
@@ -978,6 +980,9 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
     {versionAction?.kind === "accept" && <AcceptVersionDialog row={versionAction.row} version={versionAction.version} projectKey={projectKey}
       onClose={() => setVersionAction(null)}
       onAccepted={message => { setVersionAction(null); void refreshAll().then(() => showToast({ message })); }} />}
+    {versionAction?.kind === "upload" && <UploadVersionDialog row={versionAction.row} version={versionAction.version} projectKey={projectKey}
+      onClose={() => setVersionAction(null)}
+      onUploaded={message => { setVersionAction(null); void refreshAll().then(() => showToast({ message })); }} />}
     {idsDialogOpen && <SelectByIdsDialog projectKey={projectKey} current={selection.cases} filters={filters} sort={request.sort ?? "case"} activeOnly={!notInPlanShown} onClose={() => setIdsDialogOpen(false)} onSelect={selectByIds} />}
   </section>;
 }

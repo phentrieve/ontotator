@@ -303,6 +303,9 @@ class RowFacts:
     discarded: dict[str, dict[str, Any]] = field(default_factory=dict)
     # document id -> newest acceptance record (``work_plan_store.acceptances``)
     acceptances: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # document id -> upload record of a version uploaded from the text card
+    # (issue 341 a, ``version_uploads.uploads``)
+    uploads: dict[str, dict[str, Any]] = field(default_factory=dict)
     annotations_per_text: int = 1
     rule_on: bool = True  # annotate_accepted_translations_only
     # user id -> PersonRefView fields (lead viewer: display names included)
@@ -1232,6 +1235,10 @@ def load_facts(
     plan = work_plan_store.effective_plan(conn, pid)
     discarded = work_plan_store.discarded(conn, pid)
     acceptances = work_plan_store.acceptances(conn, pid)
+    # Imported here: the upload service builds on the workflow services.
+    from ontotator.application.version_uploads import uploads as load_uploads
+
+    uploads = {} if summary else load_uploads(conn, pid)
     versions = _versions(conn, pid)
     assignments = _assignments(conn, pid)
     reports = _reports(conn, pid)
@@ -1254,6 +1261,11 @@ def load_facts(
                     if item["accepted_by"]
                 ),
                 *(item["discarded_by"] for item in discarded.values()),
+                *(
+                    item["uploaded_by"]
+                    for item in uploads.values()
+                    if item["uploaded_by"]
+                ),
                 *(item.reviewer_id for item in latest_reviews.values()),
                 *author_ids.values(),
             ],
@@ -1298,6 +1310,7 @@ def load_facts(
         revisions=work_plan_store.project_revisions(conn, pid),
         discarded=discarded,
         acceptances=acceptances,
+        uploads=uploads,
         annotations_per_text=project.annotations_per_text,
         rule_on=project.annotate_accepted_translations_only,
         people=people_fields,

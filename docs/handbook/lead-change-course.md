@@ -20,14 +20,15 @@ Before you start: decide whether the new text replaces the current translation o
 
 ### Replace the translation in the app
 
-This works without a file. The new text is pasted into a translation review.
+This works without building a bundle. You upload the new text at the version, or it is pasted into a translation review.
 
 1. Open the text card and click **Translation**.
 2. If the current version is accepted: at the version, click **Request correction…**, choose the **Translation reviewer**, enter the **Reason for another review** (say where the new text comes from) and click **Assign correction review**. The reviewer replaces the text, writes the origin into the **Rationale** and submits **Accepted with corrections** ([Request a translation correction](lead-documents.md#request-a-translation-correction)). The corrected text becomes the next version and counts as accepted.
 3. Or, if the current version is accepted, paste the new text yourself: at the version, click **Correct the translation…**. The dialog lists the annotation work that stays on the accepted version. Your corrected text becomes the next version and starts as a correction with review On, so it is reviewed again ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
 4. If the current version was rejected or queried: click **Resolve…**, then **Correct the translation…**, paste the new text yourself and submit. The corrected text becomes the next version and counts as accepted.
+5. Or, whatever the state of the current version, upload the new text: at the newest version, click **Upload new version…**, paste the text or choose a .txt file, say how the text was made (for a machine translation with its provider and model), check the changes and save. The text becomes the next version, a correction that starts as *Ready for review*; accept it with **Accept this version…** if it was reviewed outside Ontotator ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)).
 
-**Request correction…** is offered only at an accepted version, and **Correct the translation…** at the newest version that is accepted, rejected or queried. The provider or model of the new text can only be named in the **Rationale**; Ontotator has no field for it.
+**Request correction…** is offered only at an accepted version, **Correct the translation…** at the newest version that is accepted, rejected or queried, and **Upload new version…** at the newest version of every translation that has no open translation review. Only **Upload new version…** has fields for the provider and model of the new text; in a translation review they can only be named in the **Rationale**.
 
 ### Replace or add a translation by file
 

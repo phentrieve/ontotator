@@ -452,22 +452,34 @@ def rejected_translation_for_lead(app: FastAPI) -> dict[str, Any]:
     )
 
 
-ACCEPTED_FOR_LEAD_CASES = {"accepted": "case-0101", "unreviewed": "case-0102"}
+ACCEPTED_FOR_LEAD_CASES = {
+    "accepted": "case-0101",
+    "unreviewed": "case-0102",
+    "in_review": "case-0103",
+}
 
 
 def accepted_translation_for_lead(app: FastAPI) -> dict[str, Any]:
-    """Issue 341: rule on, 2 cases with de review + annotate. Ana accepted the
+    """Issue 341: rule on, 3 cases with de review + annotate. Ana accepted the
     de translation of case-0101 unchanged; the annotator submitted an
-    annotation of it and Ben started one (open), so a lead correction leaves
-    annotation work on v1. case-0102 de waits for its review (no review
-    assigned): "Accept this version…" accepts it alone."""
+    annotation of it and Ben started one (open), so a lead correction or an
+    uploaded version leaves annotation work on v1. case-0102 de waits for
+    its review (no review assigned): "Accept this version…" accepts it
+    alone. case-0103 de has Ana's open translation review: "Upload new
+    version…" is refused there."""
     scenario = lead_project(app, "ACCEPTED_TRANSLATION_FOR_LEAD")
     scenario.app.state.accounts.update_profile(
         Actor.cli(), scenario.users["lead"], qualification="Physician"
     )
-    case_ids = cases(101, 2)
+    case_ids = cases(101, 3)
     docs = import_units(scenario, case_units(case_ids, ("de",)))
     plan(scenario, case_ids, {"de": REVIEW_AND_ANNOTATE})
+    assign(
+        scenario,
+        docs[(ACCEPTED_FOR_LEAD_CASES["in_review"], "de")],
+        "ana",
+        "translation_review",
+    )
     accepted = docs[(ACCEPTED_FOR_LEAD_CASES["accepted"], "de")]
     review_translation(scenario, accepted, "ana", "accepted_unchanged")
     submit(scenario, accepted, "annotator")

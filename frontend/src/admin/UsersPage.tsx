@@ -83,6 +83,7 @@ const auditActions: Readonly<Record<string, string>> = {
   "translation.lead_correction_started": "Lead correction of a translation started",
   "translation.review": "Translation reviewed",
   "translation.source_reviewed": "Source text reviewed",
+  "translation.version_uploaded": "New translation version uploaded",
   "upload.preview": "Upload checked",
   "variant.discard": "Variant discarded",
   "variant.reanchor": "Variant re-anchored",

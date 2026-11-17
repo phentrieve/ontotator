@@ -1,6 +1,6 @@
 """Work plans per language version, translation acceptances and discards."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import (
@@ -124,6 +124,51 @@ class DiscardedVariantRow(Base):
         BigInteger, ForeignKey(f"{SCHEMA}.users.id")
     )
     discarded_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class TranslationVersionUploadRow(Base):
+    """A translation version a lead uploaded from the text card (issue 341 a).
+
+    Append-only, one row per uploaded version: who uploaded it and how the
+    text was made (``method``, with provider and model for a machine
+    translation). The version itself is an ordinary ``correction`` of
+    ``previous_document_id``.
+    """
+
+    __tablename__ = "translation_version_uploads"
+    __table_args__ = (
+        ForeignKeyConstraint(*_DOCUMENT_FK),
+        ForeignKeyConstraint(
+            ["project_id", "previous_document_id"],
+            [f"{SCHEMA}.documents.project_id", f"{SCHEMA}.documents.document_id"],
+        ),
+        UniqueConstraint("project_id", "document_id"),
+        CheckConstraint(
+            "method IN ('machine_translation', 'human_translation',"
+            " 'manual_correction')",
+            name="method",
+        ),
+        CheckConstraint(
+            "method <> 'machine_translation' OR provider IS NOT NULL",
+            name="provider_required",
+        ),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.projects.id")
+    )
+    document_id: Mapped[str]
+    previous_document_id: Mapped[str]
+    method: Mapped[str]
+    provider: Mapped[str | None]
+    model: Mapped[str | None]
+    made_on: Mapped[date | None]
+    made_by: Mapped[str | None]
+    note: Mapped[str | None]
+    uploaded_by: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.users.id")
+    )
+    uploaded_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
 class TextSettingRow(Base):

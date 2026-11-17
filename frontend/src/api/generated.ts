@@ -2121,6 +2121,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{key}/variants/{document_id}/versions/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Version Upload
+         * @description Issue 341 a, read only: whether a new version can follow this one, the
+         *     work that stays on it and, with a text, the text as it would be stored.
+         */
+        post: operations["preview_version_upload_api_v1_projects__key__variants__document_id__versions_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{key}/variants/{document_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Version
+         * @description Issue 341 a: save a text as the next version of this translation: a
+         *     correction of this version, ready for review, with Review on.
+         */
+        post: operations["upload_version_api_v1_projects__key__variants__document_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/translation-reviews/{assignment_id}/source-obligations": {
         parameters: {
             query?: never;
@@ -6098,6 +6140,7 @@ export interface components {
             last_activity_at: string | null;
             acceptance?: components["schemas"]["VersionAcceptanceView"] | null;
             discarded?: components["schemas"]["VersionDiscardView"] | null;
+            upload?: components["schemas"]["VersionUploadView"] | null;
         };
         /**
          * DocumentsSummaryView
@@ -11257,6 +11300,124 @@ export interface components {
              */
             created_at: string;
         };
+        /**
+         * VersionUploadPreview
+         * @description What uploading a new version after this one would do (read only).
+         */
+        VersionUploadPreview: {
+            /** Document Id */
+            document_id: string;
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Version */
+            version: number;
+            /** Next Version */
+            next_version: number;
+            /** Translation Status */
+            translation_status: string | null;
+            /** Text Sha256 */
+            text_sha256: string;
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason: string | null;
+            /** Review On */
+            review_on: boolean;
+            /** Annotate Accepted Only */
+            annotate_accepted_only: boolean;
+            annotations: components["schemas"]["LeadCorrectionAnnotationsView"];
+            /** Open Consolidations */
+            open_consolidations: number;
+            /** Final Result */
+            final_result: boolean;
+            /** Text */
+            text: string | null;
+            /** Previous Text */
+            previous_text: string | null;
+            /** Unchanged */
+            unchanged: boolean | null;
+        };
+        /**
+         * VersionUploadPreviewRequest
+         * @description Issue 341 a: the text to check before "Upload new version…" saves it.
+         */
+        VersionUploadPreviewRequest: {
+            /** Text */
+            text?: string | null;
+        };
+        /**
+         * VersionUploadRequest
+         * @description Issue 341 a: a text made elsewhere as the next version of a translation.
+         */
+        VersionUploadRequest: {
+            /** Text */
+            text: string;
+            /** Expected Text Sha256 */
+            expected_text_sha256: string;
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "machine_translation" | "human_translation" | "manual_correction";
+            /** Provider */
+            provider?: string | null;
+            /** Model */
+            model?: string | null;
+            /** Made On */
+            made_on?: string | null;
+            /** Made By */
+            made_by?: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** VersionUploadResult */
+        VersionUploadResult: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Document Id */
+            document_id: string;
+            /** Version */
+            version: number;
+            /** Previous Document Id */
+            previous_document_id: string;
+            /** Previous Version */
+            previous_version: number;
+            /**
+             * Translation Status
+             * @constant
+             */
+            translation_status: "ready_for_review";
+            /** Text Sha256 */
+            text_sha256: string;
+        };
+        /**
+         * VersionUploadView
+         * @description How a version uploaded from the text card was made (issue 341 a).
+         */
+        VersionUploadView: {
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "machine_translation" | "human_translation" | "manual_correction";
+            /** Provider */
+            provider?: string | null;
+            /** Model */
+            model?: string | null;
+            /** Made On */
+            made_on?: string | null;
+            /** Made By */
+            made_by?: string | null;
+            /** Note */
+            note?: string | null;
+            /** Uploaded At */
+            uploaded_at?: string | null;
+            uploaded_by?: components["schemas"]["PersonRefView"] | null;
+        };
         /** WarningAcknowledgement */
         WarningAcknowledgement: {
             /** Id */
@@ -15498,6 +15659,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AssignmentView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_version_upload_api_v1_projects__key__variants__document_id__versions_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionUploadPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionUploadPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_version_api_v1_projects__key__variants__document_id__versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionUploadRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionUploadResult"];
                 };
             };
             /** @description Validation Error */

@@ -515,6 +515,39 @@ describe("translation part", () => {
     expect(onAcceptVersion).toHaveBeenCalledWith(row, versions[2]);
   });
 
+  it("issue 341: Upload new version… on the newest version of each translation, with how an uploaded version was made", () => {
+    const versions = [
+      version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "accepted", chain_name: "m1", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "m1", translation_status: "ready_for_review",
+        upload: { method: "machine_translation", provider: "DeepL", model: "deepl-2026-10", made_on: "2026-11-12", made_by: "Dr. Roe", note: "Checked against the source",
+          uploaded_at: "2026-11-16T10:12:00", uploaded_by: { pseudonym: "ann-0002", display_name: "Project lead", is_me: false } } }),
+      version({ document_id: "case-200-mt", origin: "machine_translation", derived_from: "case-200-en", chain_name: "mt", translation_status: "accepted" }),
+    ];
+    const onUploadVersion = vi.fn();
+    const textVersionTools = { username: "lead", members: [], assignments: [], variants: new Map(), requiredLanguages: () => ["de"],
+      onAssignmentsChanged: vi.fn(), onRequestCorrection: vi.fn(), onUploadVersion };
+    const row = assignRow({ versions, parallel_roots: true, work: [] });
+    renderCard({ row, initialSegment: "translation", textVersionTools, now: new Date("2026-11-20T12:00:00") });
+    const part = within(card()).getByRole("heading", { name: "Translation" }).closest("section")!;
+    // The older version sits under "Older versions" and offers no upload.
+    const upload = within(part).getAllByText("Upload new version…");
+    expect(upload.map(button => button.getAttribute("aria-label"))).toEqual(["Upload new version of m1 v2 of case-200 de…", "Upload new version of mt v1 of case-200 de…"]);
+    fireEvent.click(upload[0]);
+    expect(onUploadVersion).toHaveBeenCalledWith(row, versions[1]);
+    expect(within(part).getByText("Correction of m1 v1 · Machine translation, DeepL, deepl-2026-10")).toBeTruthy();
+    expect(within(part).getByText("Uploaded by Project lead (ann-0002), 16 Nov, 10:12 · Made on 12 Nov 2026 by Dr. Roe · Checked against the source")).toBeTruthy();
+  });
+
+  it("issue 341: no Upload new version… on a source text or a discarded translation", () => {
+    const tools = { username: "lead", members: [], assignments: [], variants: new Map(), requiredLanguages: () => ["de"], onAssignmentsChanged: vi.fn(), onUploadVersion: vi.fn() };
+    renderCard({ row: assignRow({ is_source: true, versions: [version({ document_id: "case-200-de" })] }), initialSegment: "translation", textVersionTools: tools });
+    expect(within(card()).queryByText("Upload new version…")).toBeNull();
+    cleanup();
+    const discarded = { ...version({ document_id: "case-200-de", origin: "machine_translation", translation_status: "ready_for_review" }), discarded: { reason: "Wrong text" } };
+    renderCard({ row: assignRow({ versions: [discarded] }), initialSegment: "translation", textVersionTools: tools });
+    expect(within(card()).queryByText("Upload new version…")).toBeNull();
+  });
+
   it("calls a native text the source text and a failed check failed", () => {
     renderCard({ row: assignRow({ is_source: true, versions: [version({ document_id: "case-200-de" })] }), initialSegment: "translation" });
     expect(within(card()).getByText("Source text")).toBeTruthy();

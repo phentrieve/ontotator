@@ -384,6 +384,67 @@ async def test_accept_translation_version_confirms_with_the_dry_runs_text_hash(
     assert sent.json() == {"reason": "Checked", "expected_text_sha256": "b" * 64}
 
 
+async def test_upload_translation_version_confirms_with_the_dry_runs_text_hash(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    """Issue 341 a: one route for the dialog and the tool, the same refusals."""
+    versions = f"{P}/variants/{{document_id}}/versions"
+    preview = build(
+        "VersionUploadPreview",
+        document_id="d",
+        version=2,
+        next_version=3,
+        available=True,
+        reason=None,
+        text_sha256="b" * 64,
+        text="Neu",
+        previous_text="Alt!",
+        unchanged=False,
+    )
+    fake.on("POST", f"{versions}/preview", preview)
+    args = {
+        "project": "p",
+        "document_id": "d",
+        "text": "Neu",
+        "method": "machine_translation",
+        "provider": "DeepL",
+        "model": "deepl-2026-10",
+        "made_on": "2026-11-12",
+    }
+    dry = await call(mcp_client, "upload_translation_version", args)
+    assert dry["applied"] is False
+    assert dry["plan"]["available"] is True
+    assert dry["plan"]["next_version"] == 3
+    assert dry["plan"]["text_sha256"] == "b" * 64
+    # The plan carries sizes, not the texts.
+    assert "text" not in dry["plan"] and "previous_text" not in dry["plan"]
+    assert dry["plan"]["text_characters"] == 3
+    assert dry["plan"]["previous_text_characters"] == 4
+    [checked] = fake.calls_to("POST", f"{versions}/preview")
+    assert checked.json() == {"text": "Neu"}
+    assert not fake.calls_to("POST", versions)
+    with pytest.raises(ToolFailed, match="expected_previous_sha256"):
+        await call(mcp_client, "upload_translation_version", args | {"confirm": True})
+    assert not fake.calls_to("POST", versions)
+    done = await call(
+        mcp_client,
+        "upload_translation_version",
+        args | {"confirm": True, "expected_previous_sha256": "b" * 64},
+    )
+    assert done["applied"] is True
+    # The hash is the dry run's, not re-read at confirm.
+    assert len(fake.calls_to("POST", f"{versions}/preview")) == 1
+    [sent] = fake.calls_to("POST", versions)
+    assert sent.json() == {
+        "text": "Neu",
+        "expected_text_sha256": "b" * 64,
+        "method": "machine_translation",
+        "provider": "DeepL",
+        "model": "deepl-2026-10",
+        "made_on": "2026-11-12",
+    }
+
+
 async def test_assign_texts_asks_for_a_review_of_an_accepted_translation(
     fake: FakeApi, mcp_client: Client
 ) -> None:

@@ -169,6 +169,8 @@
 .text-version-name { font-weight: var(--weight-strong); }
 .text-version-origin,
 .text-version-chain { color: var(--text-muted); }
+/* An uploaded version names how it was made after its origin, which can be long (issue 341 a). */
+.text-version-origin { min-width: 0; overflow-wrap: anywhere; }
 .text-version-actions a { white-space: nowrap; }
 .text-version-older > details > summary { color: var(--text-muted); cursor: pointer; }
 .text-version-older > details > .text-versions,
