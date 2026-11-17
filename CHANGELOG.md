@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-17
+
 ### Added
 
 - Translations: **Fix typos…** on the newest version of a translation in the text card (#453, user interface for the editorial correction). One dialog page: the lead corrects the text in the translation editor, where changed words are marked while typing, and sees the changes below the field with removed text struck through and a count (*Changes to v2 · 1 character changed*). The reason is given by click: **Spacing**, **Typo**, **Grammar** (several can be chosen) and an optional **Note**; one of them is required, and the stored reason is their words plus the note (*Spacing; Typo*, *Typo: Hypotnie*). What happens to the work on the version is one plain sentence when nothing needs the lead afterwards (*Nobody has worked on v2 yet.*, *2 waiting tasks continue on v3.*) and a highlighted block only when started or submitted annotations, consolidations or a final result stay (*2 annotations stay on v2. After saving, use Handle text change… and Carry to v3… on this row to move them.*). The new version keeps the status of the one it corrects (*v3 keeps the status of v2: Accepted. No translation review is started.*). A changed number is pointed out in place (*Changes a number: 15 → 50. Check that this is intended.*) and blocks nothing. A rejected or queried version has the action too and its correction stays rejected or queried. An unchanged text and an open translation review are refused in words; a source text has no such action. The button's hint tells it apart from its neighbours: *Spacing, typos, grammar. Keeps the status; no review.*
@@ -416,7 +418,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 First public release.
 
-[Unreleased]: https://github.com/phentrieve/ontotator/compare/v0.10.2...HEAD
+[Unreleased]: https://github.com/phentrieve/ontotator/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/phentrieve/ontotator/compare/v0.10.2...v0.11.0
 [0.10.2]: https://github.com/phentrieve/ontotator/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/phentrieve/ontotator/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/phentrieve/ontotator/compare/v0.9.0...v0.10.0

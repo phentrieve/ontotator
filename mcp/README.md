@@ -11,11 +11,11 @@ That is the default. With `ONTOTATOR_MCP_READ_CONTENT=1` four more tools read a 
 You need [uv](https://docs.astral.sh/uv/). Install the command from the repository:
 
 ```bash
-uv tool install "git+https://github.com/phentrieve/ontotator@v0.10.2#subdirectory=mcp"
+uv tool install "git+https://github.com/phentrieve/ontotator@v0.11.0#subdirectory=mcp"
 which ontotator-mcp
 ```
 
-The URL names a release tag, so the server changes only when you install another release: to update, run the command again with the newer tag in the URL. Without a tag the URL would follow `main`, and every push would update the server. From a checkout of a release tag, `uv tool install ./mcp` does the same. Without installing, `uvx --from "git+https://github.com/phentrieve/ontotator@v0.10.2#subdirectory=mcp" ontotator-mcp` runs it directly.
+The URL names a release tag, so the server changes only when you install another release: to update, run the command again with the newer tag in the URL. Without a tag the URL would follow `main`, and every push would update the server. From a checkout of a release tag, `uv tool install ./mcp` does the same. Without installing, `uvx --from "git+https://github.com/phentrieve/ontotator@v0.11.0#subdirectory=mcp" ontotator-mcp` runs it directly.
 
 ## Create a token
 
@@ -76,7 +76,7 @@ Add the server to `claude_desktop_config.json` (Settings › Developer › **Edi
 }
 ```
 
-If the client cannot find the command, give its full path (`which ontotator-mcp`), or use `"command": "uvx"` with `"args": ["--from", "git+https://github.com/phentrieve/ontotator@v0.10.2#subdirectory=mcp", "ontotator-mcp"]`.
+If the client cannot find the command, give its full path (`which ontotator-mcp`), or use `"command": "uvx"` with `"args": ["--from", "git+https://github.com/phentrieve/ontotator@v0.11.0#subdirectory=mcp", "ontotator-mcp"]`.
 
 Ask the client to call `whoami` first: it shows the token's kind, scopes, project and expiry (with a warning two weeks before), who it acts as and the server's version.
 
