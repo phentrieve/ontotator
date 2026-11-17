@@ -33,6 +33,8 @@ export interface TextVersionsTools {
   onAcceptVersion?: (row: DocumentRowView, version: DocumentVersionView) => void;
   /** The lead: "Upload new version…" on the newest version of a translation (issue 341 a). */
   onUploadVersion?: (row: DocumentRowView, version: DocumentVersionView) => void;
+  /** The lead: "Editorial correction…" on the newest version of a translation (issue 453). */
+  onEditorialCorrection?: (row: DocumentRowView, version: DocumentVersionView) => void;
 }
 
 /** Issue 341 d: a newest translation version that is neither reviewed nor accepted, not discarded. */
@@ -49,6 +51,11 @@ export function correctableVersion(row: Pick<DocumentRowView, "plan_row">, versi
 /** Issue 341 a: the newest version of a translation the lead may upload a new version after, not discarded. */
 export function uploadableVersion(row: Pick<DocumentRowView, "plan_row">, version: DocumentVersionView): boolean {
   return version.is_newest_in_chain && version.translation_status != null && !isDiscarded(row, version);
+}
+
+/** Issue 453: the newest version of a translation the lead may fix editorially: not discarded, not rejected or queried. */
+export function editoriallyCorrectableVersion(row: Pick<DocumentRowView, "plan_row">, version: DocumentVersionView): boolean {
+  return uploadableVersion(row, version) && version.translation_status !== "reviewed";
 }
 
 const uploadMethodLabels: Readonly<Record<NonNullable<DocumentVersionView["upload"]>["method"], string>> = {
@@ -217,6 +224,8 @@ export const TextVersions = forwardRef<HTMLUListElement, TextVersionsProps>(func
             onClick={() => tools.onCorrectTranslation?.(row, version)}>Correct the translation…</Button>}
           {tools.onAcceptVersion && acceptableVersion(row, version) && <Button size="sm" aria-label={`Accept ${fullName}…`}
             onClick={() => tools.onAcceptVersion?.(row, version)}>Accept this version…</Button>}
+          {tools.onEditorialCorrection && editoriallyCorrectableVersion(row, version) && <Button size="sm" aria-label={`Editorial correction of ${fullName}…`}
+            onClick={() => tools.onEditorialCorrection?.(row, version)}>Editorial correction…</Button>}
           {tools.onUploadVersion && uploadableVersion(row, version) && <Button size="sm" aria-label={`Upload new version of ${fullName}…`}
             onClick={() => tools.onUploadVersion?.(row, version)}>Upload new version…</Button>}
           {version.translation_status != null && tools.onShowTranslationReviews && <Button size="sm" aria-label={`Translation reviews for ${name}`} onClick={() => tools.onShowTranslationReviews?.(version.document_id)}>Translation reviews</Button>}

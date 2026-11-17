@@ -186,7 +186,7 @@ You assigned a translation review to someone who already reviewed this version, 
 
 ### An editorial correction was refused
 
-The correction would change a number, is larger than the cap (5 % of the text, at least 20 and at most 200 characters), or the version cannot be corrected any more: a newer version arrived, a translation review of it is open, it was rejected or queried, or it was discarded. The answer names the reason. A change of content belongs in a translation review. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
+**Editorial correction…** did not save: the correction would change a number, is larger than the cap (5 % of the text, at least 20 and at most 200 characters), or the version cannot be corrected any more: a newer version arrived, a translation review of it is open, it was rejected or queried, or it was discarded. The dialog names the reason; your text stays in the dialog until you close it. A change of content belongs in a translation review. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
 
 ### A task is still paused after I closed the report
 

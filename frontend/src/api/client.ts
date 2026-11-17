@@ -111,6 +111,10 @@ export type VersionUploadPreview = components["schemas"]["VersionUploadPreview"]
 export type VersionUploadRequest = components["schemas"]["VersionUploadRequest"];
 export type VersionUploadResult = components["schemas"]["VersionUploadResult"];
 export type VersionUploadView = components["schemas"]["VersionUploadView"];
+// Issue 453: "Editorial correction…" on a translation version
+export type EditorialCorrectionPreview = components["schemas"]["EditorialCorrectionPreview"];
+export type EditorialCorrectionRequest = components["schemas"]["EditorialCorrectionRequest"];
+export type EditorialCorrectionResult = components["schemas"]["EditorialCorrectionResult"];
 // Annotation-mode change after submissions, and its restore
 export type RowChangeView = components["schemas"]["RowChangeView"];
 export type ModeChangeTarget = components["schemas"]["ModeChangeTarget"];
@@ -682,6 +686,16 @@ export class ApiClient {
   /** Issue 341 a: save a text as the next version of this translation (a correction, ready for review). */
   async uploadVersion(key: string, documentId: string, body: VersionUploadRequest): Promise<VersionUploadResult> {
     return this.request<VersionUploadResult>(`/api/v1/projects/${encodeURIComponent(key)}/variants/${encodeURIComponent(documentId)}/versions`, { method: "POST", body: JSON.stringify(body) });
+  }
+
+  /** Issue 453, read only: whether this version can be corrected editorially and, with a text, the changes, the guards and what follows. */
+  async previewEditorialCorrection(key: string, documentId: string, text?: string): Promise<EditorialCorrectionPreview> {
+    return this.request<EditorialCorrectionPreview>(`/api/v1/projects/${encodeURIComponent(key)}/documents/${encodeURIComponent(documentId)}/editorial-correction/preview`, { method: "POST", body: JSON.stringify(text === undefined ? {} : { text }) });
+  }
+
+  /** Issue 453: save a small editorial fix as the next version of this translation, with this version's status. */
+  async editorialCorrection(key: string, documentId: string, body: EditorialCorrectionRequest): Promise<EditorialCorrectionResult> {
+    return this.request<EditorialCorrectionResult>(`/api/v1/projects/${encodeURIComponent(key)}/documents/${encodeURIComponent(documentId)}/editorial-correction`, { method: "POST", body: JSON.stringify(body) });
   }
 
   async discardVariant(key: string, documentId: string, body: DiscardRequest): Promise<DiscardResult> {

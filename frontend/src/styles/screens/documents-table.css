@@ -221,5 +221,13 @@ button.documents-text-name { min-height: 24px; padding: 0; border: 0; background
 .upload-version-file-facts { margin: 0; font-weight: var(--weight-strong); overflow-wrap: anywhere; }
 .upload-version-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: var(--space-3); min-width: 0; }
 .upload-version .form-control { width: 100%; max-width: none; }
+/* "Editorial correction…" (issue 453): the translation editor in a dialog, then the changes as in the upload. */
+.editorial-correction { display: grid; gap: var(--space-3); min-width: 0; }
+.editorial-correction > p { margin: 0; }
+.editorial-correction .form-group,
+.editorial-correction .notice { margin-bottom: 0; }
+.editorial-correction .form-control { width: 100%; max-width: none; }
+.editorial-correction .translation-editor { height: auto; min-height: 8rem; max-height: min(40vh, 22rem); }
+.editorial-correction-reason { margin: 0; overflow-wrap: anywhere; }
 .upload-version .translation-diff,
 .upload-version .translation-text { height: auto; max-height: min(40vh, 22rem); min-height: 6rem; border: 1px solid var(--border); border-radius: var(--radius); white-space: pre-wrap; overflow: auto; overflow-wrap: anywhere; padding: var(--space-3); font-family: var(--font-serif); font-size: var(--size-reading); line-height: var(--leading-reading); background: var(--surface-raised); }
