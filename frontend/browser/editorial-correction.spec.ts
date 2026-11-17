@@ -120,14 +120,14 @@ test("a comma added to an accepted translation becomes an accepted v2 on one pag
   await evidence(page, "453-dialog-changes");
   await save.click();
   await expect(dialog).toHaveCount(0);
-  await expect(page.locator(".ui-toast .ui-toast-message")).toHaveText(`${caseId} de v2 saved as an editorial correction of v1. It stays Accepted.`);
+  await expect(page.locator(".ui-toast .ui-toast-message")).toHaveText(`Typos fixed: v2 of ${caseId} de saved. It stays Accepted.`);
 
   // v2 is a correction of v1 and accepted; v1 stays accepted with its work.
   const after = await openTextCard(page, caseId, "de");
   const items = await textVersionItems(after, 2);
   const newest = items.filter({ hasText: "Correction of v1" });
   await expect(newest).toContainText("Accepted");
-  await expect(newest).toContainText(new RegExp(`Editorial correction by Project Lead \\(${esc(s.pseudonyms.lead)}, you\\), ${TIME} · Grammar: Comma after the introductory phrase`));
+  await expect(newest).toContainText(new RegExp(`Typo fix by Project Lead \\(${esc(s.pseudonyms.lead)}, you\\), ${TIME} · Grammar: Comma after the introductory phrase`));
   // No review was started and none is asked for.
   await expect(newest.getByRole("button", { name: `Accept v2 of ${caseId} de…`, exact: true })).toHaveCount(0);
   const older = items.filter({ hasNotText: "Correction of v1" });
@@ -169,7 +169,7 @@ test("at 390 px: an unreviewed translation is corrected and stays ready for revi
   await page.setViewportSize(PHONE);
   await dialog.getByRole("button", { name: "Save as v2", exact: true }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(page.locator(".ui-toast .ui-toast-message")).toHaveText(`${caseId} de v2 saved as an editorial correction of v1. It stays Ready for review.`);
+  await expect(page.locator(".ui-toast .ui-toast-message")).toHaveText(`Typos fixed: v2 of ${caseId} de saved. It stays Ready for review.`);
   await noHorizontalScroll(page, "saved");
 
   const items = await textVersionItems(await openTextCard(page, caseId, "de"), 2);
@@ -200,11 +200,11 @@ test("a rejected translation is corrected and stays rejected", async ({ page }) 
   await dialog.getByLabel("Note", { exact: true }).fill("Full stop at the end");
   await dialog.getByRole("button", { name: "Save as v2", exact: true }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(page.locator(".ui-toast .ui-toast-message")).toHaveText(`${caseId} de v2 saved as an editorial correction of v1. It stays Rejected in review.`);
+  await expect(page.locator(".ui-toast .ui-toast-message")).toHaveText(`Typos fixed: v2 of ${caseId} de saved. It stays Rejected in review.`);
   const items = await textVersionItems(await openTextCard(page, caseId, "de"), 2);
   const newest = items.filter({ hasText: "Correction of v1" });
   await expect(newest).toContainText("Rejected in review");
-  await expect(newest).toContainText("Editorial correction by Project Lead");
+  await expect(newest).toContainText("Typo fix by Project Lead");
   await expect(newest).toContainText("· Full stop at the end");
   await evidence(page, "453-rejected-row-after");
   expect(errors).toEqual([]);

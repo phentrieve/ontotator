@@ -43,7 +43,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 function refusedSave(error: unknown, short: string): string | null {
   if (!(error instanceof ApiError)) return null;
   if (error.code === "VARIANT_REVIEW_STALE") return "The text of this version changed. Reload the row to see the current text.";
-  if (error.code === "NOT_A_TRANSLATION") return "A source text has no editorial correction. Import the corrected source text as an Ontospan bundle.";
+  if (error.code === "NOT_A_TRANSLATION") return "A source text has no typo fix. Import the corrected source text as an Ontospan bundle.";
   if (error.code !== "EDITORIAL_CORRECTION_NOT_AVAILABLE") return null;
   return editorialRefusal(isRecord(error.details) && typeof error.details.reason === "string" ? error.details.reason : null, short);
 }
@@ -97,7 +97,7 @@ export interface EditorialCorrectionDialogProps {
   row: DocumentRowView;
   version: DocumentVersionView;
   projectKey: string;
-  /** Saved: the announcement ("EN100022 de v3 saved as an editorial correction of v2. It stays Accepted."). */
+  /** Saved: the announcement ("Typos fixed: v3 of EN100022 de saved. It stays Accepted."). */
   onCorrected: (message: string) => void;
   onClose: () => void;
   returnFocus?: () => HTMLElement | null | undefined;
@@ -162,7 +162,7 @@ export function EditorialCorrectionDialog({ row, version, projectKey, onCorrecte
     writing.current = true; setBusy(true); setError(undefined);
     try {
       const saved = await api.editorialCorrection(projectKey, version.document_id, { text: value, expected_text_sha256: state.text_sha256, reason });
-      onCorrected(`${textLabel(row)} v${saved.version} saved as an editorial correction of ${short}.${status ? ` It stays ${status}.` : ""}`);
+      onCorrected(`Typos fixed: v${saved.version} of ${textLabel(row)} saved.${status ? ` It stays ${status}.` : ""}`);
     } catch (failure: unknown) {
       setError(failure);
     } finally { writing.current = false; setBusy(false); }

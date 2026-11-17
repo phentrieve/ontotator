@@ -80,7 +80,7 @@ it("one page: edit the text, see the changes below it, choose the reason by clic
   fireEvent.click(within(dialog).getByRole("button", { name: "Typo" }));
   fireEvent.change(within(dialog).getByRole("textbox", { name: "Note" }), { target: { value: " vor dem Komma " } });
   fireEvent.click(save);
-  await waitFor(() => expect(props.onCorrected).toHaveBeenCalledWith("case-0101 de v3 saved as an editorial correction of v2. It stays Accepted."));
+  await waitFor(() => expect(props.onCorrected).toHaveBeenCalledWith("Typos fixed: v3 of case-0101 de saved. It stays Accepted."));
   // The hash is the one of the version the dialog opened with.
   expect(api.editorialCorrection).toHaveBeenCalledWith("p", "case-0101-de-v2", { text: NEW, expected_text_sha256: "sha-v2", reason: "Spacing; Typo: vor dem Komma" });
 });
@@ -142,7 +142,7 @@ it("keeps the status of a rejected version", async () => {
   fireEvent.change(editor, { target: { value: NEW } });
   fireEvent.click(within(dialog).getByRole("button", { name: "Grammar" }));
   fireEvent.click(within(dialog).getByRole("button", { name: "Save as v3" }));
-  await waitFor(() => expect(props.onCorrected).toHaveBeenCalledWith("case-0101 de v3 saved as an editorial correction of v2. It stays Rejected in review."));
+  await waitFor(() => expect(props.onCorrected).toHaveBeenCalledWith("Typos fixed: v3 of case-0101 de saved. It stays Rejected in review."));
 });
 
 it("says in words why a version cannot be corrected, without the editor", async () => {
