@@ -1401,7 +1401,16 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Select Final */
+        /**
+         * Select Final
+         * @description Choose, confirm again or replace the final result of one text.
+         *
+         *     A choice that replaces another final result returns ``undo`` (``id``,
+         *     ``expires_at``), the handle of ``final-selections/bulk-change/undo``:
+         *     the lead who made the change can take it back once, within 60 minutes
+         *     and while nothing the final result rests on changed since. A first
+         *     choice and a result confirmed again have no Undo (``undo`` is null).
+         */
         put: operations["select_final_api_v1_projects__key__final_selections_put"];
         post?: never;
         delete?: never;
@@ -6746,6 +6755,7 @@ export interface components {
             selected_by?: string | null;
             /** Adjudicator Not Annotator */
             adjudicator_not_annotator?: boolean | null;
+            undo?: components["schemas"]["BulkUndoView"] | null;
         };
         /** FinalWarning */
         FinalWarning: {

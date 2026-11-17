@@ -164,7 +164,14 @@ class FinalResultService:
             )
         with self.db.transaction() as conn:
             pid = self._authorize(conn, key, exclusive=True)
-            return self._select(
+            text = conn.execute(
+                select(DocumentRow.case_id, DocumentRow.language).where(
+                    DocumentRow.project_id == pid, DocumentRow.document_id == document
+                )
+            ).one_or_none()
+            texts = [] if text is None else [(text.case_id, text.language)]
+            previous = final_change_undo.previous_finals(conn, pid, texts)
+            result = self._select(
                 conn,
                 key,
                 pid,
@@ -173,6 +180,29 @@ class FinalResultService:
                 expected_revision,
                 acknowledged_cause_ids,
             )
+            # Another result replaced the final one: the Undo of the bulk
+            # "Change final…" for this one text (same record, same rules). A
+            # first choice or a result confirmed again has nothing to undo.
+            before = previous.get(texts[0]) if texts else None
+            replaced = before is not None and (
+                before["document_id"],
+                before["submission_id"],
+            ) != (document, submission)
+            undo = (
+                final_change_undo.record_applied(
+                    conn,
+                    self.actor,
+                    key,
+                    pid,
+                    [{"case_id": texts[0][0], "language": texts[0][1]}],
+                    previous,
+                    {texts[0]: result},
+                    rule="single",
+                )
+                if replaced
+                else None
+            )
+            return result | {"undo": undo}
 
     def _select(
         self,

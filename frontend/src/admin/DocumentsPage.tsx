@@ -30,6 +30,7 @@ import { FilterPopover } from "../documents/FilterPopover";
 import { DocumentCards } from "../documents/DocumentCards";
 import { DocumentsTable, tableRows, type ColumnSort, type HeaderSort, type TableSelection } from "../documents/DocumentsTable";
 import { consolidationStartedToast, panelStep } from "../documents/finalPanelText";
+import { finalChangedText, finalUndoAction } from "../documents/finalUndo";
 import { leadSteps, rowActionLabel, stepBlockedReason } from "../documents/nextStepLabels";
 import { TranslationCorrectionAction } from "../variants/TranslationCorrectionAction";
 import { DecisionBlock } from "../documents/FinalPanel";
@@ -723,7 +724,18 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
   const decision = panelKey && releasedKey !== panelKey && (decisionKey.current === panelKey || decisionOptional) ? <DecisionBlock optional={decisionOptional} projectKey={projectKey} rowKey={panelKey} page={page} query={query} refreshError={rows.error}
     username={currentUser?.username ?? ""} changeFinal={changeFinalKey === panelKey}
     onClose={closeCardFromBlock}
-    onDecided={key => { notifyFinalSelectionChanged(projectKey); recordDecision(projectKey, key); reloadAfterAction(); }}
+    onDecided={(key, undo) => {
+      notifyFinalSelectionChanged(projectKey);
+      recordDecision(projectKey, key);
+      // Another result replaced the final one: the same message with Undo as after the bulk "Change final…".
+      if (undo) {
+        const name = `${caseOfTextKey(key)} ${languageOfTextKey(key)}`;
+        const message = finalChangedText(name);
+        announce(message);
+        showToast({ message, actionLabel: "Undo", undo: true, onAction: finalUndoAction(projectKey, undo.id, { onAnnounce: announce, showToast, onChanged: () => { notifyFinalSelectionChanged(projectKey); reloadAfterAction(); } }, name) });
+      }
+      reloadAfterAction();
+    }}
     onAdvance={key => showPanel({ key, stage: panelStage, tab: panelTab }, {})}
     onReload={() => rows.reload()}
     onNavigate={route => onNavigate(route)}

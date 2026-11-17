@@ -2,8 +2,8 @@
  * Decision block of the row panel (acceptance fixes WP-A, WP-B; documents overview spec "Final-result panel",
  * V6, V9 display, VD16, VD17): "Accept result…", "Compare results…" and "Review changes…" open the
  * panel with this block on top; it decides (Use as final, Accept result, Keep, Use the newer result)
- * and then moves the panel to the next final decision of the list. Full agreement (W1) is one "Accept
- * result…"; "Consolidate…" exists only with at least two eligible submissions on one text.
+ * and then moves the panel to the next final decision of the list; after "Change final…" it stays on its text.
+ * Full agreement (W1) is one "Accept result…"; "Consolidate…" exists only with at least two eligible submissions on one text.
  */
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { api, type WorkRoundView, type DocumentRowView, type DocumentRowsPage, type FinalPanelSubmissionView, type NextStepView, type RowItemView } from "../api/client";
@@ -44,8 +44,11 @@ export interface DecisionBlockProps {
   changeFinal?: boolean;
   /** "Close" after the last final decision: closes the row panel. */
   onClose: () => void;
-  /** A decision was saved: the page records it and reloads the rows. */
-  onDecided: (rowKey: string) => void;
+  /**
+   * A decision was saved: the page records it and reloads the rows. `undo`: the choice replaced another final
+   * result, and the server keeps its Undo under this id (the page offers it in a message).
+   */
+  onDecided: (rowKey: string, undo?: { id: number } | null) => void;
   /** Show another row in the panel (VD17). */
   onAdvance: (rowKey: string) => void;
   /** "Review again": reload the rows (the panel reloads its own data with them). */
@@ -73,7 +76,8 @@ export interface DecisionBlockProps {
 
 
 interface Success { text: string; bar: string }
-interface Pending { rowKey: string; before: DocumentRowsPage }
+/** `stay`: the lead came through "Change final…", so the panel keeps showing this text after the save. */
+interface Pending { rowKey: string; before: DocumentRowsPage; stay: boolean }
 
 /** Polite announcements of the block (saves and their outcome). */
 function useAnnouncer() {
@@ -110,8 +114,11 @@ export function DecisionBlock(props: DecisionBlockProps): JSX.Element | null {
     pending.current = null;
     setBusy(null);
     setSuccess({ text: savedText(caseOfTextKey(saved.rowKey), languageOfTextKey(saved.rowKey)), bar: remainingText(page.bar) });
-    const next = nextFinalDecision(page, saved.rowKey);
-    if (next) {
+    const next = saved.stay ? null : nextFinalDecision(page, saved.rowKey);
+    if (saved.stay) {
+      // "Change final…" was about this text: no jump to the next decision of the list.
+      announce(savedText(caseOfTextKey(saved.rowKey), languageOfTextKey(saved.rowKey)));
+    } else if (next) {
       announce(`Final result saved. Next: ${rowName(next.row)}.`);
       onAdvance(rowKeyOf(next.row));
     } else {
@@ -159,9 +166,11 @@ export function DecisionBlock(props: DecisionBlockProps): JSX.Element | null {
     setFailure(null);
     setSuccess(null);
     const before = page;
-    api.selectFinalResult(projectKey, selectionPayload(request)).then(() => {
-      pending.current = { rowKey: request.rowKey, before };
-      onDecided(request.rowKey);
+    // The final result of a decided text is being replaced ("Change final…" on the card or in this block).
+    const stay = !!props.changeFinal || (row?.final != null && !panelStep(row));
+    api.selectFinalResult(projectKey, selectionPayload(request)).then(saved => {
+      pending.current = { rowKey: request.rowKey, before, stay };
+      onDecided(request.rowKey, saved.undo);
     }, error => {
       setBusy(null);
       setFailure(failureOf(error));

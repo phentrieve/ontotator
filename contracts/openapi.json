@@ -4266,6 +4266,7 @@
           "final-results"
         ],
         "summary": "Select Final",
+        "description": "Choose, confirm again or replace the final result of one text.\n\nA choice that replaces another final result returns ``undo`` (``id``,\n``expires_at``), the handle of ``final-selections/bulk-change/undo``:\nthe lead who made the change can take it back once, within 60 minutes\nand while nothing the final result rests on changed since. A first\nchoice and a result confirmed again have no Undo (``undo`` is null).",
         "operationId": "select_final_api_v1_projects__key__final_selections_put",
         "parameters": [
           {
@@ -20338,6 +20339,16 @@
               }
             ],
             "title": "Adjudicator Not Annotator"
+          },
+          "undo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BulkUndoView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",

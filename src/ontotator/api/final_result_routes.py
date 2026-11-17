@@ -42,6 +42,10 @@ class FinalSelectionView(BaseModel):
     updated_at: datetime | None = None
     selected_by: str | None = None
     adjudicator_not_annotator: bool | None = None
+    # Set when this choice replaced another final result of the text: send
+    # its ``id`` to ``final-selections/bulk-change/undo`` to bring the
+    # earlier one back (the Undo of the bulk "Change final…", for one text).
+    undo: BulkUndoView | None = None
 
 
 class FinalWithdrawalRequest(BaseModel):
@@ -420,6 +424,14 @@ def _service(request: Request, principal: Any) -> FinalResultService:
 def select_final(
     key: str, body: FinalSelectionRequest, principal: PrincipalDep, request: Request
 ) -> dict[str, Any]:
+    """Choose, confirm again or replace the final result of one text.
+
+    A choice that replaces another final result returns ``undo`` (``id``,
+    ``expires_at``), the handle of ``final-selections/bulk-change/undo``:
+    the lead who made the change can take it back once, within 60 minutes
+    and while nothing the final result rests on changed since. A first
+    choice and a result confirmed again have no Undo (``undo`` is null).
+    """
     return _service(request, principal).select(
         key,
         body.document_id,

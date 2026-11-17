@@ -1,4 +1,6 @@
-"""Undo of the bulk action "Change final…" (issue 336, step 2).
+"""Undo of the bulk action "Change final…" (issue 336, step 2), and of one
+final result replaced in the text card (the same record with one text,
+``rule: single``).
 
 The pattern of the Undo for bulk reopen and withdraw
 (``bulk_task_actions``): applying records one ``project.bulk_final_change``
@@ -245,10 +247,14 @@ def record_applied(
     changes: Sequence[Mapping[str, Any]],
     previous: Mapping[Text, Mapping[str, Any]],
     results: Mapping[Text, Mapping[str, Any]],
+    *,
+    rule: str = "newest_submission",
 ) -> dict[str, Any] | None:
     """Record an applied bulk Change final… (one audit event) with what its
     Undo needs, after the texts changed; returns the Undo's handle, or None
-    when nothing changed. ``results`` are the selections the action made."""
+    when nothing changed. ``results`` are the selections the action made.
+    ``rule`` names how the results were picked: the bulk rule, or ``single``
+    for one final result a lead replaced in the text card."""
     if not changes:
         return None
     now = datetime.now(UTC)
@@ -263,7 +269,7 @@ def record_applied(
         target_id=key,
         project_id=pid,
         details={
-            "rule": "newest_submission",
+            "rule": rule,
             "expires_at": expires.isoformat(),
             "texts": [
                 {
