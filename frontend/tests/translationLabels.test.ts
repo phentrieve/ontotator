@@ -100,6 +100,9 @@ describe("a version after the first (user review 2026-11)", () => {
     expect(versionOriginRows({ kind: "lead_correction", previous_version: 1, at: "2026-11-17T09:30:00Z" }))
       .toEqual([["This version", "Corrected by the project lead"], ["Corrected", `on ${formatReviewDate("2026-11-17T09:30:00Z")}`], ["Version before", "v1"]]);
     expect(versionOriginRows({ kind: "review_correction", previous_version: 1 })[0]).toEqual(["This version", "Corrected in a translation review"]);
+    // "Fix typos…" (issue 453): named as what it is, with the recorded reason.
+    expect(versionOriginRows({ kind: "editorial_correction", previous_version: 2, at: "2026-11-17T09:30:00Z", note: "Spacing; Typo" }))
+      .toEqual([["This version", `Typos fixed by the project lead on ${formatReviewDate("2026-11-17T09:30:00Z")}`], ["What was fixed", "Spacing; Typo"], ["Version before", "v2"]]);
     expect(versionOriginRows({ kind: "correction", previous_version: 1 })).toEqual([["This version", "Correction"], ["Version before", "v1"]]);
     expect(earlierChecksText(1, 2, [])).toBe("The automatic checks ran on v1, not on this version (v2).");
     expect(earlierChecksText(1, 2, ["units_added", "numbers_changed"])).toBe("The automatic checks ran on v1, not on this version (v2). 2 automatic checks failed on v1: Units added and Numbers changed.");

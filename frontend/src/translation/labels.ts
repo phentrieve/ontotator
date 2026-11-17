@@ -231,7 +231,7 @@ const uploadMethodWords: Readonly<Record<string, string>> = {
   machine_translation: "Machine translation", human_translation: "Human translation", manual_correction: "Corrected by hand",
 };
 export interface VersionOriginFacts {
-  kind: "upload" | "review_correction" | "lead_correction" | "correction"; previous_version: number; at?: string | null;
+  kind: "upload" | "review_correction" | "lead_correction" | "editorial_correction" | "correction"; previous_version: number; at?: string | null;
   method?: string | null; provider?: string | null; model?: string | null; made_on?: string | null; made_by?: string | null; note?: string | null;
 }
 /**
@@ -246,6 +246,10 @@ export function versionOriginRows(origin: VersionOriginFacts): [string, string][
     const made = [origin.made_on ? `on ${calendarDay(origin.made_on)}` : null, origin.made_by?.trim() ? `by ${origin.made_by.trim()}` : null].filter(Boolean).join(" ");
     if (made) rows.push(["Made", made]);
     if (origin.note?.trim()) rows.push(["Note", origin.note.trim()]);
+  } else if (origin.kind === "editorial_correction") {
+    // "Fix typos…": spacing, typos or grammar fixed by a lead without a review; the note is the recorded reason.
+    rows.push(["This version", `Typos fixed by the project lead${origin.at ? ` on ${formatReviewDate(origin.at)}` : ""}`]);
+    if (origin.note?.trim()) rows.push(["What was fixed", origin.note.trim()]);
   } else {
     rows.push(["This version", origin.kind === "lead_correction" ? "Corrected by the project lead" : origin.kind === "review_correction" ? "Corrected in a translation review" : "Correction"]);
     if (origin.at) rows.push(["Corrected", `on ${formatReviewDate(origin.at)}`]);

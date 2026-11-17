@@ -34837,6 +34837,7 @@
               "upload",
               "review_correction",
               "lead_correction",
+              "editorial_correction",
               "correction"
             ],
             "title": "Kind"
@@ -34931,7 +34932,7 @@
           "previous_version"
         ],
         "title": "VersionOrigin",
-        "description": "How a version after the first was made, for its reviewer.\n\n``upload``: a lead uploaded the text (\"Upload new version\u2026\", with the\nupload record's fields); ``review_correction``: a translation reviewer\ncorrected the previous version; ``lead_correction``: a lead did\n(\"Correct the translation\u2026\"); ``correction``: no record (an import)."
+        "description": "How a version after the first was made, for its reviewer.\n\n``upload``: a lead uploaded the text (\"Upload new version\u2026\", with the\nupload record's fields); ``review_correction``: a translation reviewer\ncorrected the previous version; ``lead_correction``: a lead did\n(\"Correct the translation\u2026\"); ``editorial_correction``: a lead fixed\nspacing, typos or grammar without a review (\"Fix typos\u2026\", ``note`` is\nthe recorded reason); ``correction``: no record (an import)."
       },
       "VersionRef": {
         "properties": {

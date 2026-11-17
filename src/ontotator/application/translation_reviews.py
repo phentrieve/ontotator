@@ -47,7 +47,10 @@ from ontotator.domain.variants import (
 from ontotator.jobs.queue import JobQueue
 from ontotator.storage.database import Database
 from ontotator.storage.guidelines import current_guideline_version, guideline_facts
-from ontotator.storage.plan_tables import TranslationVersionUploadRow
+from ontotator.storage.plan_tables import (
+    EditorialCorrectionRow,
+    TranslationVersionUploadRow,
+)
 from ontotator.storage.repository import Repository, _lock_id
 from ontotator.storage.tables import (
     AssignmentRow,
@@ -220,10 +223,18 @@ class VersionOrigin:
     ``upload``: a lead uploaded the text ("Upload new version…", with the
     upload record's fields); ``review_correction``: a translation reviewer
     corrected the previous version; ``lead_correction``: a lead did
-    ("Correct the translation…"); ``correction``: no record (an import).
+    ("Correct the translation…"); ``editorial_correction``: a lead fixed
+    spacing, typos or grammar without a review ("Fix typos…", ``note`` is
+    the recorded reason); ``correction``: no record (an import).
     """
 
-    kind: Literal["upload", "review_correction", "lead_correction", "correction"]
+    kind: Literal[
+        "upload",
+        "review_correction",
+        "lead_correction",
+        "editorial_correction",
+        "correction",
+    ]
     previous_version: int
     at: datetime | None = None
     method: str | None = None
@@ -644,6 +655,23 @@ class TranslationReviewService:
                 upload["made_on"],
                 upload["made_by"],
                 upload["note"],
+            )
+        editorial = (
+            conn.execute(
+                select(EditorialCorrectionRow).where(
+                    EditorialCorrectionRow.project_id == project_id,
+                    EditorialCorrectionRow.document_id == variant.document_id,
+                )
+            )
+            .mappings()
+            .first()
+        )
+        if editorial is not None:
+            return VersionOrigin(
+                "editorial_correction",
+                previous.version,
+                editorial["corrected_at"],
+                note=editorial["reason"],
             )
         review = conn.execute(
             select(TranslationReviewRow.created_at, AssignmentRow.lead_correction)

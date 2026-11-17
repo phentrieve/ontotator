@@ -5,6 +5,7 @@ from typing import Any
 
 from auth_harness import HARNESS
 from sqlalchemy import insert
+from test_editorial_correction import correct
 from test_lead_correction import decide
 from test_translation_review_service import review_env as review_env
 from test_translation_review_service import save
@@ -109,3 +110,29 @@ def test_a_version_corrected_in_a_review_says_so(review_env):
     assert workspace.previous_version is not None
     assert workspace.previous_version.text == "Übersetzt"
     assert workspace.failed_checks == []
+
+
+def test_a_version_made_by_fix_typos_says_so_and_carries_no_failed_check(review_env):
+    """An editorial correction (issue 453) is a later version like the others."""
+    env = review_env
+    AssignmentService(env.db).revoke(HARNESS, env.ids["bob"])
+    AssignmentService(env.db).revoke(HARNESS, env.ids["alice"])
+    corrected = correct(env, text="Übersetzt.", reason="Spacing; Typo")
+    env.ids["bob"] = assign_bob(env, corrected["document_id"])
+    workspace = env.service.open(env.accesses["bob"], env.ids["bob"])
+    origin = workspace.version_origin
+    assert origin is not None
+    assert (origin.kind, origin.previous_version, origin.note, origin.method) == (
+        "editorial_correction",
+        1,
+        "Spacing; Typo",
+        None,
+    )
+    assert origin.at is not None
+    previous = workspace.previous_version
+    assert previous is not None
+    assert (previous.variant.document_id, previous.text) == ("target", "Übersetzt")
+    # The version keeps the status of the one it fixes; the failed check of the
+    # run is one of the first version only.
+    assert workspace.failed_checks == []
+    assert task(env, "bob", env.ids["bob"]).failed_check_count == 0

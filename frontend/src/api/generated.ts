@@ -11992,14 +11992,16 @@ export interface components {
          *     ``upload``: a lead uploaded the text ("Upload new version…", with the
          *     upload record's fields); ``review_correction``: a translation reviewer
          *     corrected the previous version; ``lead_correction``: a lead did
-         *     ("Correct the translation…"); ``correction``: no record (an import).
+         *     ("Correct the translation…"); ``editorial_correction``: a lead fixed
+         *     spacing, typos or grammar without a review ("Fix typos…", ``note`` is
+         *     the recorded reason); ``correction``: no record (an import).
          */
         VersionOrigin: {
             /**
              * Kind
              * @enum {string}
              */
-            kind: "upload" | "review_correction" | "lead_correction" | "correction";
+            kind: "upload" | "review_correction" | "lead_correction" | "editorial_correction" | "correction";
             /** Previous Version */
             previous_version: number;
             /** At */

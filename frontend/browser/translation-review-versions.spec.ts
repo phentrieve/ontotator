@@ -157,13 +157,24 @@ for (const [name, viewport] of sizes) {
     const row = taskRow(page, second);
     await expect(row.locator(".task-lead-reason")).toHaveText(new RegExp(`^Second review requested by the lead on .+: ${CORRECTION_REASON}$`));
     await expect(taskRow(page, failed).locator(".task-lead-reason")).toHaveCount(0);
-    await row.getByRole("button", { name: "Reopened, why", exact: true }).click();
-    // On a phone the popover is a sheet with its title.
-    const why = page.getByRole("dialog", { name: "Why reopened", exact: true });
-    await expect(why).toHaveText(new RegExp(`Second review requested by the lead on .+: ${CORRECTION_REASON}$`));
-    await expect(why).not.toContainText("No reason given");
-    await page.keyboard.press("Escape");
-    await expect(why).toHaveCount(0);
+    if (name === "1440") {
+      await row.getByRole("button", { name: "Reopened, why", exact: true }).click();
+      const why = page.getByRole("dialog", { name: "Why reopened", exact: true });
+      await expect(why).toHaveText(new RegExp(`^Second review requested by the lead on .+: ${CORRECTION_REASON}$`));
+      await page.keyboard.press("Escape");
+      await expect(why).toHaveCount(0);
+    } else {
+      // Phone: status and reasons are stacked under the task. The second-review reason stands there once, with a
+      // plain Reopened badge; the reopened review writes its reason out below its badge.
+      await expect(row.getByText(CORRECTION_REASON, { exact: false })).toHaveCount(1);
+      await expect(row.getByText("Reopened", { exact: true })).toBeVisible();
+      await expect(taskRow(page, failed)).toContainText(REOPEN_REASON);
+      // The reason line uses the width of the stacked cell: it does not wrap word by word.
+      const line = await row.locator(".task-lead-reason").boundingBox();
+      expect(line!.width).toBeGreaterThan(180);
+      expect(line!.height).toBeLessThan(110);
+    }
+    await expect(page.getByRole("main")).not.toContainText("No reason given");
     await noPageScroll(page);
     await shot(page, `f2-mytasks-${name}`, true);
     // The review: the reason stands above Decision.
@@ -276,3 +287,35 @@ for (const [name, viewport] of sizes) {
     expect(errors).toEqual([]);
   });
 }
+
+test("a version made with Fix typos… is named as that in Translation details and carries no failed check", async ({ page }) => {
+  await page.setViewportSize(WIDE);
+  const errors = watchErrors(page);
+  const s = await reviewFlowScenario(page, "REVIEW_FLOW");
+  await loginScenarioUser(page, s, "ana");
+  const first = await submitReview(page, s.assignments["failed-translation"], REJECTED);
+  await page.context().clearCookies();
+  await loginScenarioUser(page, s, "lead");
+  const fixed = await call<{ document_id: string; version: number }>(page, `${project(s)}/documents/${encodeURIComponent(first.variant.document_id)}/editorial-correction`, "POST",
+    { text: first.text.replace("Dosis 5 mg", "Dosis 5\u00a0mg"), expected_text_sha256: first.variant.text_sha256, reason: "Spacing: non-breaking space before the unit" });
+  expect(fixed.version).toBe(2);
+  const assigned = await call<{ created: { id: number }[] }>(page, `${project(s)}/assignments`, "POST",
+    { rows: [{ document_id: fixed.document_id, username: s.users.ana }], task: "translation_review" });
+  await page.context().clearCookies();
+  await loginScenarioUser(page, s, "ana");
+  await page.goto(`/#/tasks/${assigned.created[0].id}`);
+  await expect(target(page)).toBeVisible();
+  await expect(checks(page)).toContainText("The automatic checks ran on v1, not on this version (v2).");
+  await page.getByText("Translation details", { exact: true }).click();
+  const details = page.locator(".translation-details dl");
+  await expect(details).toContainText("This versionTypos fixed by the project lead on");
+  await expect(details).toContainText("What was fixedSpacing: non-breaking space before the unit");
+  await expect(details).toContainText("Version beforev1");
+  await expect(details.getByText("Correction", { exact: true })).toHaveCount(0);
+  await shot(page, "f1-fix-typos-details-1440");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Compare with the previous version (v1)", exact: true }).click();
+  await expect(page.locator(".translation-column-subtitle")).toHaveText("Changes from v1 to v2");
+  await expect(page.getByRole("region", { name: "Comparison", exact: true }).locator("ins, del").first()).toBeVisible();
+  expect(errors).toEqual([]);
+});

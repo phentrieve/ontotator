@@ -211,7 +211,8 @@ export function MyTasks({ project, status, projects, onNavigate, username }: MyT
     </> },
     { id: "status", header: "Status", cell: task => <>
       {task.waiting_for_translation_review || task.waiting_for_lead ? <StatusBadge tone="neutral">{task.waiting_for_lead ? WAITING_FOR_LEAD : WAITING_FOR_REVIEW}</StatusBadge>
-        : reopenedNotice(task) ? <ReopenedInfo notice={reopenedNotice(task)!} inline={narrow} /> : <StatusBadge status={task.status}>{assignmentStatusLabels[task.status]}</StatusBadge>}
+        // Narrow: the notice is written out below the badge; a second-review reason already stands under the task name.
+        : reopenedNotice(task) && !(narrow && reopenedNotice(task) === secondReviewText(task)) ? <ReopenedInfo notice={reopenedNotice(task)!} inline={narrow} /> : <StatusBadge status={task.status}>{assignmentStatusLabels[task.status]}</StatusBadge>}
       {task.report_answered && (task.answered_report_id ? <a className="task-answer-link" href={routeHref(answerRoute(task, task.answered_report_id))} onClick={event => {
         if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
         event.preventDefault(); onNavigate(answerRoute(task, task.answered_report_id!));
