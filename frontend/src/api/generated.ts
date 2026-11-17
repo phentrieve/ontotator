@@ -9626,6 +9626,8 @@ export interface components {
              * @default 0
              */
             finding_count: number;
+            /** Refused By */
+            refused_by?: "CONSOLIDATION_OPEN" | null;
         };
         /**
          * RowChangeView
