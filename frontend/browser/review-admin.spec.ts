@@ -184,5 +184,72 @@ for (const size of SIZES) {
       await shot(page, `B-no-lead-people-${size.name}`);
       await expectNoSidewaysScroll(page);
     });
+
+    test("C: the new token cannot be left before it is stored; the tokens card points to the handbook for the MCP server", async ({ page }) => {
+      const errors = collectErrors(page);
+      const s = await leadScenario(page, "DEFAULT_IMPORT");
+      await loginThroughForm(page, s.users.lead, s.display_names.lead);
+      await page.goto(`/#/projects/${encodeURIComponent(s.project)}/settings/people`);
+
+      /** New token… › Create token, then every way out of the dialog; returns once it is closed. */
+      const createAndStore = async (card: Locator, name: string, label: string) => {
+        await card.getByRole("button", { name: "New token…", exact: true }).click();
+        await card.getByLabel(/^Token name/).fill(name);
+        await card.getByRole("button", { name: "Create token", exact: true }).click();
+        const dialog = page.getByRole("dialog", { name: `New token “${name}”`, exact: true });
+        await expect(dialog).toBeVisible();
+        await shot(page, `C-${label}-token-dialog-${size.name}`);
+        const secret = await dialog.locator("code").first().innerText();
+        expect(secret.length).toBeGreaterThan(20);
+        const close = dialog.locator(".modal-actions").getByRole("button", { name: "Close", exact: true });
+        const copy = dialog.getByRole("button", { name: "Copy token", exact: true });
+        await expect(close).toBeDisabled();
+        await expect(close).not.toHaveClass(/btn-primary/);
+        await expect(copy).toHaveClass(/btn-primary/);
+        await expect(dialog.locator(".ui-dialog-close")).toHaveCount(0);
+        // Escape and a click outside leave the token on the screen.
+        await page.keyboard.press("Escape");
+        await page.mouse.click(4, 4);
+        await page.keyboard.press("Escape");
+        await expect(dialog.locator("code").first()).toHaveText(secret);
+        await expectInsideWindow(page, dialog);
+        await expectNoSidewaysScroll(page);
+        await copy.click();
+        await expect(dialog.getByRole("button", { name: "Copied", exact: true })).toBeVisible();
+        expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(secret);
+        // Copying alone does not open the way out: the box does.
+        await expect(close).toBeDisabled();
+        await dialog.getByLabel("I have stored the token").check();
+        await shot(page, `C-${label}-token-stored-${size.name}`);
+        await close.click();
+        await expect(dialog).toHaveCount(0);
+        await expect(page.getByText(secret)).toHaveCount(0);
+        await expect(card.getByRole("table").getByRole("rowheader", { name, exact: true })).toBeVisible();
+      };
+
+      const project = page.getByRole("region", { name: "Project API tokens", exact: true });
+      await createAndStore(project, "Progress report script", "project");
+      const hint = project.getByText("Also for the Ontotator MCP server (AI assistant): see the handbook.", { exact: true });
+      await expect(hint).toBeVisible();
+      await hint.scrollIntoViewIfNeeded();
+      await shot(page, `C-project-tokens-card-${size.name}`);
+      await expectNoSidewaysScroll(page);
+      const projectHelp = await hint.getByRole("link", { name: "see the handbook", exact: true }).getAttribute("href");
+
+      // Profile › API tokens is the same dialog.
+      await page.goto("/#/me");
+      const personal = page.getByRole("region", { name: "API tokens", exact: true });
+      await createAndStore(personal, "Laptop script", "personal");
+      const personalHelp = await personal.getByRole("link", { name: "see the handbook", exact: true }).getAttribute("href");
+      await expectNoSidewaysScroll(page);
+
+      // Both links open the handbook section that names the MCP server.
+      await page.goto(`/${projectHelp}`);
+      await expect(page.getByRole("heading", { name: "Give a script access to the project", exact: true })).toBeInViewport();
+      await expect(page.getByText("A project token is also the safest kind for the Ontotator MCP server")).toBeVisible();
+      await page.goto(`/${personalHelp}`);
+      await expect(page.getByRole("heading", { name: "Create an API token", exact: true })).toBeInViewport();
+      expect(errors).toEqual([]);
+    });
   });
 }

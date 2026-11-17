@@ -244,10 +244,11 @@ What for: let a script or another program read or export your projects without y
 3. Enter a **Token name** that says what uses it.
 4. Tick the scopes the program needs: **Read**, **Import**, **Export** or **Project administration**.
 5. Set **Valid for (days)**: 1 to 365, 90 by default.
-6. Click **Create token**. The dialog shows the token once. Click **Copy token** and store it, for example in your password manager, then click **Close**.
+6. Click **Create token**. The dialog, titled with the name of the token (*New token “Laptop script”*), shows the token once. Click **Copy token** and store it, for example in your password manager.
+7. Tick **I have stored the token**, then click **Close**. Until the box is ticked, the dialog cannot be closed, not with **Close** and not with the Escape key.
 
 The program sends the token in the header `Authorization: Bearer <token>`. It acts as you: it can do only what its scopes allow and what you may do yourself. Annotation, review and translation review work always needs the browser, and a token cannot create other tokens. Every change made with a token is in the audit trail with the token's name.
 
-An AI assistant that speaks MCP, such as Claude Desktop, can use a token too: the Ontotator MCP server lets it set up a project, follow progress and download exports for you. Installing and configuring it is described in the [MCP server guide](../../mcp/README.md). Prefer a project token with a short lifetime for it.
+An AI assistant that speaks MCP, such as Claude Desktop, can use a token too: the Ontotator MCP server lets it set up a project, follow progress and download exports for you. Installing and configuring it is described in the [MCP server guide](../../mcp/README.md). Prefer a project token with a short lifetime for it. The line *Also for the Ontotator MCP server (AI assistant): see the handbook.* under your tokens opens this section.
 
 To stop a token, click **Revoke…** in its row, then **Revoke token**. Every program that uses it stops working at once. All your tokens are also revoked when you change your password, when an administrator issues you a reset code and when your account is deactivated. Losing a project role does not revoke a personal token, but the token at once loses what the role allowed: it can only ever do what you may do yourself right now.

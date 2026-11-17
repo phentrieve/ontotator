@@ -310,11 +310,12 @@ What for: let a script import, export or read this project, for example a nightl
 1. Open **Settings**, tab **People**.
 2. Under **Project API tokens**, click **New token…**.
 3. Enter a **Token name**, tick the scopes it needs (**Read**, **Import**, **Export**, **Project administration**) and set **Valid for (days)**.
-4. Click **Create token**. Copy the token from the dialog with **Copy token** and store it; it is shown only once.
+4. Click **Create token**. The dialog, titled with the name of the token (*New token “Progress report script”*), shows the token; it is shown only once. Click **Copy token** and store it, for example in your password manager.
+5. Tick **I have stored the token**, then click **Close**. Until the box is ticked, the dialog cannot be closed, not with **Close** and not with the Escape key.
 
 A project token works in this project only and acts as you, the lead who created it. It is revoked when you leave the project or lose the lead role (unless you are a system administrator), when you change your password and when your account is deactivated. Every lead of the project sees its tokens and can stop one with **Revoke…** and **Revoke token**. Changes made with a token are in the audit trail with the token's name.
 
-A project token is also the safest kind for the Ontotator MCP server, which lets an AI assistant set up and run the project for you ([MCP server guide](../../mcp/README.md)).
+A project token is also the safest kind for the Ontotator MCP server, which lets an AI assistant set up and run the project for you ([MCP server guide](../../mcp/README.md)). The line *Also for the Ontotator MCP server (AI assistant): see the handbook.* under the tokens opens this section.
 
 ## Publish the first or a new guideline version
 
