@@ -16,11 +16,13 @@
  * too (the server restores every text's earlier final result, or none and says which text is in the way). "Start a round…"
  * (issue 336 step 3) gives the submitted annotations a new work round in `BulkTaskDialog`, also without Undo.
  * "Change mode…" (step 4) changes the annotation mode of the texts in `BulkModeDialog`; each text is restored in its card.
+ * "Pause texts…" and "Release texts…" (issue 464) pause and release the work on the texts in `BulkPauseDialog`; each
+ * is the other's way back, so neither has an Undo.
  * The bar floats at the bottom of the viewport over the content (`useFloatingBar`): its arrival never moves the
  * table; the page reserves its height as bottom padding. Its place in the DOM keeps the focus order.
  */
 import { useEffect, useId, useRef, useState } from "react";
-import { api, type BulkModeChangeView, type BulkResult, type BulkTaskActionView, type ConsequencesView, type DocumentRowFilters, type RowRefView, type SelectionSummary, type UndoView } from "../api/client";
+import { api, type BulkModeChangeView, type BulkResult, type BulkTaskActionView, type ConsequencesView, type DocumentRowFilters, type RowRefView, type SelectionSummary, type TextPauseActionView, type UndoView } from "../api/client";
 import { ErrorNotice } from "../admin/ErrorNotice";
 import { errorMessage } from "../admin/errors";
 import { plural } from "../app/labels";
@@ -30,6 +32,8 @@ import { BulkFinalDialog } from "./BulkFinalDialog";
 import { finalAppliedText, finalUnavailableReason, FINAL_ACTION_LABELS, type FinalAction, type FinalPreview } from "./bulkFinalModel";
 import { BulkModeDialog } from "./BulkModeDialog";
 import { modeAppliedText, modeUnavailableReason, MODE_ACTION_LABEL } from "./bulkModeModel";
+import { BulkPauseDialog } from "./BulkPauseDialog";
+import { pauseAppliedText, pauseUnavailableReason, PAUSE_ACTION_LABELS, type PauseAction } from "./bulkPauseModel";
 import { BulkTaskDialog } from "./BulkTaskDialog";
 import { PLAN_CHANGED_MESSAGE, UNDO_WITHDRAWN_NOTE, undoneToast, WITHDRAW_CHECKBOX, withdrawnSummary } from "./PlanChips";
 import { PlanDialog } from "./PlanDialog";
@@ -160,10 +164,11 @@ export function SelectionBar({
   const current = summary?.key === idsKey + filtersKey ? summary.value : null;
 
   /** Per bulk action, its broadest preview for the selection: an entry without changes is unavailable (336-C). */
-  const [reach, setReach] = useState<{ key: string; reopen: BulkTaskActionView | null; withdraw: BulkTaskActionView | null; start_round: BulkTaskActionView | null; scratch: BulkModeChangeView | null; proposals: BulkModeChangeView | null; accept: FinalPreview | null; change: FinalPreview | null } | null>(null);
+  const [reach, setReach] = useState<{ key: string; reopen: BulkTaskActionView | null; withdraw: BulkTaskActionView | null; start_round: BulkTaskActionView | null; scratch: BulkModeChangeView | null; proposals: BulkModeChangeView | null; accept: FinalPreview | null; change: FinalPreview | null; pause: TextPauseActionView | null; release: TextPauseActionView | null } | null>(null);
   const [bulk, setBulk] = useState<BulkAction | null>(null);
   const [finalAction, setFinalAction] = useState<FinalAction | null>(null);
   const [modeChange, setModeChange] = useState(false);
+  const [pauseAction, setPauseAction] = useState<PauseAction | null>(null);
   useEffect(() => {
     if (rows.length < MIN_TEXTS) return;
     let active = true;
@@ -182,7 +187,9 @@ export function SelectionBar({
         // One preview per mode: the entry acts when either changes a text.
         quiet(api.bulkChangeMode(projectKey, { rows, mode: "scratch", preview: true, summary_only: true }, abort.signal)),
         quiet(api.bulkChangeMode(projectKey, { rows, mode: "proposals", preview: true, summary_only: true }, abort.signal)),
-      ]).then(([reopen, withdraw, accept, change, start_round, scratch, proposals]) => { if (active) setReach({ key, reopen, withdraw, start_round, scratch, proposals, accept, change }); });
+        quiet(api.pauseTexts(projectKey, "pause", { rows, preview: true, summary_only: true }, abort.signal)),
+        quiet(api.pauseTexts(projectKey, "release", { rows, preview: true, summary_only: true }, abort.signal)),
+      ]).then(([reopen, withdraw, accept, change, start_round, scratch, proposals, pause, release]) => { if (active) setReach({ key, reopen, withdraw, start_round, scratch, proposals, accept, change, pause, release }); });
     }, SUMMARY_DELAY_MS);
     return () => { active = false; window.clearTimeout(timer); abort.abort(); };
     // The key stands for the selection.
@@ -310,6 +317,15 @@ export function SelectionBar({
     latest.current.onChanged();
   };
 
+  /** After a pause or release: the message (no Undo; the other action is the way back), refetch, the selection stays. */
+  const pauseApplied = (result: TextPauseActionView) => {
+    setPauseAction(null);
+    const message = pauseAppliedText(result);
+    latest.current.onAnnounce(message);
+    latest.current.showToast({ message });
+    latest.current.onChanged();
+  };
+
   const moveToFront = () => {
     setFrontBusy(true); setError(undefined);
     api.moveToFront(projectKey, rows).then(result => {
@@ -325,7 +341,7 @@ export function SelectionBar({
 
   const visible = keys.size >= MIN_TEXTS || undoState !== null;
   useFloatingBar(section, visible);
-  if (!visible && !plan && !bulk && !finalAction && !modeChange) return null;
+  if (!visible && !plan && !bulk && !finalAction && !modeChange && !pauseAction) return null;
   const modeReason = modeUnavailableReason([reachable?.scratch, reachable?.proposals]);
   const withdrawing = undoState?.kind === "conflict" && undoState.consequences.withdrawn.length > 0;
 
@@ -355,6 +371,10 @@ export function SelectionBar({
                 return { id: action, label: ACTION_LABELS[action], disabled: reason !== null, ...(reason ? { description: reason } : {}), onSelect: () => setBulk(action) };
               }),
               { id: "change_mode", label: MODE_ACTION_LABEL, disabled: modeReason !== null, ...(modeReason ? { description: modeReason } : {}), onSelect: () => setModeChange(true) },
+              ...(["pause", "release"] as const).map(action => {
+                const reason = pauseUnavailableReason(action, reachable?.[action]);
+                return { id: `${action}_texts`, label: PAUSE_ACTION_LABELS[action], disabled: reason !== null, ...(reason ? { description: reason } : {}), onSelect: () => setPauseAction(action) };
+              }),
             ]} />
           <Button ref={frontButton} aria-expanded={front} onClick={() => setFront(value => !value)}>{MOVE_TO_FRONT}</Button>
           <Button aria-pressed={showSelected} onClick={onToggleShowSelected}>Show selected</Button>
@@ -382,6 +402,7 @@ export function SelectionBar({
     {finalAction && <BulkFinalDialog projectKey={projectKey} action={finalAction} rows={rows} onClose={() => setFinalAction(null)} onApplied={finalApplied} />}
     {modeChange && <BulkModeDialog projectKey={projectKey} rows={rows} onClose={() => setModeChange(false)} onApplied={modeApplied}
       reach={reachable?.scratch && reachable.proposals ? { scratch: reachable.scratch.change_count, proposals: reachable.proposals.change_count } : undefined} />}
+    {pauseAction && <BulkPauseDialog projectKey={projectKey} action={pauseAction} rows={rows} onClose={() => setPauseAction(null)} onApplied={pauseApplied} />}
     {bulk && <BulkTaskDialog projectKey={projectKey} action={bulk} rows={rows} onClose={() => setBulk(null)} onApplied={bulkApplied} />}
     {plan && <PlanDialog projectKey={projectKey} caseIds={plan} rows={rows} onClose={() => setPlan(null)}
       onSaved={(result, message) => { setPlan(null); saved(result, message); }} />}

@@ -378,8 +378,9 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
         </div>
       </div>
 
-      {failed && (
-        <InlineMessage tone="error">
+      {failed && (state.pausedMessage
+        ? <InlineMessage tone="warning">{state.pausedMessage}</InlineMessage>
+        : <InlineMessage tone="error">
           The term search failed.{" "}
           <Button size="sm" variant="secondary" onClick={retry}>Retry</Button>
         </InlineMessage>

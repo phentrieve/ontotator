@@ -65,7 +65,8 @@ function targetDocumentIds(row: DocumentRowView): Set<string> {
   return new Set([...newest.values()].map(version => version.document_id));
 }
 
-export function annotationState(row: DocumentRowView): State {
+/** `compact`: the table cell's short form; the row's "Paused by lead" badge names the pause there. */
+export function annotationState(row: DocumentRowView, compact = false): State {
   const cell = row.stages?.annotation;
   const detail = cell?.detail ?? {};
   const target = detail.target ?? detail.total ?? 0;
@@ -102,7 +103,9 @@ export function annotationState(row: DocumentRowView): State {
     }
     // Below "annotators per text" the open work comes first; the limit follows as an upper bound ("· max 2").
     case "in_progress": return { state: detail.target != null && (detail.assigned ?? 0) < detail.target ? `${running} · max ${detail.target}` : running, tone: "now" };
-    case "paused": return { state: submitted, tone: "now" };
+    // Issue 464: the lead paused the text; the count stays ("paused by lead, 1 of 2 submitted").
+    case "paused": return detail.note !== "lead_pause" ? { state: submitted, tone: "now" }
+      : { state: compact ? submitted : total > 0 ? `paused by lead, ${submitted}` : "paused by lead", tone: "later" };
     case "submitted":
     case "consolidating": return { state: submitted, tone: "done" };
     case undefined:

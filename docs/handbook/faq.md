@@ -64,6 +64,8 @@ The task was removed or given to someone else, or you followed a link meant for 
 
 A problem report pauses the task, yours or the lead's. A one-line banner *Task paused: …* above the text gives the reason; click **Show more** to read all of it. You can read your saved work but not change or submit it. If you reported the problem yourself, you can resume with a reason. If the lead paused it, only the lead can release it. See [Resume a paused task or withdraw a report](annotator.md#resume-a-paused-task-or-withdraw-a-report).
 
+A task marked **Paused by lead** is paused because the lead paused the work on its text; the mark and the banner *Paused by lead: …* give the lead's reason. You can read the task and wait: it opens again when the lead releases the text. A save that is refused meanwhile says *The project lead paused the work on this text: …*; your saved work is kept. See [A task paused by the lead](annotator.md#a-task-paused-by-the-lead).
+
 ### My submitted task is read-only
 
 A submission cannot be edited. To change your work, open the task, choose **More** › **Work rounds** and click **Continue from this submission**. Your findings are carried into a new round; check them, make your changes and submit again. See [Start a new work round](annotator.md#start-a-new-work-round). A lead can also reopen your task; it then shows **Reopened** with the lead's reason.

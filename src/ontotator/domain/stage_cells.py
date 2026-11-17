@@ -98,6 +98,8 @@ CellNote = Literal[
     "may_change",
     "not_exported",
     "carried_on_submit",
+    # Review / Annotation paused: the lead paused the text (issue 464).
+    "lead_pause",
     "v2_not_annotated",
     "no_target_proposals",  # old_text_submitted: the target has no proposals yet
     # Review re_review: why the translation is reviewed again.
@@ -171,6 +173,10 @@ class StageFacts:
     paused_by: int | None = None  # reporter of the open report
     paused_excerpt: str | None = None  # ≤ 60 characters
     paused_task: Literal["annotate", "translation_review"] | None = None
+    # Issue 464: the lead paused the text; the lead and the reason.
+    lead_paused: bool = False
+    lead_pause_by: int | None = None
+    lead_pause_reason: str | None = None
     # Old-version work items (rules 3a, 3b, finishing) are ``step.old_open``,
     # ``step.old_submitted`` and ``step.finishing``: one source for the steps
     # and the cells.
@@ -625,7 +631,23 @@ def stage_cells(facts: StageFacts, steps: Sequence[Step]) -> StageCells:
     """Review, Annotation and Final cell of one row (spec "Stage cells")."""
     codes = frozenset(step.code for step in steps)
     return StageCells(
-        review=_review(facts, codes),
-        annotation=_annotation(facts, codes),
+        review=_lead_pause(facts, _review(facts, codes)),
+        annotation=_lead_pause(facts, _annotation(facts, codes)),
         final=_final(facts, codes),
+    )
+
+
+def _lead_pause(facts: StageFacts, cell: StageCell) -> StageCell:
+    """A cell with running work on a text the lead paused reads "Paused by
+    lead" with the lead and the reason: the work is nobody's turn until the
+    text is released (issue 464). Every other cell stays: submitted work,
+    waiting work and the lead's own decisions are not paused."""
+    if not facts.lead_paused or cell.tone != "running":
+        return cell
+    return _cell(
+        "paused",
+        "waiting",
+        people=() if facts.lead_pause_by is None else (facts.lead_pause_by,),
+        excerpt=_excerpt(facts.lead_pause_reason),
+        note="lead_pause",
     )

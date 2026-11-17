@@ -660,6 +660,9 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
     )
 
     app.include_router(annotation_mode_change_router)
+    from ontotator.api.text_pause_routes import router as text_pause_router
+
+    app.include_router(text_pause_router)
     app.include_router(translation_workflow_router)
     from ontotator.api.guideline_routes import router as guideline_router
 

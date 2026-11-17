@@ -294,6 +294,9 @@ export function intentState(r: ProblemReportView): Record<Intent, { label: strin
   };
 }
 
+/** Issue 464: said wherever a report's pause ends while a lead pause of the text stands. */
+export const LEAD_PAUSE_STAYS = "The text is paused by a lead: its open tasks stay paused until the text is released (Documents, More actions, Release texts…).";
+
 /** Success message after a lead action: what changed and what did not, from the views before and after. */
 export function leadOutcome(intent: Intent, before: ProblemReportView, after: ProblemReportView, released?: number[]): string {
   const afterActive = activeHolds(after);
@@ -315,8 +318,10 @@ export function leadOutcome(intent: Intent, before: ProblemReportView, after: Pr
         .filter(id => holdsOf(after).some(h => h.assignment_id === id && (h.other_active_holds?.length ?? 0) > 0))
         .map(id => ` ${upperFirst(refOf(id))} is still paused by another report.`)
         .join("");
-      if (intent === "resume_close") return `Report closed. Released ${plural(ids.length, "the pause", "the pauses")} on ${refs}. The final result did not change.${elsewhere}`;
-      return `Released ${plural(ids.length, "the pause", "the pauses")} on ${refs}. ${stillState}${elsewhere}`;
+      // Issue 464: the lead pause of the text is its own cause and stays.
+      const byLead = after.text_paused_by_lead ? ` ${LEAD_PAUSE_STAYS}` : "";
+      if (intent === "resume_close") return `Report closed. Released ${plural(ids.length, "the pause", "the pauses")} on ${refs}. The final result did not change.${elsewhere}${byLead}`;
+      return `Released ${plural(ids.length, "the pause", "the pauses")} on ${refs}. ${stillState}${elsewhere}${byLead}`;
     }
     case "pause": {
       const wasActive = new Set(activeHolds(before).map(h => h.hold_id));

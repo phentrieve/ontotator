@@ -275,6 +275,7 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   PREVIEW_STALE: "The texts changed since the preview. Check the new preview.",
   BULK_UNDO_STALE: "Undo is no longer possible: the texts changed since.",
   BULK_REASON_REQUIRED: "Reopening tasks requires a reason.",
+  PAUSE_REASON_REQUIRED: "Pausing texts requires a reason.",
   MODE_CHANGE_STALE: "The work on this text changed. Check the new list before you change the mode.",
   MODE_CHANGE_REASON_REQUIRED: "Changing the mode requires a reason.",
   MODE_CHANGE_NOT_FOUND: "This mode change no longer exists. Reload the text.",
@@ -303,6 +304,12 @@ export function errorMessage(error: unknown): string {
   }
   if (error instanceof ApiError && error.code === "TEXT_CHANGE_NOT_APPLICABLE" && typeof error.details === "object" && error.details !== null && error.details.reason === "no_target_proposals") {
     return "The new version has no proposals yet: their automatic transfer may still be running, or they must be imported. Wait for or import the proposals for the new version, then try again.";
+  }
+  // Issue 464: the lead paused the text. The refusal names the cause and the lead's reason.
+  if (error instanceof ApiError && error.code === "TASK_HELD" && typeof error.details === "object" && error.details !== null
+    && Array.isArray(error.details.causes) && error.details.causes.includes("lead")) {
+    const reason = typeof error.details.lead_reason === "string" ? error.details.lead_reason.trim() : "";
+    return `The project lead paused the work on this text${reason ? `: ${reason}` : "."}${reason && !/[.!?]$/.test(reason) ? "." : ""} This change was not saved; your local input is kept. You can continue when the lead releases the text.`;
   }
   // Practice (issue 266): the server says why it is not available.
   if (error instanceof ApiError && error.code === "PRACTICE_UNAVAILABLE" && typeof error.details === "object" && error.details !== null

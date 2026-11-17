@@ -79,6 +79,8 @@ const START_REFUSED: Readonly<Record<string, string>> = {
   VARIANT_REVIEW_STALE: "The text of this version changed. Reload the row to see the current text.",
 };
 
+export const LEAD_PAUSED = "This text is paused by a lead, so your earlier review of this version cannot continue. Release the text first (Documents, More actions, Release texts…), then correct the translation yourself.";
+
 type Failure =
   | { kind: "languages"; missing: string[] }
   | { kind: "qualification" }
@@ -98,6 +100,10 @@ function failureOf(error: unknown): Failure {
   if (error instanceof ApiError && error.code === "LEAD_CORRECTION_NOT_AVAILABLE") {
     const reason = isRecord(error.details) && typeof error.details.reason === "string" ? error.details.reason : "";
     if (Object.hasOwn(NOT_AVAILABLE, reason)) return { kind: "not_available", text: NOT_AVAILABLE[reason] };
+  }
+  // Issue 464: the earlier review is paused because a lead paused the text; resuming a report would not help.
+  if (error instanceof ApiError && error.code === "TASK_HELD" && isRecord(error.details) && Array.isArray(error.details.causes) && error.details.causes.includes("lead")) {
+    return { kind: "not_available", text: LEAD_PAUSED };
   }
   if (error instanceof ApiError && error.code && Object.hasOwn(START_REFUSED, error.code)) return { kind: "not_available", text: START_REFUSED[error.code] };
   return { kind: "error", error };

@@ -92,6 +92,13 @@ it("explains TASK_HELD, NOT_IN_WORK_PLAN and VARIANT_REVIEW_STALE for the correc
   }
 });
 
+it("names the lead pause when the earlier review is paused with its text (issue 464)", async () => {
+  vi.mocked(api.startLeadCorrection).mockRejectedValueOnce(new ApiError(409, "nope", "TASK_HELD", { causes: ["lead"], reason: "Clinic is checking", lead_reason: "Clinic is checking" }));
+  renderPanel();
+  fireEvent.click(open());
+  expect(await within(panel()).findByText(/^This text is paused by a lead, so your earlier review of this version cannot continue\. Release the text first/)).toBeTruthy();
+});
+
 // Issue 341 b: the correction of an accepted version, from its version row (in a dialog).
 const acceptedRow = () => planRow("case-0101", "de", stepOf("annotation_in_progress"), {
   versions: [version({ document_id: "case-0101-de", version: 1, chain_name: "DeepL", origin: "machine_translation", translation_status: "accepted" })],

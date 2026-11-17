@@ -11,6 +11,7 @@ import type { DocumentRowView, RowChangeView, RowSubmissionView } from "../api/c
 import { assignmentStatusLabels, labelFor, plural } from "../app/labels";
 import { formatTime, personLabel } from "../app/submissionLabels";
 import { decisionLabels } from "../translation/labels";
+import { leadPauseLine, pausedWord } from "./labels";
 import { acceptanceLabel, acceptanceOf, isDiscarded } from "./TextVersions";
 import { MODE_WORDS } from "./stageLabels";
 
@@ -88,7 +89,7 @@ export function historyLines(row: DocumentRowView, submissions: readonly RowSubm
       const decision = reviewed?.latest_review_decision;
       const corrected = reviewed && decision === "accepted_corrected" ? row.versions.find(entry => entry.derived_from === reviewed.document_id) : undefined;
       outcome = join(decision ? labelFor(decisionLabels, decision) : "Submitted", corrected && reviewed ? `v${reviewed.version} → v${corrected.version}` : null);
-    } else outcome = join(labelFor(assignmentStatusLabels, item.status), item.held && "Paused");
+    } else outcome = join(labelFor(assignmentStatusLabels, item.status), pausedWord(item));
     const at = item === lastSubmitted ? row.stages?.review.detail.at : null;
     lines.push({ key: `work-${item.assignment_id}`, stage: "review", text: `Review: ${join(who(item), outcome, at && timeText(at, now))}` });
   }
@@ -117,7 +118,7 @@ export function historyLines(row: DocumentRowView, submissions: readonly RowSubm
       lines.push({ key: `unreviewed-${item.assignment_id}`, stage: "annotation", text: `Annotation assigned before the translation review was accepted (confirmed by ${by})` });
     }
     if (item.status === "submitted" && submissions && item.moved_to_version == null) continue;
-    const status = item.moved_to_version != null ? `moved to v${item.moved_to_version}` : join(labelFor(assignmentStatusLabels, item.status), item.held && "Paused");
+    const status = item.moved_to_version != null ? `moved to v${item.moved_to_version}` : join(labelFor(assignmentStatusLabels, item.status), pausedWord(item));
     const round = item.moved_to_version == null && item.round_ordinal != null ? `Round ${item.round_ordinal}` : null;
     lines.push({ key: `work-${item.assignment_id}`, stage: "annotation", text: `${workPrefix(item)}: ${join(who(item), round, status)}` });
   }
@@ -168,6 +169,9 @@ export function historyLines(row: DocumentRowView, submissions: readonly RowSubm
     if (entry.code !== "TASK_ON_HOLD") continue;
     lines.push({ key: `hold-${entry.cause_id}`, stage: "annotation", text: `Task paused${entry.author_label ? `: ${entry.author_label}` : ""}`, reportId: entry.report_id ?? null });
   }
+
+  // Issue 464: the lead pause in place (earlier pauses and releases are in the audit log).
+  if (row.lead_pause) lines.push({ key: "lead-pause", stage: "annotation", text: `Paused by lead: ${leadPauseLine(row.lead_pause)}` });
 
   // The final result: its event lines above say which result, who and when. Without them (the submissions are not
   // loaded yet, or a project imported without its event log) one line names the lead who chose it.

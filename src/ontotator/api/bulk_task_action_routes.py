@@ -103,12 +103,15 @@ class BulkTaskView(BaseModel):
     task: Task
     status: Literal["open", "in_progress", "submitted", "reopened"]
     person: PersonRefView
+    # Issue 464: a lead paused the task's text. A task reopened or given a
+    # round there is paused from the start, until the text is released.
+    text_paused: bool = Field(default_factory=lambda: False)
 
 
 class BulkKeptTaskView(BulkTaskView):
     # not_submitted, lead_correction, discarded, lead_correction_open,
-    # person_unavailable (reopen); submitted, started, paused, within_limit,
-    # lead_correction_task (withdraw); not_submitted, paused, not_current_version,
+    # person_unavailable (reopen); submitted, started, paused, paused_by_lead,
+    # within_limit, lead_correction_task (withdraw); not_submitted, paused, not_current_version,
     # person_unavailable, translation_not_accepted, no_round (start-round).
     reason: str
     message: str

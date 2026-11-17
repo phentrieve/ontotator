@@ -2166,6 +2166,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{key}/text-pauses/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pause Texts
+         * @description Pause the work on many texts (issue 464).
+         *
+         *     A paused text keeps its tasks: the people see them in My tasks, marked
+         *     "Paused by lead" with the ``reason``, and can read them, but no task in
+         *     progress can be saved (409 ``TASK_HELD`` with ``causes: ["lead"]``):
+         *     annotation, translation review and consolidation, on every version of
+         *     the text. A task assigned, reopened or given a new round later is paused
+         *     from the start. Submitted work and final results are untouched and
+         *     exported as before. The pause from a problem report is a separate cause
+         *     and stays as it is.
+         *
+         *     ``preview: true`` lists the texts that would be paused with their tasks
+         *     in progress, the texts skipped (already paused) and a ``preview_token``.
+         *     Applying sends that token and a ``reason``: every listed text is paused,
+         *     or none (409 ``PREVIEW_STALE`` with a fresh ``preview`` in the details
+         *     when anything changed). Each text is audited (``text.pause``, ``via:
+         *     bulk_pause_texts``). The way back is ``text-pauses/release``.
+         */
+        post: operations["pause_texts_api_v1_projects__key__text_pauses_pause_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{key}/text-pauses/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Release Texts
+         * @description Release paused texts (issue 464).
+         *
+         *     Ends the lead pause of the selected texts: their tasks in progress can
+         *     be saved again. A task that a problem report pauses as well stays paused
+         *     until that report is decided (``paused_by_report``,
+         *     ``still_paused_count``); deciding a report never releases the lead
+         *     pause. Texts that are not paused are skipped. Preview and apply as
+         *     ``text-pauses/pause``; ``reason`` is optional. Each text is audited
+         *     (``text.release``, ``via: bulk_release_texts``).
+         */
+        post: operations["release_texts_api_v1_projects__key__text_pauses_release_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{key}/documents/{doc}/translation-correction-assignment": {
         parameters: {
             query?: never;
@@ -4453,6 +4517,10 @@ export interface components {
             held: boolean;
             /** Hold Reason */
             hold_reason?: string | null;
+            /** Pause Causes */
+            pause_causes?: ("report" | "lead")[];
+            /** Lead Pause Reason */
+            lead_pause_reason?: string | null;
             /**
              * Lead Correction
              * @default false
@@ -4581,6 +4649,10 @@ export interface components {
             held: boolean;
             /** Hold Reason */
             hold_reason?: string | null;
+            /** Pause Causes */
+            pause_causes?: ("report" | "lead")[];
+            /** Lead Pause Reason */
+            lead_pause_reason?: string | null;
             /** Active Holds */
             active_holds?: components["schemas"]["ActiveHoldView"][];
             /**
@@ -4986,6 +5058,8 @@ export interface components {
              */
             status: "open" | "in_progress" | "submitted" | "reopened";
             person: components["schemas"]["PersonRefView"];
+            /** Text Paused */
+            text_paused?: boolean;
             /** Reason */
             reason: string;
             /** Message */
@@ -5241,6 +5315,8 @@ export interface components {
              */
             status: "open" | "in_progress" | "submitted" | "reopened";
             person: components["schemas"]["PersonRefView"];
+            /** Text Paused */
+            text_paused?: boolean;
         };
         /** BulkUndoRequest */
         BulkUndoRequest: {
@@ -6118,7 +6194,7 @@ export interface components {
             /** Waiting On */
             waiting_on?: string | string[] | null;
             /** Flags */
-            flags?: ("guidelines_unclear" | "over_limit") | ("guidelines_unclear" | "over_limit")[] | null;
+            flags?: ("guidelines_unclear" | "over_limit" | "lead_paused") | ("guidelines_unclear" | "over_limit" | "lead_paused")[] | null;
             /** Proposals */
             proposals?: ("with" | "without") | ("with" | "without")[] | null;
         };
@@ -6244,6 +6320,7 @@ export interface components {
             /** Proposal Set Unrecorded */
             proposal_set_unrecorded?: boolean;
             annotations_per_text?: components["schemas"]["AnnotationsPerTextView"] | null;
+            lead_pause?: components["schemas"]["LeadPauseView"] | null;
             consolidation_progress?: components["schemas"]["ConsolidationProgressView"] | null;
             /**
              * Unreviewed Translation
@@ -7555,6 +7632,22 @@ export interface components {
              */
             confirm_language: boolean;
         };
+        /**
+         * LeadPauseView
+         * @description A lead paused the work on the text: its tasks in progress cannot be
+         *     saved, also tasks assigned later, until a lead releases the text.
+         *     Submitted work and final results are untouched.
+         */
+        LeadPauseView: {
+            /** Reason */
+            reason: string;
+            paused_by?: components["schemas"]["PersonRefView"] | null;
+            /**
+             * Paused At
+             * Format: date-time
+             */
+            paused_at: string;
+        };
         /** LoginRequest */
         LoginRequest: {
             /** Username */
@@ -8214,6 +8307,31 @@ export interface components {
             /** Reporter Task */
             reporter_task: boolean;
         };
+        /**
+         * PausedTaskView
+         * @description A task in progress on the text: what a pause stops and a release opens.
+         */
+        PausedTaskView: {
+            /** Assignment Id */
+            assignment_id: number;
+            /** Document Id */
+            document_id: string;
+            /** Version */
+            version: number;
+            /**
+             * Task
+             * @enum {string}
+             */
+            task: "annotate" | "review" | "translation_review";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "in_progress" | "reopened";
+            person: components["schemas"]["PersonRefView"];
+            /** Paused By Report */
+            paused_by_report: boolean;
+        };
         /** PendingReanchorRef */
         PendingReanchorRef: {
             /** Proposal Set Id */
@@ -8714,6 +8832,8 @@ export interface components {
              * @default false
              */
             answered: boolean;
+            /** Text Paused By Lead */
+            text_paused_by_lead?: boolean;
         };
         /** Profile */
         Profile: {
@@ -10394,7 +10514,7 @@ export interface components {
             /** Reason */
             reason?: string | null;
             /** Note */
-            note?: ("machine_translation" | "review_only" | "translation_rejected" | "translation_queried" | "translation_not_accepted" | "unchanged" | "with_corrections" | "in_package" | "outside" | "review_off" | "text_change_waiting" | "may_change" | "not_exported" | "carried_on_submit" | "v2_not_annotated" | "no_target_proposals" | "correction" | "new_review" | "source_changed" | "round" | "consolidation") | null;
+            note?: ("machine_translation" | "review_only" | "translation_rejected" | "translation_queried" | "translation_not_accepted" | "unchanged" | "with_corrections" | "in_package" | "outside" | "review_off" | "text_change_waiting" | "may_change" | "not_exported" | "carried_on_submit" | "lead_pause" | "v2_not_annotated" | "no_target_proposals" | "correction" | "new_review" | "source_changed" | "round" | "consolidation") | null;
             /** Matching */
             matching?: number | null;
             /** Compared */
@@ -10720,6 +10840,10 @@ export interface components {
             held: boolean;
             /** Hold Reason */
             hold_reason?: string | null;
+            /** Pause Causes */
+            pause_causes?: ("report" | "lead")[];
+            /** Lead Pause Reason */
+            lead_pause_reason?: string | null;
             /** Source Language */
             source_language?: string | null;
             /** Target Language */
@@ -11106,6 +11230,86 @@ export interface components {
         TextLayers: {
             /** Entries */
             entries: components["schemas"]["TextLayerEntry"][];
+        };
+        /** TextPauseActionView */
+        TextPauseActionView: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "pause" | "release";
+            /** Applied */
+            applied: boolean;
+            /** Texts */
+            texts: number;
+            /** Change Count */
+            change_count: number;
+            /** Skipped Count */
+            skipped_count: number;
+            /** Task Count */
+            task_count: number;
+            /** Still Paused Count */
+            still_paused_count: number;
+            /** Changes */
+            changes: components["schemas"]["TextPauseChangeView"][];
+            /** Skipped */
+            skipped: components["schemas"]["TextPauseSkippedView"][];
+            /** Preview Token */
+            preview_token: string;
+        };
+        /** TextPauseChangeView */
+        TextPauseChangeView: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            pause?: components["schemas"]["TextPauseInfoView"] | null;
+            /** Tasks */
+            tasks: components["schemas"]["PausedTaskView"][];
+        };
+        /** TextPauseInfoView */
+        TextPauseInfoView: {
+            /** Reason */
+            reason: string;
+            paused_by?: components["schemas"]["PersonRefView"] | null;
+            /**
+             * Paused At
+             * Format: date-time
+             */
+            paused_at: string;
+        };
+        /**
+         * TextPauseRequest
+         * @description Pause or release the selected texts. ``reason`` is required to apply a
+         *     pause (the people see it in My tasks and in the task) and optional for a
+         *     release.
+         */
+        TextPauseRequest: {
+            /** Rows */
+            rows: components["schemas"]["RowRefView"][];
+            /** Reason */
+            reason?: string | null;
+            /** Preview */
+            preview?: boolean;
+            /** Summary Only */
+            summary_only?: boolean;
+            /** Preview Token */
+            preview_token?: string | null;
+        };
+        /** TextPauseSkippedView */
+        TextPauseSkippedView: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "already_paused" | "not_paused";
+            /** Message */
+            message: string;
+            pause?: components["schemas"]["TextPauseInfoView"] | null;
         };
         /** TextTypographyCounts */
         TextTypographyCounts: {
@@ -11964,6 +12168,8 @@ export interface components {
             status: "open" | "in_progress" | "submitted" | "reopened";
             /** Held */
             held: boolean;
+            /** Pause Causes */
+            pause_causes?: ("report" | "lead")[];
             /** Round Ordinal */
             round_ordinal: number | null;
             /** Round State */
@@ -15165,7 +15371,7 @@ export interface operations {
                 final_state?: ("none" | "after_annotation" | "after_review" | "choose" | "confirm" | "old_text" | "may_be_outdated" | "final")[] | null;
                 /** @description "me" or a pseudonym */
                 waiting_on?: string[] | null;
-                flags?: ("guidelines_unclear" | "over_limit")[] | null;
+                flags?: ("guidelines_unclear" | "over_limit" | "lead_paused")[] | null;
                 proposals?: ("with" | "without")[] | null;
             };
             header?: never;
@@ -15225,7 +15431,7 @@ export interface operations {
                 final_state?: ("none" | "after_annotation" | "after_review" | "choose" | "confirm" | "old_text" | "may_be_outdated" | "final")[] | null;
                 /** @description "me" or a pseudonym */
                 waiting_on?: string[] | null;
-                flags?: ("guidelines_unclear" | "over_limit")[] | null;
+                flags?: ("guidelines_unclear" | "over_limit" | "lead_paused")[] | null;
                 proposals?: ("with" | "without")[] | null;
             };
             header?: never;
@@ -16142,6 +16348,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BulkModeChangeView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pause_texts_api_v1_projects__key__text_pauses_pause_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TextPauseRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TextPauseActionView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    release_texts_api_v1_projects__key__text_pauses_release_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TextPauseRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TextPauseActionView"];
                 };
             };
             /** @description Validation Error */

@@ -88,7 +88,9 @@ def register_monitoring(server: MCPServer, api: OntotatorClient) -> None:
 
         Names who worked on the text in which task and state, every round
         of annotation and consolidation with its inputs and submissions,
-        every submitted result and every translation review. Findings are
+        every submitted result and every translation review. A paused task
+        has 'held' with 'pause_causes': 'report' (a problem report) and/or
+        'lead' (a lead paused the text, pause_texts). Findings are
         not part of it, nor the text a translation reviewer proposed or
         their rationale (list_translation_reviews with include_text). The
         rounds come from a route outside the project's path: until project
@@ -130,6 +132,8 @@ def register_monitoring(server: MCPServer, api: OntotatorClient) -> None:
                         "last_submission_id",
                         "held",
                         "hold_reason",
+                        "pause_causes",
+                        "lead_pause_reason",
                     )
                 }
                 for item in assignments
