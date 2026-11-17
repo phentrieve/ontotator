@@ -63,7 +63,7 @@ from ontotator.domain.variants import VariantInfo
 from ontotator.domain.workspace import WorkspaceMode
 from ontotator.projects.assignments import revoke_assignments
 from ontotator.storage.database import Database
-from ontotator.storage.plan_tables import DiscardedVariantRow
+from ontotator.storage.plan_tables import DiscardedVariantRow, EditorialCorrectionRow
 from ontotator.storage.repository import _lock_id
 from ontotator.storage.tables import (
     AssignmentRow,
@@ -936,6 +936,36 @@ class AssignmentService:
             raise DomainError("ASSIGNMENT_EXISTS", {"reason": "lead_correction_open"})
 
     @staticmethod
+    def _require_no_typo_fix(
+        conn: Connection, project_id: int, document_id: str
+    ) -> None:
+        """A version a lead fixed typos in takes no further review: the fix
+        is the text to review (``VARIANT_REVIEW_STALE`` names it). A review
+        of the old text would never reach the fix."""
+        fix = conn.execute(
+            select(DocumentRow.document_id, DocumentRow.version)
+            .join(
+                EditorialCorrectionRow,
+                (EditorialCorrectionRow.project_id == DocumentRow.project_id)
+                & (EditorialCorrectionRow.document_id == DocumentRow.document_id),
+            )
+            .where(
+                EditorialCorrectionRow.project_id == project_id,
+                EditorialCorrectionRow.previous_document_id == document_id,
+            )
+            .limit(1)
+        ).first()
+        if fix is not None:
+            raise DomainError(
+                "VARIANT_REVIEW_STALE",
+                {
+                    "reason": "typos_fixed",
+                    "document_id": fix.document_id,
+                    "version": fix.version,
+                },
+            )
+
+    @staticmethod
     def _require_annotation_slot(
         conn: Connection, project: RowMapping, document_id: str
     ) -> None:
@@ -995,6 +1025,7 @@ class AssignmentService:
             return existing
         if task == "translation_review":
             self._require_no_open_lead_correction(conn, project["id"], document_id)
+            self._require_no_typo_fix(conn, project["id"], document_id)
         if task == "annotate":
             self._require_annotation_slot(conn, project, document_id)
         eligibility = self.check_assignable(
@@ -1138,6 +1169,7 @@ class AssignmentService:
                 cls._require_no_open_lead_correction(
                     conn, project["id"], old["document_id"]
                 )
+                cls._require_no_typo_fix(conn, project["id"], old["document_id"])
         except DomainError as refusal:
             return refusal
         return None

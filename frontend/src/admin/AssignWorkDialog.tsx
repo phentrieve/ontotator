@@ -522,7 +522,9 @@ function AssignWorkEditor(props: AssignWorkDialogProps): JSX.Element {
     const version = props.mode === "row" && props.row.parallel_roots ? props.row.versions.find(entry => entry.document_id === item.document_id) : undefined;
     return version ? `${textLabel(item)} (${versionName(version.version, version.chain_name, true)})` : textLabel(item);
   };
-  const newest = props.mode === "row" ? props.row.versions.filter(version => version.is_newest_in_chain).at(-1) ?? props.row.versions.at(-1) : undefined;
+  // The version the task is assigned on, as the preview names it (one text, one target); the newest until it is known.
+  const newest = props.mode === "row" ? (shown?.targets.length === 1 ? shown.targets[0] : undefined)
+    ?? props.row.versions.filter(version => version.is_newest_in_chain).at(-1) ?? props.row.versions.at(-1) : undefined;
   const reasonId = `${id}-assign-reason`;
   const limitId = `${id}-limit`;
   const limitReachedId = `${id}-limit-reached`;

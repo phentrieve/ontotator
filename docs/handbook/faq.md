@@ -192,6 +192,10 @@ You assigned a translation review to someone who already reviewed this version, 
 
 **Fix typos…** did not save: a newer version arrived, a translation review of the version is open, it was discarded, or the text is the same as before. The dialog names the reason; your text stays in the dialog until you close it. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
 
+### A review of a version cannot be reopened or assigned after "Fix typos…"
+
+*A lead fixed typos in this version: v2 is the text to review. Assign a review of the newest version.* A translation review always reviews the corrected text. In the row, use **Assign review…** or **Resolve…** › **Assign a new review…**; the person who reviewed the earlier version can be chosen again. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
+
 ### A task is still paused after I closed the report
 
 Closing a report does not always release the pause. The row shows **Resume task…**; click it and release the pause. See [Decide on a problem report](lead-results.md#decide-on-a-problem-report).

@@ -634,7 +634,14 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
     async def reopen_task(
         assignment_id: int, reason: str | None = None
     ) -> dict[str, Any]:
-        """Reopen a submitted task so its person can change the submission."""
+        """Reopen a submitted task so its person can change the submission.
+
+        A translation review of a version in which a lead fixed typos since
+        (editorial_correction) is refused with
+        VARIANT_REVIEW_STALE/typos_fixed; the details name the fixed
+        version. Assign a review of the text again instead: it is a review
+        of that newest version.
+        """
         reopened: dict[str, Any] = await api.post(
             f"/api/v1/assignments/{seg(assignment_id)}/reopen", {"reason": reason}
         )

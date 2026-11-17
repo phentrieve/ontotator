@@ -175,8 +175,11 @@ function reviewText(cell: StageCellView, context: StageContext): StageText {
     case "source_changed":
       return { symbol: "⚠", word: "Source changed", detail: `translation from ${[context.sourceLanguage || "source", version(detail.from_version)].filter(Boolean).join(" ")}` };
     case "accepted": {
-      const how = detail.note === "with_corrections"
-        ? join("with corrections", detail.from_version != null && detail.version != null ? `v${detail.from_version} → v${detail.version}` : null, people)
+      const versions = detail.from_version != null && detail.version != null ? `v${detail.from_version} → v${detail.version}` : null;
+      // "Fix typos…": the person named is the lead who fixed them, never the reviewer of the fixed version.
+      const fixedBy = (detail.people ?? []).map(person => (person.is_me ? "you" : shortName(person))).join(", ");
+      const how = detail.note === "with_corrections" ? join("with corrections", versions, people)
+        : detail.note === "typos_fixed" ? join(fixedBy ? `typos fixed by ${fixedBy}` : "typos fixed", versions)
         : detail.note ? ACCEPTED_TEXT[detail.note] ?? "" : "";
       return { symbol: "✓", word: "Accepted", detail: how };
     }

@@ -105,6 +105,14 @@ export function historyLines(row: DocumentRowView, submissions: readonly RowSubm
     if (acceptance) lines.push({ key: `acceptance-${entry.document_id}`, stage: "review", text: `Review: ${acceptanceLabel(acceptance, now)}` });
   }
 
+  // "Fix typos…" (review 2, F6): one line per fix, like the other lead actions: what by whom, date time: reason.
+  for (const entry of row.versions) {
+    const fix = entry.editorial_correction;
+    if (!fix) continue;
+    const what = `typos fixed in v${entry.version}${byText(fix.corrected_by ?? null)}`;
+    lines.push({ key: `typos-${entry.document_id}`, stage: "review", text: `Review: ${fix.corrected_at ? changeText(what, timeText(fix.corrected_at, now), fix.reason) : `${what}: ${fix.reason.trim()}`}` });
+  }
+
   // Annotation: submissions in time order (once loaded), then the tasks not submitted yet.
   const several = row.versions.length > 1;
   if (submissions) {

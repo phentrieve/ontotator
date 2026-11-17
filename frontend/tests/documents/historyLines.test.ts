@@ -185,4 +185,23 @@ describe("reassignments and mode changes", () => {
     // Without the events (not loaded yet) the one line of the row stays.
     expect(historyLines(row, null, { now, me: "lead-1" }).map(line => line.text)).toEqual(["Final: chosen by you, 29 Oct, 08:00"]);
   });
+  it("review 2, F6: a typo fix is one line with who, when and the reason", () => {
+    const lead = { pseudonym: "ann-0001", display_name: "Project Lead", is_me: true };
+    const fix = (by: typeof lead | null, reason: string) => ({ reason, previous_document_id: "c-de", inserted_characters: 1, deleted_characters: 1, corrected_at: "2026-10-21T17:24:00", corrected_by: by });
+    const target = row({
+      case_id: "c", language: "de",
+      versions: [
+        version({ document_id: "c-de", origin: "machine_translation", translation_status: "reviewed", latest_review_decision: "query", is_newest_in_chain: false }),
+        version({ document_id: "c-de-v2", version: 2, origin: "correction", derived_from: "c-de", translation_status: "reviewed", latest_review_decision: "query", is_newest_in_chain: false, editorial_correction: fix(lead, "Typo; Grammar") }),
+        version({ document_id: "c-de-v3", version: 3, origin: "correction", derived_from: "c-de-v2", translation_status: "reviewed", latest_review_decision: "query", editorial_correction: { ...fix(luc, " Spacing "), previous_document_id: "c-de-v2" } }),
+      ],
+      work: [work({ assignment_id: 1, document_id: "c-de", task: "translation_review", status: "submitted", author_label: "ann-0003", person: ana })],
+    });
+    const lines = historyLines(target, [], { now });
+    expect(lines.map(line => [line.stage, line.text])).toEqual([
+      ["review", "Review: Ana Weber (ann-0003), Query"],
+      ["review", "Review: typos fixed in v2 by you, 21 Oct, 17:24: Typo; Grammar"],
+      ["review", "Review: typos fixed in v3 by Luc Martin (ann-0005), 21 Oct, 17:24: Spacing"],
+    ]);
+  });
 });

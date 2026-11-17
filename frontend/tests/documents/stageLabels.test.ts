@@ -48,6 +48,11 @@ describe("Review cell", () => {
   it("accepted", () => {
     expect(text("review", cell("accepted", "done", { note: "unchanged" }))).toEqual(["✓ Accepted", "unchanged"]);
     expect(text("review", cell("accepted", "done", { note: "with_corrections", people: [ana], from_version: 1, version: 2 }))).toEqual(["✓ Accepted", "with corrections, v1 → v2, Ana Weber"]);
+    // Review 2, F5: a lead's typo fix is credited to the lead, never to the reviewer of the fixed version.
+    expect(text("review", cell("accepted", "done", { note: "typos_fixed", people: [{ pseudonym: "ann-0001", display_name: "Project Lead", is_me: true }], from_version: 1, version: 2 })))
+      .toEqual(["✓ Accepted", "typos fixed by you, v1 → v2"]);
+    expect(text("review", cell("accepted", "done", { note: "typos_fixed", people: [luc], from_version: 2, version: 3 }))).toEqual(["✓ Accepted", "typos fixed by Luc Martin, v2 → v3"]);
+    expect(text("review", cell("accepted", "done", { note: "typos_fixed", from_version: 1, version: 2 }))).toEqual(["✓ Accepted", "typos fixed, v1 → v2"]);
     expect(text("review", cell("accepted", "done", { note: "in_package" }))).toEqual(["✓ Accepted", "in package"]);
     expect(text("review", cell("accepted", "done", { note: "outside" }))).toEqual(["✓ Accepted", "outside Ontotator"]);
   });
