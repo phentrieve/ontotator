@@ -467,7 +467,7 @@ A text whose consolidation is open keeps it while paused. The row reads *consoli
 
 To release:
 
-1. Select the texts and choose **More actions** › **Release texts…**. Or click **Release…** in the notice of one text card.
+1. Select the texts and choose **More actions** › **Release texts…**. Or click **Release…** in the notice of one text card; the message *Released 1 text.* follows there as well.
 2. Read the preview, for example *Release 3 texts with 4 open tasks · Tom Reis 2, R. Roe 2*. A task that a problem report pauses as well is named in its own group, *1 task stays paused · paused by a problem report as well: decide the report under Problem reports*. Texts that are not paused are skipped.
 3. A reason is optional (**Reason (optional)**). Click the button, for example *Release 4 texts*, tick **I understand** and click again.
 

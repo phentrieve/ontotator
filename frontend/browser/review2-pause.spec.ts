@@ -3,6 +3,7 @@
  * - F2: a text whose consolidation is open keeps it in the Documents row, the text card and History once the lead
  *   pauses the text ("consolidating · paused", the consolidator's row with "Paused by lead", no second "Consolidate…").
  * - F6: History keeps a line for the pause and one for its release, also after the release.
+ * - F7 a: "Release…" in the text card answers with the message of the bulk action.
  * - F3: an annotator whose editor was open before the pause reads the reason in the New finding panel at 390 px,
  *   where the banner above the panes is out of view; at 1440 px the banner is in view and the panel has no second line.
  * - F4: a text whose first annotator is at work and that can take another keeps "· max 2" in its row at 1440 px, the
@@ -82,14 +83,6 @@ async function pauseByApi(page: Page, project: string, caseId: string): Promise<
   expect(applied.status()).toBe(200);
 }
 
-async function releaseByApi(page: Page, project: string, caseId: string): Promise<void> {
-  const url = `/api/v1/projects/${encodeURIComponent(project)}/text-pauses/release`;
-  const rows = [{ case_id: caseId, language: "en" }];
-  const preview = await (await authenticatedRequest(page, url, "POST", { rows, preview: true })).json();
-  const applied = await authenticatedRequest(page, url, "POST", { rows, preview_token: preview.preview_token });
-  expect(applied.status()).toBe(200);
-}
-
 for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as const) {
   const phone = width < 700;
   const size = { width, height };
@@ -139,14 +132,23 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
     await expect(pausedLine.locator(".row-activity-tag")).toHaveText("Text");
     await shot(page, `f2-card-history${suffix}`);
 
+    // F7 a: "Release…" in the card says that it worked, as the bulk action does.
+    await card.getByRole("button", { name: "Back", exact: true }).click();
+    await card.getByRole("button", { name: "Release…, EN100028 en" }).click();
+    const release = page.getByRole("dialog", { name: "Release texts: 1 text" });
+    const apply = release.getByRole("button", { name: "Release 1 text" });
+    await apply.click();
+    await release.getByLabel(/^I understand/).check();
+    await apply.click();
+    await expect(release).toBeHidden();
+    await expect(page.locator(".ui-toast")).toContainText("Released 1 text.");
+    await expect(card.getByRole("group", { name: "Paused by lead" })).toHaveCount(0);
+    await expect(card.getByRole("button", { name: /^Finalization consolidating \(2 of 2 groups open\)/ })).toBeVisible();
+    await shot(page, `f7a-released-toast${suffix}`);
+
     // F6: after the release both lines stay, the release first (newest first).
-    await releaseByApi(page, s.project, "EN100028");
-    await page.reload();
-    await documentsReady(page);
-    // The card reopens from the address, on History.
-    const released = textCard(page, "EN100028", "en");
-    await expect(released.getByRole("button", { name: "Back", exact: true })).toBeVisible();
-    await expect(released.getByRole("group", { name: "Paused by lead" })).toHaveCount(0);
+    const released = card;
+    await released.getByRole("button", { name: /^History/ }).click();
     const textLines = activityLines(released).filter({ has: page.locator(".row-activity-tag", { hasText: /^Text$/ }) });
     await expect(textLines).toHaveCount(2);
     await expect(textLines.nth(0)).toContainText(/released by you, .+\d$/);
