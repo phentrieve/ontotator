@@ -10040,13 +10040,15 @@ export interface components {
          *     (``assignment_id``, ``to_person``); the ``final_*`` kinds name the
          *     results (``from_result`` the one replaced, ``to_result`` the one final
          *     afterwards; null when the submission is no longer among the row's).
+         *     ``text_paused`` and ``text_released`` (issue 464) are a lead's pause and
+         *     release of the text, with ``by`` and the ``reason`` given.
          */
         RowChangeView: {
             /**
              * Kind
              * @enum {string}
              */
-            kind: "reassigned" | "mode_changed" | "mode_restored" | "final_withdrawn" | "reopened" | "reopen_undone" | "round_started" | "final_chosen" | "final_changed" | "final_restored";
+            kind: "reassigned" | "mode_changed" | "mode_restored" | "final_withdrawn" | "reopened" | "reopen_undone" | "round_started" | "final_chosen" | "final_changed" | "final_restored" | "text_paused" | "text_released";
             /**
              * At
              * Format: date-time

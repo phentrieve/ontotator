@@ -2,6 +2,7 @@
  * Review 2 of the lead pause and the annotator limit, at 1440 and 390 px:
  * - F2: a text whose consolidation is open keeps it in the Documents row, the text card and History once the lead
  *   pauses the text ("consolidating · paused", the consolidator's row with "Paused by lead", no second "Consolidate…").
+ * - F6: History keeps a line for the pause and one for its release, also after the release.
  * - F3: an annotator whose editor was open before the pause reads the reason in the New finding panel at 390 px,
  *   where the banner above the panes is out of view; at 1440 px the banner is in view and the panel has no second line.
  * - F4: a text whose first annotator is at work and that can take another keeps "· max 2" in its row at 1440 px, the
@@ -81,6 +82,14 @@ async function pauseByApi(page: Page, project: string, caseId: string): Promise<
   expect(applied.status()).toBe(200);
 }
 
+async function releaseByApi(page: Page, project: string, caseId: string): Promise<void> {
+  const url = `/api/v1/projects/${encodeURIComponent(project)}/text-pauses/release`;
+  const rows = [{ case_id: caseId, language: "en" }];
+  const preview = await (await authenticatedRequest(page, url, "POST", { rows, preview: true })).json();
+  const applied = await authenticatedRequest(page, url, "POST", { rows, preview_token: preview.preview_token });
+  expect(applied.status()).toBe(200);
+}
+
 for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as const) {
   const phone = width < 700;
   const size = { width, height };
@@ -124,7 +133,26 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
     const consolidation = activityLines(card).filter({ hasText: "Consolidation: Kim Lang" });
     await expect(consolidation).toContainText("Paused by lead");
     await expect(consolidation.locator(".row-activity-tag")).toHaveText("Finalization");
+    // F6: the pause is a line of its own, about the text.
+    const pausedLine = activityLines(card).filter({ hasText: "paused by you" });
+    await expect(pausedLine).toContainText(new RegExp(`paused by you, .+: ${WHY}$`));
+    await expect(pausedLine.locator(".row-activity-tag")).toHaveText("Text");
     await shot(page, `f2-card-history${suffix}`);
+
+    // F6: after the release both lines stay, the release first (newest first).
+    await releaseByApi(page, s.project, "EN100028");
+    await page.reload();
+    await documentsReady(page);
+    // The card reopens from the address, on History.
+    const released = textCard(page, "EN100028", "en");
+    await expect(released.getByRole("button", { name: "Back", exact: true })).toBeVisible();
+    await expect(released.getByRole("group", { name: "Paused by lead" })).toHaveCount(0);
+    const textLines = activityLines(released).filter({ has: page.locator(".row-activity-tag", { hasText: /^Text$/ }) });
+    await expect(textLines).toHaveCount(2);
+    await expect(textLines.nth(0)).toContainText(/released by you, .+\d$/);
+    await expect(textLines.nth(1)).toContainText(new RegExp(`paused by you, .+: ${WHY}$`));
+    expect(await noHorizontalScroll(page)).toBe(true);
+    await shot(page, `f6-history-after-release${suffix}`);
     expect(errors).toEqual([]);
   });
 

@@ -29204,7 +29204,9 @@
               "round_started",
               "final_chosen",
               "final_changed",
-              "final_restored"
+              "final_restored",
+              "text_paused",
+              "text_released"
             ],
             "title": "Kind"
           },
@@ -29337,7 +29339,7 @@
           "at"
         ],
         "title": "RowChangeView",
-        "description": "A change of who works on a row, how, or of its final result: its\nHistory line, with who did it, when and (where one was given) why.\n\n``by`` is the person who made the change; a withdrawn final result\n(#343) names the lead in ``from_person`` instead. ``reopened``,\n``reopen_undone`` and ``round_started`` name the task and its person\n(``assignment_id``, ``to_person``); the ``final_*`` kinds name the\nresults (``from_result`` the one replaced, ``to_result`` the one final\nafterwards; null when the submission is no longer among the row's)."
+        "description": "A change of who works on a row, how, or of its final result: its\nHistory line, with who did it, when and (where one was given) why.\n\n``by`` is the person who made the change; a withdrawn final result\n(#343) names the lead in ``from_person`` instead. ``reopened``,\n``reopen_undone`` and ``round_started`` name the task and its person\n(``assignment_id``, ``to_person``); the ``final_*`` kinds name the\nresults (``from_result`` the one replaced, ``to_result`` the one final\nafterwards; null when the submission is no longer among the row's).\n``text_paused`` and ``text_released`` (issue 464) are a lead's pause and\nrelease of the text, with ``by`` and the ``reason`` given."
       },
       "RowItemView": {
         "properties": {

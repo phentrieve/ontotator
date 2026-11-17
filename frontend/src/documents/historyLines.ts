@@ -5,18 +5,25 @@
  * "Annotation: Tom Reis (ann-0004), Round 1, 1 finding, 21 Oct, 22:15"; a consolidation adds "4 kept automatically (all
  * matched)" (U14). A change by a lead or an annotator reads "what by whom, date time: reason": "Annotation: task of
  * Tom Reis (ann-0004) reopened by you, 21 Oct, 22:40: Guideline 2.3", "Final: changed from the result of Tom Reis
- * (ann-0004) to the result of R. Roe (ann-0007) by you, 21 Oct, 22:50", "Final: change undone by you, …".
+ * (ann-0004) to the result of R. Roe (ann-0007) by you, 21 Oct, 22:50", "Final: change undone by you, …". A lead's
+ * pause of the text and its release: "Text: paused by you, 17 Nov, 17:24: Source is checked", "Text: released by you, …".
  */
 import type { DocumentRowView, RowChangeView, RowSubmissionView } from "../api/client";
 import { assignmentStatusLabels, labelFor, plural } from "../app/labels";
 import { formatTime, personLabel } from "../app/submissionLabels";
 import { decisionLabels } from "../translation/labels";
-import { leadPauseLine, pausedWord } from "./labels";
+import { pausedWord } from "./labels";
 import { acceptanceLabel, acceptanceOf, isDiscarded } from "./TextVersions";
-import { MODE_WORDS } from "./stageLabels";
+import { HISTORY_LINE_PREFIX, MODE_WORDS, STAGE_TITLES } from "./stageLabels";
 
-/** Stage of an activity line (the row panel's stage tag and filter). */
-export type HistoryStage = "review" | "annotation" | "final";
+/**
+ * Stage of an activity line (the row panel's stage tag and filter). "text": what a lead did to the text as a whole,
+ * a pause and its release (issue 464), which belong to no single stage.
+ */
+export type HistoryStage = "review" | "annotation" | "final" | "text";
+/** The tag of a line in the card's History, and the word before its text ("Text: paused by you, …"). */
+export const HISTORY_TAGS: Readonly<Record<HistoryStage, string>> = { ...STAGE_TITLES, text: "Text" };
+export const HISTORY_PREFIXES: Readonly<Record<HistoryStage, string>> = { ...HISTORY_LINE_PREFIX, text: "Text" };
 
 export interface HistoryLine {
   key: string;
@@ -155,6 +162,13 @@ export function historyLines(row: DocumentRowView, submissions: readonly RowSubm
       case "final_restored":
         push("final", `Final: ${changeText(`change undone${byText(change.by)}, ${resultName(change.to_result)} is final again`, when)}`);
         break;
+      // Issue 464, review 2 F6: every pause and its release stay, also after the release.
+      case "text_paused":
+        push("text", `Text: ${changeText(`paused${byText(change.by)}`, when, change.reason)}`);
+        break;
+      case "text_released":
+        push("text", `Text: ${changeText(`released${byText(change.by)}`, when, change.reason)}`);
+        break;
       case "final_withdrawn":
         push("final", `Final: ${changeText(`withdrawn${byText(change.from_person)}`, when, change.reason)}`);
         break;
@@ -171,8 +185,10 @@ export function historyLines(row: DocumentRowView, submissions: readonly RowSubm
     lines.push({ key: `hold-${entry.cause_id}`, stage: "annotation", text: `Task paused${entry.author_label ? `: ${entry.author_label}` : ""}`, reportId: entry.report_id ?? null });
   }
 
-  // Issue 464: the lead pause in place (earlier pauses and releases are in the audit log).
-  if (row.lead_pause) lines.push({ key: "lead-pause", stage: "annotation", text: `Paused by lead: ${leadPauseLine(row.lead_pause)}` });
+  // Issue 464: the lead pause in place, while its event line above is not loaded yet.
+  if (row.lead_pause && !(options.changes ?? []).some(change => change.kind === "text_paused")) {
+    lines.push({ key: "lead-pause", stage: "text", text: `Text: ${changeText(`paused${byText(row.lead_pause.paused_by ?? null)}`, timeText(row.lead_pause.paused_at, now), row.lead_pause.reason)}` });
+  }
 
   // The final result: its event lines above say which result, who and when. Without them (the submissions are not
   // loaded yet, or a project imported without its event log) one line names the lead who chose it.

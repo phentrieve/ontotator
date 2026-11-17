@@ -471,7 +471,7 @@ To release:
 2. Read the preview, for example *Release 3 texts with 4 open tasks · Tom Reis 2, R. Roe 2*. A task that a problem report pauses as well is named in its own group, *1 task stays paused · paused by a problem report as well: decide the report under Problem reports*. Texts that are not paused are skipped.
 3. A reason is optional (**Reason (optional)**). Click the button, for example *Release 4 texts*, tick **I understand** and click again.
 
-Every listed text is paused or released, or none: if the texts changed since the preview, the dialog says *The texts changed since the preview. Check the new preview.* and shows it. Each text gets its own entry in the audit trail, with the reason. There is no **Undo** in the message: **Release texts…** is the way back from a pause, **Pause texts…** from a release, and neither changes any work.
+Every listed text is paused or released, or none: if the texts changed since the preview, the dialog says *The texts changed since the preview. Check the new preview.* and shows it. Each text gets its own entry in the audit trail, with the reason. The text card's **History** keeps a line for each pause and each release under the tag **Text**, also after the release: *paused by you, 17 Nov, 17:24: The clinic is checking the source text* and *released by you, 17 Nov, 18:02*, with the reason of the release when you gave one. There is no **Undo** in the message: **Release texts…** is the way back from a pause, **Pause texts…** from a release, and neither changes any work.
 
 The other actions on paused texts:
 
