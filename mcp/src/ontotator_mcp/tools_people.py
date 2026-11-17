@@ -1001,6 +1001,7 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
             ),
         ] = False,
         confirm_language: bool = False,
+        confirm_unreviewed_translation: bool = False,
         confirm: Annotated[
             bool, Field(description="False: dry run. True: reassign as planned.")
         ] = False,
@@ -1012,7 +1013,10 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         include_started) with the reason. With confirm each planned task is
         reassigned; a refusal of one task (for example the successor
         already has that text) is reported and the others go on. Submitted
-        work stays with its author.
+        work stays with its author. An annotation task on a translation
+        whose review is not accepted is refused with
+        TRANSLATION_NOT_REVIEWED unless confirm_unreviewed_translation; the
+        dry run does not mark such tasks.
         """
         # The server keeps usernames trimmed and in lower case.
         leaving = from_username.strip().lower()
@@ -1044,7 +1048,7 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
                         "username": move["to"],
                         "confirm_started": include_started,
                         "confirm_language": confirm_language,
-                        "confirm_unreviewed_translation": False,
+                        "confirm_unreviewed_translation": confirm_unreviewed_translation,
                     },
                 )
             except OntotatorError as exc:

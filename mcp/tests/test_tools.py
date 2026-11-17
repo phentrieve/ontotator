@@ -200,6 +200,32 @@ async def test_files_dir_limits_what_is_read_and_written(
         assert done["path"] == str((allowed / "out.zip").resolve())
 
 
+@pytest.mark.parametrize(("latest", "sent"), [(None, ""), (2, "2")])
+async def test_publish_guideline_names_the_latest_version_it_saw(
+    fake: FakeApi,
+    settings: Settings,
+    tmp_path: Path,
+    latest: int | None,
+    sent: str,
+) -> None:
+    guide = tmp_path / "guide.md"
+    guide.write_text("# Guide")
+    fake.on(
+        "GET",
+        f"{P}/guidelines",
+        build("GuidelineListing", latest_version=latest, current=None, versions=[]),
+    )
+    fake.on("POST", f"{P}/guidelines", build("GuidelineSummary"))
+    limited = replace(settings, files_dirs=(tmp_path.resolve(),))
+    server = build_server(limited, transport=httpx.MockTransport(fake))
+    async with Client(server) as client:
+        await call(client, "publish_guideline", {"project": "p", "path": str(guide)})
+    [post] = fake.calls_to("POST", f"{P}/guidelines")
+    form = post.request.content.decode()
+    # The route takes a form field: empty when the project has no guideline.
+    assert f'name="expected_latest_version"\r\n\r\n{sent}\r\n' in form
+
+
 async def test_without_files_dir_local_files_are_refused(
     fake: FakeApi, settings: Settings, tmp_path: Path
 ) -> None:
@@ -505,6 +531,18 @@ async def test_distribute_texts_previews_then_assigns_with_the_digest(
     [batch] = fake.calls_to("POST", f"{P}/assignments/batch")
     assert batch.json()["expected_preview_digest"] == "d1"
     assert batch.json()["case_ids"] == ["c1", "c2"]
+    assert batch.json()["confirm_unreviewed_translation"] is False
+    for preview in fake.calls_to("POST", f"{P}/assignments/batch/preview"):
+        assert "confirm_unreviewed_translation" not in preview.json()
+
+    fake.calls.clear()
+    await call(
+        mcp_client,
+        "distribute_texts",
+        args | {"confirm": True, "confirm_unreviewed_translation": True},
+    )
+    [batch] = fake.calls_to("POST", f"{P}/assignments/batch")
+    assert batch.json()["confirm_unreviewed_translation"] is True
 
 
 async def test_work_plan_sets_the_mode_with_the_previewed_revisions(
