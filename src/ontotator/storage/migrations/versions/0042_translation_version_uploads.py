@@ -8,15 +8,15 @@ the version it corrects, who uploaded it and when, and how the text was made
 optional date, person and note). The version itself is an ordinary
 ``correction`` row of ``documents``.
 
-No existing table, column or row changes. Follows 0040 (withdraw a final
-result).
+No existing table, column or row changes. Follows 0041 (annotators per text
+up to 20).
 """
 
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0041"
-down_revision = "0040"
+revision = "0042"
+down_revision = "0041"
 branch_labels = None
 depends_on = None
 SCHEMA = "ontotator"
