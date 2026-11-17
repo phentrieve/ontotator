@@ -201,7 +201,10 @@ test("the removed-text tooltip stays inside the viewport and closes with Esc aft
     await expect(tip).toBeVisible();
     const box = await inside();
     const now = (await marker(page).boundingBox())!;
-    expect(box.y + box.height).toBeLessThanOrEqual(now.y);
+    // At phone width the layer's findings are below the text (issue 438), so the marker is not at the window's
+    // bottom edge and the tooltip has room below it: there it must only stay clear of the marker.
+    if (width >= 700) expect(box.y + box.height).toBeLessThanOrEqual(now.y);
+    else expect(box.y + box.height <= now.y || box.y >= now.y + now.height).toBe(true);
     await page.keyboard.press("Escape");
     await expect(tip).toHaveCount(0);
     await marker(page).blur();

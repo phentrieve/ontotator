@@ -2772,8 +2772,13 @@ details.case-version-controls > .btn { vertical-align: bottom; }
 }
 /* End of Values block */
 
-/* <=700 px: a new mark keeps the text pane; this bar leads to the term search (spec B.5). */
+/* <=700 px: a new mark keeps the text pane; this bar leads to the term search (spec B.5). It follows the panes
+   and sticks to the bottom of the window: the workspace is one window high below the header, so its own bottom
+   edge is below the fold until the page is scrolled (issue 452). */
 .pending-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
   display: flex;
   flex-shrink: 0;
   align-items: center;
