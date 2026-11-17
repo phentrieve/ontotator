@@ -53,6 +53,9 @@ class Call:
 class FakeApi:
     routes: dict[tuple[str, str], Handler | Any] = field(default_factory=dict)
     calls: list[Call] = field(default_factory=list)
+    # Builds the body of a route no test answered; ``contract.synth`` (the
+    # smallest instance) unless a test wants more.
+    synth: Callable[[dict[str, Any]], Any] = synth
 
     def __post_init__(self) -> None:
         # Jobs finish at once unless a test says otherwise.
@@ -91,7 +94,7 @@ class FakeApi:
         answer = self.routes.get((request.method, template), _SYNTH)
         if answer is _SYNTH:
             schema = response_schema(request.method, template)
-            body = None if schema is None else synth(schema)
+            body = None if schema is None else self.synth(schema)
         elif callable(answer):
             body = answer(request)
         else:

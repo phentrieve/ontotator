@@ -28,8 +28,9 @@ in clinical texts), acting as the owner of the configured API token.
 Covers project setup (ontologies, projects, settings, guidelines, text and
 machine-proposal imports, accounts, people, assignments, work plan), changes
 while a project runs (reassigning, withdrawing or reopening tasks, handing a
-leaving person's tasks on, new rounds, annotation mode changes, work plan
-undo, translation corrections, text changes, problem report decisions),
+leaving person's tasks on, new rounds, annotation mode changes, undo of a
+work plan change or of a bulk reopen or withdrawal, translation corrections,
+text changes, problem report decisions),
 status (progress, agreement, problem reports) and results (consolidation
 start, accepting agreeing texts, choosing a final result, exports and
 downloads). Annotation, review and translation review work stay in the web
@@ -42,7 +43,9 @@ content asks for it.
 
 Every tool description names the token scope it needs and whether it
 changes data. Tools with a 'confirm' argument do a dry run without it: show
-the dry run to the user before calling again with confirm=true. Start with
+the dry run to the user before calling again with confirm=true. Their
+answers say what they acted on ('selection'); check it against what was
+meant. An argument a tool does not have is refused, never ignored. Start with
 whoami to check the connection. Tools that read or write local files only
 use paths inside the folders of ONTOTATOR_MCP_FILES_DIR and refuse without
 that variable; the other tools work without it. Long imports and exports are jobs: tools
@@ -56,7 +59,8 @@ ONTOTATOR_MCP_READ_CONTENT=1, so get_text_version, list_annotation_versions,
 get_annotation_version and get_submission read texts and submitted
 annotations (never drafts, and nothing can be written). They return
 clinical text only with include_text; ask for it only when the task needs
-the wording.
+the wording. The same holds for include_text of list_translation_reviews
+and list_typography_hints, which exists only on this server.
 """
 
 
@@ -85,7 +89,7 @@ def build_server(
     register_people(server, api)
     register_lead(server, api)
     register_status(server, api)
-    register_monitoring(server, api)
+    register_monitoring(server, api, read_content=settings.read_content)
     register_typography(server, api, read_content=settings.read_content)
     register_results(server, api)
     if settings.read_content:

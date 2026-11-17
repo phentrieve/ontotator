@@ -7,7 +7,7 @@ import { formatTime } from "../app/submissionLabels";
 import { Button, StatusBadge, type StatusTone } from "../ui";
 import { TranslationCorrectionAction } from "../variants/TranslationCorrectionAction";
 import { originLabels } from "../admin/variantMetadata";
-import { statusBadgeText, versionName } from "./labels";
+import { pausedWord, statusBadgeText, versionName } from "./labels";
 import { RouteLink, rowName } from "./RowCells";
 import type { CardWorkItem } from "./textCard/cardModel";
 import { PersonList, PersonRow, useFocusAfterRemoval } from "./textCard/PersonRow";
@@ -33,6 +33,8 @@ export interface TextVersionsTools {
   onAcceptVersion?: (row: DocumentRowView, version: DocumentVersionView) => void;
   /** The lead: "Upload new version…" on the newest version of a translation (issue 341 a). */
   onUploadVersion?: (row: DocumentRowView, version: DocumentVersionView) => void;
+  /** The lead: "Fix typos…" (an editorial correction) on the newest version of a translation (issue 453). */
+  onEditorialCorrection?: (row: DocumentRowView, version: DocumentVersionView) => void;
 }
 
 /** Issue 341 d: a newest translation version that is neither reviewed nor accepted, not discarded. */
@@ -46,10 +48,13 @@ export function correctableVersion(row: Pick<DocumentRowView, "plan_row">, versi
   return version.is_newest_in_chain && version.translation_status === "accepted" && !isDiscarded(row, version);
 }
 
-/** Issue 341 a: the newest version of a translation the lead may upload a new version after, not discarded. */
+/** Issues 341 a and 453: the newest version of a translation the lead may upload a new version after or correct editorially, not discarded. */
 export function uploadableVersion(row: Pick<DocumentRowView, "plan_row">, version: DocumentVersionView): boolean {
   return version.is_newest_in_chain && version.translation_status != null && !isDiscarded(row, version);
 }
+
+/** What tells "Fix typos…" apart from "Correct the translation…" and "Upload new version…" (the button's tooltip). */
+export const FIX_TYPOS_HINT = "Spacing, typos, grammar. Keeps the status; no review.";
 
 const uploadMethodLabels: Readonly<Record<NonNullable<DocumentVersionView["upload"]>["method"], string>> = {
   machine_translation: "Machine translation", human_translation: "Human translation", manual_correction: "Corrected by hand",
@@ -72,6 +77,12 @@ export function uploadLabel(upload: NonNullable<DocumentVersionView["upload"]>, 
   const who = ["Uploaded", upload.uploaded_by ? `by ${identityLabel(upload.uploaded_by)}` : null].filter(Boolean).join(" ");
   const made = [upload.made_on ? `on ${calendarDate(upload.made_on)}` : null, upload.made_by?.trim() ? `by ${upload.made_by.trim()}` : null].filter(Boolean).join(" ");
   return [[who, upload.uploaded_at ? formatTime(upload.uploaded_at, { now }) : null].filter(Boolean).join(", "), made ? `Made ${made}` : null, upload.note?.trim()].filter(Boolean).join(" · ");
+}
+
+/** "Typo fix by Project lead (ann-0002), 17 Nov, 10:12 · Spacing; Typo" (issue 453: the record of an editorial correction). */
+export function editorialCorrectionLabel(record: NonNullable<DocumentVersionView["editorial_correction"]>, now?: Date): string {
+  const who = ["Typo fix", record.corrected_by ? `by ${identityLabel(record.corrected_by)}` : null].filter(Boolean).join(" ");
+  return [[who, record.corrected_at ? formatTime(record.corrected_at, { now }) : null].filter(Boolean).join(", "), record.reason.trim()].filter(Boolean).join(" · ");
 }
 
 /** Acceptance record of a translation version (spec "Annotate without review: acceptance record"). */
@@ -211,6 +222,8 @@ export const TextVersions = forwardRef<HTMLUListElement, TextVersionsProps>(func
             onClick={() => tools.onCorrectTranslation?.(row, version)}>Correct the translation…</Button>}
           {tools.onAcceptVersion && acceptableVersion(row, version) && <Button size="sm" aria-label={`Accept ${fullName}…`}
             onClick={() => tools.onAcceptVersion?.(row, version)}>Accept this version…</Button>}
+          {tools.onEditorialCorrection && uploadableVersion(row, version) && <Button size="sm" aria-label={`Fix typos in ${fullName}…`} title={FIX_TYPOS_HINT}
+            onClick={() => tools.onEditorialCorrection?.(row, version)}>Fix typos…</Button>}
           {tools.onUploadVersion && uploadableVersion(row, version) && <Button size="sm" aria-label={`Upload new version of ${fullName}…`}
             onClick={() => tools.onUploadVersion?.(row, version)}>Upload new version…</Button>}
           {version.translation_status != null && tools.onShowTranslationReviews && <Button size="sm" aria-label={`Translation reviews for ${name}`} onClick={() => tools.onShowTranslationReviews?.(version.document_id)}>Translation reviews</Button>}
@@ -227,11 +240,12 @@ export const TextVersions = forwardRef<HTMLUListElement, TextVersionsProps>(func
           {!version.matches_filter && <span className="cell-secondary">Does not match the filters</span>}
         </div>
         {version.upload && <p className="text-version-record">{uploadLabel(version.upload, now)}</p>}
+        {version.editorial_correction && <p className="text-version-record">{editorialCorrectionLabel(version.editorial_correction, now)}</p>}
         {acceptance && <p className="text-version-record">{acceptanceLabel(acceptance, now)}</p>}
         {discarded && discardLabel(version, now) !== "Discarded" && <p className="text-version-record">{discardLabel(version, now)}</p>}
         {work.length > 0 && <PersonList label={`Assignments on ${name}`}>
           {work.map(item => {
-            const details = <>{labelFor(taskLabels, item.task)}{item.held && " · Paused"}</>;
+            const details = <>{labelFor(taskLabels, item.task)}{item.held && ` · ${pausedWord(item)}`}</>;
             // Moved work is history; annotations carry their actions in the Annotation part (text card).
             const plain = item.moved_to_version != null || (hideOpenWork && item.task === "annotate");
             return plain

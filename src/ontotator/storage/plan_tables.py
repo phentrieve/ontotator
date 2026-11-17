@@ -171,6 +171,40 @@ class TranslationVersionUploadRow(Base):
     uploaded_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
+class EditorialCorrectionRow(Base):
+    """A translation version made by a lead's editorial correction (issue 453).
+
+    Append-only, one row per corrected version: who corrected it, when and
+    why, and how many characters were inserted and deleted. The version
+    itself is an ordinary ``correction`` of ``previous_document_id`` with
+    that version's translation status.
+    """
+
+    __tablename__ = "translation_editorial_corrections"
+    __table_args__ = (
+        ForeignKeyConstraint(*_DOCUMENT_FK),
+        ForeignKeyConstraint(
+            ["project_id", "previous_document_id"],
+            [f"{SCHEMA}.documents.project_id", f"{SCHEMA}.documents.document_id"],
+        ),
+        UniqueConstraint("project_id", "document_id"),
+        CheckConstraint("btrim(reason) <> ''", name="reason_required"),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.projects.id")
+    )
+    document_id: Mapped[str]
+    previous_document_id: Mapped[str]
+    reason: Mapped[str]
+    inserted_characters: Mapped[int]
+    deleted_characters: Mapped[int]
+    corrected_by: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.users.id")
+    )
+    corrected_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
 class TextSettingRow(Base):
     """Per-text settings of a language version (issue 422).
 
@@ -185,6 +219,10 @@ class TextSettingRow(Base):
         CheckConstraint(
             "annotations_per_text BETWEEN 1 AND 20", name="annotations_per_text"
         ),
+        CheckConstraint(
+            "NOT paused OR (pause_reason IS NOT NULL AND paused_at IS NOT NULL)",
+            name="pause",
+        ),
     )
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
     project_id: Mapped[int] = mapped_column(
@@ -198,3 +236,12 @@ class TextSettingRow(Base):
         BigInteger, ForeignKey(f"{SCHEMA}.users.id")
     )
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    # Lead pause (issue 464): the work on the text is paused, for every
+    # version and every task, also one assigned later. After a release the
+    # reason, the lead and the time stay as the record of the last pause.
+    paused: Mapped[bool] = mapped_column(server_default=text("false"))
+    pause_reason: Mapped[str | None]
+    paused_by: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.users.id")
+    )
+    paused_at: Mapped[datetime | None]

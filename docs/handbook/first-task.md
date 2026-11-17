@@ -90,6 +90,8 @@ If you notice a mistake after submitting: open the task, choose **More** › **W
 
 If something is wrong with the text itself (cut off, wrong patient, unreadable): **More** › **Report a text problem…** ([Report a text problem](annotator.md#report-a-text-problem)).
 
+If a task in **My tasks** is marked **Paused by lead**: the lead stopped the work on that text for now and says why. You can read the task; it opens again when the lead releases the text ([A task paused by the lead](annotator.md#a-task-paused-by-the-lead)).
+
 ## If you were given a translation review
 
 A *Translation review* task shows the source and the translation side by side. You correct the translation if needed and choose a decision. See [Review a translation](annotator.md#review-a-translation).

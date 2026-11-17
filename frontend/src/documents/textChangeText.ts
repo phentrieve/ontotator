@@ -28,6 +28,8 @@ export const notNewerLine = (from: string, to: string): string =>
 export const nextAfterWithdrawLine = (to: string): string => `Next: click Apply to withdraw the task, then assign an annotation of ${to}.`;
 export const withdrawDescription = (person: string, to: string): string => `${person}’s task ends. Nothing of the draft is carried to ${to}; ${to} needs a new annotation.`;
 export const heldLine = (person: string): string => `${person}’s task is paused by a problem report. Decide the report first.`;
+/** Issue 464: the lead paused the text; the task moves or ends after the release. */
+export const leadPausedLine = (person: string): string => `${person}’s task is on a text paused by a lead. Release the text first (More actions, Release texts…).`;
 
 export const movedMessage = (person: string, to: string): string => `${person} continues on ${to}.`;
 export const finishingMessage = (person: string, from: string, to: string): string =>

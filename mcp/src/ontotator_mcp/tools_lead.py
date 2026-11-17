@@ -19,9 +19,10 @@ from pydantic import Field
 
 from ontotator_mcp.client import OntotatorClient, project_path, seg
 from ontotator_mcp.errors import OntotatorError
+from ontotator_mcp.models import Replacement, TextRef
 from ontotator_mcp.tooling import register
 from ontotator_mcp.tools_people import assignment_summary
-from ontotator_mcp.tools_setup import _cut
+from ontotator_mcp.tools_setup import _cut, unknown_texts
 from ontotator_mcp.tools_status import rows
 
 Project = Annotated[str, Field(description="Project key, e.g. 'ward-7'.")]
@@ -243,7 +244,7 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
     async def change_annotation_modes(
         project: Project,
         texts: Annotated[
-            list[dict[str, str]],
+            list[TextRef],
             Field(
                 min_length=1,
                 max_length=10000,
@@ -285,13 +286,19 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
         withdrawn. The dry run names, per text, whose submissions and whose
         unsubmitted tasks, and the texts left as they are with the reason
         (final result chosen: withdraw it first; no work yet; already in
-        this mode; no proposals). Confirm with its preview_token: every
+        this mode; no proposals), and the texts the project does not have
+        (unknown_texts: another spelling, letter case or language). Confirm with its preview_token: every
         listed text changes, or none when anything changed since (a fresh
-        dry run, ``stale``). There is no bulk undo; restore_annotation_mode
-        brings back one text while no new work started on it.
+        dry run, ``stale``). THERE IS NO UNDO for the call as a whole: the
+        answer has no ``undo`` and no tool takes it. restore_annotation_mode
+        brings back one text at a time (its mode, submissions and tasks),
+        and only while no new work started on that text.
         """
         path = project_path(project, "annotation-mode-changes/bulk")
-        body: dict[str, Any] = {"rows": texts, "mode": mode}
+        body: dict[str, Any] = {
+            "rows": [text.model_dump() for text in texts],
+            "mode": mode,
+        }
 
         def summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
             def people(items: list[dict[str, Any]], key: str) -> list[str]:
@@ -333,6 +340,7 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
                 "withdrawn_task_count": found.get("assignment_count"),
                 "skipped_texts": _cut(skipped, 50),
                 "skipped_by_reason": found.get("skipped_by_reason", {}),
+                **unknown_texts(found),
                 "preview_token": found.get("preview_token"),
             }
 
@@ -783,6 +791,92 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
             if value:
                 body[name] = value
         result: dict[str, Any] = await api.post(base, body)
+        return {"applied": True, "result": result}
+
+    @register(server, scopes="project-admin", effect="changes")
+    async def editorial_correction(
+        project: Project,
+        document_id: Annotated[
+            str,
+            Field(
+                description=(
+                    "The newest version of the translation (list_texts,"
+                    " versions); the corrected version follows it."
+                )
+            ),
+        ],
+        replacements: Annotated[
+            list[Replacement],
+            Field(
+                min_length=1,
+                description=(
+                    "The fixes: each 'old' passage must occur exactly once in"
+                    " the text (add neighbouring words until it does) and is"
+                    " replaced by 'new'; passages must not overlap."
+                ),
+            ),
+        ],
+        reason: Annotated[
+            str,
+            Field(min_length=1, description="Why the text is corrected (audited)."),
+        ],
+        expected_text_sha256: Annotated[
+            str | None,
+            Field(
+                description=(
+                    "With confirm: the text_sha256 the dry run returned, so the"
+                    " text the fixes were checked against is the text corrected."
+                )
+            ),
+        ] = None,
+        confirm: Confirm = False,
+    ) -> dict[str, Any]:
+        """Fix spacing, typos or grammar in one translation, after a dry run.
+
+        Not a translation review: the corrected text becomes the next version
+        of the translation with the status of document_id, so an accepted
+        text stays accepted (and a rejected or queried one stays so), and the
+        correction is audited with its reason. A change of content belongs
+        in a translation review (request_translation_correction,
+        start_lead_correction). The dry run returns the diff, how many
+        characters change, number_changes (the numbers the fixes change; a
+        notice to check, nothing is refused for it), whether the correction
+        is available (reason if not: not_newest, discarded, review_open,
+        unchanged) and what follows: tasks_following (annotation tasks nobody
+        opened move to the new version), the annotation work, open
+        consolidations and a final result that stay on the current version
+        (handle them with the text-change tools), findings of submitted
+        annotations and tool proposals that are carried or need a check, and
+        the text_sha256 of the current version; confirm sends that hash back
+        as expected_text_sha256 and is refused if the text changed since.
+        Only the token's owner as lead of the project can do this; a source
+        text is not corrected here.
+        """
+        base = project_path(project, "documents", seg(document_id))
+        fixes = [item.model_dump() for item in replacements]
+        if not confirm:
+            plan: dict[str, Any] = await api.post(
+                f"{base}/editorial-correction/preview", {"replacements": fixes}
+            )
+            # The whole texts stay on the server; the diff names the passages.
+            stored = plan.pop("text", None) or ""
+            previous = plan.pop("previous_text", None) or ""
+            plan["text_characters"] = len(stored)
+            plan["previous_text_characters"] = len(previous)
+            return {"applied": False, "plan": plan}
+        if not expected_text_sha256:
+            raise OntotatorError(
+                "Run the dry run first and pass its text_sha256 as"
+                " expected_text_sha256."
+            )
+        result: dict[str, Any] = await api.post(
+            f"{base}/editorial-correction",
+            {
+                "replacements": fixes,
+                "reason": reason,
+                "expected_text_sha256": expected_text_sha256,
+            },
+        )
         return {"applied": True, "result": result}
 
     @register(server, scopes=("read", "project-admin"), effect="destructive")

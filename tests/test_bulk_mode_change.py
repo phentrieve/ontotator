@@ -249,3 +249,24 @@ def test_summary_only_and_statements_do_not_grow_with_the_texts(tmp_path):
     # Applying costs a bounded number of statements per text.
     applied, _ = statements(ROWS, preview_token=both["preview_token"], reason=REASON)
     assert (applied - two) / 2 <= 40, applied - two
+
+
+def test_texts_the_project_does_not_have_are_named(tmp_path):
+    """A wrong case ID, letter case or language is in ``unknown_rows`` of the
+    preview and of the applied answer, not silently dropped."""
+    env = _two_texts(tmp_path)
+    wrong = [
+        {"case_id": "nope", "language": "en"},
+        {"case_id": "C1", "language": "en"},
+        {"case_id": "c1", "language": "xx"},
+    ]
+    found = _preview(env, rows=[ROWS[0], *wrong])
+    assert (found["texts"], found["change_count"]) == (1, 1)
+    assert found["unknown_rows"] == wrong
+    assert _preview(env)["unknown_rows"] == []
+    applied = _post(
+        env, rows=[ROWS[0], *wrong], reason=REASON, preview_token=found["preview_token"]
+    )
+    assert applied.status_code == 200, applied.text
+    assert applied.json()["applied"] is True
+    assert applied.json()["unknown_rows"] == wrong

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import threading
@@ -24,6 +25,7 @@ from mcp import Client
 
 from ontotator_mcp.config import Settings
 from ontotator_mcp.server import build_server
+from ontotator_mcp.tooling import TOOL_SCOPES
 
 REPO = Path(__file__).resolve().parents[2]
 FIXTURES = REPO / "tests" / "fixtures"
@@ -113,6 +115,22 @@ def _server(
         read_content=read_content,
     )
     return build_server(settings)
+
+
+def _scenario(info: dict[str, str], name: str) -> dict[str, Any]:
+    """A fresh scenario project of the browser tests and its lead's token."""
+    made = httpx.post(
+        f"{info['url']}/__test_scenario__", params={"name": name}, timeout=300
+    )
+    made.raise_for_status()
+    built: dict[str, Any] = made.json()
+    return built
+
+
+def _whole(result: Any) -> str:
+    """Everything a client receives of a tool result, as one string."""
+    text = "".join(getattr(part, "text", "") for part in result.content)
+    return text + json.dumps(result.structured_content, ensure_ascii=False)
 
 
 @pytest.mark.anyio
@@ -362,3 +380,333 @@ async def test_setup_import_status_and_export(
         ):
             with pytest.raises(ToolFailed, match="VERSION_NOT_FOUND"):
                 await call(reader, tool, about | extra)
+
+
+# Read tools that name something other than a project or one of its texts.
+OTHER_ARGUMENTS: dict[str, dict[str, Any]] = {
+    "find_people": {"query": "ann"},
+    "annotation_target_preview": {"annotations_per_text": 1},
+    "get_upload": {"upload_id": 1},
+    "get_job": {"job_id": 1},
+    "get_problem_report": {"report_id": "none"},
+}
+# Refused for a lead's personal token or for an ID nothing has; every other
+# read tool must answer.
+MAY_REFUSE = {
+    "list_users",
+    "list_ontology_files",
+    "get_upload",
+    "get_job",
+    "get_problem_report",
+}
+
+
+def _needles(text: str) -> list[str]:
+    """The sentences of a text, and its first words."""
+    sentences = [part.strip() for part in re.split(r"[.]", text)]
+    return [text[:30]] + [part for part in sentences if len(part) > 12]
+
+
+@pytest.mark.anyio
+async def test_no_default_tool_returns_text_of_a_project(
+    live: dict[str, str],
+) -> None:
+    """A known sentence and the annotated passages of a project are in no
+    answer of a server started without ONTOTATOR_MCP_READ_CONTENT (review
+    finding F2). Two projects: two submitted annotations with findings, and
+    a translation with submitted translation reviews."""
+    annotated = _scenario(live, "consolidation")
+    reviewed = _scenario(live, "S3")
+    for made in (annotated, reviewed):
+        project = made["project"]
+        # What must not come back, read with the opt-in: the text of every
+        # version, each annotated passage, each reviewer's text.
+        needles: list[str] = []
+        opted_in = _server(live, made["token"], read_content=True)
+        async with Client(opted_in) as content:
+            listed = await call(content, "list_texts", {"project": project})
+            rows = listed["texts"]
+            documents = sorted(
+                {row["document_id"] for row in rows}
+                | set((made.get("documents") or {}).values())
+            )
+            for document_id in documents:
+                about = {"project": project, "document_id": document_id}
+                version = await call(
+                    content, "get_text_version", about | {"include_text": True}
+                )
+                needles += _needles(version["text"])
+                for offered in await call(content, "list_annotation_versions", about):
+                    found = await call(
+                        content,
+                        "get_annotation_version",
+                        about
+                        | {
+                            "kind": offered["kind"],
+                            "version_id": offered["id"],
+                            "include_text": True,
+                        },
+                    )
+                    needles += [
+                        segment["text"]
+                        for evidence in found["evidence"]
+                        for segment in evidence["mention"]["segments"]
+                        if " " in segment["text"]
+                    ]
+            reviews = await call(
+                content,
+                "list_translation_reviews",
+                {"project": project, "include_text": True},
+            )
+            needles += [n for r in reviews for n in _needles(r["proposed_text"])]
+        needles = sorted(set(needles))
+        assert len(needles) >= 3, needles
+        if made is annotated:
+            assert "muscular hypotonia" in needles
+        else:
+            assert reviews and "Erste Korrektur" in needles
+
+        default = _server(live, made["token"])
+        leaks: list[tuple[str, dict[str, Any], list[str]]] = []
+        refused: set[str] = set()
+        async with Client(default) as client:
+            tools = (await client.list_tools()).tools
+            calls: list[tuple[str, dict[str, Any]]] = []
+            for tool in tools:
+                properties = tool.input_schema.get("properties", {})
+                assert "include_text" not in properties, tool.name
+                if TOOL_SCOPES[tool.name].effect != "read":
+                    continue
+                arguments = dict(OTHER_ARGUMENTS.get(tool.name, {}))
+                if "project" in properties:
+                    arguments["project"] = project
+                if "document_id" not in properties:
+                    calls.append((tool.name, arguments))
+                    continue
+                # Per text version; where the text is optional, also without.
+                if "document_id" not in tool.input_schema.get("required", []):
+                    calls.append((tool.name, arguments))
+                calls += [
+                    (tool.name, arguments | {"document_id": document_id})
+                    for document_id in documents
+                ]
+            # Dry runs of write tools read state too.
+            first = rows[0]
+            text = {"case_id": first["case_id"], "language": first["language"]}
+            calls += [
+                ("set_final_result", {"project": project} | text),
+                ("accept_agreeing_texts", {"project": project}),
+                ("change_final_results", {"project": project, "texts": [text]}),
+                (
+                    "reopen_texts",
+                    {"project": project, "texts": [text], "reason": "Check"},
+                ),
+                ("withdraw_open_tasks", {"project": project, "texts": [text]}),
+            ]
+            for name, arguments in calls:
+                result = await client.call_tool(name, arguments)
+                # A dry run may be refused (nothing to choose from); a read
+                # tool may not, or the check would pass on refusals.
+                if result.is_error and TOOL_SCOPES[name].effect == "read":
+                    refused.add(name)
+                answer = _whole(result)
+                found = [needle for needle in needles if needle in answer]
+                if found:
+                    leaks.append((name, arguments, found))
+            settings = await client.read_resource(
+                f"ontotator://projects/{project}/settings"
+            )
+            answer = str(settings.contents)
+            assert not [needle for needle in needles if needle in answer]
+        assert leaks == []
+        assert refused <= MAY_REFUSE, refused
+
+
+async def _statuses(client: Client, project: str) -> dict[int, str]:
+    """Status of every task of the project that is not withdrawn, by its ID."""
+    listed = await call(client, "list_assignments", {"project": project, "limit": 500})
+    return {item["id"]: item["status"] for item in listed["assignments"]}
+
+
+@pytest.mark.anyio
+async def test_a_bulk_reopen_and_a_withdrawal_can_be_undone(
+    live: dict[str, str],
+) -> None:
+    """reopen_texts and withdraw_open_tasks hand on the server's ``undo``,
+    and undo_reopen_or_withdraw takes it (review finding F1)."""
+    made = _scenario(live, "S336")
+    project = made["project"]
+    async with Client(_server(live, made["token"])) as client:
+        before = await _statuses(client, project)
+        # EN100022 and EN100023: three submitted annotations.
+        reopen = {
+            "project": project,
+            "texts": made["rows"][:2],
+            "reason": "Guideline 2.3 changed",
+        }
+        dry = await call(client, "reopen_texts", reopen)
+        assert dry["change_count"] == 3 and "undo" not in dry
+        done = await call(
+            client,
+            "reopen_texts",
+            reopen | {"confirm": True, "preview_token": dry["preview_token"]},
+        )
+        assert done["applied"] is True
+        undo_id = done["undo"]["id"]
+        assert done["undo"]["expires_at"]
+        changed = [item["assignment_id"] for item in done["changed"]]
+        reopened = await _statuses(client, project)
+        assert [reopened[i] for i in changed] == ["reopened"] * 3
+
+        undo = {"project": project, "undo_id": undo_id}
+        would = await call(client, "undo_reopen_or_withdraw", undo)
+        assert would["applied"] is False and would["blocked"] is None
+        assert would["action"] == "reopen" and would["task_count"] == 3
+        assert sorted(t["assignment_id"] for t in would["would_restore"]) == sorted(
+            changed
+        )
+        assert {t["person"] for t in would["would_restore"]} == {"Tom Reis", "R. Roe"}
+        # The dry run changed nothing.
+        assert await _statuses(client, project) == reopened
+        undone = await call(client, "undo_reopen_or_withdraw", undo | {"confirm": True})
+        assert undone["applied"] is True
+        assert {t["status"] for t in undone["restored"]} == {"submitted"}
+        assert await _statuses(client, project) == before
+        with pytest.raises(ToolFailed, match="BULK_UNDO_STALE/already_undone"):
+            await call(client, "undo_reopen_or_withdraw", undo | {"confirm": True})
+
+        # R. Roe's two tasks that are not started (EN100024, EN100029).
+        withdraw = {
+            "project": project,
+            "texts": [made["rows"][2], made["rows"][7]],
+        }
+        dry = await call(client, "withdraw_open_tasks", withdraw)
+        assert dry["change_count"] == 2
+        gone = await call(
+            client,
+            "withdraw_open_tasks",
+            withdraw | {"confirm": True, "preview_token": dry["preview_token"]},
+        )
+        withdrawn = {item["assignment_id"] for item in gone["changed"]}
+        assert not withdrawn & set(await _statuses(client, project))
+        back = await call(
+            client,
+            "undo_reopen_or_withdraw",
+            {"project": project, "undo_id": gone["undo"]["id"], "confirm": True},
+        )
+        assert back["applied"] is True and back["action"] == "withdraw"
+        assert await _statuses(client, project) == before
+
+        # Withdrawn again; then one of the texts gets another task: the undo
+        # is blocked, says why and changes nothing.
+        dry = await call(client, "withdraw_open_tasks", withdraw)
+        gone = await call(
+            client,
+            "withdraw_open_tasks",
+            withdraw | {"confirm": True, "preview_token": dry["preview_token"]},
+        )
+        await call(
+            client,
+            "assign_texts",
+            {
+                "project": project,
+                "assignments": [
+                    {
+                        "document_id": made["documents"]["EN100029"],
+                        "username": made["users"]["roe"],
+                    }
+                ],
+                "confirm_language": True,
+            },
+        )
+        state = await _statuses(client, project)
+        blocked = {"project": project, "undo_id": gone["undo"]["id"]}
+        would = await call(client, "undo_reopen_or_withdraw", blocked)
+        assert would["blocked"]["reason"] == "changed"
+        refused = await call(
+            client, "undo_reopen_or_withdraw", blocked | {"confirm": True}
+        )
+        assert refused["applied"] is False and refused["refused"] is True
+        assert await _statuses(client, project) == state
+
+        # A new round has no undo.
+        rounds = {
+            "project": project,
+            "texts": made["rows"][:1],
+            "kind": "carry_forward",
+        }
+        dry = await call(client, "start_rounds", rounds)
+        started = await call(
+            client,
+            "start_rounds",
+            rounds | {"confirm": True, "preview_token": dry["preview_token"]},
+        )
+        assert started["applied"] is True and started["change_count"] == 1
+        assert "undo" not in started
+
+
+@pytest.mark.anyio
+async def test_wrong_input_is_named_not_ignored(live: dict[str, str]) -> None:
+    """A misspelt argument is refused, and a text the project does not have
+    is named by every bulk tool (review findings F3 and F4)."""
+    made = _scenario(live, "S336F")
+    project = made["project"]
+    known = {"case_id": "EN100022", "language": "en"}
+    wrong = [
+        {"case_id": "EN999999", "language": "en"},
+        {"case_id": "EN100023", "language": "de"},
+        {"case_id": "en100022", "language": "en"},
+    ]
+    async with Client(_server(live, made["token"])) as client:
+        # ``case_id`` for ``case_ids`` ran a dry run over the whole project.
+        with pytest.raises(ToolFailed, match="did you mean 'case_ids'"):
+            await call(
+                client,
+                "accept_agreeing_texts",
+                {"project": project, "case_id": ["EN100029"]},
+            )
+        whole = await call(client, "accept_agreeing_texts", {"project": project})
+        assert whole["selection"] == f"all texts of project '{project}'"
+        assert len(whole["would_accept"]) == 2
+        one = await call(
+            client,
+            "accept_agreeing_texts",
+            {"project": project, "case_ids": ["EN100029", "EN999999"]},
+        )
+        assert one["selection"] == f"2 cases (case_ids) of project '{project}'"
+        assert one["would_accept"] == [] and one["unknown_case_ids"] == ["EN999999"]
+
+        about = {"project": project, "texts": [known, *wrong]}
+        for tool, extra in (
+            ("reopen_texts", {"reason": "Check"}),
+            ("withdraw_open_tasks", {}),
+            ("start_rounds", {"kind": "carry_forward"}),
+            ("pause_texts", {"reason": "Check"}),
+            ("release_texts", {}),
+            ("change_final_results", {}),
+            ("change_annotation_modes", {"mode": "proposals", "reason": "Check"}),
+        ):
+            dry = await call(client, tool, about | extra)
+            assert dry["applied"] is False, tool
+            assert dry["unknown_texts"] == wrong, tool
+            assert dry["selection"] == f"4 texts of project '{project}'", tool
+            # Only unknown texts: nothing to do, and the answer says why.
+            none = await call(
+                client, tool, {"project": project, "texts": wrong} | extra
+            )
+            assert none["change_count"] == 0 and none["unknown_texts"] == wrong, tool
+
+        # The applied answer names them too. EN100026: R. Roe's open task.
+        withdraw = {
+            "project": project,
+            "texts": [{"case_id": "EN100026", "language": "en"}, *wrong],
+        }
+        dry = await call(client, "withdraw_open_tasks", withdraw)
+        assert dry["change_count"] == 1
+        done = await call(
+            client,
+            "withdraw_open_tasks",
+            withdraw | {"confirm": True, "preview_token": dry["preview_token"]},
+        )
+        assert done["applied"] is True and done["unknown_texts"] == wrong
+        assert done["selection"] == f"4 texts of project '{project}'"

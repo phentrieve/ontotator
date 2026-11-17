@@ -543,6 +543,33 @@ async def test_list_texts_reads_every_page(fake: FakeApi, mcp_client: Client) ->
     assert first.get_list("stage") == ["final"]
 
 
+async def test_list_texts_shows_a_lead_pause_and_filters_on_it(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    """Issue 464: the text's pause with its reason, and what pauses each task."""
+    paused = row("c1", work=[work("in_progress", "ann-0001")])
+    paused["lead_pause"] = {
+        "reason": "Clinic is checking",
+        "paused_by": {"pseudonym": "ann-0009", "display_name": "Carla Diaz"},
+        "paused_at": "2026-11-17T09:30:00Z",
+    }
+    paused["work"][0]["pause_causes"] = ["lead"]
+    fake.on("GET", ROWS, page([paused, row("c2")], 1, 1))
+    result = await call(
+        mcp_client, "list_texts", {"project": "p", "paused_by_lead": True}
+    )
+    first, second = result["texts"]
+    assert first["lead_pause"] == {
+        "reason": "Clinic is checking",
+        "paused_by": "ann-0009",
+        "paused_at": "2026-11-17T09:30:00Z",
+    }
+    assert first["work"][0]["paused_by"] == ["lead"]
+    assert second["lead_pause"] is None
+    sent = fake.calls_to("GET", ROWS)[0].request.url.params
+    assert sent.get_list("flags") == ["lead_paused"]
+
+
 def _results(fake: FakeApi) -> None:
     """Three texts: one agreeing, one differing, one with an open annotation."""
     rows = [

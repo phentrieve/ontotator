@@ -317,7 +317,12 @@ class TranslationReviewService:
         if assignment.held:
             raise DomainError(
                 "TASK_HELD",
-                {"reason": assignment.hold_reason, "assignment_id": assignment.id},
+                {
+                    "reason": assignment.hold_reason,
+                    "causes": list(assignment.pause_causes),
+                    "lead_reason": assignment.lead_pause_reason,
+                    "assignment_id": assignment.id,
+                },
             )
         if assignment.status == "submitted":
             raise DomainError("ASSIGNMENT_SUBMITTED")

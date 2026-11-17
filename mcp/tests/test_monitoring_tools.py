@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
+import httpx
 import pytest
 from conftest import call
 from fake_api import FakeApi
 from mcp import Client
 from shapes import build
+
+from ontotator_mcp.config import Settings
+from ontotator_mcp.server import build_server
 
 P = "/api/v1/projects/{key}"
 DOC = "case/1-en-v1"
@@ -126,20 +132,43 @@ def _review_with_text() -> dict[str, object]:
 
 
 async def test_list_translation_reviews_returns_the_reviewers_text_only_on_request(
-    fake: FakeApi, mcp_client: Client
+    fake: FakeApi, settings: Settings
 ) -> None:
     fake.on("GET", f"{P}/translation-reviews", [_review_with_text()])
-    [plain] = await call(mcp_client, "list_translation_reviews", {"project": "p"})
-    assert "proposed_text" not in plain and "rationale" not in plain
-    # The decision and the hashes stay: what changed is still identifiable.
-    assert plain["decision"] == "accepted_corrected"
-    assert plain["proposed_text_sha256"] == "a" * 64
-    [full] = await call(
-        mcp_client, "list_translation_reviews", {"project": "p", "include_text": True}
+    server = build_server(
+        replace(settings, read_content=True), transport=httpx.MockTransport(fake)
     )
+    async with Client(server) as content_client:
+        [plain] = await call(
+            content_client, "list_translation_reviews", {"project": "p"}
+        )
+        assert "proposed_text" not in plain and "rationale" not in plain
+        # The decision and the hashes stay: what changed is still identifiable.
+        assert plain["decision"] == "accepted_corrected"
+        assert plain["proposed_text_sha256"] == "a" * 64
+        [full] = await call(
+            content_client,
+            "list_translation_reviews",
+            {"project": "p", "include_text": True},
+        )
     assert full["proposed_text"] == "Die Patientin erhielt 5 mg."
     assert full["rationale"] == "The dose was missing: 5 mg."
     assert full == _review_with_text()
+
+
+async def test_list_translation_reviews_has_no_include_text_without_the_opt_in(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    """Without ONTOTATOR_MCP_READ_CONTENT=1 the argument does not exist, so
+    no call returns the reviewer's text (review finding F2)."""
+    tools = {tool.name: tool for tool in (await mcp_client.list_tools()).tools}
+    listed = tools["list_translation_reviews"]
+    assert set(listed.input_schema["properties"]) == {"project", "document_id"}
+    assert "ONTOTATOR_MCP_READ_CONTENT=1" in (listed.description or "")
+    fake.on("GET", f"{P}/translation-reviews", [_review_with_text()])
+    [plain] = await call(mcp_client, "list_translation_reviews", {"project": "p"})
+    assert "proposed_text" not in plain and "rationale" not in plain
+    assert plain["proposed_text_sha256"] == "a" * 64
 
 
 async def test_get_text_detail_leaves_the_reviewers_text_out(

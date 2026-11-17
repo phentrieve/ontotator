@@ -15,6 +15,7 @@ import { onSpaceActivate } from "../ui/spaceActivates";
 import { StatusBadge } from "../ui/StatusBadge";
 import {
   middleEllipsis,
+  leadPauseLine,
   personLabel,
   submissionLabel,
   versionName,
@@ -191,6 +192,12 @@ export function VersionMarker({ row }: { row: DocumentRowView }): JSX.Element | 
   return <span className="documents-version-marker" title={title || undefined}>{text}</span>;
 }
 
+/** "Paused by lead" on a text a lead paused (issue 464); the title says who, when and why. */
+export function LeadPausedBadge({ row }: { row: Pick<DocumentRowView, "lead_pause"> }): JSX.Element | null {
+  if (!row.lead_pause) return null;
+  return <span className="documents-lead-paused" title={leadPauseLine(row.lead_pause)}><StatusBadge tone="warning">Paused by lead</StatusBadge></span>;
+}
+
 /** Small info badge "NEW"; accessible text "New since your last visit". */
 export function NewBadge(): JSX.Element {
   return <StatusBadge tone="info"><span aria-hidden="true">NEW</span><span className="visually-hidden">New since your last visit</span></StatusBadge>;
@@ -243,6 +250,7 @@ export function RowHeaderCell({ row, badge, onOpenCard, showCaseId = false, more
           <span className="visually-hidden">{`${more} more ${more === 1 ? "text" : "texts"} of this case not in plan`}</span></span>)}
       {sibling && <span className="visually-hidden">Same case as the open text</span>}
       <VersionMarker row={row} />
+      <LeadPausedBadge row={row} />
       {active && rowIsNew(row) && <NewBadge />}
       {badge != null && badge !== false && <span className="documents-row-badge">{badge}</span>}
     </span>
@@ -271,7 +279,7 @@ export function ProposalsIcon({ row }: { row: DocumentRowView }): JSX.Element | 
 /** The short state of a stage as the text card's path names it (`cardModel`). */
 const STATE_OF: Readonly<Record<StageName, (row: DocumentRowView) => { state: string }>> = {
   review: translationState,
-  annotation: annotationState,
+  annotation: row => annotationState(row, true),
   final: row => finalizationState(row, new Date()),
 };
 
@@ -279,7 +287,8 @@ const STATE_OF: Readonly<Record<StageName, (row: DocumentRowView) => { state: st
 function stagePeople(row: DocumentRowView, stage: StageName): string {
   const cell = row.stages?.[stage];
   const working = stage === "review" ? ["in_progress", "re_review"] : stage === "annotation" ? ["in_progress", "paused"] : [];
-  return cell && working.includes(cell.state) ? (cell.detail.people ?? []).map(shortName).join(", ") : "";
+  // A cell paused by the lead names that lead, not people at work (issue 464): nobody is named as open.
+  return cell && working.includes(cell.state) && cell.detail.note !== "lead_pause" ? (cell.detail.people ?? []).map(shortName).join(", ") : "";
 }
 
 /** The state a stage cell shows (also its sort value); texts outside the plan: "not in plan" and no finalization (D10). */

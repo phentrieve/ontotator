@@ -453,3 +453,14 @@ def test_single_round_for_unsubmitted_work_ignores_an_open_consolidation(env):
     assign(env, doc("c1", "en"), "adj", "review")
     made = _single(env, env.lead, task, kind="clean_restart", reason="Start again")
     assert made.status_code == 200, made.text
+
+
+def test_texts_the_project_does_not_have_are_named(env):
+    wrong = [{"case_id": "nope", "language": "en"}, {"case_id": "C1", "language": "en"}]
+    found = env.lead.post(
+        START,
+        json={"rows": [ROWS[0], *wrong], "kind": "carry_forward", "preview": True},
+    )
+    assert found.status_code == 200, found.text
+    assert found.json()["texts"] == 1
+    assert found.json()["unknown_rows"] == wrong

@@ -65,7 +65,8 @@ function targetDocumentIds(row: DocumentRowView): Set<string> {
   return new Set([...newest.values()].map(version => version.document_id));
 }
 
-export function annotationState(row: DocumentRowView): State {
+/** `compact`: the table cell's short form; the row's "Paused by lead" badge names the pause there. */
+export function annotationState(row: DocumentRowView, compact = false): State {
   const cell = row.stages?.annotation;
   const detail = cell?.detail ?? {};
   const target = detail.target ?? detail.total ?? 0;
@@ -101,7 +102,9 @@ export function annotationState(row: DocumentRowView): State {
       return { state: target > 1 ? annotatorCount(assigned, target) : assigned === 0 ? "Unassigned" : `${assigned} assigned`, tone: "now" };
     }
     case "in_progress": return { state: running, tone: "now" };
-    case "paused": return { state: submitted, tone: "now" };
+    // Issue 464: the lead paused the text; the count stays ("paused by lead, 1 of 2 submitted").
+    case "paused": return detail.note !== "lead_pause" ? { state: submitted, tone: "now" }
+      : { state: compact ? submitted : total > 0 ? `paused by lead, ${submitted}` : "paused by lead", tone: "later" };
     case "submitted":
     case "consolidating": return { state: submitted, tone: "done" };
     case undefined:

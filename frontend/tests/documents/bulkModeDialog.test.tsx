@@ -52,6 +52,7 @@ beforeEach(() => {
   vi.spyOn(api, "bulkStartRound").mockResolvedValue({ ...nothing, action: "start_round", kind: "carry_forward" });
   vi.spyOn(api, "acceptAgreeing").mockRejectedValue(new Error("not asked"));
   vi.spyOn(api, "bulkChangeFinal").mockRejectedValue(new Error("not asked"));
+  vi.spyOn(api, "pauseTexts").mockRejectedValue(new Error("not asked"));
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
@@ -166,16 +167,17 @@ function Harness() {
   </div>;
 }
 
-it("More actions lists Change mode… last, applies it and shows a message without Undo", async () => {
+it("More actions lists Change mode… after the task actions, applies it and shows a message without Undo", async () => {
   vi.spyOn(api, "selectionSummary").mockResolvedValue(summary);
   render(<Harness />);
   await waitFor(() => expect(api.bulkChangeMode).toHaveBeenCalledWith("p", { rows, mode: "proposals", preview: true, summary_only: true }, expect.any(AbortSignal)));
   expect(api.bulkChangeMode).toHaveBeenCalledWith("p", { rows, mode: "scratch", preview: true, summary_only: true }, expect.any(AbortSignal));
   fireEvent.click(screen.getByRole("button", { name: "More actions" }));
   const items = within(screen.getByRole("menu", { name: "More actions" })).getAllByRole("menuitem");
-  expect(items.at(-1)?.textContent).toBe("Change mode…");
-  expect(items.at(-1)?.getAttribute("aria-disabled")).toBeNull();
-  fireEvent.click(items.at(-1)!);
+  // "Pause texts…" and "Release texts…" (issue 464) follow it.
+  expect(items.at(-3)?.textContent).toBe("Change mode…");
+  expect(items.at(-3)?.getAttribute("aria-disabled")).toBeNull();
+  fireEvent.click(items.at(-3)!);
   const dialog = await screen.findByRole("dialog", { name: "Change mode: 8 texts" });
   fireEvent.click(within(dialog).getByLabelText("From scratch"));
   await within(dialog).findByText("Annotate 4 texts from scratch");
