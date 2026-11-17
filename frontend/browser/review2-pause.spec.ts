@@ -2,13 +2,15 @@
  * Review 2 of the lead pause and the annotator limit, at 1440 and 390 px:
  * - F2: a text whose consolidation is open keeps it in the Documents row, the text card and History once the lead
  *   pauses the text ("consolidating · paused", the consolidator's row with "Paused by lead", no second "Consolidate…").
+ * - F3: an annotator whose editor was open before the pause reads the reason in the New finding panel at 390 px,
+ *   where the banner above the panes is out of view; at 1440 px the banner is in view and the panel has no second line.
  * With SHOTS_DIR set, the states are also saved as screenshots.
  *
  * Builds fresh projects through ``POST /__test_documents__`` (scenario S464).
  */
 import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
 import { activityLines, cellUnder, documentsReady, documentsScenario, openTextCard, personRow, rowBox, showSegment, STAGE_HEADERS, textCard, textRow, type DocumentsScenario } from "./documentsHelpers";
-import { loginExisting } from "./helpers";
+import { authenticatedRequest, loginExisting, selectText } from "./helpers";
 
 test.setTimeout(300_000);
 test.use({ actionTimeout: 15_000 });
@@ -20,6 +22,8 @@ async function shot(page: Page, name: string): Promise<void> {
 const noHorizontalScroll = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
 const WHY = "The clinic is checking the source text";
 
+const TEXT = "The patient is a 14-month-old girl with developmental delay and recurrent seizures. On examination she shows generalized hypotonia.";
+
 type Scenario = DocumentsScenario & { assignments: Record<string, number>; report_id: string };
 
 /** Collects console and page errors; `expected` names the one refusal a test provokes (the browser logs a refused request). */
@@ -29,7 +33,7 @@ function watch(page: Page, errors: string[], expected?: RegExp): void {
 }
 
 /** A second signed-in person in their own browser context, at the same viewport. */
-export async function person(browser: Browser, username: string, size: { width: number; height: number }, errors: string[], expected?: RegExp): Promise<Page> {
+async function person(browser: Browser, username: string, size: { width: number; height: number }, errors: string[], expected?: RegExp): Promise<Page> {
   const context = await browser.newContext({ viewport: size });
   const page = await context.newPage();
   watch(page, errors, expected);
@@ -64,6 +68,15 @@ async function pauseText(page: Page, caseId: string): Promise<void> {
   await expect(dialog).toBeHidden();
   await expect(page.locator(".ui-toast")).toContainText("Paused 1 text.");
   await selectionBar(page).getByRole("button", { name: "Clear selection" }).click();
+}
+
+/** Pause one text as the signed-in lead, through the API (the dialog has its own spec). */
+async function pauseByApi(page: Page, project: string, caseId: string): Promise<void> {
+  const url = `/api/v1/projects/${encodeURIComponent(project)}/text-pauses/pause`;
+  const rows = [{ case_id: caseId, language: "en" }];
+  const preview = await (await authenticatedRequest(page, url, "POST", { rows, preview: true })).json();
+  const applied = await authenticatedRequest(page, url, "POST", { rows, reason: WHY, preview_token: preview.preview_token });
+  expect(applied.status()).toBe(200);
 }
 
 for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as const) {
@@ -111,5 +124,43 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
     await expect(consolidation.locator(".row-activity-tag")).toHaveText("Finalization");
     await shot(page, `f2-card-history${suffix}`);
     expect(errors).toEqual([]);
+  });
+
+  test(`F3: the annotator reads why the save was refused where they work (${width} px)`, async ({ page, browser }) => {
+    const errors: string[] = [];
+    watch(page, errors);
+    await page.setViewportSize(size);
+    const s = await documentsScenario(page, "S464") as Scenario;
+    // Tom Reis has EN100022 open before the pause lands; the refused request (409) is what this test is about.
+    const tom = await person(browser, s.users.tom, size, errors, /status of 409 \(Conflict\)/);
+    await tom.goto(`/#/tasks/${s.assignments.started}`);
+    await expect(tom.locator(".text-container")).toHaveText(`${TEXT} EN100022`);
+    await loginExisting(page, s.users.lead);
+    await pauseByApi(page, s.project, "EN100022");
+
+    if (phone) await tom.getByRole("navigation", { name: "Select view" }).getByRole("button", { name: "Document" }).click();
+    const word = TEXT.indexOf("seizures");
+    await selectText(tom, word, word + "seizures".length);
+    if (phone) await tom.getByRole("group", { name: "New finding", exact: true }).getByRole("button", { name: "Choose term", exact: true }).click();
+    // The term search is the first thing the server refuses.
+    await tom.getByLabel("Search term", { exact: true }).fill("HP:0001250");
+    const panel = tom.getByRole("region", { name: "New finding", exact: true });
+    await expect(panel.getByRole("heading", { name: "New finding" })).toBeVisible();
+    const banner = tom.locator(".paused-notice").getByText(`Paused by lead: ${WHY}`);
+    await expect(banner).toBeVisible();
+    if (phone) {
+      // The banner sits above the pane the person works in; the panel repeats its line, in view.
+      const line = panel.getByRole("status").filter({ hasText: `Paused by lead: ${WHY}` });
+      await expect(line).toBeInViewport();
+      await expect(line).toContainText("Nothing can be saved now. What you marked is kept until you leave the task.");
+      await expect(panel.getByText("“seizures”")).toBeVisible();
+    } else {
+      await expect(banner).toBeInViewport();
+      await expect(panel.getByRole("status")).toHaveCount(0);
+    }
+    expect(await noHorizontalScroll(tom)).toBe(true);
+    await shot(tom, `f3-refused${suffix}`);
+    expect(errors).toEqual([]);
+    await tom.context().close();
   });
 }
