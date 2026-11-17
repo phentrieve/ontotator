@@ -38,6 +38,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Annotation view: the findings list follows the text. A finding stands where its first marked passage begins, so a new finding appears between its neighbours instead of at the end; findings without a text span come last, findings that start at the same place keep the order they were added in, and carried findings still lead the list in the order of the earlier round. **Next unchecked** and the list of findings a modifier can be attached to use the same order. After a delete, an undo, a redo or a reload a finding is back at its place in the text (#436).
 - Consolidation: after **Reopen all decisions…** the first open group in text order opens, not the group that was first open before the reopen (#375).
 - Text-change dialogs: in **Handle text change…** a Retry while the new version has no proposals keeps the reason, the disabled **Move** and **Finish** and the current choice until the answer arrives, so **Move** no longer flashes selected; Retry shows busy and keeps focus. In **Carry to v2…** the footer Retry after a failed **Assign** keeps focus in the dialog (on the busy **Assign**, then on the new Retry) (#419).
 - Documents: a regression test covers **Select all N filtered texts** with a filter and hidden texts not in plan; it counts and selects only the rows the table can show (#379, fixed in 0.10.0 by #383).

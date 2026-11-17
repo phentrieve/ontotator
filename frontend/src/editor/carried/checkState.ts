@@ -150,17 +150,23 @@ export function checkStateBadge(variant: CheckVariant): CheckStateBadge {
 /**
  * Row keys of the findings list (spec section 1: carried findings lead the list): one row per
  * carried input in round-input order (its carried finding while it exists, else its placeholder
- * row), then every other finding in draft order. `annotationIds` is the draft order.
+ * row), then every other finding in text order: by `startOf`, the start of the finding's first
+ * segment, with findings without a text span (null) last. Findings with the same start, and all of
+ * them without `startOf`, keep the draft order, which `annotationIds` gives.
  */
 export function carriedListOrder(
   states: readonly Pick<CarriedState, "input" | "carriedId">[],
   annotationIds: readonly string[],
+  startOf?: (annotationId: string) => number | null,
 ): string[] {
   const keys: string[] = [];
   const seen = new Set<string>();
   const push = (key: string) => { if (!seen.has(key)) { seen.add(key); keys.push(key); } };
   for (const state of states) push(state.carriedId ? `annotation:${state.carriedId}` : `input:${state.input.input_id}`);
-  for (const id of annotationIds) push(`annotation:${id}`);
+  const position = (id: string) => startOf?.(id) ?? Number.POSITIVE_INFINITY;
+  // Array.prototype.sort is stable: equal starts stay in draft order. Infinity - Infinity is NaN, so compare first.
+  const others = annotationIds.map(id => ({ id, start: position(id) })).sort((a, b) => (a.start === b.start ? 0 : a.start - b.start));
+  for (const { id } of others) push(`annotation:${id}`);
   return keys;
 }
 

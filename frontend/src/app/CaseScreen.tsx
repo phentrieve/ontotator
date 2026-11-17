@@ -1413,11 +1413,18 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const pendingCarriedCount = carried.states.filter(state => state.unchecked).length;
   /**
    * Row order of the findings list (spec section 1): carried findings and placeholder rows first, in
-   * round-input order, then every other finding in draft order, including findings on hidden layers
-   * (going there makes their layer visible). The rendered list uses the same order.
+   * round-input order, then every other finding in text order (start of its first segment, findings
+   * without a text span last; issue 436), including findings on hidden layers (going there makes
+   * their layer visible). The rendered list, "Next unchecked" and the attach targets use the same order.
    */
-  const carriedListOrder = useMemo(() => orderCarriedFirst(carried.states,
-    (draft.annotations ?? []).map(snapshot => snapshot.annotation.annotation_id)), [carried.states, draft.annotations]);
+  const carriedListOrder = useMemo(() => {
+    const annotations = draft.annotations ?? [];
+    const starts = new Map(annotations.map(({ annotation }) => {
+      const segments = (annotation.evidence_refs ?? []).flatMap(ref => allEvidenceMap[ref.evidence_id]?.mention.segments ?? []);
+      return [annotation.annotation_id, segments.length ? Math.min(...segments.map(segment => segment.start)) : null] as const;
+    }));
+    return orderCarriedFirst(carried.states, annotations.map(snapshot => snapshot.annotation.annotation_id), id => starts.get(id) ?? null);
+  }, [carried.states, draft.annotations, allEvidenceMap]);
   // Version of the open text: from the round (prop), the case versions or the document list. A text
   // with the source's hash is the source's text, so its version is the source version.
   const currentTextVersion = documentVersion

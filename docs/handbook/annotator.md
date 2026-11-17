@@ -26,6 +26,8 @@ The editor has three columns:
 | Middle: the text | The text you annotate. Marked passages are highlighted. |
 | Right: details | The selected finding: **Values**, **Modifiers**, **Note**, its mentions and the term search. With nothing selected, the **New finding** panel opens here when you mark text. |
 
+The findings in the list follow the text: a finding stands where its first marked passage begins, so a finding you add in the middle of the text appears between its neighbours, not at the end. Findings without a text span come last. Carried findings stay at the top of the list, in the order of the earlier round.
+
 To make the findings list wider or narrower, drag the divider between the findings list and the text (**Resize findings column**), or focus it and press `←` or `→`. On a narrow screen, the tabs **Findings**, **Document** and **Details** switch between the columns; **Back to text** returns to the text.
 
 The toolbar shows the text name, its language and the mode:
