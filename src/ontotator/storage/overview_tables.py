@@ -42,6 +42,9 @@ class DocumentsVisitRow(Base):
 class TextChangeResolutionRow(Base):
     """How work on an old text version was handled (append-only).
 
+    A submission may have several rows for one target version: every carry
+    is kept, also one whose task was withdrawn later (issue 461).
+
     ``decided_by`` is NULL for the system carry after ``finish_then_carry``;
     that row has ``assignment_id`` NULL and the new submission.
     """
@@ -68,12 +71,15 @@ class TextChangeResolutionRow(Base):
             name="assignment_or_submission",
         ),
         UniqueConstraint("project_id", "assignment_id"),
-        # Explicit: the conventional name exceeds PostgreSQL's 63 characters.
-        UniqueConstraint(
+        # Not unique since 0047 (issue 461): a carry whose task was withdrawn
+        # without a submission may be followed by a new carry of the same
+        # submission to the same version. The service allows one standing
+        # decision (``storage.text_change_carries``).
+        Index(
+            "ix_text_change_resolutions_submission_target",
             "project_id",
             "submission_id",
             "to_document_id",
-            name="uq_text_change_resolutions_submission_target",
         ),
     )
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)

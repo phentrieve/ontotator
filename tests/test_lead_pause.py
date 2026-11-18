@@ -318,3 +318,34 @@ def test_texts_the_project_does_not_have_are_named(env):
     assert released.json()["unknown_rows"] == wrong
     known = _post(env, RELEASE, rows[:1], preview=True)
     assert known.json()["unknown_rows"] == []
+
+
+def test_history_keeps_each_pause_and_release(env):
+    """Review 2, F6: the row's changes name every pause and its release, with
+    the lead, the time and the reason, also after the release."""
+    assign(env, doc("c1", "en"), "anno", "annotate")
+    _apply(env, PAUSE, [C1, C2])
+    _apply(env, RELEASE, [C1], reason="Clarified")
+    _apply(env, PAUSE, [C1], reason="Second question")
+
+    def changes(case: str) -> list[tuple[str, str | None, bool]]:
+        body = env.lead.get(f"{BASE}/document-rows/{case}/en/submissions").json()
+        return [
+            (change["kind"], change["reason"], change["by"]["is_me"])
+            for change in body["changes"]
+            if change["kind"].startswith("text_")
+        ]
+
+    assert changes("c1") == [
+        ("text_paused", WHY, True),
+        ("text_released", "Clarified", True),
+        ("text_paused", "Second question", True),
+    ]
+    # Another text's pause is not this text's history.
+    assert changes("c2") == [("text_paused", WHY, True)]
+    released = _apply(env, RELEASE, [C2])
+    assert released["applied"] is True
+    assert changes("c2") == [("text_paused", WHY, True), ("text_released", None, True)]
+    # The other language of the case was never paused.
+    german = env.lead.get(f"{BASE}/document-rows/c2/de/submissions").json()
+    assert [c for c in german["changes"] if c["kind"].startswith("text_")] == []

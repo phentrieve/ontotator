@@ -48,6 +48,47 @@ EFFECT_TEXT: dict[Effect, str] = {
 }
 
 
+# Why a task is kept or a text skipped, by the server's reason code. The
+# server's own sentences name buttons of the web interface ("tick ...",
+# "use Change final..."); these name the tool or argument instead (#471).
+TOOL_MESSAGES: dict[str, str] = {
+    "started": "Work has started; pass include_started=true to include it.",
+    "paused": (
+        "Paused by a problem report; decide the report first"
+        " (list_problem_reports, act_on_problem_report)."
+    ),
+    "paused_by_lead": "Paused by a lead; release the text first (release_texts).",
+    "lead_correction_task": (
+        "A lead correction; withdraw it singly with withdraw_task (assignment_id)."
+    ),
+    "not_current_version": (
+        "Not on the current version of the text; decide on the task with"
+        " move_task_to_version or handle_text_change."
+    ),
+    "no_round": (
+        "No work round to restart (older or imported work); use reopen_texts"
+        " or reopen_task."
+    ),
+    "final_chosen": ("Final result chosen: withdraw it first (withdraw_final_result)."),
+    "final_result": ("Final result chosen: withdraw it first (withdraw_final_result)."),
+    "consolidation_open": (
+        "A consolidation is open: have it finished, or withdraw its task"
+        " (list_assignments, withdraw_task), first."
+    ),
+    "not_locked": ("No annotation work yet: set the mode with update_work_plan."),
+    "no_final": (
+        "No final result yet: use accept_agreeing_texts, or choose one with"
+        " set_final_result."
+    ),
+}
+
+
+def tool_message(item: dict[str, Any]) -> Any:
+    """Why ``item`` (a kept task or a skipped text) stays as it is, in the
+    words of this server's tools; the server's sentence for other reasons."""
+    return TOOL_MESSAGES.get(str(item.get("reason")), item.get("message"))
+
+
 @dataclass(frozen=True)
 class ToolInfo:
     name: str

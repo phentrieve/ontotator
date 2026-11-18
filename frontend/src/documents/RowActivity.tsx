@@ -6,10 +6,10 @@
 import type { ReactNode } from "react";
 import type { DocumentRowView, RowChangeView, RowSubmissionView } from "../api/client";
 import type { PanelStage, Route } from "../app/router";
-import { historyLines, type HistoryLine } from "./historyLines";
+import { HISTORY_PREFIXES, HISTORY_TAGS, historyLines, type HistoryLine } from "./historyLines";
 import { reasonDocumentId, ReviewReason, useReviewReason } from "./reviewReason";
 import { RouteLink } from "./RowCells";
-import { HISTORY_LINE_PREFIX, STAGE_TITLES } from "./stageLabels";
+import { STAGE_TITLES } from "./stageLabels";
 
 export interface RowActivityProps {
   row: DocumentRowView;
@@ -38,7 +38,7 @@ export function emptyActivityText(stage?: PanelStage): string {
  * separator after the tag: ": " where the tag replaces the line's own prefix (read as "Review: Ana Weber …").
  */
 function lineParts(line: HistoryLine): { separator: string; body: string } {
-  const prefix = `${HISTORY_LINE_PREFIX[line.stage]}: `;
+  const prefix = `${HISTORY_PREFIXES[line.stage]}: `;
   return line.text.startsWith(prefix) ? { separator: ": ", body: line.text.slice(prefix.length) } : { separator: " ", body: line.text };
 }
 
@@ -49,7 +49,7 @@ export function RowActivity({ row, projectKey, submissions, changes, reportRoute
   return <div className="row-activity">
     {lines.length > 0
       ? <ul className="row-activity-lines" aria-label="Activity">{lines.map(line => <li key={line.key} className="row-activity-line">
-        <span className="row-activity-tag">{STAGE_TITLES[line.stage]}</span><span className="visually-hidden">{lineParts(line).separator}</span>
+        <span className="row-activity-tag">{HISTORY_TAGS[line.stage]}</span><span className="visually-hidden">{lineParts(line).separator}</span>
         <span className="row-activity-text">{lineParts(line).body}</span>
         {line.reportId && <>{", "}<RouteLink route={reportRoute(line.reportId)} onNavigate={onNavigate}>Open report</RouteLink></>}
         {reason && line.key === `work-${reason.assignment_id}` && <ReviewReason record={reason} />}

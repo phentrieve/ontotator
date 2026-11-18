@@ -159,23 +159,40 @@ def _accepted_how(
     ctx: _Context,
     targets: Sequence[rules.Version],
     version_of: Mapping[str, rules.Version],
-) -> tuple[Literal["unchanged", "corrected", "package", "external"] | None, int | None]:
-    """How the (first) target version came to be accepted, and from which
-    version a correction started ("v1 → v2")."""
+) -> tuple[
+    Literal["unchanged", "corrected", "typos_fixed", "package", "external"] | None,
+    int | None,
+    int | None,
+]:
+    """How the (first) target version came to be accepted, from which
+    version a correction started ("v1 → v2") and, for a typo fix, the lead
+    who made it."""
     if not targets:
-        return None, None
+        return None, None, None
     target = targets[0]
+    review = ctx.facts.latest_reviews.get(target.document_id)
+    fix = ctx.facts.editorial_corrections.get(target.document_id)
+    if fix is not None:
+        if review is not None:
+            # A typo fix that was reviewed itself: the review accepted it.
+            return "unchanged", None, None
+        # Accepted like the version the lead fixed typos in (issue 453).
+        parent = version_of.get(fix["previous_document_id"])
+        return (
+            "typos_fixed",
+            parent.version if parent is not None else None,
+            fix["corrected_by"],
+        )
     if target.origin == "correction":
         parent = version_of.get(target.derived_from or "")
-        return "corrected", parent.version if parent is not None else None
-    review = ctx.facts.latest_reviews.get(target.document_id)
+        return "corrected", parent.version if parent is not None else None, None
     # Stored decisions are accepted_unchanged / accepted_corrected.
     if review is not None and review.decision.startswith("accepted"):
-        return "unchanged", None
+        return "unchanged", None, None
     acceptance = ctx.facts.acceptances.get(target.document_id)
     if acceptance is not None and acceptance["source"] in _ACCEPTANCE_HOW:
-        return _ACCEPTANCE_HOW[acceptance["source"]], None
-    return "unchanged", None
+        return _ACCEPTANCE_HOW[acceptance["source"]], None, None
+    return "unchanged", None, None
 
 
 def _latest_decision(
@@ -310,13 +327,19 @@ def stage_facts(
     elif step_facts.orphan_pause_assignment_id is not None:
         held = ctx.assignment_by_id.get(step_facts.orphan_pause_assignment_id)
         paused_by = held.user_id if held is not None else None
-    paused_task: Literal["annotate", "translation_review"] | None = None
+    paused_task: Literal["annotate", "translation_review", "consolidation"] | None = (
+        None
+    )
     if held is not None:
         paused_task = (
-            "translation_review" if held.task == "translation_review" else "annotate"
+            "translation_review"
+            if held.task == "translation_review"
+            else "consolidation"
+            if held.task == "review" and consolidating(held)
+            else "annotate"
         )
     reason, reason_text = _review_reason(ctx, reviews, version_of)
-    how, from_version = _accepted_how(ctx, targets, version_of)
+    how, from_version, fixed_by = _accepted_how(ctx, targets, version_of)
     decided = _latest_decision(ctx, live, targets, version_of)
     decision = (
         facts.latest_reviews[decided.document_id] if decided is not None else None
@@ -334,6 +357,7 @@ def stage_facts(
         review_decided_at=decision.decided_at if decision is not None else None,
         accepted_how=how,
         accepted_from_version=from_version,
+        typos_fixed_by=fixed_by,
         newest_version=max((v.version for v in targets), default=1),
         newest_origin=targets[0].origin if targets else None,
         annotators_open=_unique([item.user_id for item in running]),

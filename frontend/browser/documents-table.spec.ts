@@ -313,8 +313,8 @@ test("S5 case-0377: the lead's consolidation is the final result, without a roun
 
   // No round in a consolidation's history line.
   const card = await openCardHistory(page, caseId, "en");
-  await expect(activityLines(card).filter({ hasText: /^Annotation Consolidation: / })).toHaveCount(1);
-  await expect(activityLines(card).filter({ hasText: /^Annotation Consolidation: .*Round/ })).toHaveCount(0);
+  await expect(activityLines(card).filter({ hasText: /^Finalization Consolidation: / })).toHaveCount(1);
+  await expect(activityLines(card).filter({ hasText: /^Finalization Consolidation: .*Round/ })).toHaveCount(0);
   await expect(activityLines(card).filter({ hasText: /^Annotation: .*Round 1/ })).toHaveCount(3);
 });
 
@@ -459,7 +459,7 @@ test("S13 case-0713 en: consolidation and carry-forward kinds, the final is the 
 
   // History: the two annotations, the consolidation and the carry-forward on v2.
   await card.getByRole("button", { name: /^History \(\d+\)$/ }).click();
-  await expect(activityLines(card).filter({ hasText: /^Annotation Consolidation: / })).toHaveCount(1);
+  await expect(activityLines(card).filter({ hasText: /^Finalization Consolidation: / })).toHaveCount(1);
   await expect(activityLines(card).filter({ hasText: /^Annotation: .*v2/ })).toHaveCount(1);
   await expect(activityLines(card).filter({ hasText: /^Annotation: .*v1/ })).toHaveCount(2);
   await card.getByRole("button", { name: "Back", exact: true }).click();

@@ -747,6 +747,25 @@ describe("one layout for the parts (issues 329, 331, 332)", () => {
     expect(part.querySelector(".text-version-chain")).toBeNull();
   });
 
+  it("review 2, F1: a review of a version a lead fixed typos in is not reopened, and only the newest version is asked to be corrected", () => {
+    const fixed = [
+      version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "accepted", latest_review_decision: "accepted_unchanged", chain_name: "m1", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "m1", translation_status: "accepted",
+        editorial_correction: { reason: "Typo", previous_document_id: "case-200-de", inserted_characters: 1, deleted_characters: 1, corrected_at: "2026-11-17T10:12:00", corrected_by: null } }),
+    ];
+    const review = work({ assignment_id: 5, document_id: "case-200-de", task: "translation_review", status: "submitted", author_label: "ann-0003", person: ana });
+    const variant = (document_id: string) => [document_id, { document_id, translation_status: "accepted", text_sha256: "x" }] as const;
+    const tools = { ...textTools([toolAssignment(5, "submitted", { task: "translation_review", pseudonym: "ann-0003" })]),
+      variants: new Map([variant("case-200-de"), variant("case-200-de-v2")]) as unknown as TextVersionsTools["variants"], onRequestCorrection: vi.fn() };
+    renderCard({ row: assignRow({ versions: fixed, work: [review] }), initialSegment: "translation", textVersionTools: tools });
+    const part = within(card()).getByRole("heading", { name: "Translation" }).closest("section")!;
+    within(part).getByText("Older versions (1)").closest("details")!.open = true;
+    const row = within(within(part).getByRole("list", { name: "Assignments on v1" })).getByRole("listitem");
+    // The server refuses the reopening (VARIANT_REVIEW_STALE): the fix is reviewed, so no button offers it.
+    expect(within(row).getAllByRole("button").map(button => button.getAttribute("aria-label"))).toEqual(["Remove Ana Weber’s review assignment"]);
+    expect(within(part).getAllByText("Ask a reviewer to correct…").map(button => button.getAttribute("aria-label"))).toEqual(["Ask a reviewer to correct v2 of case-200 de…"]);
+  });
+
   it("moved work is a plain person row saying where it went", () => {
     const moved = work({ assignment_id: 9, document_id: "case-200-a3", task: "annotate", status: "in_progress", author_label: "ann-0005", person: luc, moved_to_version: 4 });
     renderCard({ row: assignRow({ versions, parallel_roots: true, work: [], moved_work: [moved] }), initialSegment: "translation", textVersionTools: textTools([]) });

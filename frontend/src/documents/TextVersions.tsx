@@ -232,11 +232,14 @@ export const TextVersions = forwardRef<HTMLUListElement, TextVersionsProps>(func
       const fullName = `${name} of ${rowName(row)}`;
       const discarded = isDiscarded(row, version);
       const acceptance = acceptanceOf(version);
+      // A lead fixed typos in this version: a review of it is not reopened, the fix is reviewed.
+      const typosFixed = row.versions.some(entry => entry.editorial_correction?.previous_document_id === version.document_id);
       let actions: ReactNode = null;
       // The actions that change this version's text, in button order (the hint line under the buttons names them).
       const offered: VersionAction[] = [];
       if (tools) {
-        const ask = !!variant && variant.translation_status === "accepted";
+        // The server refuses a correction request for a version a correction was made of: only the newest is asked.
+        const ask = !!variant && variant.translation_status === "accepted" && version.is_newest_in_chain;
         const correct = !!tools.onCorrectTranslation && correctableVersion(row, version);
         const typos = !!tools.onEditorialCorrection && uploadableVersion(row, version);
         const upload = !!tools.onUploadVersion && uploadableVersion(row, version);
@@ -281,6 +284,7 @@ export const TextVersions = forwardRef<HTMLUListElement, TextVersionsProps>(func
             return plain
               ? <PersonRow key={`${item.assignment_id}-${item.moved_to_version ?? ""}`} name={workerName(item)} pseudonym={item.person?.pseudonym ?? item.author_label} details={details} status={versionWorkStatus(item)} />
               : <WorkPersonRow key={item.assignment_id} item={item} caseId={row.case_id} textName={fullName} details={details} canManage={canManage} tools={tools}
+                noReopen={item.task === "translation_review" && typosFixed}
                 onChanged={() => tools?.onAssignmentsChanged()} onRemoved={focusAfterRemoval} />;
           })}
         </PersonList>}
