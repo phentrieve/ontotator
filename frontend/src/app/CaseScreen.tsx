@@ -3474,7 +3474,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   // The findings column's limits follow the inspector, which is at least 420 px while it holds the guidelines.
   const sidebarWidth = useSidebarWidth(versionContext?.username, { inspectorWithGuidelines: tabs.hosted });
   // The ontology tree's height under the inspector, set by dragging the divider above it.
-  const treeHeight = useTreeHeight();
+  const treeHeight = useTreeHeight(versionContext?.username, treeWalk && !treeCollapsed ? treeWalk.nonce : null);
   useLayoutEffect(() => {
     tabs.resetDetailsScroll();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new inspector subject resets its scroll

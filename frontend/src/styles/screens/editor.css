@@ -1110,6 +1110,8 @@
    gives the tree --tree-height (editor/treeHeight.ts) and the inspector the rest. */
 .sidebar-resizer.sidebar-resizer--rows { display: none; }
 .sidebar-resizer--rows .sidebar-resizer-grip { position: static; width: 32px; height: 4px; margin: 6px auto 0; }
+/* The focus ring stays inside the strip: outside it, the window's edge would cut it. */
+.sidebar-resizer--rows:focus-visible { outline-offset: calc(-1 * var(--focus-width)); }
 @media (min-width: 1025px) {
   @container case-screen (min-width: 1060px) {
     .case-screen:not(.case-comparing) .app-layout.tree-open > .sidebar-resizer.sidebar-resizer--rows {
@@ -1124,7 +1126,9 @@
       cursor: row-resize;
     }
     .case-screen:not(.case-comparing) .app-layout.tree-open.tree-sized {
-      grid-template-rows: minmax(160px, 1fr) var(--tree-height);
+      /* The limits of treeHeight.ts once more, so that a height from a higher window can push
+         neither part out before the script has measured: 220 px for the tree, 160 px for the panel. */
+      grid-template-rows: minmax(160px, 1fr) clamp(220px, var(--tree-height), 100% - 160px);
     }
   }
 }
