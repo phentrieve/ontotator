@@ -47,6 +47,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Touch targets on phone and tablet layouts (up to 1024 px wide): **Undo** and **Redo** (before 28 × 26 px, touching), **Previous text** and **Next text** (38 × 22 px) and the **✓** of a value in the consolidation view (24 × 24 px) are at least 44 × 44 px, and Undo and Redo stand apart (#472).
 - Annotation view on a phone: the **New finding** bar shows the marked words on their own line above its buttons, up to two lines and 80 characters; beside the buttons there was room for a word or two (#472).
 - Documents on a phone: the selection bar is lower (two rows of buttons instead of three, smaller summary), so the bar and a message above it leave more of the list in view (#472).
+- Consolidation, follow-ups of the consolidator review (#470, and the consolidation points of #472):
 
 ## [0.11.0] - 2026-11-17
 

@@ -48,6 +48,9 @@ class SubmissionHistorySummary(BaseModel):
     submission_id: str
     document_id: str
     author_label: str
+    # Issue 470: a consolidator also reads the input submissions of their
+    # round; only the reader's own are theirs ("(you)", a link to the viewer).
+    is_me: bool = False
     created_at: datetime
     mode: str
     round_id: str | None = None
@@ -168,6 +171,7 @@ def _history(
                 submission_id=row["submission_id"],
                 document_id=doc,
                 author_label=_author(row, blindings[row["submission_id"]]),
+                is_me=row["annotator_id"] == access.pseudonym,
                 created_at=row["created_at"],
                 mode=row["mode"],
                 round_id=bindings.get(row["submission_id"])

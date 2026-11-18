@@ -35,7 +35,7 @@ Ontotator puts the findings that different people marked on overlapping passages
 | State | Meaning |
 | --- | --- |
 | **agreed** | Everyone who marked it chose the same term and values. It is already in the result and counts as decided. Open it and click **Reopen** if it is wrong. |
-| **to decide**, or *2 fields to decide* | Still open. The number counts the highlighted rows that need your choice. |
+| **to decide**, or *2 fields to decide* | Still open. The number counts the highlighted rows that still need your choice and goes down with each ✓. When every row has one, the group reads *chosen, not saved yet* until you click **Keep**. |
 | **Conflict** mark | People chose different terms or values. |
 | **to decide** without **Conflict** | Only the passage differs, not everyone marked the finding, or an annotator left it unresolved. |
 | **Related terms** tag | The people chose a term and its parent or child, for example *Seizure* and *Status epilepticus*. A line under the **Term** row says which is the parent, for example *Seizure is a parent term of Status epilepticus.* A smaller difference than two unrelated terms, but still a choice: pick the term that fits the text. |
@@ -80,18 +80,18 @@ What for: see who marked what and work through the differences in order.
 3. One group is open at a time. Click a group, or a marked passage in the text, to open it.
 4. Press `j` for the next open group and `k` for the previous one, or click **Next open group** on the progress card.
 
-On a smaller screen, use **Hide text** and **Show text** to make room. On a phone-sized screen, each group shows its own text snippet instead.
+On a smaller screen, use **Hide text** and **Show text** to make room. On a phone-sized screen, each group shows its own text snippet instead. Without the text, **Add finding** stands above the groups ([Add a finding everyone missed](#add-a-finding-everyone-missed)).
 
 ## Decide a group in the ✓ table
 
 What for: decide a group by choosing, per row, the value that is right.
 
-1. Open a group. The table has one column per person. A robot icon marks findings from a tool proposal. With many people the table is wider than its box: scroll it sideways; the row names on the left stay in view.
-2. The rows are **Term**, one row per value field (for example the assertion), **Text**, **Modifiers** (only if someone used modifiers) and **Note**. Rows where people disagree come first and are highlighted; *(all agree)* marks rows that need no choice. You can mix: take the term from one person and a value from another.
+1. Open a group. The table has one column per person. A robot icon marks findings from a tool proposal. With many people the table is wider than its box: scroll it sideways; the row names on the left stay in view. From four people on, a line under each highlighted row says who holds which value, for example *Hypotonia 14 · Abnormality of the nervous system 6 (C, F, I, L, O, R)*: the most frequent value first, then every other value with the people who chose it (their letters if the project hides annotator names). The line, the parent-term sentence of **Related terms** and an *(all agree)* value stay in view while you scroll. The numbers tell you who to compare, not what is right ([How to decide](#how-to-decide)).
+2. The rows are **Term**, one row per value field (for example the assertion), **Text**, **Modifiers** (only if someone used modifiers) and **Note**. Rows where people disagree come first and are highlighted; *(all agree)* marks rows that need no choice, also the **Text** row when everyone marked the same passage. You can mix: take the term from one person and a value from another.
 3. In each highlighted row, click the ✓ next to the value you want. Its button is named after the value, for example *Take Hypotonia … for Term*.
 4. Read the result line below the table. It starts with "Result:" and lists what is still not chosen, for example *Term not chosen yet* or *text not chosen yet*. Once the term is chosen, **Not taken:** lists other people's terms that are not in the result.
 5. Optional: click **+ note** to write a **Note for the lead**, and tick **Guidelines unclear here** if the guidelines did not settle the case.
-6. Click **Keep**. The group reads **decided**, the message **Decision saved** appears with **Undo**, and the next open group opens. A note shows under the closed group in the list, so you and the lead see it without opening the group.
+6. Click **Keep**. The group reads **decided**, the message **Decision saved** appears with **Undo**, and the next open group opens. While a dialog is open, the message is hidden; it is back when the dialog closes. A note shows under the closed group in the list, so you and the lead see it without opening the group.
 
 ![An open group with the comparison table, the ✓ choices for Hypotonia and Absent, and the Keep button](images/consolidator-group-table.png)
 
@@ -119,7 +119,7 @@ To take it back, click **Undo** in the message, or open the group later and clic
 What for: when someone used a modifier term (such as "Severe") as a finding of its own, turn it into a modifier of the right finding.
 
 1. Open the group. The card says that a modifier term was used as a finding.
-2. Click **Attach to a finding…** and choose the finding from the menu.
+2. Click **Attach to a finding…** and choose the finding from the menu. The menu holds the decided findings of the same sentence. While none is decided, the button is inactive and says *Decide the finding it belongs to first.*: decide that group, then come back. If the sentence has no other finding, it says *This sentence has no finding to attach it to.*
 3. The group reads **attached**. The target group lists the modifier under **Attached modifier:**.
 
 ## Edit values or pick another term
@@ -141,8 +141,11 @@ What for: add a finding that no submission has.
 2. Search and pick the term. Read the definition of the active hit below the hits before you press Enter or click it.
 3. A message confirms the new finding. It is listed under **Added by you** with its values, which start as the project's defaults (for example *Present, Patient, Current*). Its value fields open right away: change what the text says, for example **Assertion** to *Absent* for a negated finding, and click **Save values**. Click **Cancel** to keep the defaults.
 4. To change the values later, click **Edit values…** next to the added finding.
+5. To take a finding out that you added by mistake, click **Remove** next to it and confirm with **Remove** under *Remove this finding?*. A message confirms it (*Finding removed: …*). There is no Undo: add the finding again if you need it.
 
 If the passage is not found, type it exactly as written, or select it in the text.
+
+On a phone-sized screen, and while the text is hidden, there is no text to select: click **Add finding** above the groups and type the passage exactly as written. The text snippets of the groups show the wording around the marked passages; for any other passage, use a wider screen.
 
 ## Change or undo a decision
 
@@ -152,7 +155,7 @@ What for: correct a decision you made.
    - Right after a decision: click **Undo** in the message, or press `Ctrl+Z` (macOS: `Cmd+Z`) while you are not typing in a field. This undoes the last decision only.
    - Later: open the decided group and click **Reopen**. Decide it again.
    - Only the note or the flag: use **Edit note** and **Save note**, or the **Guidelines unclear here** box. These save at once.
-2. To start over: open **More…** in the header and choose **Reopen all decisions…**, then **Reopen all**. Groups where everyone agreed are taken over again; every other group opens without a choice. The message offers **Undo**.
+2. To start over: open **More…** in the header and choose **Reopen all decisions…**, then **Reopen all**. Groups where everyone agreed are taken over again; every other group opens without a choice. The message offers **Undo** until your next change: once you decide a group, add or change a finding, or edit a note, the reopened decisions cannot be restored, and the message goes. **Undo** then belongs to that new decision only.
 
 If you changed a group in the full editor, reopening it drops that edit. You are asked to confirm.
 
@@ -164,9 +167,9 @@ Before you start: after you submit, you cannot change the consolidation.
 
 1. When no group is open, the progress card reads **Ready to submit**.
 2. Click **Submit consolidation**.
-3. The dialog **Submit consolidation?** says who accepts the result (*The lead then accepts the result.*; if you are the lead yourself: *Then accept the result in Documents.*) and shows how many groups and findings the result has, and how many are not in the result.
+3. The dialog **Submit consolidation?** says who accepts the result (*The lead then accepts the result.*; if you are the lead yourself: *Then accept the result in Documents.*) and shows how many groups and findings the result has, and how many are not in the result. If you kept a modifier term as a finding, it already names that finding, for example *1 finding uses a modifier term (such as Severe) as the finding itself: Neonatal onset "since birth"*. Click **Go to group** to close the dialog and open its group.
 4. Click **Submit**.
-5. If there are warnings (values filled in by default, a modifier used as a finding, two severities), the dialog now lists them under **Check before you submit**, and the button reads **Submit with** and the number of warnings. Click **Back** to fix them, or submit with warnings only if you checked that the values are right.
+5. If there are warnings (values filled in by default, a modifier used as a finding, two severities), the dialog now lists them under **Check before you submit**, and the button reads **Submit with** and the number of warnings. A modifier used as a finding is named with **Go to group**, as before the first click; a finding you added yourself is named with its passage and *added by you*. Click **Back** to fix them, or submit with warnings only if you checked that the values are right.
 6. The screen confirms: *Consolidation submitted. The lead then accepts the result.* (If you are the lead yourself: *Consolidation submitted. Accept the result in Documents.*) Open your next task or click **Back to my tasks**.
 
 While groups are open, **Submit consolidation** stays inactive and says how many groups are left.
@@ -195,6 +198,8 @@ Groups you changed here are tagged **edited in editor** on the consolidation scr
 
 ## Read others' work in the text view
 
-Consolidators can open the text view of a text they consolidate to read each person's findings side by side. See [Read a text and other people's work in the text view](lead-documents.md#read-a-text-and-other-peoples-work-in-the-text-view).
+If you also lead the project, you can open the text view of a text you consolidate to read each person's findings side by side. See [Read a text and other people's work in the text view](lead-documents.md#read-a-text-and-other-peoples-work-in-the-text-view).
 
-When a submission was carried over from an earlier version of the text, the text view of it offers **Show changes since** v1 (with the number of that version). It marks the changed passages as described for annotators in [See what changed since the earlier version](annotator.md#see-what-changed-since-the-earlier-version); the consolidation screen itself does not show them. On a phone, the text view lists the findings of the shown work below the text, which keeps the full width.
+If you do not lead the project, read the other people's findings on the consolidation screen and in the [full editor](#work-in-the-full-editor). The text view shows you the text and your own submitted results only. Its **Submissions** list also names the submissions you consolidate, as plain rows without a link; only your own rows are marked *(you)* and open in the viewer. The **Text card** belongs to **Documents**, which is for project leads, so the text view offers it to leads only.
+
+For a lead: when a submission was carried over from an earlier version of the text, the text view of it offers **Show changes since** v1 (with the number of that version). It marks the changed passages as described for annotators in [See what changed since the earlier version](annotator.md#see-what-changed-since-the-earlier-version); the consolidation screen itself does not show them. On a phone, the text view lists the findings of the shown work below the text, which keeps the full width.

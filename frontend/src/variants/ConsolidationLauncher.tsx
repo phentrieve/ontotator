@@ -10,7 +10,8 @@ import { onSpaceActivate } from '../ui/spaceActivates';
 import { notifyFinalSelectionChanged } from './finalSelectionState';
 
 /** An input submission; `label` is its visible name ("Ana Weber, Round 1, 21 Oct, 11:25"), never a code. */
-export type ConsolidationInput = SubmissionHistorySummary & { label?: string };
+/** `is_me` (whose submission the reader sees) plays no part in choosing inputs. */
+export type ConsolidationInput = Omit<SubmissionHistorySummary, "is_me"> & { label?: string };
 
 interface Props {
   projectKey: string; documentId: string; language: string;
