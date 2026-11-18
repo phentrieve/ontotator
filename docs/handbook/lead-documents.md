@@ -143,6 +143,8 @@ Active filters show as chips above the table. Remove one with its ✕, or click 
 
 To list the texts you paused, tick **Paused by lead** under **Flags** ([Pause and release the work on texts](#pause-and-release-the-work-on-texts)).
 
+To find texts with spacing errors or invisible characters, tick **Typography hints** under **Flags** ([Find spacing errors and invisible characters](#find-spacing-errors-and-invisible-characters)).
+
 To find texts with more annotators than **Annotators per text** allows, for example after you lowered the limit, tick **More annotators than the limit** under **Flags**. It counts the unremoved annotation tasks of a text's current version, open and submitted. A text with its own limit ([Assign work for one text](#assign-work-for-one-text)) is measured against that limit, not the project's. To withdraw the extra open tasks, select the texts and use [Withdraw open tasks…](#reopen-or-withdraw-the-tasks-of-several-texts).
 
 ### Sort and page through the table
@@ -208,7 +210,7 @@ What for: read a text with other people's findings or the final result, and comp
 2. Choose the language and version in **Language and version**.
 3. In **Show**, choose **Text only**, a proposal layer, someone's annotations or the result. Its findings are listed under **Findings**: beside the text, or below it on a phone, where the text keeps the full width.
 4. Optional: click **Compare** to open a second pane. Each pane has its own **Language and version** and **Show** directly above its text: **Current text** on the left, **Comparison text** on the right, so both texts start at the same height. Tick **Couple scrolling** to scroll both together. Click **Close comparison** to close it.
-   - When both panes show texts of the same language, for example v1 and its correction v2, tick **Show changes** to see what changed. The older version strikes through the removed passages, the newer version underlines the added ones; the line above the texts counts them. The marks do not change the texts, the findings or **Couple scrolling**. A change of spaces or line breaks only is not marked or counted. If the two texts have little in common, the line reads *The texts differ too much to show the changes* and nothing is marked.
+   - When both panes show texts of the same language, for example v1 and its correction v2, tick **Show changes** to see what changed. The older version strikes through the removed passages, the newer version underlines the added ones; the line above the texts counts them. The marks do not change the texts, the findings or **Couple scrolling**. A changed number of spaces is marked and counted too, for example a double space typed into the text or a removed space at the end. A change of line breaks only, or of the kind of space (a non-breaking space for a space), is not marked or counted. If the two texts have little in common, the line reads *The texts differ too much to show the changes* and nothing is marked.
    - When **Show** has someone's annotations that were carried from an earlier version of the text (after **Carry to v2…** or **Handle text change…**), tick **Show changes since** v1 above the text: changed passages get a dashed frame, added text is underlined, and a **−** marker shows the earlier wording of removed text. **Next ›** and **‹ Previous** step through the passages. The annotator sees the same marks in their task. Not offered while **Compare** is open, which has its own **Show changes**.
 5. Optional: click **Submissions** to open the **Submission history**. Choose a row to show it, then click **Close**. Each finding names its author by pseudonym; leads always see them, also when the project hides annotator names from consolidators.
 
@@ -241,10 +243,15 @@ Ontotator computes typography hints for a text when you ask for them. A hint nam
 | `ZERO_WIDTH_CHARACTER` | A zero-width space or joiner, or a byte order mark. |
 | `SOFT_HYPHEN` | A soft hyphen. |
 | `CONTROL_CHARACTER` | Another control character. |
+| `DOUBLE_FULL_STOP` | Two full stops in a row, for example *Fieber..* An ellipsis (*...* or *…*) is left alone. |
 
 A non-breaking space is no hint, because it is often correct, for example between a number and its unit. **Show invisible characters** marks it all the same.
 
-There is no page for the hints yet. Read them through the API or the MCP server (token scope `read`):
+On **Documents**, a text whose newest version has hints carries the badge **Typography hints**; point at it to read how many. To list these texts, for example before you assign them, click **Filter** and tick **Typography hints** under **Flags**. The number next to it counts the texts. A text with several parallel translations counts the newest version of each.
+
+A translation reviewer sees the hints of their text before they submit: the confirmation of **Submit review…** names them and shows the places ([Review a translation](annotator.md#review-a-translation)).
+
+Documents does not show where in a text the hints are. Read the positions through the API or the MCP server (token scope `read`):
 
 - One text version: `GET /api/v1/projects/{key}/documents/{document_id}/typography-hints`, or the MCP tool `list_typography_hints` with `document_id`. Each hint has `rule`, `start` and `end`; positions count Unicode code points, as the positions of findings do.
 - The whole project: `GET /api/v1/projects/{key}/typography-hints`, or `list_typography_hints` without `document_id`. It returns the number of hints per rule for each text that has any, 100 texts per page (`limit` up to 200); pass `next_after` as `after` for the next page. Only the newest version of each text is counted unless you ask for `versions=all`.

@@ -653,6 +653,9 @@ def _build_row(ctx: _Context, case_id: str, language: str) -> dict[str, Any]:
             "override": facts.per_text_overrides.get(key),
         },
         "lead_pause": _lead_pause(ctx, key),
+        "typography_hints": sum(
+            facts.typography_hints.get(chain.newest.document_id, 0) for chain in live
+        ),
         "consolidation_progress": None,
         "unreviewed_translation": steps_rules.unreviewed_translation(
             ctx.step_facts[key]

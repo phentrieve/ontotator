@@ -129,7 +129,64 @@ def build_annotation_loop(app: FastAPI) -> dict[str, Any]:
     )
 
 
+GLOSS_SOURCE = "Jaundice since Monday (three days). The patient takes aspirin."
+GLOSS_TARGET = (
+    "Gelbsucht (Ikterus) seit Montag (drei Tage). Die Patientin nimmt Aspirin (ASS)."
+)
+SPACED_V1 = "Kein Fieber und kein Husten."
+SPACED_V2 = "Kein Fieber  und kein Husten.."
+
+
+def build_translation_checks(app: FastAPI) -> dict[str, Any]:
+    """Issue 484. ``added-gloss``: the de translation has two passages in
+    brackets the en source does not have; its review goes to Ana.
+    ``spaced``: the correction v2 of the de translation has a double space
+    and a doubled full stop that v1 does not have."""
+    from t1_builders import correction_unit, native_unit, translation_unit
+
+    scenario = lead_project(app, "TRANSLATION_CHECKS", rule_on=True)
+    cases = ("added-gloss", "spaced")
+    gloss_source = native_unit(cases[0], "en", GLOSS_SOURCE, case_id=cases[0])
+    spaced_source = native_unit(
+        cases[1], "en", "No fever and no cough.", case_id=cases[1]
+    )
+    spaced = translation_unit(cases[1], "de", SPACED_V1, source=spaced_source)
+    import_units(
+        scenario,
+        [
+            gloss_source,
+            translation_unit(cases[0], "de", GLOSS_TARGET, source=gloss_source),
+            spaced_source,
+            spaced,
+            correction_unit(spaced, SPACED_V2),
+        ],
+    )
+    plan(scenario, cases, {"de": REVIEW_AND_ANNOTATE})
+    assignments = {
+        cases[0]: batch_assign(
+            scenario, [cases[0]], "de", "translation_review", ["ana"]
+        )[0].id
+    }
+    return result(
+        scenario,
+        all_rows(cases, ("de",)),
+        assignments=assignments,
+        texts={
+            "source": GLOSS_SOURCE,
+            cases[0]: GLOSS_TARGET,
+            "spaced-v1": SPACED_V1,
+            cases[1]: SPACED_V2,
+        },
+        documents={
+            f"spaced-v{row.version}": row.document_id
+            for row in app.state.repo.list_variants(scenario.key, case_id=cases[1])
+            if row.language == "de"
+        },
+    )
+
+
 BUILDERS: dict[str, Builder] = {
+    "TRANSLATION_CHECKS": build_translation_checks,
     "REVIEW_FLOW": build_review_flow,
     "ANNOTATION_LOOP": build_annotation_loop,
 }

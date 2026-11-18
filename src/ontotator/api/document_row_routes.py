@@ -485,6 +485,10 @@ class DocumentRowView(_View):
     # Issue 464: the lead paused the work on the text (filter
     # flags=lead_paused); None: not paused.
     lead_pause: LeadPauseView | None = None
+    # Issue 484: typography hints (spacing errors, invisible characters) in
+    # the newest version of the text (filter flags=typography_hints);
+    # computed on request, never stored.
+    typography_hints: int = Field(default_factory=lambda: 0)
     consolidation_progress: ConsolidationProgressView | None = None
     # Spec 2026-10-25 §2: the rule is off and the translation is not accepted,
     # so annotating it needs an explicit acknowledgement.

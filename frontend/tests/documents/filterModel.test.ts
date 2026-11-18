@@ -108,7 +108,7 @@ describe("filter model", () => {
     expect(over).toMatchObject({ param: "flags", values: ["over_limit"] });
     expect(optionCount({ flags: { over_limit: 3 } }, over)).toBe(3);
     expect(toggleOption({ flags: "guidelines_unclear" }, over, true)).toEqual({ flags: "guidelines_unclear,over_limit" });
-    expect(FACET_GROUPS.find(group => group.id === "flags")!.options.map(option => option.label)).toEqual(["Flagged: guidelines unclear", "More annotators than the limit", "Paused by lead"]);
+    expect(FACET_GROUPS.find(group => group.id === "flags")!.options.map(option => option.label)).toEqual(["Flagged: guidelines unclear", "More annotators than the limit", "Paused by lead", "Typography hints"]);
   });
 
   it("offers Paused by lead in Flags (issue 464)", () => {
@@ -116,6 +116,15 @@ describe("filter model", () => {
     expect(paused).toMatchObject({ param: "flags", values: ["lead_paused"] });
     expect(optionCount({ flags: { lead_paused: 4 } }, paused)).toBe(4);
     expect(toggleOption({}, paused, true)).toEqual({ flags: "lead_paused" });
+  });
+
+  it("offers Typography hints in Flags, with a chip and the server request (issue 484)", () => {
+    const hints = optionOf("Typography hints");
+    expect(hints).toMatchObject({ param: "flags", values: ["typography_hints"] });
+    expect(optionCount({ flags: { typography_hints: 2 } }, hints)).toBe(2);
+    expect(toggleOption({ flags: "lead_paused" }, hints, true)).toEqual({ flags: "lead_paused,typography_hints" });
+    expect(chipsOf({ flags: "typography_hints" }).map(chip => chip.label)).toEqual(["Typography hints"]);
+    expect(rowsRequest({ flags: "typography_hints" })).toEqual({ flags: "typography_hints" });
   });
 
   it("toggles grouped options and counts their values", () => {

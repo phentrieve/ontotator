@@ -2562,6 +2562,51 @@
         "x-ontotator-scope": "session"
       }
     },
+    "/api/v1/translation-reviews/{assignment_id}/draft/typography-hints": {
+      "get": {
+        "tags": [
+          "translation-reviews"
+        ],
+        "summary": "Draft Typography Hints",
+        "description": "Spacing errors and invisible characters of the saved draft text.\n\nRule codes and positions only, as the hints of a text version; shown in\nthe confirmation of \"Submit review\u2026\". They block nothing.",
+        "operationId": "draft_typography_hints_api_v1_translation_reviews__assignment_id__draft_typography_hints_get",
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Assignment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftTypographyHintsView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "read",
+        "x-ontotator-project-token": true
+      }
+    },
     "/api/v1/translation-reviews/{assignment_id}/checked-sentences": {
       "put": {
         "tags": [
@@ -5234,7 +5279,8 @@
                     "enum": [
                       "guidelines_unclear",
                       "over_limit",
-                      "lead_paused"
+                      "lead_paused",
+                      "typography_hints"
                     ],
                     "type": "string"
                   }
@@ -5835,7 +5881,8 @@
                     "enum": [
                       "guidelines_unclear",
                       "over_limit",
-                      "lead_paused"
+                      "lead_paused",
+                      "typography_hints"
                     ],
                     "type": "string"
                   }
@@ -14966,6 +15013,61 @@
         ],
         "title": "Body_upload_ontology_results_api_v1_admin_ontologies_upload_results_post"
       },
+      "BracketCheck": {
+        "properties": {
+          "source_count": {
+            "type": "integer",
+            "title": "Source Count"
+          },
+          "translation_count": {
+            "type": "integer",
+            "title": "Translation Count"
+          },
+          "passages": {
+            "items": {
+              "$ref": "#/components/schemas/BracketedPassage"
+            },
+            "type": "array",
+            "title": "Passages"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_count",
+          "translation_count",
+          "passages"
+        ],
+        "title": "BracketCheck",
+        "description": "``passages`` is empty unless the translation has more passages."
+      },
+      "BracketedPassage": {
+        "properties": {
+          "start": {
+            "type": "integer",
+            "title": "Start"
+          },
+          "end": {
+            "type": "integer",
+            "title": "End"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "text"
+        ],
+        "title": "BracketedPassage"
+      },
       "BulkAcceptance": {
         "properties": {
           "languages": {
@@ -18765,7 +18867,8 @@
                 "enum": [
                   "guidelines_unclear",
                   "over_limit",
-                  "lead_paused"
+                  "lead_paused",
+                  "typography_hints"
                 ]
               },
               {
@@ -18774,7 +18877,8 @@
                   "enum": [
                     "guidelines_unclear",
                     "over_limit",
-                    "lead_paused"
+                    "lead_paused",
+                    "typography_hints"
                   ]
                 },
                 "type": "array"
@@ -19185,6 +19289,10 @@
                 "type": "null"
               }
             ]
+          },
+          "typography_hints": {
+            "type": "integer",
+            "title": "Typography Hints"
           },
           "consolidation_progress": {
             "anyOf": [
@@ -19653,6 +19761,49 @@
           "revision"
         ],
         "title": "DraftResponse"
+      },
+      "DraftTypographyHintsView": {
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "description": "Draft revision the hints were computed for."
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts",
+            "description": "Number of hints per rule code."
+          },
+          "hints": {
+            "items": {
+              "$ref": "#/components/schemas/TypographyHintView"
+            },
+            "type": "array",
+            "title": "Hints"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "description": "True when 'hints' holds fewer than 'total'."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "revision",
+          "total",
+          "counts",
+          "hints",
+          "truncated"
+        ],
+        "title": "DraftTypographyHintsView"
       },
       "Duplicate": {
         "properties": {
@@ -28842,6 +28993,16 @@
               }
             ],
             "title": "Reopen Reason"
+          },
+          "added_brackets": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BracketCheck"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -33934,7 +34095,8 @@
               "TAB",
               "ZERO_WIDTH_CHARACTER",
               "SOFT_HYPHEN",
-              "CONTROL_CHARACTER"
+              "CONTROL_CHARACTER",
+              "DOUBLE_FULL_STOP"
             ],
             "title": "Rule"
           },

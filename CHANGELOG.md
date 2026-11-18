@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Translation review: the confirmation of **Submit review…** names the typography hints of the text to be saved (#484), for example *2 typography hints in your text: double space, doubled full stop.* **Show them** lists each place with a little text around it, spaces drawn as dots. The line blocks nothing. It is read from the saved draft with the new `GET /api/v1/translation-reviews/{assignment_id}/draft/typography-hints` (scope `read`; rule codes and positions, as for a text version; only the reviewer of the task).
+- Documents: the badge **Typography hints** on a text whose newest version has hints, and the filter **Typography hints** under **Flags** (`flags=typography_hints`), so a lead finds such texts before assigning (#484). Rows of `document-rows` carry `typography_hints` (the number of hints). Hints are still not stored: the count of a version is computed once per server process and kept by text hash.
+- Typography hints: the new rule `DOUBLE_FULL_STOP` finds two full stops in a row; an ellipsis (*...*, *…*) and a path (*../*) are left alone (#484).
+- Translation review: a check for names the translation added in brackets (#484). When the reviewed version has more passages in round or square brackets than its source, the checks band reads *More passages in brackets than in the source: 3 in the translation, 1 in the source*, and **Details** lists the passages the source does not have in this form. Ontotator computes it when the review is opened, for every version; it is not a check of the translation run, is not counted in **My tasks** and asks for no rationale. The review workspace carries it as `added_brackets`.
+
+### Changed
+
+- **Show changes** (text view comparison, **Show changes since**, the changed passages of a carried round) marks and counts a changed number of spaces, for example a double space a reviewer typed or a removed space at the end (#483). A change of line breaks only, or of the kind of space (a non-breaking space for a space), is still not marked.
+
 ## [0.11.0] - 2026-11-17
 
 ### Added
