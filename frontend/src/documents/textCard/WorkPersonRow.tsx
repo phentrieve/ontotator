@@ -45,7 +45,7 @@ const REVOKE_NOUN: Readonly<Record<CardWorkItem["task"], string>> = { annotate: 
  * (`revokeAssignment`); the confirm dialog says which. A consolidation is not reassigned (D1). Submitted work (an annotation,
  * a translation review or consolidation in the version list) offers "Reopen…".
  */
-export function WorkPersonRow({ item, caseId, textName, details, canManage, tools, onChanged, onRemoved, open }: {
+export function WorkPersonRow({ item, caseId, textName, details, canManage, tools, onChanged, onRemoved, open, noReopen = false }: {
   item: CardWorkItem;
   caseId: string;
   /** The text's name in the assignment dialogs. */
@@ -60,6 +60,8 @@ export function WorkPersonRow({ item, caseId, textName, details, canManage, tool
   onRemoved?: (next: HTMLElement | null) => void;
   /** A link first in the actions ("Open annotation", "Open consolidation"); for everyone. */
   open?: ReactNode;
+  /** No "Reopen…": a review of a version a lead fixed typos in (the fix is reviewed instead). */
+  noReopen?: boolean;
 }): JSX.Element {
   const [dialog, setDialog] = useState<"remove" | "reassign" | "reopen" | "revoke" | null>(null);
   const row = useRef<HTMLLIElement>(null);
@@ -73,7 +75,7 @@ export function WorkPersonRow({ item, caseId, textName, details, canManage, tool
   const actions = canManage ? <>
     {assignment && !submitted && item.task !== "review" && <Button size="sm" aria-label={`Reassign ${own} ${NOUN[item.task]}`} onClick={() => setDialog("reassign")}>Reassign…</Button>}
     {/* A submitted lead correction made a newer version: it is never reopened (FD3, FD4). */}
-    {assignment && submitted && !item.lead_correction && <Button size="sm" aria-label={`Reopen ${own} ${NOUN[item.task]}`} onClick={() => setDialog("reopen")}>Reopen…</Button>}
+    {assignment && submitted && !item.lead_correction && !noReopen && <Button size="sm" aria-label={`Reopen ${own} ${NOUN[item.task]}`} onClick={() => setDialog("reopen")}>Reopen…</Button>}
     {deletes
       ? <Button size="sm" aria-label={`Remove ${own} assignment${item.status === "open" ? "" : ", the draft is discarded"}`} onClick={() => setDialog("remove")}>Remove…</Button>
       : assignment && <Button size="sm" aria-label={`Remove ${own} ${REVOKE_NOUN[item.task]}`} onClick={() => setDialog("revoke")}>Remove…</Button>}

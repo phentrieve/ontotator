@@ -181,6 +181,27 @@ it("More actions lists Reopen… and Withdraw open tasks…, applies and offers 
   expect(await screen.findByText("The reopened tasks are submitted again.")).toBeTruthy();
 });
 
+it("a refused Undo of Reopen… names the text that changed and what changed (issue 469)", async () => {
+  vi.spyOn(api, "selectionSummary").mockResolvedValue(summary);
+  const blocked_texts = [{ case_id: "EN100022", language: "en", reason: "tasks", message: "A task of the text changed since." }];
+  vi.spyOn(api, "bulkUndo").mockRejectedValue(new ApiError(409, "stale", "BULK_UNDO_STALE", { reason: "changed", preview: { undone: 0, applied: false, texts: 4, blocked_texts } }));
+  render(<Harness />);
+  await waitFor(() => expect(api.bulkWithdraw).toHaveBeenCalled());
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+  fireEvent.click(within(screen.getByRole("menu", { name: "More actions" })).getAllByRole("menuitem")[0]);
+  const dialog = await screen.findByRole("dialog", { name: "Reopen: 7 texts" });
+  await within(dialog).findByText("Reopen 5 submitted tasks");
+  fireEvent.change(within(dialog).getByLabelText("Reason (required)"), { target: { value: "Why" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Reopen 5 tasks" }));
+  fireEvent.click(within(dialog).getByLabelText("I understand"));
+  vi.mocked(api.bulkReopen).mockResolvedValueOnce(reopenPreview({ applied: true, undo: { id: 41, expires_at: "2026-11-15T12:00:00Z" } }));
+  fireEvent.click(within(dialog).getByRole("button", { name: "Reopen 5 tasks" }));
+  await screen.findByText("Reopened 5 tasks in 4 texts.");
+  fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+  expect(await screen.findByText("Undo is not possible: 1 of 4 texts changed since (EN100022 en: a task was assigned, reopened, withdrawn or paused, or got a new round). Nothing was undone.")).toBeTruthy();
+  expect(screen.queryByText("Undo is no longer possible: the texts changed since.")).toBeNull();
+});
+
 it("Start a round… groups the preview with every reason a task is kept or a text is skipped (issue 336 step 3)", () => {
   const lines = (kind: "carry_forward" | "clean_restart") => previewGroups(roundPreview(kind)).map(group => `${group.title} · ${group.detail}`);
   expect(lines("carry_forward")).toEqual([

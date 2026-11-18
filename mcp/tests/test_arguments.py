@@ -10,7 +10,7 @@ from typing import Any
 import httpx
 import pytest
 from conftest import ToolFailed, call
-from fake_api import FakeApi, refusal
+from fake_api import PT_A, FakeApi, refusal
 from mcp import Client
 from shapes import build
 from test_scopes import _arguments, _flows
@@ -205,14 +205,16 @@ async def test_bulk_tools_name_the_texts_the_project_does_not_have(
     """A text that does not exist, or has another letter case or language,
     no longer vanishes: it is in ``unknown_texts`` of the dry run, of the
     applied answer and of a stale answer."""
-    found = build(view, texts=1, preview_token="sha256:a", unknown_rows=WRONG)
+    found = build(view, texts=1, preview_token=PT_A, unknown_rows=WRONG)
     arguments = {"project": "p", "texts": [*TEXTS, *WRONG]} | extra
     fake.on("POST", route, found)
     dry = await call(mcp_client, tool, arguments)
     assert dry["applied"] is False
     assert dry["unknown_texts"] == WRONG and dry["unknown_text_count"] == 2
     assert dry["selection"] == "3 texts of project 'p'"
-    confirmed = arguments | {"confirm": True, "preview_token": "sha256:a"}
+    # The token as the dry run handed it out (three tools mark the reason).
+    assert dry["preview_token"].startswith(PT_A)
+    confirmed = arguments | {"confirm": True, "preview_token": dry["preview_token"]}
     fake.on("POST", route, found | {"applied": True})
     done = await call(mcp_client, tool, confirmed)
     assert done["applied"] is True and done["unknown_texts"] == WRONG
@@ -227,7 +229,7 @@ async def test_bulk_tools_name_the_texts_the_project_does_not_have(
 async def test_an_older_server_that_names_no_unknown_texts_is_not_read_as_none(
     fake: FakeApi, mcp_client: Client
 ) -> None:
-    older = build("BulkTaskActionView", texts=0, preview_token="sha256:a")
+    older = build("BulkTaskActionView", texts=0, preview_token=PT_A)
     older.pop("unknown_rows", None)
     fake.on("POST", f"{P}/bulk-task-actions/withdraw", older)
     dry = await call(

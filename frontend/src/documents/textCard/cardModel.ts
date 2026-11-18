@@ -5,7 +5,7 @@ import { relativeDay } from "../../app/assignedDate";
 import type { PathSegment, PathTone } from "../../ui/StagePath";
 import { earlyFinal } from "../finalPanelText";
 import { submissionVersion } from "../SubmissionsTable";
-import { annotatorCount, shortName, stageText, startedOf, startedPart, submittedOf } from "../stageLabels";
+import { annotatorCount, consolidationPause, shortName, stageText, startedOf, startedPart, submittedOf } from "../stageLabels";
 
 export type SegmentId = "translation" | "annotation" | "finalization";
 export type CardView = "path" | "history" | "details";
@@ -144,7 +144,10 @@ export function finalizationState(row: DocumentRowView, _now: Date): State {
   const cell = row.stages?.final;
   if (row.stages?.annotation.state === "consolidating") {
     const progress = row.consolidation_progress;
-    return { state: progress ? `consolidating (${progress.open} of ${progress.total} groups open)` : "consolidating", tone: "now" };
+    // Paused by the lead or by a problem report: the consolidation stays named, it is nobody's turn under a lead pause.
+    const pause = consolidationPause(row);
+    const word = pause ? "consolidating · paused" : "consolidating";
+    return { state: progress ? `${word} (${progress.open} of ${progress.total} groups open)` : word, tone: pause === "lead" ? "later" : "now" };
   }
   switch (cell?.state) {
     case undefined:
@@ -156,7 +159,9 @@ export function finalizationState(row: DocumentRowView, _now: Date): State {
     // A preselected result (a submitted consolidation, the accept rule) or full agreement waits for acceptance, not a comparison.
     case "choose": return (cell.detail.submitted ?? 0) < 2 ? { state: cellLabel(row, "final"), tone: "now" }
       : { state: cell.detail.label_rule === "accept" || (cell.detail.all_match && !earlyFinal(row)) ? "ready to accept" : "ready to compare", tone: "now" };
-    case "confirm": return { state: "ready to accept", tone: "now" };
+    // A final result that something changed under (issue 469): the phone card's words, "Check changes, newer result".
+    // "ready to accept" is a text without a final result.
+    case "confirm": { const text = stageText("final", cell, row); return { state: [text.word, text.detail].filter(Boolean).join(", "), tone: "now" }; }
     case "final": {
       const day = dayMonth(row.final?.selected_at ?? cell.detail.at);
       return { state: day ? `accepted ${day}` : "accepted", tone: "done" };

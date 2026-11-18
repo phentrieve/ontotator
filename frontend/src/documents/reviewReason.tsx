@@ -9,10 +9,21 @@ import { labelFor } from "../app/labels";
 import { categoryLabels } from "../translation/labels";
 
 /** The version whose latest review rejected or queried it (newest first), or null. */
-export function reasonDocumentId(row: Pick<DocumentRowView, "versions" | "is_source">): string | null {
+export function reasonDocumentId(row: Pick<DocumentRowView, "versions" | "is_source"> & Partial<Pick<DocumentRowView, "work">>): string | null {
   if (row.is_source) return null;
   const versions = [...row.versions].reverse();
-  return versions.find(version => version.latest_review_decision === "rejected" || version.latest_review_decision === "query")?.document_id ?? null;
+  let found = versions.find(version => version.latest_review_decision === "rejected" || version.latest_review_decision === "query");
+  // A typo fix ("Fix typos…") has the decision of the version it fixes: the review, and its reason, is that version's.
+  // A fix that was reviewed itself has its own.
+  const reviewed = (documentId: string) => (row.work ?? []).some(item => item.task === "translation_review" && item.status === "submitted" && item.document_id === documentId);
+  const seen = new Set<string>();
+  while (found?.editorial_correction && !reviewed(found.document_id) && !seen.has(found.document_id)) {
+    seen.add(found.document_id);
+    const fixed = row.versions.find(version => version.document_id === found?.editorial_correction?.previous_document_id);
+    if (!fixed) break;
+    found = fixed;
+  }
+  return found?.document_id ?? null;
 }
 
 /** The latest rejecting or querying review of `documentId`; null while loading, without one or after a failed read. */

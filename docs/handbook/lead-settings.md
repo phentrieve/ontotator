@@ -288,7 +288,7 @@ What for: give or take away a role.
 2. Tick a role checkbox to give the role. It saves at once.
 3. Untick a role checkbox to take it away, then confirm with **Remove role**. This logs the person out on all devices; they can log in again right away. Taking away the lead role also revokes the project API tokens the person created for this project, unless they are a system administrator. Their personal tokens keep working, but no longer with the role you took away.
 
-A project needs at least one lead: **Add another project lead before removing the last lead.**
+A project needs at least one lead: **Add another project lead before removing the last lead.** When you are the project's only lead and untick your own **Lead** box or click **Remove…** on your row, this message appears at once, without a confirmation.
 
 The exception is a system administrator, who may take away the last lead, their own lead role included, for example to hand a project over. The dialog then says *This project will have no lead. You can still manage it as system administrator.* On their own row it does not speak of lost access or revoked tokens, because an administrator keeps both. A project without a lead shows "–" under **Lead** on **Projects** and can only be managed by an administrator until one is added ([Add a member](#add-a-member)).
 
