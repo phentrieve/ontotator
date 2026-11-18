@@ -20,13 +20,18 @@ import {
 import { LanguageFlag } from "../ui/LanguageTag";
 import { MODIFIER_IN_CHANGE } from "./SearchPanel";
 
-/** Whether the details under the tree show more than the name and id; remembered per browser. */
-const DETAILS_KEY = "ontotator.treeDetails";
-const detailsStartOpen = (): boolean => {
-  try { return window.localStorage.getItem(DETAILS_KEY) !== "closed"; } catch { return true; }
+/**
+ * Whether the details under the tree show more than the name and id. Kept per user in this
+ * browser, as the widths of the editor's columns are (sidebarWidth.ts).
+ */
+export const treeDetailsKey = (username: string) => `ontotator.editor.treeDetails.v1:${username}`;
+const detailsStartOpen = (username: string | undefined): boolean => {
+  if (!username) return true;
+  try { return window.localStorage.getItem(treeDetailsKey(username)) !== "closed"; } catch { return true; }
 };
-const rememberDetails = (open: boolean) => {
-  try { window.localStorage.setItem(DETAILS_KEY, open ? "open" : "closed"); } catch { /* Blocked storage: not remembered. */ }
+const rememberDetails = (username: string | undefined, open: boolean) => {
+  if (!username) return;
+  try { window.localStorage.setItem(treeDetailsKey(username), open ? "open" : "closed"); } catch { /* Blocked storage: not remembered. */ }
 };
 
 export interface TreeBrowserProps {
@@ -49,6 +54,8 @@ export interface TreeBrowserProps {
   onUseTerm: (termId: string, browseId: string) => Promise<void>;
   /** The active search languages: only their translated names are shown (F14). */
   languages?: readonly string[];
+  /** Whose choice of "Hide details" this is; without it the choice lasts for this walk only. */
+  username?: string;
 }
 
 const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
@@ -75,10 +82,11 @@ export const TreeBrowser: React.FC<TreeBrowserProps> = ({
   onClose,
   onUseTerm,
   languages = [],
+  username,
 }) => {
   const [data, setData] = useState<TreeData>(emptyTree);
   // Closed, the details keep the name and id only and the tree gets the room.
-  const [detailsOpen, setDetailsOpen] = useState(detailsStartOpen);
+  const [detailsOpen, setDetailsOpen] = useState(() => detailsStartOpen(username));
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [focusedKey, setFocusedKey] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -274,7 +282,15 @@ export const TreeBrowser: React.FC<TreeBrowserProps> = ({
             <div className="tree-detail__body">
               {detail ? (
                 <>
-                  <h3 className="tree-detail__name">{detail.label}</h3>
+                  {/* The switch sits by the name, not in the action row: there it took the room of the hint beside "Use this term". */}
+                  <div className="tree-detail__head">
+                    <h3 className="tree-detail__name">{detail.label}</h3>
+                    <Button type="button" size="sm" variant="quiet" className="tree-detail__toggle" aria-expanded={detailsOpen}
+                      aria-controls="tree-detail-more"
+                      onClick={() => { setDetailsOpen(!detailsOpen); rememberDetails(username, !detailsOpen); }}>
+                      {detailsOpen ? "Hide details" : "Show details"}
+                    </Button>
+                  </div>
                   <div className="tree-detail__ids">
                     <div className="tree-detail__id">{detail.term_id}</div>
                     {detail.external_url && (
@@ -290,7 +306,8 @@ export const TreeBrowser: React.FC<TreeBrowserProps> = ({
                       </a>
                     )}
                   </div>
-                  {detailsOpen && <div id="tree-detail-more">
+                  {/* Always there for aria-controls; empty while hidden. */}
+                  <div id="tree-detail-more">{detailsOpen && (<>
                   {detail.definition && <p className="tree-detail__definition">{detail.definition}</p>}
                   {detail.synonyms.length > 0 && (
                     <div className="tree-detail__group">
@@ -337,7 +354,7 @@ export const TreeBrowser: React.FC<TreeBrowserProps> = ({
                       </ul>
                     </div>
                   )}
-                  </div>}
+                  </>)}</div>
                 </>
               ) : (
                 <p className="tree-detail__empty">
@@ -358,11 +375,6 @@ export const TreeBrowser: React.FC<TreeBrowserProps> = ({
                 Use this term
               </Button>
               {hint && <span id="tree-use-hint" className="tree-detail__hint">{hint}</span>}
-              <Button type="button" size="sm" variant="quiet" className="tree-detail__toggle" aria-expanded={detailsOpen}
-                aria-controls={detailsOpen && detail ? "tree-detail-more" : undefined}
-                onClick={() => { setDetailsOpen(!detailsOpen); rememberDetails(!detailsOpen); }}>
-                {detailsOpen ? "Hide details" : "Show details"}
-              </Button>
             </div>
           </div>
         </div>

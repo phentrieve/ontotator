@@ -215,24 +215,47 @@ describe("the tree in the case screen", () => {
     expect(link.parentElement).toBe(detail.querySelector(".tree-detail__id")?.parentElement);
   });
 
-  it("hides the details under the tree down to name and id, and remembers that", async () => {
+  it("hides the details under the tree down to name and id, and remembers that for the user", async () => {
     window.localStorage.clear();
     mockTree({ synonyms: ["Alpha synonym"], definition: "A made-up definition." });
-    const { container } = render(<CaseScreen view={baseView([snapshot("a1", "HP:A")])} workspaceId="ws" onClose={vi.fn()} />);
-    const panel = await openPanel(container, "a1");
+    const versionContext = { canBrowseVersions: false, username: "ada", assignmentId: 1, onNavigate: vi.fn() };
+    const first = render(<CaseScreen view={baseView([snapshot("a1", "HP:A")])} workspaceId="ws" onClose={vi.fn()} versionContext={versionContext} />);
+    const panel = await openPanel(first.container, "a1");
     const detail = panel.querySelector<HTMLElement>(".tree-detail")!;
     expect(await within(detail).findByText("Alpha synonym")).toBeTruthy();
 
-    fireEvent.click(within(detail).getByRole("button", { name: "Hide details" }));
+    const hide = within(detail).getByRole("button", { name: "Hide details" });
+    expect(hide.getAttribute("aria-expanded")).toBe("true");
+    // The switch names what it shows and hides, open or closed.
+    expect(detail.querySelector(`#${hide.getAttribute("aria-controls")}`)).not.toBeNull();
+    // It stands by the name; the action row is "Use this term" and its hint, as before.
+    expect(hide.parentElement).toBe(detail.querySelector(".tree-detail__name")?.parentElement);
+    expect(detail.querySelectorAll(".tree-detail__actions button")).toHaveLength(1);
+    fireEvent.click(hide);
     expect(within(detail).queryByText("Alpha synonym")).toBeNull();
     expect(within(detail).queryByText("A made-up definition.")).toBeNull();
     expect(detail.querySelector(".tree-detail__id")?.textContent).toBe("HP:A");
     expect(detail.classList.contains("tree-detail--compact")).toBe(true);
-    expect(within(detail).getByRole("button", { name: "Show details" }).getAttribute("aria-expanded")).toBe("false");
-    expect(window.localStorage.getItem("ontotator.treeDetails")).toBe("closed");
+    const show = within(detail).getByRole("button", { name: "Show details" });
+    expect(show.getAttribute("aria-expanded")).toBe("false");
+    expect(detail.querySelector(`#${show.getAttribute("aria-controls")}`)).not.toBeNull();
+    expect(within(detail).getByRole("button", { name: "Use this term" })).toBeTruthy();
+    expect(window.localStorage.getItem("ontotator.editor.treeDetails.v1:ada")).toBe("closed");
+    first.unmount();
 
-    fireEvent.click(within(detail).getByRole("button", { name: "Show details" }));
-    expect(within(detail).getByText("Alpha synonym")).toBeTruthy();
+    // Another person at this browser starts with the details shown; "ada" finds them hidden again.
+    const other = render(<CaseScreen view={baseView([snapshot("a1", "HP:A")])} workspaceId="ws" onClose={vi.fn()}
+      versionContext={{ ...versionContext, username: "ben" }} />);
+    expect(within(await openPanel(other.container, "a1")).getByRole("button", { name: "Hide details" })).toBeTruthy();
+    other.unmount();
+    const again = render(<CaseScreen view={baseView([snapshot("a1", "HP:A")])} workspaceId="ws" onClose={vi.fn()} versionContext={versionContext} />);
+    const reopened = (await openPanel(again.container, "a1")).querySelector<HTMLElement>(".tree-detail")!;
+    expect(reopened.classList.contains("tree-detail--compact")).toBe(true);
+    expect(within(reopened).queryByText("Alpha synonym")).toBeNull();
+
+    fireEvent.click(within(reopened).getByRole("button", { name: "Show details" }));
+    expect(await within(reopened).findByText("Alpha synonym")).toBeTruthy();
+    expect(window.localStorage.getItem("ontotator.editor.treeDetails.v1:ada")).toBe("open");
     window.localStorage.clear();
   });
 
