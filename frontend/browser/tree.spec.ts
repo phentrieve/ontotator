@@ -595,6 +595,8 @@ test.describe("ontology tree", () => {
     await page.evaluate((key) => window.localStorage.removeItem(key), TREE_HEIGHT_KEY("tree-height"));
     await showInTree(page).click();
     await expect(treePanel(page)).toBeVisible();
+    // The loaded tree takes the focus once; wait for that, or it takes it from the divider later.
+    await expect(treeItem(page, SEIZURE)).toBeFocused();
     const divider = page.getByRole("separator", { name: "Resize ontology tree" });
     await expect(divider).toBeVisible();
     await expect(divider).toHaveAttribute("aria-orientation", "horizontal");
