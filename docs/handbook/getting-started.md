@@ -111,6 +111,8 @@ What for: find the texts you have to work on.
 
 ![My tasks with the status tabs and a table of tasks, each with its Text, Task, Status and an action button](images/getting-started-my-tasks.png)
 
+The list is ordered by status: **Reopened** first, then **In progress**, **Open** and **Submitted**. Within a status the tasks are in the order in which the lead assigned them; texts the lead moved to the front come first. Work from the top unless the lead says otherwise. You cannot sort the list yourself.
+
 Each row is one task. The **Task** column says what to do, for example **Annotation, from scratch**, **Annotation, from proposals**, **Consolidation** or **Translation review**. The **Status** column shows **Open**, **In progress**, **Submitted** or **Reopened**.
 
 - **Reopened**: the lead reopened your submission. The lead's reason stands under the task, for example *Reopened by the lead on 17 Nov 2026, 14:30: The onset in sentence 2 is missing.* (on a narrow screen under the badge). Without a reason, click the badge to read when it was reopened.

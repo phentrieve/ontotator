@@ -1829,9 +1829,13 @@ def case_ids(facts: RowFacts, query: RowQuery) -> tuple[list[str], int, bool]:
 
 
 def sorted_case_ids(facts: RowFacts, case_ids: Sequence[str], sort: str) -> list[str]:
-    """``case_ids`` (deduplicated) in Documents order; unknown IDs last, as given."""
+    """``case_ids`` (deduplicated) in Documents order; unknown IDs last, as given.
+
+    ``sort`` "given" keeps the order of ``case_ids`` (issue 488)."""
     known = {version.case_id for version in facts.versions}
     unique = list(dict.fromkeys(case_ids))
+    if sort == "given":
+        return unique
     ordered = _sort_cases(
         facts, (case_id for case_id in unique if case_id in known), sort
     )
