@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-D0LKeeV4.js";import{n as a,t as o}from"./lib-BdS2jgxw.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-Bej_6BKD.js";import{n as a,t as o}from"./lib-Dh2M8yvZ.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -795,7 +795,7 @@ When the lead answers, the task shows a banner with **Open the answer**, and **M
 
 The lead can pause the work on a text, for example while the text is being clarified. Your task stays in **My tasks**, marked **Paused by lead** with the lead's reason. You can open and read it; a banner *Paused by lead: …* above the text gives the reason. You cannot save or submit until the lead releases the text. Then the mark goes away and you continue where you stopped. There is nothing for you to do meanwhile.
 
-- If the pause arrives while you have the task open, the next thing you do there (a term search, a saved change, a submit) is refused and the banner appears. Nothing you saved is lost. What you had typed but not saved stays on the screen until you leave the task; when you leave, the editor asks before it discards it.
+- If the pause arrives while you have the task open, the next thing you do there (a term search, a saved change, a submit) is refused and the banner appears. In a narrow window or on a phone, where one pane shows at a time, the **New finding** panel repeats the reason (*Paused by lead: … Nothing can be saved now. What you marked is kept until you leave the task.*), because the banner is above the pane you work in. Nothing you saved is lost. What you had typed but not saved stays on the screen until you leave the task; when you leave, the editor asks before it discards it.
 - A task you are assigned on a paused text is paused from the start.
 - A task can be paused by the lead and by a problem report at the same time. **My tasks** then shows **Paused** with the report's reason and **Paused by lead** with the lead's. Each is released on its own, and the task opens when neither is left: after you resume your report, the task may still be **Paused by lead**.
 - Your submitted tasks are not paused.
@@ -850,7 +850,7 @@ A project lead who corrects a translation themselves sees only **Accepted with c
 When the lead asked for the review with **Ask a reviewer to correct…**, or reopened a review you had submitted, the lead's words stand above **Decision**:
 
 - *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.* The same line is under the task name in **My tasks**.
-- *Reopened by the lead on 18 Nov 2026, 10:00: The unit is mg in my copy.* In **My tasks**, click the **Reopened** badge to read it. Without a reason from the lead it ends with *No reason given.*
+- *Reopened by the lead on 18 Nov 2026, 10:00: The unit is mg in my copy.* In **My tasks** it stands under the task name, as the reason for a second review does; on a narrow screen it stands under the **Reopened** badge. Without a reason from the lead it ends with *No reason given.*
 
 A reopened review starts again from the text of its version; your earlier decision is listed under **Previous reviews**.
 
@@ -1501,7 +1501,7 @@ Details: [Submit the text](annotator.md#submit-the-text).
 - Your task shows **Submitted** in **My tasks**. It is read-only now; click **View** to look at it.
 - The next open task opens on its own, or **My tasks** if none is left.
 - The lead sees your submission next to the other annotators' work on the same text, and accepts one result or starts a consolidation. You do not see other people's work.
-- Your task is done. You do not need to do anything else unless the lead reopens it (**Reopened** in **My tasks**; click the badge to read the lead's reason) or you notice a mistake. A translation review the lead asks for a second time names the lead's reason under the task, for example *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.*
+- Your task is done. You do not need to do anything else unless the lead reopens it (**Reopened** in **My tasks**, with the lead's reason under the task name) or you notice a mistake. A translation review the lead asks for a second time names the lead's reason under the task, for example *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.*
 
 If you notice a mistake after submitting: open the task, choose **More** › **Work rounds** and click **Continue from this submission** ([Start a new work round](annotator.md#start-a-new-work-round)). Fix the finding, check the carried findings and submit again.
 
@@ -1627,7 +1627,7 @@ What for: find the texts you have to work on.
 
 Each row is one task. The **Task** column says what to do, for example **Annotation, from scratch**, **Annotation, from proposals**, **Consolidation** or **Translation review**. The **Status** column shows **Open**, **In progress**, **Submitted** or **Reopened**.
 
-- **Reopened**: the lead reopened your submission. Click the badge to read why.
+- **Reopened**: the lead reopened your submission. The lead's reason stands under the task, for example *Reopened by the lead on 17 Nov 2026, 14:30: The onset in sentence 2 is missing.* (on a narrow screen under the badge). Without a reason, click the badge to read when it was reopened.
 - A **Translation review** the lead asked for a second time shows the lead's reason under the task, for example *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.* The translation review and the consolidation show the lead's reason again when you open the task.
 - A **Consolidation** task shows the lead's reason under the task, for example *Reason from the lead: Term and assertion differ*, if the lead gave one.
 - **Paused**: the task waits for a decision on a problem report. A long reason is cut off here; the task shows all of it. **Answer to your report** means the lead has replied.
@@ -1990,7 +1990,7 @@ The **Documents** page lists every text of the project and what it needs next. O
 
 A task starts with the person's first saved change; opening it is not enough, and neither is ticking checked sentences in a translation review. Until then **Translation** and **Annotation** read *assigned, not started* with the person's name, in the table (*not started* without the name below 1600 px), its tooltip, the narrow cards and the text card, where the person's row shows **Not started**. After the first save they read *in review* or *In progress*. The same holds for a task you reopened, also when you asked a reviewer who had already submitted to correct a translation: it reads *assigned, not started* again until the person saves a change after the reopen. With several people or parallel versions the cell counts them, for example *1 of 2 started*.
 
-A text with fewer annotators than **Annotators per text** shows what its people are doing, not the free place. While someone has an open task, **Annotation** reads for example *assigned, not started · max 2* or *1 of 2 submitted · max 3* (below 1600 px *not started*, *1/2 submitted*; the tooltip has the full state), counted out of the people who hold the text; **Waiting on** names the person, the text is under **In progress**, and **Next step** still offers **Assign annotation…** for another annotator. The same holds after **Start a round…** for a text with one annotator. Only a text nobody is working on reads *1 annotator · max 2* or *Unassigned* and is listed under **To assign** (or under **Needs your decision** once its one annotation is submitted). To give texts in progress another annotator, select them and click **Assign annotation…** in the selection bar: it assigns only where a text still has a free place.
+A text with fewer annotators than **Annotators per text** shows what its people are doing, not the free place. While someone has an open task, **Annotation** reads for example *assigned, not started · max 2* or *1 of 2 submitted · max 3* (below 1600 px *0/1 · max 2*, *1/2 · max 3*: submitted of the people who hold the text, then the limit; the tooltip has the full state), counted out of the people who hold the text; **Waiting on** names the person, the text is under **In progress**, and **Next step** still offers **Assign annotation…** for another annotator. The same holds after **Start a round…** for a text with one annotator. Only a text nobody is working on reads *1 annotator · max 2* or *Unassigned* and is listed under **To assign** (or under **Needs your decision** once its one annotation is submitted). To give texts in progress another annotator, select them and click **Assign annotation…** in the selection bar: it assigns only where a text still has a free place. To list these texts, tick **Can take another annotator** under **Annotation** in **Filter**: it lists every text whose steps include **Assign annotation…**, also while its first annotator is at work. Combine it with the tab **In progress** to see only the texts that someone already works on. When **To assign** is empty, it says so (*No text waits for an assignment*) and offers **Show texts that can take another annotator**.
 
 The counts in **Annotation**, for example *0 of 1 submitted*, count only work on the newest version of the text. After a text change, a submission on the old version no longer counts: neither when it was carried to the new version, nor when the new version was started fresh. Carried work counts once it is submitted on the new version.
 
@@ -2357,13 +2357,15 @@ A person who has the task open when you pause is told with the next thing they d
 
 On **Documents**, a paused text carries the badge **Paused by lead**; point at it to read who paused it, when and why. Its open work is nobody's turn: **Waiting on** does not name the people, and the stage shows the pause sign. To list the paused texts, tick **Paused by lead** under **Flags** in **Filter**. The text card shows a notice **Paused by lead** with who, when and why, and each paused person's row says *Paused by lead*.
 
+A text whose consolidation is open keeps it while paused. The row reads *consolidating · paused* under **Finalization** and its annotations stay *2 of 2 submitted*, because submitted work is not paused. In the text card, **Finalization** keeps the consolidator's row with *Paused by lead*, and **Consolidate…** is not offered: the open consolidation continues after the release. The same holds when the consolidator reported a problem and that report pauses the consolidation; the row then waits for you with **Decide on report…**. In **History**, the lines of a consolidation stand under **Finalization**.
+
 To release:
 
-1. Select the texts and choose **More actions** › **Release texts…**. Or click **Release…** in the notice of one text card.
+1. Select the texts and choose **More actions** › **Release texts…**. Or click **Release…** in the notice of one text card; the message *Released 1 text.* follows there as well.
 2. Read the preview, for example *Release 3 texts with 4 open tasks · Tom Reis 2, R. Roe 2*. A task that a problem report pauses as well is named in its own group, *1 task stays paused · paused by a problem report as well: decide the report under Problem reports*. Texts that are not paused are skipped.
 3. A reason is optional (**Reason (optional)**). Click the button, for example *Release 4 texts*, tick **I understand** and click again.
 
-Every listed text is paused or released, or none: if the texts changed since the preview, the dialog says *The texts changed since the preview. Check the new preview.* and shows it. Each text gets its own entry in the audit trail, with the reason. There is no **Undo** in the message: **Release texts…** is the way back from a pause, **Pause texts…** from a release, and neither changes any work.
+Every listed text is paused or released, or none: if the texts changed since the preview, the dialog says *The texts changed since the preview. Check the new preview.* and shows it. Each text gets its own entry in the audit trail, with the reason. The text card's **History** keeps a line for each pause and each release under the tag **Text**, also after the release: *paused by you, 17 Nov, 17:24: The clinic is checking the source text* and *released by you, 17 Nov, 18:02*, with the reason of the release when you gave one. There is no **Undo** in the message: **Release texts…** is the way back from a pause, **Pause texts…** from a release, and neither changes any work.
 
 The other actions on paused texts:
 
@@ -2547,7 +2549,7 @@ What for: pick another result after you already chose one.
 2. Click **Change final…** next to **Open result**.
 3. Click **Use as final** in the row of the result you want. It saves at once; the card stays on this text and says *Final result saved for EN100022 en.*
 
-The message *Final result of EN100022 en changed.* has an **Undo** button, also while the card is open. It brings the earlier final result back (*The earlier final result of EN100022 en is back.*), under the same rules as the Undo of **Change final…** for several texts: for the lead who made the change, once, within an hour, and refused once something the final result rests on changed since ([Accept or change the final result of several texts](#accept-or-change-the-final-result-of-several-texts)). The same message follows **Use the newer result** under *Review changes…*. A first choice of a final result has no Undo: use [Withdraw a final result](#withdraw-a-final-result). **History** in the card lists each change and its Undo.
+The message *Final result of EN100022 en changed.* has an **Undo** button, also while the card is open. It brings the earlier final result back (*The earlier final result of EN100022 en is back.*), under the same rules as the Undo of **Change final…** for several texts: for the lead who made the change, once, within an hour, and refused once something the final result rests on changed since ([Accept or change the final result of several texts](#accept-or-change-the-final-result-of-several-texts)). The same message follows **Use the newer result** under *Review changes…*. After the Undo, the green line *Final result saved for EN100022 en.* in the card goes: it spoke of the result that is no longer final. A first choice of a final result has no Undo: use [Withdraw a final result](#withdraw-a-final-result). **History** in the card lists each change and its Undo.
 
 While a text has a final result, its annotation mode cannot be changed: **Change mode…** is refused (error code \`ANNOTATION_MODE_FINAL_SELECTED\`) ([Change the annotation mode of one text](lead-documents.md#change-the-annotation-mode-of-one-text)). To take the final result back instead, see [Withdraw a final result](#withdraw-a-final-result).
 
@@ -3093,7 +3095,7 @@ What for: give or take away a role.
 2. Tick a role checkbox to give the role. It saves at once.
 3. Untick a role checkbox to take it away, then confirm with **Remove role**. This logs the person out on all devices; they can log in again right away. Taking away the lead role also revokes the project API tokens the person created for this project, unless they are a system administrator. Their personal tokens keep working, but no longer with the role you took away.
 
-A project needs at least one lead: **Add another project lead before removing the last lead.**
+A project needs at least one lead: **Add another project lead before removing the last lead.** When you are the project's only lead and untick your own **Lead** box or click **Remove…** on your row, this message appears at once, without a confirmation.
 
 The exception is a system administrator, who may take away the last lead, their own lead role included, for example to hand a project over. The dialog then says *This project will have no lead. You can still manage it as system administrator.* On their own row it does not speak of lost access or revoked tokens, because an administrator keeps both. A project without a lead shows "–" under **Lead** on **Projects** and can only be managed by an administrator until one is added ([Add a member](#add-a-member)).
 
