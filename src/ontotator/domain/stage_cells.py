@@ -91,6 +91,8 @@ CellNote = Literal[
     "translation_not_accepted",
     "unchanged",
     "with_corrections",
+    # Accepted like the version a lead fixed typos in ("Fix typos…").
+    "typos_fixed",
     "in_package",
     "outside",
     "review_off",
@@ -120,6 +122,7 @@ PAUSED_EXCERPT_LENGTH = 60
 _ACCEPTED_NOTES: Mapping[str, CellNote] = {
     "unchanged": "unchanged",
     "corrected": "with_corrections",
+    "typos_fixed": "typos_fixed",
     "package": "in_package",
     "external": "outside",
 }
@@ -155,8 +158,11 @@ class StageFacts:
     review_reason_text: str | None = None  # free text, e.g. "Dosis prüfen"
     review_decided_by: int | None = None  # latest decision on the newest version
     review_decided_at: datetime | None = None
-    accepted_how: Literal["unchanged", "corrected", "package", "external"] | None = None
+    accepted_how: (
+        Literal["unchanged", "corrected", "typos_fixed", "package", "external"] | None
+    ) = None
     accepted_from_version: int | None = None  # "v1 → v2" when corrected
+    typos_fixed_by: int | None = None  # the lead of ``typos_fixed``
     newest_version: int = 1
     newest_origin: str | None = None  # VariantOrigin of the target
     annotators_open: tuple[int, ...] = ()  # on the target(s), not held
@@ -408,14 +414,17 @@ def _review(facts: StageFacts, codes: frozenset[str]) -> StageCell:
     if _accepted(step):
         accepted = sum(1 for s in step.translation_statuses if s == "accepted")
         how = facts.accepted_how
-        corrected = how == "corrected"
+        # "v1 → v2" and who: the reviewer who corrected, the lead who fixed
+        # typos (never the reviewer of the fixed version).
+        changed = how in ("corrected", "typos_fixed")
+        fixed_by = () if facts.typos_fixed_by is None else (facts.typos_fixed_by,)
         return _cell(
             "accepted",
             "done",
             note=_ACCEPTED_NOTES.get(how) if how is not None else None,
-            people=decided_by if corrected else (),
-            from_version=facts.accepted_from_version if corrected else None,
-            version=facts.newest_version if corrected else None,
+            people=(decided_by if how == "corrected" else fixed_by) if changed else (),
+            from_version=facts.accepted_from_version if changed else None,
+            version=facts.newest_version if changed else None,
             **_roots(facts, accepted),
         )
     if not step.review:

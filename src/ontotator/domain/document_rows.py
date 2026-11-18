@@ -96,12 +96,18 @@ class Version:
     translation_status: str | None
     position: int | None
     latest_decision: str | None = None
+    # Made by an editorial correction (issue 453) of a version that counts,
+    # or reviewed itself (``work_plan_store.counted_typo_fixes``).
+    typo_fix_counts: bool = False
 
     @property
     def not_newer(self) -> bool:
-        """A correction whose latest review is rejected or queried is not newer."""
+        """A correction whose latest review is rejected or queried is not
+        newer. A typo fix counts like the version it fixes: the fix of a
+        rejected or queried first version is the newest text of its chain."""
         return (
-            self.origin == "correction"
+            not self.typo_fix_counts
+            and self.origin == "correction"
             and self.translation_status == "reviewed"
             and self.latest_decision in NOT_NEWER
         )

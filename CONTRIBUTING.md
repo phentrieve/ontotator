@@ -30,7 +30,10 @@ A release is one pull request `release: X.Y.Z`; its merge commit on `main` is ta
 
 - adds a `[X.Y.Z] - YYYY-MM-DD` heading under `[Unreleased]` in `CHANGELOG.md` and updates the compare links at the end;
 - sets the version in `pyproject.toml`, `src/ontotator/__init__.py` and `frontend/package.json`, and in `uv.lock`, `frontend/package-lock.json` and `contracts/openapi.json` with them (the gate fails on contract drift);
-- bumps the MCP pin in [mcp/README.md](mcp/README.md) to the new tag (`ontotator@vX.Y.Z#subdirectory=mcp`, three places). The MCP tests fail until the pin matches the version in `pyproject.toml`.
+- sets the same version for the MCP server in `mcp/pyproject.toml` and `mcp/src/ontotator_mcp/__init__.py`, and in `mcp/uv.lock` with them (`cd mcp && uv lock`). `ontotator-mcp --version`, its User-Agent and `whoami` show it;
+- bumps the MCP pin in [mcp/README.md](mcp/README.md) to the new tag (`ontotator@vX.Y.Z#subdirectory=mcp`, three places).
+
+The MCP tests fail until the MCP version and the pin match the version in `pyproject.toml`.
 
 Pushing the tag publishes the Docker image (see [docs/operations.md](docs/operations.md)).
 

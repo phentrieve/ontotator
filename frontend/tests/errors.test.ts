@@ -58,3 +58,9 @@ it("explains a text change refused because the new version has no proposals (iss
     .toBe("The new version has no proposals yet: their automatic transfer may still be running, or they must be imported. Wait for or import the proposals for the new version, then try again.");
   expect(errorMessage(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "from_proposals" }))).toBe(ERROR_MESSAGES.TEXT_CHANGE_NOT_APPLICABLE);
 });
+
+it("names the version to review when a lead fixed typos in the one asked for", () => {
+  expect(errorMessage(new ApiError(409, "raw", "VARIANT_REVIEW_STALE", { reason: "typos_fixed", document_id: "c~de~v2", version: 2 })))
+    .toBe("A lead fixed typos in this version: v2 is the text to review. Assign a review of the newest version.");
+  expect(errorMessage(new ApiError(409, "raw", "VARIANT_REVIEW_STALE"))).toBe("A newer text version exists. Review the current version before creating a correction.");
+});
