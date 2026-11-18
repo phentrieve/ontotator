@@ -62,10 +62,14 @@ def test_a_fix_behind_an_accepted_version_becomes_accepted(
             # The downgrade changes no data.
             assert stuck.document(v2)[2] == "reviewed"
             command.upgrade(alembic_config(conn), REVISION)
+        with owner.begin() as conn:
+            assert current_revision(conn) == REVISION
+            # Later migrations follow; the application reads at the head.
+            command.upgrade(alembic_config(conn), "head")
     finally:
         owner.dispose()
     with db.transaction() as conn:
-        assert current_revision(conn) == REVISION
+        assert current_revision(conn) == head_revision()
         statuses = dict(
             conn.execute(
                 text(

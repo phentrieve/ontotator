@@ -185,7 +185,11 @@ EXTRA_REFERENCES: tuple[ExtraReference, ...] = (
         "translation_reviews",
         orphans=True,
     ),
-    # ... or the lead's query decision (issue 483).
+    # A query decision names the review it decides (issue 483).
+    ExtraReference(
+        "translation_query_decisions", "review_id", (), "translation_reviews"
+    ),
+    # A re-anchoring job may also come from a lead's query decision.
     ExtraReference(
         "jobs",
         "payload",

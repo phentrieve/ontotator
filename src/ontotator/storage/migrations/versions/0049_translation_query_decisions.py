@@ -35,12 +35,8 @@ def upgrade() -> None:
             sa.ForeignKey(f"{SCHEMA}.projects.id"),
             nullable=False,
         ),
-        sa.Column(
-            "review_id",
-            sa.BigInteger(),
-            sa.ForeignKey(f"{SCHEMA}.translation_reviews.id"),
-            nullable=False,
-        ),
+        # translation_reviews.id; no foreign key (see QueryDecisionRow).
+        sa.Column("review_id", sa.BigInteger(), nullable=False),
         sa.Column("document_id", sa.Text(), nullable=False),
         sa.Column("accepted_document_id", sa.Text(), nullable=False),
         sa.Column("kind", sa.Text(), nullable=False),

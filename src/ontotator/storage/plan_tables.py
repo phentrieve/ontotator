@@ -240,9 +240,10 @@ class QueryDecisionRow(Base):
     project_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey(f"{SCHEMA}.projects.id")
     )
-    review_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey(f"{SCHEMA}.translation_reviews.id")
-    )
+    # The decided review (``translation_reviews.id``). No foreign key, as for
+    # every reference to a review: the review history refuses TRUNCATE by its
+    # own trigger, which a referencing table would pre-empt.
+    review_id: Mapped[int] = mapped_column(BigInteger)
     document_id: Mapped[str]
     accepted_document_id: Mapped[str]
     kind: Mapped[str]
