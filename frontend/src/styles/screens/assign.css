@@ -74,10 +74,10 @@
 .text-change-held { margin: 0; }
 .text-change-error { margin: 0 auto 0 0; color: var(--danger); font-size: var(--size-sm); }
 
-/* M2 D5, B7-5: one hint in normal text with the (i) that opens the limit popover (mockup 03 A). */
+/* M2 D5, B7-5: one hint in normal text with "Change…" that opens the limit popover (mockup 03 A; issue 469). */
 .assign-limit-hint { display: flex; align-items: center; gap: var(--space-1); margin: var(--space-2) 0 var(--space-1); font-size: var(--size-md); font-weight: var(--weight-strong); }
-.assign-limit-info { color: var(--accent); border-radius: 50%; }
-.assign-limit-info[aria-expanded="true"] { background: var(--accent-light); border-color: var(--accent); }
+.assign-limit-change { margin-left: var(--space-1); font-weight: var(--weight-regular); }
+.assign-limit-change[aria-expanded="true"] { background: var(--accent-light); border-color: var(--accent); }
 .assign-limit-popover { display: grid; gap: var(--space-2); }
 .assign-limit-popover h3 { margin: 0; font-size: var(--size-base); }
 .assign-limit-popover p { margin: 0; }

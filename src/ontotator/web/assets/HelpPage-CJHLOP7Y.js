@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-HG0SF127.js";import{n as a,t as o}from"./lib-myF-OGeQ.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-C3345ZHT.js";import{n as a,t as o}from"./lib-B_kuN2zV.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -1881,7 +1881,7 @@ To take the change back, click **Undo** in the message. It restores the plan and
 
 Other ways to make the work smaller:
 
-- Fewer people per text: lower **Annotators per text**. Nobody is removed; texts that already have more annotators keep them. Lowered from the info button in the assign dialog, the limit says how many texts already have more. To list them, tick **More annotators than the limit** under **Flags** in **Filter** ([Filter the list](lead-documents.md#filter-the-list)). To take the extra open tasks back, select those texts and choose **More actions** › **Withdraw open tasks…** with **Only annotations above the limit of annotators per text** ([Reopen or withdraw the tasks of several texts](lead-documents.md#reopen-or-withdraw-the-tasks-of-several-texts)), or remove one person at a time with **Remove…** in the text card ([Remove, reassign or reopen an assignment](lead-documents.md#remove-reassign-or-reopen-an-assignment)).
+- Fewer people per text: lower **Annotators per text**. Nobody is removed; texts that already have more annotators keep them. Lowered with **Change…** in the assign dialog, the limit says how many texts already have more. To list them, tick **More annotators than the limit** under **Flags** in **Filter** ([Filter the list](lead-documents.md#filter-the-list)). To take the extra open tasks back, select those texts and choose **More actions** › **Withdraw open tasks…** with **Only annotations above the limit of annotators per text** ([Reopen or withdraw the tasks of several texts](lead-documents.md#reopen-or-withdraw-the-tasks-of-several-texts)), or remove one person at a time with **Remove…** in the text card ([Remove, reassign or reopen an assignment](lead-documents.md#remove-reassign-or-reopen-an-assignment)).
 - Order of work: **My tasks** lists open tasks by status, then in the project's order, first imported first. To have urgent texts done first, select them and click **Move to front** ([Move texts to the front of the queue](lead-documents.md#move-texts-to-the-front-of-the-queue)).
 - Stop work for a while without withdrawing it: select the texts and choose **More actions** › **Pause texts…**; **Release texts…** lets it go on ([Pause and release the work on texts](lead-documents.md#pause-and-release-the-work-on-texts)). Submitted work and final results stay as they are and are exported.
 
@@ -2051,7 +2051,7 @@ To find texts with more annotators than **Annotators per text** allows, for exam
 
 Below 1600 px width each text keeps one line in the table. Where the table is still wider than the page, it scrolls sideways with the **Text** column kept at the left:
 
-- The stage columns show a shorter state and leave out the names, which **Waiting on** already shows. For example *assigned, not started (Ana Weber)* reads *not started*, *1 of 2 submitted* reads *1/2 submitted*, *ready to compare* reads *to compare* and *Final is on old text* reads *on old text*. Submitted work from proposals that waits for the new version's proposals reads *v1 work waits* (*v2 has no proposals yet*).
+- The stage columns show a shorter state and leave out the names, which **Waiting on** already shows. For example *assigned, not started (Ana Weber)* reads *not started*, *1 of 2 submitted* reads *1/2 submitted*, *ready to compare* reads *to compare*, *Check changes, newer result* reads *Check changes* and *Final is on old text* reads *on old text*. Submitted work from proposals that waits for the new version's proposals reads *v1 work waits* (*v2 has no proposals yet*).
 - **Waiting on** shows one name and *+n* for the others.
 - **Text** keeps *source*, the version marker and **NEW** on the line and cuts a long case ID with *…*.
 - Point at a cell to see the full state with the names in its tooltip. Screen readers read the full state.
@@ -2282,7 +2282,7 @@ What for: let the annotators revise many texts at once, for example after a guid
 
 Every listed task changes, or none: if the texts changed since the preview, the dialog says *The texts changed since the preview. Check the new preview.* and shows it. Each task is recorded in the audit trail as a single reopen or withdrawal would be, so the history of every text shows it.
 
-**Undo** in the message, for example *Reopened 14 assignments in 12 texts.*, takes the change back: reopened tasks count as submitted again; withdrawn tasks come back with their drafts. Undo is for the lead who made the change, once, within an hour, and only while nothing changed on these texts since: nobody saved a draft, nobody was assigned, the plan, the final result and the text version are the same. Otherwise the message says *Undo is no longer possible: the texts changed since.* Through the API and the MCP server the same Undo is \`POST /api/v1/projects/{key}/bulk-task-actions/undo\` with the \`undo.id\` of the applied action, and the MCP tool \`undo_reopen_or_withdraw\`; with \`preview: true\` (the tool's dry run) it lists the tasks that would come back and says what blocks it, and changes nothing.
+**Undo** in the message, for example *Reopened 14 assignments in 12 texts.*, takes the change back: reopened tasks count as submitted again; withdrawn tasks come back with their drafts. Undo is for the lead who made the change, once, within an hour, and only while nothing changed on these texts since: nobody saved a draft, nobody was assigned, the plan, the final result and the text version are the same. Otherwise nothing is undone, and the message names the first text in the way and what changed on it, for example *Undo is not possible: 1 of 12 texts changed since (EN100022 en: a task was assigned, reopened, withdrawn or paused, or got a new round). Nothing was undone.* An Undo that is older than an hour or was already used says *Undo is no longer possible: the texts changed since.* Through the API and the MCP server the same Undo is \`POST /api/v1/projects/{key}/bulk-task-actions/undo\` with the \`undo.id\` of the applied action, and the MCP tool \`undo_reopen_or_withdraw\`; with \`preview: true\` (the tool's dry run) it lists the tasks that would come back and says what blocks it, with each text in the way and what changed on it (\`blocked_texts\`), and changes nothing.
 
 A message never lies over a dialog you open after it. If you open the next dialog while the message is still showing, the message waits; when you close the dialog, it is back with its **Undo** and stays for its full time again. This holds for every message with **Undo**, also in the annotation view.
 
@@ -2400,7 +2400,9 @@ What for: assign a single review or annotation.
 
 With more than five people on a text, the line *Assigned:* names the first five and how many more there are, for example *and 3 more*; the list marks each of them *Already assigned*.
 
-To change the limit of annotators per text from here, click the info button (i) next to the limit and enter the number (1 to 20):
+When every place of the text is taken, the other people turn grey with the reason, for example *no free place (1 per text)*. This is the limit of the text, not of the person. A text that already has more annotators than its limit says both numbers, for example *Limit reached: 10 assigned, limit 8.*
+
+To change the limit of annotators per text from here, click **Change…** next to the limit and enter the number (1 to 20). A number you typed stays when you switch between the two choices below. If the button cannot act, the popover says why, for example *The project setting is already 1.*
 
 - **Only for the selected text** (with several texts: **Only for the selected texts**) gives these texts their own limit, for example 4 annotators on one text for a method comparison in a project with 1. Click the button that names the number of texts, for example *Change for 1 text*. The text keeps its own value for every version, also a corrected one; the project setting and the other texts stay as they are. Entering the project's number again returns the text to the project setting. The popover then explains *Sets the most annotators for this text only (project: 1)*, and for a text that already has its own value its title reads, for example, *Up to 4 annotators for this text (project: 1)*.
 - **For all texts** changes the project setting. Click **Change for all texts**. Texts with their own value keep it.
@@ -2534,12 +2536,12 @@ A submitted consolidation cannot be reopened or reassigned. If it contains a mis
 
 ### Review changes to a final result
 
-What for: confirm a final result after something changed, for example a newer submission or a corrected text. The row's next step is **Confirm final result**.
+What for: confirm a final result after something changed, for example a newer submission or a corrected text. The row's next step is **Confirm final result**. Its **Finalization** cell says what changed, for example *Check changes, newer result*; *ready to accept* is a text that has no final result yet.
 
 1. In the row, click **Review changes…**. The card lists what changed.
 2. Optional: if the text changed, click **Show changes** to see the changed passages.
 3. Choose one:
-   - Keep the final result on the old version, for example *Keep final on v1*.
+   - Keep the final result: **Keep the current final result**. If the text has several versions, the button names the version of the final result, for example *Keep final on v1*.
    - **Use the newer result**. If annotators marked findings in it **Unresolved**, the block lists them with who wrote each note.
    - Carry it to the new version, for example *Carry to v2…* (see [Carry submitted work to a new text version](#carry-submitted-work-to-a-new-text-version)).
 
