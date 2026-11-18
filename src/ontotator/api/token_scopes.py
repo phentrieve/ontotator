@@ -155,6 +155,11 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
         "POST",
         f"{P}/documents/{{doc:path}}/editorial-correction/preview",
     ): "project-admin",
+    # Issue 483: the lead decides a queried review; a lead's project work,
+    # as the editorial correction above.
+    ("POST", f"{P}/documents/{{doc:path}}/query-decision"): "project-admin",
+    # Its preview: only a token that may decide needs it.
+    ("GET", f"{P}/documents/{{doc:path}}/query-decision"): "project-admin",
     ("POST", f"{P}/variants/{{document_id:path}}/discard"): "project-admin",
     # Issue 341 d: accept exactly one version, as the discard above.
     ("POST", f"{P}/variants/{{document_id:path}}/accept"): "project-admin",

@@ -126,6 +126,8 @@ ARCHIVED: tuple[ArchivedTable, ...] = (
     ArchivedTable("translation_version_uploads"),
     # Editorial corrections of translation versions (issue 453).
     ArchivedTable("translation_editorial_corrections"),
+    # A lead's decisions on queried translation reviews (issue 483).
+    ArchivedTable("translation_query_decisions"),
     ArchivedTable("final_selections"),
     ArchivedTable("final_selection_events"),
     ArchivedTable("export_selection_snapshots"),
@@ -181,6 +183,14 @@ EXTRA_REFERENCES: tuple[ExtraReference, ...] = (
         "payload",
         ("producer", "review_id"),
         "translation_reviews",
+        orphans=True,
+    ),
+    # ... or the lead's query decision (issue 483).
+    ExtraReference(
+        "jobs",
+        "payload",
+        ("producer", "decision_id"),
+        "translation_query_decisions",
         orphans=True,
     ),
     # The audit trail records the rows it is about; a row the archive lacks

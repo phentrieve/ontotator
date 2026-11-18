@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from builtins import list as List
 from collections import Counter
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal, cast
@@ -144,6 +144,32 @@ def second_review_requests(
     return found
 
 
+def query_answer_times(
+    conn: Connection, assignment_ids: Sequence[int]
+) -> dict[int, datetime]:
+    """When a lead decided the query of each submitted translation review
+    (issue 483): only the task's current submission counts."""
+    if not assignment_ids:
+        return {}
+    from ontotator.storage.plan_tables import QueryDecisionRow
+    from ontotator.storage.tables import TranslationReviewRow
+
+    rows = conn.execute(
+        select(AssignmentRow.id, QueryDecisionRow.decided_at)
+        .join(
+            TranslationReviewRow,
+            TranslationReviewRow.assignment_id == AssignmentRow.id,
+        )
+        .join(QueryDecisionRow, QueryDecisionRow.review_id == TranslationReviewRow.id)
+        .where(
+            AssignmentRow.id.in_(sorted(assignment_ids)),
+            AssignmentRow.last_submission_id
+            == func.concat("tr-", TranslationReviewRow.id),
+        )
+    )
+    return {row.id: row.decided_at for row in rows}
+
+
 def latest_reopen(
     conn: Connection, assignment_id: int
 ) -> tuple[datetime, str | None] | None:
@@ -207,6 +233,9 @@ class TaskSummary:
     # task's current round); None for other tasks.
     second_review_at: datetime | None = None
     second_review_reason: str | None = None
+    # A submitted translation review that asked a query: when the lead decided
+    # it (issue 483; the answer is in the review's workspace); None otherwise.
+    query_answered_at: datetime | None = None
     # R-26: a lead answered one of the owner's reports on this task since the
     # owner last opened it.
     report_answered: bool = False
@@ -1478,6 +1507,14 @@ class AssignmentService:
                     if r["task"] == "translation_review"
                 },
             )
+            query_answers = query_answer_times(
+                conn,
+                [
+                    r["assignment_id"]
+                    for r in rows
+                    if r["task"] == "translation_review" and r["status"] == "submitted"
+                ],
+            )
             reports = {
                 r.report_id: r
                 for r in conn.execute(
@@ -1632,6 +1669,7 @@ class AssignmentService:
                         ),
                         second_review_at=second[0] if second else None,
                         second_review_reason=second[1] if second else None,
+                        query_answered_at=query_answers.get(row["assignment_id"]),
                     )
                 )
             return result

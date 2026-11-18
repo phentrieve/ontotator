@@ -422,8 +422,10 @@ Then decide:
 | --- | --- | --- |
 | **Accepted unchanged** | The translation is right as it stands. | It becomes available for annotation. Annotation tasks already assigned open by themselves. |
 | **Accepted with corrections** | You corrected it and it is now right. Editing chooses this for you. | Your corrected text is saved as a new text version, which is accepted for annotation. |
-| **Query** | The meaning may differ clinically and you are not sure. | Not accepted. The lead reads your rationale and decides. Annotation tasks already assigned keep waiting. |
+| **Query** | The meaning may differ clinically and you are not sure. | Not accepted. The lead reads your rationale and decides: they take the text you proposed, or accept the translation as it is, and answer you. Annotation tasks already assigned keep waiting until then. |
 | **Rejected** | The translation changes the clinical meaning. | Not accepted. The lead decides: a new review, a correction or discarding it. Annotation tasks already assigned keep waiting. |
+
+A problem in the source that does not affect the translation is no reason for a **Query**. Examples: a dose that looks too low but is what the source says, a footnote digit stuck to a year, a word broken by a hyphen at a line end. If the translation gives the source correctly, accept it (**Accepted unchanged**, or **Accepted with corrections** if you corrected something else) and put your remark in the **Rationale**. It is kept with your review, and the lead reads it under **Translation reviews** in the text card. A **Query** holds the annotation of the text until the lead decides; keep it for a translation you are not sure about.
 
 Steps:
 
@@ -440,6 +442,8 @@ Steps:
 8. A message confirms the review, with **View result**. Your next open task opens on its own, another translation review first, or **My tasks** if none is left. If you also annotate this text and your review finished its translation, your annotation of the text opens instead and the message adds *Annotate this text now*. Finished means: the translation is accepted (with corrections, on the corrected version), every other translation of the text is accepted too, and no further review or decision of the lead is pending. After **Query** or **Rejected** it does not come first.
 
 On a wide screen, **Your review** is a column on the right. To give the texts more room, drag its left edge (**Resize review panel**), or focus the edge and press `←` or `→`; `Enter` restores the default width. **Collapse review panel** folds it to a narrow strip: the bar at the bottom then shows the decision and **Submit review…**, and **Expand review panel** or **Change ↓** opens it again. Width and folding are remembered in this browser.
+
+After a **Query** the lead decides. **My tasks** then shows *Answer from the lead* at your submitted review (tab **Submitted**). Open the task: above **Submitted review** you read what was decided, for example *The lead decided your query on 18 Nov 2026, 10:12. Your text was accepted as v2.* (or *v1 was accepted as it is.*), and the lead's answer, for example *Answer from the lead: Yes, as proposed.*
 
 A project lead who corrects a translation themselves sees only **Accepted with corrections**. When the lead corrects a translation that was already accepted, the corrected version is reviewed again: it then appears as a new translation review task, usually for you ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
 

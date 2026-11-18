@@ -55,6 +55,14 @@ describe("My tasks component", () => {
     expect(within(rows[1]).queryByText("Answer to your report")).toBeNull();
   });
 
+  it("marks a submitted query the lead decided (issue 483)", async () => {
+    vi.mocked(api.listMyTasks).mockResolvedValue([{ ...task(3, "submitted"), query_answered_at: "2026-11-18T10:12:00Z" }, task(1, "submitted")]);
+    render(<MyTasks projects={[]} onNavigate={vi.fn()} />);
+    const rows = await screen.findAllByTestId("task-row");
+    expect(within(rows[0]).getByText("Answer from the lead")).toBeDefined();
+    expect(within(rows[1]).queryByText("Answer from the lead")).toBeNull();
+  });
+
   it("links the answer badge to the answered report (#18)", async () => {
     const onNavigate = vi.fn();
     vi.mocked(api.listMyTasks).mockResolvedValue([{ ...task(3, "open"), report_answered: true, answered_report_id: "r-7" }]);

@@ -205,6 +205,55 @@ class EditorialCorrectionRow(Base):
     corrected_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
+class QueryDecisionRow(Base):
+    """A lead's decision on a translation review submitted as a query (issue 483).
+
+    Append-only, one row per decided review. ``kind``: ``reviewer_text`` (the
+    reviewer's proposed text, as the lead confirmed it, became the next
+    version, accepted) or ``unchanged`` (the queried version was accepted as
+    it is). ``document_id`` is the version the lead decided on (the queried
+    one, or its typo fix), ``accepted_document_id`` the version the decision
+    accepted. ``answer`` is what the lead wrote to the reviewer; ``edited``
+    says that the lead changed the reviewer's text before saving it.
+    """
+
+    __tablename__ = "translation_query_decisions"
+    __table_args__ = (
+        ForeignKeyConstraint(*_DOCUMENT_FK),
+        ForeignKeyConstraint(
+            ["project_id", "accepted_document_id"],
+            [f"{SCHEMA}.documents.project_id", f"{SCHEMA}.documents.document_id"],
+        ),
+        UniqueConstraint("review_id"),
+        CheckConstraint("kind IN ('reviewer_text', 'unchanged')", name="kind"),
+        CheckConstraint(
+            "kind <> 'unchanged' OR btrim(coalesce(answer, '')) <> ''",
+            name="answer_required",
+        ),
+        Index(
+            "ix_translation_query_decisions_project_accepted",
+            "project_id",
+            "accepted_document_id",
+        ),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.projects.id")
+    )
+    review_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.translation_reviews.id")
+    )
+    document_id: Mapped[str]
+    accepted_document_id: Mapped[str]
+    kind: Mapped[str]
+    answer: Mapped[str | None]
+    edited: Mapped[bool] = mapped_column(server_default=text("false"))
+    decided_by: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.users.id")
+    )
+    decided_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
 class TextSettingRow(Base):
     """Per-text settings of a language version (issue 422).
 

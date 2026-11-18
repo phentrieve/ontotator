@@ -41,3 +41,30 @@ export function LeadReason({ task, className = "lead-reason" }: { task: LeadReas
   if (lines.length === 0) return null;
   return <div className={className} role="note" aria-label="From the lead">{lines.map(line => <p key={line}>{line}</p>)}</div>;
 }
+
+/** The lead's decision on a submitted query (issue 483), as the translation review's workspace carries it. */
+export interface QueryAnswerFacts {
+  kind: "reviewer_text" | "unchanged";
+  accepted_version: number;
+  decided_at: string;
+  answer?: string | null;
+  edited?: boolean;
+}
+
+/** "Your text was accepted as v2." / "…, with changes by the lead." / "v1 was accepted as it is." */
+export function queryOutcomeText(answer: QueryAnswerFacts): string {
+  if (answer.kind === "unchanged") return `v${answer.accepted_version} was accepted as it is.`;
+  return `Your text was accepted as v${answer.accepted_version}${answer.edited ? ", with changes by the lead" : ""}.`;
+}
+
+/**
+ * The lead's decision on the reviewer's query with the answer, at the submitted review (My tasks, View result).
+ * Renders nothing while the lead has not decided the query.
+ */
+export function QueryAnswer({ answer }: { answer: QueryAnswerFacts | null | undefined }): JSX.Element | null {
+  if (!answer) return null;
+  return <div className="lead-reason" role="note" aria-label="Answer from the lead">
+    <p>{`The lead decided your query${on(answer.decided_at)}. ${queryOutcomeText(answer)}`}</p>
+    {answer.answer?.trim() ? <p>{`Answer from the lead: ${answer.answer.trim()}`}</p> : <p>The lead wrote no answer.</p>}
+  </div>;
+}

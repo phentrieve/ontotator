@@ -113,6 +113,25 @@ class VersionEditorialCorrectionView(_View):
     corrected_by: PersonRefView | None = None
 
 
+class VersionQueryDecisionView(_View):
+    """The lead's decision on a query that accepted this version (issue 483)."""
+
+    # ``reviewer_text``: this version is the reviewer's proposed text;
+    # ``unchanged``: this version was accepted as it is.
+    kind: Literal["reviewer_text", "unchanged"]
+    # The version the lead decided on, the version the reviewer read and the
+    # reviewer's task.
+    decided_document_id: str
+    reviewed_document_id: str
+    reviewer_assignment_id: int
+    # What the lead wrote to the reviewer.
+    answer: str | None = None
+    # The lead changed the reviewer's text before saving it.
+    edited: bool = False
+    decided_at: datetime | None = None
+    decided_by: PersonRefView | None = None
+
+
 class DocumentVersionView(_View):
     document_id: str
     external_id: str
@@ -131,6 +150,7 @@ class DocumentVersionView(_View):
     discarded: VersionDiscardView | None = None
     upload: VersionUploadView | None = None
     editorial_correction: VersionEditorialCorrectionView | None = None
+    query_decision: VersionQueryDecisionView | None = None
 
 
 class RowProposalSetView(_View):

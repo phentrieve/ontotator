@@ -246,6 +246,24 @@ class VersionOrigin:
 
 
 @dataclass(frozen=True)
+class QueryAnswer:
+    """The lead's decision on the reviewer's query (issue 483), as the
+    reviewer reads it at the submitted task.
+
+    ``reviewer_text``: the proposed text became version
+    ``accepted_version`` (``edited``: the lead changed it before saving);
+    ``unchanged``: the reviewed version (or its typo fix) was accepted as it
+    is. ``answer`` is what the lead wrote.
+    """
+
+    kind: Literal["reviewer_text", "unchanged"]
+    accepted_version: int
+    decided_at: datetime
+    answer: str | None = None
+    edited: bool = False
+
+
+@dataclass(frozen=True)
 class ReviewDraft:
     text: str
     form: dict[str, Any]
@@ -284,6 +302,9 @@ class ReviewWorkspace:
     second_review_reason: str | None = None
     reopened_at: datetime | None = None
     reopen_reason: str | None = None
+    # The lead's decision on this submitted query, with the answer; None
+    # while the lead has not decided it and for other decisions.
+    query_answer: QueryAnswer | None = None
 
 
 class TranslationReviewService:
@@ -623,7 +644,19 @@ class TranslationReviewService:
                 second_review_reason=second[1] if second else None,
                 reopened_at=reopen[0] if reopen else None,
                 reopen_reason=reopen[1] if reopen else None,
+                query_answer=self._query_answer(conn, submitted),
             )
+
+    @staticmethod
+    def _query_answer(
+        conn: Connection, submitted: TranslationReviewRecord | None
+    ) -> QueryAnswer | None:
+        if submitted is None or submitted.decision != "query":
+            return None
+        from ontotator.application.query_decisions import decisions_of_reviews
+
+        found = decisions_of_reviews(conn, [submitted.id]).get(submitted.id)
+        return None if found is None else QueryAnswer(**found)
 
     @staticmethod
     def _version_origin(

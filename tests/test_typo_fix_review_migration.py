@@ -1,6 +1,7 @@
 """Migration 0046 (review 2, F1), data only: a typo fix left ``reviewed``
 behind a review of the old text becomes ``accepted`` like the version it
-fixes. It follows 0045 (the lead pause): one head."""
+fixes. It follows 0045 (the lead pause); 0049 (query decisions) follows it:
+one head."""
 
 from __future__ import annotations
 
@@ -24,7 +25,8 @@ PREVIOUS = "0045"
 
 def test_one_head_follows_the_lead_pause() -> None:
     scripts = ScriptDirectory.from_config(alembic_config())
-    assert scripts.get_heads() == [head_revision()] == [REVISION]
+    # One head; later migrations follow this one.
+    assert scripts.get_heads() == [head_revision()]
     revision = scripts.get_revision(REVISION)
     assert revision is not None and revision.down_revision == PREVIOUS
 
