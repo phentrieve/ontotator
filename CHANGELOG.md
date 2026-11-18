@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- Ontology tree: **Hide details** below the selected term keeps only its name and code, so the tree gets the room; **Show details** brings the rest back. The choice is kept in the browser.
+- Ontology tree: **Hide details**, next to the name of the selected term below the tree, keeps only its name and code on one line, so the rows of the tree get the room (about 20 px in a 600 px high window, 67 px at 900 px); **Show details** brings the rest back. The choice is kept per user in the browser.
 
 ### Changed
 
