@@ -56,6 +56,19 @@ export interface ProjectDocumentsQuery {
   page?: string;
 }
 
+/** Filters of the translation reviews list; absent means all, newest first, page 1. */
+export interface TranslationReviewsQuery {
+  /** Reviewer (pseudonym). */
+  reviewer?: string;
+  /** Decision code, or `open` for a review that is not submitted. */
+  decision?: string;
+  language?: string;
+  /** `oldest`: oldest submitted first; absent means newest first. */
+  sort?: string;
+  page?: string;
+}
+export const TRANSLATION_REVIEW_FIELDS = ["reviewer", "decision", "language", "sort", "page"] as const;
+
 /** Activity filters of the row panel (route `panel_stage`). */
 export type PanelStage = "review" | "annotation" | "final";
 export const PANEL_STAGES: readonly PanelStage[] = ["review", "annotation", "final"];
@@ -136,6 +149,8 @@ export type Route =
   | { name: "projectCase"; key: string; caseId: string; variant?: string; annotations?: string; compare?: string; show?: string; compare_show?: string; documents?: ProjectDocumentsQuery }
   | { name: "projectProgress"; key: string }
   | { name: "projectExport"; key: string }
+  /** The lead's list of translation reviews (issue 483); filters, order and page live in the address. */
+  | ({ name: "projectTranslationReviews"; key: string } & TranslationReviewsQuery)
   /** Read-only guidelines page; without `version` the version in force. */
   | { name: "projectGuidelines"; key: string; version?: number }
   | { name: "projectProblemReport"; key: string; reportId: string; action?: "resume"; section?: "decide"; documents?: ProjectDocumentsQuery }
@@ -240,6 +255,15 @@ export function parseRoute(hash: string): Route {
       const version = Number(guidelines[2]);
       return Number.isSafeInteger(version) ? { name: "projectGuidelines", key, version } : notFound;
     }
+    const reviews = /^#\/projects\/([^/]+)\/translation-reviews$/.exec(path);
+    if (reviews) {
+      const query: TranslationReviewsQuery = {};
+      for (const field of TRANSLATION_REVIEW_FIELDS) {
+        const value = params.get(field);
+        if (value !== null && value !== "") query[field] = value;
+      }
+      return { name: "projectTranslationReviews", key: decodeURIComponent(reviews[1]), ...query };
+    }
     const project = /^#\/projects\/([^/]+)\/(documents|progress|export)$/.exec(path);
     if (!project) return notFound;
     const key = decodeURIComponent(project[1]);
@@ -288,6 +312,8 @@ export function routeHref(route: Route): string {
     ])}`;
     case "projectProgress": return `#/projects/${encodeURIComponent(route.key)}/progress`;
     case "projectExport": return `#/projects/${encodeURIComponent(route.key)}/export`;
+    case "projectTranslationReviews": return `#/projects/${encodeURIComponent(route.key)}/translation-reviews${querySuffix(
+      TRANSLATION_REVIEW_FIELDS.map(field => [field, route[field]]))}`;
     case "projectGuidelines": return `#/projects/${encodeURIComponent(route.key)}/guidelines${route.version === undefined ? "" : `/v${route.version}`}`;
     case "projectProblemReport": return `#/projects/${encodeURIComponent(route.key)}/problem-reports/${encodeURIComponent(route.reportId)}${querySuffix([
       ["action", route.action], ["section", route.section], ...documentsEntries(route.documents, "documents_"),

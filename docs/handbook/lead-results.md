@@ -137,6 +137,21 @@ Every listed text changes, or none: if a text or a final result changed since th
 
 ## Translation and text-change decisions
 
+### Read the translation reviews of a project
+
+What for: judge one reviewer's work, and read what reviewers wrote, without opening every text card.
+
+1. In the sidebar, click **Progress**, then **Translation reviews**.
+2. The list has one row per submitted translation review, newest first, and one per review that is assigned but not submitted (*Open*, always last). Each row shows the text (case ID, language, version), the reviewer, the decision, whether the change is clinically relevant, the categories, the rationale, the number of changed passages and when it was submitted.
+3. Filter with **Person**, **Decision** and **Language**; **Order** turns the list to **Oldest first**. The address keeps the filters, so the list is as you left it when you come back from a text. The list shows 25 reviews per page; **Previous** and **Next** change the page.
+4. Click **Compare versions** in the row of a review that was accepted with corrections. The text view opens with the reviewed version on the left and the corrected version on the right; tick **Show changes** to see the passages ([Read a text and other people's work in the text view](lead-documents.md#read-a-text-and-other-peoples-work-in-the-text-view)). Every other row has **Open text**, which opens the reviewed version: a query or a rejection creates no version, and an unchanged text has nothing to compare.
+
+Read the **Rationale** column also for accepted reviews. A reviewer who accepts a translation may note a problem there that does not change the translation, for example an odd dose that the source also has. No other page shows such a remark.
+
+The **Changes** column counts each changed place once, by words: a replaced wording is one passage. **Show changes** counts added and removed passages separately, so its numbers can be higher. A change of spaces or line breaks only is not counted. *Not counted* means the two texts differ too much to count.
+
+Only leads and system administrators can open the list. To decide a query or a rejection, go on with the next section.
+
 ### Resolve a rejected or queried translation
 
 What for: decide what happens after a reviewer rejected or queried a translation. The row's next step is **Resolve rejected translation** or **Resolve queried translation**.

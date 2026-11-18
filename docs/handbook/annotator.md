@@ -425,6 +425,8 @@ Then decide:
 | **Query** | The meaning may differ clinically and you are not sure. | Not accepted. The lead reads your rationale and decides. Annotation tasks already assigned keep waiting. |
 | **Rejected** | The translation changes the clinical meaning. | Not accepted. The lead decides: a new review, a correction or discarding it. Annotation tasks already assigned keep waiting. |
 
+The lead reads the **Rationale** of every review, also of an accepted one, in a list of all translation reviews. A remark that does not change the translation, for example about the source, can go there.
+
 Steps:
 
 1. Open the task. The **Source** is on the left, the **Translation** on the right.

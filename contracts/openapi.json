@@ -2775,6 +2775,155 @@
         "x-ontotator-project-token": true
       }
     },
+    "/api/v1/projects/{key}/translation-review-list": {
+      "get": {
+        "tags": [
+          "translation-reviews"
+        ],
+        "summary": "Translation Review List",
+        "description": "Submitted and open translation reviews (leads and system admins).",
+        "operationId": "translation_review_list_api_v1_projects__key__translation_review_list_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "reviewer",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The reviewer's pseudonym.",
+              "title": "Reviewer"
+            },
+            "description": "The reviewer's pseudonym."
+          },
+          {
+            "name": "decision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "accepted_unchanged",
+                      "accepted_corrected",
+                      "query",
+                      "rejected",
+                      "open"
+                    ],
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Decision"
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Languages of the reviewed texts.",
+              "title": "Language"
+            },
+            "description": "Languages of the reviewed texts."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "-submitted",
+                "submitted"
+              ],
+              "type": "string",
+              "description": "By submitted date; open reviews always come last.",
+              "default": "-submitted",
+              "title": "Sort"
+            },
+            "description": "By submitted date; open reviews always come last."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranslationReviewListPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "read",
+        "x-ontotator-project-token": true
+      }
+    },
     "/api/v1/assignments/{assignment_id}/work-time": {
       "get": {
         "tags": [
@@ -33369,6 +33518,206 @@
           "passed"
         ],
         "title": "TranslationCheckView"
+      },
+      "TranslationReviewListPage": {
+        "properties": {
+          "reviews": {
+            "items": {
+              "$ref": "#/components/schemas/TranslationReviewListRow"
+            },
+            "type": "array",
+            "title": "Reviews"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "reviewers": {
+            "items": {
+              "$ref": "#/components/schemas/PersonRefView"
+            },
+            "type": "array",
+            "title": "Reviewers"
+          },
+          "languages": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Languages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reviews",
+          "total",
+          "limit",
+          "offset",
+          "reviewers",
+          "languages"
+        ],
+        "title": "TranslationReviewListPage"
+      },
+      "TranslationReviewListRow": {
+        "properties": {
+          "review_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Id"
+          },
+          "assignment_id": {
+            "type": "integer",
+            "title": "Assignment Id"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "reviewer": {
+            "$ref": "#/components/schemas/PersonRefView"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "accepted_unchanged",
+              "accepted_corrected",
+              "query",
+              "rejected",
+              "open"
+            ],
+            "title": "Decision"
+          },
+          "clinical_change": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clinical Change"
+          },
+          "categories": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "omission",
+                "addition",
+                "assertion",
+                "value",
+                "anatomy",
+                "terminology",
+                "source"
+              ]
+            },
+            "type": "array",
+            "title": "Categories"
+          },
+          "rationale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rationale"
+          },
+          "changed_passages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changed Passages"
+          },
+          "created_variant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created Variant Id"
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At"
+          },
+          "assigned_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "review_id",
+          "assignment_id",
+          "document_id",
+          "case_id",
+          "language",
+          "version",
+          "reviewer",
+          "decision",
+          "clinical_change",
+          "categories",
+          "rationale",
+          "changed_passages",
+          "created_variant_id",
+          "submitted_at",
+          "assigned_at"
+        ],
+        "title": "TranslationReviewListRow",
+        "description": "One translation review of the project.\n\n``decision`` is ``open`` for an assigned review that is not submitted\n(again); then ``review_id``, the form fields and ``submitted_at`` are\nnull. ``changed_passages``: the passages the reviewer's text differs in\nfrom the reviewed text, compared by words (0 when the text is unchanged,\nnull when the texts differ too much to count). ``created_variant_id``:\nthe version an \"accepted with corrections\" review created."
       },
       "TranslationReviewRecord": {
         "properties": {

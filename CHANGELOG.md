@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Translations: a list of translation reviews for leads (#483). **Translation reviews** on **Progress** opens one row per submitted translation review, newest first, and one per review that is assigned but not submitted: the text (case ID, language, version), the reviewer, the decision, the clinical flag, the categories, the rationale, the number of changed passages and the submitted date. The rationale is shown for accepting reviews too, so a remark a reviewer leaves there, for example about the source, reaches the lead. **Person**, **Decision**, **Language** and **Order** filter and sort on the server, 25 reviews per page; the address keeps them. **Compare versions** in the row of a review accepted with corrections opens the text view with the reviewed and the corrected version side by side, ready for **Show changes**; other rows open the reviewed text. New `GET /api/v1/projects/{key}/translation-review-list` (scope `read`; leads and system administrators only, everyone else gets 403) with `reviewer` (pseudonym), `decision` (also `open`), `language`, `sort` (`-submitted`, `submitted`), `limit` (at most 200) and `offset`; it returns `reviews`, `total` and the choices of the filters (`reviewers`, `languages`). `changed_passages` is counted on the server by words: a replaced wording is one passage, a change of spaces only is none, and it is null when the texts differ too much to count. `GET …/translation-reviews` is unchanged. No migration.
+
 ## [0.11.0] - 2026-11-17
 
 ### Added
