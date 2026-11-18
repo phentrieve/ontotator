@@ -4246,7 +4246,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
         <div className="inspector-pane density-compact" ref={inspectorRef}>
           {/* With the guidelines open (from 1060 px): "Details | Guidelines vN" at the top; Details stays mounted while hidden. */}
           {tabs.hosted && guidelines && <InspectorTabList idBase={inspectorIdBase} tab={tabs.tab}
-            version={guidelines.version} onSelect={tabs.select} onClose={guidelines.close} />}
+            version={guidelines.versionName} onSelect={tabs.select} onClose={guidelines.close} />}
           <div className="inspector-details" {...(tabs.hosted ? { role: "tabpanel", id: inspectorIds.detailsPanel,
             "aria-labelledby": inspectorIds.detailsTab, hidden: guidelinesTab } : {})}>
           {/* Always mounted so the text change is announced; aria-live, not role="status", which the save state owns.

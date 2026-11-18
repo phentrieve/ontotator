@@ -63,6 +63,9 @@ def register_monitoring(
         For leads each version names how many members were notified of it
         and opened it ('reach') and who has not seen it yet ('not_seen');
         the text of a version is the resource ontotator://projects/{project}/guideline.
+        'version' counts the project's uploads and is the identifier; 'label'
+        is the version the document gives itself ('3.1'), null without one.
+        Name a version to people as '3.1 (v2)', as the app does.
         """
         listing: dict[str, Any] = await api.get(project_path(project, "guidelines"))
         return listing

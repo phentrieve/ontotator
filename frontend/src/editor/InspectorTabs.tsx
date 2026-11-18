@@ -159,7 +159,8 @@ export interface InspectorTabListProps {
   /** Prefix of the tab and panel IDs (see `inspectorTabIds`). */
   idBase: string;
   tab: InspectorTab;
-  version: number;
+  /** The shown version as it is named: "v2", or "3.1 (v2)" with the project's own label. */
+  version: string;
   onSelect: (tab: InspectorTab) => void;
   onClose: () => void;
 }
@@ -195,7 +196,7 @@ export function InspectorTabList({ idBase, tab, version, onSelect, onClose }: In
   return <div className="inspector-tabs" onKeyDown={onEscape}>
     <div role="tablist" aria-label="Inspector" className="inspector-tablist" onKeyDown={onKeyDown}>
       {tabButton("details", <>Details</>)}
-      {tabButton("guidelines", <>Guidelines <span className="inspector-tab-badge">v{version}</span></>)}
+      {tabButton("guidelines", <>Guidelines <span className="inspector-tab-badge">{version}</span></>)}
     </div>
     <IconButton className="inspector-tabs-close" label="Close guidelines" icon={<IconClose />} variant="quiet" size="sm" onClick={onClose} />
   </div>;

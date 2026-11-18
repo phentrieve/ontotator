@@ -8,6 +8,7 @@ case no guideline is in force (no fallback to an earlier version).
 from __future__ import annotations
 
 import hashlib
+import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -18,6 +19,7 @@ from ontotator.domain.errors import DomainError
 GuidelineKind = Literal["markdown", "text"]
 MAX_GUIDELINE_BYTES = 262_144
 MAX_NOTE_CHARS = 280
+MAX_LABEL_CHARS = 40
 NOTICE_LIMIT = 5
 
 _BOM = b"\xef\xbb\xbf"
@@ -57,7 +59,7 @@ def decode_body(data: bytes) -> str:
 
 
 def validate_note(
-    value: str | None, *, field: Literal["change_note", "reason"]
+    value: str | None, *, field: Literal["change_note", "reason", "label"]
 ) -> str | None:
     """A change note or withdrawal reason: optional, one line, at most 280 chars."""
     if value is None:
@@ -68,6 +70,20 @@ def validate_note(
     if len(note) > MAX_NOTE_CHARS or note.splitlines() != [note]:
         raise DomainError("GUIDELINE_NOTE_INVALID", {"field": field})
     return note
+
+
+def validate_label(value: str | None) -> str | None:
+    """A project's own name of a version ("3.1"): optional, one line, at most
+    40 characters, no control or format characters. The upload number stays
+    the identifier; the label is only shown with it."""
+    label = validate_note(value, field="label")
+    if label is None:
+        return None
+    if len(label) > MAX_LABEL_CHARS or any(
+        unicodedata.category(char) in {"Cc", "Cf"} for char in label
+    ):
+        raise DomainError("GUIDELINE_NOTE_INVALID", {"field": "label"})
+    return label
 
 
 def body_sha256(body: str) -> str:
@@ -86,6 +102,7 @@ class VersionFact:
     created_at: datetime
     change_note: str | None
     withdrawn: bool
+    label: str | None = None
 
 
 def current_version(versions: Sequence[VersionFact]) -> int | None:
@@ -102,6 +119,7 @@ class Notice:
     to_version: int  # L
     changes: tuple[VersionFact, ...]  # versions in (S, L], newest first
     more: int  # versions in (S, L] beyond NOTICE_LIMIT
+    to_label: str | None = None  # the project's own name of L
 
 
 def compute_notice(versions: Sequence[VersionFact], seen: int | None) -> Notice | None:
@@ -120,4 +138,5 @@ def compute_notice(versions: Sequence[VersionFact], seen: int | None) -> Notice 
         to_version=latest,
         changes=tuple(unseen[:NOTICE_LIMIT]),
         more=max(len(unseen) - NOTICE_LIMIT, 0),
+        to_label=unseen[0].label,
     )

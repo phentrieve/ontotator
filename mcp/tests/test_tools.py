@@ -252,6 +252,34 @@ async def test_publish_guideline_names_the_latest_version_it_saw(
     form = post.request.content.decode()
     # The route takes a form field: empty when the project has no guideline.
     assert f'name="expected_latest_version"\r\n\r\n{sent}\r\n' in form
+    # No label given: the field is sent empty, which the server reads as none.
+    assert 'name="label"\r\n\r\n\r\n' in form
+
+
+async def test_publish_guideline_sends_the_label(
+    fake: FakeApi, settings: Settings, tmp_path: Path
+) -> None:
+    guide = tmp_path / "guide.md"
+    guide.write_text("# Guide")
+    fake.on(
+        "GET",
+        f"{P}/guidelines",
+        build("GuidelineListing", latest_version=1, current=None, versions=[]),
+    )
+    fake.on(
+        "POST", f"{P}/guidelines", build("GuidelineSummary", version=2, label="3.1")
+    )
+    limited = replace(settings, files_dirs=(tmp_path.resolve(),))
+    server = build_server(limited, transport=httpx.MockTransport(fake))
+    async with Client(server) as client:
+        summary = await call(
+            client,
+            "publish_guideline",
+            {"project": "p", "path": str(guide), "label": "3.1"},
+        )
+    [post] = fake.calls_to("POST", f"{P}/guidelines")
+    assert 'name="label"\r\n\r\n3.1\r\n' in post.request.content.decode()
+    assert (summary["version"], summary["label"]) == (2, "3.1")
 
 
 async def test_guideline_notes_state_their_limit(

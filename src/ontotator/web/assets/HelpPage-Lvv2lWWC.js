@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-Qbr7cgVg.js";import{n as a,t as o}from"./lib-C4NATZjP.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-CFckHJ6B.js";import{n as a,t as o}from"./lib-DCBVg41H.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -73,7 +73,7 @@ Words you meet in the app, in alphabetical order. The handbook uses one word per
 | Finalization | The third part of the lead's text card, where the lead accepts the final result or starts a consolidation. |
 | Finding | One ontology term marked in a text, with its values, modifiers and zero or more mentions. |
 | Group | In a consolidation: the findings from different submissions on overlapping passages, decided together. |
-| Guidelines | The project's annotation rules. Leads publish numbered versions (v1, v2, …); you read the version in force. |
+| Guidelines | The project's annotation rules. Leads publish numbered versions (v1, v2, …); you read the version in force. A lead can add the version the document gives itself; it is then shown first, for example *3.1 (v2)*. |
 | Layer | Part of the annotation setup with its own ontology. Each required layer must be checked before you submit. A **Reference** layer is read-only; a **Locked** layer cannot be edited. |
 | Mention | A marked passage of text that supports a finding. A finding can have several mentions. |
 | Modifier | An HPO term such as a severity or an onset, attached to a finding. |
@@ -449,7 +449,7 @@ The **More** menu holds **Work rounds**, **Report a text problem…**, **Report 
 
 Open the guidelines with **More** › *Guidelines v2* or, the first time, with the button in the notice, for example *Read guidelines v2*. On a wide screen they open in the right column, so the text keeps its place in the middle:
 
-- The right column gets two tabs, **Details** and *Guidelines v2*. Click a tab to switch, or focus a tab and press \`←\` or \`→\`.
+- The right column gets two tabs, **Details** and *Guidelines v2* (*Guidelines 3.1 (v2)* when the version has the lead's own number). Click a tab to switch, or focus a tab and press \`←\` or \`→\`.
 - Selecting a finding in the list or in the text keeps the guidelines in front. The decision keys \`1\`, \`2\` and \`0\` act on the selected proposal from there.
 - When you mark text, use the term search (\`/\`) or the values (\`V\`), or a decision needs a note (\`4\`, **Unresolved**), **Details** comes to the front by itself. The guidelines tab stays until you close it.
 - **All versions** opens the guidelines page in a new tab. **Close**, the ✕ next to the tabs or \`Esc\` closes the guidelines and returns to **Details**.
@@ -972,7 +972,7 @@ Decide each group by the text and the project guidelines, as if you were annotat
 - If none of the versions is right, use **More…** › **Other term…** or **Edit values…** ([Edit values or pick another term](#edit-values-or-pick-another-term)).
 - If the guidelines do not settle it, decide as well as you can, write a **Note for the lead** and tick **Guidelines unclear here**. The lead sees both and can improve the guidelines.
 
-Open the guidelines with the guidelines button in the header, for example *Guidelines v2* ([Read the project guidelines](getting-started.md#read-the-project-guidelines)).
+Open the guidelines with the guidelines button in the header, for example *Guidelines v2*, or *Guidelines 3.1 (v2)* when your lead gave the version its own number ([Read the project guidelines](getting-started.md#read-the-project-guidelines)).
 
 ## Groups and their states
 
@@ -1290,6 +1290,10 @@ The result has findings with values filled in by default, modifier terms used as
 
 ## Leading a project
 
+### The app says "Guidelines v2", but our guideline is version 3.1
+
+The number after *v* counts the guideline files published in this project; it is not the version of your document. When you publish, enter your document's version in **Your version of the guideline (optional)**. The app then shows it first, for example *Guidelines 3.1 (v2)*. A version that is already published keeps its name: publish the text again with your version to change it. See [Publish the first or a new guideline version](lead-settings.md#publish-the-first-or-a-new-guideline-version).
+
 ### I cannot accept a result
 
 In projects where the consolidator of a text may not be one of its annotators, you cannot choose a result you made yourself. Another lead must choose it. See [Accept a result or compare results](lead-results.md#accept-a-result-or-compare-results).
@@ -1441,7 +1445,7 @@ The editor opens. If you have no task, you see **No texts are assigned to you ye
 
 ## 3. Read the guidelines
 
-The first time you open a task in a project with guidelines, a notice asks you to read them. Click the read button in the notice, for example *Read guidelines v2*. Later you find them under **More** in the toolbar. On a wide screen they open in the right column, as a tab next to **Details**, so the text stays in view; see [The guidelines in the editor](annotator.md#the-guidelines-in-the-editor).
+The first time you open a task in a project with guidelines, a notice asks you to read them. Click the read button in the notice, for example *Read guidelines v2* (or *Read guidelines 3.1 (v2)* when your lead gave the version its own number). Later you find them under **More** in the toolbar. On a wide screen they open in the right column, as a tab next to **Details**, so the text stays in view; see [The guidelines in the editor](annotator.md#the-guidelines-in-the-editor).
 
 The guidelines tell you what to mark and how: which findings count, how much text to mark, how to handle negations or family history. When in doubt, follow the guidelines; if they do not answer your question, ask your lead.
 
@@ -1637,7 +1641,7 @@ Each row is one task. The **Task** column says what to do, for example **Annotat
 
 On a phone, each row has two parts: under **Task** the text, what to do and the status below each other, and beside it the **Action**. The reason of a **Paused** or **Reopened** task is written out in full under its badge, so there is no badge to tap. The project is shown under the text when the list mixes several projects; the dates **Assigned** and **Last change** are left out. Nothing needs to be swiped sideways.
 
-If the project has guidelines, a link such as *Project guidelines v2* appears above the table. Read them before you start: they say what to mark and how.
+If the project has guidelines, a link such as *Project guidelines v2* (or *Project guidelines 3.1 (v2)*) appears above the table. Read them before you start: they say what to mark and how.
 
 If you see **No texts are assigned to you yet.**, wait until your lead assigns texts to you.
 
@@ -1690,7 +1694,7 @@ If you see **Task not found or not yours**, the task was withdrawn or is assigne
 What for: check the annotation rules of the project.
 
 1. Open a task.
-2. Open **More** in the toolbar and choose the guidelines, for example *Guidelines v2*. *(new)* after it means the guidelines changed since you last read them. In a translation review or consolidation, the guidelines are a button in the header instead, with a **New** badge.
+2. Open **More** in the toolbar and choose the guidelines, for example *Guidelines v2*, or *Guidelines 3.1 (v2)* when your lead gave the version its own number: *3.1* is the version of the guideline document, *v2* counts the uploads in the app. *(new)* after it means the guidelines changed since you last read them. In a translation review or consolidation, the guidelines are a button in the header instead, with a **New** badge.
 3. The guidelines open beside the text; in the editor they take the right column as a tab next to **Details** (see [The guidelines in the editor](annotator.md#the-guidelines-in-the-editor)). Click **All versions** to see older versions, or **Close** to hide them.
 
 The first time you open a task in a project with guidelines, a notice asks you to read them. Click the read button in the notice, for example *Read guidelines v2*. The notice also says where you find them later: under **More** › *Guidelines* in the editor, or the guidelines button in the header of a translation review or consolidation.
@@ -2104,7 +2108,7 @@ What for: read a text with other people's findings or the final result, and comp
 4. Optional: click **Compare** to open a second pane. Each pane has its own **Language and version** and **Show** directly above its text: **Current text** on the left, **Comparison text** on the right, so both texts start at the same height. Tick **Couple scrolling** to scroll both together. Click **Close comparison** to close it.
    - When both panes show texts of the same language, for example v1 and its correction v2, tick **Show changes** to see what changed. The older version strikes through the removed passages, the newer version underlines the added ones; the line above the texts counts them. The marks do not change the texts, the findings or **Couple scrolling**. A change of spaces or line breaks only is not marked or counted. If the two texts have little in common, the line reads *The texts differ too much to show the changes* and nothing is marked.
    - When **Show** has someone's annotations that were carried from an earlier version of the text (after **Carry to v2…** or **Handle text change…**), tick **Show changes since** v1 above the text: changed passages get a dashed frame, added text is underlined, and a **−** marker shows the earlier wording of removed text. **Next ›** and **‹ Previous** step through the passages. The annotator sees the same marks in their task. Not offered while **Compare** is open, which has its own **Show changes**.
-5. Optional: click **Submissions** to open the **Submission history**. Choose a row to show it, then click **Close**. Each finding names its author by pseudonym; leads always see them, also when the project hides annotator names from consolidators.
+5. Optional: click **Submissions** to open the **Submission history**. Choose a row to show it, then click **Close**. Each finding names its author by pseudonym; leads always see them, also when the project hides annotator names from consolidators. Each submission names the guideline version it was made under, for example *Guidelines v2* or, with your own version of the guideline, *Guidelines 3.1 (v2) (current: 3.2 (v3))* ([Publish the first or a new guideline version](lead-settings.md#publish-the-first-or-a-new-guideline-version)).
 
 **Open my task** goes to your own task on this text.
 
@@ -2114,7 +2118,7 @@ What for: see each version of a translation, its reviews and its origin.
 
 1. Open the text card and click **Translation**.
 2. The list shows each version with its origin and status, then one row per person who worked on it: the name, the task and the status. Older ones are under **Older versions**; with parallel versions they are grouped by version chain.
-3. Click **View text** to read a version, or **Translation reviews** to see every review decision. In a reviewer's row, **Reopen…** lets them review the version again and **Remove…** removes their assignment. A review of a version you fixed typos in has no **Reopen…**: assign a review of the corrected version instead.
+3. Click **View text** to read a version, or **Translation reviews** to see every review decision, each with the guideline version it was made under (*Guidelines v2*, or *Guidelines 3.1 (v2)* with your own version). In a reviewer's row, **Reopen…** lets them review the version again and **Remove…** removes their assignment. A review of a version you fixed typos in has no **Reopen…**: assign a review of the corrected version instead.
    The buttons that change the text of a version say who does the work, and a grey line under them says the difference in a few words, for example *Ask a reviewer: a reviewer corrects it in a new review. Correct it myself: you edit it here; it is reviewed again. Fix typos: spacing, typos, grammar; the status stays, no review. Upload: a text made elsewhere becomes the next version.* At an accepted version, **Ask a reviewer to correct…** gives the correction to a translation reviewer ([Request a translation correction](#request-a-translation-correction)). At the newest accepted version, **Correct it myself…** lets you correct it yourself ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)). At the newest version of a translation, **Upload a corrected text…** brings in a text made elsewhere as the next version ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)). **Fix typos…** at the newest version fixes spacing, typos or grammar without a review and keeps the status of the text; a version made this way says *Typo fix* under its name, with the lead and the reason ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
 4. Click **Compare with source** to compare the translation with the source text.
 
@@ -2549,7 +2553,7 @@ What for: pick another result after you already chose one.
 
 1. Open the text card at **Finalization**.
 2. Click **Change final…** next to **Open result**.
-3. Click **Use as final** in the row of the result you want. It saves at once; the card stays on this text and says *Final result saved for EN100022 en.*
+3. Click **Use as final** in the row of the result you want. It saves at once; the card stays on this text and says *Final result saved for EN100022 en.* Each result names the guideline version it was made under, for example *Guidelines v2 (current: v3)*, or *Guidelines 3.1 (v2) (current: 3.2 (v3))* when the versions have your own numbers ([Publish the first or a new guideline version](lead-settings.md#publish-the-first-or-a-new-guideline-version)).
 
 The message *Final result of EN100022 en changed.* has an **Undo** button, also while the card is open. It brings the earlier final result back (*The earlier final result of EN100022 en is back.*), under the same rules as the Undo of **Change final…** for several texts: for the lead who made the change, once, within an hour, and refused once something the final result rests on changed since ([Accept or change the final result of several texts](#accept-or-change-the-final-result-of-several-texts)). The same message follows **Use the newer result** under *Review changes…*. After the Undo, the green line *Final result saved for EN100022 en.* in the card goes: it spoke of the result that is no longer final. A first choice of a final result has no Undo: use [Withdraw a final result](#withdraw-a-final-result). **History** in the card lists each change and its Undo.
 
@@ -3138,10 +3142,13 @@ Before you start: published versions cannot be edited, only withdrawn. Check the
 2. Without guidelines, the form is already open (**No guidelines yet**). Otherwise, click **Publish a new version**.
 3. Choose a \`.md\` or \`.txt\` file (UTF-8, up to 256 KB) in **Guideline file (.md or .txt, up to 256 KB)**.
 4. Check the preview.
-5. Optional: describe the change in **What changed? (optional)**.
-6. Click the publish button, for example *Publish as v2*. Or click **Discard**.
+5. Optional: enter the version your document gives itself, for example *3.1*, in **Your version of the guideline (optional)** (one line, up to 40 characters).
+6. Optional: describe the change in **What changed? (optional)**.
+7. Click the publish button, for example *Publish as v2*. Or click **Discard**.
 
 Everyone sees a notice in their next task.
+
+The number after *v* counts the uploads of this project: the first file you publish is v1, the next one v2, also when you publish an earlier text again. It is not the version of your document. If your document has its own version, enter it in step 5: the app then shows it before the upload number everywhere, for example *Guidelines 3.1 (v2)*, *Guidelines updated to 3.1 (v2)* in the notice, and *Guidelines 3.1 (v2) (current: 3.2 (v3))* on a submitted result. Without it, everything reads *Guidelines v2*. Your version cannot be changed after publishing. To correct it, publish the text again with the right one.
 
 ## See who has read the guidelines
 
@@ -3159,13 +3166,13 @@ What for: go back to an earlier text.
 
 1. Open **Settings**, tab **Guidelines**.
 2. In the row of the old version, click **More…**, then the republish item, for example *Republish v1…*.
-3. The form opens with the old text. Click the publish button, for example *Publish as v3*.
+3. The form opens with the old text and, if the old version had one, its own version in **Your version of the guideline (optional)**. Click the publish button, for example *Publish as v3*.
 
 ## Withdraw a guideline version
 
 What for: remove a version that must no longer be read, for example because it contains a mistake.
 
-Warning: the text of the withdrawn version is deleted for good. The version number stays, and results made under it show it as withdrawn. No guideline is in force until you publish or republish one.
+Warning: the text of the withdrawn version is deleted for good. The version number and your own version of it stay, and results made under it show it as withdrawn, for example *Guidelines 3.1 (v2) (withdrawn)*. No guideline is in force until you publish or republish one.
 
 1. Open **Settings**, tab **Guidelines**.
 2. In the version's row, click **More…**, then the withdraw item, for example *Withdraw v2…*.

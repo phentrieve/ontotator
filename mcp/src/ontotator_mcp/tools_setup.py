@@ -463,6 +463,16 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
                 ),
             ),
         ] = "",
+        label: Annotated[
+            str,
+            Field(
+                description=(
+                    "The version the guideline document gives itself, e.g. '3.1';"
+                    " one line, at most 40 characters. Shown before the upload"
+                    " number: 'Guidelines 3.1 (v2)'. Empty: none."
+                )
+            ),
+        ] = "",
     ) -> dict[str, Any]:
         """Publish a new version of the project's annotation guideline.
 
@@ -472,7 +482,9 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         ONTOTATOR_MCP_FILES_DIR; without that variable it refuses. Earlier
         versions stay; annotators are asked
         to read the new one. Refused with GUIDELINE_VERSION_CONFLICT if
-        another version was published meanwhile.
+        another version was published meanwhile. 'version' in the result
+        counts the project's uploads and is the identifier; 'label' is the
+        document's own version, if one was given.
         """
         files = api.local_files([path])
         listing = await api.get(project_path(project, "guidelines"))
@@ -485,6 +497,7 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
                 "change_note": change_note,
                 # A form field: empty for a project without a guideline.
                 "expected_latest_version": "" if latest is None else str(latest),
+                "label": label,
             },
         )
         return summary | {"local_files": [str(file) for file in files]}

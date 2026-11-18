@@ -490,6 +490,68 @@ test("PUBLISHED: My tasks link and the guidelines page", async ({ page }) => {
   await expectGuidelinesItem(page, "Guidelines v1");
 });
 
+test("PUBLISHED: a version with the project's own label reads 3.1 (v2) for the lead and in a task (#487)", async ({ page, browser }) => {
+  const s = await guidelineScenario(page, "PUBLISHED");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await loginGuidelineUser(page, s, "lead");
+  await visit(page, settingsUrl(s));
+  await expectInForce(page, 1, "v1.md");
+  await openPublish(page);
+  await fileInput(page).setInputFiles(s.files["v2.md"]);
+  const own = page.getByLabel("Your version of the guideline (optional)", { exact: true });
+  await expect(page.getByText("The version your document gives itself, for example 3.1. It is shown before the upload number: Guidelines 3.1 (v2).", { exact: true })).toBeVisible();
+  await own.fill("3.1");
+  await page.getByLabel("What changed? (optional)").fill(V2_NOTE);
+  await evidence(page, "label-publish-form");
+  // The upload number stays the identifier: the button still names it.
+  await page.getByRole("button", { name: "Publish as v2", exact: true }).click();
+  await expect(page.locator(".guidelines-success")).toContainText("Published 3.1 (v2). Annotators and reviewers see the update notice when they next open a task.");
+  await expect(page.getByRole("heading", { name: "In force Guidelines 3.1 (v2)", level: 2, exact: true })).toBeVisible();
+  const table = page.getByRole("table", { name: "Guideline versions" });
+  await expect(table.getByRole("rowheader").nth(0)).toHaveText(/^3\.1 \(v2\)/);
+  // The version published without a label reads as before.
+  await expect(table.getByRole("rowheader").nth(1)).toHaveText(/^v1/);
+  await expect(table.getByRole("button", { name: "Read 3.1 (v2)", exact: true })).toBeVisible();
+  await expect(table.getByRole("button", { name: "More actions, v1", exact: true })).toBeVisible();
+  await evidence(page, "label-settings");
+  const listing = await value<Listing>(page, `${root(s)}/guidelines`);
+  expect(listing.versions.map(item => [item.version, item.label ?? null])).toEqual([[2, "3.1"], [1, null]]);
+
+  // The withdraw dialog names it the same way and says what stays.
+  await page.getByRole("region", { name: /^In force/ }).getByRole("button", { name: "More actions, 3.1 (v2)", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Withdraw 3.1 (v2)…", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Withdraw 3.1 (v2)?" });
+  await expect(dialog).toContainText("results made under 3.1 (v2) keep showing “Guidelines 3.1 (v2) (withdrawn)”");
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+
+  const ana = await actor(browser, s, "ana");
+  try {
+    await ana.page.setViewportSize({ width: 1440, height: 900 });
+    await ana.page.goto("/#/");
+    await expect(ana.page.getByRole("link", { name: /^Project guidelines 3\.1 \(v2\)(, .+)?$/ })).toBeVisible();
+    await openTask(ana.page, s, "annotate-1");
+    await expect(ana.page.getByText(/^(Guidelines updated to 3\.1 \(v2\)|This project has guidelines \(3\.1 \(v2\)\))$/)).toBeVisible();
+    await evidence(ana.page, "label-task-notice");
+    await ana.page.getByRole("button", { name: "Read guidelines 3.1 (v2)", exact: true }).click();
+    const tab = ana.page.locator(".inspector-pane").getByRole("tabpanel", { name: "Guidelines 3.1 (v2)", exact: true });
+    await expect(tab.getByRole("heading", { name: "Guidelines 3.1 (v2)", level: 2 })).toBeVisible();
+    await expect(tab.getByText(V2_TEXT)).toBeVisible();
+    await evidence(ana.page, "label-task-tab");
+
+    // The guidelines page, also at phone width: the names fit without sideways scrolling.
+    await ana.page.setViewportSize({ width: 390, height: 844 });
+    await ana.page.goto(`/#/projects/${encodeURIComponent(s.project)}/guidelines`);
+    await expect(ana.page.getByRole("heading", { name: "Guidelines 3.1 (v2)", level: 2 })).toBeVisible();
+    const versions = ana.page.getByRole("list", { name: "Versions" });
+    await expect(versions.getByRole("link", { name: "3.1 (v2)", exact: true })).toHaveAttribute("href", `#/projects/${encodeURIComponent(s.project)}/guidelines/v2`);
+    await expect(versions.getByRole("link", { name: "v1", exact: true })).toBeVisible();
+    expect(await ana.page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    await ana.page.goto(`/#/projects/${encodeURIComponent(s.project)}/guidelines/v1`);
+    await expect(ana.page.getByText("This is v1. The current version is 3.1 (v2).", { exact: true })).toBeVisible();
+    await evidence(ana.page, "label-page-390");
+  } finally { await ana.close(); }
+});
+
 test("PUBLISHED: long links, wide tables and code wrap or scroll in their own box, never the panel or the page (#410)", async ({ page, browser }) => {
   const s = await guidelineScenario(page, "PUBLISHED");
   await loginGuidelineUser(page, s, "lead");
