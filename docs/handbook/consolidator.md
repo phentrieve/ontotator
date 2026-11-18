@@ -26,7 +26,7 @@ Decide each group by the text and the project guidelines, as if you were annotat
 - If none of the versions is right, use **More…** › **Other term…** or **Edit values…** ([Edit values or pick another term](#edit-values-or-pick-another-term)).
 - If the guidelines do not settle it, decide as well as you can, write a **Note for the lead** and tick **Guidelines unclear here**. The lead sees both and can improve the guidelines.
 
-Open the guidelines with the guidelines button in the header, for example *Guidelines v2* ([Read the project guidelines](getting-started.md#read-the-project-guidelines)).
+Open the guidelines with the guidelines button in the header, for example *Guidelines v2*, or *Guidelines 3.1 (v2)* when your lead gave the version its own number ([Read the project guidelines](getting-started.md#read-the-project-guidelines)).
 
 ## Groups and their states
 

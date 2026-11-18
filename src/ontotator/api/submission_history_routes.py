@@ -55,6 +55,8 @@ class SubmissionHistorySummary(BaseModel):
     mode: str
     round_id: str | None = None
     guideline_version: int | None = None
+    # The project's own name of that version ("3.1"), if it has one.
+    guideline_label: str | None = None
     guideline_withdrawn: bool = False
 
 
@@ -175,6 +177,9 @@ def _history(
                 round_id=bindings.get(row["submission_id"])
                 or row["payload"].get("origin_key", {}).get("round_id"),
                 guideline_version=row["guideline_version"],
+                guideline_label=facts[row["guideline_version"]].label
+                if row["guideline_version"] is not None
+                else None,
                 guideline_withdrawn=row["guideline_version"] is not None
                 and facts[row["guideline_version"]].withdrawn,
             )

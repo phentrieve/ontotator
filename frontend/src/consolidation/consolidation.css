@@ -640,3 +640,7 @@
 /* #472: the row's "Decision saved · Undo" never shows beside a dialog opened after it, as the app's toast (issue 439). */
 body:has([role="dialog"][aria-modal="true"]) .cons-undo { visibility: hidden; }
 
+/* Phone and tablet layouts (up to 1024 px), used by touch: the ✓ of a value is at least 44 × 44 px (issue 472). */
+@media (max-width: 1024px) {
+  .cons-take { width: 44px; height: 44px; }
+}

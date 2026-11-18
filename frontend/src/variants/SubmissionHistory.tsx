@@ -1,3 +1,4 @@
+import { currentGuidelineRef, type GuidelineRef } from '../guidelines/versionName';
 import { useEffect, useState } from 'react';
 import { api, type FinalSelectionSummary, type RowRoundView, type RowSubmissionView, type SubmissionHistorySummary } from '../api/client';
 import type { ProjectDocumentsQuery, Route } from '../app/router';
@@ -21,7 +22,7 @@ export interface SubmissionHistoryProps {
 /** Issue 470: a consolidator who is not the lead also sees the submissions they consolidate, which the viewer does not open for them. */
 export const OTHERS_INTRO = 'Submitted results for this text version: your own and the submissions you consolidate. Results are read-only. Choose one of your own rounds to open it in the viewer; read the other submissions on the consolidation screen.';
 
-interface HistoryData { rows: RowSubmissionView[]; rounds: RowRoundView[]; final: FinalSelectionSummary | null; parallel: boolean; guidelineCurrent: number | null }
+interface HistoryData { rows: RowSubmissionView[]; rounds: RowRoundView[]; final: FinalSelectionSummary | null; parallel: boolean; guidelineCurrent: GuidelineRef | null }
 
 /** A submission from the per-document history (non-leads): the reader's own and, for a consolidator, the submissions of
  *  their round (issue 470); the finding count comes from its detail. */
@@ -30,13 +31,13 @@ function ownRow(row: SubmissionHistorySummary, version: number, findings: number
     submission_id: row.submission_id, document_id: row.document_id, version, chain_name: null, author_label: row.author_label,
     is_me: !!row.is_me, recorded_at: row.created_at, mode: row.mode, kind: row.mode === 'review' ? 'consolidation' : row.mode === 'proposal_check' ? 'proposal_check' : 'annotation',
     round_id: row.round_id ?? null, round_ordinal: null, round_state: null, is_latest_in_round: null, finding_count: findings,
-    guideline_version: row.guideline_version ?? null, guideline_withdrawn: row.guideline_withdrawn,
+    guideline_version: row.guideline_version ?? null, guideline_label: row.guideline_label ?? null, guideline_withdrawn: row.guideline_withdrawn,
   };
 }
 
 /** Version in force for the "(current: v3)" label; a failed read only drops the comparison. */
-const currentGuideline = (projectKey: string): Promise<number | null> =>
-  api.listGuidelines(projectKey).then(listing => listing.current?.version ?? null, () => null);
+const currentGuideline = (projectKey: string): Promise<GuidelineRef | null> =>
+  api.listGuidelines(projectKey).then(listing => currentGuidelineRef(listing), () => null);
 
 async function loadLead(projectKey: string, caseId: string, language: string): Promise<HistoryData> {
   const [data, page, guidelineCurrent] = await Promise.all([api.getRowSubmissions(projectKey, caseId, language), api.listDocumentRows(projectKey, { case: caseId, language }), currentGuideline(projectKey)]);

@@ -855,6 +855,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/translation-reviews/{assignment_id}/draft/typography-hints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Draft Typography Hints
+         * @description Spacing errors and invisible characters of the saved draft text.
+         *
+         *     Rule codes and positions only, as the hints of a text version; shown in
+         *     the confirmation of "Submit review…". They block nothing.
+         */
+        get: operations["draft_typography_hints_api_v1_translation_reviews__assignment_id__draft_typography_hints_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/translation-reviews/{assignment_id}/checked-sentences": {
         parameters: {
             query?: never;
@@ -2076,6 +2099,9 @@ export interface paths {
          *     bring back (``tasks``) and, in ``blocked``, why it cannot run now
          *     (``changed``, ``not_in_plan``, ``person_unavailable``); a record that is
          *     unknown, expired or already undone is refused in a preview too.
+         *     ``blocked_texts`` names each text in the way and what changed on it
+         *     (``texts``: how many texts the action changed). The refusal of a blocked
+         *     Undo carries that answer as ``preview`` in its details.
          */
         post: operations["bulk_undo_api_v1_projects__key__bulk_task_actions_undo_post"];
         delete?: never;
@@ -4553,6 +4579,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Label */
+            label?: string | null;
         };
         /** AssignmentOpenRequest */
         AssignmentOpenRequest: {
@@ -4739,7 +4767,7 @@ export interface components {
              * @default case
              * @enum {string}
              */
-            sort: "case" | "import" | "activity";
+            sort: "case" | "import" | "activity" | "given";
             filters?: components["schemas"]["DocumentRowFilters"];
             /**
              * Mode
@@ -4786,7 +4814,7 @@ export interface components {
              * @default case
              * @enum {string}
              */
-            sort: "case" | "import" | "activity";
+            sort: "case" | "import" | "activity" | "given";
             filters?: components["schemas"]["DocumentRowFilters"];
             /**
              * Mode
@@ -4941,6 +4969,11 @@ export interface components {
              * @default
              */
             expected_latest_version: string;
+            /**
+             * Label
+             * @default
+             */
+            label: string;
         };
         /** Body_upload_ontologies_api_v1_admin_ontologies__post */
         Body_upload_ontologies_api_v1_admin_ontologies__post: {
@@ -4951,6 +4984,32 @@ export interface components {
         Body_upload_ontology_results_api_v1_admin_ontologies_upload_results_post: {
             /** Files[] */
             "files[]": string[];
+        };
+        /**
+         * BracketCheck
+         * @description ``passages`` is empty unless the translation has more passages.
+         */
+        BracketCheck: {
+            /** Source Count */
+            source_count: number;
+            /** Translation Count */
+            translation_count: number;
+            /** Passages */
+            passages: components["schemas"]["BracketedPassage"][];
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+        };
+        /** BracketedPassage */
+        BracketedPassage: {
+            /** Start */
+            start: number;
+            /** End */
+            end: number;
+            /** Text */
+            text: string;
         };
         /** BulkAcceptance */
         BulkAcceptance: {
@@ -5365,6 +5424,10 @@ export interface components {
             /** Tasks */
             tasks?: components["schemas"]["BulkUndoTaskView"][];
             blocked?: components["schemas"]["BulkUndoBlock"] | null;
+            /** Texts */
+            texts?: number;
+            /** Blocked Texts */
+            blocked_texts?: components["schemas"]["BulkUndoTextBlock"][];
         };
         /** BulkUndoTaskView */
         BulkUndoTaskView: {
@@ -5387,6 +5450,20 @@ export interface components {
              */
             status: "open" | "in_progress" | "submitted" | "reopened";
             person: components["schemas"]["PersonRefView"];
+        };
+        /** BulkUndoTextBlock */
+        BulkUndoTextBlock: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "final" | "versions" | "plan" | "tasks" | "submissions" | "drafts" | "not_in_plan" | "person_unavailable";
+            /** Message */
+            message: string;
         };
         /**
          * BulkUndoView
@@ -6254,7 +6331,7 @@ export interface components {
             /** Waiting On */
             waiting_on?: string | string[] | null;
             /** Flags */
-            flags?: ("guidelines_unclear" | "over_limit" | "lead_paused") | ("guidelines_unclear" | "over_limit" | "lead_paused")[] | null;
+            flags?: ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator" | "typography_hints") | ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator" | "typography_hints")[] | null;
             /** Proposals */
             proposals?: ("with" | "without") | ("with" | "without")[] | null;
         };
@@ -6381,6 +6458,8 @@ export interface components {
             proposal_set_unrecorded?: boolean;
             annotations_per_text?: components["schemas"]["AnnotationsPerTextView"] | null;
             lead_pause?: components["schemas"]["LeadPauseView"] | null;
+            /** Typography Hints */
+            typography_hints?: number;
             consolidation_progress?: components["schemas"]["ConsolidationProgressView"] | null;
             /**
              * Unreviewed Translation
@@ -6531,6 +6610,30 @@ export interface components {
         DraftResponse: {
             /** Revision */
             revision: number;
+        };
+        /** DraftTypographyHintsView */
+        DraftTypographyHintsView: {
+            /**
+             * Revision
+             * @description Draft revision the hints were computed for.
+             */
+            revision: number;
+            /** Total */
+            total: number;
+            /**
+             * Counts
+             * @description Number of hints per rule code.
+             */
+            counts: {
+                [key: string]: number;
+            };
+            /** Hints */
+            hints: components["schemas"]["TypographyHintView"][];
+            /**
+             * Truncated
+             * @description True when 'hints' holds fewer than 'total'.
+             */
+            truncated: boolean;
         };
         /** Duplicate */
         Duplicate: {
@@ -6916,6 +7019,8 @@ export interface components {
             author?: components["schemas"]["PersonRefView"] | null;
             /** Guideline Version */
             guideline_version?: number | null;
+            /** Guideline Label */
+            guideline_label?: string | null;
             /**
              * Guideline Withdrawn
              * @default false
@@ -7180,6 +7285,8 @@ export interface components {
         GuidelineDocument: {
             /** Version */
             version: number;
+            /** Label */
+            label?: string | null;
             /**
              * Kind
              * @enum {string}
@@ -7226,6 +7333,8 @@ export interface components {
         GuidelineNoticeChangeView: {
             /** Version */
             version: number;
+            /** Label */
+            label?: string | null;
             /** Change Note */
             change_note: string | null;
             /**
@@ -7245,6 +7354,8 @@ export interface components {
             from_version: number | null;
             /** To Version */
             to_version: number;
+            /** To Label */
+            to_label?: string | null;
             /** Changes */
             changes: components["schemas"]["GuidelineNoticeChangeView"][];
             /** More */
@@ -7277,6 +7388,8 @@ export interface components {
         GuidelineSummary: {
             /** Version */
             version: number;
+            /** Label */
+            label?: string | null;
             /**
              * Kind
              * @enum {string}
@@ -9927,6 +10040,7 @@ export interface components {
             reopened_at?: string | null;
             /** Reopen Reason */
             reopen_reason?: string | null;
+            added_brackets?: components["schemas"]["BracketCheck"] | null;
         };
         /** RevokedAssignmentView */
         RevokedAssignmentView: {
@@ -10040,13 +10154,15 @@ export interface components {
          *     (``assignment_id``, ``to_person``); the ``final_*`` kinds name the
          *     results (``from_result`` the one replaced, ``to_result`` the one final
          *     afterwards; null when the submission is no longer among the row's).
+         *     ``text_paused`` and ``text_released`` (issue 464) are a lead's pause and
+         *     release of the text, with ``by`` and the ``reason`` given.
          */
         RowChangeView: {
             /**
              * Kind
              * @enum {string}
              */
-            kind: "reassigned" | "mode_changed" | "mode_restored" | "final_withdrawn" | "reopened" | "reopen_undone" | "round_started" | "final_chosen" | "final_changed" | "final_restored";
+            kind: "reassigned" | "mode_changed" | "mode_restored" | "final_withdrawn" | "reopened" | "reopen_undone" | "round_started" | "final_chosen" | "final_changed" | "final_restored" | "text_paused" | "text_released";
             /**
              * At
              * Format: date-time
@@ -10232,6 +10348,8 @@ export interface components {
             author?: components["schemas"]["PersonRefView"] | null;
             /** Guideline Version */
             guideline_version?: number | null;
+            /** Guideline Label */
+            guideline_label?: string | null;
             /**
              * Guideline Withdrawn
              * @default false
@@ -10586,7 +10704,7 @@ export interface components {
             /** Reason */
             reason?: string | null;
             /** Note */
-            note?: ("machine_translation" | "review_only" | "translation_rejected" | "translation_queried" | "translation_not_accepted" | "unchanged" | "with_corrections" | "in_package" | "outside" | "review_off" | "text_change_waiting" | "may_change" | "not_exported" | "carried_on_submit" | "lead_pause" | "v2_not_annotated" | "no_target_proposals" | "correction" | "new_review" | "source_changed" | "round" | "consolidation") | null;
+            note?: ("machine_translation" | "review_only" | "translation_rejected" | "translation_queried" | "translation_not_accepted" | "unchanged" | "with_corrections" | "typos_fixed" | "in_package" | "outside" | "review_off" | "text_change_waiting" | "may_change" | "not_exported" | "carried_on_submit" | "lead_pause" | "report_pause" | "v2_not_annotated" | "no_target_proposals" | "correction" | "new_review" | "source_changed" | "round" | "consolidation") | null;
             /** Matching */
             matching?: number | null;
             /** Compared */
@@ -10806,6 +10924,8 @@ export interface components {
             round_id?: string | null;
             /** Guideline Version */
             guideline_version?: number | null;
+            /** Guideline Label */
+            guideline_label?: string | null;
             /**
              * Guideline Withdrawn
              * @default false
@@ -11537,6 +11657,8 @@ export interface components {
              * @default false
              */
             guideline_withdrawn: boolean;
+            /** Guideline Label */
+            guideline_label?: string | null;
         };
         /** TranslationRunView */
         TranslationRunView: {
@@ -11694,7 +11816,7 @@ export interface components {
              * Rule
              * @enum {string}
              */
-            rule: "DOUBLE_SPACE" | "SPACE_BEFORE_PUNCTUATION" | "MISSING_SPACE_AFTER_PUNCTUATION" | "TRAILING_WHITESPACE_LINE" | "TRAILING_WHITESPACE_TEXT" | "TAB" | "ZERO_WIDTH_CHARACTER" | "SOFT_HYPHEN" | "CONTROL_CHARACTER";
+            rule: "DOUBLE_SPACE" | "SPACE_BEFORE_PUNCTUATION" | "MISSING_SPACE_AFTER_PUNCTUATION" | "TRAILING_WHITESPACE_LINE" | "TRAILING_WHITESPACE_TEXT" | "TAB" | "ZERO_WIDTH_CHARACTER" | "SOFT_HYPHEN" | "CONTROL_CHARACTER" | "DOUBLE_FULL_STOP";
             /**
              * Start
              * @description First code point of the hint (zero-based, Unicode code points, as annotation spans).
@@ -14129,6 +14251,37 @@ export interface operations {
             };
         };
     };
+    draft_typography_hints_api_v1_translation_reviews__assignment_id__draft_typography_hints_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assignment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftTypographyHintsView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     save_checked_sentences_api_v1_translation_reviews__assignment_id__checked_sentences_put: {
         parameters: {
             query?: never;
@@ -15488,7 +15641,7 @@ export interface operations {
                 final_state?: ("none" | "after_annotation" | "after_review" | "choose" | "confirm" | "old_text" | "may_be_outdated" | "final")[] | null;
                 /** @description "me" or a pseudonym */
                 waiting_on?: string[] | null;
-                flags?: ("guidelines_unclear" | "over_limit" | "lead_paused")[] | null;
+                flags?: ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator" | "typography_hints")[] | null;
                 proposals?: ("with" | "without")[] | null;
             };
             header?: never;
@@ -15548,7 +15701,7 @@ export interface operations {
                 final_state?: ("none" | "after_annotation" | "after_review" | "choose" | "confirm" | "old_text" | "may_be_outdated" | "final")[] | null;
                 /** @description "me" or a pseudonym */
                 waiting_on?: string[] | null;
-                flags?: ("guidelines_unclear" | "over_limit" | "lead_paused")[] | null;
+                flags?: ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator" | "typography_hints")[] | null;
                 proposals?: ("with" | "without")[] | null;
             };
             header?: never;

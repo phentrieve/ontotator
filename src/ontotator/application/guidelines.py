@@ -31,6 +31,7 @@ from ontotator.domain.guidelines import (
     compute_notice,
     decode_body,
     kind_for_filename,
+    validate_label,
     validate_note,
 )
 from ontotator.storage.database import Database, advisory_lock_id
@@ -68,6 +69,8 @@ class GuidelineSummary(BaseModel):
     """One version; ``reach`` and ``not_seen`` only for leads and admins."""
 
     version: int
+    # The project's own name of the version ("3.1"); shown before the number.
+    label: str | None = None
     kind: Literal["markdown", "text"]
     filename: str | None
     size_bytes: int
@@ -96,6 +99,7 @@ class GuidelineBrief:
     version: int
     kind: str
     created_at: datetime
+    label: str | None = None
 
 
 def _withdrawn_exists() -> Exists:
@@ -131,6 +135,7 @@ def guideline_briefs(
             GuidelineVersionRow.version,
             GuidelineVersionRow.kind,
             GuidelineVersionRow.created_at,
+            GuidelineVersionRow.label,
         )
         .join(
             latest,
@@ -140,7 +145,7 @@ def guideline_briefs(
         .where(~_withdrawn_exists())
     )
     return {
-        row.project_id: GuidelineBrief(row.version, row.kind, row.created_at)
+        row.project_id: GuidelineBrief(row.version, row.kind, row.created_at, row.label)
         for row in rows
     }
 
@@ -150,6 +155,7 @@ def _version_facts(conn: Connection, project_id: int) -> list[VersionFact]:
         select(
             GuidelineVersionRow.version,
             GuidelineVersionRow.created_at,
+            GuidelineVersionRow.label,
             GuidelineContentRow.change_note,
             _withdrawn_exists().label("withdrawn"),
         )
@@ -166,6 +172,7 @@ def _version_facts(conn: Connection, project_id: int) -> list[VersionFact]:
             created_at=row.created_at,
             change_note=row.change_note,
             withdrawn=bool(row.withdrawn),
+            label=row.label,
         )
         for row in rows
     ]
@@ -192,6 +199,7 @@ def guideline_notice(
 @dataclass(frozen=True)
 class _Version:
     version: int
+    label: str | None
     kind: Literal["markdown", "text"]
     sha256: str
     size_bytes: int
@@ -210,6 +218,7 @@ def _versions(conn: Connection, project_id: int) -> list[_Version]:
     rows = conn.execute(
         select(
             GuidelineVersionRow.version,
+            GuidelineVersionRow.label,
             GuidelineVersionRow.kind,
             GuidelineVersionRow.body_sha256,
             GuidelineVersionRow.size_bytes,
@@ -238,6 +247,7 @@ def _versions(conn: Connection, project_id: int) -> list[_Version]:
     return [
         _Version(
             version=row.version,
+            label=row.label,
             kind=row.kind,
             sha256=row.body_sha256,
             size_bytes=row.size_bytes,
@@ -252,6 +262,13 @@ def _versions(conn: Connection, project_id: int) -> list[_Version]:
         )
         for row in rows
     ]
+
+
+def _named(version: int, label: str | None) -> dict[str, int | str]:
+    """Refusal details naming a version: its number, and its label if it has one."""
+    return (
+        {"version": version} if label is None else {"version": version, "label": label}
+    )
 
 
 def _current(versions: list[_Version]) -> int | None:
@@ -361,28 +378,40 @@ class GuidelineService:
         data: bytes,
         change_note: str | None,
         expected_latest_version: int | None,
+        label: str | None = None,
     ) -> GuidelineSummary:
         filename = _clean_filename(filename)
         kind = kind_for_filename(filename)
         body = decode_body(data)
         note = validate_note(change_note, field="change_note")
+        version_label = validate_label(label)
         sha256 = body_sha256(body)
         user_id = _user_id(actor)
         with self.db.transaction() as conn:
             pid = self._manage(conn, actor, key)
             versions = _versions(conn, pid)
             latest = versions[0].version if versions else None
+            if expected_latest_version is None and latest is not None:
+                # The request named no version (an older client, a script):
+                # nobody published meanwhile, and repeating it never helps.
+                # Same code, so older clients keep working (issue 486).
+                raise DomainError(
+                    "GUIDELINE_VERSION_CONFLICT",
+                    {"latest_version": latest, "reason": "expected_version_missing"},
+                )
             if expected_latest_version != latest:
                 raise DomainError(
                     "GUIDELINE_VERSION_CONFLICT", {"latest_version": latest}
                 )
             current = _current(versions)
             if current is not None and versions[0].sha256 == sha256:
-                raise DomainError("GUIDELINE_UNCHANGED", {"version": current})
+                raise DomainError(
+                    "GUIDELINE_UNCHANGED", _named(current, versions[0].label)
+                )
             version = (latest or 0) + 1
             size = len(body.encode("utf-8"))
             now = self._now()
-            label = conn.execute(
+            pseudonym = conn.execute(
                 select(UserRow.pseudonym).where(UserRow.id == user_id)
             ).scalar_one()
             conn.execute(
@@ -393,8 +422,9 @@ class GuidelineService:
                     body_sha256=sha256,
                     size_bytes=size,
                     created_by=user_id,
-                    created_by_label=label,
+                    created_by_label=pseudonym,
                     created_at=now,
+                    label=version_label,
                 )
             )
             conn.execute(
@@ -448,7 +478,9 @@ class GuidelineService:
             if target is None:
                 raise DomainError("GUIDELINE_NOT_FOUND", {"version": version})
             if target.withdrawn_at is not None:
-                raise DomainError("GUIDELINE_ALREADY_WITHDRAWN", {"version": version})
+                raise DomainError(
+                    "GUIDELINE_ALREADY_WITHDRAWN", _named(version, target.label)
+                )
             now = self._now()
             label = conn.execute(
                 select(UserRow.pseudonym).where(UserRow.id == user_id)
@@ -610,6 +642,7 @@ def _summaries(
         result.append(
             GuidelineSummary(
                 version=item.version,
+                label=item.label,
                 kind=item.kind,
                 filename=item.filename,
                 size_bytes=item.size_bytes,

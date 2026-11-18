@@ -299,6 +299,8 @@ export type VersionRef = components["schemas"]["VersionRef"];
 export type TextLayerEntry = components["schemas"]["TextLayerEntry"];
 export type AnnotationVersion = components["schemas"]["AnnotationVersion"];
 export type ReviewWorkspace = components["schemas"]["ReviewWorkspace"];
+export type DraftTypographyHints = components["schemas"]["DraftTypographyHintsView"];
+export type BracketCheck = components["schemas"]["BracketCheck"];
 export type TranslationReviewRecord = components["schemas"]["TranslationReviewRecord"];
 export type ReanchorItem = components["schemas"]["ReanchorItem"];
 export type PendingReanchorRef = components["schemas"]["PendingReanchorRef"];
@@ -346,7 +348,7 @@ export type GuidelineSummary = components["schemas"]["GuidelineSummary"];
 export type GuidelineListing = components["schemas"]["GuidelineListing"];
 export type GuidelineDocument = components["schemas"]["GuidelineDocument"];
 export type GuidelineNotice = components["schemas"]["GuidelineNoticeView"];
-export type GuidelinePublishInput = { file: File; changeNote: string; expectedLatestVersion: number | null };
+export type GuidelinePublishInput = { file: File; changeNote: string; expectedLatestVersion: number | null; /** The project's own name of the version ("3.1"); empty or absent: none. */ label?: string };
 export type GuidelineWithdrawBody = { reason: string | null; expected_latest_version: number };
 export type CreateProjectRequest = components["schemas"]["CreateProjectRequest"];
 export type ProjectPin = components["schemas"]["ProjectPin"];
@@ -582,6 +584,7 @@ export class ApiClient {
     const body = new FormData();
     body.append("file", input.file);
     body.append("change_note", input.changeNote);
+    if (input.label) body.append("label", input.label);
     // An empty value means "no version exists yet" (first upload).
     body.append("expected_latest_version", input.expectedLatestVersion === null ? "" : String(input.expectedLatestVersion));
     return this.request(`/api/v1/projects/${encodeURIComponent(key)}/guidelines`, { method: "POST", body });
@@ -1005,6 +1008,11 @@ export class ApiClient {
 
   async openTranslationReview(assignmentId: number): Promise<ReviewWorkspace> {
     return this.request<ReviewWorkspace>(`/api/v1/translation-reviews/${assignmentId}`, { method: "GET" });
+  }
+
+  /** Typography hints of the saved draft text: rule codes and positions in code points (issue 484). */
+  async getDraftTypographyHints(assignmentId: number): Promise<DraftTypographyHints> {
+    return this.request<DraftTypographyHints>(`/api/v1/translation-reviews/${assignmentId}/draft/typography-hints`, { method: "GET" });
   }
 
   async saveTranslationReviewDraft(assignmentId: number, body: TranslationReviewDraftRequest): Promise<TranslationReviewDraftResponse> {

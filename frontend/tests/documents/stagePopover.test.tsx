@@ -74,11 +74,12 @@ describe("StagePopover", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("says when the stage has no activity yet", () => {
+  it("says when the stage has no activity yet", async () => {
     render(<Harness stage="final" />);
     openPopover();
     const dialog = screen.getByRole("dialog", { name: "Finalization activity, case-108 de" });
-    expect(within(dialog).getByText("No finalization activity yet.")).toBeTruthy();
+    // Finalization reads the submissions too: a consolidation's lines are filed there (review 2, F2).
+    expect(await within(dialog).findByText("No finalization activity yet.")).toBeTruthy();
     expect(within(dialog).queryByRole("list")).toBeNull();
   });
 

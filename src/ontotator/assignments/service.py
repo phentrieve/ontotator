@@ -63,7 +63,7 @@ from ontotator.domain.variants import VariantInfo
 from ontotator.domain.workspace import WorkspaceMode
 from ontotator.projects.assignments import revoke_assignments
 from ontotator.storage.database import Database
-from ontotator.storage.plan_tables import DiscardedVariantRow
+from ontotator.storage.plan_tables import DiscardedVariantRow, EditorialCorrectionRow
 from ontotator.storage.repository import _lock_id
 from ontotator.storage.tables import (
     AssignmentRow,
@@ -259,6 +259,126 @@ def _assignments() -> Select[tuple[object, ...]]:
             & (DocumentRow.document_id == AssignmentRow.document_id),
         )
     )
+
+
+_STATUS_RANK = {"reopened": 0, "in_progress": 1, "open": 2, "submitted": 3}
+
+
+def _in_task_order(
+    conn: Connection, user_id: int, rows: List[RowMapping]
+) -> List[RowMapping]:
+    """A person's tasks in the order of My tasks (issue 488).
+
+    By status, then in the order of assignment (assignment id), with two
+    refinements:
+
+    - A task a lead moved to a new text version ("Handle text change") stands
+      at the place of the task it continues. The move revokes the old
+      assignment and creates the new one in the same transaction, so the new
+      one's ``created_at`` is the resolution's ``decided_at``. A task moved
+      twice keeps the place of the first one.
+    - Texts a lead moved to the front of the queue (issue 339) after their
+      task was assigned come first within their status, the latest move
+      first, each move in the order of assignment.
+    """
+    from ontotator.storage.overview_tables import TextChangeResolutionRow
+
+    Key = tuple[str, str, datetime]
+    earlier: dict[Key, tuple[int, Key]] = {
+        (row.project_key, row.to_document_id, row.decided_at): (
+            row.id,
+            (row.project_key, row.document_id, row.created_at),
+        )
+        for row in conn.execute(
+            select(
+                ProjectRow.project_key,
+                TextChangeResolutionRow.to_document_id,
+                TextChangeResolutionRow.decided_at,
+                AssignmentRow.id,
+                AssignmentRow.document_id,
+                AssignmentRow.created_at,
+            )
+            .join(
+                AssignmentRow,
+                AssignmentRow.id == TextChangeResolutionRow.assignment_id,
+            )
+            .join(ProjectRow, ProjectRow.id == AssignmentRow.project_id)
+            .where(
+                TextChangeResolutionRow.resolution == "moved",
+                AssignmentRow.user_id == user_id,
+            )
+        )
+    }
+    first: dict[int, int] = {}
+    for row in rows:
+        root = row["assignment_id"]
+        key = (row["project_key"], row["document_id"], row["assigned_at"])
+        # Ids only fall along the chain, so it ends.
+        while row["task"] == "annotate" and key in earlier and earlier[key][0] < root:
+            root, key = earlier[key]
+        first[row["assignment_id"]] = root
+    # Per text, the audit ids of the moves to the front, newest first.
+    moves: dict[tuple[str, str, str], List[int]] = {}
+    for event in conn.execute(
+        select(ProjectRow.project_key, AuditEventRow.id, AuditEventRow.details)
+        .join(ProjectRow, ProjectRow.id == AuditEventRow.project_id)
+        .where(
+            ProjectRow.project_key.in_({row["project_key"] for row in rows}),
+            AuditEventRow.action == "project.queue_order",
+        )
+        .order_by(AuditEventRow.id.desc())
+    ):
+        for text in event.details.get("moved_to_front") or []:
+            moves.setdefault(
+                (event.project_key, text["case_id"], text["language"]), []
+            ).append(event.id)
+    front: dict[int, int] = {}
+    if moves:
+        # A move counts for tasks assigned before it: audit ids give the order.
+        assigned: dict[str, int] = dict(
+            conn.execute(
+                select(AuditEventRow.target_id, func.min(AuditEventRow.id))
+                .where(
+                    AuditEventRow.project_id.in_(
+                        select(ProjectRow.id).where(
+                            ProjectRow.project_key.in_(
+                                {project for project, _, _ in moves}
+                            )
+                        )
+                    ),
+                    AuditEventRow.target_type == "assignment",
+                    AuditEventRow.target_id.in_(
+                        [str(root) for root in set(first.values())]
+                    ),
+                    AuditEventRow.action == "assignment.create",
+                )
+                .group_by(AuditEventRow.target_id)
+            )
+            .tuples()
+            .all()
+        )
+        for row in rows:
+            created = assigned.get(str(first[row["assignment_id"]]))
+            latest = moves.get((row["project_key"], row["case_id"], row["language"]))
+            if created is not None and latest and latest[0] > created:
+                front[row["assignment_id"]] = latest[0]
+    if not front and all(
+        first[row["assignment_id"]] == row["assignment_id"] for row in rows
+    ):
+        return rows
+
+    def place(row: RowMapping) -> tuple[int, int, int, int, int]:
+        assignment_id = row["assignment_id"]
+        moved = front.get(assignment_id)
+        return (
+            _STATUS_RANK[row["status"]],
+            moved is None,
+            -(moved or 0),
+            first[assignment_id],
+            assignment_id,
+        )
+
+    return sorted(rows, key=place)
 
 
 def _paused(row: RowMapping) -> dict[str, Any]:
@@ -936,6 +1056,36 @@ class AssignmentService:
             raise DomainError("ASSIGNMENT_EXISTS", {"reason": "lead_correction_open"})
 
     @staticmethod
+    def _require_no_typo_fix(
+        conn: Connection, project_id: int, document_id: str
+    ) -> None:
+        """A version a lead fixed typos in takes no further review: the fix
+        is the text to review (``VARIANT_REVIEW_STALE`` names it). A review
+        of the old text would never reach the fix."""
+        fix = conn.execute(
+            select(DocumentRow.document_id, DocumentRow.version)
+            .join(
+                EditorialCorrectionRow,
+                (EditorialCorrectionRow.project_id == DocumentRow.project_id)
+                & (EditorialCorrectionRow.document_id == DocumentRow.document_id),
+            )
+            .where(
+                EditorialCorrectionRow.project_id == project_id,
+                EditorialCorrectionRow.previous_document_id == document_id,
+            )
+            .limit(1)
+        ).first()
+        if fix is not None:
+            raise DomainError(
+                "VARIANT_REVIEW_STALE",
+                {
+                    "reason": "typos_fixed",
+                    "document_id": fix.document_id,
+                    "version": fix.version,
+                },
+            )
+
+    @staticmethod
     def _require_annotation_slot(
         conn: Connection, project: RowMapping, document_id: str
     ) -> None:
@@ -995,6 +1145,7 @@ class AssignmentService:
             return existing
         if task == "translation_review":
             self._require_no_open_lead_correction(conn, project["id"], document_id)
+            self._require_no_typo_fix(conn, project["id"], document_id)
         if task == "annotate":
             self._require_annotation_slot(conn, project, document_id)
         eligibility = self.check_assignable(
@@ -1138,6 +1289,7 @@ class AssignmentService:
                 cls._require_no_open_lead_correction(
                     conn, project["id"], old["document_id"]
                 )
+                cls._require_no_typo_fix(conn, project["id"], old["document_id"])
         except DomainError as refusal:
             return refusal
         return None
@@ -1341,19 +1493,13 @@ class AssignmentService:
             )
             .join(UserRow, UserRow.id == AssignmentRow.user_id)
             .where(qualifying_assignment(user_id))
-            .order_by(
-                case(
-                    {"reopened": 0, "in_progress": 1, "open": 2, "submitted": 3},
-                    value=AssignmentRow.status,
-                ),
-                DocumentRow.position.asc().nulls_last(),
-                ProjectRow.project_key,
-                AssignmentRow.document_id,
-                AssignmentRow.id,
-            )
+            # Issue 488: within a status, the order of assignment (never the
+            # text's upload position); refined by ``_in_task_order``. The
+            # editor's "next task" follows this list (frontend ``nextOpenTask``).
+            .order_by(case(_STATUS_RANK, value=AssignmentRow.status), AssignmentRow.id)
         )
         with self.db.transaction() as conn:
-            rows = list(conn.execute(query).mappings())
+            rows = _in_task_order(conn, user_id, list(conn.execute(query).mappings()))
             # Issue 213: unsubmitted annotation tasks under the rule may wait.
             ruled: dict[str, int] = dict(
                 conn.execute(
