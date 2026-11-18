@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { api, ApiError, type CurrentUser, type Member, type MemberCandidate } from "../api/client";
 import { Button, Checkbox, ConfirmDialog, DataTable, EmptyState, InlineMessage, StatusBadge, SuggestInput, type Column, type StatusTone, EmptyValue } from "../ui";
 import { ErrorNotice } from "./ErrorNotice";
+import { fieldError } from "./errors";
 import { SettingsHint } from "./SettingsCard";
 import { labelFor, roleLabels, taskLabels } from "../app/labels";
 import { personLabel, textLabel } from "../app/identity";
@@ -95,6 +96,7 @@ function MemberEditor({ projectKey, currentUser }: MembersSectionProps): JSX.Ele
   const search = useRef(0);
   const typeUsername = (value: string) => {
     setUsername(value);
+    setError(undefined);
     const request = ++search.current;
     if (value.trim().length < 3) { setSuggestions([]); return; }
     // Suggestions are a convenience: a failed search leaves the typed username usable.
@@ -127,6 +129,10 @@ function MemberEditor({ projectKey, currentUser }: MembersSectionProps): JSX.Ele
   };
   const blocked = busy || pending !== null || removal !== null || members === null;
   const exact = username.trim() ? suggestions.find(user => user.username === username.trim()) : undefined;
+  // Issue 472: a refused username is said at the field; a typed display name names the username to use.
+  const refusedUsername = adding ? fieldError(error, ["USERNAME_INVALID", "USER_NOT_FOUND"]) : undefined;
+  const namesake = refusedUsername ? suggestions.find(user => user.display_name?.trim().toLowerCase() === username.trim().toLowerCase()) : undefined;
+  const usernameError = namesake ? `This is the person's name. Choose the person from the list, or type the username: ${namesake.username}.` : refusedUsername;
   const closeAdd = () => { setAdding(false); setUsername(""); setNewRoles([]); setSuggestions([]); requestAnimationFrame(() => addButton.current?.focus()); };
   const memberName = (member: Member) => member.display_name?.trim() || member.username || personLabel(member);
   const pendingMember = members?.find(member => member.username === pending?.username);
@@ -156,14 +162,14 @@ function MemberEditor({ projectKey, currentUser }: MembersSectionProps): JSX.Ele
     {loadError !== undefined && <><ErrorNotice error={loadError} /><Button onClick={() => setRetry(value => value + 1)}>Try again</Button></>}
     {members !== null && (members.length ? <DataTable label="Project members" columns={columns} rows={members} rowKey={member => member.username} /> : <EmptyState title="No project members." />)}
     <p role="status" className="settings-confirmation">{confirmation}</p>
-    {error !== undefined && !pending && <ErrorNotice error={error} />}
+    {error !== undefined && !pending && !usernameError && <ErrorNotice error={error} />}
     {!adding ? <Button ref={addButton} onClick={() => setAdding(true)}>Add member…</Button> : <form aria-label="Add member" onSubmit={event => {
       event.preventDefault();
       if (!event.currentTarget.reportValidity() || blocked) return;
       if (!newRoles.length) { setError(new Error("Choose at least one role for the new member.")); return; }
       void change(username, newRoles, false, true);
     }}><fieldset disabled={blocked}><legend className="settings-subheading">Add member</legend>
-      <SuggestInput id={`${id}-username`} label="Username" hint="Type at least three letters of the name of someone from your projects, or the exact username or e-mail of anyone else." value={username} required autoFocus onChange={event => typeUsername(event.target.value)}
+      <SuggestInput id={`${id}-username`} label="Username" hint="Type at least three letters of the name of someone from your projects, or the exact username or e-mail of anyone else." value={username} error={usernameError} required autoFocus onChange={event => typeUsername(event.target.value)}
         suggestions={suggestions.filter(user => user.username !== username.trim()).map(candidateOption)} onPick={typeUsername} />
       {/* Issue 129, W1: a typed-out username confirms its person under the field (an open list would cover the roles). */}
       {exact && <p className="field-hint" role="status">{`Found ${exact.username}: ${candidateLabel(exact)}`}</p>}

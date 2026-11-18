@@ -54,6 +54,8 @@ export function HiddenAxisValuesField({ profile, axisDefaults, value, onChange, 
               onChange({ ...value, [layer.layer_id]: { ...value[layer.layer_id], [axis.id]: next } });
             }}>{axisOptionLabel(option)}</Button>;
         })}
+        {/* The reason for the greyed value, on the screen and not only in its tooltip (issue 472). */}
+        {options.has(axisDefaults[layer.layer_id]?.[axis.id] ?? "") && <span className="field-hint axis-shown-reason">{`“${axisOptionLabel(axisDefaults[layer.layer_id]?.[axis.id] ?? "")}” is prefilled and cannot be hidden.`}</span>}
       </div>)}
     </div>)}
   </div>;

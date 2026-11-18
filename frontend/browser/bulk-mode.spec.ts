@@ -65,7 +65,7 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
 
     await dialog.getByRole("radio", { name: "From proposals" }).check();
     await expect(groups).toHaveCount(4);
-    await expect(groups.nth(0)).toContainText("Annotate 4 texts from proposals · discards 6 submissions, removes 2 unsubmitted assignments");
+    await expect(groups.nth(0)).toContainText("Annotate 4 texts from proposals · discards 6 submissions, removes 2 unsubmitted tasks");
     await expect(groups.nth(1)).toContainText("Skip 1 text · final result chosen: use Withdraw final… first");
     await expect(groups.nth(1)).toContainText("EN100026 en");
     await expect(groups.nth(2)).toContainText("Skip 2 texts · no annotation work yet: set the mode with Plan…");
@@ -76,7 +76,7 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
     const people = dialog.getByRole("list", { name: "Affected people" }).getByRole("listitem");
     await expect(people).toHaveText([
       "Tom Reis: 4 submissions are discarded.",
-      "R. Roe: 2 submissions are discarded; 1 unsubmitted assignment is removed.",
+      "R. Roe: 2 submissions are discarded; 1 unsubmitted task is removed.",
       "Carla Diaz: 1 unsubmitted consolidation is removed.",
     ]);
     await expect(dialog.locator(".work-plan-summary")).toHaveText("Will change: the annotation mode of 4 texts");

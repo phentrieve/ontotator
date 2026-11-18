@@ -14,6 +14,15 @@ const KINDS = new Map<string, InvisibleKind>([
   ...of("zero-width", 0x200b, 0x200c, 0x200d, 0x2060, 0xfeff),
   ...of("soft-hyphen", 0xad),
 ]);
+/** The key shown on the screen while the marks are on (issue 472): each mark with what it stands for. */
+export const INVISIBLES_KEY: readonly (readonly [string, string])[] = [
+  ["\u00B7", "space"], ["\u00B0", "non-breaking space"], ["\u2192", "tab"], ["\u00B6", "line end"], ["\u00AC", "soft hyphen"], ["|", "zero-width character"],
+];
+
+export function InvisiblesKey(): JSX.Element {
+  return <p className="invisibles-key">Marks:{INVISIBLES_KEY.map(([mark, name], index) => <span key={name}>{index > 0 && ","} <span className="invisibles-key-mark" aria-hidden="true">{mark}</span> {name}</span>)}</p>;
+}
+
 const PATTERN = new RegExp(`\\r\\n|\\r|\\n|[${[...KINDS.keys()].join("")}]`, "g");
 
 /**

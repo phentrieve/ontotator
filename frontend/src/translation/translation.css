@@ -284,6 +284,9 @@
 .show-invisibles [data-invisible="zero-width"]::before { content: ""; top: 0.2em; bottom: 0.2em; left: -1px; border-left: 2px solid var(--warning); }
 /* Soft hyphen: a raised "not" sign between the two neighbours. */
 .show-invisibles [data-invisible="soft-hyphen"]::before { content: "\00AC"; top: -0.55em; left: 0; transform: translateX(-50%); font-size: 0.75em; color: var(--warning); }
+/* The key of the marks, on a line of its own below the Text view choices. */
+.invisibles-key { flex-basis: 100%; margin: 0; color: var(--text-muted); font-size: var(--size-sm); line-height: var(--leading-sm); }
+.invisibles-key-mark { color: var(--text); font-weight: var(--weight-strong); }
 /* The mark of a line end hangs over the right edge of a full line; it must not make the box scroll sideways. */
 .translation-text.show-invisibles, .translation-review .translation-diff.show-invisibles, .translation-diff.show-invisibles, .translation-editor.show-invisibles { overflow-x: hidden; }
 

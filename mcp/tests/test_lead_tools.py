@@ -770,9 +770,13 @@ async def test_change_annotation_modes_dry_run_confirm_and_stale_token(
             "from_mode": "proposals",
             "discarded_submissions": 1,
             "authors": ["Tom Reis"],
+            "withdrawn_tasks": 2,
             "withdrawn_unsubmitted_tasks": ["ann-2"],
         }
     ]
+    # Issue 472: the counts say what they count, beside the lists of people.
+    assert dry["withdrawn_task_count"] == 2
+    assert dry["withdrawn_unsubmitted_task_count"] == 1
     assert dry["skipped_texts"][0]["message"].startswith("Final result chosen")
     [post] = fake.calls_to("POST", bulk)
     assert post.json() == {"rows": texts, "mode": "scratch", "preview": True}

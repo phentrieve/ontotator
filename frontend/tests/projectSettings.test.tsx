@@ -472,6 +472,8 @@ describe("project settings sections", () => {
   it("Ontology shows the frozen translations, read-only (#254)", async () => {
     const view = renderSettings("ontology");
     expect(await screen.findByText("Not frozen yet.")).toBeDefined();
+    // Issue 472: the card says that this is expected after a move to another release.
+    expect(screen.getByText("This is also what you see after a move to another ontology release: the move ends the earlier freeze, and the next use freezes again.")).toBeDefined();
     view.unmount();
     vi.mocked(api.getProjectSettings).mockResolvedValue({ ...settings, locked: true, frozen_translations: {
       files: [{ ontology_id: "HP", filename: "hp-de.babelon.tsv", sha256: "c".repeat(64), languages: ["de"] }],

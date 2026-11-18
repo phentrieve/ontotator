@@ -50,7 +50,7 @@ export function LanguagesField({ id, label, value, onChange, disabled = false, h
     <SuggestInput ref={inputRef} id={id} label={label} value={draft} disabled={disabled}
       suggestions={commonLanguageCodes.filter(code => code.startsWith(draft.trim().toLowerCase()) && !value.includes(code)).map(code => ({ value: code }))}
       onPick={code => commit(code)} autoCapitalize="none" spellCheck={false}
-      hint={`${hint ? `${hint} ` : ""}Press Enter or Add to add a language.`} error={error}
+      hint={`${hint ? `${hint} ` : ""}Type a language code, for example de (not “German”), then press Enter or Add language.`} error={error}
       onChange={(event) => {
         setDraft(event.target.value);
         setError("");

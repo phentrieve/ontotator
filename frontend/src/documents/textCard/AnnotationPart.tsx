@@ -11,7 +11,7 @@ import { StatusBadge } from "../../ui/StatusBadge";
 import { RouteLink } from "../RowCells";
 import { shortName } from "../stageLabels";
 import type { TextVersionsTools } from "../TextVersions";
-import { dayMonth, personVersion, textViewRoute, type CardWorkItem } from "./cardModel";
+import { dayMonth, personVersion, rowDay, textViewRoute, type CardWorkItem } from "./cardModel";
 import { PersonList, PersonRow, useFocusAfterRemoval } from "./PersonRow";
 import { assignedLine, workerName, WorkPersonRow } from "./WorkPersonRow";
 
@@ -32,26 +32,32 @@ export function roundLine(item: Pick<CardWorkItem, "assignment_id" | "round_ordi
   return `Round ${ordinal}, started${by}${day ? ` ${day}` : ""}`;
 }
 
-/** "2026-11-10": the local day a proposal set was imported (337-A). */
-export function setDate(iso: string): string {
+/** "2026-11-10": the local day a proposal set was imported (337-A); `withTime` adds "14:05" to tell two sets of one day apart. */
+export function setDate(iso: string, withTime = false): string {
   const day = new Date(iso);
   if (Number.isNaN(day.getTime())) return iso.slice(0, 10);
-  return `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
+  const two = (value: number) => String(value).padStart(2, "0");
+  return `${day.getFullYear()}-${two(day.getMonth() + 1)}-${two(day.getDate())}${withTime ? ` ${two(day.getHours())}:${two(day.getMinutes())}` : ""}`;
+}
+
+/** Another set of the same day is named beside this one: both then show their time (issue 472). */
+export function sameDaySets(shown: RowProposalSetView | null | undefined, others: readonly (Pick<RowProposalSetView, "set_id" | "imported_at"> | null | undefined)[]): boolean {
+  return !!shown && others.some(other => !!other && other.set_id !== shown.set_id && setDate(other.imported_at) === setDate(shown.imported_at));
 }
 
 /** "set 2026-10-02 (phentrieve 1.4), 24 proposals" (issue 337, 337-A). */
-export function proposalSetText(set: RowProposalSetView): string {
+export function proposalSetText(set: RowProposalSetView, withTime = false): string {
   const tool = [set.tool, set.tool_version].filter(Boolean).join(" ");
-  return `set ${setDate(set.imported_at)}${tool ? ` (${tool})` : ""}, ${plural(set.proposal_count, "proposal")}`;
+  return `set ${setDate(set.imported_at, withTime)}${tool ? ` (${tool})` : ""}, ${plural(set.proposal_count, "proposal")}`;
 }
 
 /** A person row names their set only when it differs from the text's: "newest set" or "set 2026-10-02". */
-export function personSetText(item: Pick<CardWorkItem, "proposal_set" | "proposal_set_unrecorded">, shown: RowProposalSetView | null | undefined): string | null {
+export function personSetText(item: Pick<CardWorkItem, "proposal_set" | "proposal_set_unrecorded">, shown: RowProposalSetView | null | undefined, withTime = false): string | null {
   const own = item.proposal_set;
   // Started before sets were recorded: said per person only when the text's line names a set.
   if (item.proposal_set_unrecorded && shown) return "set not recorded";
   if (!own || !shown || own.set_id === shown.set_id) return null;
-  return own.newest ? "newest set" : `set ${setDate(own.imported_at)}`;
+  return own.newest ? "newest set" : `set ${setDate(own.imported_at, withTime)}`;
 }
 
 /** "Annotators: 4 for this text (project: 1)" when the text has its own value (issue 422, 422-B). */
@@ -133,6 +139,7 @@ export function AnnotationPart({ row, projectKey, query, submissions, changes, c
   const ownLimit = ownLimitText(row);
   // Version-aware as `CardPlanSelect`: "no_proposals" means the current version has none.
   const proposals = mode?.source === "no_proposals" ? 0 : mode?.proposal_count ?? row.proposal_count ?? 0;
+  const setTimes = sameDaySets(row.proposal_set, [row.newer_proposal_set, ...people.map(item => item.proposal_set)]);
   const openLayer = (name: string, documentId: string, submissionId: string, removed = false) =>
     <RouteLink route={textViewRoute(projectKey, row.case_id, documentId, query, { show: `submission:${submissionId}` })} onNavigate={onNavigate}
       className="btn btn-secondary btn-sm" aria-label={`Open annotation of ${name}${removed ? " (assignment removed)" : ""}`}>Open annotation</RouteLink>;
@@ -147,9 +154,9 @@ export function AnnotationPart({ row, projectKey, query, submissions, changes, c
     {!planControl && mode && <p>{annotationTaskName(mode.mode)}</p>}
     {!planControl && mode?.source === "no_proposals" && <p className="text-card-muted">{NO_PROPOSALS}</p>}
     {proposals > 0 && (row.proposal_set
-      ? <p className="text-card-muted text-card-proposal-set"><span className="text-card-label">Proposals</span> {proposalSetText(row.proposal_set)}
+      ? <p className="text-card-muted text-card-proposal-set"><span className="text-card-label">Proposals</span> {proposalSetText(row.proposal_set, setTimes)}
         {mode?.mode === "proposals" && row.newer_proposal_set && <>
-          {" "}<StatusBadge tone="info">{`Newer set available: ${setDate(row.newer_proposal_set.imported_at)}`}</StatusBadge>
+          {" "}<StatusBadge tone="info">{`Newer set available: ${setDate(row.newer_proposal_set.imported_at, setTimes)}`}</StatusBadge>
           {" "}<a href={helpHref("newerProposals")} target="_blank" rel="noopener noreferrer">How to use it</a>
         </>}</p>
       : row.proposal_set_unrecorded
@@ -161,7 +168,7 @@ export function AnnotationPart({ row, projectKey, query, submissions, changes, c
     {(people.length > 0 || removedPeople.length > 0) && <PersonList label="Annotators">
       {people.map(item => {
         const layer = item.status === "submitted" ? layerOf(item.author_label, item.document_id) : undefined;
-        const day = layer ? dayMonth(layer.recorded_at) : null;
+        const day = layer ? rowDay(layer.recorded_at, now) : null;
         const submittedText = layer ? `Submitted${day ? ` ${day}` : ""}, ${plural(layer.finding_count, "finding")}` : null;
         // "Assigned 18 Oct by you, from proposals · v2"; "Submitted 22 Oct, 14 findings · assigned 15 Oct · v1" (the
         // version only when the text has several, issue 445).
@@ -175,7 +182,7 @@ export function AnnotationPart({ row, projectKey, query, submissions, changes, c
           roundText,
           assignedText ? <>{assignedText}{modeText && `, ${modeText}`}</> : modeText,
           personVersion(row, item),
-          personSetText(item, row.proposal_set),
+          personSetText(item, row.proposal_set, setTimes),
         ]);
         return <WorkPersonRow key={item.assignment_id} item={item} caseId={row.case_id} textName={textLabel(row)} details={details} canManage={canManage} tools={tools}
           onChanged={onChanged} onRemoved={focusAfterRemoval} open={layer ? openLayer(workerName(item), item.document_id, layer.submission_id) : undefined} />;
@@ -184,9 +191,9 @@ export function AnnotationPart({ row, projectKey, query, submissions, changes, c
         const name = layer.author ? shortName(layer.author) : layer.author_label;
         // The removal date when the page's assignments still list the revoked assignment.
         const revoked = tools?.assignments.find(entry => entry.pseudonym === layer.author_label && entry.document_id === layer.document_id && entry.revoked_at)?.revoked_at;
-        const submittedDay = dayMonth(layer.recorded_at);
+        const submittedDay = rowDay(layer.recorded_at, now);
         return <PersonRow key={layer.submission_id} name={name} pseudonym={layer.author_label} removed status={{ tone: "neutral", label: "Removed" }}
-          details={joined([revoked ? `Removed ${dayMonth(revoked)}` : "Assignment removed", `${submittedDay ? `submitted ${submittedDay}` : "submitted"}, kept in the history`, personVersion(row, layer)])}>
+          details={joined([revoked ? `Removed ${rowDay(revoked, now)}` : "Assignment removed", `${submittedDay ? `submitted ${submittedDay}` : "submitted"}, kept in the history`, personVersion(row, layer)])}>
           {openLayer(name, layer.document_id, layer.submission_id, true)}
         </PersonRow>;
       })}

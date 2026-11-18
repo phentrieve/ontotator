@@ -147,7 +147,7 @@ Before you start: an administrator must have uploaded the new release ([Upload o
 4. Read the panel **Check before moving**:
    - The first table (**Becomes**, **Why**) lists draft terms that will be replaced by their successor.
    - The second table (**Status**, **Suggestions**) lists draft terms that are obsolete or missing in the new release, and proposals on such terms that are not yet rejected or replaced. Proposals are never rewritten. Their annotators must change them before submitting.
-5. Click **Move to this release**, or **Cancel**. The page says **Ontology release changed.**
+5. Click **Move to this release**, or **Cancel**. The page says **Ontology release changed.** The card **Translations** then reads *Not frozen yet.* until the next term search ([See which translations the project uses](#see-which-translations-the-project-uses)).
 
 ![The check before moving to another release. The first table shows which draft terms are replaced automatically, the second which ones annotators must change by hand.](images/lead-move-release-check.png)
 
@@ -161,13 +161,13 @@ What for: check which translation files term searches use in this project.
 
 1. Open **Settings**, tab **Ontology**.
 2. Read the card **Translations**.
-   - *Not frozen yet.* The first term search or opening a text in the editor takes the translation files on the server then.
+   - *Not frozen yet.* The first term search or opening a text in the editor takes the translation files on the server then. The card also reads like this right after **Move to this release**: the move ends the earlier freeze, and the next use freezes again.
    - *No translations: searches use the English names only.* The project froze when no translation file was on the server.
    - Otherwise the card lists the frozen files with their language, ontology and checksum. *Uploaded later, not used here* names files on the server that the project does not use.
    - *Translations updated on …* says when and by whom the project last moved to the newest translations: by display name and pseudonym, or *from the command line*. Only leads and system administrators see who; other members see only when.
    - **Earlier translations** lists, collapsed, the files earlier searches used and until when.
 
-The project froze its translations at the first use of its ontology. A file an administrator uploads after that does not reach the project by itself ([When a translation reaches a project](admin.md#when-a-translation-reaches-a-project)). To use it, see [Use the newest translations](#use-the-newest-translations). Changing the ontology version, the branches or the annotation scheme, or replacing the task profile, ends the freeze: the next use takes the files on the server then. The ended files stay listed under **Earlier translations**.
+The project froze its translations at the first use of its ontology. A file an administrator uploads after that does not reach the project by itself ([When a translation reaches a project](admin.md#when-a-translation-reaches-a-project)). To use it, see [Use the newest translations](#use-the-newest-translations). Changing the ontology version, the branches or the annotation scheme, or replacing the task profile, ends the freeze: the next use takes the files on the server then. The ended files are listed under **Earlier translations** once the project is frozen again.
 
 ## Use the newest translations
 
@@ -214,7 +214,7 @@ What for: new findings start with these values. They stay marked as not confirme
 What for: hide values the project does not use from the editor.
 
 1. Open **Settings**, tab **Annotation**, and open **Values annotators can choose**.
-2. Click a value to switch it off (hidden) or on (shown). The prefilled value of a value field cannot be hidden.
+2. Click a value to switch it off (hidden) or on (shown). The prefilled value of a value field cannot be hidden: it is greyed, and the row says why, for example *“Present” is prefilled and cannot be hidden.*
 3. Click **Save changes**.
 
 Existing findings keep their values. A finding with a hidden value must be changed before it is saved again.
@@ -276,7 +276,7 @@ Before you start: the person needs an account ([Create a user account](admin.md#
 2. Click **Add member…**.
 3. In **Username**, type at least three letters of the name, or the exact username or e-mail. Pick the person from the suggestions.
 4. Tick one or more roles: **Lead**, **Annotator**, **Consolidator**.
-5. Click **Add member**. The page confirms the new role.
+5. Click **Add member**. The page confirms the new role. A username that is not accepted is said under the field. If you typed the name instead of choosing the suggestion, the message names the username to use.
 
 Annotators also do translation reviews. Only people with the **Consolidator** role can be chosen as consolidator of a text. Ontotator sends no e-mail; tell the person that they were added.
 

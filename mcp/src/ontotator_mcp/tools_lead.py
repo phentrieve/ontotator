@@ -284,7 +284,10 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
         Like change_annotation_mode for each text: its submissions
         (annotations and consolidations) are DISCARDED and its tasks are
         withdrawn. The dry run names, per text, whose submissions and whose
-        unsubmitted tasks, and the texts left as they are with the reason
+        unsubmitted tasks (a person is named once per text). The counts:
+        withdrawn_task_count is every task on the changed texts, submitted
+        ones included; withdrawn_unsubmitted_task_count the tasks without a
+        submission. It also names the texts left as they are with the reason
         (final result chosen: withdraw it first; no work yet; already in
         this mode; no proposals), and the texts the project does not have
         (unknown_texts: another spelling, letter case or language). Confirm with its preview_token: every
@@ -316,6 +319,7 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
                     "from_mode": item.get("from_mode"),
                     "discarded_submissions": len(item.get("submissions", [])),
                     "authors": people(item.get("submissions", []), "author"),
+                    "withdrawn_tasks": len(item.get("assignments", [])),
                     "withdrawn_unsubmitted_tasks": people(
                         [
                             task
@@ -338,6 +342,11 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
                 "change_count": found.get("change_count", len(changes)),
                 "discarded_submission_count": found.get("submission_count"),
                 "withdrawn_task_count": found.get("assignment_count"),
+                "withdrawn_unsubmitted_task_count": sum(
+                    task.get("status") != "submitted"
+                    for item in found.get("changes", [])
+                    for task in item.get("assignments", [])
+                ),
                 "skipped_texts": _cut(skipped, 50),
                 "skipped_by_reason": found.get("skipped_by_reason", {}),
                 **unknown_texts(found),

@@ -25,6 +25,7 @@ import { acceptedCorrection, annotateThisTextLabel, categoryLabels, comparisonCo
 import { checkReview, type ClinicalCategory, type ReviewDecisionCode, type ReviewForm as FormValue } from "./reviewRules";
 import { LanguageTag } from "../ui/LanguageTag";
 import { SentenceCount, SentenceView } from "./SentenceMarks";
+import { InvisiblesKey } from "./invisibles";
 import { isChecked, rebaseMarks, resolveMarks, splitSentences, storedMarks, toggled, withRange, type MarkState, type Sentence, type Side, type StoredMarks } from "./sentences";
 
 export interface TranslationReviewScreenProps {
@@ -794,6 +795,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
                 items={comparisons.map(row => ({ id: row.id, label: row.name.replace(/^t/, "T"), onSelect: () => showComparison(true, row.id) }))} />)}
           </div>
           {marksError && marking && <p className="sentence-save-error" role="alert">Checked sentences are not saved. <Button size="sm" variant="quiet" onClick={() => { pendingMarks.current ??= marks; sendMarks(); }}>Retry</Button></p>}
+          {showInvisibles && <InvisiblesKey />}
         </div>
         <div className={`translation-columns${comparison ? " translation-columns--comparison" : ""}`}>
           <div className="translation-column">
@@ -872,7 +874,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
             busy={busy} readOnly={readOnly} error={error} onResolve={submit} onPending={setPendingSourceUpdates} openRef={openSourceUpdate} />
           {submitted && <InlineMessage tone="success" title="Review submitted"><p>{correctsAccepted && submitted.decision === "accepted_corrected" ? acceptedCorrection.outcome : decisionOutcomes[submitted.decision]}</p>
             {createdVersion !== null && <p>A corrected version v{createdVersion} was created.</p>}
-            {submitted.created_variant_id && createdVersion === null && <Button size="sm" onClick={() => { void loadCreated(submitted); }}>Retry corrected version metadata</Button>}</InlineMessage>}
+            {submitted.created_variant_id && createdVersion === null && <><p>A corrected version was created, but its number could not be loaded.</p><Button size="sm" onClick={() => { void loadCreated(submitted); }}>Load the version number again</Button></>}</InlineMessage>}
           {submitted && leadCorrection && <div className="translation-next-task">
             {navigateLink({ name: "projectDocuments", key: projectKey, case: workspace.variant.case_id, language: workspace.variant.language }, "Back to Documents", "btn btn-secondary")}
           </div>}

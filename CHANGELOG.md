@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Wording, dates and hints across roles (#472). One word per thing: the bulk dialogs **Reopen…**, **Withdraw open tasks…** and **Change mode…** count *tasks* (*Reopen 8 tasks*, *2 unsubmitted tasks*), and the editor says *finding* (**Add finding**, *This is the finding's current term.*). The single **Reopen…** dialog names the person in its title and says why its reason is optional. The round of a task moved to a newer text version reads *Round 1, carried over from the earlier text version*. While a task is paused, the entry that resumes it reads **Text problems**. In the translation review, **Load the version number again** replaces *Retry corrected version metadata* and stands with its message.
+- Dates: the text view names a submission with the local date and time (*My annotation, from scratch, 17 Nov, 13:39*) and no longer with a raw timestamp; the labels of `GET …/annotation-versions` and `…/layers` no longer carry the timestamp, which stays in `created_at`. In the text card, *Submitted* and *Removed* follow the rule of *assigned* (*Submitted today 14:02 · assigned today 13:39*), and two proposal sets of one day show their time. **Last change** in My tasks (`updated_at` of `GET /api/v1/me/tasks`) now also moves when the person saves a draft.
+- Documents: at 1400 to 1599 px the status cells are no longer cut while the table has room (*accepted 17 Nov*, *20/22 submitted*).
+- Hints: a key of the marks while **Show invisible characters** is ticked; **Change term** starts with the marked words; the reason beside a greyed prefilled value under **Values annotators can choose**; language fields ask for a code (*de*, not *German*); **Add to projects** shows the project key of same-named projects; **Add member…** says a refused username under the field; the card **Translations** says that *Not frozen yet.* is expected after **Move to this release**.
+- MCP server: `change_annotation_modes` says what its counts count: `withdrawn_task_count` is every task on the changed texts, the new `withdrawn_unsubmitted_task_count` the tasks without a submission, and each text has `withdrawn_tasks` beside the names.
+
 ## [0.11.0] - 2026-11-17
 
 ### Added

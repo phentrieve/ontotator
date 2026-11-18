@@ -84,7 +84,7 @@ test("Retry corrected version metadata: the submitted correction names its new v
   expect(record.created_variant_id).toBeTruthy();
 
   // The review is submitted; only the version number of the corrected text is missing.
-  const retry = page.getByRole("button", { name: "Retry corrected version metadata", exact: true });
+  const retry = page.getByRole("button", { name: "Load the version number again", exact: true });
   await expect(retry).toBeVisible();
   await expect(review.getByText("Review submitted", { exact: true })).toBeVisible();
   await expect(page.getByText(/^A corrected version v\d+ was created\.$/)).toHaveCount(0);

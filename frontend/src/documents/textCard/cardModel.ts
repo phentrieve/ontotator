@@ -1,6 +1,7 @@
 /** The text card's path (U3): the state and tone of Translation, Annotation and Finalization, pure. */
 import type { DocumentRowView, NextStepView } from "../../api/client";
 import type { ProjectDocumentsQuery, Route } from "../../app/router";
+import { relativeDay } from "../../app/assignedDate";
 import type { PathSegment, PathTone } from "../../ui/StagePath";
 import { earlyFinal } from "../finalPanelText";
 import { submissionVersion } from "../SubmissionsTable";
@@ -130,6 +131,13 @@ export function dayMonth(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const date = new Date(iso);
   return Number.isNaN(date.getTime()) ? null : `${date.getDate()} ${MONTHS[date.getMonth()]}`;
+}
+
+/** The day in a person's row, by the rule of "assigned …": "today 14:02", "yesterday", "Mon", else "18 Oct". */
+export function rowDay(iso: string | null | undefined, now: Date = new Date()): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? null : relativeDay(date, now);
 }
 
 export function finalizationState(row: DocumentRowView, _now: Date): State {

@@ -5,6 +5,7 @@
 
 import type { components, operations } from "./generated";
 import { attachmentFilename, type DownloadPayload } from "./download";
+import { versionRefLabel } from "../app/submissionLabels";
 import { lastApiError, recordApiError, type LastApiError } from "./lastError";
 export type { DownloadPayload } from "./download";
 
@@ -958,12 +959,14 @@ export class ApiClient {
   async listAnnotationVersions(projectKey: string, documentId: string, assignmentId?: number): Promise<VersionRef[]> {
     const query = new URLSearchParams();
     if (assignmentId !== undefined) query.set("assignment", String(assignmentId));
-    return this.request<VersionRef[]>(`/api/v1/projects/${encodeURIComponent(projectKey)}/documents/${encodeURIComponent(documentId)}/annotation-versions${query.size ? `?${query}` : ""}`, { method: "GET" });
+    const refs = await this.request<VersionRef[]>(`/api/v1/projects/${encodeURIComponent(projectKey)}/documents/${encodeURIComponent(documentId)}/annotation-versions${query.size ? `?${query}` : ""}`, { method: "GET" });
+    return refs.map(ref => ({ ...ref, label: versionRefLabel(ref) }));
   }
 
   async listTextLayers(key: string, documentId: string): Promise<TextLayerEntry[]> {
     const body = await this.request<components["schemas"]["TextLayers"]>(`/api/v1/projects/${encodeURIComponent(key)}/documents/${encodeURIComponent(documentId)}/layers`, { method: "GET" });
-    return body.entries;
+    // An own submission's entry carries its ref's label: both get the local time.
+    return body.entries.map(entry => entry.ref ? { ...entry, label: entry.kind === "own" ? versionRefLabel(entry.ref) : entry.label, ref: { ...entry.ref, label: versionRefLabel(entry.ref) } } : entry);
   }
 
   async finalExportPreflight(projectKey: string): Promise<FinalPreflight> {
