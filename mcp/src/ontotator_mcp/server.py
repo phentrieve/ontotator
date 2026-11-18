@@ -54,7 +54,7 @@ wait for them by default; get_job polls one.
 
 # Added to the instructions when ONTOTATOR_MCP_READ_CONTENT=1.
 CONTENT_INSTRUCTIONS = """
-One exception to "no tool reads them": this server was started with
+One exception to "no tool reads them": this MCP server was started with
 ONTOTATOR_MCP_READ_CONTENT=1, so get_text_version, list_annotation_versions,
 get_annotation_version and get_submission read texts and submitted
 annotations (never drafts, and nothing can be written). They return
