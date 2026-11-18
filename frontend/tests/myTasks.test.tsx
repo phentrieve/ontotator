@@ -176,6 +176,8 @@ describe("My tasks component", () => {
       // The reopen reason is written out; there is no badge to tap.
       expect(reopened).toMatch(/doc-4.*Project P.*Annotation.*Reopened.*The project lead reopened this task on .+\. Reason: Check the onset\./);
       expect(screen.queryByRole("button", { name: "Reopened, why" })).toBeNull();
+      // Narrow: the notice under the badge says it once.
+      expect(rows[0].querySelector(".task-lead-reason")).toBeNull();
       expect(paused).toMatch(/In progress.*Paused.*The text names two doses\./);
       // Two projects are listed: each row names its project.
       expect(consolidation).toMatch(/doc-2.*Project Q \(q\).*Consolidation.*Reason from the lead: Assertion differs.*Open/);
@@ -192,6 +194,10 @@ describe("My tasks component", () => {
     const rows = await screen.findAllByTestId("task-row");
     // The row keeps only the badge; the sentence opens from its info button.
     expect(rows[0].textContent).not.toContain("reopened this task");
+    // Review 2, F7 c: the reason is written out under the task name, as the reason for a second review is; a
+    // reopening without a reason adds no line.
+    expect(rows[0].querySelector(".task-lead-reason")!.textContent).toMatch(/^Reopened by the lead on .+: Check the onset\.$/);
+    expect(rows[1].querySelector(".task-lead-reason")).toBeNull();
     expect(within(rows[2]).queryByRole("button", { name: "Reopened, why" })).toBeNull();
     fireEvent.click(within(rows[0]).getByRole("button", { name: "Reopened, why" }));
     expect((await screen.findByRole("dialog", { name: "Why reopened" })).textContent).toMatch(/The project lead reopened this task on .+\. Reason: Check the onset\./);

@@ -156,8 +156,9 @@ for (const [name, viewport] of sizes) {
     // My tasks: one line under the task name; the Reopened badge gives the same reason, never "No reason given."
     const row = taskRow(page, second);
     await expect(row.locator(".task-lead-reason")).toHaveText(new RegExp(`^Second review requested by the lead on .+: ${CORRECTION_REASON}$`));
-    await expect(taskRow(page, failed).locator(".task-lead-reason")).toHaveCount(0);
     if (name === "1440") {
+      // The reopened review writes its reason out under the task name too (review 2, F7 c).
+      await expect(taskRow(page, failed).locator(".task-lead-reason")).toHaveText(new RegExp(`^Reopened by the lead on .+: ${REOPEN_REASON}$`));
       await row.getByRole("button", { name: "Reopened, why", exact: true }).click();
       const why = page.getByRole("dialog", { name: "Why reopened", exact: true });
       await expect(why).toHaveText(new RegExp(`^Second review requested by the lead on .+: ${CORRECTION_REASON}$`));
@@ -166,6 +167,7 @@ for (const [name, viewport] of sizes) {
     } else {
       // Phone: status and reasons are stacked under the task. The second-review reason stands there once, with a
       // plain Reopened badge; the reopened review writes its reason out below its badge.
+      await expect(taskRow(page, failed).locator(".task-lead-reason")).toHaveCount(0);
       await expect(row.getByText(CORRECTION_REASON, { exact: false })).toHaveCount(1);
       await expect(row.getByText("Reopened", { exact: true })).toBeVisible();
       await expect(taskRow(page, failed)).toContainText(REOPEN_REASON);

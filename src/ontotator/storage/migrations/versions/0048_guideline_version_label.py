@@ -9,14 +9,14 @@ version is withdrawn.
 No existing row changes: every version starts without a label. The table is
 append-only for the application; adding a column does not touch its rows.
 
-Follows 0045 (lead pause of a text).
+Follows 0047 (carry a submission again).
 """
 
 import sqlalchemy as sa
 from alembic import op
 
 revision = "0048"
-down_revision = "0045"
+down_revision = "0047"
 branch_labels = None
 depends_on = None
 SCHEMA = "ontotator"

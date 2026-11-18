@@ -230,6 +230,22 @@ def test_an_invalid_label_is_refused_and_nothing_is_published(team, label) -> No
     assert versions(team.app) == []
 
 
+def test_publish_without_an_expected_version_says_the_field_was_empty(team) -> None:
+    """Issue 486: not "someone published meanwhile" for a client that sends
+    no ``expected_latest_version`` once versions exist."""
+    assert publish(team.lead).status_code == 201
+    missing = publish(team.lead, b"# Rules 2")
+    assert missing.status_code == 409
+    assert missing.json() == {
+        "code": "GUIDELINE_VERSION_CONFLICT",
+        "details": {"latest_version": 1, "reason": "expected_version_missing"},
+    }
+    stale = publish(team.lead, b"# Rules 2", expected="2")
+    assert stale.status_code == 409
+    assert stale.json()["details"] == {"latest_version": 1}
+    assert versions(team.app) == [1]
+
+
 def test_error_statuses(team) -> None:
     lead = team.lead
     cases = [

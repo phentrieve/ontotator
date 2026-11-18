@@ -391,6 +391,14 @@ class GuidelineService:
             pid = self._manage(conn, actor, key)
             versions = _versions(conn, pid)
             latest = versions[0].version if versions else None
+            if expected_latest_version is None and latest is not None:
+                # The request named no version (an older client, a script):
+                # nobody published meanwhile, and repeating it never helps.
+                # Same code, so older clients keep working (issue 486).
+                raise DomainError(
+                    "GUIDELINE_VERSION_CONFLICT",
+                    {"latest_version": latest, "reason": "expected_version_missing"},
+                )
             if expected_latest_version != latest:
                 raise DomainError(
                     "GUIDELINE_VERSION_CONFLICT", {"latest_version": latest}

@@ -10,6 +10,8 @@ from conftest import ToolFailed, call
 from fake_api import TOKEN, FakeApi, refusal
 from mcp import Client
 
+from ontotator_mcp import __version__
+from ontotator_mcp.__main__ import main
 from ontotator_mcp.config import ConfigError, Settings
 from ontotator_mcp.errors import api_error
 from ontotator_mcp.server import build_server
@@ -226,3 +228,35 @@ def test_the_readme_installs_the_current_release() -> None:
         f"git+https://github.com/phentrieve/ontotator@v{version}#subdirectory=mcp"
     )
     assert set(urls) == {expected}
+
+
+def test_the_mcp_server_carries_the_release_version(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """ontotator-mcp is versioned with the app (#486).
+
+    A release bumps the root pyproject.toml; this fails until
+    mcp/pyproject.toml, ``__version__`` and mcp/uv.lock are bumped with it.
+    The version is what ``--version``, the User-Agent and whoami show, so a
+    running process can be told from the release on the server.
+    """
+    root = Path(__file__).resolve().parents[2]
+    release = tomllib.loads((root / "pyproject.toml").read_text())["project"]["version"]
+    package = tomllib.loads((root / "mcp" / "pyproject.toml").read_text())
+    assert package["project"]["version"] == release
+    assert __version__ == release
+    lock = tomllib.loads((root / "mcp" / "uv.lock").read_text())
+    [locked] = [p for p in lock["package"] if p["name"] == "ontotator-mcp"]
+    assert locked["version"] == release
+    with pytest.raises(SystemExit):
+        main(["--version"])
+    assert capsys.readouterr().out.strip() == f"ontotator-mcp {release}"
+
+
+@pytest.mark.anyio
+async def test_requests_name_the_release_in_the_user_agent(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    await call(mcp_client, "whoami", {})
+    agent = fake.calls[0].request.headers["user-agent"]
+    assert agent == f"ontotator-mcp/{__version__}"

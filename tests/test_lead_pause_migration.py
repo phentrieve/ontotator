@@ -1,6 +1,7 @@
 """Migration 0045 (issue 464): the lead pause of a text, four columns on
 ``text_settings``, purely additive. It follows 0044 (editorial corrections),
-which follows 0043 (when an assignment was started): one head."""
+which follows 0043 (when an assignment was started); 0046 (data only)
+follows it."""
 
 from __future__ import annotations
 
@@ -43,6 +44,7 @@ def _columns(conn: Connection) -> set[str]:
 
 def test_one_head():
     scripts = ScriptDirectory.from_config(alembic_config())
+    # One head; 0046 and 0047 (carry a submission again, issue 461) follow this one.
     assert scripts.get_heads() == [head_revision()]
     assert _previous() == PREVIOUS
     previous = scripts.get_revision(PREVIOUS)

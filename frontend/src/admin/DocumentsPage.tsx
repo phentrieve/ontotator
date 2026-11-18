@@ -820,6 +820,7 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
     onStep={stepCard} onClose={closeCard} onNavigate={route => onNavigate(route)}
     onAssign={(row, task) => { void onAssign(row, task); }}
     onChangePlan={row => setPlanFor(row)} onOpenText={entry => openCard({ key: rowKeyOf(entry), tab: panelTab })} onChanged={reloadAfterAction}
+    onMessage={message => { announce(message); showToast({ message }); }}
     decision={decision} textVersionTools={textVersionTools} canManage me={currentUser ?? null}
     reportRoute={reportId => ({ name: "projectProblemReport", key: projectKey, reportId, documents: query })}
     plan={<><PlanChips row={panelRow} groupRevision={groupOf(panelRow.case_id)?.plan_revision ?? 1} saves={planSaves} size={narrow ? "card" : "table"} /><PlanRowNotice row={panelRow} saves={planSaves} /></>}

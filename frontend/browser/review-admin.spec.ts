@@ -131,15 +131,13 @@ for (const size of SIZES) {
         return (await response.json() as { username: string; roles: string[] }[]).filter(member => member.roles.includes("lead")).map(member => member.username);
       };
 
-      // The project's only lead, who is no administrator: the dialog is as before and the server refuses.
+      // The project's only lead, who is no administrator: refused at once, before any confirmation (review 2, F7 d).
       await loginThroughForm(page, s.users.lead, s.display_names.lead);
       await page.goto(people);
       await members.getByRole("checkbox", { name: `${s.users.lead}: Lead`, exact: true }).click();
-      const ownRemoval = page.getByRole("dialog", { name: "Remove Project Lead from the project?", exact: true });
-      await expect(ownRemoval).toContainText("Project Lead loses access to this project.");
-      await expect(ownRemoval).not.toContainText("will have no lead");
-      await ownRemoval.getByRole("button", { name: "Remove from project", exact: true }).click();
       await expect(members.getByRole("alert")).toContainText("Add another project lead before removing the last lead.");
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      await expect(members.getByRole("checkbox", { name: `${s.users.lead}: Lead`, exact: true })).toBeChecked();
       await shot(page, `B-lead-refused-${size.name}`);
       expect(await leads()).toEqual([s.users.lead]);
       await page.getByRole("button", { name: "Log out", exact: true }).click();

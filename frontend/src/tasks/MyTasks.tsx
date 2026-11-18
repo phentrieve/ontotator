@@ -210,6 +210,9 @@ export function MyTasks({ project, status, projects, onNavigate, username }: MyT
       {failedChecks(task) > 0 && <span className="task-check-flag"><IconWarning /> {failedChecksTitle(failedChecks(task))}</span>}
       {task.consolidation_reason && <p className="cell-secondary task-consolidation-reason">{consolidationReasonText(task.consolidation_reason)}</p>}
       {secondReviewText(task) && <p className="cell-secondary task-lead-reason">{secondReviewText(task)}</p>}
+      {/* The lead's reason for reopening is written out like the one for a second review (review 2, F7 c); on a narrow
+          screen the notice under the "Reopened" badge already says it. */}
+      {!narrow && task.reopen_reason?.trim() && reopenedText(task) && <p className="cell-secondary task-lead-reason">{reopenedText(task)}</p>}
     </> },
     { id: "status", header: "Status", cell: task => <>
       {task.waiting_for_translation_review || task.waiting_for_lead ? <StatusBadge tone="neutral">{task.waiting_for_lead ? WAITING_FOR_LEAD : WAITING_FOR_REVIEW}</StatusBadge>
