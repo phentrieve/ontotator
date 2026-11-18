@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Ontology tree: the link next to an ICD-10-CM code (prefix `ICD10CM`) opens the code on icd10data.com (`https://www.icd10data.com/search?s=E11.621`) instead of the EBI OLS search, which has no ICD-10-CM.
+
 ## [0.11.0] - 2026-11-17
 
 ### Added
