@@ -27,7 +27,11 @@ from ontotator.domain.profiles import (
     resolve_type,
 )
 
-CURIE_PATTERN = re.compile(r"^[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$")
+# PREFIX:LOCAL. The local part may hold dots between other characters, as in
+# ICD-10 or ATC codes (`ICD10CM:T36.0X1A`); a leading, trailing or doubled dot
+# is no id.
+CURIE_REGEX = r"^[A-Za-z0-9_-]+:[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*$"
+CURIE_PATTERN = re.compile(CURIE_REGEX)
 
 ActorKind = Literal["human", "tool"]
 
