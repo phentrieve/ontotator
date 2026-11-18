@@ -2076,6 +2076,9 @@ export interface paths {
          *     bring back (``tasks``) and, in ``blocked``, why it cannot run now
          *     (``changed``, ``not_in_plan``, ``person_unavailable``); a record that is
          *     unknown, expired or already undone is refused in a preview too.
+         *     ``blocked_texts`` names each text in the way and what changed on it
+         *     (``texts``: how many texts the action changed). The refusal of a blocked
+         *     Undo carries that answer as ``preview`` in its details.
          */
         post: operations["bulk_undo_api_v1_projects__key__bulk_task_actions_undo_post"];
         delete?: never;
@@ -5365,6 +5368,10 @@ export interface components {
             /** Tasks */
             tasks?: components["schemas"]["BulkUndoTaskView"][];
             blocked?: components["schemas"]["BulkUndoBlock"] | null;
+            /** Texts */
+            texts?: number;
+            /** Blocked Texts */
+            blocked_texts?: components["schemas"]["BulkUndoTextBlock"][];
         };
         /** BulkUndoTaskView */
         BulkUndoTaskView: {
@@ -5387,6 +5394,20 @@ export interface components {
              */
             status: "open" | "in_progress" | "submitted" | "reopened";
             person: components["schemas"]["PersonRefView"];
+        };
+        /** BulkUndoTextBlock */
+        BulkUndoTextBlock: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "final" | "versions" | "plan" | "tasks" | "submissions" | "drafts" | "not_in_plan" | "person_unavailable";
+            /** Message */
+            message: string;
         };
         /**
          * BulkUndoView

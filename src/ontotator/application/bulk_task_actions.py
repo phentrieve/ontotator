@@ -187,9 +187,29 @@ UNDO_BLOCKS: dict[str, str] = {
     "person_unavailable": "A person is no longer an active member with this role.",
 }
 
+# Why one text blocks the Undo (issue 469), with the words the toast and the
+# MCP tool show. The first five name the part of the text's recorded state
+# that differs, in the order they are checked, as the Undo of Change final…
+# does (``final_change_undo.BLOCKS``); ``drafts`` is work saved in a task.
+# The last two are a withdrawn task that cannot come back.
+UNDO_TEXT_BLOCKS: dict[str, str] = {
+    "final": "The final result was changed, confirmed again or withdrawn since.",
+    "versions": "The text got a new version, or a version was discarded or"
+    " restored since.",
+    "plan": "The work plan of the text changed since.",
+    "tasks": "A task of the text changed since (assigned, reopened, withdrawn,"
+    " paused or a new round).",
+    "submissions": "Something was submitted or discarded on the text since.",
+    "drafts": "Work on a task of the text was saved since.",
+    "not_in_plan": "The text no longer plans the task, or its version was discarded.",
+    "person_unavailable": "A person of a task is no longer an active member"
+    " with this role.",
+}
+Text = tuple[str, str]
 
-def _stale(reason: str) -> DomainError:
-    return DomainError("BULK_UNDO_STALE", {"reason": reason})
+
+def _stale(reason: str, **more: Any) -> DomainError:
+    return DomainError("BULK_UNDO_STALE", {"reason": reason, **more})
 
 
 class BulkTaskActionService:
@@ -749,8 +769,33 @@ class BulkTaskActionService:
             "undoable": undoable,
         }
         if undoable:
+            texts = sorted(
+                set(
+                    conn.execute(
+                        select(DocumentRow.case_id, DocumentRow.language)
+                        .join(
+                            AssignmentRow,
+                            and_(
+                                AssignmentRow.project_id == DocumentRow.project_id,
+                                AssignmentRow.document_id == DocumentRow.document_id,
+                            ),
+                        )
+                        .where(
+                            AssignmentRow.project_id == pid,
+                            AssignmentRow.id.in_(list(ids)),
+                        )
+                    ).tuples()
+                )
+            )
+            states = _text_states(conn, pid, texts)
             details |= {
                 "state": _after_state(conn, pid, ids),
+                # Per text, so that a refused Undo names the text that
+                # changed and what changed on it.
+                "texts": [
+                    {"case_id": text[0], "language": text[1], "state": states[text]}
+                    for text in texts
+                ],
                 "expires_at": expires.isoformat(),
             }
         record_audit(
@@ -842,8 +887,32 @@ class BulkTaskActionService:
             if not preview:
                 query = query.with_for_update(key_share=True, of=AssignmentRow)
             rows = list(conn.execute(query).mappings())
+            # A record written before the texts were kept one by one has none.
+            entries: list[dict[str, Any]] = list(record.get("texts", []))
+            texts: list[Text] = [(e["case_id"], e["language"]) for e in entries]
+            states = _text_states(conn, pid, texts)
+            # Each text that changed since, with the first part that differs.
+            blocked_texts: list[dict[str, Any]] = []
+            for entry, text in zip(entries, texts, strict=True):
+                # In the order of ``UNDO_TEXT_BLOCKS`` (a stored JSON object
+                # does not keep the order of its keys).
+                recorded = entry["state"]
+                part = next(
+                    (
+                        name
+                        for name in UNDO_TEXT_BLOCKS
+                        if name in recorded and states[text][name] != recorded[name]
+                    ),
+                    None,
+                )
+                if part is not None:
+                    blocked_texts.append(_text_block(text, part))
             blocked: str | None = None
-            if len(rows) != len(ids) or record["state"] != _after_state(conn, pid, ids):
+            if (
+                blocked_texts
+                or len(rows) != len(ids)
+                or record["state"] != _after_state(conn, pid, ids)
+            ):
                 blocked = "changed"
             elif action == "reopen":
                 if any(
@@ -854,7 +923,12 @@ class BulkTaskActionService:
             elif any(row["revoked_at"] is None for row in rows):
                 blocked = "changed"
             else:
-                blocked = self._restore_refusal(conn, project, rows)
+                refusals = self._restore_refusals(conn, project, rows)
+                if refusals:
+                    blocked = next(iter(refusals.values()))
+                    blocked_texts = [
+                        _text_block(text, reason) for text, reason in refusals.items()
+                    ]
             people = person_refs(
                 conn,
                 {int(row["user_id"]) for row in rows},
@@ -883,11 +957,15 @@ class BulkTaskActionService:
                 "blocked": None
                 if blocked is None
                 else {"reason": blocked, "message": UNDO_BLOCKS[blocked]},
+                "texts": len(texts)
+                or len({(row["case_id"], row["language"]) for row in rows}),
+                "blocked_texts": blocked_texts,
             }
             if preview:
                 return view
             if blocked is not None:
-                raise _stale(blocked)
+                # All or nothing; the refusal carries what the preview says.
+                raise _stale(blocked, preview=view)
             for row in rows:
                 if action == "reopen":
                     conn.execute(
@@ -959,15 +1037,15 @@ class BulkTaskActionService:
             }
 
     @staticmethod
-    def _restore_refusal(
+    def _restore_refusals(
         conn: Connection, project: RowMapping, rows: Sequence[RowMapping]
-    ) -> str | None:
-        """Why withdrawn tasks cannot come back (None: they can): a new task
-        could not be given there now. The person can no longer take it
-        (``person_unavailable``), or its text does not plan the task or its
-        version is discarded (``not_in_plan``). The limit of annotators is
-        not asked again: the state digest says the text has exactly the
-        tasks it had."""
+    ) -> dict[Text, str]:
+        """The texts whose withdrawn tasks cannot come back, each with the
+        reason (empty: all can): a new task could not be given there now. Its
+        text does not plan the task or its version is discarded
+        (``not_in_plan``), or the person can no longer take it
+        (``person_unavailable``). The limit of annotators is not asked again:
+        the state digest says the text has exactly the tasks it had."""
         pid = int(project["id"])
         plan = plan_for(
             conn, pid, {RowKey(row["case_id"], row["language"]) for row in rows}
@@ -982,24 +1060,104 @@ class BulkTaskActionService:
                 )
             ).scalars()
         )
-        checked: set[tuple[int, str]] = set()
+        available: dict[tuple[int, str], bool] = {}
+        refusals: dict[Text, str] = {}
         for row in rows:
-            flags = plan.get(RowKey(row["case_id"], row["language"]))
+            text = (str(row["case_id"]), str(row["language"]))
+            if text in refusals:
+                continue
+            flags = plan.get(RowKey(*text))
             planned = flags is not None and (
                 flags.review if row["task"] == "translation_review" else flags.annotate
             )
             if not planned or row["document_id"] in discarded:
-                return "not_in_plan"
+                refusals[text] = "not_in_plan"
+                continue
             who = (int(row["user_id"]), str(row["task"]))
-            if who not in checked:
+            if who not in available:
                 try:
                     AssignmentService._require_target(
                         conn, project, who[0], cast(Task, who[1])
                     )
+                    available[who] = True
                 except DomainError:
-                    return "person_unavailable"
-                checked.add(who)
-        return None
+                    available[who] = False
+            if not available[who]:
+                refusals[text] = "person_unavailable"
+        return refusals
+
+
+def _text_block(text: Text, reason: str) -> dict[str, Any]:
+    return {
+        "case_id": text[0],
+        "language": text[1],
+        "reason": reason,
+        "message": UNDO_TEXT_BLOCKS[reason],
+    }
+
+
+def _text_states(
+    conn: Connection, pid: int, texts: Sequence[Text]
+) -> dict[Text, dict[str, str]]:
+    """Per text, a digest of each part an Undo would restore over: the parts
+    the Undo of Change final… keeps (final result, versions, plan row, tasks
+    with their rounds, submissions) and ``drafts``, the annotation drafts and
+    translation review drafts of the text's versions. The number of
+    statements does not grow with the number of texts."""
+    if not texts:
+        return {}
+    # Imported here: that module imports this one (``UNDO_MINUTES``).
+    from ontotator.application.final_change_undo import text_states
+
+    states = text_states(conn, pid, texts)
+    text_of: dict[str, Text] = {
+        document_id: (case_id, language)
+        for document_id, case_id, language in conn.execute(
+            select(
+                DocumentRow.document_id, DocumentRow.case_id, DocumentRow.language
+            ).where(
+                DocumentRow.project_id == pid,
+                tuple_(DocumentRow.case_id, DocumentRow.language).in_(
+                    [(case_id, language) for case_id, language in texts]
+                ),
+            )
+        ).tuples()
+    }
+    documents = sorted(text_of)
+    drafts: dict[Text, list[list[Any]]] = {text: [] for text in texts}
+    for document_id, annotator_id, mode, revision in conn.execute(
+        select(
+            DraftRow.document_id,
+            DraftRow.annotator_id,
+            DraftRow.mode,
+            DraftRow.revision,
+        )
+        .where(DraftRow.project_id == pid, DraftRow.document_id.in_(documents))
+        .order_by(DraftRow.id)
+    ).tuples():
+        drafts[text_of[document_id]].append([document_id, annotator_id, mode, revision])
+    reviews: dict[Text, list[list[Any]]] = {text: [] for text in texts}
+    for document_id, assignment_id, revision in conn.execute(
+        select(
+            AssignmentRow.document_id,
+            TranslationReviewDraftRow.assignment_id,
+            TranslationReviewDraftRow.revision,
+        )
+        .join(
+            AssignmentRow,
+            AssignmentRow.id == TranslationReviewDraftRow.assignment_id,
+        )
+        .where(
+            AssignmentRow.project_id == pid,
+            AssignmentRow.document_id.in_(documents),
+        )
+        .order_by(TranslationReviewDraftRow.assignment_id)
+    ).tuples():
+        reviews[text_of[document_id]].append([assignment_id, revision])
+    return {
+        text: states[text] | {"drafts": state_digest([drafts[text], reviews[text]])}
+        for text in texts
+    }
 
 
 def _current_versions(

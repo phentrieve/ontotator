@@ -3,7 +3,7 @@ import { useState } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api, ApiError, type AcceptAgreeingView, type BulkChangeFinalUndoView, type BulkChangeFinalView, type BulkTaskActionView, type SelectionSummary } from "../../src/api/client";
 import { BulkFinalDialog } from "../../src/documents/BulkFinalDialog";
-import { finalAppliedText, finalConsequences, finalGroups, finalSummaryText, finalUnavailableReason, finalUndoneText, finalUndoRefusal } from "../../src/documents/bulkFinalModel";
+import { finalAppliedText, finalConsequences, finalGroups, finalSummaryText, finalUnavailableReason, finalUndoneText, finalUndoRefusal, taskUndoRefusal } from "../../src/documents/bulkFinalModel";
 import { SelectionBar } from "../../src/documents/SelectionBar";
 import { Toast, useToast } from "../../src/ui";
 
@@ -106,6 +106,18 @@ it("words the Undo: what came back, exports made meanwhile, and the texts in the
   );
   // Expired, used or another lead's: the general message.
   expect(finalUndoRefusal(new ApiError(409, "stale", "BULK_UNDO_STALE", { reason: "expired" }))).toBeNull();
+  // Issue 469: the Undo of a bulk Reopen or Withdraw names the text in the same pattern.
+  const task = (case_id: string, reason: string) => ({ case_id, language: "en", reason, message: "Server words." });
+  const taskRefusal = (blocked_texts: unknown[], texts = 7) => new ApiError(409, "stale", "BULK_UNDO_STALE", { reason: "changed", preview: { undone: 0, applied: false, texts, blocked_texts } });
+  expect(taskUndoRefusal(taskRefusal([task("EN100022", "tasks")]))).toBe(
+    "Undo is not possible: 1 of 7 texts changed since (EN100022 en: a task was assigned, reopened, withdrawn or paused, or got a new round). Nothing was undone.");
+  expect(taskUndoRefusal(taskRefusal([task("EN100022", "drafts"), task("EN100023", "plan"), task("EN100024", "final")]))).toBe(
+    "Undo is not possible: 3 of 7 texts changed since (EN100022 en: work on a task was saved; and 2 more texts). Nothing was undone.");
+  // A reason this client does not know: the server's words.
+  expect(taskUndoRefusal(taskRefusal([task("EN100022", "later")], 1))).toBe("Undo is not possible: 1 of 1 text changed since (EN100022 en: Server words.). Nothing was undone.");
+  // No text named (an expired or used Undo, or an older record): the general message stays.
+  expect(taskUndoRefusal(taskRefusal([]))).toBeNull();
+  expect(taskUndoRefusal(new ApiError(409, "stale", "BULK_UNDO_STALE", { reason: "expired" }))).toBeNull();
   expect(finalUndoRefusal(new Error("offline"))).toBeNull();
 });
 

@@ -81,12 +81,12 @@ A submitted consolidation cannot be reopened or reassigned. If it contains a mis
 
 ### Review changes to a final result
 
-What for: confirm a final result after something changed, for example a newer submission or a corrected text. The row's next step is **Confirm final result**.
+What for: confirm a final result after something changed, for example a newer submission or a corrected text. The row's next step is **Confirm final result**. Its **Finalization** cell says what changed, for example *Check changes, newer result*; *ready to accept* is a text that has no final result yet.
 
 1. In the row, click **Review changes…**. The card lists what changed.
 2. Optional: if the text changed, click **Show changes** to see the changed passages.
 3. Choose one:
-   - Keep the final result on the old version, for example *Keep final on v1*.
+   - Keep the final result: **Keep the current final result**. If the text has several versions, the button names the version of the final result, for example *Keep final on v1*.
    - **Use the newer result**. If annotators marked findings in it **Unresolved**, the block lists them with who wrote each note.
    - Carry it to the new version, for example *Carry to v2…* (see [Carry submitted work to a new text version](#carry-submitted-work-to-a-new-text-version)).
 
