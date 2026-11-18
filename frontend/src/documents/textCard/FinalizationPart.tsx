@@ -6,6 +6,7 @@ import { plural } from "../../app/labels";
 import { Button, InlineMessage } from "../../ui";
 import type { ProjectDocumentsQuery, Route } from "../../app/router";
 import { earlyFinal, openAnnotateWork } from "../finalPanelText";
+import { pausedWord } from "../labels";
 import { RouteLink } from "../RowCells";
 import { shortName } from "../stageLabels";
 import type { TextVersionsTools } from "../TextVersions";
@@ -90,9 +91,10 @@ export function FinalizationPart({ row, projectKey, query, decision, onNavigate,
     </InlineMessage>}
     {running.length > 0 ? <PersonList label="Consolidators">
       {running.map(item => {
-        const assigned = assignedLine(item, now, !groups);
+        const assigned = assignedLine(item, now, !groups && !item.held);
         // The version the consolidation runs on, when the text has several (issue 445).
-        const parts = [groups, assigned, personVersion(row, item)].filter(Boolean);
+        // "Paused by lead" first, as on an annotator's row (issue 464).
+        const parts = [pausedWord(item), groups, assigned, personVersion(row, item)].filter(Boolean);
         return <WorkPersonRow key={item.assignment_id} item={item} caseId={row.case_id} textName={textLabel(row)} canManage={canManage} tools={tools} onChanged={() => onChanged?.()}
           onRemoved={focusAfterRemoval} details={parts.length > 0 ? parts.map((part, index) => <span key={index}>{index > 0 && " · "}{part}</span>) : undefined}
           open={item.is_me ? consolidationLink(`Open consolidation of ${workerName(item)}`, item.assignment_id) : undefined} />;

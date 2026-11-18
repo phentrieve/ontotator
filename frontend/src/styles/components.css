@@ -520,7 +520,7 @@ textarea.form-control {
 .empty-state { padding: var(--space-5) 0; }
 .empty-state-title { margin: 0; font-size: var(--size-xl); line-height: var(--leading-xl); font-weight: var(--weight-strong); }
 .empty-state-body { margin-top: var(--space-2); color: var(--text-muted); }
-.empty-state-action { margin-top: var(--space-4); }
+.empty-state-action { margin-top: var(--space-4); display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 /* Filters sit on one even grid so five controls read as one calm group. */
