@@ -38,7 +38,12 @@ FACET_GROUPS: tuple[FacetGroup, ...] = (
 # "More annotators than the limit" (issue 339 b): a current version of the
 # row has more unrevoked annotate tasks than "annotators per text".
 # "Paused by lead" (issue 464): a lead paused the work on the text.
-FlagFilter = Literal["guidelines_unclear", "over_limit", "lead_paused"]
+# "Can take another annotator" (review 2, F4): the row has the step
+# ``assign_annotation``, also while its first annotator is at work (the row
+# is then in progress and no tab lists it as to assign).
+FlagFilter = Literal[
+    "guidelines_unclear", "over_limit", "lead_paused", "can_take_annotator"
+]
 # Facet "Tool proposals" (spec 2026-10-23 §2b).
 ProposalValue = Literal["with", "without"]
 Key = TypeVar("Key")
@@ -62,6 +67,11 @@ def flag_values(row: Mapping[str, Any]) -> tuple[str, ...]:
         *(("guidelines_unclear",) if row.get("flagged_unclear") else ()),
         *(("over_limit",) if row.get("over_limit") else ()),
         *(("lead_paused",) if row.get("lead_pause") else ()),
+        *(
+            ("can_take_annotator",)
+            if any(step["code"] == "assign_annotation" for step in row.get("steps", ()))
+            else ()
+        ),
     )
 
 

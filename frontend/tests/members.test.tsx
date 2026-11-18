@@ -58,6 +58,22 @@ describe("project members", () => {
     expect((screen.getByRole("checkbox", { name: "lead: Lead" }) as HTMLInputElement).checked).toBe(true);
   });
 
+  it("tells the project's only lead at once that the lead role cannot go, without a confirmation (review 2, F7 d)", async () => {
+    render(<MembersSection projectKey="p" currentUser={{ username: "lead", is_system_admin: false }} />);
+    fireEvent.click(await screen.findByRole("checkbox", { name: "lead: Lead" }));
+    expect(screen.getByRole("alert").textContent).toContain("Add another project lead before removing the last lead.");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect((screen.getByRole("checkbox", { name: "lead: Lead" }) as HTMLInputElement).checked).toBe(true);
+    // "Remove…" on the same row is the same removal.
+    fireEvent.click(screen.getByRole("button", { name: "Remove Lead from the project" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("alert").textContent).toContain("Add another project lead before removing the last lead.");
+    expect(api.setMemberRoles).not.toHaveBeenCalled();
+    // Another role of the same person is still confirmed as before.
+    fireEvent.click(screen.getByRole("checkbox", { name: "alice: Annotator" }));
+    expect(screen.getByRole("dialog")).toBeDefined();
+  });
+
   it("confirms all actual affected assignment details before resending with revocation", async () => {
     vi.mocked(api.setMemberRoles).mockRejectedValueOnce(new ApiError(409, "Has work", "MEMBER_HAS_ASSIGNMENTS", { assignments: [{ id: 2, document_id: "doc-reopened", task: "annotate" }, { id: 3, document_id: "doc-in-progress", task: "review" }] })).mockResolvedValueOnce({ ...members[0], roles: [] });
     render(<MembersSection projectKey="p" />);

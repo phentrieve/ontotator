@@ -72,6 +72,14 @@ def _undo(env: Any, result: dict[str, Any], who: Any = None) -> Any:
     return (who or env.lead).post(UNDO, json={"undo_id": result["undo"]["id"]})
 
 
+def _named(refused: Any) -> list[tuple[str, str, str]]:
+    """The texts a refused Undo names, each with what changed on it."""
+    return [
+        (block["case_id"], block["language"], block["reason"])
+        for block in refused.json()["details"]["preview"]["blocked_texts"]
+    ]
+
+
 def _apply(env: Any, url: str, **body: Any) -> dict[str, Any]:
     token = _post(env, url, preview=True, **body).json()["preview_token"]
     extra = {"reason": "Guideline 2.3"} if url == REOPEN else {}
@@ -213,10 +221,93 @@ def test_undo_is_refused_once_the_texts_changed(env):
     assert preview["blocked"]["message"]
     assert [t["assignment_id"] for t in preview["tasks"]] == [a1]
     assert (preview["applied"], preview["action"]) == (False, "withdraw")
+    # It names the text and what changed on it (issue 469).
+    assert (preview["texts"], preview["blocked_texts"]) == (
+        1,
+        [
+            {
+                "case_id": "c1",
+                "language": "en",
+                "reason": "tasks",
+                "message": "A task of the text changed since (assigned, reopened,"
+                " withdrawn, paused or a new round).",
+            }
+        ],
+    )
     refused = _undo(env, result)
     assert refused.status_code == 409
     assert refused.json()["code"] == "BULK_UNDO_STALE"
+    # The refusal carries the same answer.
+    assert refused.json()["details"] == {"reason": "changed", "preview": preview}
     assert _status(env, a1) == ("open", True)
+
+
+def test_a_refused_undo_names_only_the_texts_that_changed(env):
+    """Issue 469: bulk Reopen of two texts, then one reopened task is removed."""
+    a1 = assign(env, doc("c1", "en"), "anno", "annotate")
+    a2 = assign(env, doc("c2", "en"), "anno", "annotate")
+    submit(env, a1, "s1")
+    submit(env, a2, "s2")
+    result = _apply(env, REOPEN)
+    # Nothing changed yet: nothing is named.
+    free = env.lead.post(
+        UNDO, json={"undo_id": result["undo"]["id"], "preview": True}
+    ).json()
+    assert (free["texts"], free["blocked"], free["blocked_texts"]) == (2, None, [])
+    # The lead removes the reopened task of c2.
+    removed = env.lead.post(
+        f"/api/v1/assignments/{a2}/revoke", json={"reason": "Wrong person"}
+    )
+    assert removed.status_code == 200, removed.text
+    refused = _undo(env, result)
+    assert refused.status_code == 409
+    details = refused.json()["details"]
+    assert details["reason"] == "changed"
+    assert details["preview"]["texts"] == 2
+    assert [
+        (b["case_id"], b["language"], b["reason"])
+        for b in details["preview"]["blocked_texts"]
+    ] == [("c2", "en", "tasks")]
+    # Nothing was undone.
+    assert _status(env, a1) == ("reopened", False)
+
+
+def test_an_undo_recorded_without_its_texts_is_refused_without_names(env):
+    """A record of the hour before the upgrade keeps one digest for all texts."""
+    a1 = assign(env, doc("c1", "en"), "anno", "annotate")
+    submit(env, a1, "s1")
+    result = _apply(env, REOPEN, rows=[{"case_id": "c1", "language": "en"}])
+    # The audit log is append-only: the old record is a copy without the texts.
+    with env.db.transaction() as conn:
+        event = (
+            conn.execute(
+                select(AuditEventRow).where(AuditEventRow.id == result["undo"]["id"])
+            )
+            .mappings()
+            .one()
+        )
+        old = conn.execute(
+            insert(AuditEventRow)
+            .values(
+                {k: v for k, v in event.items() if k != "id"}
+                | {
+                    "details": {
+                        k: v for k, v in event["details"].items() if k != "texts"
+                    }
+                }
+            )
+            .returning(AuditEventRow.id)
+        ).scalar_one()
+    result = {"undo": {"id": old}}
+    _set(env, a1, updated_at=AssignmentRow.updated_at + timedelta(seconds=5))
+    refused = _undo(env, result)
+    assert refused.status_code == 409
+    shown = refused.json()["details"]["preview"]
+    assert (shown["blocked"]["reason"], shown["texts"], shown["blocked_texts"]) == (
+        "changed",
+        1,
+        [],
+    )
 
 
 def test_withdraw_keeps_started_submitted_and_within_limit_tasks(env):
@@ -476,7 +567,8 @@ def test_undo_is_refused_after_a_save_a_plan_change_or_other_work(env):
         )
     refused = _undo(env, result)
     assert refused.status_code == 409
-    assert refused.json()["details"] == {"reason": "changed"}
+    assert refused.json()["details"]["reason"] == "changed"
+    assert _named(refused) == [("c1", "de", "drafts")]
     assert _status(env, review) == ("in_progress", True)
 
     # A reopened annotation is saved again (the assignment's updated_at).
@@ -489,7 +581,9 @@ def test_undo_is_refused_after_a_save_a_plan_change_or_other_work(env):
             .where(AssignmentRow.id == a1)
             .values(updated_at=AssignmentRow.updated_at + timedelta(seconds=5))
         )
-    assert _undo(env, reopened).json()["details"] == {"reason": "changed"}
+    saved = _undo(env, reopened)
+    assert saved.json()["details"]["reason"] == "changed"
+    assert _named(saved) == [("c1", "en", "tasks")]
     assert _status(env, a1) == ("reopened", False)
 
     # A withdrawn task does not come back once its text left the plan.
@@ -500,7 +594,9 @@ def test_undo_is_refused_after_a_save_a_plan_change_or_other_work(env):
         UNDO, json={"undo_id": withdrawn["undo"]["id"], "preview": True}
     ).json()["blocked"]
     assert blocked["reason"] == "changed"
-    assert _undo(env, withdrawn).status_code == 409
+    left = _undo(env, withdrawn)
+    assert left.status_code == 409
+    assert _named(left) == [("c2", "en", "plan")]
     assert _status(env, b1) == ("open", True)
 
 

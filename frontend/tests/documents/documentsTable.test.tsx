@@ -291,6 +291,29 @@ describe("cells", () => {
     expect(status(3).getAttribute("title")).toBe("assigned, not started · open: Tom Reis");
   });
 
+  it("a narrow cell keeps the limit in view while a text with open work can take another annotator (review 2, F4)", () => {
+    const room = stagedRow("case-106", "de", {
+      stages: {
+        review: cell("accepted", "done", { note: "unchanged" }),
+        annotation: cell("in_progress", "running", { people: [tom], submitted: 0, total: 1, assigned: 1, target: 2, started: 0, open_tasks: 1 }),
+        final: cell("none", "none"),
+      },
+    });
+    const full = stagedRow("case-107", "de", {
+      stages: {
+        review: cell("accepted", "done", { note: "unchanged" }),
+        annotation: cell("in_progress", "running", { people: [ana, tom], submitted: 0, total: 2, started: 0, open_tasks: 2 }),
+        final: cell("none", "none"),
+      },
+    });
+    renderTable(page([group("case-106", [room]), group("case-107", [full])]));
+    const status = (name: string) => cellsOf(name)[3].querySelector<HTMLElement>(".documents-status")!;
+    expect(status("case-106 de").getAttribute("title")).toBe("assigned, not started · max 2 · open: Tom Reis");
+    expect(status("case-106 de").querySelector(".stage-state-narrow")!.textContent).toBe("0/1 · max 2");
+    // A fully staffed text reads as before.
+    expect(status("case-107 de").querySelector(".stage-state-narrow")!.textContent).toBe("not started");
+  });
+
   it("a narrow table shows a short state, aria-hidden; the full state stays in the title and for screen readers (issue 248)", () => {
     const old = stagedRow("case-106", "de", {
       stages: {
@@ -328,7 +351,18 @@ describe("cells", () => {
     const fresh = stagedRow("case-109", "de", {
       stages: { review: cell("accepted", "done", { note: "unchanged" }), annotation: cell("unassigned", "todo"), final: cell("none", "none") },
     });
-    renderTable(page([group("case-106", [consolidating]), group("case-108", [early]), group("case-109", [fresh])]));
+    // Review 2, F2: paused by the lead, the consolidation stays in Finalization.
+    const paused = stagedRow("case-107", "de", {
+      stages: {
+        review: cell("accepted", "done", { note: "unchanged" }),
+        annotation: cell("consolidating", "waiting", { people: [tom], submitted: 2, total: 2, note: "lead_pause" }),
+        final: cell("after_review", "waiting"),
+      },
+    });
+    renderTable(page([group("case-106", [consolidating]), group("case-107", [paused]), group("case-108", [early]), group("case-109", [fresh])]));
+    expect(cellsOf("case-107 de")[3].querySelector<HTMLElement>(".documents-status")!.getAttribute("title")).toBe("2 of 2 submitted");
+    expect(cellsOf("case-107 de")[4].querySelector<HTMLElement>(".documents-status")!.getAttribute("title")).toBe("consolidating · paused");
+    expect(cellsOf("case-107 de")[4].querySelector<HTMLElement>(".documents-status")!.className).toContain("stage-cell--waiting");
     const status = (name: string, index: number) => cellsOf(name)[index].querySelector<HTMLElement>(".documents-status")!;
     expect(status("case-106 de", 3).className).toContain("stage-cell--done");
     expect(status("case-106 de", 3).querySelector(".stage-cell-symbol")!.textContent).toBe("✓");

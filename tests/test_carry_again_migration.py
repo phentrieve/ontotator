@@ -1,7 +1,7 @@
 """Migration 0047 (issue 461): a submission may be carried to one version
 more than once. The unique constraint on (project, submission, target) of
 ``text_change_resolutions`` becomes a plain index; no row changes. It follows
-0045 (the lead pause): one head."""
+0046 (the typo fix after a review): one head."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from ontotator.storage.schema import (
 
 # Renumbering only touches these two constants.
 REVISION = "0047"
-PREVIOUS = "0045"
+PREVIOUS = "0046"
 S = "ontotator"
 UNIQUE = "uq_text_change_resolutions_submission_target"
 INDEX = "ix_text_change_resolutions_submission_target"

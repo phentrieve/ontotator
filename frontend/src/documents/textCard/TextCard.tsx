@@ -17,6 +17,7 @@ import { useShortcut } from "../../ui/shortcuts";
 import { StagePath } from "../../ui/StagePath";
 import { useMediaQuery } from "../../ui/useMediaQuery";
 import { BulkPauseDialog } from "../BulkPauseDialog";
+import { pauseAppliedText } from "../bulkPauseModel";
 import { historyLines } from "../historyLines";
 import { leadPauseLine } from "../labels";
 import { leadSteps, stepLabel } from "../nextStepLabels";
@@ -62,6 +63,8 @@ export interface TextCardProps {
   onOpenText?: (row: DocumentRowView) => void;
   /** Reload rows after remove. */
   onChanged: () => void;
+  /** A short message after an action of the card (the page shows it as a toast and announces it). */
+  onMessage?: (message: string) => void;
   /** The existing DecisionBlock (Compare/Consolidate/Accept result). */
   decision?: ReactNode;
   textVersionTools?: TextVersionsTools;
@@ -117,7 +120,7 @@ function OtherLanguages({ row, rows, canManage, onOpenText, onChangePlan }: Pick
 }
 
 /** Banners above the path: open problem reports (with "Decide on report…") and findings flagged "guidelines unclear" (X5). Each is a notice with its title and a button row. */
-function Banners({ row, projectKey, query, reportRoute, onNavigate, steps, canManage, onChanged }: Pick<TextCardProps, "row" | "projectKey" | "query" | "reportRoute" | "onNavigate" | "canManage" | "onChanged"> & { steps: readonly CardStep[] }): JSX.Element | null {
+function Banners({ row, projectKey, query, reportRoute, onNavigate, steps, canManage, onChanged, onMessage }: Pick<TextCardProps, "row" | "projectKey" | "query" | "reportRoute" | "onNavigate" | "canManage" | "onChanged" | "onMessage"> & { steps: readonly CardStep[] }): JSX.Element | null {
   const id = useId();
   const [releasing, setReleasing] = useState(false);
   const open = (row.problem_reports ?? []).filter(report => report.state === "open");
@@ -134,7 +137,8 @@ function Banners({ row, projectKey, query, reportRoute, onNavigate, steps, canMa
       <p className="text-card-banner-text text-card-muted">Open tasks cannot be saved, also tasks assigned now. Submitted work and the final result are untouched.</p>
       {canManage && <div className="text-card-actions"><Button size="sm" aria-label={`Release…, ${name}`} onClick={() => setReleasing(true)}>Release…</Button></div>}
       {releasing && <BulkPauseDialog projectKey={projectKey} action="release" rows={[{ case_id: row.case_id, language: row.language }]}
-        onClose={() => setReleasing(false)} onApplied={() => { setReleasing(false); onChanged(); }} />}
+        onClose={() => setReleasing(false)} // The same message as the bulk action ("Released 1 text."), so the lead sees that it worked (review 2, F7 a).
+        onApplied={result => { setReleasing(false); onMessage?.(pauseAppliedText(result)); onChanged(); }} />}
     </div>}
     {open.length > 0 && <div className="text-card-banner" role="group" aria-labelledby={`${id}-report`}>
       <p id={`${id}-report`} className="text-card-banner-title">{plural(open.length, "open problem report")}{open.length === 1 && `: ${open[0].title}`}</p>
@@ -176,8 +180,9 @@ export function TextCard(props: TextCardProps): JSX.Element {
   const submissions = useRowSubmissions(projectKey, row.case_id, row.language, true);
   const list = submissions.data?.submissions ?? null;
 
-  // A refreshed rows page with new activity on the row reloads its submissions.
-  const activity = row.last_activity_at ?? "";
+  // A refreshed rows page with new activity on the row reloads its submissions. A pause or its release is no work on
+  // the text and leaves the activity time alone, but adds a History line: it reloads them too.
+  const activity = `${row.last_activity_at ?? ""}|${row.lead_pause?.paused_at ?? ""}`;
   const seenActivity = useRef(activity);
   const { reload } = submissions;
   useEffect(() => {

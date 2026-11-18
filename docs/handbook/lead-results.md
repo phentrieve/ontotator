@@ -81,12 +81,12 @@ A submitted consolidation cannot be reopened or reassigned. If it contains a mis
 
 ### Review changes to a final result
 
-What for: confirm a final result after something changed, for example a newer submission or a corrected text. The row's next step is **Confirm final result**.
+What for: confirm a final result after something changed, for example a newer submission or a corrected text. The row's next step is **Confirm final result**. Its **Finalization** cell says what changed, for example *Check changes, newer result*; *ready to accept* is a text that has no final result yet.
 
 1. In the row, click **Review changes…**. The card lists what changed.
 2. Optional: if the text changed, click **Show changes** to see the changed passages.
 3. Choose one:
-   - Keep the final result on the old version, for example *Keep final on v1*.
+   - Keep the final result: **Keep the current final result**. If the text has several versions, the button names the version of the final result, for example *Keep final on v1*.
    - **Use the newer result**. If annotators marked findings in it **Unresolved**, the block lists them with who wrote each note.
    - Carry it to the new version, for example *Carry to v2…* (see [Carry submitted work to a new text version](#carry-submitted-work-to-a-new-text-version)).
 
@@ -98,7 +98,7 @@ What for: pick another result after you already chose one.
 2. Click **Change final…** next to **Open result**.
 3. Click **Use as final** in the row of the result you want. It saves at once; the card stays on this text and says *Final result saved for EN100022 en.*
 
-The message *Final result of EN100022 en changed.* has an **Undo** button, also while the card is open. It brings the earlier final result back (*The earlier final result of EN100022 en is back.*), under the same rules as the Undo of **Change final…** for several texts: for the lead who made the change, once, within an hour, and refused once something the final result rests on changed since ([Accept or change the final result of several texts](#accept-or-change-the-final-result-of-several-texts)). The same message follows **Use the newer result** under *Review changes…*. A first choice of a final result has no Undo: use [Withdraw a final result](#withdraw-a-final-result). **History** in the card lists each change and its Undo.
+The message *Final result of EN100022 en changed.* has an **Undo** button, also while the card is open. It brings the earlier final result back (*The earlier final result of EN100022 en is back.*), under the same rules as the Undo of **Change final…** for several texts: for the lead who made the change, once, within an hour, and refused once something the final result rests on changed since ([Accept or change the final result of several texts](#accept-or-change-the-final-result-of-several-texts)). The same message follows **Use the newer result** under *Review changes…*. After the Undo, the green line *Final result saved for EN100022 en.* in the card goes: it spoke of the result that is no longer final. A first choice of a final result has no Undo: use [Withdraw a final result](#withdraw-a-final-result). **History** in the card lists each change and its Undo.
 
 While a text has a final result, its annotation mode cannot be changed: **Change mode…** is refused (error code `ANNOTATION_MODE_FINAL_SELECTED`) ([Change the annotation mode of one text](lead-documents.md#change-the-annotation-mode-of-one-text)). To take the final result back instead, see [Withdraw a final result](#withdraw-a-final-result).
 
@@ -144,7 +144,7 @@ What for: decide what happens after a reviewer rejected or queried a translation
 1. In the row, click **Resolve…**. The options open below the row with the reviewer's rationale. When someone holds an annotation that waits for this translation, a line names them, for example *Ana Weber is waiting for this decision to start the annotation.*
 2. Choose one:
    - The reopen item, for example *Reopen Ana Weber's review…*: the same person reviews it again. Enter an optional **Reason (optional)** and click **Reopen review**. Their task shows **Reopened** with your reason (in **My tasks** behind the badge, in the review above **Decision**) and starts from the version's current text; their earlier decision stays in the history. If they then accept it with corrections, the corrected text becomes the next version.
-   - **Assign a new review…**: someone else reviews it. The person who already reviewed it shows *Review submitted* with **Reopen their review…**; a new assignment for them is not possible, reopen their review instead.
+   - **Assign a new review…**: someone else reviews it. The person who already reviewed it shows *Review submitted* with **Reopen their review…**; a new assignment for them is not possible, reopen their review instead. After **Fix typos…** on the rejected or queried version the review is a review of the corrected version, there is no reopen item, and the person who reviewed the earlier version can be assigned again ([Fix a typo in a translation without a review](#fix-a-typo-in-a-translation-without-a-review)).
    - **Correct the translation…**: you correct it yourself ([Correct a translation yourself](#correct-a-translation-yourself)).
    - The discard item, for example *Discard the de translation…*: enter a **Reason** and click **Discard**. Nothing is deleted; the versions are marked as discarded.
 3. Or click **Cancel**. Changing a filter, the tab, the order or the page also closes the options; nothing is saved until you choose.
@@ -220,7 +220,7 @@ What for: correct spacing, a typo or grammar in a translation without a translat
 
 If a number changes, the dialog points it out, for example *Changes a number: 15 → 50. Check that this is intended.*; you can still save.
 
-The corrected text becomes the next version of the translation, a correction of the version it fixes with that version's status: the correction of an accepted v2 is an accepted v3, and v2 stays accepted as well. A version that was rejected or queried can be corrected too: its correction is rejected or queried like it, and you resolve it as before ([Resolve a rejected or queried translation](#resolve-a-rejected-or-queried-translation)). No translation review is started and **Review** is not changed. The version row names the correction, for example *Typo fix by Project lead (ann-0002), 17 Nov, 10:12 · Spacing; Typo*. The audit log records who corrected the text, the changed passages and the reason.
+The corrected text becomes the next version of the translation, a correction of the version it fixes with that version's status: the correction of an accepted v2 is an accepted v3, and v2 stays accepted as well. A version that was rejected or queried can be corrected too: its correction is rejected or queried like it, and you resolve it as before ([Resolve a rejected or queried translation](#resolve-a-rejected-or-queried-translation)). The corrected version is then the text of the row: **Assign a new review…** and **Assign review…** assign a review of it (the dialog names the version, for example *case-0102 de v2*), the reviewer reads the corrected text, and **Translation details** in the review says *Typos fixed by the project lead on …* with what you fixed. The version you corrected takes no further review: its submitted review has no **Reopen…**, and the options under **Resolve…** have no reopen item; assign the review again instead, also to the person who reviewed the earlier version. If the reviewer rejects or queries the corrected version, it stays the text to resolve. No translation review is started and **Review** is not changed. The version row names the correction, for example *Typo fix by Project lead (ann-0002), 17 Nov, 10:12 · Spacing; Typo*, and **History** has a line for it, for example *typos fixed in v3 by you, 17 Nov, 10:12: Spacing; Typo*. On Documents the **Translation** state of an accepted text you corrected reads *Accepted, typos fixed by you, v2 → v3* (on a wide screen *accepted* with the marker *v3 corrected*). The audit log records who corrected the text, the changed passages and the reason.
 
 What happens to work on the corrected version:
 

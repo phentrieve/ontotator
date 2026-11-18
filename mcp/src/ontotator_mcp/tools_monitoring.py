@@ -19,7 +19,7 @@ DocumentId = Annotated[
 # Tasks that work in rounds: their rounds name the inputs and submissions.
 ROUND_TASKS = ("annotate", "review")
 # What a reviewer wrote in a translation review: the full corrected text and
-# the free-text rationale. Returned only by a server started with
+# the free-text rationale. Returned only by an MCP server started with
 # ONTOTATOR_MCP_READ_CONTENT=1, and there only with include_text.
 REVIEW_CONTENT = ("proposed_text", "rationale")
 
@@ -101,7 +101,9 @@ def register_monitoring(
         'lead' (a lead paused the text, pause_texts). Findings are
         not part of it, nor the text a translation reviewer proposed or
         their rationale (list_translation_reviews returns them with
-        include_text, on a server started with ONTOTATOR_MCP_READ_CONTENT=1). The
+        include_text, when this MCP server runs with
+        ONTOTATOR_MCP_READ_CONTENT=1, a setting in the MCP client's
+        configuration of ontotator-mcp, not of the Ontotator server). The
         rounds come from a route outside the project's path: until project
         tokens reach it, it needs a personal token.
         """
@@ -188,8 +190,8 @@ def register_monitoring(
 
             Oldest first. A lead sees every review; anyone else their own.
             The text a reviewer proposed and their rationale are returned
-            only with include_text, which exists because this server runs
-            with ONTOTATOR_MCP_READ_CONTENT=1; the text hashes always.
+            only with include_text, which exists because this MCP server
+            runs with ONTOTATOR_MCP_READ_CONTENT=1; the text hashes always.
             """
             return await reviews_of(project, document_id, include_text)
 
@@ -204,7 +206,9 @@ def register_monitoring(
 
             Oldest first. A lead sees every review; anyone else their own.
             The text a reviewer proposed and their rationale are not
-            returned (the text hashes are): they need a server started with
-            ONTOTATOR_MCP_READ_CONTENT=1.
+            returned (the text hashes are): they need this MCP server
+            (not the Ontotator server) to run with
+            ONTOTATOR_MCP_READ_CONTENT=1, set in the MCP client's
+            configuration of ontotator-mcp; whoami says whether it is on.
             """
             return await reviews_of(project, document_id, False)

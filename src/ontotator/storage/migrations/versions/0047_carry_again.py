@@ -12,14 +12,14 @@ No row changes. The downgrade is refused while a submission has more than
 one decision for a target: the unique constraint could not come back, and
 rows of this table are never deleted.
 
-Follows 0045 (the lead pause of a text).
+Follows 0046 (the typo fix accepted with the version it fixes).
 """
 
 import sqlalchemy as sa
 from alembic import op
 
 revision = "0047"
-down_revision = "0045"
+down_revision = "0046"
 branch_labels = None
 depends_on = None
 SCHEMA = "ontotator"

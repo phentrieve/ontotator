@@ -286,6 +286,10 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
 export function errorMessage(error: unknown): string {
   // Never the raw browser text ("Failed to fetch").
   if (error instanceof NetworkError) return "Connection lost. Try again.";
+  if (error instanceof ApiError && error.code === "VARIANT_REVIEW_STALE" && typeof error.details === "object" && error.details !== null && error.details.reason === "typos_fixed") {
+    const version = error.details.version;
+    return `A lead fixed typos in this version${typeof version === "number" ? `: v${version} is the text to review` : ""}. Assign a review of the newest version.`;
+  }
   if (error instanceof ApiError && error.code === "REANCHOR_ITEMS_UNRESOLVED" && typeof error.details === "object" && error.details !== null) {
     const count = error.details.count;
     if (typeof count === "number" && Number.isSafeInteger(count) && count >= 0) return `${count} finding(s) after text correction still need review. Re-create them or dismiss them with a reason before submitting.`;

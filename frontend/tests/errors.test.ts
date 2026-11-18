@@ -68,3 +68,9 @@ it("names the earlier decision when a submission was already carried or dismisse
   // A decision about the open task (move, let finish, withdraw) names no resolution: the general sentence.
   expect(refused({})).toBe(ERROR_MESSAGES.TEXT_CHANGE_NOT_APPLICABLE);
 });
+
+it("names the version to review when a lead fixed typos in the one asked for", () => {
+  expect(errorMessage(new ApiError(409, "raw", "VARIANT_REVIEW_STALE", { reason: "typos_fixed", document_id: "c~de~v2", version: 2 })))
+    .toBe("A lead fixed typos in this version: v2 is the text to review. Assign a review of the newest version.");
+  expect(errorMessage(new ApiError(409, "raw", "VARIANT_REVIEW_STALE"))).toBe("A newer text version exists. Review the current version before creating a correction.");
+});
