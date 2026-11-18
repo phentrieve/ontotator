@@ -154,7 +154,9 @@ test("S11 keep: the panel names the causes and Keep final saves at once", async 
   const caseId = "case-0611";
   const [ann1, ann2] = [esc(labels["ann-0001"]), esc(labels["ann-0002"])];
   await openDocuments(page, s);
-  await expect(rowCell(textRow(page, caseId, "en"), "finalization")).toContainText("ready to accept");
+  // Issue 469: a final result that changed under the lead is not "ready to accept"; the cell says what changed.
+  await expect(rowCell(textRow(page, caseId, "en"), "finalization")).toContainText("Check changes, newer result, result revised");
+  await expect(rowCell(textRow(page, caseId, "en"), "finalization")).not.toContainText("ready to accept");
 
   // SELECTED_RESULT_REVISED and SELECTED_NEWER_RESULT.
   const panel = await reviewChanges(page, caseId, "en");
@@ -162,8 +164,8 @@ test("S11 keep: the panel names the causes and Keep final saves at once", async 
   await expect(panel.getByText(new RegExp(`^Round 1${SEP}${ann2}${SEP}v1 was submitted after the final result was chosen \\(${TIME}\\)\\.$`))).toBeVisible();
   await expect(panel.getByRole("button", { name: "Use the newer result", exact: true })).toBeVisible();
 
-  // The checkbox confirmation of the expanded row is gone: "Keep final on v1" is the decision itself.
-  await panel.getByRole("button", { name: "Keep final on v1", exact: true }).click();
+  // The checkbox confirmation of the expanded row is gone: "Keep the current final result" is the decision itself.
+  await panel.getByRole("button", { name: "Keep the current final result", exact: true }).click();
   await expect(panel.locator(".final-panel-success")).toContainText(savedFor(caseId, "en"));
   await expect(panel.getByText("No more final results to decide.", { exact: true })).toBeVisible();
   await panel.getByRole("button", { name: "Close", exact: true }).last().click();
@@ -222,7 +224,7 @@ test("S11 a kept superseded round stays acknowledged after a hold, resume and re
   await documentsReady(page);
   const panel = await reviewChanges(page, caseId, "en");
   await expect(panel.getByText(new RegExp(`^Round 1${SEP}${esc(labels["ann-0001"])} has been superseded by Round 2\\.$`))).toBeVisible();
-  await panel.getByRole("button", { name: "Keep final on v1", exact: true }).click();
+  await panel.getByRole("button", { name: "Keep the current final result", exact: true }).click();
   await expect(panel.locator(".final-panel-success")).toBeVisible();
   await panel.getByRole("button", { name: "Close", exact: true }).last().click();
   await expect(rowAction(page, "Review changes…", caseId, "en")).toHaveCount(0);
@@ -250,7 +252,7 @@ test("S11 a kept superseded round stays acknowledged after a hold, resume and re
   await page.reload();
   await documentsReady(page);
   await expect(rowAction(page, "Review changes…", caseId, "en")).toHaveCount(0);
-  await expect(rowCell(textRow(page, caseId, "en"), "finalization")).not.toContainText("ready to accept");
+  await expect(rowCell(textRow(page, caseId, "en"), "finalization")).not.toContainText("Check changes");
   const rows = await leadCall<{ groups: { rows: { language: string; categories: string[] }[] }[] }>(page, `/api/v1/projects/${project}/document-rows?case=${caseId}`);
   expect(rows.groups.flatMap(group => group.rows).find(row => row.language === "en")?.categories ?? []).not.toContain("confirm-final");
 });
@@ -273,7 +275,7 @@ test("S2 keep under a decision filter: the row turns Resolved and the panel move
 
   const panel = await reviewChanges(page, caseId, "es");
   await expect(panel.getByText(new RegExp(`^Round 1${SEP}${esc(labels["ann-0001"])} is abandoned\\.$`))).toBeVisible();
-  await panel.getByRole("button", { name: "Keep final on v1", exact: true }).click();
+  await panel.getByRole("button", { name: "Keep the current final result", exact: true }).click();
 
   // VD17: after the decision the panel shows the next final decision of the list (fr).
   const next = await openDecisionBlock(page, caseId, "fr");
@@ -320,7 +322,7 @@ test("S11 conflict: another lead changes the selection while the panel is open; 
 
   await openDocuments(page, s);
   const panel = await reviewChanges(page, caseId, "en");
-  await expect(panel.getByRole("button", { name: "Keep final on v1", exact: true })).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Keep the current final result", exact: true })).toBeVisible();
 
   const other = await session(username);
   try {
@@ -331,13 +333,13 @@ test("S11 conflict: another lead changes the selection while the panel is open; 
     });
   } finally { await other.close(); }
 
-  await panel.getByRole("button", { name: "Keep final on v1", exact: true }).click();
+  await panel.getByRole("button", { name: "Keep the current final result", exact: true }).click();
   const notice = panel.getByRole("alert");
   await expect(notice).toContainText("This final result changed.");
   await panel.getByRole("button", { name: "Review again", exact: true }).click();
   await expect(notice).toHaveCount(0);
   // The other lead's choice is the final now: nothing is left to review on this row.
-  await expect(rowCell(textRow(page, caseId, "en"), "finalization")).not.toContainText("ready to accept");
+  await expect(rowCell(textRow(page, caseId, "en"), "finalization")).not.toContainText("Check changes");
 });
 
 test("S13 session ends during a decision: nothing is saved and the decision stays available", async ({ page }) => {

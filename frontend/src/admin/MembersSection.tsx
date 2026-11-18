@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { api, ApiError, type CurrentUser, type Member, type MemberCandidate } from "../api/client";
 import { Button, Checkbox, ConfirmDialog, DataTable, EmptyState, InlineMessage, StatusBadge, SuggestInput, type Column, type StatusTone, EmptyValue } from "../ui";
 import { ErrorNotice } from "./ErrorNotice";
+import { ERROR_MESSAGES } from "./errors";
 import { SettingsHint } from "./SettingsCard";
 import { labelFor, roleLabels, taskLabels } from "../app/labels";
 import { personLabel, textLabel } from "../app/identity";
@@ -133,6 +134,17 @@ function MemberEditor({ projectKey, currentUser }: MembersSectionProps): JSX.Ele
   const pendingName = pendingMember ? memberName(pendingMember) : pending?.username;
   const leads = members?.filter(member => member.roles.includes("lead")) ?? [];
   const lastLead = removal !== null && removal.lead && leads.length === 1 && leads[0].username === removal.username;
+  /**
+   * The removal the server refuses with LAST_LEAD, known before asking: a lead who is no system administrator takes the
+   * lead role from the project's only lead. The refusal is said at once, not after a confirmation that could never
+   * work (review 2, F7 d). An unknown viewer is left to the server.
+   */
+  const refusedLastLead = (member: Member, losesLead: boolean): boolean => {
+    if (!losesLead || currentUser == null || currentUser.is_system_admin === true) return false;
+    if (leads.length !== 1 || leads[0].username !== member.username) return false;
+    setError(new ApiError(409, ERROR_MESSAGES.LAST_LEAD, "LAST_LEAD"));
+    return true;
+  };
   const columns: Column<Member>[] = [
     { id: "person", header: "Person", cell: member => personLabel(member) },
     { id: "username", header: "Username", cell: member => member.username },
@@ -143,10 +155,12 @@ function MemberEditor({ projectKey, currentUser }: MembersSectionProps): JSX.Ele
       if (event.target.checked) { void change(member.username, [...member.roles, role], false); return; }
       // Taking a role away ends the person's sessions, so it is never a silent single click.
       setError(undefined);
+      if (refusedLastLead(member, role === "lead")) return;
       setRemoval({ username: member.username, name: memberName(member), roles: member.roles.filter(item => item !== role), removed: role, lead: role === "lead" });
     }} /> })),
     { id: "actions", header: <span className="visually-hidden">Actions</span>, cell: member => <Button size="sm" disabled={blocked} aria-label={`Remove ${memberName(member)} from the project`} onClick={() => {
       setError(undefined);
+      if (refusedLastLead(member, member.roles.includes("lead"))) return;
       setRemoval({ username: member.username, name: memberName(member), roles: [], removed: "", lead: member.roles.includes("lead") });
     }}>Remove…</Button> },
   ];

@@ -663,7 +663,43 @@ async def test_undo_reopen_or_withdraw_changes_nothing_when_blocked(
     )
     assert result["applied"] is False and result["refused"] is True
     assert result["blocked"] == blocked
+    assert (result["texts"], result["blocked_texts"]) == (0, [])
+    assert result["note"].startswith(
+        "Undo is not possible: The texts changed since the action (blocked);"
+    )
     # Only previews were sent: nothing was applied.
+    assert all(c.json().get("preview") for c in fake.calls_to("POST", BULK_UNDO))
+
+
+async def test_undo_reopen_or_withdraw_names_the_texts_that_changed(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    """Issue 469: the refusal names the text and what changed on it."""
+    named = [
+        {
+            "case_id": case,
+            "language": "en",
+            "reason": "tasks",
+            "message": "A task of the text changed since (assigned, reopened,"
+            " withdrawn, paused or a new round).",
+        }
+        for case in ("EN100022", "EN100023")
+    ]
+    view = _undo_view(blocked={"reason": "changed", "message": "Changed."})
+    fake.on("POST", BULK_UNDO, view | {"texts": 7, "blocked_texts": named})
+    result = await call(
+        mcp_client,
+        "undo_reopen_or_withdraw",
+        {"project": "p", "undo_id": 41, "confirm": True},
+    )
+    assert result["refused"] is True
+    assert (result["texts"], result["blocked_texts"]) == (7, named)
+    assert result["note"] == (
+        "Undo is not possible: 2 of 7 texts changed since the action (EN100022 en:"
+        " A task of the text changed since (assigned, reopened, withdrawn, paused"
+        " or a new round). And 1 more, see blocked_texts.); nothing was restored."
+        " reopen_task, withdraw_task and assign_texts change one task."
+    )
     assert all(c.json().get("preview") for c in fake.calls_to("POST", BULK_UNDO))
 
 

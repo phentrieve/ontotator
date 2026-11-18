@@ -186,6 +186,27 @@ class BulkUndoBlock(BaseModel):
     message: str
 
 
+class BulkUndoTextBlock(BaseModel):
+    case_id: str
+    language: str
+    # What changed on this text since the action: its final result
+    # (``final``), its versions (``versions``), its plan row (``plan``), a
+    # task (``tasks``), its submissions (``submissions``) or work saved in a
+    # task (``drafts``). Or why its withdrawn task cannot come back
+    # (``not_in_plan``, ``person_unavailable``).
+    reason: Literal[
+        "final",
+        "versions",
+        "plan",
+        "tasks",
+        "submissions",
+        "drafts",
+        "not_in_plan",
+        "person_unavailable",
+    ]
+    message: str
+
+
 class BulkUndoResult(BaseModel):
     # Tasks brought back; 0 in a preview.
     undone: int
@@ -202,6 +223,11 @@ class BulkUndoResult(BaseModel):
     # A preview only: why the Undo cannot run now; null when it can.
     # Applying then answers 409 ``BULK_UNDO_STALE`` with this ``reason``.
     blocked: BulkUndoBlock | None = None
+    # Texts the action changed.
+    texts: int = Field(default_factory=lambda: 0)
+    # The texts in the way of the Undo, each with what changed on it
+    # (issue 469); empty when nothing blocks.
+    blocked_texts: list[BulkUndoTextBlock] = Field(default_factory=list)
 
 
 def _service(request: Request, key: str, principal: Any) -> BulkTaskActionService:
@@ -317,7 +343,25 @@ def bulk_undo(
     bring back (``tasks``) and, in ``blocked``, why it cannot run now
     (``changed``, ``not_in_plan``, ``person_unavailable``); a record that is
     unknown, expired or already undone is refused in a preview too.
+    ``blocked_texts`` names each text in the way and what changed on it
+    (``texts``: how many texts the action changed). The refusal of a blocked
+    Undo carries that answer as ``preview`` in its details.
     """
-    return _service(request, key, principal).undo(
-        key, body.undo_id, preview=body.preview
-    )
+    try:
+        return _service(request, key, principal).undo(
+            key, body.undo_id, preview=body.preview
+        )
+    except DomainError as refusal:
+        details = refusal.details
+        # Only a blocked Undo carries a preview.
+        if (
+            refusal.code != "BULK_UNDO_STALE"
+            or not isinstance(details, dict)
+            or "preview" not in details
+        ):
+            raise
+        # The refused preview reads like the answer to ``preview: true``.
+        shown = BulkUndoResult.model_validate(details["preview"])
+        raise DomainError(
+            "BULK_UNDO_STALE", details | {"preview": shown.model_dump(mode="json")}
+        ) from None

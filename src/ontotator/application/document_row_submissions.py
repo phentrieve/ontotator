@@ -458,8 +458,9 @@ def _row_changes(
 ) -> list[dict[str, Any]]:
     """What leads and annotators changed on the row, oldest first:
     reassignments, mode changes, reopened tasks (and a bulk reopen that was
-    undone), new rounds, and every change of the final result (chosen,
-    replaced, a change undone, withdrawn (#343)).
+    undone), new rounds, every change of the final result (chosen,
+    replaced, a change undone, withdrawn (#343)), and each pause and release
+    of the text by a lead (issue 464).
 
     Tasks and rounds come from the audit trail (``assignment.reopen``,
     ``assignment.reopen_undone``, ``round.create``: the reason is stored
@@ -541,9 +542,27 @@ def _row_changes(
         )
         .order_by(AuditEventRow.id)
     ).all()
+    # Issue 464: the lead paused or released the text. The audit trail keeps
+    # every pause and release (the text's settings only the pause in place).
+    pauses = conn.execute(
+        select(
+            AuditEventRow.at,
+            AuditEventRow.action,
+            AuditEventRow.actor_user_id,
+            AuditEventRow.details,
+        )
+        .where(
+            AuditEventRow.project_id == pid,
+            AuditEventRow.action.in_(["text.pause", "text.release"]),
+            AuditEventRow.target_type == "text",
+            AuditEventRow.target_id == f"{case_id} {language}",
+        )
+        .order_by(AuditEventRow.id)
+    ).all()
     people = person_refs(
         conn,
         {
+            *(row.actor_user_id for row in pauses if row.actor_user_id is not None),
             *(row.user_id for row in reassigned),
             *replacements.values(),
             *(
@@ -627,6 +646,17 @@ def _row_changes(
         else:
             change["kind"] = "reopen_undone"
         changes.append(change)
+    for row in pauses:
+        changes.append(
+            {
+                "kind": "text_paused"
+                if row.action == "text.pause"
+                else "text_released",
+                "at": row.at,
+                "by": person(row.actor_user_id),
+                "reason": (row.details or {}).get("reason"),
+            }
+        )
     # The final result, event by event: the first choice (also the first
     # after a withdrawal), each replacement, each change that was undone. A
     # result confirmed again (its warnings acknowledged) is no change.
