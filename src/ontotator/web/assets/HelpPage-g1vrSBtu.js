@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-DDgx8Ysb.js";import{n as a,t as o}from"./lib-CVNiPR5N.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-B_Sn6XB0.js";import{n as a,t as o}from"./lib-CXLryzWb.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -1449,7 +1449,7 @@ The editor has three columns: the list of **Findings** on the left, in the order
 
 1. Read the text from the start. When it names a finding, for example "seizures", select the words with the mouse.
 2. The panel **New finding** opens. **Search term** already holds the marked words, and the hits are listed under **Terms**. **Copy text** under the marked words copies them, for example to look them up in a web search; see [Mark text and add a finding](annotator.md#mark-text-and-add-a-finding).
-3. Read the hits before you choose: the search matches words, not meaning, and only a term whose name or synonym equals your words is sure to be on top. If the top hit is the right term, press Enter; a hit tagged **Weak match** is added only after you choose it with \`↓\`. Otherwise, click another hit, or try another word or a synonym in **Search term**.
+3. Read the hits before you choose: the search matches words, not meaning, and only a term whose name or synonym equals your words is sure to be on top. If the top hit is the right term, press Enter; a hit tagged **Weak match** is added only after you choose it with \`↓\`. Otherwise, click another hit, or try another word or a synonym in **Search term**. If you picked the wrong term, click **Change term** in the finding: the search starts with the marked words again.
 
 ![The New finding panel with the marked text and the term search open](images/annotator-new-finding.png)
 

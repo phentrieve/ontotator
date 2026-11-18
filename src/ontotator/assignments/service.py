@@ -1399,7 +1399,6 @@ class AssignmentService:
         )
         with self.db.transaction() as conn:
             rows = list(conn.execute(query).mappings())
-            saved = _last_saves(conn, user_id, [r["assignment_id"] for r in rows])
             # Issue 213: unsubmitted annotation tasks under the rule may wait.
             ruled: dict[str, int] = dict(
                 conn.execute(
@@ -1597,6 +1596,7 @@ class AssignmentService:
                             },
                         )
                     }
+            saved = _last_saves(conn, user_id, [r["assignment_id"] for r in rows])
             result = []
             for row in rows:
                 source = target = None

@@ -7,7 +7,7 @@ import { routeHref, type ProjectDocumentsQuery, type Route } from "../../src/app
 import { formatTime } from "../../src/app/submissionLabels";
 import { TextCard, type TextCardProps } from "../../src/documents/textCard/TextCard";
 import { rowDay, type SegmentId } from "../../src/documents/textCard/cardModel";
-import { sameDaySets } from "../../src/documents/textCard/AnnotationPart";
+import { proposalSetText, sameDaySets } from "../../src/documents/textCard/AnnotationPart";
 import { annotateItem, cardRow } from "./cardFixtures";
 import { final, round, stepOf, submission, submissions, version, work } from "./fixtures";
 import { ana, cell, luc, tom } from "./tableFixtures";
@@ -223,8 +223,12 @@ describe("annotation part", () => {
     renderCard({ row: assignRow({ proposal_set: morning, newer_proposal_set: afternoon }) });
     expect(within(part()).getByText("Proposals").closest("p")!.textContent)
       .toBe("Proposals set 2026-11-17 09:12 (phentrieve 1.4), 24 proposals Newer set available: 2026-11-17 13:40 How to use it");
-    expect(sameDaySets(morning, [afternoon])).toBe(true);
+    expect(sameDaySets(morning, [afternoon])).toBe("minutes");
     expect(sameDaySets(morning, [morning, null, set(3, "2026-11-18T08:00:00", true)])).toBe(false);
+    // Two imports within one minute: the seconds tell them apart.
+    const second = set(4, "2026-11-17T09:12:40", true);
+    expect(sameDaySets(morning, [second])).toBe("seconds");
+    expect(proposalSetText(second, "seconds")).toBe("set 2026-11-17 09:12:40 (phentrieve 1.4), 24 proposals");
     // The day of a row follows the rule of "assigned today 13:39".
     expect(rowDay("2026-10-21T09:05:00", now)).toBe("today 09:05");
     expect(rowDay("2026-10-20T09:05:00", now)).toBe("yesterday");

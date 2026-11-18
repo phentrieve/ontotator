@@ -28,8 +28,12 @@ test("the Annotation part names the set, a newer one with its help, and the text
   const card = await openTextCard(page, CASE, "en");
   await showSegment(card, "Annotation");
   const line = card.locator(".text-card-proposal-set");
-  await expect(line).toContainText(/^Proposals set \d{4}-\d{2}-\d{2} \(test-tool 1\), 3 proposals/);
-  await expect(line.getByText(/^Newer set available: \d{4}-\d{2}-\d{2}$/)).toBeVisible();
+  // Both sets of this fixture are imported on the same day, within seconds: each shows its time (issue 472).
+  await expect(line).toContainText(/^Proposals set \d{4}-\d{2}-\d{2} \d\d:\d\d(:\d\d)? \(test-tool 1\), 3 proposals/);
+  const newer = line.getByText(/^Newer set available: \d{4}-\d{2}-\d{2} \d\d:\d\d(:\d\d)?$/);
+  await expect(newer).toBeVisible();
+  const shown = ((await line.textContent()) ?? "").match(/^Proposals set (\S+ \S+) /)?.[1];
+  expect(await newer.textContent()).not.toBe(`Newer set available: ${shown}`);
   const help = line.getByRole("link", { name: "How to use it", exact: true });
   await expect(help).toHaveAttribute("href", /work-from-new-tool-proposals/);
   await expect(help).toHaveAttribute("target", "_blank");

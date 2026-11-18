@@ -32,27 +32,35 @@ export function roundLine(item: Pick<CardWorkItem, "assignment_id" | "round_ordi
   return `Round ${ordinal}, started${by}${day ? ` ${day}` : ""}`;
 }
 
+/** How exactly a set's import time is named beside its day: not at all, "14:05" or "14:05:09". */
+export type SetTime = false | "minutes" | "seconds";
+
 /** "2026-11-10": the local day a proposal set was imported (337-A); `withTime` adds "14:05" to tell two sets of one day apart. */
-export function setDate(iso: string, withTime = false): string {
+export function setDate(iso: string, withTime: SetTime = false): string {
   const day = new Date(iso);
   if (Number.isNaN(day.getTime())) return iso.slice(0, 10);
   const two = (value: number) => String(value).padStart(2, "0");
-  return `${day.getFullYear()}-${two(day.getMonth() + 1)}-${two(day.getDate())}${withTime ? ` ${two(day.getHours())}:${two(day.getMinutes())}` : ""}`;
+  return `${day.getFullYear()}-${two(day.getMonth() + 1)}-${two(day.getDate())}${withTime ? ` ${two(day.getHours())}:${two(day.getMinutes())}${withTime === "seconds" ? `:${two(day.getSeconds())}` : ""}` : ""}`;
 }
 
-/** Another set of the same day is named beside this one: both then show their time (issue 472). */
-export function sameDaySets(shown: RowProposalSetView | null | undefined, others: readonly (Pick<RowProposalSetView, "set_id" | "imported_at"> | null | undefined)[]): boolean {
-  return !!shown && others.some(other => !!other && other.set_id !== shown.set_id && setDate(other.imported_at) === setDate(shown.imported_at));
+/**
+ * Another set of the same day is named beside this one: both then show their time (issue 472), with seconds when
+ * they were imported within the same minute.
+ */
+export function sameDaySets(shown: RowProposalSetView | null | undefined, others: readonly (Pick<RowProposalSetView, "set_id" | "imported_at"> | null | undefined)[]): SetTime {
+  if (!shown) return false;
+  const same = (time: SetTime) => others.some(other => !!other && other.set_id !== shown.set_id && setDate(other.imported_at, time) === setDate(shown.imported_at, time));
+  return same("minutes") ? "seconds" : same(false) ? "minutes" : false;
 }
 
 /** "set 2026-10-02 (phentrieve 1.4), 24 proposals" (issue 337, 337-A). */
-export function proposalSetText(set: RowProposalSetView, withTime = false): string {
+export function proposalSetText(set: RowProposalSetView, withTime: SetTime = false): string {
   const tool = [set.tool, set.tool_version].filter(Boolean).join(" ");
   return `set ${setDate(set.imported_at, withTime)}${tool ? ` (${tool})` : ""}, ${plural(set.proposal_count, "proposal")}`;
 }
 
 /** A person row names their set only when it differs from the text's: "newest set" or "set 2026-10-02". */
-export function personSetText(item: Pick<CardWorkItem, "proposal_set" | "proposal_set_unrecorded">, shown: RowProposalSetView | null | undefined, withTime = false): string | null {
+export function personSetText(item: Pick<CardWorkItem, "proposal_set" | "proposal_set_unrecorded">, shown: RowProposalSetView | null | undefined, withTime: SetTime = false): string | null {
   const own = item.proposal_set;
   // Started before sets were recorded: said per person only when the text's line names a set.
   if (item.proposal_set_unrecorded && shown) return "set not recorded";

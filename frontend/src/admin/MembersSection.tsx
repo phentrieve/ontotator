@@ -2,10 +2,10 @@ import { useEffect, useId, useRef, useState } from "react";
 import { api, ApiError, type CurrentUser, type Member, type MemberCandidate } from "../api/client";
 import { Button, Checkbox, ConfirmDialog, DataTable, EmptyState, InlineMessage, StatusBadge, SuggestInput, type Column, type StatusTone, EmptyValue } from "../ui";
 import { ErrorNotice } from "./ErrorNotice";
-import { fieldError } from "./errors";
 import { SettingsHint } from "./SettingsCard";
 import { labelFor, roleLabels, taskLabels } from "../app/labels";
 import { personLabel, textLabel } from "../app/identity";
+import { fieldError } from "./errors";
 export interface MembersSectionProps {
   projectKey: string;
   /** Who is looking: a system administrator may remove the last lead and keeps managing the project. */
