@@ -355,6 +355,14 @@ Texts that already have a final result are left out, also when you assign one te
 
 **Reads** shows the languages in each person's profile. If someone's profile lists languages but not one the task needs, the dialog asks again; click **Assign anyway** or **Back**. A person with no languages listed counts as unknown and gets no warning. Ontotator sends no e-mail; the work appears in each person's **My tasks**.
 
+The order in which you assign is the order in which a person works. The dialog says so above the summary: *My tasks lists a person's tasks by status, then in the order of assignment. New tasks come after the tasks the person already has.* With several texts it adds *These texts are assigned in the order shown above.*
+
+- **My tasks** lists **Reopened** tasks first, then **In progress**, **Open** and **Submitted**. Within a status the tasks are in the order of assignment, and after a submit the editor opens the next task in that order.
+- Several texts assigned at once are assigned in the order of the **Documents** list when you open the dialog (**Order**: **Case ID**, **Import order** or **Last activity**; a descending order counts as ascending). The line **Texts** in the dialog names them in that order.
+- To give a person a fixed order that is not an order of the list, assign the texts in blocks, first block first, or one by one.
+- A task you give to someone else with **Reassign…** is a new task for that person and comes last. A reopened task moves to the **Reopened** tasks at the top and returns to its place when it is submitted again. A task that follows a corrected text, or that you continue on a new version with **Handle text change…**, keeps its place. Work you carry to a new version from a submission is a new task and comes last.
+- The upload order of the texts plays no part. To have texts done first whose tasks are already assigned, see [Move texts to the front of the queue](#move-texts-to-the-front-of-the-queue).
+
 With **Annotate only after the translation review is accepted** on, you can assign annotators to a text while its translation review is assigned or underway, so both steps are set up at once. The summary says *Still in translation review: the task opens once the review is accepted.* The annotator sees the task in **My tasks** as **Waiting for translation review** and cannot start it; it counts under **Open tasks**. When the review is accepted, the task opens with no further step from you. This also holds for **Distribute evenly…**. A text with no translation review under way still cannot get annotators: assign the review first. With parallel translations of one text, only the translation under review can get a waiting task; the others follow once every translation is accepted, and the dialog's summary says which were left out.
 
 What happens to a waiting task:
@@ -485,12 +493,12 @@ The other actions on paused texts:
 
 What for: have some texts done first, for example a batch uploaded later that is now urgent.
 
-**My tasks** lists each person's open tasks by status, then in the project's order: first imported first. To change that order:
+**My tasks** lists each person's tasks by status, then in the order of assignment ([Assign work to the selected texts](#assign-work-to-the-selected-texts)). To put texts first whose tasks are already assigned:
 
 1. Select the texts, then click **Move to front** in the selection bar.
-2. Read the confirmation **Move to the front of the queue** and click the button that names the texts, for example *Move 2 texts to the front*. Or click **Cancel**, or press Escape, to keep the order.
+2. Read the confirmation **Move to the front of the queue**. It says *Tasks already assigned on the 2 selected texts come first in My tasks. Tasks you assign later follow the order of assignment.* Click the button that names the texts, for example *Move 2 texts to the front*. Or click **Cancel**, or press Escape, to keep the order.
 
-The selected texts now come first, in their earlier order among themselves; the other texts follow in theirs. The message says how many texts moved, for example *2 texts moved to the front of the queue.* The order applies to tasks already assigned and to tasks you assign later, and **Import order** under **Order** on **Documents** follows it. A later upload comes last again. Each move is recorded in the audit trail. There is no Undo: to change the order again, move other texts to the front.
+The selected texts now come first, in their earlier order among themselves; the other texts follow in theirs. The message says how many texts moved, for example *2 texts moved to the front of the queue.* In **My tasks**, the tasks of these texts that are already assigned now come first within their status, for every person who has one, in the order of assignment among themselves; a later move goes in front of an earlier one. Tasks you assign afterwards follow the order of assignment. **Import order** under **Order** on **Documents** follows the new order of the texts. A later upload comes last again. Each move is recorded in the audit trail. There is no Undo: to change the order again, move other texts to the front.
 
 ### Assign work for one text
 
@@ -517,7 +525,7 @@ The proposal uses the languages in each person's profile: a person is proposed f
 
 1. In the assign dialog, click **Distribute evenly…**. The proposal takes the place of the assign dialog; **Close** without confirming returns to it.
 2. Set **People per document** and click **Propose**.
-3. Check the proposal. Change a person in any cell, or click **Propose again**. Texts nobody can take are listed under **Unassignable documents**.
+3. Check the proposal. The tasks are assigned in the order of the table, and each person sees theirs in that order in **My tasks**. Change a person in any cell, or click **Propose again**. Texts nobody can take are listed under **Unassignable documents**.
 4. Click **Confirm**. This covers only the task shown in the assign dialog. If the selection needs more, the assign dialog comes back on the next step; otherwise it closes and the message says the assignments are saved.
 
 If you chose someone whose profile lists other languages than the text needs, the dialog stays open after **Confirm** and asks; click **Assign anyway**. The other rows are already saved.

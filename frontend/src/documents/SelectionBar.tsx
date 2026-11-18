@@ -7,7 +7,7 @@
  * translation plan presets live in the plan dialog's quick choice). Every plan save keeps the selection and shows an
  * Undo toast (D22); a save that changes nothing says why instead. The summary sends the selected texts (`rows`); the
  * plan dialog edits whole cases. "Move to front" (issue 339) puts the selected texts first in the project's order,
- * so their tasks come first in My tasks, after an inline confirmation. "More actions ▾" (issue 336, decision 336-C)
+ * so their tasks already assigned come first in My tasks (issue 488), after an inline confirmation. "More actions ▾" (issue 336, decision 336-C)
  * holds the bulk actions on the texts' tasks, "Reopen…" and "Withdraw open tasks…", and on their final results,
  * "Accept agreeing results…" (texts without a final result; issues 354, 339) and "Change final…" (the newest
  * submission replaces the final result; issue 336 step 2); an entry that does nothing for the selection stays in the
@@ -384,7 +384,7 @@ export function SelectionBar({
       {limitNote && keys.size >= MIN_TEXTS && <p className="selection-bar-limit">{limitNote}</p>}
       {front && keys.size >= MIN_TEXTS && <div className="selection-bar-undo">
         <InlineConfirm title="Move to the front of the queue" busy={frontBusy} confirmLabel={moveTextsText(keys.size)}
-          message={<p>{`Open tasks on the ${plural(keys.size, "selected text")} come first in My tasks, before the tasks on texts imported earlier. The other texts keep their order.`}</p>}
+          message={<p>{`Tasks already assigned on the ${plural(keys.size, "selected text")} come first in My tasks. Tasks you assign later follow the order of assignment. The texts' order under Import order changes with it.`}</p>}
           onCancel={() => { setFront(false); frontButton.current?.focus(); }} onConfirm={moveToFront} />
       </div>}
       {error !== undefined && <div className="selection-bar-error"><ErrorNotice error={error} /></div>}

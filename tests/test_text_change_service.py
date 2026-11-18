@@ -1141,3 +1141,34 @@ def test_operations_lock_the_assignee(env, monkeypatch):
     locked.clear()
     _move(env, moved["assignment_id"])
     assert locked == [identity(env.scenario, "eva")[0].user_id]
+
+
+def test_a_moved_task_keeps_its_place_in_my_tasks(app):
+    """Issue 488: the move gives the person a new assignment (a higher id);
+    in My tasks it stands where the task it continues stood, also after a
+    second move."""
+    from t1_builders import native_unit
+
+    from ontotator.assignments.service import AssignmentService
+
+    env = _env(app)
+    other = import_texts(
+        env.scenario,
+        [native_unit("case-0077", "de", "Ein anderer Text.", case_id="case-0077")],
+    )[("case-0077", "de", 1)]
+    first = assign(env.scenario, env.docs[0], "ana", "annotate")
+    second = assign(env.scenario, other, "ana", "annotate")
+    access, _actor = identity(env.scenario, "ana")
+
+    def order() -> list[int]:
+        tasks = AssignmentService(env.db).my_tasks(access.user_id)
+        return [task.assignment_id for task in tasks]
+
+    assert order() == [first, second]
+    moved = _move(env, first)
+    assert moved.assignment_id > second
+    assert order() == [moved.assignment_id, second]
+    _third_version(env)
+    again = _move(env, moved.assignment_id)
+    assert again.assignment_id > moved.assignment_id
+    assert order() == [again.assignment_id, second]

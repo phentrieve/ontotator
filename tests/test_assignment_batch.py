@@ -774,3 +774,106 @@ def test_decision_with_final_or_segment_is_422(env):
             json=body("translation_review", filters=filters),
         )
         assert response.status_code == 422, response.text
+
+
+# --- order of assignment (issue 488) ------------------------------------------ #
+
+
+def _stored(env: Any) -> list[tuple[str, str]]:
+    """(document, username) of every assignment in the stored order."""
+    with env.db.transaction() as conn:
+        return [
+            (document_id, username)
+            for document_id, username in conn.execute(
+                select(AssignmentRow.document_id, UserRow.username)
+                .join(UserRow, UserRow.id == AssignmentRow.user_id)
+                .where(AssignmentRow.project_id == env.pid)
+                .order_by(AssignmentRow.id)
+            ).tuples()
+        ]
+
+
+def _my_tasks(env: Any, username: str) -> list[str]:
+    from auth_harness import logged_in
+
+    response = logged_in(env.app, username, assignments=[]).get("/api/v1/me/tasks")
+    assert response.status_code == 200, response.text
+    return [task["document_id"] for task in response.json()]
+
+
+def test_sort_given_assigns_in_the_order_of_case_ids(env):
+    """``sort: given`` (MCP ``distribute_texts`` with ``case_ids``): the tasks
+    are created in the caller's order, and the person's translation reviews
+    are listed in it."""
+    wanted = [CASES[7], CASES[2], CASES[11], CASES[0]]
+    shown = preview(
+        env, "translation_review", case_ids=wanted, usernames=["ana"], sort="given"
+    )
+    assert [target["case_id"] for target in shown["targets"]] == wanted
+    response = commit(
+        env, "translation_review", case_ids=wanted, usernames=["ana"], sort="given"
+    )
+    assert response.status_code == 200, response.text
+    assert [c["document_id"] for c in response.json()["created"]] == [
+        de(case) for case in wanted
+    ]
+    assert _stored(env) == [(de(case), "ana") for case in wanted]
+    assert _my_tasks(env, "ana") == [de(case) for case in wanted]
+
+
+def test_sort_given_keeps_the_first_of_a_repeated_case_and_unknown_cases(env):
+    wanted = [CASES[3], "case-9999", CASES[1], CASES[3]]
+    shown = preview(
+        env, "translation_review", case_ids=wanted, usernames=["ana"], sort="given"
+    )
+    assert [target["case_id"] for target in shown["targets"]] == [CASES[3], CASES[1]]
+
+
+def test_without_sort_given_the_batch_assigns_in_documents_order(env):
+    wanted = [CASES[7], CASES[2], CASES[11]]
+    response = commit(env, "translation_review", case_ids=wanted, usernames=["ana"])
+    assert response.status_code == 200, response.text
+    assert _stored(env) == [(de(case), "ana") for case in sorted(wanted)]
+    assert _my_tasks(env, "ana") == [de(case) for case in sorted(wanted)]
+
+
+def test_split_gives_each_person_a_block_in_the_given_order(env):
+    wanted = [CASES[9], CASES[4], CASES[6], CASES[1], CASES[8]]
+    response = commit(
+        env,
+        "translation_review",
+        case_ids=wanted,
+        mode="split",
+        usernames=["ana", "ben"],
+        sort="given",
+    )
+    assert response.status_code == 200, response.text
+    assert _stored(env) == [
+        (de(wanted[0]), "ana"),
+        (de(wanted[1]), "ana"),
+        (de(wanted[2]), "ana"),
+        (de(wanted[3]), "ben"),
+        (de(wanted[4]), "ben"),
+    ]
+    assert _my_tasks(env, "ana") == [de(case) for case in wanted[:3]]
+    assert _my_tasks(env, "ben") == [de(case) for case in wanted[3:]]
+
+
+def test_each_assigns_every_person_in_the_given_order(env):
+    set_status(env, "accepted", *CASES)
+    set_project(env, annotations_per_text=2)
+    wanted = [CASES[5], CASES[0], CASES[3]]
+    response = commit(
+        env,
+        "annotate",
+        case_ids=wanted,
+        mode="each",
+        usernames=["ana", "ben"],
+        sort="given",
+    )
+    assert response.status_code == 200, response.text
+    assert _stored(env) == [
+        (de(case), name) for case in wanted for name in ("ana", "ben")
+    ]
+    for name in ("ana", "ben"):
+        assert _my_tasks(env, name) == [de(case) for case in wanted]

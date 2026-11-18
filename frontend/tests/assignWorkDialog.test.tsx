@@ -605,6 +605,17 @@ it("no acknowledgement for reviewed targets", async () => {
   expect(api.commitAssignmentBatch).toHaveBeenCalledWith("p/key", expect.objectContaining({ confirm_unreviewed_translation: false }));
 });
 
+it("says in which order a person sees the tasks: several texts in the order shown, one text after the person's other tasks (#488)", async () => {
+  const note = "My tasks lists a person's tasks by status, then in the order of assignment. New tasks come after the tasks the person already has.";
+  const many = render(<AssignWorkDialog {...casesProps()} />); await ready();
+  expect(screen.getByText(`${note} These texts are assigned in the order shown above.`)).toBeDefined();
+  // The texts are named in the preview's order, which is the order of assignment.
+  expect(document.querySelector(".assign-texts")!.textContent).toContain("case-0101 de, case-0102 de");
+  many.unmount();
+  render(<AssignWorkDialog mode="row" projectKey="p/key" row={row} task="annotate" onClose={vi.fn()} onAssigned={vi.fn()} />); await ready();
+  expect(screen.getByText(note)).toBeDefined();
+});
+
 it("bulk mode names every affected text", async () => {
   annotateCases(); unreviewedOf = id => id === "case-0101" || id === "case-0105";
   render(<AssignWorkDialog {...casesProps()} />); await ready();

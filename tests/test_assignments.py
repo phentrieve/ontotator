@@ -205,19 +205,21 @@ def test_my_tasks_order_and_current_authority(core) -> None:
     db, service, _project, users = core
     first = service.assign(Actor.cli(), "p", "first", "alice", "annotate")
     second = service.assign(Actor.cli(), "p", "second", "alice", "annotate")
+    # Issue 488: the order of assignment, not the upload position ("second"
+    # has the lower one).
     assert [row.document_id for row in service.my_tasks(users["alice"])] == [
-        "second",
         "first",
+        "second",
     ]
     with db.transaction() as conn:
         conn.execute(
             update(AssignmentRow)
-            .where(AssignmentRow.id == first.id)
+            .where(AssignmentRow.id == second.id)
             .values(status="reopened")
         )
     assert [row.assignment_id for row in service.my_tasks(users["alice"])] == [
-        first.id,
         second.id,
+        first.id,
     ]
     with db.transaction() as conn:
         conn.execute(update(AssignmentRow).values(status="submitted"))

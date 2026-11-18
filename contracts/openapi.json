@@ -14391,7 +14391,8 @@
             "enum": [
               "case",
               "import",
-              "activity"
+              "activity",
+              "given"
             ],
             "title": "Sort",
             "default": "case"
@@ -14493,7 +14494,8 @@
             "enum": [
               "case",
               "import",
-              "activity"
+              "activity",
+              "given"
             ],
             "title": "Sort",
             "default": "case"

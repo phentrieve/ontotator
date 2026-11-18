@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- A person's tasks follow the order of assignment (#488, options 1 and 3). **My tasks** and the editor's next task were ordered by status and then by the text's upload position, so a lead who assigned texts in a planned order did not get that order. Within a status the tasks are now in the order of assignment (assignment ID); translation reviews and consolidations use the same list. Bulk assignment creates the tasks in the order of its input: the rows of `POST /api/v1/projects/{key}/assignments` (MCP `assign_texts`, **Distribute evenly…**), and for `POST …/assignments/batch` the order of `sort`, which has the new value `given` for the order of `case_ids` (MCP `distribute_texts` sends it when it is given `case_ids`; the assign dialog keeps the order of the **Documents** list). A reopened task still moves to the **Reopened** tasks at the top; a task that follows a corrected text keeps its ID and its place; a task continued on a new version with **Handle text change…** takes the place of the task it continues; a reassigned task and work carried from a submission are new tasks and come last. **Move to front** still puts texts first: the tasks already assigned on these texts come first within their status; tasks assigned afterwards follow the order of assignment. The assign dialog, **Propose distribution**, the handbook and the descriptions of `assign_texts` and `distribute_texts` say in which order a person sees the tasks. Annotators cannot sort **My tasks**; its project filter and status tabs keep the order. No migration.
+
 ## [0.11.0] - 2026-11-17
 
 ### Added

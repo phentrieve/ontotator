@@ -1236,8 +1236,10 @@ class WorkPlanService:
 
         Every version of the selected texts ``(case_id, language)`` gets the
         lowest positions, in their current order; the other documents follow
-        in theirs. My tasks lists open work by status, then by this order, so
-        the selected texts come first. Positions are renumbered ``0..n-1``
+        in theirs. My tasks lists a person's tasks by status, then in the
+        order of assignment (issue 488); the tasks already assigned on the
+        texts named in this move's audit event come first there
+        (``assignments.service._in_task_order``). Positions are renumbered ``0..n-1``
         (an upload appends after the highest). Unknown texts are ignored; one
         ``project.queue_order`` audit event names the moved texts.
         """

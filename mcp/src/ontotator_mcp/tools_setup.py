@@ -722,7 +722,14 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         ] = False,
         confirm_unreviewed_translation: bool = False,
     ) -> dict[str, Any]:
-        """Assign text versions to people, one task per row."""
+        """Assign text versions to people, one task per row.
+
+        The tasks are created in the order of the rows. My tasks lists a
+        person's tasks by status, then in the order of assignment, and the
+        editor opens the next task in that order: put the rows in the order
+        the person should work in. New tasks come after the tasks the person
+        already has.
+        """
         body: dict[str, Any] = {
             "rows": [row.model_dump() for row in assignments],
             "task": task,
@@ -754,7 +761,13 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
             ),
         ],
         case_ids: Annotated[
-            list[str], Field(description="Cases; empty means every case.")
+            list[str],
+            Field(
+                description=(
+                    "Cases, in the order the people should work in; empty"
+                    " means every case, by case ID."
+                )
+            ),
         ] = [],  # noqa: B006
         task: Literal["annotate", "translation_review"] = "annotate",
         confirm_unreviewed_translation: bool = False,
@@ -772,6 +785,13 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         whose review is not accepted (unreviewed_translation in the dry
         run's targets) is refused with TRANSLATION_NOT_REVIEWED unless
         confirm_unreviewed_translation.
+
+        The tasks are created in the order of case_ids (without case_ids: by
+        case ID). My tasks lists a person's tasks by status, then in the
+        order of assignment, and the editor opens the next task in that
+        order: give case_ids in the order the people should work in. With
+        'split' each person gets a block of consecutive cases. New tasks
+        come after the tasks a person already has.
         """
         body: dict[str, Any] = {
             "task": task,
@@ -779,6 +799,8 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
             "mode": mode,
             "usernames": usernames,
             "case_ids": case_ids or await all_case_ids(api, project),
+            # Issue 488: the caller's order is the order of assignment.
+            "sort": "given" if case_ids else "case",
         }
         preview: dict[str, Any] = await api.post(
             project_path(project, "assignments/batch/preview"), body

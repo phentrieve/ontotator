@@ -4739,7 +4739,7 @@ export interface components {
              * @default case
              * @enum {string}
              */
-            sort: "case" | "import" | "activity";
+            sort: "case" | "import" | "activity" | "given";
             filters?: components["schemas"]["DocumentRowFilters"];
             /**
              * Mode
@@ -4786,7 +4786,7 @@ export interface components {
              * @default case
              * @enum {string}
              */
-            sort: "case" | "import" | "activity";
+            sort: "case" | "import" | "activity" | "given";
             filters?: components["schemas"]["DocumentRowFilters"];
             /**
              * Mode
