@@ -47,7 +47,7 @@ test("the limit popover gives one text its own limit; the project keeps its valu
   await showSegment(card, "Annotation");
   await card.getByRole("button", { name: "Assign annotators…", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: /^Assign / });
-  await dialog.getByRole("button", { name: "About the limit: 2 annotators per text" }).click();
+  await dialog.getByRole("button", { name: "Change… (limit: 2 annotators per text)" }).click();
   const popover = page.getByRole("dialog", { name: "Annotators per text" });
   await expect(popover.getByRole("radio", { name: `Only for the selected text (${SCRATCH} en)` })).toBeChecked();
   await expect(popover.getByRole("radio", { name: "For all texts" })).not.toBeChecked();

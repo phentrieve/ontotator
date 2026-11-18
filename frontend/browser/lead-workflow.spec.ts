@@ -502,13 +502,13 @@ test("ROWS: row actions within three clicks", async ({ page }) => {
   await page.getByRole("link", { name: "Back to Documents" }).first().click();
   await documentsReady(page);
 
-  // Review changes… (PLAN_RESTORED): the card with "Keep final on v1": 2 (the checkbox confirmation is gone).
+  // Review changes… (PLAN_RESTORED): the card with "Keep the current final result" (one version, issue 469): 2 (the checkbox confirmation is gone).
   clicks = counter(page);
   await clicks.click(rowAction(page, "Review changes…", cases.review_changes, "de"));
   const review = await openDecisionBlock(page, cases.review_changes, "de");
-  await expect(review.getByRole("button", { name: "Keep final on v1", exact: true })).toBeVisible();
+  await expect(review.getByRole("button", { name: "Keep the current final result", exact: true })).toBeVisible();
   await evidence(page, "row-review-changes", review);
-  await clicks.click(review.getByRole("button", { name: "Keep final on v1", exact: true }));
+  await clicks.click(review.getByRole("button", { name: "Keep the current final result", exact: true }));
   expect(clicks.total).toBe(2);
   await expect(review.locator(".final-panel-success")).toContainText(new RegExp(`Final result saved for ${esc(cases.review_changes)}${SEP}de\\.`));
   await textCard(page, cases.review_changes, "de").getByRole("button", { name: "Close", exact: true }).first().click();

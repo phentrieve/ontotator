@@ -101,6 +101,8 @@ const NARROW_STATES: readonly (readonly [RegExp, string])[] = [
   [/^Submitted on (v\d+)$/, "$1 submitted"],
   [/^Finishing on (v\d+)$/, "finishing $1"],
   [/^ready to compare$/, "to compare"],
+  // What changed ("newer result", "text corrected") stays in the title.
+  [/^Check changes, .+$/, "Check changes"],
   [/^consolidating \(.+\)$/, "consolidating"],
   // The ⏸ glyph (and the row's "Paused by lead" badge) says the pause where "· paused" would be cut.
   [/^consolidating · paused(?: \(.+\))?$/, "consolidating"],
