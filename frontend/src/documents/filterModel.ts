@@ -47,6 +47,11 @@ const ORIGIN_LABELS: Readonly<Record<string, string>> = { machine_translation: "
 export const FLAGGED_UNCLEAR = "Flagged: guidelines unclear";
 /** Issue 339 b (decision 336-D): a current version has more annotators than "Annotators per text". */
 export const OVER_LIMIT = "More annotators than the limit";
+/**
+ * Review 2, F4: texts with the step "Assign annotation…", also while the first annotator is at work (the row is then
+ * under In progress, not To assign). A value of the server's `flags` facet, listed with the Annotation options.
+ */
+export const CAN_TAKE_ANNOTATOR = "Can take another annotator";
 /** Issue 464: texts a lead paused. */
 export const LEAD_PAUSED = "Paused by lead";
 /** Issue 484: the newest version of the text has typography hints (spacing errors, invisible characters). */
@@ -68,6 +73,7 @@ export const FACET_GROUPS: readonly FacetGroup[] = [
   ] },
   { id: "annotation", legend: "Annotation", options: [
     option("annotation_state", "Unassigned", "unassigned", "partly_assigned"),
+    option("flags", CAN_TAKE_ANNOTATOR, "can_take_annotator"),
     option("annotation_state", "In progress", "in_progress", "consolidating", "finishing_on_old"),
     option("annotation_state", "Paused", "paused"),
     option("annotation_state", "On old text", "old_text_open", "old_text_submitted"),
@@ -117,7 +123,7 @@ function stateKnown(param: "review_state" | "annotation_state" | "final_state", 
 const KNOWN: Readonly<Record<string, (value: string) => boolean>> = {
   language: () => true,
   waiting_on: () => true,
-  flags: value => value === "guidelines_unclear" || value === "over_limit" || value === "lead_paused" || value === "typography_hints",
+  flags: value => value === "guidelines_unclear" || value === "over_limit" || value === "lead_paused" || value === "can_take_annotator" || value === "typography_hints",
   proposals: value => value === "with" || value === "without",
   origin: value => Object.hasOwn(originLabels, value),
   plan: value => Object.hasOwn(PLAN_LABELS, value),

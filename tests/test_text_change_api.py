@@ -321,3 +321,44 @@ def test_a_project_token_moves_and_resolves_text_changes(client):
     for action in ("text_change.move", "text_change.resolve"):
         [entry] = _audit_details(env, action)
         assert entry["api_token"]["id"] == token_id, action
+
+
+def test_preview_and_carry_name_the_earlier_decision(client):
+    """Issue 461: the dry run refuses like the carry, with the decision."""
+    from ontotator.assignments.service import AssignmentService
+
+    env = _env(_app(client))
+    done = _submitted(env)
+    _login(client, env, "lead")
+    path = f"/api/v1/projects/{env.key}/text-changes/preview"
+    body = {"submission_id": done["submission_id"], "target_document_id": env.docs[1]}
+    assert client.post(path, json=body).status_code == 200
+    carried = _carry(client, env, done["submission_id"]).json()
+    task = carried["assignment"]["id"]
+
+    preview = client.post(path, json=body)
+    assert _code(preview) == (422, "TEXT_CHANGE_NOT_APPLICABLE")
+    details = preview.json()["details"]
+    assert details["reason"] == "already_resolved"
+    assert (details["resolution"], details["assignment_id"]) == ("carried", task)
+    assert details["decided_at"]
+    again = _carry(client, env, done["submission_id"], request_id="carry-2")
+    assert _code(again) == (422, "TEXT_CHANGE_NOT_APPLICABLE")
+    assert again.json()["details"] == details
+
+    # The task is withdrawn before the person submits: the carry is open again.
+    AssignmentService(env.db).revoke(Actor.cli(), task)
+    preview = client.post(path, json=body)
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["findings"] == 2
+    second = _carry(client, env, done["submission_id"], request_id="carry-3")
+    assert second.status_code == 200, second.text
+    assert second.json()["resolution"] == "carried"
+    assert second.json()["assignment"]["id"] != task
+    with env.db.transaction() as conn:
+        audits = conn.execute(
+            select(AuditEventRow.details).where(
+                AuditEventRow.action == "text_change.carry"
+            )
+        ).all()
+    assert len(audits) == 2

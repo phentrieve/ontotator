@@ -59,13 +59,20 @@ def test_the_app_holds_the_lease_while_it_runs(tmp_path: Path) -> None:
 
 
 def _kill_session(engine: Engine, lease: RuntimeLease) -> int:
-    """End the lease's database session, as a server restart or a timeout would."""
+    """End the lease's database session, as a server restart or a timeout would.
+
+    Returns when the session is gone. ``pg_terminate_backend(pid)`` alone only
+    sends the signal: the backend keeps its locks until it has handled it, so
+    a test that looked at the lease right away saw it still held now and then.
+    With a timeout the function waits for the backend to exit.
+    """
     conn = lease._conn
     assert conn is not None
     pid = int(conn.execute(text("SELECT pg_backend_pid()")).scalar_one())
     with engine.connect() as other:
         assert other.execute(
-            text("SELECT pg_terminate_backend(:p)"), {"p": pid}
+            text("SELECT pg_terminate_backend(:p, :wait_ms)"),
+            {"p": pid, "wait_ms": 30_000},
         ).scalar()
     return pid
 

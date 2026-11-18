@@ -968,7 +968,12 @@ class FinalResultService:
         review_records = {
             review["id"]: TranslationReviewRecord.model_validate(review).model_dump(
                 mode="json",
-                exclude={"project_id", "reviewer_user_id", "guideline_withdrawn"},
+                exclude={
+                    "project_id",
+                    "reviewer_user_id",
+                    "guideline_withdrawn",
+                    "guideline_label",
+                },
             )
             for review in conn.execute(
                 select(TranslationReviewRow).where(

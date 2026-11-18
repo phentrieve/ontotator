@@ -166,12 +166,15 @@ class TranslationReviewRecord(BaseModel):
     # The guideline version in force at submit (G15); NULL when none was.
     guideline_version: int | None = None
     guideline_withdrawn: bool = False
+    # The project's own name of that version ("3.1"); set with the flag above.
+    guideline_label: str | None = None
 
 
 def with_guideline_withdrawn(
     conn: Connection, project_id: int, records: list[TranslationReviewRecord]
 ) -> list[TranslationReviewRecord]:
-    """``records`` with ``guideline_withdrawn`` set from the stamped versions."""
+    """``records`` with ``guideline_withdrawn`` and ``guideline_label`` set
+    from the stamped versions."""
     if not any(r.guideline_version is not None for r in records):
         return records
     facts = guideline_facts(conn, project_id)
@@ -180,7 +183,10 @@ def with_guideline_withdrawn(
         r
         if r.guideline_version is None
         else r.model_copy(
-            update={"guideline_withdrawn": facts[r.guideline_version].withdrawn}
+            update={
+                "guideline_withdrawn": facts[r.guideline_version].withdrawn,
+                "guideline_label": facts[r.guideline_version].label,
+            }
         )
         for r in records
     ]

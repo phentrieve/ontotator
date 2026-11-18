@@ -7,6 +7,7 @@ schema) or a function. Each call is recorded with its contract template.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -16,6 +17,17 @@ import httpx
 from contract import check, match, named, response_schema, synth
 
 TOKEN = "ott_test-token-never-shown"
+# Two preview tokens as the server makes them (``sha256:`` and 64 hex digits).
+PT_A = "sha256:" + "a" * 64
+PT_B = "sha256:" + "b" * 64
+
+
+def marked(token: str, reason: str = "") -> str:
+    """``token`` as reopen_texts, withdraw_open_tasks and start_rounds hand
+    it out: the server's token and a mark of the dry run's reason."""
+    return f"{token}.{hashlib.sha256(reason.encode()).hexdigest()[:8]}"
+
+
 Handler = Callable[[httpx.Request], Any]
 
 

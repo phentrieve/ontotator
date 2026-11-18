@@ -348,7 +348,7 @@ export type GuidelineSummary = components["schemas"]["GuidelineSummary"];
 export type GuidelineListing = components["schemas"]["GuidelineListing"];
 export type GuidelineDocument = components["schemas"]["GuidelineDocument"];
 export type GuidelineNotice = components["schemas"]["GuidelineNoticeView"];
-export type GuidelinePublishInput = { file: File; changeNote: string; expectedLatestVersion: number | null };
+export type GuidelinePublishInput = { file: File; changeNote: string; expectedLatestVersion: number | null; /** The project's own name of the version ("3.1"); empty or absent: none. */ label?: string };
 export type GuidelineWithdrawBody = { reason: string | null; expected_latest_version: number };
 export type CreateProjectRequest = components["schemas"]["CreateProjectRequest"];
 export type ProjectPin = components["schemas"]["ProjectPin"];
@@ -584,6 +584,7 @@ export class ApiClient {
     const body = new FormData();
     body.append("file", input.file);
     body.append("change_note", input.changeNote);
+    if (input.label) body.append("label", input.label);
     // An empty value means "no version exists yet" (first upload).
     body.append("expected_latest_version", input.expectedLatestVersion === null ? "" : String(input.expectedLatestVersion));
     return this.request(`/api/v1/projects/${encodeURIComponent(key)}/guidelines`, { method: "POST", body });

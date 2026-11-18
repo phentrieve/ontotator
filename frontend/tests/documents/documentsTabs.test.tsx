@@ -46,7 +46,7 @@ it("no segment shows All", () => {
 it("tab empty states with Show all texts", () => {
   const onNavigate = vi.fn();
   const titles: [Parameters<typeof TabEmptyState>[0]["tab"], string][] = [
-    ["decision", "Nothing needs your decision"], ["assign", "Nothing to assign"], ["progress", "Nothing in progress"], ["done", "Nothing done yet"],
+    ["decision", "Nothing needs your decision"], ["assign", "No text waits for an assignment"], ["progress", "Nothing in progress"], ["done", "Nothing done yet"],
   ];
   for (const [tab, title] of titles) {
     const view = render(<TabEmptyState tab={tab} projectKey="p" onNavigate={onNavigate} />);
@@ -55,6 +55,12 @@ it("tab empty states with Show all texts", () => {
     expect(onNavigate).toHaveBeenLastCalledWith({ name: "projectDocuments", key: "p" });
     view.unmount();
   }
+  // "To assign" says where the texts with a free place are (review 2, F4).
+  const assign = render(<TabEmptyState tab="assign" projectKey="p" onNavigate={onNavigate} />);
+  expect(screen.getByText(/can still take another annotator, up to the limit\. Such texts are under In progress; Filter › Annotation › Can take another annotator lists them\./)).toBeTruthy();
+  fireEvent.click(screen.getByRole("link", { name: "Show texts that can take another annotator" }));
+  expect(onNavigate).toHaveBeenLastCalledWith({ name: "projectDocuments", key: "p", flags: "can_take_annotator" });
+  assign.unmount();
   render(<TabEmptyState tab="all" projectKey="p" onNavigate={onNavigate} />);
   expect(screen.getByRole("heading", { name: "No texts yet" })).toBeTruthy();
   expect(screen.getByText("Upload texts to start.")).toBeTruthy();

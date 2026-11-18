@@ -118,6 +118,38 @@ describe("TextPane passages", () => {
     expect(screen.getByRole("tooltip")).toBeTruthy();
   });
 
+  it("keeps the tooltip after a tap or click on the marker until it is dismissed (issue 468)", () => {
+    vi.useFakeTimers();
+    try {
+      render(<><TextPane {...base} text={V2} passages={passages} passagesSince="v1" /><button type="button">Elsewhere</button></>);
+      const marker = screen.getByRole("button", { name: /^Changed text/ });
+      // A touch tap: the pointer arrives, the click follows, and the pointer "leaves" at once.
+      const tap = () => { fireEvent.mouseOver(marker); fireEvent.click(marker); fireEvent.mouseOut(marker); };
+      tap();
+      act(() => { vi.advanceTimersByTime(2000); });
+      expect(screen.getByRole("tooltip").textContent).toContain("In v1:");
+      // Inside the tooltip: it stays, also when the pointer leaves it.
+      fireEvent.click(screen.getByRole("tooltip"));
+      fireEvent.mouseLeave(screen.getByRole("tooltip"));
+      expect(screen.getByRole("tooltip")).toBeTruthy();
+      // The marker again closes it; a tap elsewhere and Esc do too.
+      fireEvent.click(marker);
+      expect(screen.queryByRole("tooltip")).toBeNull();
+      tap();
+      expect(screen.getByRole("tooltip")).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Elsewhere" }));
+      expect(screen.queryByRole("tooltip")).toBeNull();
+      tap();
+      fireEvent.keyDown(document.body, { key: "Escape" });
+      expect(screen.queryByRole("tooltip")).toBeNull();
+      // Without a click, hover still closes when the pointer leaves.
+      fireEvent.mouseOver(marker);
+      fireEvent.mouseOut(marker);
+      act(() => { vi.advanceTimersByTime(300); });
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    } finally { vi.useRealTimers(); }
+  });
+
   it("keeps the marker focused when the marks are redrawn", () => {
     const mounted = render(<TextPane {...base} text={V2} passages={passages} passagesSince="v1" />);
     act(() => screen.getByRole("button", { name: /^Changed text/ }).focus());

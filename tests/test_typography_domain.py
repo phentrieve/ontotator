@@ -1,6 +1,7 @@
 """Typography hints: rules, positions in code points, and what stays quiet."""
 
 import time
+from collections.abc import Callable
 
 import pytest
 
@@ -19,6 +20,7 @@ FACE = "\N{GRINNING FACE}"  # outside the Basic Multilingual Plane
 ACUTE = "\N{COMBINING ACUTE ACCENT}"
 MISSING = "MISSING_SPACE_AFTER_PUNCTUATION"
 BEFORE = "SPACE_BEFORE_PUNCTUATION"
+_SHORT_RUN = 10_000  # characters; the linear-time test also uses 4 times this
 
 
 def found(text: str) -> list[tuple[str, str]]:
@@ -247,20 +249,39 @@ def test_count_by_rule_lists_only_rules_with_hints() -> None:
     assert count_by_rule(hints) == {"DOUBLE_SPACE": 2, "TAB": 1}
 
 
+def _cpu_seconds(text: str) -> float:
+    """CPU time of one call in this thread; waiting for other work does not count."""
+    started = time.thread_time()
+    typography_hints(text)
+    return time.thread_time() - started
+
+
 @pytest.mark.parametrize(
-    "text",
+    "build",
     [
-        " " * 200_000 + "x",
-        "a" + " " * 200_000,
-        "a" + " \t" * 100_000 + "b",
-        "Ab,Cd" * 40_000,
-        "a." * 100_000,
-        "x" * 200_000 + ".Ab",
-        ("a" + " " * 2_000 + "\n") * 100,
+        pytest.param(lambda n: " " * n + "x", id="spaces-at-start"),
+        pytest.param(lambda n: "a" + " " * n, id="spaces-at-end"),
+        pytest.param(lambda n: "a" + " \t" * (n // 2) + "b", id="spaces-and-tabs"),
+        pytest.param(lambda n: "Ab,Cd" * (n // 5), id="commas-between-words"),
+        pytest.param(lambda n: "a." * (n // 2), id="periods-after-letters"),
+        pytest.param(lambda n: "x" * n + ".Ab", id="long-word-before-period"),
+        pytest.param(
+            lambda n: ("a" + " " * (n // 10) + "\n") * 10, id="spaces-at-line-ends"
+        ),
     ],
 )
-def test_long_runs_take_linear_time(text: str) -> None:
-    # Each of these takes minutes with a pattern that retries inside a run.
-    started = time.perf_counter()
-    typography_hints(text)
-    assert time.perf_counter() - started < 5
+def test_long_runs_take_linear_time(build: Callable[[int], str]) -> None:
+    # A pattern that retries inside a run takes time that grows with the
+    # square of the length. So the test compares two lengths instead of
+    # using a time limit: four times the text takes about 4 times as long
+    # when the time is linear and about 16 times as long when it is
+    # quadratic. The limit of 8 lies in the middle, and the result does not
+    # depend on how fast the machine is. The fastest of several calls
+    # counts, because other work can only make a call slower.
+    short, long = build(_SHORT_RUN), build(4 * _SHORT_RUN)
+    short_times, long_times = [], []
+    for _ in range(5):
+        short_times.append(_cpu_seconds(short))
+        long_times.append(_cpu_seconds(long))
+    ratio = min(long_times) / min(short_times)
+    assert ratio < 8, f"4 times the text took {ratio:.1f} times as long"

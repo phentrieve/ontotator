@@ -236,6 +236,10 @@
   .translation-texts .translation-column > .translation-diff,
   .translation-texts .translation-column > .translation-editor { height: auto; min-height: 12rem; max-height: 50vh; max-height: 50dvh; }
   .translation-review-bar, .translation-checks-band, .translation-check-details { padding-inline: var(--space-4); }
+  /* Translation details: the panel spans the bar instead of running off the right edge. */
+  .translation-review-bar { position: relative; }
+  .translation-review-bar .translation-details { position: static; }
+  .translation-review-bar .translation-details[open] > dl { left: var(--space-4); right: var(--space-4); min-width: 0; }
   .translation-texts { padding-inline: var(--space-4); }
   .translation-decision-body, .translation-decision-footer, .translation-pinned-bar { padding-inline: var(--space-4); }
   .translation-text, .translation-review .translation-diff, .translation-editor-mirror, .translation-editor-input { padding-inline: var(--space-4); }

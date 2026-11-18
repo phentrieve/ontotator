@@ -18,9 +18,14 @@ from mcp.server.mcpserver import MCPServer
 from pydantic import Field
 
 from ontotator_mcp.client import OntotatorClient, project_path, seg
-from ontotator_mcp.errors import OntotatorError
+from ontotator_mcp.errors import (
+    HINTS,
+    OntotatorError,
+    check_preview_token,
+    stale_note,
+)
 from ontotator_mcp.models import Replacement, TextRef
-from ontotator_mcp.tooling import register
+from ontotator_mcp.tooling import register, tool_message
 from ontotator_mcp.tools_people import assignment_summary
 from ontotator_mcp.tools_setup import _cut, unknown_texts
 from ontotator_mcp.tools_status import rows
@@ -54,6 +59,8 @@ WithdrawTasks = Annotated[
     ),
 ]
 CONFIRMATION = "WORK_PLAN_CONFIRMATION_REQUIRED"
+# A submission already carried to, or dismissed for, the version (code/reason).
+ALREADY_RESOLVED = "TEXT_CHANGE_NOT_APPLICABLE/already_resolved"
 
 
 async def find_assignment(
@@ -142,7 +149,9 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
         the round is created; the current round is superseded
         (carry_forward) or abandoned with its draft (clean_restart). A
         submitted annotation gets no new round while a consolidation of its
-        text is open (CONSOLIDATION_OPEN): finish or withdraw it first.
+        text is open (CONSOLIDATION_OPEN): the dry run says so (``blocked``)
+        and confirm changes nothing; have the consolidation finished or
+        withdraw its task first.
         """
         if kind == "clean_restart" and not (reason or "").strip():
             raise OntotatorError("A clean restart needs a reason.")
@@ -151,8 +160,14 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
         listed: list[dict[str, Any]] = await api.get(f"{base}/rounds")
         current = next((r for r in listed if r.get("active")), None)
         sources: list[dict[str, Any]] = []
-        if kind == "carry_forward":
+        # The server marks the submissions a new round cannot start from
+        # right now (refused_by); a clean restart is refused the same way.
+        if kind == "carry_forward" or task.get("status") == "submitted":
             sources = await api.get(f"{base}/round-sources")
+        blocked = next(
+            (str(s["refused_by"]) for s in sources if s.get("refused_by")), None
+        )
+        if kind == "carry_forward":
             if source_submission_id is None:
                 if len(sources) != 1:
                     raise OntotatorError(
@@ -171,7 +186,7 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
             "current_round": _round_summary(current),
             "kind": kind,
             "source_submission_id": source_submission_id,
-            "sources": _cut(sources),
+            "sources": _cut(sources) if kind == "carry_forward" else [],
             "consequence": (
                 "The current round is abandoned with its draft; the person starts"
                 " again from the beginning."
@@ -180,6 +195,17 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
                 " the source submission."
             ),
         }
+        if blocked:
+            # What confirm would be refused with: no round would start.
+            plan["consequence"] = "Nothing: the new round would be refused."
+            return {
+                "applied": False,
+                "blocked": {
+                    "code": blocked,
+                    "message": HINTS.get(blocked, "The server would refuse it."),
+                },
+                "plan": plan,
+            }
         if not confirm:
             return {"applied": False, "plan": plan}
         created: dict[str, Any] = await api.post(
@@ -328,7 +354,8 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
                 for item in found.get("changes", [])
             ]
             skipped = [
-                {key: item.get(key) for key in ("case_id", "language", "message")}
+                {key: item.get(key) for key in ("case_id", "language")}
+                | {"message": tool_message(item)}
                 for item in found.get("skipped", [])
             ]
             return {
@@ -347,10 +374,7 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
         if not confirm:
             preview: dict[str, Any] = await api.post(path, body | {"preview": True})
             return summary(preview, False)
-        if preview_token is None:
-            raise OntotatorError(
-                "Run the dry run first and pass its preview_token with confirm."
-            )
+        check_preview_token(preview_token)
         try:
             applied: dict[str, Any] = await api.post(
                 path, body | {"preview_token": preview_token, "reason": reason}
@@ -363,8 +387,7 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
                 raise
             return summary(fresh, False) | {
                 "stale": True,
-                "note": "Texts changed since the dry run; nothing was changed."
-                " Check this new dry run and confirm with its preview_token.",
+                "note": stale_note("Texts", "changed"),
             }
         return summary(applied, True)
 
@@ -731,7 +754,12 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
         ],
         provider: Annotated[
             str | None,
-            Field(description="Required for machine_translation, e.g. 'DeepL'."),
+            Field(
+                description=(
+                    "Required for machine_translation, in the dry run too,"
+                    " e.g. 'DeepL'."
+                )
+            ),
         ] = None,
         model: Annotated[
             str | None, Field(description="Model or tool, e.g. 'deepl-2026-10'.")
@@ -771,6 +799,11 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
         refused if a newer version arrived since. A source text is not
         uploaded here (import a package instead).
         """
+        if method == "machine_translation" and not (provider or "").strip():
+            raise OntotatorError(
+                "A machine translation names its provider; nothing was checked or"
+                " changed. Pass provider (e.g. 'DeepL'), in the dry run too."
+            )
         base = project_path(project, "variants", seg(document_id), "versions")
         if not confirm:
             plan: dict[str, Any] = await api.post(f"{base}/preview", {"text": text})
@@ -846,7 +879,9 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
         Not a translation review: the corrected text becomes the next version
         of the translation with the status of document_id, so an accepted
         text stays accepted (and a rejected or queried one stays so), and the
-        correction is audited with its reason. A change of content belongs
+        correction is audited with its reason. A review assigned afterwards
+        is a review of the corrected version; document_id takes no further
+        review. A change of content belongs
         in a translation review (request_translation_correction,
         start_lead_correction). The dry run returns the diff, how many
         characters change, number_changes (the numbers the fixes change; a
@@ -1129,7 +1164,7 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
             "assignment": assignment_summary(decided),
         }
 
-    # The decision is final in every mode, 'dismiss' included.
+    # 'dismiss' is final; a carry is final while its task stands (issue 461).
     @register(server, scopes="project-admin", effect="destructive")
     async def carry_submission(
         project: Project,
@@ -1160,13 +1195,28 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
 
         The dry run counts the findings that can be placed and lists the
         people who could check them. With confirm a new task carries the
-        placed findings; the submission itself stays. The decision, 'dismiss'
-        included, is final: the submission cannot be carried to this version
-        again.
+        placed findings; the submission itself stays. One decision per
+        submission and version: when one exists, the dry run returns
+        already_resolved (the earlier resolution, the assignment_id of its
+        task, decided_at) instead of a preview, and confirm is refused.
+        'dismiss' is final. A carry can be repeated only after its task was
+        withdrawn or removed without a submission.
         """
-        preview = await _text_change_preview(
-            api, project, {"submission_id": submission_id}, target_document_id
-        )
+        try:
+            preview = await _text_change_preview(
+                api, project, {"submission_id": submission_id}, target_document_id
+            )
+        except OntotatorError as exc:
+            if confirm or exc.code != ALREADY_RESOLVED:
+                raise
+            earlier = exc.details if isinstance(exc.details, dict) else {}
+            return {
+                "applied": False,
+                "already_resolved": {
+                    name: earlier.get(name)
+                    for name in ("resolution", "assignment_id", "decided_at")
+                },
+            }
         if not confirm:
             return {"applied": False, "preview": preview}
         carried: dict[str, Any] = await api.post(

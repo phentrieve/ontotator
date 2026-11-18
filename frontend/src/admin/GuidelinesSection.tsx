@@ -4,6 +4,7 @@ import { personLabel } from "../app/identity";
 import { formatTime } from "../app/submissionLabels";
 import { readGuidelineFile, type GuidelineKind } from "../guidelines/fileChecks";
 import { formatGuidelineDay, GuidelineReader, withdrawnNote } from "../guidelines/GuidelineReader";
+import { guidelineVersionName, MAX_GUIDELINE_LABEL_CHARS } from "../guidelines/versionName";
 import { Button, DataTable, Dialog, GuidelineDocument, IconMore, InlineMessage, MenuButton, StatusBadge, TextInput, type Column, EmptyValue } from "../ui";
 import { ErrorNotice } from "./ErrorNotice";
 import { SettingsHint } from "./SettingsCard";
@@ -23,6 +24,7 @@ function notSeenLabel({ person, notified }: NotSeen): string {
   return label.endsWith(")") ? `${label.slice(0, -1)}, notified)` : `${label} (notified)`;
 }
 const published = (summary: GuidelineSummary) => `${formatTime(summary.created_at)} by ${personLabel(summary.created_by)}`;
+const nameOf = (item: Pick<GuidelineSummary, "version" | "label">) => guidelineVersionName(item.version, item.label);
 const isConflict = (error: unknown) => error instanceof ApiError && error.code === "GUIDELINE_VERSION_CONFLICT";
 
 /** Settings › Guidelines: publish, read and withdraw versions; who has not seen the current one (spec G14, G23 to G25). */
@@ -40,6 +42,7 @@ function GuidelinesEditor({ projectKey }: { projectKey: string }): JSX.Element {
   const [chosen, setChosen] = useState<Chosen | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [note, setNote] = useState("");
+  const [label, setLabel] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<unknown>();
   const [republishError, setRepublishError] = useState<unknown>();
@@ -86,7 +89,7 @@ function GuidelinesEditor({ projectKey }: { projectKey: string }): JSX.Element {
   };
   const discard = () => {
     fileRead.current++;
-    setChosen(null); setFileError(null); setNote(""); setPublishError(undefined); setFileKey(value => value + 1); setPublishOpen(false);
+    setChosen(null); setFileError(null); setNote(""); setLabel(""); setPublishError(undefined); setFileKey(value => value + 1); setPublishOpen(false);
   };
   // Withdrawn texts are deleted, so only a version whose text still exists can be republished: its text
   // fills the publish form as a new file, for review before "Publish as vN".
@@ -96,11 +99,12 @@ function GuidelinesEditor({ projectKey }: { projectKey: string }): JSX.Element {
     try {
       const document = await api.getGuideline(projectKey, version);
       if (ticket !== fileRead.current) return;
-      if (document.body === null) { setRepublishError(new Error(`The text of v${version} is no longer available.`)); return; }
+      if (document.body === null) { setRepublishError(new Error(`The text of ${nameOf(document)} is no longer available.`)); return; }
       const name = document.filename ?? `guidelines-v${version}.${document.kind === "markdown" ? "md" : "txt"}`;
       const file = new File([document.body], name, { type: document.kind === "markdown" ? "text/markdown" : "text/plain" });
       setFileKey(value => value + 1);
-      setNote(`Republished v${version}`);
+      setNote(`Republished ${nameOf(document)}`);
+      setLabel(document.label ?? "");
       setPublishOpen(true);
       focusPreview.current = true;
       setChosen({ file, text: document.body, kind: document.kind });
@@ -115,9 +119,9 @@ function GuidelinesEditor({ projectKey }: { projectKey: string }): JSX.Element {
     if (writing.current || !chosen || listing === null) return;
     writing.current = true; setPublishing(true); setPublishError(undefined); setSuccess(null);
     try {
-      const summary = await api.publishGuideline(projectKey, { file: chosen.file, changeNote: note.trim(), expectedLatestVersion: listing.latest_version });
+      const summary = await api.publishGuideline(projectKey, { file: chosen.file, changeNote: note.trim(), expectedLatestVersion: listing.latest_version, ...(label.trim() ? { label: label.trim() } : {}) });
       discard();
-      showSuccess(`Published v${summary.version}. Annotators and reviewers see the update notice when they next open a task.`);
+      showSuccess(`Published ${nameOf(summary)}. Annotators and reviewers see the update notice when they next open a task.`);
       reload();
     } catch (failure: unknown) {
       setPublishError(failure);
@@ -128,11 +132,12 @@ function GuidelinesEditor({ projectKey }: { projectKey: string }): JSX.Element {
   const withdraw = async () => {
     if (writing.current || withdrawTarget === null || listing?.latest_version == null) return;
     const version = withdrawTarget;
+    const name = guidelineVersionName(version, listing.versions.find(item => item.version === version)?.label);
     writing.current = true; setWithdrawing(true); setWithdrawError(undefined); setSuccess(null);
     try {
       await api.withdrawGuideline(projectKey, version, { reason: reason.trim() || null, expected_latest_version: listing.latest_version });
       setWithdrawTarget(null); setReason("");
-      showSuccess(`v${version} withdrawn.`);
+      showSuccess(`${name} withdrawn.`);
       reload();
     } catch (failure: unknown) {
       setWithdrawError(failure);
@@ -153,18 +158,18 @@ function GuidelinesEditor({ projectKey }: { projectKey: string }): JSX.Element {
   const formOpen = publishOpen || chosen !== null || (listing !== null && !current);
   useEffect(() => { if (publishOpen && focusFile.current) { focusFile.current = false; document.getElementById(`${id}-file`)?.focus(); } }, [publishOpen, id]);
   const moreItems = (item: GuidelineSummary) => [
-    ...(item.version !== current?.version ? [{ id: "republish", label: `Republish v${item.version}…`, onSelect: () => { void republish(item.version); } }] : []),
-    { id: "withdraw", label: `Withdraw v${item.version}…`, onSelect: () => openWithdraw(item.version) },
+    ...(item.version !== current?.version ? [{ id: "republish", label: `Republish ${nameOf(item)}…`, onSelect: () => { void republish(item.version); } }] : []),
+    { id: "withdraw", label: `Withdraw ${nameOf(item)}…`, onSelect: () => openWithdraw(item.version) },
   ];
-  const more = (item: GuidelineSummary, size?: "md") => <MenuButton label={`More actions, v${item.version}`} buttonLabel="More…" icon={<IconMore />} size={size} items={moreItems(item)} />;
+  const more = (item: GuidelineSummary, size?: "md") => <MenuButton label={`More actions, ${nameOf(item)}`} buttonLabel="More…" icon={<IconMore />} size={size} items={moreItems(item)} />;
 
   const columns: Column<GuidelineSummary>[] = [
-    { id: "version", header: "Version", rowHeader: true, cell: item => <>v{item.version}{item.version === current?.version && <> <StatusBadge tone="success">In force</StatusBadge></>}</> },
+    { id: "version", header: "Version", rowHeader: true, cell: item => <>{nameOf(item)}{item.version === current?.version && <> <StatusBadge tone="success">In force</StatusBadge></>}</> },
     { id: "published", header: "Published", cell: item => formatTime(item.created_at) },
     { id: "note", header: "What changed", cell: item => withdrawnNote(item) ?? item.change_note ?? "" },
     { id: "seen", header: "Seen by", cell: item => !item.withdrawn && item.reach ? `${item.reach.opened} of ${item.reach.members}` : <EmptyValue /> },
     { id: "actions", header: <span className="visually-hidden">Actions</span>, align: "end", cell: item => item.withdrawn ? null : <div className="guidelines-row-actions">
-      <Button size="sm" aria-label={`Read v${item.version}`} onClick={() => setReading(item.version)}>Read</Button>
+      <Button size="sm" aria-label={`Read ${nameOf(item)}`} onClick={() => setReading(item.version)}>Read</Button>
       {more(item)}
     </div> },
   ];
@@ -177,11 +182,11 @@ function GuidelinesEditor({ projectKey }: { projectKey: string }): JSX.Element {
       {current ? <section className="settings-card guidelines-in-force" aria-labelledby={`${id}-current`}>
         <div className="guidelines-in-force-head">
           <div className="guidelines-in-force-name">
-            <h2 id={`${id}-current`} className="guidelines-card-title"><span className="settings-eyebrow">In force</span> Guidelines v{current.version}</h2>
+            <h2 id={`${id}-current`} className="guidelines-card-title"><span className="settings-eyebrow">In force</span> Guidelines {nameOf(current)}</h2>
             <span className="guidelines-in-force-file">{`${current.filename ?? "—"} · ${formatSize(current.size_bytes)}`}</span>
           </div>
           <div className="guidelines-current-actions">
-            <Button aria-label={`Read v${current.version}`} onClick={() => setReading(current.version)}>Read</Button>
+            <Button aria-label={`Read ${nameOf(current)}`} onClick={() => setReading(current.version)}>Read</Button>
             {!formOpen && <Button variant="primary" onClick={() => { setSuccess(null); focusFile.current = true; setPublishOpen(true); }}>Publish a new version</Button>}
             {more(current, "md")}
           </div>
@@ -195,7 +200,7 @@ function GuidelinesEditor({ projectKey }: { projectKey: string }): JSX.Element {
           </details></>}</dd></>}
         </dl>
       </section>
-      : latestWithdrawn && <InlineMessage tone="warning">{`No guideline is in force. v${listing.latest_version} was withdrawn on ${formatGuidelineDay(latestWithdrawn.at)} by ${personLabel(latestWithdrawn.by)}. Publish a new version${versions.some(item => !item.withdrawn) ? ", or republish an earlier version from the list below" : ""}.`}</InlineMessage>}
+      : latestWithdrawn && <InlineMessage tone="warning">{`No guideline is in force. ${guidelineVersionName(listing.latest_version ?? "", versions.find(item => item.version === listing.latest_version)?.label)} was withdrawn on ${formatGuidelineDay(latestWithdrawn.at)} by ${personLabel(latestWithdrawn.by)}. Publish a new version${versions.some(item => !item.withdrawn) ? ", or republish an earlier version from the list below" : ""}.`}</InlineMessage>}
 
       {formOpen && <form className={`settings-card guidelines-publish${versions.length ? "" : " guidelines-publish--first"}`} aria-labelledby={`${id}-publish`} onSubmit={event => { void publish(event); }}>
         <h2 id={`${id}-publish`} className="guidelines-card-title">{versions.length ? `Publish v${nextVersion}` : "No guidelines yet"}</h2>
@@ -207,6 +212,9 @@ function GuidelinesEditor({ projectKey }: { projectKey: string }): JSX.Element {
         {republishError !== undefined && <ErrorNotice error={republishError} />}
         {chosen && <>
           <p className="guidelines-file-facts">{`${chosen.file.name}, ${formatSize(chosen.file.size)}`}</p>
+          <TextInput id={`${id}-label`} label="Your version of the guideline (optional)" maxLength={MAX_GUIDELINE_LABEL_CHARS}
+            hint={`The version your document gives itself, for example 3.1. It is shown before the upload number: Guidelines ${guidelineVersionName(nextVersion, label.trim() || "3.1")}.`}
+            value={label} onChange={event => setLabel(event.target.value)} />
           <TextInput id={`${id}-note`} label="What changed? (optional)" hint="Shown with the update notice." maxLength={280}
             value={note} onChange={event => setNote(event.target.value)} />
         </>}
@@ -229,21 +237,22 @@ function GuidelinesEditor({ projectKey }: { projectKey: string }): JSX.Element {
         <h2 id={`${id}-versions`} className="settings-section-title">All versions</h2>
         <DataTable label="Guideline versions" columns={columns} rows={versions} rowKey={item => String(item.version)} />
       </section>}
-      {reading !== null && <section ref={readerRef} tabIndex={-1} className="guidelines-reading" aria-label={`Reading v${reading}`}>
-        <GuidelineReader key={`${reading}-${generation}`} projectKey={projectKey} version={reading} currentVersion={current?.version ?? null} />
+      {reading !== null && <section ref={readerRef} tabIndex={-1} className="guidelines-reading" aria-label={`Reading ${guidelineVersionName(reading, versions.find(item => item.version === reading)?.label)}`}>
+        <GuidelineReader key={`${reading}-${generation}`} projectKey={projectKey} version={reading} currentVersion={current?.version ?? null}
+          label={versions.find(item => item.version === reading)?.label} currentLabel={current?.label} />
         <Button onClick={() => setReading(null)}>Close the reading view</Button>
       </section>}
     </>}
 
-    <Dialog open={target !== null} size="sm" title={`Withdraw v${withdrawTarget ?? ""}?`} onClose={closeWithdraw}
+    <Dialog open={target !== null} size="sm" title={`Withdraw ${target ? nameOf(target) : `v${withdrawTarget ?? ""}`}?`} onClose={closeWithdraw}
       footer={<>
         <Button onClick={closeWithdraw} aria-disabled={withdrawing || undefined}>Cancel</Button>
-        <Button variant="danger" loading={withdrawing} onClick={() => { void withdraw(); }}>Withdraw v{withdrawTarget}</Button>
+        <Button variant="danger" loading={withdrawing} onClick={() => { void withdraw(); }}>Withdraw {target ? nameOf(target) : `v${withdrawTarget}`}</Button>
       </>}>
       {target && <>
-        <p>{`The text, file name and change note of v${target.version} are deleted and can no longer be read or exported. The version number, who published it and when stay; results made under v${target.version} keep showing “Guidelines v${target.version} (withdrawn)”. This cannot be undone.`}</p>
+        <p>{`The text, file name and change note of ${nameOf(target)} are deleted and can no longer be read or exported. The version number, ${target.label ? "your version, " : ""}who published it and when stay; results made under ${nameOf(target)} keep showing “Guidelines ${nameOf(target)} (withdrawn)”. This cannot be undone.`}</p>
         {targetIsCurrent && <p>{previous
-          ? `No guideline is in force until you publish a new version. v${previous.version} does not come back automatically.`
+          ? `No guideline is in force until you publish a new version. ${nameOf(previous)} does not come back automatically.`
           : "No guideline is in force until you publish a new version."}</p>}
         <TextInput id={`${id}-reason`} label="Reason (optional)" hint="Shown instead of the change note. Do not repeat confidential content." maxLength={280}
           value={reason} onChange={event => setReason(event.target.value)} />

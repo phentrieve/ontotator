@@ -5280,6 +5280,7 @@
                       "guidelines_unclear",
                       "over_limit",
                       "lead_paused",
+                      "can_take_annotator",
                       "typography_hints"
                     ],
                     "type": "string"
@@ -5882,6 +5883,7 @@
                       "guidelines_unclear",
                       "over_limit",
                       "lead_paused",
+                      "can_take_annotator",
                       "typography_hints"
                     ],
                     "type": "string"
@@ -7090,7 +7092,7 @@
           "bulk-task-actions"
         ],
         "summary": "Bulk Undo",
-        "description": "Undo a bulk reopen or withdrawal by the ``undo.id`` of its apply.\n\nThe server keeps what the action changed; the request names only that\nrecord. It works once, for the lead who applied the action, before\n``undo.expires_at``, and only while the texts are exactly as the action\nleft them (tasks, drafts, review drafts, rounds, final results, plan,\nversions); otherwise 409 ``BULK_UNDO_STALE`` and nothing is undone.\nReopened tasks are submitted again; withdrawn tasks come back with their\ndrafts. An action that reopened a translation review has no Undo.\n``preview: true`` changes nothing: it lists the tasks the Undo would\nbring back (``tasks``) and, in ``blocked``, why it cannot run now\n(``changed``, ``not_in_plan``, ``person_unavailable``); a record that is\nunknown, expired or already undone is refused in a preview too.",
+        "description": "Undo a bulk reopen or withdrawal by the ``undo.id`` of its apply.\n\nThe server keeps what the action changed; the request names only that\nrecord. It works once, for the lead who applied the action, before\n``undo.expires_at``, and only while the texts are exactly as the action\nleft them (tasks, drafts, review drafts, rounds, final results, plan,\nversions); otherwise 409 ``BULK_UNDO_STALE`` and nothing is undone.\nReopened tasks are submitted again; withdrawn tasks come back with their\ndrafts. An action that reopened a translation review has no Undo.\n``preview: true`` changes nothing: it lists the tasks the Undo would\nbring back (``tasks``) and, in ``blocked``, why it cannot run now\n(``changed``, ``not_in_plan``, ``person_unavailable``); a record that is\nunknown, expired or already undone is refused in a preview too.\n``blocked_texts`` names each text in the way and what changed on it\n(``texts``: how many texts the action changed). The refusal of a blocked\nUndo carries that answer as ``preview`` in its details.",
         "operationId": "bulk_undo_api_v1_projects__key__bulk_task_actions_undo_post",
         "parameters": [
           {
@@ -13948,6 +13950,17 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
           }
         },
         "type": "object",
@@ -14438,7 +14451,8 @@
             "enum": [
               "case",
               "import",
-              "activity"
+              "activity",
+              "given"
             ],
             "title": "Sort",
             "default": "case"
@@ -14540,7 +14554,8 @@
             "enum": [
               "case",
               "import",
-              "activity"
+              "activity",
+              "given"
             ],
             "title": "Sort",
             "default": "case"
@@ -14970,6 +14985,11 @@
             "type": "string",
             "pattern": "^[0-9]{0,9}$",
             "title": "Expected Latest Version",
+            "default": ""
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
             "default": ""
           }
         },
@@ -16230,6 +16250,17 @@
                 "type": "null"
               }
             ]
+          },
+          "texts": {
+            "type": "integer",
+            "title": "Texts"
+          },
+          "blocked_texts": {
+            "items": {
+              "$ref": "#/components/schemas/BulkUndoTextBlock"
+            },
+            "type": "array",
+            "title": "Blocked Texts"
           }
         },
         "type": "object",
@@ -16290,6 +16321,44 @@
           "person"
         ],
         "title": "BulkUndoTaskView"
+      },
+      "BulkUndoTextBlock": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "final",
+              "versions",
+              "plan",
+              "tasks",
+              "submissions",
+              "drafts",
+              "not_in_plan",
+              "person_unavailable"
+            ],
+            "title": "Reason"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "reason",
+          "message"
+        ],
+        "title": "BulkUndoTextBlock"
       },
       "BulkUndoView": {
         "properties": {
@@ -18868,6 +18937,7 @@
                   "guidelines_unclear",
                   "over_limit",
                   "lead_paused",
+                  "can_take_annotator",
                   "typography_hints"
                 ]
               },
@@ -18878,6 +18948,7 @@
                     "guidelines_unclear",
                     "over_limit",
                     "lead_paused",
+                    "can_take_annotator",
                     "typography_hints"
                   ]
                 },
@@ -20891,6 +20962,17 @@
             ],
             "title": "Guideline Version"
           },
+          "guideline_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guideline Label"
+          },
           "guideline_withdrawn": {
             "type": "boolean",
             "title": "Guideline Withdrawn",
@@ -21738,6 +21820,17 @@
             "type": "integer",
             "title": "Version"
           },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
           "kind": {
             "type": "string",
             "enum": [
@@ -21918,6 +22011,17 @@
             "type": "integer",
             "title": "Version"
           },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
           "change_note": {
             "anyOf": [
               {
@@ -21964,6 +22068,17 @@
           "to_version": {
             "type": "integer",
             "title": "To Version"
+          },
+          "to_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Label"
           },
           "changes": {
             "items": {
@@ -22034,6 +22149,17 @@
           "version": {
             "type": "integer",
             "title": "Version"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
           },
           "kind": {
             "type": "string",
@@ -29361,7 +29487,9 @@
               "round_started",
               "final_chosen",
               "final_changed",
-              "final_restored"
+              "final_restored",
+              "text_paused",
+              "text_released"
             ],
             "title": "Kind"
           },
@@ -29494,7 +29622,7 @@
           "at"
         ],
         "title": "RowChangeView",
-        "description": "A change of who works on a row, how, or of its final result: its\nHistory line, with who did it, when and (where one was given) why.\n\n``by`` is the person who made the change; a withdrawn final result\n(#343) names the lead in ``from_person`` instead. ``reopened``,\n``reopen_undone`` and ``round_started`` name the task and its person\n(``assignment_id``, ``to_person``); the ``final_*`` kinds name the\nresults (``from_result`` the one replaced, ``to_result`` the one final\nafterwards; null when the submission is no longer among the row's)."
+        "description": "A change of who works on a row, how, or of its final result: its\nHistory line, with who did it, when and (where one was given) why.\n\n``by`` is the person who made the change; a withdrawn final result\n(#343) names the lead in ``from_person`` instead. ``reopened``,\n``reopen_undone`` and ``round_started`` name the task and its person\n(``assignment_id``, ``to_person``); the ``final_*`` kinds name the\nresults (``from_result`` the one replaced, ``to_result`` the one final\nafterwards; null when the submission is no longer among the row's).\n``text_paused`` and ``text_released`` (issue 464) are a lead's pause and\nrelease of the text, with ``by`` and the ``reason`` given."
       },
       "RowItemView": {
         "properties": {
@@ -30014,6 +30142,17 @@
               }
             ],
             "title": "Guideline Version"
+          },
+          "guideline_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guideline Label"
           },
           "guideline_withdrawn": {
             "type": "boolean",
@@ -30929,6 +31068,7 @@
                   "translation_not_accepted",
                   "unchanged",
                   "with_corrections",
+                  "typos_fixed",
                   "in_package",
                   "outside",
                   "review_off",
@@ -30937,6 +31077,7 @@
                   "not_exported",
                   "carried_on_submit",
                   "lead_pause",
+                  "report_pause",
                   "v2_not_annotated",
                   "no_target_proposals",
                   "correction",
@@ -31603,6 +31744,17 @@
               }
             ],
             "title": "Guideline Version"
+          },
+          "guideline_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guideline Label"
           },
           "guideline_withdrawn": {
             "type": "boolean",
@@ -33664,6 +33816,17 @@
             "type": "boolean",
             "title": "Guideline Withdrawn",
             "default": false
+          },
+          "guideline_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guideline Label"
           }
         },
         "type": "object",

@@ -125,6 +125,7 @@ def _chains(
     if case_ids is not None:
         query = query.where(DocumentRow.case_id.in_(list(case_ids)))
     decisions = latest_review_decisions(conn, pid, case_ids)
+    typo_fixes = store.counted_typo_fixes(conn, pid)
     groups: dict[RowKey, list[rules.Version]] = defaultdict(list)
     for row in conn.execute(query):
         groups[RowKey(row.case_id, row.language)].append(
@@ -140,6 +141,7 @@ def _chains(
                 translation_status=row.translation_status,
                 position=row.position,
                 latest_decision=decisions.get(row.document_id),
+                typo_fix_counts=row.document_id in typo_fixes,
             )
         )
     return {key: rules.build_chains(versions) for key, versions in groups.items()}
@@ -1236,8 +1238,10 @@ class WorkPlanService:
 
         Every version of the selected texts ``(case_id, language)`` gets the
         lowest positions, in their current order; the other documents follow
-        in theirs. My tasks lists open work by status, then by this order, so
-        the selected texts come first. Positions are renumbered ``0..n-1``
+        in theirs. My tasks lists a person's tasks by status, then in the
+        order of assignment (issue 488); the tasks already assigned on the
+        texts named in this move's audit event come first there
+        (``assignments.service._in_task_order``). Positions are renumbered ``0..n-1``
         (an upload appends after the highest). Unknown texts are ignored; one
         ``project.queue_order`` audit event names the moved texts.
         """

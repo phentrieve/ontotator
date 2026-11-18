@@ -752,7 +752,14 @@ def test_carry_dismiss_records_only(env):
     assert _counts(env) == before | {"resolutions": before["resolutions"] + 1}
     with pytest.raises(DomainError) as refused:
         _carry(env, work["submission_id"])
-    assert refused.value.details == {"reason": "already_resolved"}
+    [recorded] = _resolutions(env)
+    # The refusal names the earlier decision; a dismissal has no task (#461).
+    assert refused.value.details == {
+        "reason": "already_resolved",
+        "resolution": "dismissed",
+        "assignment_id": None,
+        "decided_at": recorded.decided_at.isoformat(),
+    }
 
 
 def test_carry_from_final_does_not_touch_the_final(env):
@@ -1141,3 +1148,208 @@ def test_operations_lock_the_assignee(env, monkeypatch):
     locked.clear()
     _move(env, moved["assignment_id"])
     assert locked == [identity(env.scenario, "eva")[0].user_id]
+
+
+def test_a_moved_task_keeps_its_place_in_my_tasks(app):
+    """Issue 488: the move gives the person a new assignment (a higher id);
+    in My tasks it stands where the task it continues stood, also after a
+    second move."""
+    from t1_builders import native_unit
+
+    from ontotator.assignments.service import AssignmentService
+
+    env = _env(app)
+    other = import_texts(
+        env.scenario,
+        [native_unit("case-0077", "de", "Ein anderer Text.", case_id="case-0077")],
+    )[("case-0077", "de", 1)]
+    first = assign(env.scenario, env.docs[0], "ana", "annotate")
+    second = assign(env.scenario, other, "ana", "annotate")
+    access, _actor = identity(env.scenario, "ana")
+
+    def order() -> list[int]:
+        tasks = AssignmentService(env.db).my_tasks(access.user_id)
+        return [task.assignment_id for task in tasks]
+
+    assert order() == [first, second]
+    moved = _move(env, first)
+    assert moved.assignment_id > second
+    assert order() == [moved.assignment_id, second]
+    _third_version(env)
+    again = _move(env, moved.assignment_id)
+    assert again.assignment_id > moved.assignment_id
+    assert order() == [again.assignment_id, second]
+
+
+# --- carry again after the carried task was withdrawn (issue 461) ------------- #
+
+
+def _withdraw(env: Env, assignment_id: int, *, remove: bool = False) -> None:
+    """The lead withdraws a task; ``remove`` also discards its draft."""
+    from ontotator.assignments.service import AssignmentService
+    from ontotator.auth.audit import Actor
+
+    service = AssignmentService(env.db)
+    if remove:
+        service.remove(Actor.cli(), assignment_id)
+    else:
+        service.revoke(Actor.cli(), assignment_id)
+
+
+def _submit_carried(env: Env, name: str, round_view: Any) -> str:
+    """``name`` decides every carried finding and submits the carry round."""
+    from ontotator.application.submissions import SubmissionService
+    from ontotator.application.work_rounds import RoundInputResolutionService
+    from ontotator.domain.workspace import MutationEnvelope
+
+    key = round_view.workspace_key
+    scoped = _scoped(env, name)
+
+    def envelope(payload: dict[str, Any]) -> MutationEnvelope:
+        return MutationEnvelope(
+            mutation_id=f"m-{uuid4().hex}",
+            expected_revision=scoped.open_draft(key).revision,
+            payload=payload,
+        )
+
+    resolver = RoundInputResolutionService(scoped)
+    for item in env.repo.get_round_input_inventory(env.key, round_view.round_id):
+        target = item["target_snapshot"]
+        if target is None:
+            payload = {
+                "input_id": item["input_id"],
+                "outcome": "dismissed",
+                "reason": "Not on the corrected text",
+            }
+        else:
+            payload = {
+                "input_id": item["input_id"],
+                "outcome": "completed",
+                "annotation_ref": {
+                    "annotation_id": target["annotation"]["annotation_id"],
+                    "version": target["version"],
+                },
+            }
+        resolver.resolve(key, envelope(payload))
+    ontology = env.scenario.app.state.ontology_registry
+    submission = SubmissionService(scoped, ontology).submit(
+        key, envelope({"document_checked": True})
+    )
+    return str(submission.submission_id)
+
+
+def test_preview_of_a_carried_submission_reports_already_resolved(env):
+    work = _submitted(env)
+    carried = _carry(env, work["submission_id"])
+    before = _counts(env)
+    with pytest.raises(DomainError, match="TEXT_CHANGE_NOT_APPLICABLE") as refused:
+        _preview(env, submission_id=work["submission_id"])
+    [resolution] = _resolutions(env)
+    assert refused.value.details == {
+        "reason": "already_resolved",
+        "resolution": "carried",
+        "assignment_id": carried.assignment_id,
+        "decided_at": resolution.decided_at.isoformat(),
+    }
+    # The confirmed call names the same decision and task.
+    with pytest.raises(DomainError) as again:
+        _carry(env, work["submission_id"])
+    assert again.value.details == refused.value.details
+    assert _counts(env) == before
+
+
+def test_preview_of_a_dismissed_submission_reports_already_resolved(env):
+    work = _submitted(env)
+    _carry(env, work["submission_id"], mode="dismiss")
+    with pytest.raises(DomainError) as refused:
+        _preview(env, submission_id=work["submission_id"])
+    assert refused.value.details["reason"] == "already_resolved"
+    assert refused.value.details["resolution"] == "dismissed"
+    assert refused.value.details["assignment_id"] is None
+
+
+@pytest.mark.parametrize("remove", [False, True])
+def test_carry_again_after_the_carried_task_was_withdrawn(env, remove):
+    work = _submitted(env)
+    first = _carry(env, work["submission_id"])
+    _withdraw(env, first.assignment_id, remove=remove)
+    assert _preview(env, submission_id=work["submission_id"]).findings == 2
+    second = _carry(env, work["submission_id"])
+    assert second.resolution == "carried"
+    assert second.assignment_id != first.assignment_id
+    assert second.round.round_id != first.round.round_id
+    assert second.carried_findings == 2
+    assert _assignment(env, second.assignment_id).revoked_at is None
+    # The person gets the placed finding again.
+    draft = _scoped(env, "tom").open_draft(second.round.workspace_key)
+    assert len(draft.annotations) == 1
+    # The earlier decision stays: two rows, the first unchanged.
+    earlier, later = _resolutions(env)
+    assert (earlier.resolution, earlier.round_id) == ("carried", first.round.round_id)
+    assert (later.resolution, later.round_id) == ("carried", second.round.round_id)
+    assert len(_audits(env, "text_change.carry")) == 2
+    # The new carry stands: a third one is refused and names the new task.
+    with pytest.raises(DomainError) as refused:
+        _carry(env, work["submission_id"])
+    assert refused.value.details["reason"] == "already_resolved"
+    assert refused.value.details["assignment_id"] == second.assignment_id
+    # The carried work can be submitted as usual.
+    assert _submit_carried(env, "tom", second.round)
+
+
+def test_carry_again_after_a_withdrawn_handover_may_go_to_the_author(env):
+    work = _submitted(env)
+    first = _carry(env, work["submission_id"], mode="other", username=env.user("ana"))
+    _withdraw(env, first.assignment_id)
+    second = _carry(env, work["submission_id"])
+    assert second.resolution == "carried"
+    assert [row.resolution for row in _resolutions(env)] == ["handed_over", "carried"]
+
+
+def test_no_second_carry_when_the_carried_task_has_a_submission(env):
+    work = _submitted(env)
+    first = _carry(env, work["submission_id"])
+    _submit_carried(env, "tom", first.round)
+    _withdraw(env, first.assignment_id)
+    with pytest.raises(DomainError) as refused:
+        _carry(env, work["submission_id"])
+    assert refused.value.details["reason"] == "already_resolved"
+    with pytest.raises(DomainError) as refused:
+        _preview(env, submission_id=work["submission_id"])
+    assert refused.value.details["reason"] == "already_resolved"
+    assert refused.value.details["assignment_id"] == first.assignment_id
+
+
+def test_a_carry_whose_task_moved_on_still_stands(env):
+    """v3 arrives and the carried task moves there: the work lives on."""
+    from ontotator.application.text_changes import TextChangeService
+
+    work = _submitted(env)
+    first = _carry(env, work["submission_id"])
+    _third_version(env)
+    _move(env, first.assignment_id)
+    assert _assignment(env, first.assignment_id).revoked_at is not None
+    with env.db.transaction() as conn:
+        standing = TextChangeService._standing_carry(
+            conn, _pid(env), work["submission_id"], env.docs[1]
+        )
+    assert standing is not None and standing["assignment_id"] == first.assignment_id
+
+
+def test_a_dismissed_carry_stays_final(env):
+    work = _submitted(env)
+    _carry(env, work["submission_id"], mode="dismiss")
+    for mode in ("author", "dismiss"):
+        with pytest.raises(DomainError) as refused:
+            _carry(env, work["submission_id"], mode=mode)
+        assert refused.value.details["reason"] == "already_resolved"
+    assert len(_resolutions(env)) == 1
+
+
+def test_no_second_carry_while_the_carried_task_stands(env):
+    work = _submitted(env)
+    _carry(env, work["submission_id"])
+    with pytest.raises(DomainError) as refused:
+        _carry(env, work["submission_id"], mode="dismiss")
+    assert refused.value.details["reason"] == "already_resolved"
+    assert len(_resolutions(env)) == 1
