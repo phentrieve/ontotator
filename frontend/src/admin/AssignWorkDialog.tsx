@@ -10,7 +10,7 @@ import { IconInfo } from "../ui/icons";
 import { DistributionDialog } from "./DistributionDialog";
 import { ErrorNotice } from "./ErrorNotice";
 import { errorMessage } from "./errors";
-import { holdersLine, leftLines, MAX_ANNOTATORS_PER_TEXT, memberReason, memberUnavailable, onePersonSummary, partlyAssignedLines, personName, resultMessage, skippedLines, stepLabel, stepName, stepShortLabel, stepsOverview } from "./assignSummary";
+import { holdersLine, leftLines, memberReason, memberUnavailable, onePersonSummary, partlyAssignedLines, personName, resultMessage, skippedLines, stepLabel, stepName, stepShortLabel, stepsOverview, validPerText } from "./assignSummary";
 
 export type AssignWorkTask = "translation_review" | "annotate";
 export type AssignWorkDialogProps =
@@ -71,8 +71,10 @@ const annotators = (n: number) => n === 1 ? "1 annotator" : `${n} annotators`;
  * project's follows the project again), "For all texts" changes the project setting. Lowering it only warns; no assignment
  * is ever removed. Saving reloads the member list with the new limit; the dialog and its selection stay.
  */
-function LimitInfo({ projectKey, current, project, texts, textName, onSaved, onFailed }: {
+function LimitInfo({ projectKey, current, project, max, texts, textName, onSaved, onFailed }: {
   projectKey: string;
+  /** The server's maximum (issue 457); null or absent: no limit. */
+  max?: number | null;
   /** The limit of the selected texts (their own value, else the project's). */
   current: number;
   /** The project setting. */
@@ -95,7 +97,7 @@ function LimitInfo({ projectKey, current, project, texts, textName, onSaved, onF
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
   const target = Number(value);
-  const valid = Number.isInteger(target) && target >= 1 && target <= MAX_ANNOTATORS_PER_TEXT;
+  const valid = validPerText(target, max);
   const forTexts = scope === "texts" && texts.length > 0;
   // Texts with different limits: no single "current" value; each text is compared with its own.
   const mixed = texts.some(text => text.limit !== current);
@@ -147,7 +149,7 @@ function LimitInfo({ projectKey, current, project, texts, textName, onSaved, onF
           : <p>This is a <strong>project setting</strong>: the most annotators any text can get. Fewer is fine.</p>}
         {/* R-11: a compact inline number field, as high as the small buttons. */}
         <p className="assign-limit-field"><label htmlFor={`${id}-per-text`}>Annotators per text</label>
-          <input id={`${id}-per-text`} className="form-control assign-limit-input" type="number" min={1} max={MAX_ANNOTATORS_PER_TEXT} step={1} required value={value} disabled={busy}
+          <input id={`${id}-per-text`} className="form-control assign-limit-input" type="number" min={1} max={max ?? undefined} step={1} required value={value} disabled={busy}
             onChange={event => setValue(event.target.value)}
             onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); void save(); } }} /></p>
         {texts.length > 0 && <div role="radiogroup" aria-label="Change it for" className="assign-limit-scope">
@@ -549,7 +551,7 @@ function AssignWorkEditor(props: AssignWorkDialogProps): JSX.Element {
   if (shown && props.mode === "row" && !limitTexts.length) limitTexts.push({ case_id: props.row.case_id, language: props.row.language,
     limit: props.row.annotations_per_text?.effective ?? shown.per_text, assigned: props.row.work.filter(item => item.task === "annotate" && item.moved_to_version == null).length });
   const limitInfo = shown && <LimitInfo key={`${shown.per_text}:${shown.project_per_text}`} projectKey={props.projectKey} current={shown.per_text}
-    project={shown.project_per_text} texts={task === "annotate" ? limitTexts : []}
+    project={shown.project_per_text} max={shown.max_per_text} texts={task === "annotate" ? limitTexts : []}
     textName={props.mode === "row" ? textLabel(props.row) : undefined}
     onFailed={() => setReload(count => count + 1)}
     onSaved={(value, scope, texts) => { reset(); setLimitSaved(scope === "project" ? `Annotators per text: ${value}, for all texts.` : `Annotators per text: ${value}, for ${texts === 1 && props.mode === "row" ? textLabel(props.row) : plural(texts, "text")}.`); setReload(count => count + 1); props.onLimitChanged?.(); }} />;

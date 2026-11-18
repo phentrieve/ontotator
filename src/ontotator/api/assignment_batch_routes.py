@@ -212,6 +212,8 @@ class BatchPreview(BaseModel):
     per_text: int
     # The project's "Annotations per text" (the texts without an override).
     project_per_text: int
+    # The server's maximum of "Annotations per text"; None: no limit.
+    max_per_text: int | None = None
     digest: str
     # "Split evenly" with too few people: the most open slots of one target
     # ("Choose at least n annotators for n annotations per text"); no usernames.

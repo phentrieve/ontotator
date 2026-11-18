@@ -75,10 +75,11 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
             list[str] | None,
             Field(
                 description=(
-                    "Submissions to merge (2 to 40, the API's bound); None:"
-                    " every eligible one."
+                    "Submissions to merge: at least 2, at most twice the"
+                    " text's annotations per text and never fewer than 40"
+                    " (more is refused with ROUND_INPUT_INVALID, which names"
+                    " the bound); None: every eligible one."
                 ),
-                max_length=40,
             ),
         ] = None,
         reason: str | None = None,

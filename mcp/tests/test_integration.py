@@ -222,6 +222,8 @@ async def test_setup_import_status_and_export(
 
         overview = await call(client, "project_overview", {"project": PROJECT})
         assert overview["name"] == "MCP smoke"
+        # Issue 457: the server's maximum of annotations per text; none here.
+        assert overview["annotations_per_text_max"] is None
 
         # A cohort joins: accounts, codes in a private file, roles and work.
         codes = tmp_path / "codes.csv"

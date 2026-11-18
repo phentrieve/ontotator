@@ -86,9 +86,9 @@ export function memberReason(member: Pick<BatchPersonView, "unavailable" | "alre
 export const memberUnavailable = (member: Pick<BatchPersonView, "unavailable">): boolean => member.unavailable === "role_missing" || member.unavailable === "inactive";
 
 /** Targets that already hold some of their assignments: "case-0101, de: 1 of 2 assigned". */
-/** The most annotators a text can get: the upper bound of the project setting and of a text's own value (issue 447; the server
- *  and the database check the same bound). */
-export const MAX_ANNOTATORS_PER_TEXT = 20;
+/** Whether `target` is a value of "Annotators per text": a whole number from 1. There is no built-in maximum (issue 457);
+ *  `max` is the server's (`ONTOTATOR_MAX_ANNOTATIONS_PER_TEXT`), null or absent when it has none. */
+export const validPerText = (target: number, max?: number | null): boolean => Number.isSafeInteger(target) && target >= 1 && (max == null || target <= max);
 
 /** Holders named in the assign dialog's status line before "and n more". */
 export const HOLDERS_SHOWN = 5;

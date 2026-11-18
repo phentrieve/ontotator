@@ -17,8 +17,9 @@ from ontotator.authz.memberships import grant_roles
 from ontotator.authz.policy import Action
 from ontotator.authz.project_authority import require_project_management
 from ontotator.domain.annotation_limits import (
-    MAX_ANNOTATIONS_PER_TEXT,
+    ANNOTATIONS_PER_TEXT_CEILING,
     MIN_ANNOTATIONS_PER_TEXT,
+    require_annotations_per_text,
 )
 from ontotator.domain.annotation_modes import AnnotationMode
 from ontotator.domain.canonical import canonical_hash
@@ -53,6 +54,7 @@ from ontotator.projects.repin import (
     open_draft,
     rewrite_draft,
 )
+from ontotator.settings import max_annotations_per_text
 from ontotator.storage.database import Database
 from ontotator.storage.repository import Repository, _lock_id
 from ontotator.storage.tables import (
@@ -167,8 +169,10 @@ class ProjectSettingsChange(BaseModel):
     hidden_axis_values: HiddenValues = Field(default_factory=dict)
     creation_defaults: CreationDefaults = Field(default_factory=dict)
     # ``None`` keeps the stored value (the settings page sends full replaces).
+    # No built-in maximum (issue 457); the ceiling is the column's type. A
+    # server maximum is checked in ``update_settings``.
     annotations_per_text: int | None = Field(
-        None, ge=MIN_ANNOTATIONS_PER_TEXT, le=MAX_ANNOTATIONS_PER_TEXT
+        None, ge=MIN_ANNOTATIONS_PER_TEXT, le=ANNOTATIONS_PER_TEXT_CEILING
     )
     import_plan: ImportPlanSetting | None = None
     tool_proposal_mode: AnnotationMode | None = None
@@ -186,6 +190,9 @@ class ProjectSettings(ProjectSettingsChange):
     locked: bool
     axis_defaults: dict[str, dict[str, str]]
     annotation_policy_revision: int = 1
+    # The server's maximum of "Annotations per text"
+    # (``ONTOTATOR_MAX_ANNOTATIONS_PER_TEXT``); ``None``: no limit.
+    annotations_per_text_max: int | None = None
     # ``None``: not frozen yet, the first use takes the server's translations.
     frozen_translations: FrozenTranslations | None = None
 
@@ -463,6 +470,7 @@ class ProjectService:
                 locked=self._locked(conn, row["id"]),
                 axis_defaults=axis_defaults(profile, pins),
                 annotation_policy_revision=row["annotation_policy_revision"],
+                annotations_per_text_max=max_annotations_per_text(),
                 frozen_translations=self._frozen_translations(
                     conn,
                     row["id"],
@@ -764,8 +772,21 @@ class ProjectService:
             return self.settings(key, viewer=actor, viewer_is_lead=True)
 
     def update_settings(
-        self, actor: Actor, key: str, change: ProjectSettingsChange
+        self,
+        actor: Actor,
+        key: str,
+        change: ProjectSettingsChange,
+        *,
+        server_maximum: bool = True,
     ) -> ProjectSettings:
+        """Change the settings ``change`` names; only real changes are written.
+
+        ``server_maximum``: a new "Annotations per text" above the server's
+        maximum is refused (``ANNOTATIONS_PER_TEXT_ABOVE_MAXIMUM``); a stored
+        value that is sent again is no change and stays. False only for the
+        practice project the server builds itself, which needs its two
+        annotators.
+        """
         fields = change.model_dump(exclude_unset=True)
         for name in ("annotations_per_text", "import_plan", "tool_proposal_mode"):
             if fields.get(name, 0) is None:
@@ -785,6 +806,10 @@ class ProjectService:
             fields = {
                 name: value for name, value in fields.items() if value != row[name]
             }
+            if server_maximum and "annotations_per_text" in fields:
+                require_annotations_per_text(
+                    fields["annotations_per_text"], max_annotations_per_text()
+                )
             combined = dict(row) | fields
             validate_hidden_values(
                 TaskProfile.model_validate(row["task_profile"]),
