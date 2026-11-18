@@ -345,6 +345,50 @@ async def test_text_changes_send_the_tasks_revision(
     assert carried.json()["username"] == "bob"
 
 
+async def test_carry_dry_run_reports_an_earlier_decision(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    """Issue 461: already_resolved instead of a preview; confirm is refused."""
+    details = {
+        "reason": "already_resolved",
+        "resolution": "carried",
+        "assignment_id": 12,
+        "decided_at": "2026-11-17T10:00:00+00:00",
+    }
+    fake.on(
+        "POST",
+        f"{P}/text-changes/preview",
+        refusal(422, "TEXT_CHANGE_NOT_APPLICABLE", details),
+    )
+    args = {"project": "p", "submission_id": "s1", "target_document_id": "d2"}
+    dry = await call(mcp_client, "carry_submission", args)
+    assert dry == {
+        "selection": "project 'p', target_document_id 'd2', submission_id 's1'",
+        "applied": False,
+        "already_resolved": {
+            "resolution": "carried",
+            "assignment_id": 12,
+            "decided_at": "2026-11-17T10:00:00+00:00",
+        },
+    }
+    with pytest.raises(ToolFailed, match="already_resolved"):
+        await call(mcp_client, "carry_submission", args | {"confirm": True})
+    assert not fake.calls_to("POST", f"{P}/submissions/{{submission_id}}/carry")
+
+
+async def test_carry_dry_run_passes_other_refusals_on(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    fake.on(
+        "POST",
+        f"{P}/text-changes/preview",
+        refusal(422, "TEXT_CHANGE_NOT_APPLICABLE", {"reason": "not_ancestor"}),
+    )
+    args = {"project": "p", "submission_id": "s1", "target_document_id": "d2"}
+    with pytest.raises(ToolFailed, match="not_ancestor"):
+        await call(mcp_client, "carry_submission", args)
+
+
 async def test_a_problem_report_action_sends_the_reports_revision(
     fake: FakeApi, mcp_client: Client
 ) -> None:

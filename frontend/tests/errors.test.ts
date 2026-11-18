@@ -58,3 +58,13 @@ it("explains a text change refused because the new version has no proposals (iss
     .toBe("The new version has no proposals yet: their automatic transfer may still be running, or they must be imported. Wait for or import the proposals for the new version, then try again.");
   expect(errorMessage(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "from_proposals" }))).toBe(ERROR_MESSAGES.TEXT_CHANGE_NOT_APPLICABLE);
 });
+
+it("names the earlier decision when a submission was already carried or dismissed (issue 461)", () => {
+  const refused = (details: Record<string, unknown>) => errorMessage(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "already_resolved", ...details }));
+  const carried = "This work was already carried to this version. Its task is still there or was submitted. Reload the row.";
+  expect(refused({ resolution: "carried", assignment_id: 12, decided_at: "2026-11-17T10:00:00+00:00" })).toBe(carried);
+  expect(refused({ resolution: "handed_over", assignment_id: 12 })).toBe(carried);
+  expect(refused({ resolution: "dismissed", assignment_id: null })).toBe("It was already decided to start this version fresh. That decision is final.");
+  // A decision about the open task (move, let finish, withdraw) names no resolution: the general sentence.
+  expect(refused({})).toBe(ERROR_MESSAGES.TEXT_CHANGE_NOT_APPLICABLE);
+});

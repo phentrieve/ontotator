@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Text change: a submission can be carried to a new version again after the task of the earlier carry was withdrawn or removed without a submission (#461). Until now the second carry was refused with `TEXT_CHANGE_NOT_APPLICABLE` / `already_resolved`, and the person's work could reach the new version only through a fresh task. The earlier decision stays in the audit log and in `text_change_resolutions`; the row of Documents offers *Carry to v2…* again. A carry whose task still exists, has a submission or was moved to a newer version stands, and the fresh start (`dismiss`) stays final. The dry run now says so before the confirmed call: `POST /api/v1/projects/{key}/text-changes/preview` with a `submission_id` is refused like the carry (422 `TEXT_CHANGE_NOT_APPLICABLE`, `reason` `already_resolved`), and both refusals name the earlier decision in `details` (`resolution`, `assignment_id` of its task, `decided_at`). The MCP tool `carry_submission` returns this as `already_resolved` in its dry run instead of a preview; the carry dialog shows it as a sentence. Migration 0047 turns the unique constraint `uq_text_change_resolutions_submission_target` into a plain index; no row changes.
+
 ## [0.11.0] - 2026-11-17
 
 ### Added
