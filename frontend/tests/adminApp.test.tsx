@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { administrationGear, chooseUserMenu } from "./support/userMenu";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { App } from "../src/App";
 import { AuthGate } from "../src/app/AuthGate";
@@ -24,7 +25,7 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); api.setCsrfToken(null); window.history.replaceState(null, "", "#/"); });
 const link = (name: string | RegExp) => fireEvent.click(screen.getByRole("link", { name }));
-const logout = () => fireEvent.click(screen.getByRole("button", { name: "Log out" }));
+const logout = () => chooseUserMenu("Log out");
 async function create() {
   if (!screen.queryByRole("form", { name: "New user" })) fireEvent.click(await screen.findByRole("button", { name: "New user…" }));
   const form = await screen.findByRole("form", { name: "New user" });
@@ -39,21 +40,21 @@ it("keeps pending issuance and visible one-time code through shell/hash/logout u
   const onLogout = vi.fn(); render(<App user={user} onLogout={onLogout} />);
   await create();
   await waitFor(() => expect(api.adminCreateUser).toHaveBeenCalledOnce());
-  link(/^My tasks/); logout();
+  link("Back to Projects"); logout();
   await act(async () => {});
   expect(window.location.hash).toBe("#/admin/users"); expect(onLogout).not.toHaveBeenCalled();
   act(() => { window.location.hash = "#/me"; });
   await waitFor(() => expect(window.location.hash).toBe("#/admin/users"));
   await act(async () => pending.resolve(created));
   const dialog = await screen.findByRole("dialog", { name: "Setup code for bea" });
-  link(/^My tasks/); logout(); await act(async () => {});
+  link("Back to Projects"); logout(); await act(async () => {});
   expect(screen.getByText("setup-secret")).toBeTruthy(); expect(onLogout).not.toHaveBeenCalled();
   fireEvent.click(within(dialog).getByLabelText("I have handed over or stored the code"));
-  link(/^My tasks/); logout(); await act(async () => {});
+  link("Back to Projects"); logout(); await act(async () => {});
   expect(window.location.hash).toBe("#/admin/users"); expect(onLogout).not.toHaveBeenCalled();
   fireEvent.click(within(dialog.querySelector(".modal-actions") as HTMLElement).getByRole("button", { name: "Close" }));
   logout(); await waitFor(() => expect(onLogout).toHaveBeenCalledOnce());
-  link(/^My tasks/); await screen.findByRole("heading", { name: "My tasks" });
+  link("Back to Projects"); await screen.findByRole("heading", { name: "Projects" });
   expect(screen.queryByText("setup-secret")).toBeNull();
 });
 
@@ -82,7 +83,7 @@ it("restores native history during reset issuance and acknowledged code, then pe
   vi.spyOn(api, "adminIssueResetCode").mockReturnValue(pending.promise);
   render(<App user={user} />);
   await screen.findByRole("heading", { name: "My tasks" });
-  link("Users");
+  fireEvent.click(administrationGear()!);
   fireEvent.click(await screen.findByRole("button", { name: "More actions for alex" }));
   fireEvent.click(screen.getByRole("menuitem", { name: "Reset code" }));
   fireEvent.click(within(screen.getByRole("dialog", { name: "Issue a new reset code for Alex?" })).getByRole("button", { name: "Reset code" }));
@@ -114,12 +115,12 @@ it("guards ordinary user writes without opening a new leave dialog", async () =>
   fireEvent.change(within(form).getByLabelText("Display name (required)"), { target: { value: "Alex updated" } });
   fireEvent.click(within(form).getByRole("button", { name: "Save changes" }));
   await waitFor(() => expect(api.adminUpdateUser).toHaveBeenCalledOnce());
-  link(/^My tasks/); logout(); await act(async () => {});
+  link("Back to Projects"); logout(); await act(async () => {});
   expect(window.location.hash).toBe("#/admin/users"); expect(onLogout).not.toHaveBeenCalled();
   expect(screen.getAllByRole("dialog")).toHaveLength(1);
   expect(screen.queryByRole("dialog", { name: "Changes not saved" })).toBeNull();
   await act(async () => pending.resolve({ ...alex, display_name: "Alex updated" }));
-  link(/^My tasks/); await screen.findByRole("heading", { name: "My tasks" });
+  link("Back to Projects"); await screen.findByRole("heading", { name: "Projects" });
 });
 
 it("refreshes authoritative project navigation after creation and a saved name", async () => {
@@ -156,7 +157,10 @@ it("loads ontology administration only on its route and follows actual pinned-pr
   await screen.findByRole("heading", { name: "My tasks" });
   expect(api.adminListUsers).not.toHaveBeenCalled(); expect(api.adminListOntologies).not.toHaveBeenCalled();
   expect(api.getProjectSettings).not.toHaveBeenCalled(); expect(api.listOntologies).not.toHaveBeenCalled();
-  link("Ontologies"); await screen.findByText("hp.json");
+  // No administration entry in the work sidebar: the gear opens the area, its sidebar lists the pages.
+  expect(screen.queryByRole("link", { name: "Ontologies" })).toBeNull();
+  fireEvent.click(administrationGear()!);
+  fireEvent.click(await screen.findByRole("link", { name: "Ontologies" })); await screen.findByText("hp.json");
   link("p/key"); await screen.findByRole("heading", { level: 1, name: /· Settings$/ });
   expect(api.getProjectSettings).toHaveBeenCalledWith("p/key");
 });
@@ -207,10 +211,11 @@ it("starts at the main region after a navigation that left focus nowhere, and ke
   (document.activeElement as HTMLElement | null)?.blur();
   link("Ontologies");
   await waitFor(() => expect(document.activeElement).toBe(document.getElementById("main")));
-  const profile = screen.getByRole("link", { name: "Profile" });
-  profile.focus(); fireEvent.click(profile);
-  await waitFor(() => expect(window.location.hash).toBe("#/me"));
-  expect(document.activeElement).toBe(profile);
+  vi.spyOn(api, "adminPracticeSettings").mockReturnValue(new Promise(() => {}));
+  const settingsLink = screen.getByRole("link", { name: "Server settings" });
+  settingsLink.focus(); fireEvent.click(settingsLink);
+  await waitFor(() => expect(window.location.hash).toBe("#/admin/settings"));
+  expect(document.activeElement).toBe(settingsLink);
 });
 
 it("after deleting a project, Projects never asks for its summary (no 404)", async () => {

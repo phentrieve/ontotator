@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
 import { documentsTab, openTextCard, rowAction, showSegment, textCard, textName, textNamePattern, textVersionItems } from "./documentsHelpers";
-import { loginThroughForm, openTasksHome, routerReady, selectText, submitCase, TASKS_HOME, TEST_PASSWORD } from "./helpers";
+import { administrationGear, clickLogOut, loginThroughForm, openAdministration, openTasksHome, routerReady, selectText, submitCase, TASKS_HOME, TEST_PASSWORD } from "./helpers";
 
 interface Actor { username: string; code: string }
 interface ProjectSetup { key: string; admin: string; lead: Actor; annotator: Actor }
@@ -24,7 +24,7 @@ async function redeemCode(page: Page, actor: Actor) {
 }
 
 async function logout(page: Page) {
-  await page.getByRole("button", { name: "Log out", exact: true }).click();
+  await clickLogOut(page);
   await expect(page.getByRole("form", { name: "Log in to Ontotator" })).toBeVisible();
 }
 
@@ -76,6 +76,8 @@ async function createProjectThroughUi(page: Page): Promise<ProjectSetup> {
   expect(bootstrap.ok()).toBeTruthy();
   const issued = await bootstrap.json() as { code: string };
   await redeemCode(page, { username, code: issued.code });
+  // The gear opens Administration; its sidebar lists Users, Ontologies, Technical reports and Server settings.
+  await openAdministration(page);
   await page.getByRole("link", { name: "Ontologies", exact: true }).click();
   await page.getByLabel("Ontology files", { exact: true }).and(page.locator('input[type="file"]')).setInputFiles(
     fileURLToPath(new URL("../../tests/fixtures/hp.json", import.meta.url)),
@@ -89,6 +91,8 @@ async function createProjectThroughUi(page: Page): Promise<ProjectSetup> {
   const annotator = await createUser(page, `ui-ann-${suffix}`);
 
   const key = `ui-project-${suffix}`;
+  // New project is a button on the Projects page.
+  await page.getByRole("link", { name: "Back to Projects", exact: true }).click();
   await page.getByRole("link", { name: "New project", exact: true }).click();
   await page.getByLabel(/^Project key/).fill(key);
   await page.getByLabel(/^Name \(required\)/).fill(`Browser project ${suffix}`);
@@ -231,6 +235,7 @@ test.describe("Administration through real accounts and jobs", () => {
 
   test("admin sets up a project with real setup-code handovers", async ({ page }) => {
     const setup = await createProjectThroughUi(page);
+    await openAdministration(page);
     await page.getByRole("link", { name: "Ontologies", exact: true }).click();
     await expect(page.getByRole("table", { name: "Ontology files", exact: true })
       .getByRole("link", { name: setup.key, exact: true })).toBeVisible();
@@ -239,6 +244,7 @@ test.describe("Administration through real accounts and jobs", () => {
       await redeemCode(page, actor);
       // redeemCode ends on My tasks; neither has a task yet.
       await expect(page.getByRole("heading", { name: "No texts are assigned to you yet." })).toBeVisible();
+      await expect(administrationGear(page)).toHaveCount(0);
       await expect(page.getByRole("link", { name: "Users", exact: true })).toHaveCount(0);
       await logout(page);
     }

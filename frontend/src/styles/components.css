@@ -627,6 +627,25 @@ a.shell-product { color: inherit; text-decoration: none; }
 .shell-nav-link:hover { background: var(--surface-sunken); text-decoration: underline; }
 .shell-nav-link[aria-current] { color: var(--accent); background: var(--accent-light); font-weight: var(--weight-strong); }
 .shell-nav-link:focus-visible { outline: var(--focus-width) solid var(--focus-ring); outline-offset: var(--focus-offset); }
+/* Administration's sidebar: the way back to the work pages, above the area's own entries. */
+.shell-nav-back { display: flex; align-items: center; gap: var(--space-1); color: var(--text-muted); }
+.shell-nav-back + .shell-nav-group { margin-top: var(--space-3); }
+/* Top right: Handbook, the gear to Administration (system administrators) and the user menu (issue 510). */
+.shell-actions { flex-wrap: nowrap; }
+.shell-admin { position: relative; flex: none; padding: 5px 8px; }
+.shell-admin[aria-current] { color: var(--accent); background: var(--accent-light); }
+/* Open technical reports: over the gear's corner, so the header keeps its width when the count arrives. */
+.shell-admin-count { position: absolute; top: -5px; left: calc(50% + 6px); min-width: 16px; padding: 0 4px; border-radius: 8px; background: var(--accent); color: var(--on-accent); font-size: var(--size-xs); line-height: 16px; font-weight: var(--weight-strong); text-align: center; pointer-events: none; }
+.shell-user-menu { min-width: 0; max-width: min(24rem, 100%); padding: 3px 8px; text-align: start; color: var(--text); }
+.shell-user-menu .current-user { min-width: 0; }
+.shell-user-menu .icon { flex: none; color: var(--text-muted); }
+.shell-user-initials { display: none; font-weight: var(--weight-strong); }
+/* A named group of choices in a menu (the theme): a line above and below, a muted caption, the choices in one row. */
+.ui-menu-group { margin-block: var(--space-1); padding: var(--space-1) 0; border-block: 1px solid var(--border); }
+.ui-menu-group-label { display: block; padding: 0 var(--space-2); color: var(--text-muted); font-size: var(--size-sm); line-height: var(--leading-sm); }
+.ui-menu-group-items { display: flex; gap: var(--space-1); }
+.ui-menu-group-items .ui-menu-item { flex: 1; text-align: center; }
+.ui-menu-item[aria-checked="true"] { background: var(--accent-light); color: var(--accent); font-weight: var(--weight-strong); box-shadow: inset 0 0 0 1px var(--accent); }
 /* position: relative contains the absolutely positioned visually hidden spans of long tables (no extra document height). */
 .shell-main { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; overflow: auto; }
 .shell-main > * { flex-shrink: 0; }
@@ -824,7 +843,7 @@ ul.task-counts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space
   .shell-actions { width: 100%; }
   .shell-body > .app-nav .project-switcher { flex: 1 0 100%; }
   .shell-page { padding: var(--space-5) var(--space-4); }
-  /* Reading shell on phones: one header row (Sections, breadcrumb, Log out) so the text keeps the screen. The product
+  /* Reading shell on phones: one header row (Sections, breadcrumb, the gear, the user menu) so the text keeps the screen. The product
      name goes and the identity is only read out; the editor's own line still names the annotator. */
   .shell-reading .shell-header { flex-wrap: nowrap; align-items: flex-start; gap: var(--space-2); padding-block: var(--space-2); }
   .shell-reading .shell-heading { flex: 1 1 auto; flex-wrap: nowrap; align-items: flex-start; gap: var(--space-2); }
@@ -836,6 +855,10 @@ ul.task-counts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space
   .shell-reading .shell-help { display: none; }
   .shell-reading .shell-nav-help { display: block; margin-top: var(--space-3); }
   .shell-reading .current-user { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  /* The user menu shows the initials there; the name stays in its accessible name. */
+  .shell-reading .shell-user-initials { display: inline; }
+  /* As high as the other small buttons of this row, so the text below starts where it did. */
+  .shell-reading .shell-user-menu { padding: 5px 8px; }
 }
 
 /* Documents table primitives (Documents U1): disclosure, final marker, inline confirmation, segments. */

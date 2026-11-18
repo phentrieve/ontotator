@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { chooseUserMenu, administrationGear } from "./support/userMenu";
 import { afterEach, expect, it, vi } from "vitest";
 import { App } from "../src/App";
 import { api, ApiError, type AssignmentWorkspace } from "../src/api/client";
@@ -45,7 +46,7 @@ it("uses the assigned task list, cleans old identity preferences and routes thro
   expect(localStorage.getItem("ontotator.mode.pkg")).toBeNull();
   expect(preferences).not.toHaveBeenCalled();
   vi.spyOn(api, "adminListUsers").mockResolvedValue([]);
-  clickSection("Users");
+  fireEvent.click(administrationGear()!);
   await waitFor(() => expect(window.location.hash).toBe("#/admin/users"));
   expect(screen.getAllByRole("banner")).toHaveLength(1);
   expect(await screen.findByRole("heading", { name: "Users" })).toBeDefined();
@@ -72,7 +73,7 @@ it("holds shell navigation during a save and honors only the latest destination"
   await waitFor(() => expect(api.applyCommand).toHaveBeenCalledOnce());
   const editor = document.querySelector(".text-container");
   clickSection(/^My tasks/);
-  clickSection("Profile");
+  chooseUserMenu("Profile");
   expect(window.location.hash).toBe("#/tasks/17");
   expect(document.querySelector(".text-container")).toBe(editor);
   await act(async () => save({ ...first.view.draft, revision: 1 }));
@@ -143,7 +144,7 @@ it("does not commit a pending route after the authenticated App unmounts", async
   const mounted = render(<App user={testUser("alice")} />);
   await editFinding();
   await waitFor(() => expect(api.applyCommand).toHaveBeenCalledOnce());
-  clickSection("Profile");
+  chooseUserMenu("Profile");
   mounted.unmount();
   await act(async () => finish({ ...first.view.draft, revision: 1 }));
   expect(window.location.hash).toBe("#/tasks/17");
@@ -334,7 +335,7 @@ it("preserves intermediate Forward entries after discarding through two pending 
 
 it("keeps historical task entries when a shell link supersedes two pending Back traversals", async () => {
   const { dialog, open } = await threeTaskHistory();
-  clickSection("Profile");
+  chooseUserMenu("Profile");
   fireEvent.click(within(dialog).getByRole("button", { name: "Discard edits and leave" }));
   await waitFor(() => expect(window.location.hash).toBe("#/me"));
   for (const id of [8, 4]) {
