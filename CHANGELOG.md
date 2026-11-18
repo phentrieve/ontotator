@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- MCP server: `ontotator-mcp` has the version of the release it comes from, no longer `0.1.0` in every release (#486). `ontotator-mcp --version`, the User-Agent of its requests and `whoami` show it; a release sets it with the app version (CONTRIBUTING, **Releases**; an MCP test fails while they differ). `whoami` returns the version of the Ontotator server (`server`) for every kind of token, a project token included (#485), next to the MCP server's own (`mcp_server.version`), and a `warning` when the two differ: a running MCP process keeps the code it started with, also after the package was upgraded.
+- MCP server: the tool descriptions say that `ONTOTATOR_MCP_READ_CONTENT=1` is a setting of this MCP server in the MCP client's configuration, not of the Ontotator server (#485); `whoami` reports whether the content tools are on (`mcp_server.content_tools`).
+- API: `POST …/guidelines` without `expected_latest_version` while versions exist still answers 409 `GUIDELINE_VERSION_CONFLICT`, now with `details.reason` `expected_version_missing` next to `latest_version` (#486). The MCP server reads it as "the request named no version; restart an older MCP server" instead of "another version was published meanwhile; repeat".
+- MCP server: `change_note` of `publish_guideline` and `reason` of `withdraw_guideline` state their limit (one line of at most 280 characters; annotators see it) and refuse a longer text before sending; `GUIDELINE_NOTE_INVALID` names the limit (#486).
+- MCP server: refusals say what to do next (#471). `start_consolidation` names the open consolidation task of the person (it no longer advises a dry run the tool does not have) and the missing consolidator role; its description no longer promises the role to everyone. `ASSIGNEE_ROLE_MISSING`, `ANNOTATIONS_PER_TEXT_REACHED`, `VARIANT_REVIEW_STALE`, `NOT_A_TRANSLATION`, and `BULK_UNDO_STALE` and `VERSION_UPLOAD_NOT_AVAILABLE` with each of their reasons, end with the next step; a code is no longer repeated as its own details. `assign_texts` gives each refused row a `hint` and counts refused rows in `warning`.
+- MCP server: the dry run of `start_new_round` reports an open consolidation (`blocked`) instead of promising a round the confirm refuses (#471). Skip and keep reasons of the bulk tools name the tool or argument (`include_started=true`, `withdraw_final_result`, `release_texts`, `update_work_plan`) instead of buttons of the web interface.
+- MCP server: the `preview_token` of `reopen_texts`, `withdraw_open_tasks` and `start_rounds` also stands for the reason, so a confirm with another reason than the dry run's is refused (#471). A cut or mistyped `preview_token` is refused as such; the note of a stale answer also names a token of another dry run. `start_rounds` with `clean_restart` and no reason, and `upload_translation_version` for a machine translation without `provider`, fail at the dry run.
+
 ## [0.11.0] - 2026-11-17
 
 ### Added
