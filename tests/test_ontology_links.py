@@ -12,6 +12,8 @@ from ontotator.ontology.links import external_term_url
         ("MONDO:0007739", "https://monarchinitiative.org/MONDO:0007739"),
         ("GO:0008150", "https://www.ebi.ac.uk/ols4/search?q=GO%3A0008150"),
         ("TEST:0000001", "https://www.ebi.ac.uk/ols4/search?q=TEST%3A0000001"),
+        ("ICD10CM:E11.621", "https://www.icd10data.com/search?s=E11.621"),
+        ("ICD10CM:A00-A09", "https://www.icd10data.com/search?s=A00-A09"),
     ],
 )
 def test_each_prefix_links_to_its_term_page(term_id: str, expected: str) -> None:
@@ -22,6 +24,10 @@ def test_the_id_is_encoded_where_it_could_break_the_url() -> None:
     assert (
         external_term_url("HP:12 3/4")
         == "https://hpo.jax.org/browse/term/HP%3A12%203%2F4"
+    )
+    assert (
+        external_term_url("ICD10CM:E11 6/1")
+        == "https://www.icd10data.com/search?s=E11%206%2F1"
     )
 
 
