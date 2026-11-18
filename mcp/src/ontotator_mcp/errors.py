@@ -101,7 +101,59 @@ HINTS: dict[str, str] = {
         "Another guideline version was published meanwhile; check the guideline"
         " and repeat."
     ),
+    "VARIANT_REVIEW_STALE": (
+        "The text version or its review is not the one named: a newer version or"
+        " review arrived since the dry run, or the value passed is not the one"
+        " the dry run returned. Run the dry run again and confirm with what it"
+        " returns (text_sha256 or preview_token)."
+    ),
+    # The lead's decision on a queried translation review (#483, #485).
+    "QUERY_DECISION_NOT_AVAILABLE": (
+        "The query on this version cannot be decided; the dry run of"
+        " decide_translation_query (confirm false) names the reason."
+    ),
+    "QUERY_DECISION_NOT_AVAILABLE/already_decided": (
+        "A lead already decided this query; a query is decided once. list_texts"
+        " shows the accepted version of the translation."
+    ),
+    "QUERY_DECISION_NOT_AVAILABLE/not_a_query": (
+        "The latest translation review of this version was not submitted as a"
+        " query, or the version is not waiting for the lead (list_translation_reviews"
+        " shows the decisions). For a rejected translation use"
+        " start_lead_correction; for a text reviewed outside Ontotator,"
+        " upload_translation_version and accept_translation_version."
+    ),
+    "QUERY_DECISION_NOT_AVAILABLE/review_open": (
+        "A translation review or lead correction of this version is open. Let"
+        " it be submitted, or withdraw its task (list_assignments,"
+        " withdraw_task), then repeat the call."
+    ),
+    "QUERY_DECISION_NOT_AVAILABLE/not_newest": (
+        "document_id is not the newest version of its translation. list_texts"
+        " names the newest (document_id, version); repeat the call with it."
+    ),
+    "QUERY_DECISION_NOT_AVAILABLE/discarded": (
+        "This version was discarded; its query cannot be decided. list_texts"
+        " names the current version of the translation."
+    ),
+    "QUERY_DECISION_NOT_AVAILABLE/unchanged": (
+        "The text to save equals the text of the version, so there is no new"
+        " version to make. Accept the version as it is: decision 'unchanged'"
+        " with an answer."
+    ),
+    "QUERY_DECISION_NOT_AVAILABLE/answer_required": (
+        "Accepting the version as it is (decision 'unchanged') needs an answer"
+        " to the reviewer's question: pass answer."
+    ),
 }
+
+
+def hint_for(code: str | None) -> str | None:
+    """What to do about ``code``: the sentence for the code with its reason
+    (``CODE/reason``) if there is one, else the one for the code alone."""
+    if not code:
+        return None
+    return HINTS.get(code) or HINTS.get(code.split("/")[0])
 
 
 class OntotatorError(ToolError):
@@ -188,7 +240,7 @@ def api_error(response: httpx.Response) -> OntotatorError:
     parts = [head]
     if details not in (None, ""):
         parts.append(_text(details))
-    hint = HINTS.get((code or "").split("/")[0])
+    hint = hint_for(code)
     if hint is None and response.status_code == 404:
         hint = "Not found, or not visible to the token's owner."
     if hint:
