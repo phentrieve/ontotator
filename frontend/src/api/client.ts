@@ -299,6 +299,8 @@ export type VersionRef = components["schemas"]["VersionRef"];
 export type TextLayerEntry = components["schemas"]["TextLayerEntry"];
 export type AnnotationVersion = components["schemas"]["AnnotationVersion"];
 export type ReviewWorkspace = components["schemas"]["ReviewWorkspace"];
+export type DraftTypographyHints = components["schemas"]["DraftTypographyHintsView"];
+export type BracketCheck = components["schemas"]["BracketCheck"];
 export type TranslationReviewRecord = components["schemas"]["TranslationReviewRecord"];
 export type ReanchorItem = components["schemas"]["ReanchorItem"];
 export type PendingReanchorRef = components["schemas"]["PendingReanchorRef"];
@@ -1006,6 +1008,11 @@ export class ApiClient {
 
   async openTranslationReview(assignmentId: number): Promise<ReviewWorkspace> {
     return this.request<ReviewWorkspace>(`/api/v1/translation-reviews/${assignmentId}`, { method: "GET" });
+  }
+
+  /** Typography hints of the saved draft text: rule codes and positions in code points (issue 484). */
+  async getDraftTypographyHints(assignmentId: number): Promise<DraftTypographyHints> {
+    return this.request<DraftTypographyHints>(`/api/v1/translation-reviews/${assignmentId}/draft/typography-hints`, { method: "GET" });
   }
 
   async saveTranslationReviewDraft(assignmentId: number, body: TranslationReviewDraftRequest): Promise<TranslationReviewDraftResponse> {

@@ -56,6 +56,16 @@ describe("changePassages display rules and bound", () => {
     expect(passage.before.map(part => part.text).join("")).toBe("\u{1f468}\u200d\u{1f469}\u200d\u{1f467}");
   });
 
+  it("counts a change of the number of spaces as a passage (issue 483)", () => {
+    const [typed, ...rest] = changePassages("Fever and cough.", "Fever  and cough.");
+    expect(rest).toEqual([]);
+    expect({ start: typed.start, end: typed.end, hasRemoved: typed.hasRemoved }).toEqual({ start: 5, end: 7, hasRemoved: true });
+    expect(typed.before).toEqual([{ text: " ", removed: true }]);
+    // A space removed at the end of the text: nothing was added, the passage is a removal.
+    const [removed] = changePassages("Fever. ", "Fever.");
+    expect({ start: removed.start, end: removed.end, hasRemoved: removed.hasRemoved }).toEqual({ start: 6, end: 6, hasRemoved: true });
+  });
+
   it("is null when the texts differ too much", () => {
     const words = (prefix: string) => Array.from({ length: 30 }, (_, index) => `${prefix}${index}`).join(" ");
     expect(boundedPassages(words("a"), words("b"), undefined)).not.toBeNull();

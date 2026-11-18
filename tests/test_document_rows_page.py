@@ -339,6 +339,7 @@ ROW_KEYS = {
     "proposal_set_unrecorded",
     "annotations_per_text",
     "lead_pause",
+    "typography_hints",
     "consolidation_progress",
     "unreviewed_translation",
 }

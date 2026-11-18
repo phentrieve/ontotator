@@ -122,7 +122,9 @@ Add your qualification (for example "physician, native German speaker") in your 
 
 The translation tool checked its own output and found a possible problem, for example numbers or units that differ from the source. Click **Details** to read the check, what the tool reported and what to do if the translation is right anyway. Open **Technical details** for the technical code of the check. If Ontotator has no description for a check, ask the project lead what it checks. See [Review a translation](annotator.md#review-a-translation).
 
-The checks run once, on the first version of a translation. In the review of a later version the band reads *The automatic checks ran on v1, not on this version (v2).* and names a check that failed on v1; it asks for nothing there ([Review a later version](annotator.md#review-a-later-version)).
+A line *More passages in brackets than in the source* in the same band is a check of Ontotator itself on the version you review. It asks for no rationale ([Review a translation](annotator.md#review-a-translation)).
+
+The checks of the translation tool run once, on the first version of a translation. In the review of a later version the band reads *The automatic checks ran on v1, not on this version (v2).* and names a check that failed on v1; it asks for nothing there ([Review a later version](annotator.md#review-a-later-version)).
 
 ## Consolidating
 

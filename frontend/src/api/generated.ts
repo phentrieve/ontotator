@@ -855,6 +855,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/translation-reviews/{assignment_id}/draft/typography-hints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Draft Typography Hints
+         * @description Spacing errors and invisible characters of the saved draft text.
+         *
+         *     Rule codes and positions only, as the hints of a text version; shown in
+         *     the confirmation of "Submit review…". They block nothing.
+         */
+        get: operations["draft_typography_hints_api_v1_translation_reviews__assignment_id__draft_typography_hints_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/translation-reviews/{assignment_id}/checked-sentences": {
         parameters: {
             query?: never;
@@ -4962,6 +4985,32 @@ export interface components {
             /** Files[] */
             "files[]": string[];
         };
+        /**
+         * BracketCheck
+         * @description ``passages`` is empty unless the translation has more passages.
+         */
+        BracketCheck: {
+            /** Source Count */
+            source_count: number;
+            /** Translation Count */
+            translation_count: number;
+            /** Passages */
+            passages: components["schemas"]["BracketedPassage"][];
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+        };
+        /** BracketedPassage */
+        BracketedPassage: {
+            /** Start */
+            start: number;
+            /** End */
+            end: number;
+            /** Text */
+            text: string;
+        };
         /** BulkAcceptance */
         BulkAcceptance: {
             /** Languages */
@@ -6282,7 +6331,7 @@ export interface components {
             /** Waiting On */
             waiting_on?: string | string[] | null;
             /** Flags */
-            flags?: ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator") | ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator")[] | null;
+            flags?: ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator" | "typography_hints") | ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator" | "typography_hints")[] | null;
             /** Proposals */
             proposals?: ("with" | "without") | ("with" | "without")[] | null;
         };
@@ -6409,6 +6458,8 @@ export interface components {
             proposal_set_unrecorded?: boolean;
             annotations_per_text?: components["schemas"]["AnnotationsPerTextView"] | null;
             lead_pause?: components["schemas"]["LeadPauseView"] | null;
+            /** Typography Hints */
+            typography_hints?: number;
             consolidation_progress?: components["schemas"]["ConsolidationProgressView"] | null;
             /**
              * Unreviewed Translation
@@ -6559,6 +6610,30 @@ export interface components {
         DraftResponse: {
             /** Revision */
             revision: number;
+        };
+        /** DraftTypographyHintsView */
+        DraftTypographyHintsView: {
+            /**
+             * Revision
+             * @description Draft revision the hints were computed for.
+             */
+            revision: number;
+            /** Total */
+            total: number;
+            /**
+             * Counts
+             * @description Number of hints per rule code.
+             */
+            counts: {
+                [key: string]: number;
+            };
+            /** Hints */
+            hints: components["schemas"]["TypographyHintView"][];
+            /**
+             * Truncated
+             * @description True when 'hints' holds fewer than 'total'.
+             */
+            truncated: boolean;
         };
         /** Duplicate */
         Duplicate: {
@@ -9965,6 +10040,7 @@ export interface components {
             reopened_at?: string | null;
             /** Reopen Reason */
             reopen_reason?: string | null;
+            added_brackets?: components["schemas"]["BracketCheck"] | null;
         };
         /** RevokedAssignmentView */
         RevokedAssignmentView: {
@@ -11735,7 +11811,7 @@ export interface components {
              * Rule
              * @enum {string}
              */
-            rule: "DOUBLE_SPACE" | "SPACE_BEFORE_PUNCTUATION" | "MISSING_SPACE_AFTER_PUNCTUATION" | "TRAILING_WHITESPACE_LINE" | "TRAILING_WHITESPACE_TEXT" | "TAB" | "ZERO_WIDTH_CHARACTER" | "SOFT_HYPHEN" | "CONTROL_CHARACTER";
+            rule: "DOUBLE_SPACE" | "SPACE_BEFORE_PUNCTUATION" | "MISSING_SPACE_AFTER_PUNCTUATION" | "TRAILING_WHITESPACE_LINE" | "TRAILING_WHITESPACE_TEXT" | "TAB" | "ZERO_WIDTH_CHARACTER" | "SOFT_HYPHEN" | "CONTROL_CHARACTER" | "DOUBLE_FULL_STOP";
             /**
              * Start
              * @description First code point of the hint (zero-based, Unicode code points, as annotation spans).
@@ -14170,6 +14246,37 @@ export interface operations {
             };
         };
     };
+    draft_typography_hints_api_v1_translation_reviews__assignment_id__draft_typography_hints_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assignment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftTypographyHintsView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     save_checked_sentences_api_v1_translation_reviews__assignment_id__checked_sentences_put: {
         parameters: {
             query?: never;
@@ -15529,7 +15636,7 @@ export interface operations {
                 final_state?: ("none" | "after_annotation" | "after_review" | "choose" | "confirm" | "old_text" | "may_be_outdated" | "final")[] | null;
                 /** @description "me" or a pseudonym */
                 waiting_on?: string[] | null;
-                flags?: ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator")[] | null;
+                flags?: ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator" | "typography_hints")[] | null;
                 proposals?: ("with" | "without")[] | null;
             };
             header?: never;
@@ -15589,7 +15696,7 @@ export interface operations {
                 final_state?: ("none" | "after_annotation" | "after_review" | "choose" | "confirm" | "old_text" | "may_be_outdated" | "final")[] | null;
                 /** @description "me" or a pseudonym */
                 waiting_on?: string[] | null;
-                flags?: ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator")[] | null;
+                flags?: ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator" | "typography_hints")[] | null;
                 proposals?: ("with" | "without")[] | null;
             };
             header?: never;
