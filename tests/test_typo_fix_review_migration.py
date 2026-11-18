@@ -24,7 +24,8 @@ PREVIOUS = "0045"
 
 def test_one_head_follows_the_lead_pause() -> None:
     scripts = ScriptDirectory.from_config(alembic_config())
-    assert scripts.get_heads() == [head_revision()] == [REVISION]
+    # One head; 0047 (carry a submission again, issue 461) follows this one.
+    assert scripts.get_heads() == [head_revision()]
     revision = scripts.get_revision(REVISION)
     assert revision is not None and revision.down_revision == PREVIOUS
 

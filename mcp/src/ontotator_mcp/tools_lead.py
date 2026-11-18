@@ -59,6 +59,8 @@ WithdrawTasks = Annotated[
     ),
 ]
 CONFIRMATION = "WORK_PLAN_CONFIRMATION_REQUIRED"
+# A submission already carried to, or dismissed for, the version (code/reason).
+ALREADY_RESOLVED = "TEXT_CHANGE_NOT_APPLICABLE/already_resolved"
 
 
 async def find_assignment(
@@ -1162,7 +1164,7 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
             "assignment": assignment_summary(decided),
         }
 
-    # The decision is final in every mode, 'dismiss' included.
+    # 'dismiss' is final; a carry is final while its task stands (issue 461).
     @register(server, scopes="project-admin", effect="destructive")
     async def carry_submission(
         project: Project,
@@ -1193,13 +1195,28 @@ def register_lead(server: MCPServer, api: OntotatorClient) -> None:
 
         The dry run counts the findings that can be placed and lists the
         people who could check them. With confirm a new task carries the
-        placed findings; the submission itself stays. The decision, 'dismiss'
-        included, is final: the submission cannot be carried to this version
-        again.
+        placed findings; the submission itself stays. One decision per
+        submission and version: when one exists, the dry run returns
+        already_resolved (the earlier resolution, the assignment_id of its
+        task, decided_at) instead of a preview, and confirm is refused.
+        'dismiss' is final. A carry can be repeated only after its task was
+        withdrawn or removed without a submission.
         """
-        preview = await _text_change_preview(
-            api, project, {"submission_id": submission_id}, target_document_id
-        )
+        try:
+            preview = await _text_change_preview(
+                api, project, {"submission_id": submission_id}, target_document_id
+            )
+        except OntotatorError as exc:
+            if confirm or exc.code != ALREADY_RESOLVED:
+                raise
+            earlier = exc.details if isinstance(exc.details, dict) else {}
+            return {
+                "applied": False,
+                "already_resolved": {
+                    name: earlier.get(name)
+                    for name in ("resolution", "assignment_id", "decided_at")
+                },
+            }
         if not confirm:
             return {"applied": False, "preview": preview}
         carried: dict[str, Any] = await api.post(

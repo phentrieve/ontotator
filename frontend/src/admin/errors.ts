@@ -309,6 +309,11 @@ export function errorMessage(error: unknown): string {
   if (error instanceof ApiError && error.code === "TEXT_CHANGE_NOT_APPLICABLE" && typeof error.details === "object" && error.details !== null && error.details.reason === "no_target_proposals") {
     return "The new version has no proposals yet: their automatic transfer may still be running, or they must be imported. Wait for or import the proposals for the new version, then try again.";
   }
+  // Issue 461: the submission has a decision for this version already; the refusal names it.
+  if (error instanceof ApiError && error.code === "TEXT_CHANGE_NOT_APPLICABLE" && typeof error.details === "object" && error.details !== null && error.details.reason === "already_resolved") {
+    if (error.details.resolution === "dismissed") return "It was already decided to start this version fresh. That decision is final.";
+    if (error.details.resolution === "carried" || error.details.resolution === "handed_over") return "This work was already carried to this version. Its task is still there or was submitted. Reload the row.";
+  }
   // Issue 464: the lead paused the text. The refusal names the cause and the lead's reason.
   if (error instanceof ApiError && error.code === "TASK_HELD" && typeof error.details === "object" && error.details !== null
     && Array.isArray(error.details.causes) && error.details.causes.includes("lead")) {
