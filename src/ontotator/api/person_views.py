@@ -8,9 +8,17 @@ class PersonRefView(BaseModel):
 
     pseudonym: str
     display_name: str | None = None
-    # The login name (issue 471), which API clients name a person by: only
-    # in a project's task views, for a lead and of a current member of the
-    # project, as the members list shows it. The audit and the job list
-    # name nobody's login.
-    username: str | None = None
     is_me: bool = False
+
+
+class MemberRefView(PersonRefView):
+    """A person in a lead's task views (Documents rows, previews of the bulk
+    actions), with the login name API clients name a person by (issue 471).
+
+    ``username`` only for a lead and of a current member of the project, as
+    the members list shows it; otherwise None. Every other view uses
+    ``PersonRefView``, which has no such field: problem reports, the audit
+    and the job list name nobody's login.
+    """
+
+    username: str | None = None

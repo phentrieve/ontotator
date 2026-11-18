@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ontotator.api.bulk_task_action_routes import BulkUndoView
 from ontotator.api.identity import PrincipalDep
-from ontotator.api.person_views import PersonRefView
+from ontotator.api.person_views import MemberRefView, PersonRefView
 from ontotator.api.routes import get_access
 from ontotator.api.work_plan_routes import (
     MAX_SELECTED_ROWS,
@@ -238,7 +238,7 @@ class FinalRestore(BaseModel):
     from_submission_id: str
     from_version: int | None = None
     # Who had chosen the earlier final result, and when.
-    selected_by: PersonRefView | None = None
+    selected_by: MemberRefView | None = None
     selected_at: datetime
 
 

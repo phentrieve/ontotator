@@ -561,6 +561,7 @@ def _row_changes(
         },
         viewer_id=viewer_user_id,
         viewer_is_lead=True,
+        logins_of_project=pid,
     )
 
     def person(user_id: int | None) -> dict[str, Any] | None:

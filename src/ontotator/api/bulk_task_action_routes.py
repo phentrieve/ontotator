@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ontotator.api.identity import PrincipalDep
-from ontotator.api.person_views import PersonRefView
+from ontotator.api.person_views import MemberRefView
 from ontotator.api.routes import get_access
 from ontotator.api.work_plan_routes import (
     MAX_SELECTED_ROWS,
@@ -102,7 +102,7 @@ class BulkTaskView(BaseModel):
     version: int
     task: Task
     status: Literal["open", "in_progress", "submitted", "reopened"]
-    person: PersonRefView
+    person: MemberRefView
     # Issue 464: a lead paused the task's text. A task reopened or given a
     # round there is paused from the start, until the text is released.
     text_paused: bool = Field(default_factory=lambda: False)
@@ -175,7 +175,7 @@ class BulkUndoTaskView(BaseModel):
     task: Task
     # The task's status now: in a preview before the Undo, else after it.
     status: Literal["open", "in_progress", "submitted", "reopened"]
-    person: PersonRefView
+    person: MemberRefView
 
 
 class BulkUndoBlock(BaseModel):

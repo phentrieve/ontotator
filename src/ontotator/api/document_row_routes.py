@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from ontotator.api.document_projection import AssignmentFilter, AssignmentStatus
 from ontotator.api.encoded_routes import EncodedParameterRoute
 from ontotator.api.identity import PrincipalDep
-from ontotator.api.person_views import PersonRefView
+from ontotator.api.person_views import MemberRefView
 from ontotator.api.routes import get_access, get_ontology
 from ontotator.api.work_plan_routes import (
     MAX_SELECTED_ROWS,
@@ -74,7 +74,7 @@ class VersionAcceptanceView(_View):
     source: Literal["package", "lead", "override"]
     reason: str | None = None
     accepted_at: datetime | None = None
-    accepted_by: PersonRefView | None = None
+    accepted_by: MemberRefView | None = None
     # Package metadata (``translation.review``), kept only as given.
     reviewer: str | None = None
     reviewed_at: str | None = None
@@ -85,7 +85,7 @@ class VersionDiscardView(_View):
 
     reason: str | None = None
     discarded_at: datetime | None = None
-    discarded_by: PersonRefView | None = None
+    discarded_by: MemberRefView | None = None
 
 
 class VersionUploadView(_View):
@@ -98,7 +98,7 @@ class VersionUploadView(_View):
     made_by: str | None = None
     note: str | None = None
     uploaded_at: datetime | None = None
-    uploaded_by: PersonRefView | None = None
+    uploaded_by: MemberRefView | None = None
 
 
 class VersionEditorialCorrectionView(_View):
@@ -110,7 +110,7 @@ class VersionEditorialCorrectionView(_View):
     inserted_characters: int
     deleted_characters: int
     corrected_at: datetime | None = None
-    corrected_by: PersonRefView | None = None
+    corrected_by: MemberRefView | None = None
 
 
 class DocumentVersionView(_View):
@@ -171,7 +171,7 @@ class WorkItemView(_View):
     round_ordinal: int | None
     round_state: str | None
     # Lead workflow (D1): the assignee as a person reference.
-    person: PersonRefView | None = None
+    person: MemberRefView | None = None
     # F1 (FD1): the lead's own correction of a rejected or queried version.
     lead_correction: bool = False
     # Text changes (V5): version this (revoked) work was moved to.
@@ -179,7 +179,7 @@ class WorkItemView(_View):
     # Spec 2026-10-23 §2: assignment date, assigner and the annotation mode
     # fixed at assignment time (annotate only).
     assigned_at: datetime | None = None
-    assigned_by: PersonRefView | None = None
+    assigned_by: MemberRefView | None = None
     annotation_mode: AnnotationMode | None = None
     # Issue 337: the proposal set an annotation task works on (its round's,
     # or the newest one for a task from proposals not started yet); None:
@@ -202,7 +202,7 @@ class ReportIssueView(_View):
     reporter_label: str
     created_at: datetime
     task_state: Literal["paused", "resumed"]
-    reporter: PersonRefView | None = None
+    reporter: MemberRefView | None = None
 
 
 class RowItemView(_View):
@@ -238,7 +238,7 @@ class FinalSelectionSummary(_View):
     is_newest_of_chain: bool
     # Snapshot at selection time; the current rule is on the page.
     adjudicator_not_annotator: bool | None
-    author: PersonRefView | None = None
+    author: MemberRefView | None = None
 
 
 class MissingFinalView(_View):
@@ -264,22 +264,22 @@ class RowProblemReport(_View):
     created_at: datetime
     state: Literal["open", "resolved", "withdrawn"]
     active_hold_count: int
-    reporter: PersonRefView | None = None
+    reporter: MemberRefView | None = None
 
 
 class StepOwnerView(_View):
     kind: Literal["you", "person", "people", "none"]
-    person: PersonRefView | None = None
+    person: MemberRefView | None = None
     count: int = 0
     # Waiting on (VD8): every person of the step; for an in-progress step the
     # people of every in-progress step of the row.
-    people: list[PersonRefView] = Field(default_factory=list)
+    people: list[MemberRefView] = Field(default_factory=list)
 
 
 class StageCellDetailView(_View):
     """Muted second line of a stage cell (documents overview "Stage cells")."""
 
-    people: list[PersonRefView] = Field(default_factory=list)
+    people: list[MemberRefView] = Field(default_factory=list)
     assigned: int | None = None
     target: int | None = None
     submitted: int | None = None
@@ -350,7 +350,7 @@ class StepDetailView(_View):
     total: int | None = None
     round_ordinal: int | None = None
     excerpt: str | None = None
-    reporter: PersonRefView | None = None
+    reporter: MemberRefView | None = None
     task_paused: bool = False
 
 
@@ -413,7 +413,7 @@ class LeadPauseView(_View):
 
     reason: str
     # None: paused through an API token or by an account since erased.
-    paused_by: PersonRefView | None = None
+    paused_by: MemberRefView | None = None
     paused_at: datetime
 
 
@@ -597,7 +597,7 @@ class RowSubmissionView(_View):
     round_state: str | None
     is_latest_in_round: bool | None
     finding_count: int
-    author: PersonRefView | None = None
+    author: MemberRefView | None = None
     guideline_version: int | None = None
     guideline_withdrawn: bool = False
     # Consolidation submissions: findings kept automatically (all matched, U14).
@@ -620,7 +620,7 @@ class RowRoundView(_View):
     is_me: bool
     round_ordinal: int | None
     submitted: bool
-    author: PersonRefView | None = None
+    author: MemberRefView | None = None
 
 
 class OpenTranslationReviewView(_View):
@@ -630,14 +630,14 @@ class OpenTranslationReviewView(_View):
     chain_name: str | None
     reviewer_label: str
     is_me: bool
-    reviewer: PersonRefView | None = None
+    reviewer: MemberRefView | None = None
 
 
 class RowResultRefView(_View):
     """A submission named as a final result in a History line: its author,
     and whether it is a consolidation."""
 
-    author: PersonRefView
+    author: MemberRefView
     consolidation: bool = False
 
 
@@ -666,11 +666,11 @@ class RowChangeView(_View):
     ]
     at: datetime
     task: str | None = None
-    by: PersonRefView | None = None
+    by: MemberRefView | None = None
     assignment_id: int | None = None
     round_ordinal: int | None = None
-    from_person: PersonRefView | None = None
-    to_person: PersonRefView | None = None
+    from_person: MemberRefView | None = None
+    to_person: MemberRefView | None = None
     from_mode: str | None = None
     to_mode: str | None = None
     from_result: RowResultRefView | None = None

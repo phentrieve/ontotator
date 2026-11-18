@@ -15278,7 +15278,7 @@
             "title": "Status"
           },
           "person": {
-            "$ref": "#/components/schemas/PersonRefView"
+            "$ref": "#/components/schemas/MemberRefView"
           },
           "text_paused": {
             "type": "boolean",
@@ -16028,7 +16028,7 @@
             "title": "Status"
           },
           "person": {
-            "$ref": "#/components/schemas/PersonRefView"
+            "$ref": "#/components/schemas/MemberRefView"
           },
           "text_paused": {
             "type": "boolean",
@@ -16204,7 +16204,7 @@
             "title": "Status"
           },
           "person": {
-            "$ref": "#/components/schemas/PersonRefView"
+            "$ref": "#/components/schemas/MemberRefView"
           }
         },
         "type": "object",
@@ -18022,7 +18022,7 @@
             "title": "Recorded At"
           },
           "author": {
-            "$ref": "#/components/schemas/PersonRefView"
+            "$ref": "#/components/schemas/MemberRefView"
           }
         },
         "type": "object",
@@ -20752,7 +20752,7 @@
           "author": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -21021,7 +21021,7 @@
           "selected_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -21265,7 +21265,7 @@
           "author": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -22864,7 +22864,7 @@
           "paused_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -23014,6 +23014,47 @@
           "roles"
         ],
         "title": "MemberChange"
+      },
+      "MemberRefView": {
+        "properties": {
+          "pseudonym": {
+            "type": "string",
+            "title": "Pseudonym"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "is_me": {
+            "type": "boolean",
+            "title": "Is Me",
+            "default": false
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pseudonym"
+        ],
+        "title": "MemberRefView",
+        "description": "A person in a lead's task views (Documents rows, previews of the bulk\nactions), with the login name API clients name a person by (issue 471).\n\n``username`` only for a lead and of a current member of the project, as\nthe members list shows it; otherwise None. Every other view uses\n``PersonRefView``, which has no such field: problem reports, the audit\nand the job list name nobody's login."
       },
       "MissingFinalView": {
         "properties": {
@@ -24195,7 +24236,7 @@
           "reviewer": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -24749,7 +24790,7 @@
             "title": "Status"
           },
           "person": {
-            "$ref": "#/components/schemas/PersonRefView"
+            "$ref": "#/components/schemas/MemberRefView"
           },
           "paused_by_report": {
             "type": "boolean",
@@ -24803,17 +24844,6 @@
               }
             ],
             "title": "Display Name"
-          },
-          "username": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Username"
           },
           "is_me": {
             "type": "boolean",
@@ -28496,7 +28526,7 @@
           "reporter": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -28937,7 +28967,7 @@
             "title": "Status"
           },
           "person": {
-            "$ref": "#/components/schemas/PersonRefView"
+            "$ref": "#/components/schemas/MemberRefView"
           }
         },
         "type": "object",
@@ -29276,7 +29306,7 @@
           "by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -29308,7 +29338,7 @@
           "from_person": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -29318,7 +29348,7 @@
           "to_person": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -29548,7 +29578,7 @@
           "reporter": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -29644,7 +29674,7 @@
       "RowResultRefView": {
         "properties": {
           "author": {
-            "$ref": "#/components/schemas/PersonRefView"
+            "$ref": "#/components/schemas/MemberRefView"
           },
           "consolidation": {
             "type": "boolean",
@@ -29738,7 +29768,7 @@
           "author": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -29889,7 +29919,7 @@
           "author": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -30693,7 +30723,7 @@
         "properties": {
           "people": {
             "items": {
-              "$ref": "#/components/schemas/PersonRefView"
+              "$ref": "#/components/schemas/MemberRefView"
             },
             "type": "array",
             "title": "People"
@@ -31189,7 +31219,7 @@
           "reporter": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -31225,7 +31255,7 @@
           "person": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -31239,7 +31269,7 @@
           },
           "people": {
             "items": {
-              "$ref": "#/components/schemas/PersonRefView"
+              "$ref": "#/components/schemas/MemberRefView"
             },
             "type": "array",
             "title": "People"
@@ -33064,7 +33094,7 @@
           "paused_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -34814,7 +34844,7 @@
           "accepted_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -34880,7 +34910,7 @@
           "discarded_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -34926,7 +34956,7 @@
           "corrected_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -35532,7 +35562,7 @@
           "uploaded_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -35739,7 +35769,7 @@
           "person": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -35777,7 +35807,7 @@
           "assigned_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"

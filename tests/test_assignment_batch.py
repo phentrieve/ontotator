@@ -293,7 +293,6 @@ def test_preview_people_sorted_reads_then_open_tasks_then_name_with_reasons(env)
     assert ana["person"] == {
         "pseudonym": env.app.state.accounts.get_by_username("ana").pseudonym,
         "display_name": "Ana Weber",
-        "username": None,
         "is_me": False,
     }
     assert skipped(result) == {CASES[19]: "already_assigned"}

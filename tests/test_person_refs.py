@@ -243,8 +243,9 @@ def test_login_names_only_for_a_lead_and_of_members_of_the_project(env):
         for_ana = person_refs(
             conn, ids, viewer_id=ana.id, viewer_is_lead=False, logins_of_project=env.pid
         )
-    # Not asked for (the audit, the job list): nobody's login.
-    assert {ref.username for ref in plain.values()} == {None}
+    # Not asked for (problem reports, the audit, the job list): the
+    # reference has no login name at all, not even an empty one.
+    assert all("username" not in ref.model_dump() for ref in plain.values())
     assert plain[ana.id].display_name == "Ana Weber"
     assert (for_lead[ana.id].username, for_lead[ben.id].username) == ("ana", "ben")
     assert for_lead[outsider.id].username is None
@@ -263,7 +264,7 @@ def test_the_audit_names_no_login(env):
         for name in ("actor", "target_person")
         if event[name]
     ]
-    assert people and {person["username"] for person in people} == {None}
+    assert people and all("username" not in person for person in people)
 
 
 def test_a_documents_row_names_the_login_of_a_task_for_the_lead(env):

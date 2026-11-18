@@ -51,12 +51,14 @@ async def size(client: Client, name: str, arguments: dict[str, Any]) -> int:
 def ref(number: int, *, lead: bool = True, login: bool = True) -> dict[str, Any]:
     """A person as the server names them to a lead (or to anyone else);
     without ``login`` as the audit does, which names nobody's login."""
-    return build(
-        "PersonRefView",
-        pseudonym=f"ann-{number:04d}",
-        display_name=f"Person Number {number}" if lead else None,
-        username=f"person{number}" if lead and login else None,
-    )
+    names = {
+        "pseudonym": f"ann-{number:04d}",
+        "display_name": f"Person Number {number}" if lead else None,
+    }
+    if not login:
+        # The plain reference has no login name at all.
+        return build("PersonRefView", **names)
+    return build("MemberRefView", **names, username=f"person{number}" if lead else None)
 
 
 def full_row(number: int, *, per_text: int = 2, annotators: int = 2) -> dict[str, Any]:

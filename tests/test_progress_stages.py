@@ -158,7 +158,6 @@ def test_workload_people_sorted_by_open_work(env):
     assert ana["person"] == {
         "pseudonym": accounts.get_by_username("ana").pseudonym,
         "display_name": "Ana Weber",
-        "username": "ana",
         "is_me": False,
     }
     columns = (
