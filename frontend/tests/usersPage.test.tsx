@@ -1,9 +1,11 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, AuthError, type AdminUser, type CodeResponse, type CreatedUser, type CurrentUser } from "../src/api/client";
-import { auditActor, auditDetails, auditTarget, UsersPage } from "../src/admin/UsersPage";
+import { auditActor, auditDetails, auditTarget, fieldLabels, UsersPage } from "../src/admin/UsersPage";
 import { formatDateTime, formatShortDateTime } from "../src/app/labels";
 
 const currentUser: CurrentUser = { username: "root", display_name: "Root", pseudonym: "ann-root", is_system_admin: true, csrf_token: "csrf" };
@@ -342,7 +344,7 @@ describe("account status, projects at creation, history and erasure", () => {
   it("words audit details", () => {
     const base = { at: "", actor: "", action: "", target_type: "user", target_id: "x", project_key: null };
     expect(auditDetails({ ...base, details: { active: false } })).toBe("Deactivated");
-    expect(auditDetails({ ...base, details: { fields: ["email", "display_name"] } })).toBe("Email, Display name");
+    expect(auditDetails({ ...base, details: { fields: ["email", "display_name"] } })).toBe("E-mail, Display name");
     expect(auditDetails({ ...base, details: {} })).toBe("");
     expect(auditDetails({ ...base, details: { purpose: "setup" } })).toBe("Setup code");
     expect(auditDetails({ ...base, details: { task: "annotate", user_id: 4, document_id: "case-1", ok: true } })).toBe("Task: Annotation; User 4; Document id: case-1; Ok: yes");
@@ -360,6 +362,48 @@ describe("account status, projects at creation, history and erasure", () => {
     expect(auditTarget({ ...created, details: {} })).toBe("API token 6");
     expect(auditDetails({ ...base, details: { name: "N", api_token: { id: 6, name: "nightly" } } })).toBe("Name: N; Via API token: nightly");
     expect(auditDetails({ ...base, details: { ends_at: "2027-02-03T11:54:22Z" } })).toBe(`Ends at: ${formatDateTime("2027-02-03T11:54:22Z")}`);
+  });
+
+  it("says which languages were added and removed (#467)", () => {
+    const base = { at: "", actor: "", action: "user.languages", target_type: "user", target_id: "x", project_key: null };
+    expect(auditDetails({ ...base, details: { before: ["de", "es"], after: ["de", "fr"] } })).toBe("Added: fr. Removed: es.");
+    expect(auditDetails({ ...base, details: { before: [], after: ["de", "fr"] } })).toBe("Added: de, fr.");
+    expect(auditDetails({ ...base, details: { before: ["de"], after: [] } })).toBe("Removed: de.");
+    expect(auditDetails({ ...base, details: { before: ["de"], after: ["de"] } })).toBe("No change.");
+    // Events from before the languages were recorded stay empty.
+    expect(auditDetails({ ...base, details: {} })).toBe("");
+  });
+
+  it("names changed settings as the settings page does, with the values where they were recorded (#472)", () => {
+    const base = { at: "", actor: "", action: "project.update", target_type: "project", target_id: "study-one", project_key: "study-one" };
+    // Events from before the values were recorded: the names only.
+    expect(auditDetails({ ...base, details: { fields: ["blind_consolidation", "record_working_time"], annotation_policy_revision: 1 } }))
+      .toBe("Hide annotator names during consolidation, Record working time");
+    expect(auditDetails({ ...base, details: { fields: ["allow_spanless_findings", "require_spanless_note"] } })).toBe("Findings that point to no text passage");
+    expect(auditDetails({ ...base, details: { fields: ["pins", "creation_defaults"] } })).toBe("Ontology version, Prefilled values");
+    expect(auditDetails({ ...base, details: { fields: ["added_later"] } })).toBe("Added later");
+    expect(auditDetails({ ...base, details: {
+      fields: ["annotations_per_text", "blind_consolidation", "description", "import_plan", "languages", "name", "tool_proposal_mode"],
+      changes: {
+        annotations_per_text: { before: 1, after: 3 }, blind_consolidation: { before: false, after: true },
+        import_plan: { before: "review_and_annotate_translations", after: "nothing" }, languages: { before: [], after: ["de", "fr"] },
+        name: { before: "Study", after: "Study One" }, tool_proposal_mode: { before: "proposals", after: "scratch" },
+      },
+    } })).toBe("Annotators per text: 1 → 3; Hide annotator names during consolidation: off → on; Description; "
+      + "New imports: Plan review and annotation for every translation → Plan nothing; I plan texts on Documents; Languages of the texts: none → de, fr; "
+      + "Name: Study → Study One; Texts with tool proposals: Annotators work from the proposals → Annotators start from scratch");
+    // The two fields behind one choice show as that choice.
+    expect(auditDetails({ ...base, details: { fields: ["require_spanless_note"], changes: { allow_spanless_findings: { before: true, after: true }, require_spanless_note: { before: true, after: false } } } }))
+      .toBe("Findings that point to no text passage: Allowed with a reason → Allowed, reason optional");
+    expect(auditDetails({ ...base, details: { fields: ["allow_spanless_findings", "require_spanless_note"], changes: { allow_spanless_findings: { before: true, after: false }, require_spanless_note: { before: false, after: false } } } }))
+      .toBe("Findings that point to no text passage: Allowed, reason optional → Not allowed");
+  });
+
+  it("uses the labels of the settings and profile screens for changed fields", () => {
+    const sources = ["src/admin/projectFields.tsx", "src/admin/ProjectSettingsPage.tsx", "src/me/ProfilePage.tsx"].map(file => readFileSync(resolve(process.cwd(), file), "utf8")).join("\n");
+    for (const label of new Set(Object.values(fieldLabels))) {
+      expect([`label="${label}"`, `title="${label}"`, `>${label}<`, `>${label}{`].some(text => sources.includes(text)), label).toBe(true);
+    }
   });
 
   it("words audit actors", () => {

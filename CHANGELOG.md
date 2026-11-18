@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Users › **History**: *Languages changed* says which languages were added and removed (*Added: fr. Removed: es.*) (#467). The audit event `user.languages` now records `before` and `after`; earlier events keep their empty **Details**. **Anonymise…** erases a person's languages, so it also removes them from these events; the events themselves stay.
+- Users › **History**: *Project settings changed* names each setting as the settings page does (*Hide annotator names during consolidation*, not *Blind consolidation*) and shows the old and the new value (*Annotators per text: 1 → 3*) (#472). The audit event `project.update` records them in `details.changes` (`{setting: {before, after}}`) for the name, the languages, the choices and the checkboxes; the description, the prefilled values and the values annotators can choose are named without values. Earlier events show the names only. *Profile changed* uses the field labels of the profile forms (*E-mail*).
+- Users › **History** on a phone: the **Details** column keeps a readable width instead of about 80 px with breaks inside words; the table scrolls sideways (#472).
+
 ## [0.11.0] - 2026-11-17
 
 ### Added
