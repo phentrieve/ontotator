@@ -10791,6 +10791,11 @@ export interface components {
             /** Author Label */
             author_label: string;
             /**
+             * Is Me
+             * @default false
+             */
+            is_me: boolean;
+            /**
              * Created At
              * Format: date-time
              */

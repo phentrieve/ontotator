@@ -18,13 +18,17 @@ export interface SubmissionHistoryProps {
   documents?: ProjectDocumentsQuery;
 }
 
+/** Issue 470: a consolidator who is not the lead also sees the submissions they consolidate, which the viewer does not open for them. */
+export const OTHERS_INTRO = 'Submitted results for this text version: your own and the submissions you consolidate. Results are read-only. Choose one of your own rounds to open it in the viewer; read the other submissions on the consolidation screen.';
+
 interface HistoryData { rows: RowSubmissionView[]; rounds: RowRoundView[]; final: FinalSelectionSummary | null; parallel: boolean; guidelineCurrent: number | null }
 
-/** Own submission from the per-document history (non-leads); the finding count comes from its detail. */
+/** A submission from the per-document history (non-leads): the reader's own and, for a consolidator, the submissions of
+ *  their round (issue 470); the finding count comes from its detail. */
 function ownRow(row: SubmissionHistorySummary, version: number, findings: number): RowSubmissionView {
   return {
     submission_id: row.submission_id, document_id: row.document_id, version, chain_name: null, author_label: row.author_label,
-    is_me: true, recorded_at: row.created_at, mode: row.mode, kind: row.mode === 'review' ? 'consolidation' : row.mode === 'proposal_check' ? 'proposal_check' : 'annotation',
+    is_me: !!row.is_me, recorded_at: row.created_at, mode: row.mode, kind: row.mode === 'review' ? 'consolidation' : row.mode === 'proposal_check' ? 'proposal_check' : 'annotation',
     round_id: row.round_id ?? null, round_ordinal: null, round_state: null, is_latest_in_round: null, finding_count: findings,
     guideline_version: row.guideline_version ?? null, guideline_withdrawn: row.guideline_withdrawn,
   };
@@ -69,15 +73,19 @@ export function SubmissionHistory({ projectKey, caseId, documentId, language, ve
     );
     return () => { active = false; };
   }, [open, requestIdentity]);
-  const viewRoute = (row: RowSubmissionView): Route => ({
+  // Issue 470: a non-lead opens only their own submissions in the viewer; another person's row is text, not a link.
+  const viewRoute = (row: RowSubmissionView): Route | null => !canManage && !row.is_me ? null : {
     name: 'projectCase', key: projectKey, caseId, variant: row.document_id,
     annotations: refKey({ kind: canManage ? 'submission' : 'own', id: row.submission_id }), ...(documents ? { documents } : {}),
-  });
+  };
+  const others = !canManage && !!current?.data?.rows.some(row => !row.is_me);
   const close = () => setOpened(null);
   return <>
     <Button size="sm" onClick={() => { setRetry(value => value + 1); setOpened(identity); }}>Submissions</Button>
     <Dialog open={open} title="Submission history" size="lg" onClose={close} footer={<Button onClick={close}>Close</Button>}>
-      <p>{canManage ? 'Submitted results of this text in all versions.' : 'Your submitted results for this text version.'} Results are read-only; choose a round to open it in the viewer.</p>
+      <p>{canManage ? 'Submitted results of this text in all versions. Results are read-only; choose a round to open it in the viewer.'
+        : others ? OTHERS_INTRO
+        : 'Your submitted results for this text version. Results are read-only; choose a round to open it in the viewer.'}</p>
       {current?.error ? <><ErrorNotice error={current.error} /><Button onClick={() => setRetry(value => value + 1)}>Retry submissions</Button></>
         : !current?.data ? <InlineMessage tone="info">Loading submissions...</InlineMessage>
         : <SubmissionsTable rows={current.data.rows} rounds={current.data.rounds} final={current.data.final} parallel={current.data.parallel}

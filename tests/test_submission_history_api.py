@@ -16,6 +16,14 @@ def test_lead_and_owner_history_are_bounded(case_env):
         response = client.get(path(SOURCE, "submissions"))
         assert response.status_code == 200, response.text
         assert {item["submission_id"] for item in response.json()} == expected
+    # Issue 470: only the reader's own submissions are marked as theirs.
+    assert [i["is_me"] for i in env.alice.get(path(SOURCE, "submissions")).json()] == [
+        True
+    ]
+    assert {
+        item["submission_id"]: item["is_me"]
+        for item in env.lead.get(path(SOURCE, "submissions")).json()
+    } == {"own-history": False, "foreign-history": False}
     assert env.alice.get(path(SOURCE, "submissions/foreign-history")).status_code == 404
     assert env.reviewer.get(path(SOURCE, "submissions/own-history")).status_code == 404
     result = env.lead.get(path(SOURCE, "submissions/own-history"))

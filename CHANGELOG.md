@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Consolidation, follow-ups of the consolidator review (#470, and the consolidation points of #472):
+  - The **Undo** of *Reopened n decided groups.* is taken away with the next change (a decision, a note, an added, changed or removed finding). The server restores the reopened decisions only while nothing changed since, so the button could only answer *Could not restore the decisions.*, next to the **Undo** of the new decision. One **Undo** at most is on offer now.
+  - With four or more annotators, a line under each highlighted row says who holds which value, for example *Hypotonia 14 · Abnormality of the nervous system 6 (C, F, I, L, O, R)*, for the term, each value field and a conflicting text. It names people as the table's columns do (letters when the project hides annotator names). The line, the parent-term sentence of **Related terms** and an *(all agree)* value shown once across the columns stay in view while the table scrolls sideways, like the row labels.
+  - **Remove** next to **Edit values…** on a finding under **Added by you**, with a confirmation next to it (*Remove this finding?*); it used to need the full editor. Without the text pane (a phone-sized screen, or **Hide text**), **Add finding** now stands above the groups and takes a typed passage.
+  - **Attach to a finding…** is always shown on a modifier term marked as a finding. While no finding of its sentence is decided it is inactive and says *Decide the finding it belongs to first.* (or *This sentence has no finding to attach it to.*).
+  - Text view of a consolidator who does not lead the project: **Submissions** no longer marks the submissions they consolidate *(you)* and no longer links them (the link led to *This annotation version is not available to you.*); its first sentence says whose results are listed. The **Text card** button, which led to *Documents is for project leads*, is shown to leads only. `GET …/documents/{doc}/submissions` and its detail carry `is_me`. The handbook no longer promises such a consolidator the side-by-side view. Access is unchanged.
+  - The submit warning about a modifier term used as a finding names the finding (*… as the finding itself: Neonatal onset “since birth”*) with **Go to group**, and the dialog shows it before the first **Submit** where a group kept such a term.
+  - The **Text** row reads *“hypotonia” (all agree)* when everyone marked the same passage, not *(overlapping, comes with the chosen finding)*. *2 fields to decide* counts down with each choice and reads *chosen, not saved yet* before **Keep**. The row's *Decision saved · Undo* is hidden while a dialog is open, as the toast is on Documents.
+
 ## [0.11.0] - 2026-11-17
 
 ### Added

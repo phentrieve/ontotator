@@ -31412,6 +31412,11 @@
             "type": "string",
             "title": "Author Label"
           },
+          "is_me": {
+            "type": "boolean",
+            "title": "Is Me",
+            "default": false
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",

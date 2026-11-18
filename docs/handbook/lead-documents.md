@@ -202,7 +202,7 @@ What for: see what happened to a text and its technical IDs.
 
 ### Read a text and other people's work in the text view
 
-What for: read a text with other people's findings or the final result, and compare two of them side by side. Leads and consolidators see other people's work; everyone else sees only their own.
+What for: read a text with other people's findings or the final result, and compare two of them side by side. Leads see other people's work; everyone else sees only their own. A consolidator who does not lead the project reads the submissions on the consolidation screen instead ([Read others' work in the text view](consolidator.md#read-others-work-in-the-text-view)).
 
 1. Open the text view with **Open text** in the text card.
 2. Choose the language and version in **Language and version**.
@@ -210,7 +210,7 @@ What for: read a text with other people's findings or the final result, and comp
 4. Optional: click **Compare** to open a second pane. Each pane has its own **Language and version** and **Show** directly above its text: **Current text** on the left, **Comparison text** on the right, so both texts start at the same height. Tick **Couple scrolling** to scroll both together. Click **Close comparison** to close it.
    - When both panes show texts of the same language, for example v1 and its correction v2, tick **Show changes** to see what changed. The older version strikes through the removed passages, the newer version underlines the added ones; the line above the texts counts them. The marks do not change the texts, the findings or **Couple scrolling**. A change of spaces or line breaks only is not marked or counted. If the two texts have little in common, the line reads *The texts differ too much to show the changes* and nothing is marked.
    - When **Show** has someone's annotations that were carried from an earlier version of the text (after **Carry to v2…** or **Handle text change…**), tick **Show changes since** v1 above the text: changed passages get a dashed frame, added text is underlined, and a **−** marker shows the earlier wording of removed text. **Next ›** and **‹ Previous** step through the passages. The annotator sees the same marks in their task. Not offered while **Compare** is open, which has its own **Show changes**.
-5. Optional: click **Submissions** to open the **Submission history**. Choose a row to show it, then click **Close**. Each finding names its author by pseudonym; leads always see them, also when the project hides annotator names from consolidators.
+5. Optional: click **Submissions** to open the **Submission history**. Choose a row to show it, then click **Close**. Someone who does not lead the project sees their own submissions there and, as a consolidator, the submissions they consolidate as rows without a link; the **Text card** button is shown to leads only. Each finding names its author by pseudonym; leads always see them, also when the project hides annotator names from consolidators.
 
 **Open my task** goes to your own task on this text.
 
