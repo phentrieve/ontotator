@@ -10586,7 +10586,7 @@ export interface components {
             /** Reason */
             reason?: string | null;
             /** Note */
-            note?: ("machine_translation" | "review_only" | "translation_rejected" | "translation_queried" | "translation_not_accepted" | "unchanged" | "with_corrections" | "in_package" | "outside" | "review_off" | "text_change_waiting" | "may_change" | "not_exported" | "carried_on_submit" | "lead_pause" | "v2_not_annotated" | "no_target_proposals" | "correction" | "new_review" | "source_changed" | "round" | "consolidation") | null;
+            note?: ("machine_translation" | "review_only" | "translation_rejected" | "translation_queried" | "translation_not_accepted" | "unchanged" | "with_corrections" | "typos_fixed" | "in_package" | "outside" | "review_off" | "text_change_waiting" | "may_change" | "not_exported" | "carried_on_submit" | "lead_pause" | "v2_not_annotated" | "no_target_proposals" | "correction" | "new_review" | "source_changed" | "round" | "consolidation") | null;
             /** Matching */
             matching?: number | null;
             /** Compared */

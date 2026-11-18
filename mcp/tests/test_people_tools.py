@@ -11,7 +11,7 @@ from typing import Any
 import httpx
 import pytest
 from conftest import ToolFailed, call
-from fake_api import FakeApi, refusal
+from fake_api import PT_A, PT_B, FakeApi, marked, refusal
 from mcp import Client
 from shapes import build
 
@@ -513,7 +513,7 @@ async def test_reopen_texts_dry_run_then_confirm_with_the_token(
     fake: FakeApi, mcp_client: Client
 ) -> None:
     texts = [{"case_id": "c1", "language": "en"}]
-    fake.on("POST", BULK_REOPEN, _bulk("reopen", "sha256:a"))
+    fake.on("POST", BULK_REOPEN, _bulk("reopen", PT_A))
     dry = await call(
         mcp_client,
         "reopen_texts",
@@ -522,7 +522,9 @@ async def test_reopen_texts_dry_run_then_confirm_with_the_token(
     assert dry["applied"] is False
     assert dry["would_change"][0]["person"] == "Tom Reis"
     assert dry["kept"][0]["why"] == "Not submitted yet."
-    assert dry["preview_token"] == "sha256:a"
+    # The server's token and a mark of the reason (#471).
+    token = marked(PT_A, "Guideline 2.3")
+    assert dry["preview_token"] == token
     [post] = fake.calls_to("POST", BULK_REOPEN)
     assert post.json() == {"rows": texts, "reason": "Guideline 2.3", "preview": True}
     with pytest.raises(ToolFailed):
@@ -531,7 +533,7 @@ async def test_reopen_texts_dry_run_then_confirm_with_the_token(
             "reopen_texts",
             {"project": "p", "texts": texts, "reason": "x", "confirm": True},
         )
-    fake.on("POST", BULK_REOPEN, _bulk("reopen", "sha256:a", applied=True))
+    fake.on("POST", BULK_REOPEN, _bulk("reopen", PT_A, applied=True))
     done = await call(
         mcp_client,
         "reopen_texts",
@@ -540,11 +542,12 @@ async def test_reopen_texts_dry_run_then_confirm_with_the_token(
             "texts": texts,
             "reason": "Guideline 2.3",
             "confirm": True,
-            "preview_token": "sha256:a",
+            "preview_token": token,
         },
     )
     assert done["applied"] is True and done["change_count"] == 1
-    assert fake.calls_to("POST", BULK_REOPEN)[-1].json()["preview_token"] == "sha256:a"
+    # The server gets its own token back, without the mark.
+    assert fake.calls_to("POST", BULK_REOPEN)[-1].json()["preview_token"] == PT_A
     # Nothing to undo (the server sent none): no ``undo`` in the answer.
     assert "undo" not in done and "undo" not in dry
 
@@ -588,7 +591,7 @@ async def test_an_applied_reopen_or_withdrawal_keeps_its_undo(
 ) -> None:
     """The server's ``undo`` reaches the caller (review finding F1)."""
     action = "reopen" if tool == "reopen_texts" else "withdraw"
-    fake.on("POST", route, _bulk(action, "sha256:a", applied=True, undo=UNDO))
+    fake.on("POST", route, _bulk(action, PT_A, applied=True, undo=UNDO))
     done = await call(
         mcp_client,
         tool,
@@ -596,7 +599,7 @@ async def test_an_applied_reopen_or_withdrawal_keeps_its_undo(
             "project": "p",
             "texts": [{"case_id": "c1", "language": "en"}],
             "confirm": True,
-            "preview_token": "sha256:a",
+            "preview_token": marked(PT_A, extra.get("reason", "")),
         }
         | extra,
     )
@@ -673,7 +676,7 @@ async def test_undo_reopen_or_withdraw_names_a_used_or_expired_undo(
 async def test_withdraw_open_tasks_answers_a_stale_token_with_a_fresh_dry_run(
     fake: FakeApi, mcp_client: Client
 ) -> None:
-    fresh = _bulk("withdraw", "sha256:b")
+    fresh = _bulk("withdraw", PT_B)
     fake.on("POST", BULK_WITHDRAW, refusal(409, "PREVIEW_STALE", {"preview": fresh}))
     result = await call(
         mcp_client,
@@ -683,10 +686,12 @@ async def test_withdraw_open_tasks_answers_a_stale_token_with_a_fresh_dry_run(
             "texts": [{"case_id": "c1", "language": "en"}],
             "over_limit_only": True,
             "confirm": True,
-            "preview_token": "sha256:a",
+            "preview_token": marked(PT_A),
         },
     )
-    assert result["stale"] is True and result["preview_token"] == "sha256:b"
+    assert result["stale"] is True and result["preview_token"] == marked(PT_B)
+    # A well-formed token of another dry run looks like a change (#471).
+    assert "or the preview_token is not the one" in result["note"]
     [post] = fake.calls_to("POST", BULK_WITHDRAW)
     assert post.json()["over_limit_only"] is True
 
@@ -698,24 +703,36 @@ async def test_start_rounds_dry_run_confirm_and_stale_token(
     fake: FakeApi, mcp_client: Client
 ) -> None:
     texts = [{"case_id": "c1", "language": "en"}]
-    preview = _bulk("start_round", "sha256:a", kind="clean_restart")
+    preview = _bulk("start_round", PT_A, kind="clean_restart")
     fake.on("POST", BULK_START_ROUND, preview)
-    args = {"project": "p", "texts": texts, "kind": "clean_restart"}
+    bare = {"project": "p", "texts": texts, "kind": "clean_restart"}
+    # A clean restart without a reason fails at the dry run already (#471).
+    with pytest.raises(ToolFailed, match="needs a reason"):
+        await call(mcp_client, "start_rounds", bare)
+    assert fake.calls_to("POST", BULK_START_ROUND) == []
+    args = bare | {"reason": "New tool set"}
+    token = marked(PT_A, "New tool set")
     dry = await call(mcp_client, "start_rounds", args)
-    assert dry["applied"] is False and dry["preview_token"] == "sha256:a"
+    assert dry["applied"] is False and dry["preview_token"] == token
     assert dry["would_change"][0]["person"] == "Tom Reis"
     [post] = fake.calls_to("POST", BULK_START_ROUND)
-    assert post.json() == {"rows": texts, "kind": "clean_restart", "preview": True}
-    # A restart is not confirmed without a reason, nor without the token.
-    for extra in ({"preview_token": "sha256:a"}, {"reason": "New tool set"}):
+    assert post.json() == {
+        "rows": texts,
+        "kind": "clean_restart",
+        "reason": "New tool set",
+        "preview": True,
+    }
+    # Not confirmed without the token, nor with another reason than the
+    # dry run's, nor without a reason.
+    for extra in (
+        {},
+        {"preview_token": token, "reason": "Another reason"},
+        {"preview_token": token, "reason": None},
+    ):
         with pytest.raises(ToolFailed):
             await call(mcp_client, "start_rounds", args | {"confirm": True} | extra)
     assert len(fake.calls_to("POST", BULK_START_ROUND)) == 1
-    confirmed = args | {
-        "confirm": True,
-        "reason": "New tool set",
-        "preview_token": "sha256:a",
-    }
+    confirmed = args | {"confirm": True, "preview_token": token}
     fake.on("POST", BULK_START_ROUND, preview | {"applied": True})
     done = await call(mcp_client, "start_rounds", confirmed)
     assert done["applied"] is True and done["change_count"] == 1
@@ -723,12 +740,13 @@ async def test_start_rounds_dry_run_confirm_and_stale_token(
         "rows": texts,
         "kind": "clean_restart",
         "reason": "New tool set",
-        "preview_token": "sha256:a",
+        "preview_token": PT_A,
     }
-    fresh = _bulk("start_round", "sha256:b", kind="clean_restart")
+    fresh = _bulk("start_round", PT_B, kind="clean_restart")
     fake.on("POST", BULK_START_ROUND, refusal(409, "PREVIEW_STALE", {"preview": fresh}))
     stale = await call(mcp_client, "start_rounds", confirmed)
-    assert stale["stale"] is True and stale["preview_token"] == "sha256:b"
+    assert stale["stale"] is True
+    assert stale["preview_token"] == marked(PT_B, "New tool set")
 
 
 PAUSE_TEXTS = f"{P}/text-pauses/pause"
@@ -781,9 +799,9 @@ async def test_pause_texts_dry_run_confirm_and_stale_token(
     """Issue 464: pause on the dry-run, then confirm pattern."""
     texts = [{"case_id": "c1", "language": "en"}, {"case_id": "c2", "language": "en"}]
     args = {"project": "p", "texts": texts, "reason": "Clinic is checking"}
-    fake.on("POST", PAUSE_TEXTS, _pause("pause", "sha256:a"))
+    fake.on("POST", PAUSE_TEXTS, _pause("pause", PT_A))
     dry = await call(mcp_client, "pause_texts", args)
-    assert dry["applied"] is False and dry["preview_token"] == "sha256:a"
+    assert dry["applied"] is False and dry["preview_token"] == PT_A
     assert dry["would_change"] == [
         {
             "case_id": "c1",
@@ -803,26 +821,26 @@ async def test_pause_texts_dry_run_confirm_and_stale_token(
     with pytest.raises(ToolFailed):
         await call(mcp_client, "pause_texts", args | {"confirm": True})
     assert len(fake.calls_to("POST", PAUSE_TEXTS)) == 1
-    confirmed = args | {"confirm": True, "preview_token": "sha256:a"}
-    fake.on("POST", PAUSE_TEXTS, _pause("pause", "sha256:a", applied=True))
+    confirmed = args | {"confirm": True, "preview_token": PT_A}
+    fake.on("POST", PAUSE_TEXTS, _pause("pause", PT_A, applied=True))
     done = await call(mcp_client, "pause_texts", confirmed)
     assert done["applied"] is True and done["changed"][0]["case_id"] == "c1"
     assert fake.calls_to("POST", PAUSE_TEXTS)[-1].json() == {
         "rows": texts,
         "reason": "Clinic is checking",
-        "preview_token": "sha256:a",
+        "preview_token": PT_A,
     }
-    fresh = _pause("pause", "sha256:b")
+    fresh = _pause("pause", PT_B)
     fake.on("POST", PAUSE_TEXTS, refusal(409, "PREVIEW_STALE", {"preview": fresh}))
     stale = await call(mcp_client, "pause_texts", confirmed)
-    assert stale["stale"] is True and stale["preview_token"] == "sha256:b"
+    assert stale["stale"] is True and stale["preview_token"] == PT_B
 
 
 async def test_release_texts_names_tasks_a_report_still_pauses(
     fake: FakeApi, mcp_client: Client
 ) -> None:
     texts = [{"case_id": "c1", "language": "en"}]
-    fake.on("POST", RELEASE_TEXTS, _pause("release", "sha256:a"))
+    fake.on("POST", RELEASE_TEXTS, _pause("release", PT_A))
     dry = await call(mcp_client, "release_texts", {"project": "p", "texts": texts})
     assert dry["still_paused_by_report"] == 1
     assert dry["would_change"][0] == {
@@ -835,14 +853,14 @@ async def test_release_texts_names_tasks_a_report_still_pauses(
     }
     [post] = fake.calls_to("POST", RELEASE_TEXTS)
     assert post.json() == {"rows": texts, "preview": True}
-    fake.on("POST", RELEASE_TEXTS, _pause("release", "sha256:a", applied=True))
+    fake.on("POST", RELEASE_TEXTS, _pause("release", PT_A, applied=True))
     done = await call(
         mcp_client,
         "release_texts",
-        {"project": "p", "texts": texts, "confirm": True, "preview_token": "sha256:a"},
+        {"project": "p", "texts": texts, "confirm": True, "preview_token": PT_A},
     )
     assert done["applied"] is True
     assert fake.calls_to("POST", RELEASE_TEXTS)[-1].json() == {
         "rows": texts,
-        "preview_token": "sha256:a",
+        "preview_token": PT_A,
     }
