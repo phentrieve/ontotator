@@ -13901,6 +13901,17 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
           }
         },
         "type": "object",
@@ -14923,6 +14934,11 @@
             "type": "string",
             "pattern": "^[0-9]{0,9}$",
             "title": "Expected Latest Version",
+            "default": ""
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
             "default": ""
           }
         },
@@ -20740,6 +20756,17 @@
             ],
             "title": "Guideline Version"
           },
+          "guideline_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guideline Label"
+          },
           "guideline_withdrawn": {
             "type": "boolean",
             "title": "Guideline Withdrawn",
@@ -21587,6 +21614,17 @@
             "type": "integer",
             "title": "Version"
           },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
           "kind": {
             "type": "string",
             "enum": [
@@ -21767,6 +21805,17 @@
             "type": "integer",
             "title": "Version"
           },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
           "change_note": {
             "anyOf": [
               {
@@ -21813,6 +21862,17 @@
           "to_version": {
             "type": "integer",
             "title": "To Version"
+          },
+          "to_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Label"
           },
           "changes": {
             "items": {
@@ -21883,6 +21943,17 @@
           "version": {
             "type": "integer",
             "title": "Version"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
           },
           "kind": {
             "type": "string",
@@ -29854,6 +29925,17 @@
             ],
             "title": "Guideline Version"
           },
+          "guideline_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guideline Label"
+          },
           "guideline_withdrawn": {
             "type": "boolean",
             "title": "Guideline Withdrawn",
@@ -31442,6 +31524,17 @@
               }
             ],
             "title": "Guideline Version"
+          },
+          "guideline_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guideline Label"
           },
           "guideline_withdrawn": {
             "type": "boolean",
@@ -33503,6 +33596,17 @@
             "type": "boolean",
             "title": "Guideline Withdrawn",
             "default": false
+          },
+          "guideline_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guideline Label"
           }
         },
         "type": "object",

@@ -1,3 +1,4 @@
+import { guidelineVersionName, MAX_GUIDELINE_LABEL_CHARS } from "../guidelines/versionName";
 import { ApiError, NetworkError } from "../api/client";
 
 /** The server's guideline file refusals; the client-side file checks reuse them verbatim. */
@@ -326,13 +327,15 @@ export function errorMessage(error: unknown): string {
     : "Something went wrong. Please try again.";
 }
 
-/** Guideline refusals that name a version (`v{n}`) or the refused field. */
+/** Guideline refusals that name a version (`v{n}`, or `3.1 (v{n})` with the project's own label) or the refused field. */
 function guidelineMessage(error: unknown): string | null {
   if (!(error instanceof ApiError) || typeof error.details !== "object" || error.details === null) return null;
   const version = error.details.version;
   const named = typeof version === "number" && Number.isSafeInteger(version) && version > 0;
-  if (error.code === "GUIDELINE_UNCHANGED" && named) return `This file is identical to v${version}. Nothing was published.`;
-  if (error.code === "GUIDELINE_ALREADY_WITHDRAWN" && named) return `v${version} is already withdrawn.`;
+  const name = named ? guidelineVersionName(version, typeof error.details.label === "string" ? error.details.label : null) : "";
+  if (error.code === "GUIDELINE_UNCHANGED" && named) return `This file is identical to ${name}. Nothing was published.`;
+  if (error.code === "GUIDELINE_ALREADY_WITHDRAWN" && named) return `${name} is already withdrawn.`;
+  if (error.code === "GUIDELINE_NOTE_INVALID" && error.details.field === "label") return `The version label must be one line of at most ${MAX_GUIDELINE_LABEL_CHARS} characters.`;
   if (error.code === "GUIDELINE_NOTE_INVALID" && error.details.field === "reason") return "The reason must be one line of at most 280 characters.";
   return null;
 }

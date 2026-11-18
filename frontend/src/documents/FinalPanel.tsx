@@ -11,6 +11,7 @@ import { plural } from "../app/labels";
 import { routeHref, type ProjectDocumentsQuery, type Route } from "../app/router";
 import { Time } from "../app/Time";
 import { submissionGuidelineLabel } from "../guidelines/submissionLabel";
+import type { GuidelineRef } from "../guidelines/versionName";
 import { Button, InlineMessage, type ButtonVariant } from "../ui";
 import { onSpaceActivate } from "../ui/spaceActivates";
 import { useMediaQuery } from "../ui/useMediaQuery";
@@ -262,7 +263,7 @@ interface ContentProps extends DecisionBlockProps {
   row: DocumentRowView;
   page: DocumentRowsPage;
   data: FinalPanelData;
-  guidelineCurrent: number | null;
+  guidelineCurrent: GuidelineRef | null;
   /** Id of the choice whose save is in flight; every choice is unavailable meanwhile. */
   busy: string | null;
   onSave: (request: FinalConfirmRequest, triggerId: string) => void;
@@ -386,7 +387,7 @@ function AcceptContent(props: ContentProps & { submission: FinalPanelSubmissionV
     </UnresolvedNotice>
     <p className="final-panel-question">{acceptQuestion(submission)}</p>
     <p className="cell-secondary">{submissionLine(submission, row.language, row.parallel_roots, now)}</p>
-    <p className="cell-secondary">{submissionGuidelineLabel(submission.guideline_version, submission.guideline_withdrawn, guidelineCurrent)}</p>
+    <p className="cell-secondary">{submissionGuidelineLabel(submission.guideline_version, submission.guideline_withdrawn, guidelineCurrent, submission.guideline_label)}</p>
     <div className="final-panel-actions">
       {!isFinal && <ChoiceButton id={triggerId} label="Accept result" variant="primary" blocked={!submission.eligible} busy={busy} onAnnounce={onAnnounce}
         onChoose={() => onSave(selectRequest(row, data.submissions, submission, triggerId), triggerId)} />}
@@ -410,7 +411,7 @@ function DecidedContent(props: ContentProps & { onChange: () => void }): JSX.Ele
         {submissionLine(final, row.language, row.parallel_roots, now)}{", "}
         {link(route(final.document_id, final.submission_id), "Open submission")}
       </p>
-      <p className="cell-secondary">{submissionGuidelineLabel(final.guideline_version, final.guideline_withdrawn, guidelineCurrent)}</p>
+      <p className="cell-secondary">{submissionGuidelineLabel(final.guideline_version, final.guideline_withdrawn, guidelineCurrent, final.guideline_label)}</p>
     </>}
     {listed.length > 1 && <div className="final-panel-actions">
       <Button size="sm" onClick={props.onChange}>Change final…</Button>
@@ -489,7 +490,7 @@ function SubmissionTable(props: ContentProps & { listed: FinalPanelSubmissionVie
           return <li key={submission.submission_id} className={isFinal ? "submissions-list-item final-row" : "submissions-list-item"}>
             <span id={nameId} className="submissions-list-label">{submissionName(submission)}</span>
             <span className="cell-secondary">{submissionWhen(submission, now)}</span>
-            <span className="cell-secondary">{submissionGuidelineLabel(submission.guideline_version, submission.guideline_withdrawn, guidelineCurrent)}</span>
+            <span className="cell-secondary">{submissionGuidelineLabel(submission.guideline_version, submission.guideline_withdrawn, guidelineCurrent, submission.guideline_label)}</span>
             <span className="submissions-list-findings">{`${plural(submission.finding_count, "finding")}, only here: ${onlyHereText(submission, row.parallel_roots)}`}</span>
             <div className="submissions-list-line">{actions(submission, nameId, triggerId, isFinal)}</div>
           </li>;
@@ -511,7 +512,7 @@ function SubmissionTable(props: ContentProps & { listed: FinalPanelSubmissionVie
           <th scope="row" id={nameId}>
             {submissionName(submission)}
             <div className="cell-secondary">{submissionWhen(submission, now)}</div>
-            <div className="cell-secondary">{submissionGuidelineLabel(submission.guideline_version, submission.guideline_withdrawn, guidelineCurrent)}</div>
+            <div className="cell-secondary">{submissionGuidelineLabel(submission.guideline_version, submission.guideline_withdrawn, guidelineCurrent, submission.guideline_label)}</div>
           </th>
           <td>{submission.finding_count}</td>
           <td>{onlyHereText(submission, row.parallel_roots)}</td>

@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Guidelines: a version can carry the project's own version of the document (#487). **Settings** › **Guidelines** has one more optional field when publishing, **Your version of the guideline (optional)** (for example *3.1*; one line, up to 40 characters). It is stored with the version and shown before the upload number wherever the version is named: *Guidelines 3.1 (v2)* in the task, the reader and the settings, *Guidelines updated to 3.1 (v2)* in the notice, *Project guidelines 3.1 (v2)* on My tasks, and *Guidelines 3.1 (v2) (current: 3.2 (v3))* on submitted results and translation reviews. Without it everything reads as before (*Guidelines v2*). The upload number stays the identifier: `expected_latest_version`, withdraw, republish, the stamp on a submission and the export reference `urn:ontotator:{project}:guidelines:v{n}` are unchanged. The label cannot be edited later and stays when the version is withdrawn; **Republish** fills it in from the earlier version. API: `POST /api/v1/projects/{key}/guidelines` takes the optional form field `label` (refused with `GUIDELINE_NOTE_INVALID`, `field: label`); the version views carry `label`, a task's `guideline` and `guideline_notice` carry `label` and `to_label`, and each `guideline_version` stamp of a submission or translation review comes with `guideline_label`. The translation review export (`ontotator-translation-review/v1`) gets the additive field `guideline_label` after `guideline_withdrawn`; the final export (`index.csv`, `guideline_ref`) is unchanged. MCP: `publish_guideline` takes an optional `label`; `list_guidelines` returns it. Migration 0048 adds the nullable column `guideline_versions.label`; a project archive carries it.
+
+
 ## [0.11.0] - 2026-11-17
 
 ### Added

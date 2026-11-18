@@ -631,13 +631,14 @@ describe("My tasks guideline links", () => {
   it("links Project guidelines v3 once per project with a version in force", async () => {
     vi.spyOn(api, "listMyTasks").mockResolvedValue([...tasks, task(5, "open", "r", "Project R")]);
     vi.mocked(api.listGuidelines).mockImplementation(async key => key === "p" ? guidelineListing([guidelineSummary(3), guidelineSummary(2)])
-      : key === "q" ? guidelineListing([guidelineSummary(1)]) : guidelineListing([withdrawnGuideline(2), guidelineSummary(1)]));
+      : key === "q" ? guidelineListing([guidelineSummary(1, { label: "3.1" })]) : guidelineListing([withdrawnGuideline(2), guidelineSummary(1)]));
     const onNavigate = vi.fn();
     const { rerender } = render(<MyTasks projects={[]} onNavigate={onNavigate} />);
     await screen.findAllByTestId("task-row");
     const links = await screen.findAllByRole("link", { name: /^Project guidelines/ });
     // Ordered as the project filter options; R has no version in force (its current one is withdrawn).
-    expect(links.map(link => link.textContent)).toEqual(["Project guidelines v3, Project P", "Project guidelines v1, Project Q"]);
+    // Q's version has the project's own label, shown before the upload number (#487).
+    expect(links.map(link => link.textContent)).toEqual(["Project guidelines v3, Project P", "Project guidelines 3.1 (v1), Project Q"]);
     expect(links.map(link => link.getAttribute("href"))).toEqual(["#/projects/p/guidelines", "#/projects/q/guidelines"]);
     expect(vi.mocked(api.listGuidelines).mock.calls.map(([key]) => key).sort()).toEqual(["p", "q", "r"]);
     fireEvent.click(links[0]);

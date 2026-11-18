@@ -6,6 +6,7 @@ import { kindLabels, personLabel, submissionLabel, type SubmissionKind } from ".
 import { Time } from "../app/Time";
 import { plural } from "../app/labels";
 import { submissionGuidelineLabel } from "../guidelines/submissionLabel";
+import type { GuidelineRef } from "../guidelines/versionName";
 import { Button, DataTable, StatusBadge, type Column } from "../ui";
 import { isPlainClick } from "./RowCells";
 
@@ -53,7 +54,7 @@ export interface SubmissionsTableProps {
   /** DOM id of the Final row's View link (stable focus target). */
   finalLinkId?: string;
   /** Guideline version in force; with it older stamps read "Guidelines v2 (current: v3)". Null or absent: the stamp alone. */
-  guidelineCurrent?: number | null;
+  guidelineCurrent?: GuidelineRef | null;
 }
 
 /** "Round n", "Initial submission" without a round, or the kind for rounds without an ordinal (consolidation). */
@@ -133,7 +134,7 @@ export function SubmissionsTable({
     return caseId == null ? version : `${textLabel({ case_id: caseId, language })} ${version}`;
   };
   const guidelineLabel = (row: RowSubmissionView) => <span className="cell-secondary submission-guideline">
-    {submissionGuidelineLabel(row.guideline_version, row.guideline_withdrawn, guidelineCurrent)}
+    {submissionGuidelineLabel(row.guideline_version, row.guideline_withdrawn, guidelineCurrent, row.guideline_label)}
   </span>;
   const roundCellContent = (row: RowSubmissionView) => viewLink(row, [roundName(row), ...roundSuffixes(row, rows)].join(", "));
 

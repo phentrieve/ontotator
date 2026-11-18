@@ -599,6 +599,8 @@ class RowSubmissionView(_View):
     finding_count: int
     author: PersonRefView | None = None
     guideline_version: int | None = None
+    # The project's own name of that version ("3.1"), if it has one.
+    guideline_label: str | None = None
     guideline_withdrawn: bool = False
     # Consolidation submissions: findings kept automatically (all matched, U14).
     # A factory default keeps it optional in the generated types: the

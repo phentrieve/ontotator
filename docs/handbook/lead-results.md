@@ -96,7 +96,7 @@ What for: pick another result after you already chose one.
 
 1. Open the text card at **Finalization**.
 2. Click **Change final…** next to **Open result**.
-3. Click **Use as final** in the row of the result you want. It saves at once; the card stays on this text and says *Final result saved for EN100022 en.*
+3. Click **Use as final** in the row of the result you want. It saves at once; the card stays on this text and says *Final result saved for EN100022 en.* Each result names the guideline version it was made under, for example *Guidelines v2 (current: v3)*, or *Guidelines 3.1 (v2) (current: 3.2 (v3))* when the versions have your own numbers ([Publish the first or a new guideline version](lead-settings.md#publish-the-first-or-a-new-guideline-version)).
 
 The message *Final result of EN100022 en changed.* has an **Undo** button, also while the card is open. It brings the earlier final result back (*The earlier final result of EN100022 en is back.*), under the same rules as the Undo of **Change final…** for several texts: for the lead who made the change, once, within an hour, and refused once something the final result rests on changed since ([Accept or change the final result of several texts](#accept-or-change-the-final-result-of-several-texts)). The same message follows **Use the newer result** under *Review changes…*. A first choice of a final result has no Undo: use [Withdraw a final result](#withdraw-a-final-result). **History** in the card lists each change and its Undo.
 

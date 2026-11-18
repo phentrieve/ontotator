@@ -47,7 +47,7 @@ The **More** menu holds **Work rounds**, **Report a text problem…**, **Report 
 
 Open the guidelines with **More** › *Guidelines v2* or, the first time, with the button in the notice, for example *Read guidelines v2*. On a wide screen they open in the right column, so the text keeps its place in the middle:
 
-- The right column gets two tabs, **Details** and *Guidelines v2*. Click a tab to switch, or focus a tab and press `←` or `→`.
+- The right column gets two tabs, **Details** and *Guidelines v2* (*Guidelines 3.1 (v2)* when the version has the lead's own number). Click a tab to switch, or focus a tab and press `←` or `→`.
 - Selecting a finding in the list or in the text keeps the guidelines in front. The decision keys `1`, `2` and `0` act on the selected proposal from there.
 - When you mark text, use the term search (`/`) or the values (`V`), or a decision needs a note (`4`, **Unresolved**), **Details** comes to the front by itself. The guidelines tab stays until you close it.
 - **All versions** opens the guidelines page in a new tab. **Close**, the ✕ next to the tabs or `Esc` closes the guidelines and returns to **Details**.

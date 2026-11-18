@@ -4553,6 +4553,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Label */
+            label?: string | null;
         };
         /** AssignmentOpenRequest */
         AssignmentOpenRequest: {
@@ -4941,6 +4943,11 @@ export interface components {
              * @default
              */
             expected_latest_version: string;
+            /**
+             * Label
+             * @default
+             */
+            label: string;
         };
         /** Body_upload_ontologies_api_v1_admin_ontologies__post */
         Body_upload_ontologies_api_v1_admin_ontologies__post: {
@@ -6916,6 +6923,8 @@ export interface components {
             author?: components["schemas"]["PersonRefView"] | null;
             /** Guideline Version */
             guideline_version?: number | null;
+            /** Guideline Label */
+            guideline_label?: string | null;
             /**
              * Guideline Withdrawn
              * @default false
@@ -7180,6 +7189,8 @@ export interface components {
         GuidelineDocument: {
             /** Version */
             version: number;
+            /** Label */
+            label?: string | null;
             /**
              * Kind
              * @enum {string}
@@ -7226,6 +7237,8 @@ export interface components {
         GuidelineNoticeChangeView: {
             /** Version */
             version: number;
+            /** Label */
+            label?: string | null;
             /** Change Note */
             change_note: string | null;
             /**
@@ -7245,6 +7258,8 @@ export interface components {
             from_version: number | null;
             /** To Version */
             to_version: number;
+            /** To Label */
+            to_label?: string | null;
             /** Changes */
             changes: components["schemas"]["GuidelineNoticeChangeView"][];
             /** More */
@@ -7277,6 +7292,8 @@ export interface components {
         GuidelineSummary: {
             /** Version */
             version: number;
+            /** Label */
+            label?: string | null;
             /**
              * Kind
              * @enum {string}
@@ -10232,6 +10249,8 @@ export interface components {
             author?: components["schemas"]["PersonRefView"] | null;
             /** Guideline Version */
             guideline_version?: number | null;
+            /** Guideline Label */
+            guideline_label?: string | null;
             /**
              * Guideline Withdrawn
              * @default false
@@ -10801,6 +10820,8 @@ export interface components {
             round_id?: string | null;
             /** Guideline Version */
             guideline_version?: number | null;
+            /** Guideline Label */
+            guideline_label?: string | null;
             /**
              * Guideline Withdrawn
              * @default false
@@ -11532,6 +11553,8 @@ export interface components {
              * @default false
              */
             guideline_withdrawn: boolean;
+            /** Guideline Label */
+            guideline_label?: string | null;
         };
         /** TranslationRunView */
         TranslationRunView: {

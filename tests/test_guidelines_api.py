@@ -38,11 +38,13 @@ def publish(
     filename: str = "rules.md",
     note: str = "",
     expected: str = "",
+    label: str | None = None,
 ):
+    data = {"change_note": note, "expected_latest_version": expected}
+    if label is not None:
+        data["label"] = label
     return client.post(
-        BASE,
-        files={"file": (filename, body, "text/markdown")},
-        data={"change_note": note, "expected_latest_version": expected},
+        BASE, files={"file": (filename, body, "text/markdown")}, data=data
     )
 
 
@@ -174,6 +176,58 @@ def test_reads_endpoint_returns_204_and_is_idempotent(team) -> None:
     assert reach == {"notified": 1, "opened": 1, "members": 1}
     bad = team.annotator.post(f"{BASE}/1/reads", json={"event": "read"})
     assert bad.status_code == 422
+
+
+def test_label_is_stored_with_the_version_and_stays_when_withdrawn(team) -> None:
+    """Issue 487: the project's own version, shown before the upload number."""
+    first = publish(team.lead, b"# 3.0", label="  3.0 ")
+    assert first.status_code == 201, first.text
+    assert (first.json()["version"], first.json()["label"]) == (1, "3.0")
+    # Without a label, and with an empty one, everything reads as before.
+    assert publish(team.lead, b"# x", expected="1").json()["label"] is None
+    assert publish(team.lead, b"# y", expected="2", label=" ").json()["label"] is None
+    fourth = publish(team.lead, b"# 3.1", expected="3", label="3.1")
+    assert (fourth.json()["version"], fourth.json()["label"]) == (4, "3.1")
+    # The same label twice is allowed: a republished text gets a new number.
+    assert publish(team.lead, b"# 3.1 b", expected="4", label="3.1").status_code == 201
+
+    listing = team.annotator.get(BASE).json()
+    assert [(v["version"], v["label"]) for v in listing["versions"]] == [
+        (5, "3.1"),
+        (4, "3.1"),
+        (3, None),
+        (2, None),
+        (1, "3.0"),
+    ]
+    assert listing["current"]["label"] == "3.1"
+    assert team.annotator.get(f"{BASE}/1").json()["label"] == "3.0"
+
+    withdrawn = team.lead.post(
+        f"{BASE}/1/withdraw", json={"reason": None, "expected_latest_version": 5}
+    )
+    assert withdrawn.status_code == 200, withdrawn.text
+    # The text, file name and note go; the number and the label stay.
+    document = team.annotator.get(f"{BASE}/1").json()
+    assert (document["body"], document["filename"]) == (None, None)
+    assert document["label"] == "3.0"
+    again = team.lead.post(
+        f"{BASE}/1/withdraw", json={"reason": None, "expected_latest_version": 5}
+    )
+    assert again.json()["details"] == {"version": 1, "label": "3.0"}
+    same = publish(team.lead, b"# 3.1 b", expected="5", label="3.2")
+    assert same.json()["code"] == "GUIDELINE_UNCHANGED"
+    assert same.json()["details"] == {"version": 5, "label": "3.1"}
+
+
+@pytest.mark.parametrize("label", ["x" * 41, "3.1\nfinal", "3.1\u202e"])
+def test_an_invalid_label_is_refused_and_nothing_is_published(team, label) -> None:
+    refused = publish(team.lead, label=label)
+    assert (refused.status_code, refused.json()["code"]) == (
+        422,
+        "GUIDELINE_NOTE_INVALID",
+    )
+    assert refused.json()["details"] == {"field": "label"}
+    assert versions(team.app) == []
 
 
 def test_error_statuses(team) -> None:
