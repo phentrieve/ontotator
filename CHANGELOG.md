@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Ontologies: a term id may have dots inside its local part, as ICD-10 or ATC codes do (`ICD10CM:T36.0X1A`). Annotations, modifiers, the search filter `within` and the OBO Graph import accept such ids; an OBO IRI ending in `ICD10CM_T36.0X1A` becomes `ICD10CM:T36.0X1A`. A dot at the start or end of the local part, or two dots in a row, is still no id. An IRI's local part may now also hold a hyphen (`XMPL_A00-A09`), as the CURIE form already allowed.
+
 ## [0.11.0] - 2026-11-17
 
 ### Added
