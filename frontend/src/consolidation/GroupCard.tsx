@@ -195,7 +195,7 @@ export function GroupCard(props: GroupCardProps): JSX.Element {
   const inputIds = group.members.map(member => member.input_id);
   const sameTerm = line.termId ? sameTermGroups(group, allGroups, line.termId, choices) : [];
   const termName = group.members.find(member => member.term_id === line.termId)?.term_label || otherTerm?.label || line.termId;
-  // #472: the state counts the rows still without a choice; with every choice made it says that nothing is saved yet.
+  // Issue 472: the state counts the rows still without a choice; with every choice made it says that nothing is saved yet.
   const undecided = rows.filter(row => row.conflict && choices[row.id] === undefined).length;
   const status = open && conflicts > 0 && undecided === 0 ? CHOSEN_NOT_SAVED : groupStatus(group, undecided);
   const stored = useMemo(() => (open ? null : storedResult(group, text)), [open, group, text]);
