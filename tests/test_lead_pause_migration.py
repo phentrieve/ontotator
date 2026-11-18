@@ -43,7 +43,8 @@ def _columns(conn: Connection) -> set[str]:
 
 def test_one_head():
     scripts = ScriptDirectory.from_config(alembic_config())
-    assert scripts.get_heads() == [head_revision()] == [REVISION]
+    # One head; 0046 (hide the term id prefix) follows this one.
+    assert scripts.get_heads() == [head_revision()]
     assert _previous() == PREVIOUS
     previous = scripts.get_revision(PREVIOUS)
     assert previous is not None and previous.down_revision == BEFORE

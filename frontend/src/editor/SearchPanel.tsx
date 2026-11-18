@@ -13,6 +13,7 @@ import { SearchManager, type SearchState, type WorkspaceKey } from "./searchStat
 import { firstUsableIndex, matchLine } from "./termSearch";
 import { COHORT_TAG, MODIFIER_ROOTS } from "./modifiers";
 import "./modifiers.css";
+import { useTermIdDisplay } from "./termIds";
 
 export interface SearchPanelProps {
   canAssign?: boolean;
@@ -75,6 +76,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
   onPickModifier,
   modifierFilter = false,
 }) => {
+  const showTermId = useTermIdDisplay();
   const [modifiersOnly, setModifiersOnly] = useState(false);
   // "Modifiers only" switched on by the `mod:` prefix: an emptied field switches it off again.
   const modifiersFromPrefix = useRef(false);
@@ -412,7 +414,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
               >
                 <div className="candidate-header">
                   <strong className="candidate-label" title={cand.label}>{cand.label}</strong>
-                  <span className="candidate-id">{cand.term_id}</span>
+                  <span className="candidate-id" title={cand.term_id}>{showTermId(cand.term_id)}</span>
                   {isModifierHit(cand) && <span className="candidate-role">{cand.role === "cohort" ? COHORT_TAG : "Modifier"}</span>}
                   {cand.weak_match && <span className="candidate-role">Weak match</span>}
                   {canAssign && (
@@ -448,7 +450,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
         // preview of another length never moves the rows under the pointer. A long definition scrolls inside the
         // pane, so it is a named region in the Tab order: a keyboard user can reach it and scroll it with the arrows.
         <section className="candidate-preview" data-testid="candidate-preview" aria-labelledby={`${listboxId}-preview`} tabIndex={0}>
-          <div id={`${listboxId}-preview`} className="candidate-preview-title">{`Definition of ${candidates[shownActive].label} (${candidates[shownActive].term_id})`}</div>
+          <div id={`${listboxId}-preview`} className="candidate-preview-title">{`Definition of ${candidates[shownActive].label} (${showTermId(candidates[shownActive].term_id)})`}</div>
           <p className="candidate-preview-text">{candidates[shownActive].definition || "This term has no definition in the ontology."}</p>
         </section>
       )}

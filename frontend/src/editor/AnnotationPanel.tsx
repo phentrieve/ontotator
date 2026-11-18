@@ -20,6 +20,7 @@ import { useCoalescedAxisChange } from "./useCoalescedAxisChange";
 import { useValuesLayout } from "./valuesLayout";
 import { quoteOf } from "./modifiers";
 import { CopyTextButton } from "./CopyTextButton";
+import { useTermIdDisplay } from "./termIds";
 
 export type AxesValues = Record<string, string | null>;
 export type Axes = AxesValues;
@@ -134,6 +135,7 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
   modifiersSection,
   modifierNotice,
 }) => {
+  const showTermId = useTermIdDisplay();
   const [showSearch, setShowSearch] = useState(false);
   const changeTermButton = useRef<HTMLButtonElement>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -250,7 +252,7 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
           <div>
             <span className="replacement-banner__label">Replacement for proposal: </span>
             <span className="replacement-banner__term">
-              {linkedTarget.termLabel ? `${linkedTarget.termLabel} (${linkedTarget.termId})` : linkedTarget.termId}
+              {linkedTarget.termLabel ? `${linkedTarget.termLabel} (${showTermId(linkedTarget.termId)})` : showTermId(linkedTarget.termId)}
             </span>
           </div>
           {onNavigateTarget && (

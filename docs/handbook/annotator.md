@@ -125,6 +125,7 @@ What for: find the right ontology term quickly.
 Search options:
 
 - To search only modifier terms (severity, onset, …), switch on **Modifiers only**, or type `mod:` before the word.
+- Some projects show codes without the ontology prefix, for example `N18.1` instead of `ICD10CM:N18.1` (a lead's setting, see [Show codes without the ontology prefix](lead-settings.md#show-codes-without-the-ontology-prefix)). Point at a code to see it in full.
 - The language of the text is searched too. To search names in other languages, click the language button next to the field (it lists the languages searched, for example *EN, DE*) and tick them under **Search languages**. English names are always searched.
 - Hits tagged **Modifier** are modifier terms. Use one as a finding only if it names the finding itself; otherwise add it under **Modifiers**. Obsolete terms cannot be chosen.
 - Hits tagged **Weak match** do not match your words closely: at least one word is not at the start of a word of the name, even allowing for a typo or a plural. They are listed last, and Enter takes one only after you choose it with `↓` or `↑`. If all hits are weak, the line under the field says "no close match".
