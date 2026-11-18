@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 from conftest import ToolFailed, call
-from fake_api import FakeApi, refusal
+from fake_api import PT_A, PT_B, FakeApi, refusal
 from mcp import Client
 from shapes import build, page, panel, row, submission
 
@@ -70,6 +70,51 @@ async def test_a_new_round_is_a_dry_run_until_confirmed(
     restart = {"project": "p", "assignment_id": 3, "kind": "clean_restart"}
     with pytest.raises(ToolFailed, match="needs a reason"):
         await call(mcp_client, "start_new_round", restart | {"confirm": True})
+
+
+@pytest.mark.parametrize("kind", ["carry_forward", "clean_restart"])
+async def test_a_new_round_dry_run_reports_an_open_consolidation(
+    fake: FakeApi, mcp_client: Client, kind: str
+) -> None:
+    """Issue 471: the dry run no longer promises a round the confirm
+    refuses. The server marks the submissions (``refused_by``); with it the
+    dry run says ``blocked`` and confirm sends nothing."""
+    fake.on("GET", f"{P}/assignments", [_task() | {"status": "submitted"}])
+    current = build("WorkRoundView", round_id="r1", kind="ordinary", active=True)
+    fake.on("GET", f"{TASK}/rounds", [current])
+    source = build(
+        "RoundSourceView", submission_id="s1", refused_by="CONSOLIDATION_OPEN"
+    )
+    fake.on("GET", f"{TASK}/round-sources", [source])
+    args: dict[str, Any] = {
+        "project": "p",
+        "assignment_id": 3,
+        "kind": kind,
+        "reason": "Guideline changed",
+    }
+    for confirm in (False, True):
+        answer = await call(mcp_client, "start_new_round", args | {"confirm": confirm})
+        assert answer["applied"] is False
+        assert answer["blocked"]["code"] == "CONSOLIDATION_OPEN"
+        assert "withdraw_task" in answer["blocked"]["message"]
+        assert answer["plan"]["consequence"].startswith("Nothing")
+    assert _writes(fake) == []
+
+
+async def test_a_clean_restart_of_unsubmitted_work_does_not_ask_for_sources(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    fake.on("GET", f"{P}/assignments", [_task()])
+    fake.on("GET", f"{TASK}/rounds", [])
+    args = {
+        "project": "p",
+        "assignment_id": 3,
+        "kind": "clean_restart",
+        "reason": "Wrong tool set",
+    }
+    dry = await call(mcp_client, "start_new_round", args)
+    assert dry["applied"] is False and "blocked" not in dry
+    assert not fake.calls_to("GET", f"{TASK}/round-sources")
 
 
 async def test_a_new_round_names_an_open_consolidation(
@@ -345,6 +390,50 @@ async def test_text_changes_send_the_tasks_revision(
     assert carried.json()["username"] == "bob"
 
 
+async def test_carry_dry_run_reports_an_earlier_decision(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    """Issue 461: already_resolved instead of a preview; confirm is refused."""
+    details = {
+        "reason": "already_resolved",
+        "resolution": "carried",
+        "assignment_id": 12,
+        "decided_at": "2026-11-17T10:00:00+00:00",
+    }
+    fake.on(
+        "POST",
+        f"{P}/text-changes/preview",
+        refusal(422, "TEXT_CHANGE_NOT_APPLICABLE", details),
+    )
+    args = {"project": "p", "submission_id": "s1", "target_document_id": "d2"}
+    dry = await call(mcp_client, "carry_submission", args)
+    assert dry == {
+        "selection": "project 'p', target_document_id 'd2', submission_id 's1'",
+        "applied": False,
+        "already_resolved": {
+            "resolution": "carried",
+            "assignment_id": 12,
+            "decided_at": "2026-11-17T10:00:00+00:00",
+        },
+    }
+    with pytest.raises(ToolFailed, match="already_resolved"):
+        await call(mcp_client, "carry_submission", args | {"confirm": True})
+    assert not fake.calls_to("POST", f"{P}/submissions/{{submission_id}}/carry")
+
+
+async def test_carry_dry_run_passes_other_refusals_on(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    fake.on(
+        "POST",
+        f"{P}/text-changes/preview",
+        refusal(422, "TEXT_CHANGE_NOT_APPLICABLE", {"reason": "not_ancestor"}),
+    )
+    args = {"project": "p", "submission_id": "s1", "target_document_id": "d2"}
+    with pytest.raises(ToolFailed, match="not_ancestor"):
+        await call(mcp_client, "carry_submission", args)
+
+
 async def test_a_problem_report_action_sends_the_reports_revision(
     fake: FakeApi, mcp_client: Client
 ) -> None:
@@ -573,6 +662,11 @@ async def test_upload_translation_version_confirms_with_the_dry_runs_text_hash(
         "model": "deepl-2026-10",
         "made_on": "2026-11-12",
     }
+    # A machine translation without its provider fails at the dry run (#471).
+    without = {key: value for key, value in args.items() if key != "provider"}
+    with pytest.raises(ToolFailed, match="names its provider"):
+        await call(mcp_client, "upload_translation_version", without)
+    assert not fake.calls_to("POST", f"{versions}/preview")
     dry = await call(mcp_client, "upload_translation_version", args)
     assert dry["applied"] is False
     assert dry["plan"]["available"] is True
@@ -657,7 +751,10 @@ async def test_assign_texts_names_the_correction_for_a_review_accepted_version(
     )
     by_review, other = result["refused"]
     assert "request_translation_correction" in by_review["hint"]
-    assert "hint" not in other
+    # Every refused row says what to do next, and the answer says so first.
+    assert "translations only" in other["hint"]
+    assert next(iter(result)) == "warning"
+    assert result["warning"].startswith("2 of 2 rows were refused")
     tools = {tool.name: tool for tool in (await mcp_client.list_tools()).tools}
     schema = tools["assign_texts"].input_schema["properties"]["task"]
     assert "request_translation_correction" in schema["description"]
@@ -759,10 +856,10 @@ async def test_change_annotation_modes_dry_run_confirm_and_stale_token(
             | fields
         )
 
-    fake.on("POST", bulk, preview("sha256:a"))
+    fake.on("POST", bulk, preview(PT_A))
     args = {"project": "p", "texts": texts, "mode": "scratch", "reason": "Wrong model"}
     dry = await call(mcp_client, "change_annotation_modes", args)
-    assert dry["applied"] is False and dry["preview_token"] == "sha256:a"
+    assert dry["applied"] is False and dry["preview_token"] == PT_A
     assert dry["would_change"] == [
         {
             "case_id": "c",
@@ -779,18 +876,16 @@ async def test_change_annotation_modes_dry_run_confirm_and_stale_token(
     with pytest.raises(ToolFailed):
         await call(mcp_client, "change_annotation_modes", args | {"confirm": True})
     assert len(fake.calls_to("POST", bulk)) == 1
-    confirmed = args | {"confirm": True, "preview_token": "sha256:a"}
-    fake.on("POST", bulk, preview("sha256:a", applied=True))
+    confirmed = args | {"confirm": True, "preview_token": PT_A}
+    fake.on("POST", bulk, preview(PT_A, applied=True))
     done = await call(mcp_client, "change_annotation_modes", confirmed)
     assert done["applied"] is True and done["change_count"] == 1
     assert fake.calls_to("POST", bulk)[-1].json() == {
         "rows": texts,
         "mode": "scratch",
-        "preview_token": "sha256:a",
+        "preview_token": PT_A,
         "reason": "Wrong model",
     }
-    fake.on(
-        "POST", bulk, refusal(409, "PREVIEW_STALE", {"preview": preview("sha256:b")})
-    )
+    fake.on("POST", bulk, refusal(409, "PREVIEW_STALE", {"preview": preview(PT_B)}))
     stale = await call(mcp_client, "change_annotation_modes", confirmed)
-    assert stale["stale"] is True and stale["preview_token"] == "sha256:b"
+    assert stale["stale"] is True and stale["preview_token"] == PT_B

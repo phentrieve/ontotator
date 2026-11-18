@@ -146,6 +146,22 @@ describe("task guidelines notice", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Guidelines v3" })).toBeDefined();
   });
 
+  it("names labelled versions first in the button, the notice and the drawer (#487)", async () => {
+    vi.mocked(api.getGuideline).mockImplementation(async (_key, version) => guidelineDocument(guidelineSummary(version, { label: "3.2" })));
+    const labelled: GuidelineNotice = { from_version: 1, to_version: 3, to_label: "3.2", more: 0, changes: [
+      { version: 3, label: "3.2", change_note: "Negations", created_at: T, withdrawn: false },
+      { version: 2, label: "3.1", change_note: null, created_at: T, withdrawn: true },
+    ] };
+    render(<Harness assignment={task({ guideline: { ...inForce(3), label: "3.2" }, guideline_notice: labelled })} />);
+    const notice = within(screen.getByTestId("notice-slot"));
+    expect(await notice.findByText("Guidelines updated to 3.2 (v3)")).toBeDefined();
+    expect(notice.getAllByRole("listitem").map(item => item.textContent)).toEqual(["3.2 (v3): Negations", "3.1 (v2): withdrawn"]);
+    const button = screen.getByRole("button", { name: /^Guidelines 3\.2 \(v3\), open the project guidelines/ });
+    expect(button.textContent).toContain("Guidelines 3.2 (v3)");
+    fireEvent.click(notice.getByRole("button", { name: "Read guidelines 3.2 (v3)" }));
+    expect(await screen.findByRole("heading", { level: 2, name: "Guidelines 3.2 (v3)" })).toBeDefined();
+  });
+
   it("first-exposure notice copy", async () => {
     render(<Harness assignment={task({ guideline_notice: first })} />);
     const notice = within(screen.getByTestId("notice-slot"));

@@ -130,6 +130,8 @@ for (const [width, height, suffix] of SIZES) {
     await undo.click();
     await expect(toast).toContainText("The earlier final result of EN100022 en is back.");
     await expect(page.getByRole("dialog", { name: "EN100022 en" })).toBeVisible();
+    // Review 2, F7 b: the line about the result that is no longer final goes.
+    await expect(page.locator(".final-panel-success")).toHaveCount(0);
     await shot(page, `f2-undone-after${suffix}`);
 
     // History, newest first: the Undo, the change in the card, the bulk change, the first choice.

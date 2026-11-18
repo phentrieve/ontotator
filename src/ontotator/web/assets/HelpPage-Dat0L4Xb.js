@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-DN543gsu.js";import{n as a,t as o}from"./lib-Cpo_inee.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-Bi3JTCuq.js";import{n as a,t as o}from"./lib-CtB72lHB.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -73,7 +73,7 @@ Words you meet in the app, in alphabetical order. The handbook uses one word per
 | Finalization | The third part of the lead's text card, where the lead accepts the final result or starts a consolidation. |
 | Finding | One ontology term marked in a text, with its values, modifiers and zero or more mentions. |
 | Group | In a consolidation: the findings from different submissions on overlapping passages, decided together. |
-| Guidelines | The project's annotation rules. Leads publish numbered versions (v1, v2, …); you read the version in force. |
+| Guidelines | The project's annotation rules. Leads publish numbered versions (v1, v2, …); you read the version in force. A lead can add the version the document gives itself; it is then shown first, for example *3.1 (v2)*. |
 | Layer | Part of the annotation setup with its own ontology. Each required layer must be checked before you submit. A **Reference** layer is read-only; a **Locked** layer cannot be edited. |
 | Mention | A marked passage of text that supports a finding. A finding can have several mentions. |
 | Modifier | An HPO term such as a severity or an onset, attached to a finding. |
@@ -227,7 +227,7 @@ You cannot deactivate your own account. In project member lists the person shows
 What for: check what was changed on an account and by whom.
 
 1. On **Users**, click **More…** in the row and choose **History**. For anonymised accounts, click the **History** button in the row.
-2. Read the table: **When**, **By**, **What**, **Whom**, **Project**, **Details**. **What** names the change in plain words, for example *Project settings changed*, *Final result withdrawn*, *Final export created* or *Phenopackets created*. Research exports are listed too, for example *Edit log exported* or *Working time exported*. A text given its own number of annotators reads *Annotators per text changed for one text*, with the text, the old and new value and the project value under **Details**.
+2. Read the table: **When**, **By**, **What**, **Whom**, **Project**, **Details**. **What** names the change in plain words, for example *Project settings changed*, *Final result withdrawn*, *Final export created* or *Phenopackets created*. Research exports are listed too, for example *Edit log exported* or *Working time exported*. A text given its own number of annotators reads *Annotators per text changed for one text*, with the text, the old and new value and the project value under **Details**. *Languages changed* says which languages were added and removed (*Added: fr. Removed: es.*). *Project settings changed* names each setting as the settings page does, with the old and the new value (*Hide annotator names during consolidation: off → on*); the description, the prefilled values and the values annotators can choose are named without values. Entries from before these values were recorded show the names only. On a phone, scroll the table sideways to read **Details**.
 3. Changes made with an API token name it under **Details** (*Via API token*); the single requests a token made are left out here. The dialog shows the newest 200 entries. For the whole trail, use the command \`ontotator admin audit\`, see [Server operations](../operations.md#users-ontologies-and-projects). An editorial correction of a translation is recorded as *Typo fix in a translation*; its details carry the reason and the changed passages.
 
 ## Anonymise a deactivated account
@@ -449,7 +449,7 @@ The **More** menu holds **Work rounds**, **Report a text problem…**, **Report 
 
 Open the guidelines with **More** › *Guidelines v2* or, the first time, with the button in the notice, for example *Read guidelines v2*. On a wide screen they open in the right column, so the text keeps its place in the middle:
 
-- The right column gets two tabs, **Details** and *Guidelines v2*. Click a tab to switch, or focus a tab and press \`←\` or \`→\`.
+- The right column gets two tabs, **Details** and *Guidelines v2* (*Guidelines 3.1 (v2)* when the version has the lead's own number). Click a tab to switch, or focus a tab and press \`←\` or \`→\`.
 - Selecting a finding in the list or in the text keeps the guidelines in front. The decision keys \`1\`, \`2\` and \`0\` act on the selected proposal from there.
 - When you mark text, use the term search (\`/\`) or the values (\`V\`), or a decision needs a note (\`4\`, **Unresolved**), **Details** comes to the front by itself. The guidelines tab stays until you close it.
 - **All versions** opens the guidelines page in a new tab. **Close**, the ✕ next to the tabs or \`Esc\` closes the guidelines and returns to **Details**.
@@ -795,7 +795,7 @@ When the lead answers, the task shows a banner with **Open the answer**, and **M
 
 The lead can pause the work on a text, for example while the text is being clarified. Your task stays in **My tasks**, marked **Paused by lead** with the lead's reason. You can open and read it; a banner *Paused by lead: …* above the text gives the reason. You cannot save or submit until the lead releases the text. Then the mark goes away and you continue where you stopped. There is nothing for you to do meanwhile.
 
-- If the pause arrives while you have the task open, the next thing you do there (a term search, a saved change, a submit) is refused and the banner appears. Nothing you saved is lost. What you had typed but not saved stays on the screen until you leave the task; when you leave, the editor asks before it discards it.
+- If the pause arrives while you have the task open, the next thing you do there (a term search, a saved change, a submit) is refused and the banner appears. In a narrow window or on a phone, where one pane shows at a time, the **New finding** panel repeats the reason (*Paused by lead: … Nothing can be saved now. What you marked is kept until you leave the task.*), because the banner is above the pane you work in. Nothing you saved is lost. What you had typed but not saved stays on the screen until you leave the task; when you leave, the editor asks before it discards it.
 - A task you are assigned on a paused text is paused from the start.
 - A task can be paused by the lead and by a problem report at the same time. **My tasks** then shows **Paused** with the report's reason and **Paused by lead** with the lead's. Each is released on its own, and the task opens when neither is left: after you resume your report, the task may still be **Paused by lead**.
 - Your submitted tasks are not paused.
@@ -850,7 +850,7 @@ A project lead who corrects a translation themselves sees only **Accepted with c
 When the lead asked for the review with **Ask a reviewer to correct…**, or reopened a review you had submitted, the lead's words stand above **Decision**:
 
 - *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.* The same line is under the task name in **My tasks**.
-- *Reopened by the lead on 18 Nov 2026, 10:00: The unit is mg in my copy.* In **My tasks**, click the **Reopened** badge to read it. Without a reason from the lead it ends with *No reason given.*
+- *Reopened by the lead on 18 Nov 2026, 10:00: The unit is mg in my copy.* In **My tasks** it stands under the task name, as the reason for a second review does; on a narrow screen it stands under the **Reopened** badge. Without a reason from the lead it ends with *No reason given.*
 
 A reopened review starts again from the text of its version; your earlier decision is listed under **Previous reviews**.
 
@@ -860,7 +860,7 @@ What for: review a translation that already has an earlier version, for example 
 
 The task shows the version you were given, not the first one:
 
-- **Translation details** says how this version was made: **This version** (for example *Human translation*, *Machine translation, DeepL, deepl-2026-10*, *Corrected by hand*, *Corrected by the project lead*, *Corrected in a translation review* or, after **Fix typos…**, *Typos fixed by the project lead on 17 November 2026 at 10:12* with **What was fixed**), when it was uploaded or corrected, the **Version before** and, for an uploaded text, what the lead recorded about who made it and when. The machine translation run of the first version is listed separately, for example *Translation run of v1*.
+- **Translation details** says how this version was made: **This version** (for example *Human translation*, *Machine translation, DeepL, deepl-2026-10*, *Corrected by hand*, *Corrected by the project lead*, *Corrected in a translation review* or, after **Fix typos…**, *Typos fixed by the project lead on 17 November 2026 at 10:12* with **What was fixed**), when it was uploaded or corrected, the **Version before** and, for an uploaded text, what the lead recorded about who made it and when. The machine translation run of the first version is listed separately, for example *Translation run of v1*. On a phone the details open below the bar across the width of the screen.
 - The line under the translation reads *Same as the version you were given (v2).* Your own edits are underlined against that version, and **Show changes** shows them.
 - **Compare** shows what changed since the version before. Click **Compare** (with several texts to compare, choose *The previous version (v1)*): the third column, *Changes from v1 to v2*, shows this version with the removed passages struck through and the added ones underlined. **Close** hides it again.
 - The automatic checks ran on the first version only. The band says so, for example *The automatic checks ran on v1, not on this version (v2). 1 automatic check failed on v1: Units added in translation.* **Details** lists the checks of v1. A check that failed on v1 is not counted in **My tasks** for this task, and **Accepted unchanged** needs no rationale because of it. Check yourself whether the passage is right in this version.
@@ -972,7 +972,7 @@ Decide each group by the text and the project guidelines, as if you were annotat
 - If none of the versions is right, use **More…** › **Other term…** or **Edit values…** ([Edit values or pick another term](#edit-values-or-pick-another-term)).
 - If the guidelines do not settle it, decide as well as you can, write a **Note for the lead** and tick **Guidelines unclear here**. The lead sees both and can improve the guidelines.
 
-Open the guidelines with the guidelines button in the header, for example *Guidelines v2* ([Read the project guidelines](getting-started.md#read-the-project-guidelines)).
+Open the guidelines with the guidelines button in the header, for example *Guidelines v2*, or *Guidelines 3.1 (v2)* when your lead gave the version its own number ([Read the project guidelines](getting-started.md#read-the-project-guidelines)).
 
 ## Groups and their states
 
@@ -1290,6 +1290,10 @@ The result has findings with values filled in by default, modifier terms used as
 
 ## Leading a project
 
+### The app says "Guidelines v2", but our guideline is version 3.1
+
+The number after *v* counts the guideline files published in this project; it is not the version of your document. When you publish, enter your document's version in **Your version of the guideline (optional)**. The app then shows it first, for example *Guidelines 3.1 (v2)*. A version that is already published keeps its name: publish the text again with your version to change it. See [Publish the first or a new guideline version](lead-settings.md#publish-the-first-or-a-new-guideline-version).
+
 ### I cannot accept a result
 
 In projects where the consolidator of a text may not be one of its annotators, you cannot choose a result you made yourself. Another lead must choose it. See [Accept a result or compare results](lead-results.md#accept-a-result-or-compare-results).
@@ -1337,6 +1341,10 @@ You assigned a translation review to someone who already reviewed this version, 
 ### "Fix typos…" did not save
 
 **Fix typos…** did not save: a newer version arrived, a translation review of the version is open, it was discarded, or the text is the same as before. The dialog names the reason; your text stays in the dialog until you close it. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
+
+### A review of a version cannot be reopened or assigned after "Fix typos…"
+
+*A lead fixed typos in this version: v2 is the text to review. Assign a review of the newest version.* A translation review always reviews the corrected text. In the row, use **Assign review…** or **Resolve…** › **Assign a new review…**; the person who reviewed the earlier version can be chosen again. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
 
 ### A task is still paused after I closed the report
 
@@ -1437,7 +1445,7 @@ The editor opens. If you have no task, you see **No texts are assigned to you ye
 
 ## 3. Read the guidelines
 
-The first time you open a task in a project with guidelines, a notice asks you to read them. Click the read button in the notice, for example *Read guidelines v2*. Later you find them under **More** in the toolbar. On a wide screen they open in the right column, as a tab next to **Details**, so the text stays in view; see [The guidelines in the editor](annotator.md#the-guidelines-in-the-editor).
+The first time you open a task in a project with guidelines, a notice asks you to read them. Click the read button in the notice, for example *Read guidelines v2* (or *Read guidelines 3.1 (v2)* when your lead gave the version its own number). Later you find them under **More** in the toolbar. On a wide screen they open in the right column, as a tab next to **Details**, so the text stays in view; see [The guidelines in the editor](annotator.md#the-guidelines-in-the-editor).
 
 The guidelines tell you what to mark and how: which findings count, how much text to mark, how to handle negations or family history. When in doubt, follow the guidelines; if they do not answer your question, ask your lead.
 
@@ -1497,7 +1505,7 @@ Details: [Submit the text](annotator.md#submit-the-text).
 - Your task shows **Submitted** in **My tasks**. It is read-only now; click **View** to look at it.
 - The next open task opens on its own, or **My tasks** if none is left.
 - The lead sees your submission next to the other annotators' work on the same text, and accepts one result or starts a consolidation. You do not see other people's work.
-- Your task is done. You do not need to do anything else unless the lead reopens it (**Reopened** in **My tasks**; click the badge to read the lead's reason) or you notice a mistake. A translation review the lead asks for a second time names the lead's reason under the task, for example *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.*
+- Your task is done. You do not need to do anything else unless the lead reopens it (**Reopened** in **My tasks**, with the lead's reason under the task name) or you notice a mistake. A translation review the lead asks for a second time names the lead's reason under the task, for example *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.*
 
 If you notice a mistake after submitting: open the task, choose **More** › **Work rounds** and click **Continue from this submission** ([Start a new work round](annotator.md#start-a-new-work-round)). Fix the finding, check the carried findings and submit again.
 
@@ -1623,7 +1631,7 @@ What for: find the texts you have to work on.
 
 Each row is one task. The **Task** column says what to do, for example **Annotation, from scratch**, **Annotation, from proposals**, **Consolidation** or **Translation review**. The **Status** column shows **Open**, **In progress**, **Submitted** or **Reopened**.
 
-- **Reopened**: the lead reopened your submission. Click the badge to read why.
+- **Reopened**: the lead reopened your submission. The lead's reason stands under the task, for example *Reopened by the lead on 17 Nov 2026, 14:30: The onset in sentence 2 is missing.* (on a narrow screen under the badge). Without a reason, click the badge to read when it was reopened.
 - A **Translation review** the lead asked for a second time shows the lead's reason under the task, for example *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.* The translation review and the consolidation show the lead's reason again when you open the task.
 - A **Consolidation** task shows the lead's reason under the task, for example *Reason from the lead: Term and assertion differ*, if the lead gave one.
 - **Paused**: the task waits for a decision on a problem report. A long reason is cut off here; the task shows all of it. **Answer to your report** means the lead has replied.
@@ -1633,7 +1641,7 @@ Each row is one task. The **Task** column says what to do, for example **Annotat
 
 On a phone, each row has two parts: under **Task** the text, what to do and the status below each other, and beside it the **Action**. The reason of a **Paused** or **Reopened** task is written out in full under its badge, so there is no badge to tap. The project is shown under the text when the list mixes several projects; the dates **Assigned** and **Last change** are left out. Nothing needs to be swiped sideways.
 
-If the project has guidelines, a link such as *Project guidelines v2* appears above the table. Read them before you start: they say what to mark and how.
+If the project has guidelines, a link such as *Project guidelines v2* (or *Project guidelines 3.1 (v2)*) appears above the table. Read them before you start: they say what to mark and how.
 
 If you see **No texts are assigned to you yet.**, wait until your lead assigns texts to you.
 
@@ -1686,7 +1694,7 @@ If you see **Task not found or not yours**, the task was withdrawn or is assigne
 What for: check the annotation rules of the project.
 
 1. Open a task.
-2. Open **More** in the toolbar and choose the guidelines, for example *Guidelines v2*. *(new)* after it means the guidelines changed since you last read them. In a translation review or consolidation, the guidelines are a button in the header instead, with a **New** badge.
+2. Open **More** in the toolbar and choose the guidelines, for example *Guidelines v2*, or *Guidelines 3.1 (v2)* when your lead gave the version its own number: *3.1* is the version of the guideline document, *v2* counts the uploads in the app. *(new)* after it means the guidelines changed since you last read them. In a translation review or consolidation, the guidelines are a button in the header instead, with a **New** badge.
 3. The guidelines open beside the text; in the editor they take the right column as a tab next to **Details** (see [The guidelines in the editor](annotator.md#the-guidelines-in-the-editor)). Click **All versions** to see older versions, or **Close** to hide them.
 
 The first time you open a task in a project with guidelines, a notice asks you to read them. Click the read button in the notice, for example *Read guidelines v2*. The notice also says where you find them later: under **More** › *Guidelines* in the editor, or the guidelines button in the header of a translation review or consolidation.
@@ -1796,7 +1804,7 @@ This works without building a bundle. You upload the new text at the version, or
 4. If the current version was rejected or queried: click **Resolve…**, then **Correct the translation…**, paste the new text yourself and submit. The corrected text becomes the next version and counts as accepted.
 5. Or, whatever the state of the current version, upload the new text: at the newest version, click **Upload a corrected text…**, paste the text or choose a .txt file, say how the text was made (for a machine translation with its provider and model), check the changes and save. The text becomes the next version, a correction that starts as *Ready for review*; accept it with **Accept this version…** if it was reviewed outside Ontotator ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)).
 
-**Ask a reviewer to correct…** is offered only at an accepted version, **Correct it myself…** at the newest accepted version (for a rejected or queried one it is **Correct the translation…** under **Resolve…**), and **Upload a corrected text…** at the newest version of every translation that has no open translation review. Only **Upload a corrected text…** has fields for the provider and model of the new text; in a translation review they can only be named in the **Rationale**. A typo, a missing space or a grammar slip needs none of these steps: **Fix typos…** at the newest version fixes it without a review and keeps the status of the text ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
+**Ask a reviewer to correct…** is offered only at an accepted version that is the newest of its translation, **Correct it myself…** at the newest accepted version (for a rejected or queried one it is **Correct the translation…** under **Resolve…**), and **Upload a corrected text…** at the newest version of every translation that has no open translation review. Only **Upload a corrected text…** has fields for the provider and model of the new text; in a translation review they can only be named in the **Rationale**. A typo, a missing space or a grammar slip needs none of these steps: **Fix typos…** at the newest version fixes it without a review and keeps the status of the text ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
 
 ### Replace or add a translation by file
 
@@ -1875,7 +1883,7 @@ To take the change back, click **Undo** in the message. It restores the plan and
 
 Other ways to make the work smaller:
 
-- Fewer people per text: lower **Annotators per text**. Nobody is removed; texts that already have more annotators keep them. Lowered from the info button in the assign dialog, the limit says how many texts already have more. To list them, tick **More annotators than the limit** under **Flags** in **Filter** ([Filter the list](lead-documents.md#filter-the-list)). To take the extra open tasks back, select those texts and choose **More actions** › **Withdraw open tasks…** with **Only annotations above the limit of annotators per text** ([Reopen or withdraw the tasks of several texts](lead-documents.md#reopen-or-withdraw-the-tasks-of-several-texts)), or remove one person at a time with **Remove…** in the text card ([Remove, reassign or reopen an assignment](lead-documents.md#remove-reassign-or-reopen-an-assignment)).
+- Fewer people per text: lower **Annotators per text**. Nobody is removed; texts that already have more annotators keep them. Lowered with **Change…** in the assign dialog, the limit says how many texts already have more. To list them, tick **More annotators than the limit** under **Flags** in **Filter** ([Filter the list](lead-documents.md#filter-the-list)). To take the extra open tasks back, select those texts and choose **More actions** › **Withdraw open tasks…** with **Only annotations above the limit of annotators per text** ([Reopen or withdraw the tasks of several texts](lead-documents.md#reopen-or-withdraw-the-tasks-of-several-texts)), or remove one person at a time with **Remove…** in the text card ([Remove, reassign or reopen an assignment](lead-documents.md#remove-reassign-or-reopen-an-assignment)).
 - Order of work: **My tasks** lists open tasks by status, then in the project's order, first imported first. To have urgent texts done first, select them and click **Move to front** ([Move texts to the front of the queue](lead-documents.md#move-texts-to-the-front-of-the-queue)).
 - Stop work for a while without withdrawing it: select the texts and choose **More actions** › **Pause texts…**; **Release texts…** lets it go on ([Pause and release the work on texts](lead-documents.md#pause-and-release-the-work-on-texts)). Submitted work and final results stay as they are and are exported.
 
@@ -1986,7 +1994,7 @@ The **Documents** page lists every text of the project and what it needs next. O
 
 A task starts with the person's first saved change; opening it is not enough, and neither is ticking checked sentences in a translation review. Until then **Translation** and **Annotation** read *assigned, not started* with the person's name, in the table (*not started* without the name below 1600 px), its tooltip, the narrow cards and the text card, where the person's row shows **Not started**. After the first save they read *in review* or *In progress*. The same holds for a task you reopened, also when you asked a reviewer who had already submitted to correct a translation: it reads *assigned, not started* again until the person saves a change after the reopen. With several people or parallel versions the cell counts them, for example *1 of 2 started*.
 
-A text with fewer annotators than **Annotators per text** shows what its people are doing, not the free place. While someone has an open task, **Annotation** reads for example *assigned, not started · max 2* or *1 of 2 submitted · max 3* (below 1600 px *not started*, *1/2 submitted*; the tooltip has the full state), counted out of the people who hold the text; **Waiting on** names the person, the text is under **In progress**, and **Next step** still offers **Assign annotation…** for another annotator. The same holds after **Start a round…** for a text with one annotator. Only a text nobody is working on reads *1 annotator · max 2* or *Unassigned* and is listed under **To assign** (or under **Needs your decision** once its one annotation is submitted). To give texts in progress another annotator, select them and click **Assign annotation…** in the selection bar: it assigns only where a text still has a free place.
+A text with fewer annotators than **Annotators per text** shows what its people are doing, not the free place. While someone has an open task, **Annotation** reads for example *assigned, not started · max 2* or *1 of 2 submitted · max 3* (below 1600 px *0/1 · max 2*, *1/2 · max 3*: submitted of the people who hold the text, then the limit; the tooltip has the full state), counted out of the people who hold the text; **Waiting on** names the person, the text is under **In progress**, and **Next step** still offers **Assign annotation…** for another annotator. The same holds after **Start a round…** for a text with one annotator. Only a text nobody is working on reads *1 annotator · max 2* or *Unassigned* and is listed under **To assign** (or under **Needs your decision** once its one annotation is submitted). To give texts in progress another annotator, select them and click **Assign annotation…** in the selection bar: it assigns only where a text still has a free place. To list these texts, tick **Can take another annotator** under **Annotation** in **Filter**: it lists every text whose steps include **Assign annotation…**, also while its first annotator is at work. Combine it with the tab **In progress** to see only the texts that someone already works on. When **To assign** is empty, it says so (*No text waits for an assignment*) and offers **Show texts that can take another annotator**.
 
 The counts in **Annotation**, for example *0 of 1 submitted*, count only work on the newest version of the text. After a text change, a submission on the old version no longer counts: neither when it was carried to the new version, nor when the new version was started fresh. Carried work counts once it is submitted on the new version.
 
@@ -2045,7 +2053,7 @@ To find texts with more annotators than **Annotators per text** allows, for exam
 
 Below 1600 px width each text keeps one line in the table. Where the table is still wider than the page, it scrolls sideways with the **Text** column kept at the left:
 
-- The stage columns show a shorter state and leave out the names, which **Waiting on** already shows. For example *assigned, not started (Ana Weber)* reads *not started*, *1 of 2 submitted* reads *1/2 submitted*, *ready to compare* reads *to compare* and *Final is on old text* reads *on old text*. Submitted work from proposals that waits for the new version's proposals reads *v1 work waits* (*v2 has no proposals yet*).
+- The stage columns show a shorter state and leave out the names, which **Waiting on** already shows. For example *assigned, not started (Ana Weber)* reads *not started*, *1 of 2 submitted* reads *1/2 submitted*, *ready to compare* reads *to compare*, *Check changes, newer result* reads *Check changes* and *Final is on old text* reads *on old text*. Submitted work from proposals that waits for the new version's proposals reads *v1 work waits* (*v2 has no proposals yet*).
 - **Waiting on** shows one name and *+n* for the others.
 - **Text** keeps *source*, the version marker and **NEW** on the line and cuts a long case ID with *…*.
 - Point at a cell to see the full state with the names in its tooltip. Screen readers read the full state.
@@ -2085,6 +2093,7 @@ What for: see what happened to a text and its technical IDs.
      - *task of R. Roe (ann-0295) reopened by you, 17 Nov, 13:37: Guideline changed* (**Reopen…**, single or for several texts; an Undo adds *reopening of the task of R. Roe (ann-0295) undone by you, …*),
      - *Round 2 for Tom Reis (ann-0004) started by you, 17 Nov, 13:39: Second pass* (**Start a round…**),
      - *the result of Tom Reis (ann-0004) chosen by you, …*, *changed from the result of Tom Reis (ann-0004) to the result of R. Roe (ann-0295) by you, …* and, after an Undo, *change undone by you, the result of Tom Reis (ann-0004) is final again, …* (the final result; a consolidation reads *the consolidation by …*),
+     - *typos fixed in v2 by you, 17 Nov, 17:24: Typo; Grammar* (**Fix typos…**),
      - *withdrawn by you, 17 Nov, 14:02: Wrong text* (**Withdraw final…**), reassignments, and *mode changed by you, now annotated from scratch, …: reason*.
    - **Details** shows the **Plan**, the **Problem reports** and the **Technical details**. Each problem report shows its title, then who reported it, when, its state and the paused tasks, then **Open report**. In the **Technical details**, the lines **Submission ID** and **Round ID** name the person and the version, for example *Submission ID, ann-0004, v1*.
 2. Click **Back** to return to the path.
@@ -2099,7 +2108,7 @@ What for: read a text with other people's findings or the final result, and comp
 4. Optional: click **Compare** to open a second pane. Each pane has its own **Language and version** and **Show** directly above its text: **Current text** on the left, **Comparison text** on the right, so both texts start at the same height. Tick **Couple scrolling** to scroll both together. Click **Close comparison** to close it.
    - When both panes show texts of the same language, for example v1 and its correction v2, tick **Show changes** to see what changed. The older version strikes through the removed passages, the newer version underlines the added ones; the line above the texts counts them. The marks do not change the texts, the findings or **Couple scrolling**. A change of spaces or line breaks only is not marked or counted. If the two texts have little in common, the line reads *The texts differ too much to show the changes* and nothing is marked.
    - When **Show** has someone's annotations that were carried from an earlier version of the text (after **Carry to v2…** or **Handle text change…**), tick **Show changes since** v1 above the text: changed passages get a dashed frame, added text is underlined, and a **−** marker shows the earlier wording of removed text. **Next ›** and **‹ Previous** step through the passages. The annotator sees the same marks in their task. Not offered while **Compare** is open, which has its own **Show changes**.
-5. Optional: click **Submissions** to open the **Submission history**. Choose a row to show it, then click **Close**. Each finding names its author by pseudonym; leads always see them, also when the project hides annotator names from consolidators.
+5. Optional: click **Submissions** to open the **Submission history**. Choose a row to show it, then click **Close**. Each finding names its author by pseudonym; leads always see them, also when the project hides annotator names from consolidators. Each submission names the guideline version it was made under, for example *Guidelines v2* or, with your own version of the guideline, *Guidelines 3.1 (v2) (current: 3.2 (v3))* ([Publish the first or a new guideline version](lead-settings.md#publish-the-first-or-a-new-guideline-version)).
 
 **Open my task** goes to your own task on this text.
 
@@ -2109,7 +2118,7 @@ What for: see each version of a translation, its reviews and its origin.
 
 1. Open the text card and click **Translation**.
 2. The list shows each version with its origin and status, then one row per person who worked on it: the name, the task and the status. Older ones are under **Older versions**; with parallel versions they are grouped by version chain.
-3. Click **View text** to read a version, or **Translation reviews** to see every review decision. In a reviewer's row, **Reopen…** lets them review the version again and **Remove…** removes their assignment.
+3. Click **View text** to read a version, or **Translation reviews** to see every review decision, each with the guideline version it was made under (*Guidelines v2*, or *Guidelines 3.1 (v2)* with your own version). In a reviewer's row, **Reopen…** lets them review the version again and **Remove…** removes their assignment. A review of a version you fixed typos in has no **Reopen…**: assign a review of the corrected version instead.
    The buttons that change the text of a version say who does the work, and a grey line under them says the difference in a few words, for example *Ask a reviewer: a reviewer corrects it in a new review. Correct it myself: you edit it here; it is reviewed again. Fix typos: spacing, typos, grammar; the status stays, no review. Upload: a text made elsewhere becomes the next version.* At an accepted version, **Ask a reviewer to correct…** gives the correction to a translation reviewer ([Request a translation correction](#request-a-translation-correction)). At the newest accepted version, **Correct it myself…** lets you correct it yourself ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)). At the newest version of a translation, **Upload a corrected text…** brings in a text made elsewhere as the next version ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)). **Fix typos…** at the newest version fixes spacing, typos or grammar without a review and keeps the status of the text; a version made this way says *Typo fix* under its name, with the lead and the reason ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
 4. Click **Compare with source** to compare the translation with the source text.
 
@@ -2275,7 +2284,7 @@ What for: let the annotators revise many texts at once, for example after a guid
 
 Every listed task changes, or none: if the texts changed since the preview, the dialog says *The texts changed since the preview. Check the new preview.* and shows it. Each task is recorded in the audit trail as a single reopen or withdrawal would be, so the history of every text shows it.
 
-**Undo** in the message, for example *Reopened 14 assignments in 12 texts.*, takes the change back: reopened tasks count as submitted again; withdrawn tasks come back with their drafts. Undo is for the lead who made the change, once, within an hour, and only while nothing changed on these texts since: nobody saved a draft, nobody was assigned, the plan, the final result and the text version are the same. Otherwise the message says *Undo is no longer possible: the texts changed since.* Through the API and the MCP server the same Undo is \`POST /api/v1/projects/{key}/bulk-task-actions/undo\` with the \`undo.id\` of the applied action, and the MCP tool \`undo_reopen_or_withdraw\`; with \`preview: true\` (the tool's dry run) it lists the tasks that would come back and says what blocks it, and changes nothing.
+**Undo** in the message, for example *Reopened 14 assignments in 12 texts.*, takes the change back: reopened tasks count as submitted again; withdrawn tasks come back with their drafts. Undo is for the lead who made the change, once, within an hour, and only while nothing changed on these texts since: nobody saved a draft, nobody was assigned, the plan, the final result and the text version are the same. Otherwise nothing is undone, and the message names the first text in the way and what changed on it, for example *Undo is not possible: 1 of 12 texts changed since (EN100022 en: a task was assigned, reopened, withdrawn or paused, or got a new round). Nothing was undone.* An Undo that is older than an hour or was already used says *Undo is no longer possible: the texts changed since.* Through the API and the MCP server the same Undo is \`POST /api/v1/projects/{key}/bulk-task-actions/undo\` with the \`undo.id\` of the applied action, and the MCP tool \`undo_reopen_or_withdraw\`; with \`preview: true\` (the tool's dry run) it lists the tasks that would come back and says what blocks it, with each text in the way and what changed on it (\`blocked_texts\`), and changes nothing.
 
 A message never lies over a dialog you open after it. If you open the next dialog while the message is still showing, the message waits; when you close the dialog, it is back with its **Undo** and stays for its full time again. This holds for every message with **Undo**, also in the annotation view.
 
@@ -2352,13 +2361,15 @@ A person who has the task open when you pause is told with the next thing they d
 
 On **Documents**, a paused text carries the badge **Paused by lead**; point at it to read who paused it, when and why. Its open work is nobody's turn: **Waiting on** does not name the people, and the stage shows the pause sign. To list the paused texts, tick **Paused by lead** under **Flags** in **Filter**. The text card shows a notice **Paused by lead** with who, when and why, and each paused person's row says *Paused by lead*.
 
+A text whose consolidation is open keeps it while paused. The row reads *consolidating · paused* under **Finalization** and its annotations stay *2 of 2 submitted*, because submitted work is not paused. In the text card, **Finalization** keeps the consolidator's row with *Paused by lead*, and **Consolidate…** is not offered: the open consolidation continues after the release. The same holds when the consolidator reported a problem and that report pauses the consolidation; the row then waits for you with **Decide on report…**. In **History**, the lines of a consolidation stand under **Finalization**.
+
 To release:
 
-1. Select the texts and choose **More actions** › **Release texts…**. Or click **Release…** in the notice of one text card.
+1. Select the texts and choose **More actions** › **Release texts…**. Or click **Release…** in the notice of one text card; the message *Released 1 text.* follows there as well.
 2. Read the preview, for example *Release 3 texts with 4 open tasks · Tom Reis 2, R. Roe 2*. A task that a problem report pauses as well is named in its own group, *1 task stays paused · paused by a problem report as well: decide the report under Problem reports*. Texts that are not paused are skipped.
 3. A reason is optional (**Reason (optional)**). Click the button, for example *Release 4 texts*, tick **I understand** and click again.
 
-Every listed text is paused or released, or none: if the texts changed since the preview, the dialog says *The texts changed since the preview. Check the new preview.* and shows it. Each text gets its own entry in the audit trail, with the reason. There is no **Undo** in the message: **Release texts…** is the way back from a pause, **Pause texts…** from a release, and neither changes any work.
+Every listed text is paused or released, or none: if the texts changed since the preview, the dialog says *The texts changed since the preview. Check the new preview.* and shows it. Each text gets its own entry in the audit trail, with the reason. The text card's **History** keeps a line for each pause and each release under the tag **Text**, also after the release: *paused by you, 17 Nov, 17:24: The clinic is checking the source text* and *released by you, 17 Nov, 18:02*, with the reason of the release when you gave one. There is no **Undo** in the message: **Release texts…** is the way back from a pause, **Pause texts…** from a release, and neither changes any work.
 
 The other actions on paused texts:
 
@@ -2391,7 +2402,9 @@ What for: assign a single review or annotation.
 
 With more than five people on a text, the line *Assigned:* names the first five and how many more there are, for example *and 3 more*; the list marks each of them *Already assigned*.
 
-To change the limit of annotators per text from here, click the info button (i) next to the limit and enter the number (1 to 20):
+When every place of the text is taken, the other people turn grey with the reason, for example *no free place (1 per text)*. This is the limit of the text, not of the person. A text that already has more annotators than its limit says both numbers, for example *Limit reached: 10 assigned, limit 8.*
+
+To change the limit of annotators per text from here, click **Change…** next to the limit and enter the number (1 to 20). A number you typed stays when you switch between the two choices below. If the button cannot act, the popover says why, for example *The project setting is already 1.*
 
 - **Only for the selected text** (with several texts: **Only for the selected texts**) gives these texts their own limit, for example 4 annotators on one text for a method comparison in a project with 1. Click the button that names the number of texts, for example *Change for 1 text*. The text keeps its own value for every version, also a corrected one; the project setting and the other texts stay as they are. Entering the project's number again returns the text to the project setting. The popover then explains *Sets the most annotators for this text only (project: 1)*, and for a text that already has its own value its title reads, for example, *Up to 4 annotators for this text (project: 1)*.
 - **For all texts** changes the project setting. Click **Change for all texts**. Texts with their own value keep it.
@@ -2525,12 +2538,12 @@ A submitted consolidation cannot be reopened or reassigned. If it contains a mis
 
 ### Review changes to a final result
 
-What for: confirm a final result after something changed, for example a newer submission or a corrected text. The row's next step is **Confirm final result**.
+What for: confirm a final result after something changed, for example a newer submission or a corrected text. The row's next step is **Confirm final result**. Its **Finalization** cell says what changed, for example *Check changes, newer result*; *ready to accept* is a text that has no final result yet.
 
 1. In the row, click **Review changes…**. The card lists what changed.
 2. Optional: if the text changed, click **Show changes** to see the changed passages.
 3. Choose one:
-   - Keep the final result on the old version, for example *Keep final on v1*.
+   - Keep the final result: **Keep the current final result**. If the text has several versions, the button names the version of the final result, for example *Keep final on v1*.
    - **Use the newer result**. If annotators marked findings in it **Unresolved**, the block lists them with who wrote each note.
    - Carry it to the new version, for example *Carry to v2…* (see [Carry submitted work to a new text version](#carry-submitted-work-to-a-new-text-version)).
 
@@ -2540,9 +2553,9 @@ What for: pick another result after you already chose one.
 
 1. Open the text card at **Finalization**.
 2. Click **Change final…** next to **Open result**.
-3. Click **Use as final** in the row of the result you want. It saves at once; the card stays on this text and says *Final result saved for EN100022 en.*
+3. Click **Use as final** in the row of the result you want. It saves at once; the card stays on this text and says *Final result saved for EN100022 en.* Each result names the guideline version it was made under, for example *Guidelines v2 (current: v3)*, or *Guidelines 3.1 (v2) (current: 3.2 (v3))* when the versions have your own numbers ([Publish the first or a new guideline version](lead-settings.md#publish-the-first-or-a-new-guideline-version)).
 
-The message *Final result of EN100022 en changed.* has an **Undo** button, also while the card is open. It brings the earlier final result back (*The earlier final result of EN100022 en is back.*), under the same rules as the Undo of **Change final…** for several texts: for the lead who made the change, once, within an hour, and refused once something the final result rests on changed since ([Accept or change the final result of several texts](#accept-or-change-the-final-result-of-several-texts)). The same message follows **Use the newer result** under *Review changes…*. A first choice of a final result has no Undo: use [Withdraw a final result](#withdraw-a-final-result). **History** in the card lists each change and its Undo.
+The message *Final result of EN100022 en changed.* has an **Undo** button, also while the card is open. It brings the earlier final result back (*The earlier final result of EN100022 en is back.*), under the same rules as the Undo of **Change final…** for several texts: for the lead who made the change, once, within an hour, and refused once something the final result rests on changed since ([Accept or change the final result of several texts](#accept-or-change-the-final-result-of-several-texts)). The same message follows **Use the newer result** under *Review changes…*. After the Undo, the green line *Final result saved for EN100022 en.* in the card goes: it spoke of the result that is no longer final. A first choice of a final result has no Undo: use [Withdraw a final result](#withdraw-a-final-result). **History** in the card lists each change and its Undo.
 
 While a text has a final result, its annotation mode cannot be changed: **Change mode…** is refused (error code \`ANNOTATION_MODE_FINAL_SELECTED\`) ([Change the annotation mode of one text](lead-documents.md#change-the-annotation-mode-of-one-text)). To take the final result back instead, see [Withdraw a final result](#withdraw-a-final-result).
 
@@ -2588,7 +2601,7 @@ What for: decide what happens after a reviewer rejected or queried a translation
 1. In the row, click **Resolve…**. The options open below the row with the reviewer's rationale. When someone holds an annotation that waits for this translation, a line names them, for example *Ana Weber is waiting for this decision to start the annotation.*
 2. Choose one:
    - The reopen item, for example *Reopen Ana Weber's review…*: the same person reviews it again. Enter an optional **Reason (optional)** and click **Reopen review**. Their task shows **Reopened** with your reason (in **My tasks** behind the badge, in the review above **Decision**) and starts from the version's current text; their earlier decision stays in the history. If they then accept it with corrections, the corrected text becomes the next version.
-   - **Assign a new review…**: someone else reviews it. The person who already reviewed it shows *Review submitted* with **Reopen their review…**; a new assignment for them is not possible, reopen their review instead.
+   - **Assign a new review…**: someone else reviews it. The person who already reviewed it shows *Review submitted* with **Reopen their review…**; a new assignment for them is not possible, reopen their review instead. After **Fix typos…** on the rejected or queried version the review is a review of the corrected version, there is no reopen item, and the person who reviewed the earlier version can be assigned again ([Fix a typo in a translation without a review](#fix-a-typo-in-a-translation-without-a-review)).
    - **Correct the translation…**: you correct it yourself ([Correct a translation yourself](#correct-a-translation-yourself)).
    - The discard item, for example *Discard the de translation…*: enter a **Reason** and click **Discard**. Nothing is deleted; the versions are marked as discarded.
 3. Or click **Cancel**. Changing a filter, the tab, the order or the page also closes the options; nothing is saved until you choose.
@@ -2664,7 +2677,7 @@ What for: correct spacing, a typo or grammar in a translation without a translat
 
 If a number changes, the dialog points it out, for example *Changes a number: 15 → 50. Check that this is intended.*; you can still save.
 
-The corrected text becomes the next version of the translation, a correction of the version it fixes with that version's status: the correction of an accepted v2 is an accepted v3, and v2 stays accepted as well. A version that was rejected or queried can be corrected too: its correction is rejected or queried like it, and you resolve it as before ([Resolve a rejected or queried translation](#resolve-a-rejected-or-queried-translation)). No translation review is started and **Review** is not changed. The version row names the correction, for example *Typo fix by Project lead (ann-0002), 17 Nov, 10:12 · Spacing; Typo*. The audit log records who corrected the text, the changed passages and the reason.
+The corrected text becomes the next version of the translation, a correction of the version it fixes with that version's status: the correction of an accepted v2 is an accepted v3, and v2 stays accepted as well. A version that was rejected or queried can be corrected too: its correction is rejected or queried like it, and you resolve it as before ([Resolve a rejected or queried translation](#resolve-a-rejected-or-queried-translation)). The corrected version is then the text of the row: **Assign a new review…** and **Assign review…** assign a review of it (the dialog names the version, for example *case-0102 de v2*), the reviewer reads the corrected text, and **Translation details** in the review says *Typos fixed by the project lead on …* with what you fixed. The version you corrected takes no further review: its submitted review has no **Reopen…**, and the options under **Resolve…** have no reopen item; assign the review again instead, also to the person who reviewed the earlier version. If the reviewer rejects or queries the corrected version, it stays the text to resolve. No translation review is started and **Review** is not changed. The version row names the correction, for example *Typo fix by Project lead (ann-0002), 17 Nov, 10:12 · Spacing; Typo*, and **History** has a line for it, for example *typos fixed in v3 by you, 17 Nov, 10:12: Spacing; Typo*. On Documents the **Translation** state of an accepted text you corrected reads *Accepted, typos fixed by you, v2 → v3* (on a wide screen *accepted* with the marker *v3 corrected*). The audit log records who corrected the text, the changed passages and the reason.
 
 What happens to work on the corrected version:
 
@@ -2707,6 +2720,8 @@ Before you start: to see what changed, open the text view of the old version, cl
 1. In the row, click the carry button, for example *Carry to v2…*.
 2. Choose who continues: the author, **Someone else…** (then pick the **Annotator**), or start the new version fresh, for example *Start v2 fresh*: nothing is carried, and the assign dialog opens next.
 3. Click **Assign**.
+
+A submission is carried to a version once. If you withdraw or remove the carried task before the person submits it, the row offers the carry again, for example *Carry to v2…*. The fresh start, for example *Start v2 fresh*, is final.
 
 Work from proposals is carried too: the decisions on the proposals move to the matching proposals of the new version, and only what touches a changed passage is marked **Check needed**. An accepted, edited or Unresolved proposal without a counterpart in the new version becomes the annotator's own finding and is marked **Check needed** too; an Unresolved one keeps its note. A rejected proposal without a counterpart is dropped. If the new version has no proposals yet, the dialog says so: their automatic transfer may still be running, or they must be imported. Wait for or import the proposals for the new version, then click **Retry**. To annotate the new version from scratch instead, [change the annotation mode of the text](lead-documents.md#change-the-annotation-mode-of-one-text); that discards the work of the whole text. Until the new version has proposals, the row's **Annotation** column reads *v1 work waits* with *v2 has no proposals yet*, and *Carry to v2…* is disabled with the hint *Import proposals for v2*; it works as soon as the proposals are there. To assign the new version anew instead, use the text card.
 
@@ -3088,7 +3103,7 @@ What for: give or take away a role.
 2. Tick a role checkbox to give the role. It saves at once.
 3. Untick a role checkbox to take it away, then confirm with **Remove role**. This logs the person out on all devices; they can log in again right away. Taking away the lead role also revokes the project API tokens the person created for this project, unless they are a system administrator. Their personal tokens keep working, but no longer with the role you took away.
 
-A project needs at least one lead: **Add another project lead before removing the last lead.**
+A project needs at least one lead: **Add another project lead before removing the last lead.** When you are the project's only lead and untick your own **Lead** box or click **Remove…** on your row, this message appears at once, without a confirmation.
 
 The exception is a system administrator, who may take away the last lead, their own lead role included, for example to hand a project over. The dialog then says *This project will have no lead. You can still manage it as system administrator.* On their own row it does not speak of lost access or revoked tokens, because an administrator keeps both. A project without a lead shows "–" under **Lead** on **Projects** and can only be managed by an administrator until one is added ([Add a member](#add-a-member)).
 
@@ -3127,10 +3142,13 @@ Before you start: published versions cannot be edited, only withdrawn. Check the
 2. Without guidelines, the form is already open (**No guidelines yet**). Otherwise, click **Publish a new version**.
 3. Choose a \`.md\` or \`.txt\` file (UTF-8, up to 256 KB) in **Guideline file (.md or .txt, up to 256 KB)**.
 4. Check the preview.
-5. Optional: describe the change in **What changed? (optional)**.
-6. Click the publish button, for example *Publish as v2*. Or click **Discard**.
+5. Optional: enter the version your document gives itself, for example *3.1*, in **Your version of the guideline (optional)** (one line, up to 40 characters).
+6. Optional: describe the change in **What changed? (optional)**.
+7. Click the publish button, for example *Publish as v2*. Or click **Discard**.
 
 Everyone sees a notice in their next task.
+
+The number after *v* counts the uploads of this project: the first file you publish is v1, the next one v2, also when you publish an earlier text again. It is not the version of your document. If your document has its own version, enter it in step 5: the app then shows it before the upload number everywhere, for example *Guidelines 3.1 (v2)*, *Guidelines updated to 3.1 (v2)* in the notice, and *Guidelines 3.1 (v2) (current: 3.2 (v3))* on a submitted result. Without it, everything reads *Guidelines v2*. Your version cannot be changed after publishing. To correct it, publish the text again with the right one.
 
 ## See who has read the guidelines
 
@@ -3148,13 +3166,13 @@ What for: go back to an earlier text.
 
 1. Open **Settings**, tab **Guidelines**.
 2. In the row of the old version, click **More…**, then the republish item, for example *Republish v1…*.
-3. The form opens with the old text. Click the publish button, for example *Publish as v3*.
+3. The form opens with the old text and, if the old version had one, its own version in **Your version of the guideline (optional)**. Click the publish button, for example *Publish as v3*.
 
 ## Withdraw a guideline version
 
 What for: remove a version that must no longer be read, for example because it contains a mistake.
 
-Warning: the text of the withdrawn version is deleted for good. The version number stays, and results made under it show it as withdrawn. No guideline is in force until you publish or republish one.
+Warning: the text of the withdrawn version is deleted for good. The version number and your own version of it stay, and results made under it show it as withdrawn, for example *Guidelines 3.1 (v2) (withdrawn)*. No guideline is in force until you publish or republish one.
 
 1. Open **Settings**, tab **Guidelines**.
 2. In the version's row, click **More…**, then the withdraw item, for example *Withdraw v2…*.
