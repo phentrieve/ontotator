@@ -4320,6 +4320,11 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
                     Discard<span aria-hidden="true"> <Kbd>Esc</Kbd></span>
                   </Button>}
                 </div>
+                {/* One pane at a time (≤700 px): the paused banner above the panes is out of view here, so a person whose
+                    save was just refused reads the reason where they work (review 2, F3). Wider windows show the banner. */}
+                {held && panesLayout && <InlineMessage tone="warning">
+                  <span><strong>{holdTitle ?? "Task paused"}:</strong> {(holdReason?.trim() || "A project problem needs attention.").replace(/[.!?…]?$/, end => end || ".")} Nothing can be saved now. What you marked is kept until you leave the task.</span>
+                </InlineMessage>}
                 {pendingIsMarkedSpan
                   ? <>
                     <p className="pending-quote">“{quoteSegments(view.document.text, pendingAnnotation.segments)}”</p>

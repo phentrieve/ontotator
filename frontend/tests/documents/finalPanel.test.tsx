@@ -393,8 +393,11 @@ describe("decided", () => {
     afterDecision = page([group("case-122", [{ ...decided, final: final({ case_id: "case-122", language: "de", document_id: "case-122-de", submission_id: "case-122-s2", author_label: "ann-0004", revision: 5 }) }]), group("case-123", [waiting])]);
     const onDecided = vi.fn<(key: string, undo?: { id: number } | null) => void>();
     const onAdvance = vi.fn();
+    const before = page([group("case-122", [decided]), group("case-123", [waiting])]);
+    let showPage: (value: typeof before) => void = () => undefined;
     function Page(): JSX.Element {
-      const [current, setCurrent] = useState(page([group("case-122", [decided]), group("case-123", [waiting])]));
+      const [current, setCurrent] = useState(before);
+      showPage = setCurrent;
       return <DecisionBlock projectKey="p" rowKey="case-122:de" page={current} query={{}} now={now} changeFinal onClose={vi.fn()} onAdvance={onAdvance} onReload={vi.fn()} onNavigate={vi.fn()}
         onDecided={(key, undo) => { onDecided(key, undo); setCurrent(afterDecision!); }} />;
     }
@@ -407,6 +410,10 @@ describe("decided", () => {
     // case-123 waits for a decision, but the lead came to change this text: no jump.
     expect(onAdvance).not.toHaveBeenCalled();
     await waitFor(() => expect(liveRegion().textContent).toBe("Final result saved for case-122 de."));
+    expect(document.querySelector(".final-panel-success")).not.toBeNull();
+    // Undo in the page's toast brings the earlier final result back: the line about the saved one goes (review 2, F7 b).
+    act(() => showPage(page([group("case-122", [decided]), group("case-123", [waiting])])));
+    await waitFor(() => expect(document.querySelector(".final-panel-success")).toBeNull());
   });
 
   it("opens on the compare content with changeFinal", async () => {

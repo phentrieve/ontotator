@@ -779,7 +779,7 @@ test("every Progress count opens Documents with the same number of rows", async 
     // Texts in view: the text names plus the not-planned sources folded into their case lines.
     const shown = page.getByRole("button", { name: /^Text case-\d{4} [a-z]{2}$|^source [a-z]{2} \(native\), \d+ translations?$/ });
     if (Number(count) === 0) {
-      await expect(page.getByText(/^(No texts match these filters\.|Nothing needs your decision|Nothing to assign|Nothing in progress|Nothing done yet|No texts yet)$/).first(), label).toBeVisible();
+      await expect(page.getByText(/^(No texts match these filters\.|Nothing needs your decision|No text waits for an assignment|Nothing in progress|Nothing done yet|No texts yet)$/).first(), label).toBeVisible();
     }
     await expect(shown, `${label} (${link.href})`).toHaveCount(Number(count));
     checked.push(`${label}: ${count}`);
