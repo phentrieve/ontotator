@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Dark theme (#492). Ontotator follows the light or dark setting of the device, and **Profile** › **Appearance** has the setting **Theme** with **System**, **Light** and **Dark**. The choice is kept in the browser (not in the account), applies at once, also to the login page, and is applied before the page is drawn, by a small script file of its own (`/theme.js`), because the Content-Security-Policy allows no inline script. Every colour has a dark value in `frontend/src/styles/tokens.css`; form fields and scrollbars follow through `color-scheme`. Marks in the text, person lanes, **Show changes**, notices, badges and focus rings keep WCAG AA contrast in both themes: a unit test checks the colour pairs that are used together, a browser test checks the main screens in dark at 1440 px and 390 px. Screenshots and handbook images stay light. No API change, no migration.
+
 ### Changed
 
 - MCP server: `ontotator-mcp` has the version of the release it comes from, no longer `0.1.0` in every release (#486). `ontotator-mcp --version`, the User-Agent of its requests and `whoami` show it; a release sets it with the app version (CONTRIBUTING, **Releases**; an MCP test fails while they differ). `whoami` returns the version of the Ontotator server (`server`) for every kind of token, a project token included (#485), next to the MCP server's own (`mcp_server.version`), and a `warning` when the two differ: a running MCP process keeps the code it started with, also after the package was upgraded.

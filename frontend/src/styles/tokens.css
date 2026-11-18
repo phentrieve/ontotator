@@ -1,10 +1,14 @@
 /*
- * Design tokens: direction C, "reading document". Light theme only.
+ * Design tokens: direction C, "reading document". Light values first, the dark
+ * theme at the end of this file.
  * Every interface colour is declared here; every other stylesheet refers to
  * these custom properties. Palette regression tests parse the hex tokens.
  * Frozen for the continued direction C implementation (T6a Task 2, 2026-10-15).
  */
 :root {
+  /* Form controls and scrollbars follow the theme. "light dark" follows the system;
+     an explicit choice (data-theme, set by public/theme.js and src/ui/theme.ts) narrows it below. */
+  color-scheme: light dark;
   /* Surfaces: warm paper, a brighter sheet for the document, a sunken band for bars. */
   --surface: #f7f4ee;
   --surface-raised: #fffdf8;
@@ -123,6 +127,8 @@
   --obsolete-fill: #f1f5f9;
   --obsolete-border: #cbd5e1;
   --overlay-scrim: rgba(15, 23, 42, 0.45);
+  /* Behind a dialog (.modal-overlay): the text colour at 40 %, as before it was a token. */
+  --modal-scrim: rgb(31 26 20 / 0.4);
   --dialog-shadow-colour: rgba(0, 0, 0, 0.1);
   --dashboard-hero-start: #eff6ff;
   --dashboard-hero-end: #e0e7ff;
@@ -142,6 +148,8 @@
   --session-card-shadow-colour: rgba(0, 0, 0, 0.08);
   --flag-shadow-colour: rgba(15, 23, 42, 0.18);
   --language-menu-shadow-colour: rgba(15, 23, 42, 0.14);
+  /* The tick of a checked checkbox (components.css): a data image cannot read a custom property. */
+  --checkbox-tick: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='%23ffffff' stroke-width='2'/%3E%3C/svg%3E");
   /* Axis values (spec 2026-10-23 §3, variant B): aliases of existing colours, the word always stays. */
   --axis-present-text: var(--success);
   --axis-present-fill: var(--success-light);
@@ -163,4 +171,182 @@
   --axis-future-fill: var(--notice-warning-fill);
   --axis-neutral-text: var(--text);
   --axis-neutral-fill: var(--surface-raised);
+}
+
+/*
+ * Dark theme. The same values twice, because CSS cannot share one block between a
+ * media query and a selector: once for "System" on a dark system (no choice stored,
+ * or no script), once for the explicit choice "Dark". frontend/tests/themeTokens.test.ts
+ * checks that the two blocks are equal, that every light colour has a dark value and
+ * that the pairs used together keep their contrast. Aliases (lanes, axis values) follow
+ * through var() and are not repeated.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    /* Surfaces: warm charcoal; the sheet is one step lighter, the bars one step darker. */
+    --surface: #1b1815;
+    --surface-raised: #24201b;
+    --surface-sunken: #131110;
+
+    /* Text */
+    --text: #ece6da;
+    --text-muted: #b5ab9b;
+    --on-accent: #14110d;
+
+    /* Lines */
+    --border: #3b352c;
+    --border-strong: #948a78;
+
+    /* Accent and states: light on dark; the "-light" tints are dark fills under light text. */
+    --accent: #8db6ec;
+    --accent-hover: #abc9f2;
+    --accent-light: #1e3352;
+    --success: #86c891;
+    --success-light: #1b3622;
+    --warning: #e2b354;
+    --warning-light: #3f300c;
+    --danger: #f0907e;
+    --danger-hover: #f5ab9c;
+    --danger-light: #4b2019;
+
+    /* Focus */
+    --focus-ring: #8db6ec;
+
+    /* Mark palette: six deep fills under light text; same slots as in light. */
+    --mark-0-fill: #665c00;
+    --mark-1-fill: #1d5a2c;
+    --mark-2-fill: #6e2f12;
+    --mark-3-fill: #2c478f;
+    --mark-4-fill: #7a2c4c;
+    --mark-5-fill: #085872;
+
+    /* Mark states */
+    --mark-line: #ddd4c4;
+    --mark-selected: #a9c8f2;
+    --mark-negated-hatch: #948a78;
+
+    /* Shape */
+    --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4), 0 0 0 1px rgb(255 255 255 / 0.06);
+    --shadow-2: 0 12px 32px -8px rgb(0 0 0 / 0.7), 0 2px 6px rgb(0 0 0 / 0.4), 0 0 0 1px rgb(255 255 255 / 0.08);
+
+    /* Component colours */
+    --review-badge-fill: #33204d;
+    --review-badge-text: #d5acf6;
+    --assistant-gradient-start: #b79cf7;
+    --assistant-gradient-end: #f08fc0;
+    --danger-border: #8f4034;
+    --danger-hover-fill: #5e2a21;
+    --disabled-fill: #8a94a3;
+    --obsolete-fill: #2a2f36;
+    --obsolete-border: #4a5361;
+    --overlay-scrim: rgba(0, 0, 0, 0.6);
+    --modal-scrim: rgb(0 0 0 / 0.6);
+    --dialog-shadow-colour: rgba(0, 0, 0, 0.5);
+    --dashboard-hero-start: #172338;
+    --dashboard-hero-end: #1c2244;
+    --dashboard-hero-border: #2c4a7a;
+    --dashboard-hero-shadow-colour: rgba(0, 0, 0, 0.4);
+    --dashboard-table-shadow-colour: rgba(0, 0, 0, 0.4);
+    --dashboard-row-fill: #1f1c18;
+    --notice-success-text: #a3dcae;
+    --notice-success-border: #2f6b3a;
+    --notice-warning-fill: #3d3208;
+    --notice-warning-text: #f0d572;
+    --notice-warning-border: #8a6d0a;
+    --notice-info-fill: #10344a;
+    --notice-info-text: #a3d6f3;
+    --notice-info-border: #1f6a94;
+    --getting-started-shadow-colour: rgba(0, 0, 0, 0.4);
+    --session-card-shadow-colour: rgba(0, 0, 0, 0.5);
+    --flag-shadow-colour: rgba(255, 255, 255, 0.3);
+    --language-menu-shadow-colour: rgba(0, 0, 0, 0.6);
+    --checkbox-tick: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='%2314110d' stroke-width='2'/%3E%3C/svg%3E");
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Surfaces: warm charcoal; the sheet is one step lighter, the bars one step darker. */
+  --surface: #1b1815;
+  --surface-raised: #24201b;
+  --surface-sunken: #131110;
+
+  /* Text */
+  --text: #ece6da;
+  --text-muted: #b5ab9b;
+  --on-accent: #14110d;
+
+  /* Lines */
+  --border: #3b352c;
+  --border-strong: #948a78;
+
+  /* Accent and states: light on dark; the "-light" tints are dark fills under light text. */
+  --accent: #8db6ec;
+  --accent-hover: #abc9f2;
+  --accent-light: #1e3352;
+  --success: #86c891;
+  --success-light: #1b3622;
+  --warning: #e2b354;
+  --warning-light: #3f300c;
+  --danger: #f0907e;
+  --danger-hover: #f5ab9c;
+  --danger-light: #4b2019;
+
+  /* Focus */
+  --focus-ring: #8db6ec;
+
+  /* Mark palette: six deep fills under light text; same slots as in light. */
+  --mark-0-fill: #665c00;
+  --mark-1-fill: #1d5a2c;
+  --mark-2-fill: #6e2f12;
+  --mark-3-fill: #2c478f;
+  --mark-4-fill: #7a2c4c;
+  --mark-5-fill: #085872;
+
+  /* Mark states */
+  --mark-line: #ddd4c4;
+  --mark-selected: #a9c8f2;
+  --mark-negated-hatch: #948a78;
+
+  /* Shape */
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4), 0 0 0 1px rgb(255 255 255 / 0.06);
+  --shadow-2: 0 12px 32px -8px rgb(0 0 0 / 0.7), 0 2px 6px rgb(0 0 0 / 0.4), 0 0 0 1px rgb(255 255 255 / 0.08);
+
+  /* Component colours */
+  --review-badge-fill: #33204d;
+  --review-badge-text: #d5acf6;
+  --assistant-gradient-start: #b79cf7;
+  --assistant-gradient-end: #f08fc0;
+  --danger-border: #8f4034;
+  --danger-hover-fill: #5e2a21;
+  --disabled-fill: #8a94a3;
+  --obsolete-fill: #2a2f36;
+  --obsolete-border: #4a5361;
+  --overlay-scrim: rgba(0, 0, 0, 0.6);
+  --modal-scrim: rgb(0 0 0 / 0.6);
+  --dialog-shadow-colour: rgba(0, 0, 0, 0.5);
+  --dashboard-hero-start: #172338;
+  --dashboard-hero-end: #1c2244;
+  --dashboard-hero-border: #2c4a7a;
+  --dashboard-hero-shadow-colour: rgba(0, 0, 0, 0.4);
+  --dashboard-table-shadow-colour: rgba(0, 0, 0, 0.4);
+  --dashboard-row-fill: #1f1c18;
+  --notice-success-text: #a3dcae;
+  --notice-success-border: #2f6b3a;
+  --notice-warning-fill: #3d3208;
+  --notice-warning-text: #f0d572;
+  --notice-warning-border: #8a6d0a;
+  --notice-info-fill: #10344a;
+  --notice-info-text: #a3d6f3;
+  --notice-info-border: #1f6a94;
+  --getting-started-shadow-colour: rgba(0, 0, 0, 0.4);
+  --session-card-shadow-colour: rgba(0, 0, 0, 0.5);
+  --flag-shadow-colour: rgba(255, 255, 255, 0.3);
+  --language-menu-shadow-colour: rgba(0, 0, 0, 0.6);
+  --checkbox-tick: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='%2314110d' stroke-width='2'/%3E%3C/svg%3E");
+}
+:root[data-theme="light"] {
+  color-scheme: light;
 }
