@@ -40,7 +40,10 @@ interface Drag {
   latest: number;
 }
 
-/** Vertical separator between the findings column and the text pane (spec section 10). */
+/**
+ * Separator that resizes a panel: by default the vertical one between the findings column and the
+ * text pane (spec section 10); with `orientation="horizontal"` the one above the docked ontology tree.
+ */
 export function SidebarResizer({ width, limits, controls, onChange, onReset, onCommit, label = "Resize findings column",
   hint = "Resize the findings column (focus the divider)", side = "end", orientation = "vertical", measure }: SidebarResizerProps) {
   const rows = orientation === "horizontal";
@@ -76,6 +79,9 @@ export function SidebarResizer({ width, limits, controls, onChange, onReset, onC
       const current = drag.current;
       if (!current) return;
       event.preventDefault();
+      // This Escape gives up the drag and nothing else: the screen's own Escape (clear the selection,
+      // which also closes the ontology tree) does not run on it.
+      event.stopPropagation();
       endDrag(event.currentTarget);
       onChange(current.startWidth);
       onCommit("drag-cancel");
