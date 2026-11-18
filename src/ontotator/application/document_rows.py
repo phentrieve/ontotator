@@ -71,6 +71,7 @@ from ontotator.storage.tables import (
     TranslationReviewRow,
     UserRow,
 )
+from ontotator.storage.text_change_carries import carry_lapsed
 from ontotator.storage.text_pause import TextPause, paused_texts
 from ontotator.storage.text_settings import per_text_overrides
 from ontotator.storage.workflow_tables import (
@@ -260,6 +261,10 @@ class ResolutionFact:
     resolution: str
     from_document_id: str
     to_document_id: str
+    # A carry whose task was withdrawn or removed without a submission
+    # (issue 461): it settles nothing any more, the submission can be
+    # carried again.
+    lapsed: bool = False
 
 
 @dataclass(frozen=True)
@@ -1045,6 +1050,7 @@ def _resolutions(conn: Connection, pid: int) -> list[ResolutionFact]:
             resolution=row.resolution,
             from_document_id=row.from_document_id,
             to_document_id=row.to_document_id,
+            lapsed=row.lapsed,
         )
         for row in conn.execute(
             select(
@@ -1053,6 +1059,7 @@ def _resolutions(conn: Connection, pid: int) -> list[ResolutionFact]:
                 TextChangeResolutionRow.resolution,
                 TextChangeResolutionRow.from_document_id,
                 TextChangeResolutionRow.to_document_id,
+                carry_lapsed().label("lapsed"),
             )
             .where(TextChangeResolutionRow.project_id == pid)
             .order_by(TextChangeResolutionRow.id)
