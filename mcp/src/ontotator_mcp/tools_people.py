@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import contextlib
 import csv
+import hashlib
 import io
 import os
 import re
@@ -22,9 +23,9 @@ from mcp.server.mcpserver import MCPServer
 from pydantic import Field
 
 from ontotator_mcp.client import OntotatorClient, project_path, seg
-from ontotator_mcp.errors import OntotatorError
+from ontotator_mcp.errors import OntotatorError, check_preview_token, stale_note
 from ontotator_mcp.models import NewUser, TextRef
-from ontotator_mcp.tooling import register
+from ontotator_mcp.tooling import register, tool_message
 from ontotator_mcp.tools_setup import OPEN_STATES, _cut, unknown_texts
 
 Project = Annotated[str, Field(description="Project key, e.g. 'ward-7'.")]
@@ -70,10 +71,17 @@ PreviewToken = Annotated[
         max_length=80,
         description=(
             "With confirm: the preview_token of the dry run, so exactly the"
-            " tasks it listed change."
+            " tasks it listed change. It also stands for the reason: confirm"
+            " with the same reason as the dry run."
         ),
     ),
 ]
+
+
+def _reason_mark(reason: Any) -> str:
+    """Eight hex digits that stand for ``reason`` in a preview_token."""
+    text = reason.strip() if isinstance(reason, str) else ""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:8]
 
 
 def bulk_summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
@@ -90,13 +98,14 @@ def bulk_summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
         }
         entry["person"] = person.get("display_name") or person.get("pseudonym")
         if "message" in item:
-            entry["why"] = item["message"]
+            entry["why"] = tool_message(item)
         return entry
 
     changes = [brief(item) for item in found.get("changes", [])]
     kept = [brief(item) for item in found.get("kept", [])]
     skipped = [
-        {key: item.get(key) for key in ("case_id", "language", "message")}
+        {key: item.get(key) for key in ("case_id", "language")}
+        | {"message": tool_message(item)}
         for item in found.get("skipped", [])
     ]
     return (
@@ -139,7 +148,8 @@ def pause_summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
 
     changes = [text(item) for item in found.get("changes", [])]
     skipped = [
-        {key: item.get(key) for key in ("case_id", "language", "message")}
+        {key: item.get(key) for key in ("case_id", "language")}
+        | {"message": tool_message(item)}
         for item in found.get("skipped", [])
     ]
     return {
@@ -655,19 +665,36 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         preview_token: str | None,
     ) -> dict[str, Any]:
         """Dry run, or apply with the dry run's token; a stale token answers
-        with the fresh dry run (``stale``)."""
+        with the fresh dry run (``stale``).
+
+        The server's token covers the tasks, not the reason. The token this
+        tool hands out therefore ends with a mark of the reason, and a
+        confirm with another reason is refused here (#471).
+        """
         path = project_path(project, "bulk-task-actions", action)
         body = body | {"rows": [text.model_dump() for text in body["rows"]]}
+        mark = _reason_mark(body.get("reason"))
+
+        def summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
+            result = bulk_summary(found, applied)
+            if result.get("preview_token"):
+                result["preview_token"] = f"{result['preview_token']}.{mark}"
+            return result
+
         if not confirm:
             preview: dict[str, Any] = await api.post(path, body | {"preview": True})
-            return bulk_summary(preview, False)
-        if preview_token is None:
+            return summary(preview, False)
+        token, _, given = (preview_token or "").partition(".")
+        check_preview_token(token if preview_token is not None else None)
+        if given != mark:
             raise OntotatorError(
-                "Run the dry run first and pass its preview_token with confirm."
+                "The reason is not the one of the dry run this preview_token"
+                " belongs to; nothing was changed. Run the dry run again with"
+                " this reason and confirm with its preview_token."
             )
         try:
             applied: dict[str, Any] = await api.post(
-                path, body | {"preview_token": preview_token}
+                path, body | {"preview_token": token}
             )
         except OntotatorError as exc:
             fresh = (
@@ -675,12 +702,11 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
             )
             if exc.code != "PREVIEW_STALE" or not isinstance(fresh, dict):
                 raise
-            return bulk_summary(fresh, False) | {
+            return summary(fresh, False) | {
                 "stale": True,
-                "note": "Tasks changed since the dry run; nothing was changed."
-                " Check this new dry run and confirm with its preview_token.",
+                "note": stale_note("Tasks", "changed"),
             }
-        return bulk_summary(applied, True)
+        return summary(applied, True)
 
     @register(server, scopes="project-admin", effect="changes")
     async def reopen_texts(
@@ -703,8 +729,8 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         """Reopen the submitted tasks of many texts, after a dry run.
 
         Like reopen_task for each task: its person gets it back in My tasks
-        with the reason. Texts with a final result are skipped (change it
-        first); unsubmitted tasks are kept. The dry run lists both, the
+        with the reason. Texts with a final result are skipped (withdraw it
+        first, withdraw_final_result); unsubmitted tasks are kept. The dry run lists both, the
         texts the project does not have (unknown_texts: another spelling,
         letter case or language; nothing happens to them) and a
         preview_token; confirm with it: every listed task is reopened, or
@@ -878,8 +904,11 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         run, ``stale``). No tool takes a round back: the answer has no
         ``undo``, and undo_reopen_or_withdraw does not apply.
         """
-        if confirm and kind == "clean_restart" and not (reason or "").strip():
-            raise OntotatorError("A clean_restart needs a reason.")
+        if kind == "clean_restart" and not (reason or "").strip():
+            raise OntotatorError(
+                "A clean_restart needs a reason; nothing was checked or changed."
+                " Pass reason, in the dry run too."
+            )
         body: dict[str, Any] = {"rows": texts, "kind": kind}
         if reason:
             body["reason"] = reason
@@ -899,10 +928,7 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         if not confirm:
             preview: dict[str, Any] = await api.post(path, body | {"preview": True})
             return pause_summary(preview, False)
-        if preview_token is None:
-            raise OntotatorError(
-                "Run the dry run first and pass its preview_token with confirm."
-            )
+        check_preview_token(preview_token)
         try:
             applied: dict[str, Any] = await api.post(
                 path, body | {"preview_token": preview_token}
@@ -915,8 +941,7 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
                 raise
             return pause_summary(fresh, False) | {
                 "stale": True,
-                "note": "The texts changed since the dry run; nothing was changed."
-                " Check this new dry run and confirm with its preview_token.",
+                "note": stale_note("The texts", "changed"),
             }
         return pause_summary(applied, True)
 
@@ -1008,6 +1033,7 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
             ),
         ] = False,
         confirm_language: bool = False,
+        confirm_unreviewed_translation: bool = False,
         confirm: Annotated[
             bool, Field(description="False: dry run. True: reassign as planned.")
         ] = False,
@@ -1019,7 +1045,10 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         include_started) with the reason. With confirm each planned task is
         reassigned; a refusal of one task (for example the successor
         already has that text) is reported and the others go on. Submitted
-        work stays with its author.
+        work stays with its author. An annotation task on a translation
+        whose review is not accepted is refused with
+        TRANSLATION_NOT_REVIEWED unless confirm_unreviewed_translation; the
+        dry run does not mark such tasks.
         """
         # The server keeps usernames trimmed and in lower case.
         leaving = from_username.strip().lower()
@@ -1051,7 +1080,7 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
                         "username": move["to"],
                         "confirm_started": include_started,
                         "confirm_language": confirm_language,
-                        "confirm_unreviewed_translation": False,
+                        "confirm_unreviewed_translation": confirm_unreviewed_translation,
                     },
                 )
             except OntotatorError as exc:

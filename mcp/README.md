@@ -11,11 +11,13 @@ That is the default. With `ONTOTATOR_MCP_READ_CONTENT=1` four more tools read a 
 You need [uv](https://docs.astral.sh/uv/). Install the command from the repository:
 
 ```bash
-uv tool install "git+https://github.com/phentrieve/ontotator@v0.10.2#subdirectory=mcp"
+uv tool install "git+https://github.com/phentrieve/ontotator@v0.11.0#subdirectory=mcp"
 which ontotator-mcp
 ```
 
-The URL names a release tag, so the server changes only when you install another release: to update, run the command again with the newer tag in the URL. Without a tag the URL would follow `main`, and every push would update the server. From a checkout of a release tag, `uv tool install ./mcp` does the same. Without installing, `uvx --from "git+https://github.com/phentrieve/ontotator@v0.10.2#subdirectory=mcp" ontotator-mcp` runs it directly.
+The URL names a release tag, so the server changes only when you install another release: to update, run the command again with the newer tag in the URL. Without a tag the URL would follow `main`, and every push would update the server. From a checkout of a release tag, `uv tool install ./mcp` does the same. Without installing, `uvx --from "git+https://github.com/phentrieve/ontotator@v0.11.0#subdirectory=mcp" ontotator-mcp` runs it directly.
+
+`ontotator-mcp` has the version of the Ontotator release it comes from (`ontotator-mcp --version`). Use the release your server runs. After installing another release, restart the MCP client: a running `ontotator-mcp` process keeps the code it started with. `whoami` shows both versions and warns when they differ.
 
 ## Create a token
 
@@ -76,9 +78,9 @@ Add the server to `claude_desktop_config.json` (Settings › Developer › **Edi
 }
 ```
 
-If the client cannot find the command, give its full path (`which ontotator-mcp`), or use `"command": "uvx"` with `"args": ["--from", "git+https://github.com/phentrieve/ontotator@v0.10.2#subdirectory=mcp", "ontotator-mcp"]`.
+If the client cannot find the command, give its full path (`which ontotator-mcp`), or use `"command": "uvx"` with `"args": ["--from", "git+https://github.com/phentrieve/ontotator@v0.11.0#subdirectory=mcp", "ontotator-mcp"]`.
 
-Ask the client to call `whoami` first: it shows the token's kind, scopes, project and expiry (with a warning two weeks before), who it acts as and the server's version.
+Ask the client to call `whoami` first: it shows the token's kind, scopes, project and expiry (with a warning two weeks before) and who it acts as. For every kind of token, a project token included, it also shows the version of the Ontotator server (`server`) and of this MCP server (`mcp_server`), with a `warning` when they differ, and whether the [content tools](#content-tools-opt-in) are on (`mcp_server.content_tools`).
 
 ## Tools
 
@@ -104,7 +106,7 @@ A token can do only what both its scopes and its owner's roles allow. Many tools
 | `set_task_profile` | project-admin | overwrites | Replace the project's task profile (layers, annotation types, value axes). |
 | `set_ontology_pins` | project-admin | may remove or withdraw | Pin the project to ontology releases, after a dry run. |
 | `refresh_translations` | project-admin | overwrites | Move the project to the newest translation files on the server. |
-| `publish_guideline` | project-admin | adds | Publish a new version of the project's annotation guideline. |
+| `publish_guideline` | read, project-admin | adds | Publish a new version of the project's annotation guideline. |
 | `withdraw_guideline` | read, project-admin | overwrites | Withdraw a published guideline version, for example one published by mistake. |
 | `upload_texts` | import | adds | Stage texts or a proposal bundle and check them; imports nothing yet. |
 | `get_upload` | import | reads | The state and check of one staged upload. |
@@ -181,7 +183,7 @@ Useful token sets: a project token with `read`, `import`, `export` and `project-
 
 ### Content tools (opt-in)
 
-By default no tool puts clinical text or the findings of a submission into the model's context. Start the server with `ONTOTATOR_MCP_READ_CONTENT=1` to add four read-only tools; without the variable they are not registered, so a client does not see them and cannot call them. Use them to compare two submissions of one text before a final result exists, to compare annotations across two versions of a text, or to fetch one text version without exporting the project.
+By default no tool puts clinical text or the findings of a submission into the model's context. Start the MCP server with `ONTOTATOR_MCP_READ_CONTENT=1` to add four read-only tools. It is a setting of `ontotator-mcp` on your computer (the `env` of its entry in the MCP client's configuration), not of the Ontotator server; `whoami` says whether it is on. Without the variable the tools are not registered: a client does not see them and cannot call them. Use them to compare two submissions of one text before a final result exists, to compare annotations across two versions of a text, or to fetch one text version without exporting the project.
 
 | Tool | Token scopes | Effect | What it does |
 | --- | --- | --- | --- |
@@ -209,7 +211,7 @@ Wrong input is named, not ignored:
 - **Every answer of a tool with `confirm` starts with `selection`**, in the dry run and when applied: what the tool acted on, as it understood the call. For example `2 texts of project 'ward-7'`, `all texts of project 'ward-7'` (no `case_ids` given), `all cases of project 'ward-7', language 'de'`, or `project 'ward-7', case_id 'c-12', language 'en'` for a tool that acts on one text. Compare it with what was meant before confirming.
 - **Texts the project does not have are listed.** `reopen_texts`, `withdraw_open_tasks`, `start_rounds`, `pause_texts`, `release_texts`, `change_final_results` and `change_annotation_modes` return `unknown_texts` (case ID and language as given) and `unknown_text_count`, in the dry run and in the applied answer: a text that does not exist, or is spelt with another letter case or language. Nothing happens to them; before, such a text vanished (`change_count: 0` and no skipped text). The routes report them as `unknown_rows`; against a server older than this change the entry is missing rather than empty. `accept_agreeing_texts` names unknown `case_ids` in `unknown_case_ids`, as before.
 
-- **New round of a task** (`start_new_round`): `carry_forward` lets the person continue from one of their submissions (the dry run lists them), `clean_restart` abandons the current round with its draft and starts it again from the beginning (needs a reason). A submitted annotation gets no new round while a consolidation of its text is open (`CONSOLIDATION_OPEN`): have the consolidation finished or withdraw its task first, as the bulk tool `start_rounds` skips such texts.
+- **New round of a task** (`start_new_round`): `carry_forward` lets the person continue from one of their submissions (the dry run lists them), `clean_restart` abandons the current round with its draft and starts it again from the beginning (needs a reason). A submitted annotation gets no new round while a consolidation of its text is open (`CONSOLIDATION_OPEN`): the dry run says so (`blocked`) and confirm changes nothing. Have the consolidation finished or withdraw its task first, as the bulk tool `start_rounds` skips such texts.
 - **Annotation mode of a text with work** (`change_annotation_mode`): the preview names every submission that is discarded and every task that is withdrawn; `restore_annotation_mode` (with the `change_id` from `list_mode_changes`) brings them back while no new work started. `change_annotation_modes` does the same for many texts after a dry run that names the people per text and the texts it skips; every listed text changes or none, and each text is restored on its own.
 - **Final result of one text** (`set_final_result`): choose any eligible submission, also when it differs from the others, or change an existing final result; naming the current final result confirms it after a change and acknowledges the causes the dry run lists. `accept_agreeing_texts` remains the bulk tool for full agreement: the server picks the texts in one request, and the confirm call passes the dry run's `preview_token`, so exactly the texts it listed become final (or none, with a fresh dry run, when something changed). Its dry run names every text it leaves out with a reason, and the case IDs the project does not have. `set_final_result` and `withdraw_final_result` show the final result's revision in the dry run; pass it as `expected_revision` with `confirm` (required for withdrawing), so a final result that someone changed in between is refused. `change_final_results` changes the final result of many texts that already have one to their newest submission (for example after a second round or a consolidation; an annotation only when it is the text's only submission or agrees in full with the others, otherwise the text is skipped with reason `differ`): the dry run lists each text with the result it gets and every skipped text with the reason, and the confirm call passes the dry run's `preview_token`, which also covers the final result each text has, so all listed texts change or none. Its confirmed answer carries `undo.id` for `undo_change_final_results` (next item); `set_final_result` changes one text back. `withdraw_final_result` takes a final result back with a reason; the text then needs a final result again and its annotation mode can change.
 - **Undo a bulk change of final results** (`undo_change_final_results`): the confirmed answer of `change_final_results` carries `undo.id`, and so does the confirmed answer of `set_final_result` when it replaced another final result (one text; a first choice or a confirmation has none). The dry run lists the final result each text would get back and the texts in the way, with the reason; with `confirm` every text is restored or none. It works once, for the lead who made the change, within 60 minutes, while nothing the final results rest on changed (final result, versions, plan, tasks, submissions). Final exports made in between do not block and stay as they are (`exports_since`).
@@ -259,6 +261,17 @@ A refusal of the API becomes a tool error with the HTTP status, the API's code a
 | `NOT_ALLOWED`, `ADMIN_REQUIRED` | The token's owner lacks the role. |
 | `PROJECT_BUSY` | The project is busy and nothing changed; try again. |
 | `REVISION_CONFLICT` | Someone changed the same thing meanwhile; read again and repeat. |
+| `GUIDELINE_VERSION_CONFLICT` | Another guideline version was published or withdrawn meanwhile. With `expected_version_missing` the request named no latest version: an `ontotator-mcp` older than the server; restart it after an upgrade. |
+| `GUIDELINE_NOTE_INVALID` | `change_note` or `reason` is not one line of at most 280 characters. |
+
+Other refusals an agent meets also end with the next step, for example `ASSIGNEE_ROLE_MISSING` (add the role with `set_member_roles`), `BULK_UNDO_STALE` with its reason (`not_found`, `expired`, `already_undone`), `VERSION_UPLOAD_NOT_AVAILABLE` with its reason (`not_newest`, `discarded`, `review_open`, `unchanged`), `NOT_A_TRANSLATION` and `VARIANT_REVIEW_STALE`. A code is said once. `assign_texts` does not fail for a row it cannot assign: the row is in `refused` with its code and a `hint`, and `warning` at the top counts such rows.
+
+Dry runs and their tokens:
+
+- A `preview_token` that is cut or mistyped is refused before anything is sent (*not one a dry run returned*). A well-formed token that the server does not accept returns a fresh dry run (`stale`); its note says that tasks or texts changed, or that the token is not the one of the last dry run with the same arguments.
+- The `preview_token` of `reopen_texts`, `withdraw_open_tasks` and `start_rounds` also stands for the reason: a confirm with another reason than the dry run's is refused.
+- `start_rounds` with `clean_restart` needs its reason in the dry run already, and `upload_translation_version` its `provider` for a machine translation.
+- Why a task is kept or a text skipped is said with the tool or argument to use (`include_started=true`, `withdraw_final_result`, `update_work_plan`), not with a button of the web interface.
 
 ## Worked example: a Phentrieve proposals project
 

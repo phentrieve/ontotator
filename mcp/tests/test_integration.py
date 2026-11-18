@@ -144,6 +144,9 @@ async def test_setup_import_status_and_export(
         assert me["token"]["kind"] == "system"
         assert me["token"]["expires_in_days"] <= 1
         assert "warning" in me["token"]
+        # The MCP server is the release the app is (#486): no warning.
+        assert me["server"]["version"] == me["mcp_server"]["version"]
+        assert "warning" not in me
 
         uploads = await call(
             client, "upload_ontology_files", {"paths": [str(FIXTURES / "hp.json")]}

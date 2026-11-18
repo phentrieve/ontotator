@@ -12,10 +12,11 @@ from typing import Any
 import httpx
 import pytest
 from conftest import ToolFailed, call
-from fake_api import FakeApi, refusal, token_view
+from fake_api import PT_A, PT_B, FakeApi, refusal, token_view
 from mcp import Client
 from shapes import build, page, panel, row, submission, work
 
+from ontotator_mcp import __version__
 from ontotator_mcp.config import ConfigError, Settings
 from ontotator_mcp.server import build_server
 
@@ -31,9 +32,17 @@ async def test_whoami_drops_the_csrf_token(fake: FakeApi, mcp_client: Client) ->
         "/api/v1/auth/me",
         build("CurrentUser", username="lead", csrf_token="secret-csrf"),
     )
+    fake.on("GET", "/api/v1/about", build("About", version=__version__))
     result = await call(mcp_client, "whoami", {})
     assert result["user"]["username"] == "lead"
     assert "csrf_token" not in result["user"]
+    # Both versions, and no warning while they are the same (#486).
+    assert result["server"]["version"] == __version__
+    assert result["mcp_server"]["version"] == __version__
+    assert "warning" not in result
+    # The content tools are a setting of this MCP server (#485).
+    assert result["mcp_server"]["content_tools"] is False
+    assert "MCP client's configuration" in result["mcp_server"]["content_tools_note"]
     assert result["url"] == "https://ontotator.test"
     assert result["token"]["kind"] == "personal"
     assert "warning" not in result["token"]
@@ -47,12 +56,30 @@ async def test_whoami_with_a_project_token_names_its_project(
         "/api/v1/me/token",
         token_view(kind="project", project_key="ward-7", scopes=["read", "export"]),
     )
+    fake.on("GET", "/api/v1/about", build("About", version="0.10.1"))
     result = await call(mcp_client, "whoami", {})
     assert result["user"] is None
     assert result["token"]["project_key"] == "ward-7"
     assert "ward-7" in result["note"]
+    # A project token gets the server's version too (#485), and a plain
+    # warning when this MCP server is another release (#486).
+    assert result["server"]["version"] == "0.10.1"
+    assert result["mcp_server"]["version"] == __version__
+    assert f"ontotator-mcp {__version__}" in result["warning"]
+    assert "0.10.1" in result["warning"] and "restart" in result["warning"]
     # A project token cannot read /auth/me; whoami does not try.
-    assert fake.templates() == [("GET", "/api/v1/me/token")]
+    assert fake.templates() == [("GET", "/api/v1/me/token"), ("GET", "/api/v1/about")]
+
+
+async def test_whoami_says_when_the_content_tools_are_on(
+    fake: FakeApi, settings: Settings
+) -> None:
+    server = build_server(
+        replace(settings, read_content=True), transport=httpx.MockTransport(fake)
+    )
+    async with Client(server) as client:
+        result = await call(client, "whoami", {})
+    assert result["mcp_server"]["content_tools"] is True
 
 
 async def test_whoami_reports_the_token_and_warns_before_it_expires(
@@ -66,9 +93,10 @@ async def test_whoami_reports_the_token_and_warns_before_it_expires(
     assert 2 < token["expires_in_days"] <= 3
     assert "expires soon" in token["warning"]
     assert "secret" not in token
-    # Without the read scope only the token itself is read.
+    # Without the read scope the user is not read; the version is.
     assert result["user"] is None
-    assert fake.templates() == [("GET", "/api/v1/me/token")]
+    assert "version" in result["server"]
+    assert fake.templates() == [("GET", "/api/v1/me/token"), ("GET", "/api/v1/about")]
 
 
 async def test_upload_texts_streams_files_and_returns_the_check(
@@ -198,6 +226,63 @@ async def test_files_dir_limits_what_is_read_and_written(
             client, "download_export", {"job_id": 9, "path": str(allowed / "out.zip")}
         )
         assert done["path"] == str((allowed / "out.zip").resolve())
+
+
+@pytest.mark.parametrize(("latest", "sent"), [(None, ""), (2, "2")])
+async def test_publish_guideline_names_the_latest_version_it_saw(
+    fake: FakeApi,
+    settings: Settings,
+    tmp_path: Path,
+    latest: int | None,
+    sent: str,
+) -> None:
+    guide = tmp_path / "guide.md"
+    guide.write_text("# Guide")
+    fake.on(
+        "GET",
+        f"{P}/guidelines",
+        build("GuidelineListing", latest_version=latest, current=None, versions=[]),
+    )
+    fake.on("POST", f"{P}/guidelines", build("GuidelineSummary"))
+    limited = replace(settings, files_dirs=(tmp_path.resolve(),))
+    server = build_server(limited, transport=httpx.MockTransport(fake))
+    async with Client(server) as client:
+        await call(client, "publish_guideline", {"project": "p", "path": str(guide)})
+    [post] = fake.calls_to("POST", f"{P}/guidelines")
+    form = post.request.content.decode()
+    # The route takes a form field: empty when the project has no guideline.
+    assert f'name="expected_latest_version"\r\n\r\n{sent}\r\n' in form
+
+
+async def test_guideline_notes_state_their_limit(
+    fake: FakeApi, mcp_client: Client, tmp_path: Path
+) -> None:
+    """Issue 486: one line of at most 280 characters, said in the schema and
+    refused before anything is sent."""
+    tools = {tool.name: tool for tool in (await mcp_client.list_tools()).tools}
+    for tool, argument in (
+        ("publish_guideline", "change_note"),
+        ("withdraw_guideline", "reason"),
+    ):
+        schema = tools[tool].input_schema["properties"][argument]
+        text = str(schema)
+        assert "'maxLength': 280" in text, tool
+        assert "annotators see it" in text and "one line" in text, tool
+    guide = tmp_path / "guide.md"
+    guide.write_text("# Guide")
+    with pytest.raises(ToolFailed, match="at most 280"):
+        await call(
+            mcp_client,
+            "publish_guideline",
+            {"project": "p", "path": str(guide), "change_note": "x" * 281},
+        )
+    with pytest.raises(ToolFailed, match="at most 280"):
+        await call(
+            mcp_client,
+            "withdraw_guideline",
+            {"project": "p", "version": 1, "reason": "x" * 281},
+        )
+    assert fake.calls == []
 
 
 async def test_without_files_dir_local_files_are_refused(
@@ -505,6 +590,18 @@ async def test_distribute_texts_previews_then_assigns_with_the_digest(
     [batch] = fake.calls_to("POST", f"{P}/assignments/batch")
     assert batch.json()["expected_preview_digest"] == "d1"
     assert batch.json()["case_ids"] == ["c1", "c2"]
+    assert batch.json()["confirm_unreviewed_translation"] is False
+    for preview in fake.calls_to("POST", f"{P}/assignments/batch/preview"):
+        assert "confirm_unreviewed_translation" not in preview.json()
+
+    fake.calls.clear()
+    await call(
+        mcp_client,
+        "distribute_texts",
+        args | {"confirm": True, "confirm_unreviewed_translation": True},
+    )
+    [batch] = fake.calls_to("POST", f"{P}/assignments/batch")
+    assert batch.json()["confirm_unreviewed_translation"] is True
 
 
 async def test_work_plan_sets_the_mode_with_the_previewed_revisions(
@@ -625,7 +722,7 @@ def _preview(**fields: Any) -> dict[str, Any]:
             skipped=[skipped],
             already_final=3,
             unknown_case_ids=["nope"],
-            preview_token="sha256:one",
+            preview_token=PT_A,
         )
         | fields
     )
@@ -646,7 +743,7 @@ async def test_accept_agreeing_texts_dry_run_asks_the_server_once(
     assert result["skipped"][0]["message"].startswith("No result")
     assert result["skipped_by_reason"] == {"differ": 1}
     assert result["unknown_case_ids"] == ["nope"]
-    assert (result["already_final"], result["preview_token"]) == (3, "sha256:one")
+    assert (result["already_final"], result["preview_token"]) == (3, PT_A)
 
 
 async def test_accept_agreeing_texts_applies_the_dry_runs_token(
@@ -661,10 +758,10 @@ async def test_accept_agreeing_texts_applies_the_dry_runs_token(
     result = await call(
         mcp_client,
         "accept_agreeing_texts",
-        {"project": "p", "confirm": True, "preview_token": "sha256:one"},
+        {"project": "p", "confirm": True, "preview_token": PT_A},
     )
     [request] = fake.calls_to("POST", ACCEPT)
-    assert request.json() == {"preview_token": "sha256:one"}
+    assert request.json() == {"preview_token": PT_A}
     assert [t["submission_id"] for t in result["accepted"]] == ["s1"]
     assert not fake.calls_to("PUT", f"{P}/final-selections")
 
@@ -672,15 +769,15 @@ async def test_accept_agreeing_texts_applies_the_dry_runs_token(
 async def test_accept_agreeing_texts_stale_token_returns_a_fresh_dry_run(
     fake: FakeApi, mcp_client: Client
 ) -> None:
-    fresh = _preview(texts=[], preview_token="sha256:two")
+    fresh = _preview(texts=[], preview_token=PT_B)
     fake.on("POST", ACCEPT, refusal(409, "PREVIEW_STALE", {"preview": fresh}))
     result = await call(
         mcp_client,
         "accept_agreeing_texts",
-        {"project": "p", "confirm": True, "preview_token": "sha256:one"},
+        {"project": "p", "confirm": True, "preview_token": PT_A},
     )
     assert result["applied"] is False and result["stale"] is True
-    assert (result["would_accept"], result["preview_token"]) == ([], "sha256:two")
+    assert (result["would_accept"], result["preview_token"]) == ([], PT_B)
 
 
 CHANGE = f"{P}/final-selections/bulk-change"
@@ -716,7 +813,7 @@ def _change_preview(**fields: Any) -> dict[str, Any]:
             skipped_by_reason={"already_newest": 1},
             changes=[change],
             skipped=[skip],
-            preview_token="sha256:one",
+            preview_token=PT_A,
         )
         | fields
     )
@@ -738,7 +835,7 @@ async def test_change_final_results_dry_run_then_confirm_with_its_token(
     assert result["applied"] is False
     assert [c["submission_id"] for c in result["would_change"]] == ["s2"]
     assert result["skipped_by_reason"] == {"already_newest": 1}
-    assert (result["change_count"], result["preview_token"]) == (1, "sha256:one")
+    assert (result["change_count"], result["preview_token"]) == (1, PT_A)
     with pytest.raises(ToolFailed, match="preview_token"):
         await call(
             mcp_client,
@@ -753,13 +850,13 @@ async def test_change_final_results_dry_run_then_confirm_with_its_token(
             "project": "p",
             "texts": TEXTS,
             "confirm": True,
-            "preview_token": "sha256:one",
+            "preview_token": PT_A,
         },
     )
     assert fake.calls_to("POST", CHANGE)[-1].json() == {
         "rows": TEXTS,
         "rule": "newest_submission",
-        "preview_token": "sha256:one",
+        "preview_token": PT_A,
     }
     assert done["applied"] is True
     assert [c["case_id"] for c in done["changed"]] == ["c1"]
@@ -769,7 +866,7 @@ async def test_change_final_results_dry_run_then_confirm_with_its_token(
 async def test_change_final_results_stale_token_returns_a_fresh_dry_run(
     fake: FakeApi, mcp_client: Client
 ) -> None:
-    fresh = _change_preview(changes=[], change_count=0, preview_token="sha256:two")
+    fresh = _change_preview(changes=[], change_count=0, preview_token=PT_B)
     fake.on("POST", CHANGE, refusal(409, "PREVIEW_STALE", {"preview": fresh}))
     result = await call(
         mcp_client,
@@ -778,11 +875,11 @@ async def test_change_final_results_stale_token_returns_a_fresh_dry_run(
             "project": "p",
             "texts": TEXTS,
             "confirm": True,
-            "preview_token": "sha256:one",
+            "preview_token": PT_A,
         },
     )
     assert result["applied"] is False and result["stale"] is True
-    assert (result["would_change"], result["preview_token"]) == ([], "sha256:two")
+    assert (result["would_change"], result["preview_token"]) == ([], PT_B)
 
 
 UNDO_CHANGE = f"{CHANGE}/undo"
@@ -837,7 +934,7 @@ async def test_a_confirmed_change_of_final_results_names_its_undo(
             "project": "p",
             "texts": TEXTS,
             "confirm": True,
-            "preview_token": "sha256:one",
+            "preview_token": PT_A,
         },
     )
     assert done["undo"] == handle
