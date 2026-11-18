@@ -9,8 +9,10 @@ from typing import Annotated, Any, Literal
 from mcp.server.mcpserver import MCPServer
 from pydantic import Field
 
+from ontotator_mcp import __version__
 from ontotator_mcp.client import OntotatorClient, project_path, seg
-from ontotator_mcp.errors import OntotatorError
+from ontotator_mcp.config import READ_CONTENT_VARIABLE
+from ontotator_mcp.errors import OntotatorError, hint_for
 from ontotator_mcp.models import (
     AssignmentRow,
     CasePlanChoice,
@@ -127,6 +129,9 @@ ACCEPTED_BY_REVIEW_HINT = (
     " (in the web interface: Ask a reviewer to correct... at the accepted version)."
 )
 
+# One line a guideline's change note or withdrawal reason may have.
+NOTE_LENGTH = 280
+
 OPEN_STATES = ("open", "in_progress", "reopened")
 
 
@@ -196,11 +201,42 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
 
         Call this first to check that ONTOTATOR_URL and ONTOTATOR_TOKEN work.
         Any scope but admin alone reads the token itself; ``expires_in_days`` and a warning
-        tell when to replace it. With the read scope and a token that is not
-        a project token it also names the user and the server's version.
+        tell when to replace it. For every kind of token it names the
+        version of the Ontotator server (``server``) and of this MCP server
+        (``mcp_server``), with a ``warning`` when they differ, and whether
+        this MCP server has the content tools on (``content_tools``). With
+        the read scope and a token that is not a project token it also
+        names the user.
         """
         token = token_summary(await api.get("/api/v1/me/token"), now=utc_now())
-        result: dict[str, Any] = {"token": token, "url": api.settings.url}
+        result: dict[str, Any] = {
+            "token": token,
+            "url": api.settings.url,
+            "mcp_server": {
+                "version": __version__,
+                "content_tools": api.settings.read_content,
+                "content_tools_note": (
+                    f"On: this MCP server was started with {READ_CONTENT_VARIABLE}=1."
+                    if api.settings.read_content
+                    else "Off: the tools that return texts and submitted"
+                    " annotations do not exist. They are a setting of this MCP"
+                    " server, not of the Ontotator server: set"
+                    f" {READ_CONTENT_VARIABLE}=1 in the MCP client's"
+                    " configuration of ontotator-mcp (env) and restart it."
+                ),
+            },
+        }
+        # The version is open to every token, a project token included.
+        about: dict[str, Any] = await api.get("/api/v1/about")
+        result["server"] = about
+        if about.get("version") != __version__:
+            result["warning"] = (
+                f"This MCP server is ontotator-mcp {__version__}, the Ontotator"
+                f" server is {about.get('version')}. Tools may send requests the"
+                " server no longer accepts, or miss newer ones. Install the"
+                " ontotator-mcp of the server's release and restart the MCP"
+                " server (a running process keeps the code it started with)."
+            )
         if "read" not in token["scopes"] or token["project_key"] is not None:
             result["user"] = None
             result["note"] = (
@@ -210,9 +246,8 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
             )
             return result
         me = await api.get("/api/v1/auth/me")
-        about = await api.get("/api/v1/about")
         me.pop("csrf_token", None)
-        return result | {"user": me, "server": about}
+        return result | {"user": me}
 
     @register(server, scopes="read", effect="read")
     async def list_projects() -> list[dict[str, Any]]:
@@ -418,7 +453,26 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
                 )
             ),
         ],
-        change_note: str = "",
+        change_note: Annotated[
+            str,
+            Field(
+                max_length=NOTE_LENGTH,
+                description=(
+                    "What changed, in one line of at most 280 characters;"
+                    " annotators see it."
+                ),
+            ),
+        ] = "",
+        label: Annotated[
+            str,
+            Field(
+                description=(
+                    "The version the guideline document gives itself, e.g. '3.1';"
+                    " one line, at most 40 characters. Shown before the upload"
+                    " number: 'Guidelines 3.1 (v2)'. Empty: none."
+                )
+            ),
+        ] = "",
     ) -> dict[str, Any]:
         """Publish a new version of the project's annotation guideline.
 
@@ -428,7 +482,9 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         ONTOTATOR_MCP_FILES_DIR; without that variable it refuses. Earlier
         versions stay; annotators are asked
         to read the new one. Refused with GUIDELINE_VERSION_CONFLICT if
-        another version was published meanwhile.
+        another version was published meanwhile. 'version' in the result
+        counts the project's uploads and is the identifier; 'label' is the
+        document's own version, if one was given.
         """
         files = api.local_files([path])
         listing = await api.get(project_path(project, "guidelines"))
@@ -441,6 +497,7 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
                 "change_note": change_note,
                 # A form field: empty for a project without a guideline.
                 "expected_latest_version": "" if latest is None else str(latest),
+                "label": label,
             },
         )
         return summary | {"local_files": [str(file) for file in files]}
@@ -449,7 +506,15 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
     async def withdraw_guideline(
         project: Project,
         version: Annotated[int, Field(ge=1, description="Guideline version.")],
-        reason: str | None = None,
+        reason: Annotated[
+            str | None,
+            Field(
+                max_length=NOTE_LENGTH,
+                description=(
+                    "Why, in one line of at most 280 characters; annotators see it."
+                ),
+            ),
+        ] = None,
     ) -> dict[str, Any]:
         """Withdraw a published guideline version, for example one published by mistake.
 
@@ -729,6 +794,10 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         editor opens the next task in that order: put the rows in the order
         the person should work in. New tasks come after the tasks the person
         already has.
+
+        A row that cannot be assigned does not fail the call: it is listed
+        under ``refused`` with its code and a hint, and ``warning`` counts
+        such rows.
         """
         body: dict[str, Any] = {
             "rows": [row.model_dump() for row in assignments],
@@ -741,9 +810,23 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         result: dict[str, Any] = await api.post(
             project_path(project, "assignments"), body
         )
-        for refusal in result.get("refused", []):
-            if refusal.get("reason") == "accepted_by_review":
+        refused = result.get("refused", [])
+        for refusal in refused:
+            code = str(refusal.get("code") or "")
+            reason = refusal.get("reason")
+            if reason == "accepted_by_review":
                 refusal["hint"] = ACCEPTED_BY_REVIEW_HINT
+            elif hint := hint_for(f"{code}/{reason}" if reason else code):
+                refusal["hint"] = hint
+        if refused:
+            # A refused row is not an error of the call: say it at the top.
+            result = {
+                "warning": (
+                    f"{len(refused)} of {len(assignments)} rows were refused and"
+                    " got no task; 'refused' names each with its code and what"
+                    " to do (hint)."
+                )
+            } | result
         return result
 
     @register(server, scopes=("read", "project-admin"), effect="additive")

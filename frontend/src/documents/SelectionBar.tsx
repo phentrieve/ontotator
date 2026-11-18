@@ -29,7 +29,7 @@ import { plural } from "../app/labels";
 import { Button, Checkbox, IconSortDown, InlineConfirm, InlineMessage, MenuButton, type ToastMessage } from "../ui";
 import { ACTION_LABELS, appliedText, unavailableReason, type BulkAction } from "./bulkActionModel";
 import { BulkFinalDialog } from "./BulkFinalDialog";
-import { finalAppliedText, finalUnavailableReason, FINAL_ACTION_LABELS, type FinalAction, type FinalPreview } from "./bulkFinalModel";
+import { finalAppliedText, finalUnavailableReason, FINAL_ACTION_LABELS, taskUndoRefusal, type FinalAction, type FinalPreview } from "./bulkFinalModel";
 import { BulkModeDialog } from "./BulkModeDialog";
 import { modeAppliedText, modeUnavailableReason, MODE_ACTION_LABEL } from "./bulkModeModel";
 import { BulkPauseDialog } from "./BulkPauseDialog";
@@ -277,7 +277,8 @@ export function SelectionBar({
             latest.current.showToast({ message: done });
             latest.current.onChanged();
           }, (failure: unknown) => {
-            const text = errorMessage(failure);
+            // All or nothing: the refusal names the first text that changed since (issue 469).
+            const text = taskUndoRefusal(failure) ?? errorMessage(failure);
             latest.current.onAnnounce(text);
             latest.current.showToast({ message: text, persist: true });
           });

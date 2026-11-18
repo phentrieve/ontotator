@@ -599,6 +599,8 @@ class RowSubmissionView(_View):
     finding_count: int
     author: PersonRefView | None = None
     guideline_version: int | None = None
+    # The project's own name of that version ("3.1"), if it has one.
+    guideline_label: str | None = None
     guideline_withdrawn: bool = False
     # Consolidation submissions: findings kept automatically (all matched, U14).
     # A factory default keeps it optional in the generated types: the
@@ -650,7 +652,9 @@ class RowChangeView(_View):
     ``reopen_undone`` and ``round_started`` name the task and its person
     (``assignment_id``, ``to_person``); the ``final_*`` kinds name the
     results (``from_result`` the one replaced, ``to_result`` the one final
-    afterwards; null when the submission is no longer among the row's)."""
+    afterwards; null when the submission is no longer among the row's).
+    ``text_paused`` and ``text_released`` (issue 464) are a lead's pause and
+    release of the text, with ``by`` and the ``reason`` given."""
 
     kind: Literal[
         "reassigned",
@@ -663,6 +667,8 @@ class RowChangeView(_View):
         "final_chosen",
         "final_changed",
         "final_restored",
+        "text_paused",
+        "text_released",
     ]
     at: datetime
     task: str | None = None

@@ -304,6 +304,8 @@ def test_frozen_snapshot_keeps_references(review_env) -> None:
     [resolution] = content["source_reviews"]
     assert resolution["review_record"]["guideline_version"] == 1
     assert "guideline_withdrawn" not in resolution["review_record"]
+    # The frozen final content keeps the number only (#487: no label there).
+    assert "guideline_label" not in resolution["review_record"]
 
     # A withdrawal after the freeze changes nothing in the archive (G20, G25).
     guidelines.publish(SECOND)
@@ -361,7 +363,7 @@ def test_readme_mentions_guidelines() -> None:
 def test_translation_review_export_rows_carry_guideline_fields(exported_env) -> None:
     env = exported_env
     guidelines = _lead(env)
-    guidelines.publish(FIRST)
+    guidelines.publish(FIRST, "3.0")
     reviewed = submit_review(env)
     assert reviewed.guideline_version == 1
     first = _ref(env, 1)
@@ -370,12 +372,16 @@ def test_translation_review_export_rows_carry_guideline_fields(exported_env) -> 
     result = run(env, queued(env))
     row = json.loads(env.db.blobs.get(result.result["sha256"]))
     assert row["format"] == "ontotator-translation-review/v1"
-    assert list(row)[-3:] == [
+    assert list(row)[-4:] == [
         "guideline_version",
         "guideline_ref",
         "guideline_withdrawn",
+        "guideline_label",
     ]
     assert row["guideline_version"] == 1
+    # The project's own label, added after the earlier fields (#487); the
+    # reference keeps the upload number.
+    assert row["guideline_label"] == "3.0"
     assert row["guideline_ref"] == first
     assert row["guideline_withdrawn"] is True
     assert FIRST not in json.dumps(row, ensure_ascii=False)
@@ -395,6 +401,7 @@ def test_unstamped_translation_review_row_has_null_reference(
     assert row["guideline_version"] is None
     assert row["guideline_ref"] is None
     assert row["guideline_withdrawn"] is False
+    assert row["guideline_label"] is None
 
 
 def test_review_row_reference_needs_the_recorded_version_hash() -> None:

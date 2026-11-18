@@ -112,7 +112,9 @@ class _Context:
                 self.resolution_of[resolution.assignment_id] = resolution.resolution
                 if resolution.resolution == "moved":
                     self.moved_to[resolution.assignment_id] = resolution.to_document_id
-            if resolution.submission_id is not None:
+            if resolution.submission_id is not None and not resolution.lapsed:
+                # A lapsed carry (issue 461) settles nothing: rule 3b offers
+                # the carry again.
                 self.submission_resolutions.setdefault(
                     resolution.submission_id, set()
                 ).add(resolution.resolution)

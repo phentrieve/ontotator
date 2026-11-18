@@ -4246,7 +4246,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
         <div className="inspector-pane density-compact" ref={inspectorRef}>
           {/* With the guidelines open (from 1060 px): "Details | Guidelines vN" at the top; Details stays mounted while hidden. */}
           {tabs.hosted && guidelines && <InspectorTabList idBase={inspectorIdBase} tab={tabs.tab}
-            version={guidelines.version} onSelect={tabs.select} onClose={guidelines.close} />}
+            version={guidelines.versionName} onSelect={tabs.select} onClose={guidelines.close} />}
           <div className="inspector-details" {...(tabs.hosted ? { role: "tabpanel", id: inspectorIds.detailsPanel,
             "aria-labelledby": inspectorIds.detailsTab, hidden: guidelinesTab } : {})}>
           {/* Always mounted so the text change is announced; aria-live, not role="status", which the save state owns.
@@ -4317,6 +4317,11 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
                     Discard<span aria-hidden="true"> <Kbd>Esc</Kbd></span>
                   </Button>}
                 </div>
+                {/* One pane at a time (≤700 px): the paused banner above the panes is out of view here, so a person whose
+                    save was just refused reads the reason where they work (review 2, F3). Wider windows show the banner. */}
+                {held && panesLayout && <InlineMessage tone="warning">
+                  <span><strong>{holdTitle ?? "Task paused"}:</strong> {(holdReason?.trim() || "A project problem needs attention.").replace(/[.!?…]?$/, end => end || ".")} Nothing can be saved now. What you marked is kept until you leave the task.</span>
+                </InlineMessage>}
                 {pendingIsMarkedSpan
                   ? <>
                     <p className="pending-quote">“{quoteSegments(view.document.text, pendingAnnotation.segments)}”</p>
@@ -4405,6 +4410,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
               })()}
               replacementChanges={replacementChangesOf(selectedTarget, decisionsMap[refKey(selectedTarget)]?.replacement?.annotation_id)}
               documentText={view.document.text}
+              showSentence={panesLayout}
               currentDecision={decisionsMap[refKey(selectedTarget)] ?? null}
               draftAnnotations={draft.annotations ?? []}
               onDecide={(payload) => { void handleReviewDecision(payload, selectedTarget); }}
@@ -4602,7 +4608,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
           Below the panes, not inside them: the bar sticks to the bottom of the window while the page is unscrolled (issue 452). */}
       {pendingBarShown && (
         <div ref={pendingBarRef} className="pending-bar" role="group" aria-label="New finding">
-          <span className="pending-bar__text">New finding “{quoteSegments(view.document.text, pendingAnnotation!.segments, 40)}”</span>
+          <span className="pending-bar__text">New finding “{quoteSegments(view.document.text, pendingAnnotation!.segments, 80)}”</span>
           <Button type="button" variant="primary" size="sm" onClick={chooseTerm}>Choose term</Button>
           <Button type="button" variant="secondary" size="sm" onClick={discardPending}>Discard</Button>
           <CopyTextButton text={passageRef.current} onAnnounce={announceCarried} compact={narrowBar} />

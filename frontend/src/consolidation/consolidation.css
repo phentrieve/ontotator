@@ -615,3 +615,8 @@
 
 /* Submit summary: the server's warnings as a list inside the warning box. */
 .cons-warning-list { margin: var(--space-1) 0 0; padding-inline-start: var(--space-5); }
+
+/* Phone and tablet layouts (up to 1024 px), used by touch: the ✓ of a value is at least 44 × 44 px (issue 472). */
+@media (max-width: 1024px) {
+  .cons-take { width: 44px; height: 44px; }
+}

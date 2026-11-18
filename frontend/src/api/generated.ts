@@ -2076,6 +2076,9 @@ export interface paths {
          *     bring back (``tasks``) and, in ``blocked``, why it cannot run now
          *     (``changed``, ``not_in_plan``, ``person_unavailable``); a record that is
          *     unknown, expired or already undone is refused in a preview too.
+         *     ``blocked_texts`` names each text in the way and what changed on it
+         *     (``texts``: how many texts the action changed). The refusal of a blocked
+         *     Undo carries that answer as ``preview`` in its details.
          */
         post: operations["bulk_undo_api_v1_projects__key__bulk_task_actions_undo_post"];
         delete?: never;
@@ -4553,6 +4556,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Label */
+            label?: string | null;
         };
         /** AssignmentOpenRequest */
         AssignmentOpenRequest: {
@@ -4941,6 +4946,11 @@ export interface components {
              * @default
              */
             expected_latest_version: string;
+            /**
+             * Label
+             * @default
+             */
+            label: string;
         };
         /** Body_upload_ontologies_api_v1_admin_ontologies__post */
         Body_upload_ontologies_api_v1_admin_ontologies__post: {
@@ -5365,6 +5375,10 @@ export interface components {
             /** Tasks */
             tasks?: components["schemas"]["BulkUndoTaskView"][];
             blocked?: components["schemas"]["BulkUndoBlock"] | null;
+            /** Texts */
+            texts?: number;
+            /** Blocked Texts */
+            blocked_texts?: components["schemas"]["BulkUndoTextBlock"][];
         };
         /** BulkUndoTaskView */
         BulkUndoTaskView: {
@@ -5387,6 +5401,20 @@ export interface components {
              */
             status: "open" | "in_progress" | "submitted" | "reopened";
             person: components["schemas"]["PersonRefView"];
+        };
+        /** BulkUndoTextBlock */
+        BulkUndoTextBlock: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "final" | "versions" | "plan" | "tasks" | "submissions" | "drafts" | "not_in_plan" | "person_unavailable";
+            /** Message */
+            message: string;
         };
         /**
          * BulkUndoView
@@ -6254,7 +6282,7 @@ export interface components {
             /** Waiting On */
             waiting_on?: string | string[] | null;
             /** Flags */
-            flags?: ("guidelines_unclear" | "over_limit" | "lead_paused") | ("guidelines_unclear" | "over_limit" | "lead_paused")[] | null;
+            flags?: ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator") | ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator")[] | null;
             /** Proposals */
             proposals?: ("with" | "without") | ("with" | "without")[] | null;
         };
@@ -6916,6 +6944,8 @@ export interface components {
             author?: components["schemas"]["PersonRefView"] | null;
             /** Guideline Version */
             guideline_version?: number | null;
+            /** Guideline Label */
+            guideline_label?: string | null;
             /**
              * Guideline Withdrawn
              * @default false
@@ -7180,6 +7210,8 @@ export interface components {
         GuidelineDocument: {
             /** Version */
             version: number;
+            /** Label */
+            label?: string | null;
             /**
              * Kind
              * @enum {string}
@@ -7226,6 +7258,8 @@ export interface components {
         GuidelineNoticeChangeView: {
             /** Version */
             version: number;
+            /** Label */
+            label?: string | null;
             /** Change Note */
             change_note: string | null;
             /**
@@ -7245,6 +7279,8 @@ export interface components {
             from_version: number | null;
             /** To Version */
             to_version: number;
+            /** To Label */
+            to_label?: string | null;
             /** Changes */
             changes: components["schemas"]["GuidelineNoticeChangeView"][];
             /** More */
@@ -7277,6 +7313,8 @@ export interface components {
         GuidelineSummary: {
             /** Version */
             version: number;
+            /** Label */
+            label?: string | null;
             /**
              * Kind
              * @enum {string}
@@ -10040,13 +10078,15 @@ export interface components {
          *     (``assignment_id``, ``to_person``); the ``final_*`` kinds name the
          *     results (``from_result`` the one replaced, ``to_result`` the one final
          *     afterwards; null when the submission is no longer among the row's).
+         *     ``text_paused`` and ``text_released`` (issue 464) are a lead's pause and
+         *     release of the text, with ``by`` and the ``reason`` given.
          */
         RowChangeView: {
             /**
              * Kind
              * @enum {string}
              */
-            kind: "reassigned" | "mode_changed" | "mode_restored" | "final_withdrawn" | "reopened" | "reopen_undone" | "round_started" | "final_chosen" | "final_changed" | "final_restored";
+            kind: "reassigned" | "mode_changed" | "mode_restored" | "final_withdrawn" | "reopened" | "reopen_undone" | "round_started" | "final_chosen" | "final_changed" | "final_restored" | "text_paused" | "text_released";
             /**
              * At
              * Format: date-time
@@ -10232,6 +10272,8 @@ export interface components {
             author?: components["schemas"]["PersonRefView"] | null;
             /** Guideline Version */
             guideline_version?: number | null;
+            /** Guideline Label */
+            guideline_label?: string | null;
             /**
              * Guideline Withdrawn
              * @default false
@@ -10586,7 +10628,7 @@ export interface components {
             /** Reason */
             reason?: string | null;
             /** Note */
-            note?: ("machine_translation" | "review_only" | "translation_rejected" | "translation_queried" | "translation_not_accepted" | "unchanged" | "with_corrections" | "in_package" | "outside" | "review_off" | "text_change_waiting" | "may_change" | "not_exported" | "carried_on_submit" | "lead_pause" | "v2_not_annotated" | "no_target_proposals" | "correction" | "new_review" | "source_changed" | "round" | "consolidation") | null;
+            note?: ("machine_translation" | "review_only" | "translation_rejected" | "translation_queried" | "translation_not_accepted" | "unchanged" | "with_corrections" | "typos_fixed" | "in_package" | "outside" | "review_off" | "text_change_waiting" | "may_change" | "not_exported" | "carried_on_submit" | "lead_pause" | "report_pause" | "v2_not_annotated" | "no_target_proposals" | "correction" | "new_review" | "source_changed" | "round" | "consolidation") | null;
             /** Matching */
             matching?: number | null;
             /** Compared */
@@ -10801,6 +10843,8 @@ export interface components {
             round_id?: string | null;
             /** Guideline Version */
             guideline_version?: number | null;
+            /** Guideline Label */
+            guideline_label?: string | null;
             /**
              * Guideline Withdrawn
              * @default false
@@ -11532,6 +11576,8 @@ export interface components {
              * @default false
              */
             guideline_withdrawn: boolean;
+            /** Guideline Label */
+            guideline_label?: string | null;
         };
         /** TranslationRunView */
         TranslationRunView: {
@@ -15483,7 +15529,7 @@ export interface operations {
                 final_state?: ("none" | "after_annotation" | "after_review" | "choose" | "confirm" | "old_text" | "may_be_outdated" | "final")[] | null;
                 /** @description "me" or a pseudonym */
                 waiting_on?: string[] | null;
-                flags?: ("guidelines_unclear" | "over_limit" | "lead_paused")[] | null;
+                flags?: ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator")[] | null;
                 proposals?: ("with" | "without")[] | null;
             };
             header?: never;
@@ -15543,7 +15589,7 @@ export interface operations {
                 final_state?: ("none" | "after_annotation" | "after_review" | "choose" | "confirm" | "old_text" | "may_be_outdated" | "final")[] | null;
                 /** @description "me" or a pseudonym */
                 waiting_on?: string[] | null;
-                flags?: ("guidelines_unclear" | "over_limit" | "lead_paused")[] | null;
+                flags?: ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator")[] | null;
                 proposals?: ("with" | "without")[] | null;
             };
             header?: never;
