@@ -395,7 +395,7 @@ When the lead answers, the task shows a banner with **Open the answer**, and **M
 
 The lead can pause the work on a text, for example while the text is being clarified. Your task stays in **My tasks**, marked **Paused by lead** with the lead's reason. You can open and read it; a banner *Paused by lead: …* above the text gives the reason. You cannot save or submit until the lead releases the text. Then the mark goes away and you continue where you stopped. There is nothing for you to do meanwhile.
 
-- If the pause arrives while you have the task open, the next thing you do there (a term search, a saved change, a submit) is refused and the banner appears. Nothing you saved is lost. What you had typed but not saved stays on the screen until you leave the task; when you leave, the editor asks before it discards it.
+- If the pause arrives while you have the task open, the next thing you do there (a term search, a saved change, a submit) is refused and the banner appears. In a narrow window or on a phone, where one pane shows at a time, the **New finding** panel repeats the reason (*Paused by lead: … Nothing can be saved now. What you marked is kept until you leave the task.*), because the banner is above the pane you work in. Nothing you saved is lost. What you had typed but not saved stays on the screen until you leave the task; when you leave, the editor asks before it discards it.
 - A task you are assigned on a paused text is paused from the start.
 - A task can be paused by the lead and by a problem report at the same time. **My tasks** then shows **Paused** with the report's reason and **Paused by lead** with the lead's. Each is released on its own, and the task opens when neither is left: after you resume your report, the task may still be **Paused by lead**.
 - Your submitted tasks are not paused.
@@ -450,7 +450,7 @@ A project lead who corrects a translation themselves sees only **Accepted with c
 When the lead asked for the review with **Ask a reviewer to correct…**, or reopened a review you had submitted, the lead's words stand above **Decision**:
 
 - *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.* The same line is under the task name in **My tasks**.
-- *Reopened by the lead on 18 Nov 2026, 10:00: The unit is mg in my copy.* In **My tasks**, click the **Reopened** badge to read it. Without a reason from the lead it ends with *No reason given.*
+- *Reopened by the lead on 18 Nov 2026, 10:00: The unit is mg in my copy.* In **My tasks** it stands under the task name, as the reason for a second review does; on a narrow screen it stands under the **Reopened** badge. Without a reason from the lead it ends with *No reason given.*
 
 A reopened review starts again from the text of its version; your earlier decision is listed under **Previous reviews**.
 

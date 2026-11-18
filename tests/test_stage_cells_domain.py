@@ -1207,6 +1207,51 @@ def test_consolidation_shows_consolidating() -> None:
     assert (c.final.state, c.final.tone) == ("after_review", "waiting")
 
 
+def test_a_paused_consolidation_stays_consolidating() -> None:
+    """Review 2, F2: a pause never hides the open consolidation. The cell
+    keeps the consolidators and the counts, so the row and the card still
+    name it and never offer a second consolidation."""
+    base: dict[str, Any] = dict(
+        per_text=2,
+        annotation_assignments=2,
+        annotators_submitted=(ANA, TOM),
+        consolidators=(LUC,),
+        submissions=2,
+    )
+    by_lead = cells(
+        facts(
+            **base,
+            lead_paused=True,
+            lead_pause_by=ANA,
+            lead_pause_reason="Source text is being checked",
+        )
+    ).annotation
+    assert (by_lead.state, by_lead.tone) == ("consolidating", "waiting")
+    assert (by_lead.detail.people, by_lead.detail.note) == ((LUC,), "lead_pause")
+    assert (by_lead.detail.submitted, by_lead.detail.total) == (2, 2)
+    assert by_lead.detail.excerpt == "Source text is being checked"
+
+    f = facts(
+        **base,
+        open_report_id="r1",
+        paused_by=LUC,
+        paused_excerpt="Which rule applies?",
+        paused_task="consolidation",
+    )
+    steps = derive_steps(f.step)
+    assert steps[0].code == "decide_report"
+    by_report = stage_cells(f, steps).annotation
+    assert (by_report.state, by_report.tone) == ("consolidating", "decision")
+    assert (by_report.detail.people, by_report.detail.note) == ((LUC,), "report_pause")
+    assert by_report.detail.excerpt == "Which rule applies?"
+    # The report wins over a lead pause on the same text: it is the lead's turn.
+    both = stage_cells(dataclasses.replace(f, lead_paused=True), steps).annotation
+    assert (both.tone, both.detail.note) == ("decision", "report_pause")
+    # A paused annotation task is still the paused cell.
+    annotator = stage_cells(dataclasses.replace(f, paused_task="annotate"), steps)
+    assert annotator.annotation.state == "paused"
+
+
 def test_final_choose_counts_consolidation_submissions() -> None:
     # Walkthrough step 11: two annotations and a consolidation, no final yet.
     base: dict[str, Any] = dict(

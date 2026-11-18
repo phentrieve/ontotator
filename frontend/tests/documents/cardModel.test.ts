@@ -144,6 +144,14 @@ describe("Finalization", () => {
     expect(finalizationState(cardRow(stages, { consolidation_progress: { round_id: "r1", open: 2, total: 3 } }), now)).toEqual({ state: "consolidating (2 of 3 groups open)", tone: "now" });
     expect(finalizationState(cardRow(stages), now)).toEqual({ state: "consolidating", tone: "now" });
   });
+  it("a paused consolidation stays named: nobody's turn under a lead pause, the lead's under a report (review 2, F2)", () => {
+    const progress = { consolidation_progress: { round_id: "r1", open: 2, total: 2 } };
+    const byLead = { annotation: cell("consolidating", "waiting", { note: "lead_pause", submitted: 2, total: 2 }), final: cell("after_review", "waiting") };
+    expect(finalizationState(cardRow(byLead, progress), now)).toEqual({ state: "consolidating · paused (2 of 2 groups open)", tone: "later" });
+    expect(annotationState(cardRow(byLead))).toEqual({ state: "2 of 2 submitted", tone: "done" });
+    const byReport = { annotation: cell("consolidating", "decision", { note: "report_pause" }), final: cell("after_review", "waiting") };
+    expect(finalizationState(cardRow(byReport), now)).toEqual({ state: "consolidating · paused", tone: "now" });
+  });
   it("confirm reads ready to accept", () => {
     expect(finalizationState(cardRow({ final: cell("confirm", "decision") }), now)).toEqual({ state: "ready to accept", tone: "now" });
   });

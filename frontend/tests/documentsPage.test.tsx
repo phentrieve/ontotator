@@ -839,7 +839,7 @@ it("shows an unknown text and an empty decision filter with Show all texts", asy
 it("shows the empty states per tab, for filters and for an empty project", async () => {
   mockRows(page([], { bar: { ...page([]).bar, all: 3 } }));
   const cases: [ProjectDocumentsQuery, string][] = [
-    [{ segment: "assign" }, "Nothing to assign"],
+    [{ segment: "assign" }, "No text waits for an assignment"],
     [{ segment: "progress" }, "Nothing in progress"],
     [{ segment: "decision" }, "Nothing needs your decision"],
     [{ segment: "done", language: "de" }, "Nothing done yet"],

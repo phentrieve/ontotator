@@ -75,7 +75,14 @@ export interface DecisionBlockProps {
 }
 
 
-interface Success { text: string; bar: string }
+/** The final result of the text `rowKey` on this page; null without one, undefined when the page does not list the text. */
+function finalOf(page: DocumentRowsPage, rowKey: string): string | null | undefined {
+  const row = page.groups.flatMap(group => group.rows).find(entry => rowKeyOf(entry) === rowKey);
+  return row ? row.final?.submission_id ?? null : undefined;
+}
+
+/** `rowKey` and `submissionId`: the text and the final result the line speaks of (absent when the list could not be refreshed). */
+interface Success { text: string; bar: string; rowKey?: string; submissionId?: string | null }
 /** `stay`: the lead came through "Change final…", so the panel keeps showing this text after the save. */
 interface Pending { rowKey: string; before: DocumentRowsPage; stay: boolean }
 
@@ -113,7 +120,7 @@ export function DecisionBlock(props: DecisionBlockProps): JSX.Element | null {
     if (!saved || !page || page === saved.before) return;
     pending.current = null;
     setBusy(null);
-    setSuccess({ text: savedText(caseOfTextKey(saved.rowKey), languageOfTextKey(saved.rowKey)), bar: remainingText(page.bar) });
+    setSuccess({ text: savedText(caseOfTextKey(saved.rowKey), languageOfTextKey(saved.rowKey)), bar: remainingText(page.bar), rowKey: saved.rowKey, submissionId: finalOf(page, saved.rowKey) });
     const next = saved.stay ? null : nextFinalDecision(page, saved.rowKey);
     if (saved.stay) {
       // "Change final…" was about this text: no jump to the next decision of the list.
@@ -129,6 +136,13 @@ export function DecisionBlock(props: DecisionBlockProps): JSX.Element | null {
     // Only a new page completes a save.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
+
+  // The saved final result is no longer the text's (Undo in the toast brought the earlier one back, or it was withdrawn
+  // or replaced elsewhere): "Final result saved" would be stale (review 2, F7 b).
+  useEffect(() => {
+    if (!success?.rowKey || !page || pending.current) return;
+    if (finalOf(page, success.rowKey) !== success.submissionId) setSuccess(null);
+  }, [page, success]);
 
   // Another row (advance or a new panel target): "none left" belonged to the previous row.
   const shownKey = useRef(rowKey);
