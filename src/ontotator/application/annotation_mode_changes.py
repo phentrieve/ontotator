@@ -430,13 +430,17 @@ class AnnotationModeChangeService:
             return result
         viewer = self.actor.user_id if self.actor.user_id is not None else -1
         authors = lead_pseudonym_refs(
-            conn, (item.annotator_id for item in submissions), viewer_id=viewer
+            conn,
+            (item.annotator_id for item in submissions),
+            viewer_id=viewer,
+            logins_of_project=pid,
         )
         people = person_refs(
             conn,
             (item.user_id for item in assignments),
             viewer_id=viewer,
             viewer_is_lead=True,
+            logins_of_project=pid,
         )
         views: dict[RowKey, dict[str, Any]] = {
             row: {

@@ -158,6 +158,7 @@ def test_workload_people_sorted_by_open_work(env):
     assert ana["person"] == {
         "pseudonym": accounts.get_by_username("ana").pseudonym,
         "display_name": "Ana Weber",
+        "username": "ana",
         "is_me": False,
     }
     columns = (
@@ -172,6 +173,40 @@ def test_workload_people_sorted_by_open_work(env):
         (0, 1, 0, 0, 0),
         (0, 0, 0, 0, 1),
     ]
+    # Issue 485: what was submitted, by task.
+    by_task = (
+        "translation_reviews_submitted",
+        "annotations_submitted",
+        "reviews_submitted",
+    )
+    assert [tuple(w[c] for c in by_task) for w in workload] == [
+        (0, 0, 0),
+        (0, 0, 0),
+        (0, 1, 0),
+    ]
+
+
+def test_workload_submitted_is_split_by_task(env):
+    """Issue 485: ten reviews and one annotation are not eleven of one kind."""
+    write(env, {RowKey("c1", "de"): REVIEW})
+    review = assign(env, doc("c1", "de"), "ana", "translation_review")
+    annotation = assign(env, doc("c1", "en"), "ana", "annotate")
+    consolidation = assign(env, doc("c2", "en"), "adj", "review")
+    with env.db.transaction() as conn:
+        conn.execute(
+            update(AssignmentRow)
+            .where(AssignmentRow.id.in_([review, annotation, consolidation]))
+            .values(status="submitted")
+        )
+    workload = {w["username"]: w for w in progress(env.lead)["workload"]}
+    ana, adj = workload["ana"], workload["adj"]
+    assert (ana["submitted"], adj["submitted"]) == (2, 1)
+    assert (
+        ana["translation_reviews_submitted"],
+        ana["annotations_submitted"],
+        ana["reviews_submitted"],
+    ) == (1, 1, 0)
+    assert (adj["annotations_submitted"], adj["reviews_submitted"]) == (0, 1)
 
 
 def test_annotation_in_progress_excludes_paused_rows(env):

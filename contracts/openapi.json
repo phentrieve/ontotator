@@ -13100,6 +13100,13 @@
           "rows_over_target": {
             "type": "integer",
             "title": "Rows Over Target"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/AnnotationTargetRow"
+            },
+            "type": "array",
+            "title": "Rows"
           }
         },
         "type": "object",
@@ -13107,6 +13114,29 @@
           "rows_over_target"
         ],
         "title": "AnnotationTargetPreview"
+      },
+      "AnnotationTargetRow": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "annotators": {
+            "type": "integer",
+            "title": "Annotators"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "annotators"
+        ],
+        "title": "AnnotationTargetRow"
       },
       "AnnotationTypeDefinition": {
         "properties": {
@@ -24774,6 +24804,17 @@
             ],
             "title": "Display Name"
           },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
           "is_me": {
             "type": "boolean",
             "title": "Is Me",
@@ -26541,6 +26582,18 @@
             "type": "integer",
             "title": "Submitted",
             "default": 0
+          },
+          "translation_reviews_submitted": {
+            "type": "integer",
+            "title": "Translation Reviews Submitted"
+          },
+          "annotations_submitted": {
+            "type": "integer",
+            "title": "Annotations Submitted"
+          },
+          "reviews_submitted": {
+            "type": "integer",
+            "title": "Reviews Submitted"
           }
         },
         "type": "object",

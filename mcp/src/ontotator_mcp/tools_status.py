@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
@@ -9,7 +10,7 @@ from mcp.server.mcpserver import MCPServer
 from pydantic import Field
 
 from ontotator_mcp.client import OntotatorClient, project_path
-from ontotator_mcp.tooling import register
+from ontotator_mcp.tooling import person, register
 
 Project = Annotated[str, Field(description="Project key, e.g. 'ward-7'.")]
 Stage = Literal["translation_review", "annotation", "final", "done"]
@@ -24,14 +25,92 @@ def _newest(row: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def _lead_pause(pause: dict[str, Any] | None) -> dict[str, Any] | None:
-    """A lead paused the text: why, who (pseudonym) and when; else None."""
+    """A lead paused the text: why, who and when; else None."""
     if not pause:
         return None
     return {
         "reason": pause.get("reason"),
-        "paused_by": (pause.get("paused_by") or {}).get("pseudonym"),
+        "paused_by": person(pause.get("paused_by")),
         "paused_at": pause.get("paused_at"),
     }
+
+
+def _named(ref: Any, label: Any) -> dict[str, Any] | None:
+    """The person of ``ref``; of the pseudonym ``label`` when the row has no
+    reference."""
+    return person(ref) or person({"pseudonym": label})
+
+
+# What list_texts can return of a text besides case_id and language.
+TextField = Literal[
+    "is_source",
+    "document_id",
+    "version",
+    "origin",
+    "translation_status",
+    "in_plan",
+    "plan",
+    "stages",
+    "next_step",
+    "annotations_per_text",
+    "over_limit",
+    "work",
+    "lead_pause",
+    "final",
+    "problem_reports",
+]
+# The short form: enough to find a text, see where it stands and act on it.
+COMPACT_FIELDS: tuple[str, ...] = (
+    "is_source",
+    "document_id",
+    "version",
+    "stages",
+    "next_step",
+    "annotations_per_text",
+    "over_limit",
+)
+
+
+def chosen(
+    summary: dict[str, Any], fields: Sequence[str] | None, compact: tuple[str, ...]
+) -> dict[str, Any]:
+    """``summary`` with its key fields and the ``fields`` asked for (``all``:
+    every field; None: the compact ones)."""
+    if fields is not None and "all" in fields:
+        return summary
+    wanted = {"case_id", "language", *(compact if fields is None else fields)}
+    return {name: value for name, value in summary.items() if name in wanted}
+
+
+def workload_entry(entry: dict[str, Any]) -> dict[str, Any]:
+    """One person's workload: the person's three names, then the counts
+    (``submitted`` also by task, from a server that splits it)."""
+    names = person((entry.get("person") or {}) | {"username": entry.get("username")})
+    counts = {
+        name: value
+        for name, value in entry.items()
+        if name not in ("person", "username")
+    }
+    return (names or dict.fromkeys(("username", "display_name", "pseudonym"))) | counts
+
+
+def audit_event(event: dict[str, Any], details: bool) -> dict[str, Any]:
+    """One audit event in short: what, when, who and on what; the event's
+    ``details`` only on request."""
+    found = {
+        "id": event.get("id"),
+        "at": event.get("at"),
+        "action": event.get("action"),
+        "actor": person(event.get("actor")),
+        "api_token": event.get("api_token"),
+        "target_type": event.get("target_type"),
+        "target_id": event.get("target_id"),
+        "target_person": person(event.get("target_person")),
+    }
+    if found["actor"] is None:
+        # No person: the system, a job or an account that is gone.
+        found["actor_label"] = event.get("actor_label") or event.get("actor_kind")
+    return found | ({"details": event.get("details")} if details else {})
 
 
 def text_summary(row: dict[str, Any]) -> dict[str, Any]:
@@ -52,14 +131,17 @@ def text_summary(row: dict[str, Any]) -> dict[str, Any]:
         "plan": row.get("plan_row"),
         "stages": {name: (cell or {}).get("state") for name, cell in stages.items()},
         "next_step": step.get("code"),
+        "annotations_per_text": (row.get("annotations_per_text") or {}).get(
+            "effective"
+        ),
+        "over_limit": row.get("over_limit", False),
         "work": [
             {
                 "assignment_id": item.get("assignment_id"),
                 "task": item.get("task"),
                 "status": item.get("status"),
                 "document_id": item.get("document_id"),
-                "person": (item.get("person") or {}).get("pseudonym")
-                or item.get("author_label"),
+                "person": _named(item.get("person"), item.get("author_label")),
                 "paused_by": item.get("pause_causes", []),
             }
             for item in row.get("work", [])
@@ -70,7 +152,7 @@ def text_summary(row: dict[str, Any]) -> dict[str, Any]:
         else {
             "submission_id": final.get("submission_id"),
             "kind": final.get("kind"),
-            "author": final.get("author_label"),
+            "author": _named(final.get("author"), final.get("author_label")),
         },
         "problem_reports": len(row.get("problem_reports", [])),
     }
@@ -94,16 +176,40 @@ async def rows(
 
 def register_status(server: MCPServer, api: OntotatorClient) -> None:
     @register(server, scopes="read", effect="read")
-    async def project_overview(project: Project) -> dict[str, Any]:
+    async def project_overview(
+        project: Project,
+        include_links: Annotated[
+            bool,
+            Field(
+                description=(
+                    "Also the Documents filter behind each count of 'stages'"
+                    " ('links', for a link into the web interface). Off by"
+                    " default: they are most of the answer."
+                )
+            ),
+        ] = False,
+    ) -> dict[str, Any]:
         """Where a project stands: settings, totals per stage, people and open decisions.
 
         Combines the project's settings, progress, the number of texts that
         need the lead and the warnings the final export would show.
+        'workload' has one entry per person (username, display_name,
+        pseudonym) with their open, paused and submitted tasks; 'submitted'
+        is the sum of translation_reviews_submitted, annotations_submitted
+        and reviews_submitted (consolidations).
         """
         settings = await api.get(project_path(project, "settings"))
         progress = await api.get(project_path(project, "progress"))
         summary = await api.get(project_path(project, "documents/summary"))
         warnings = await api.get(project_path(project, "workflow-warnings"))
+        stages = progress.get("stages")
+        if isinstance(stages, dict) and not include_links:
+            stages = {
+                name: {key: value for key, value in card.items() if key != "links"}
+                if isinstance(card, dict)
+                else card
+                for name, card in stages.items()
+            }
         return {
             "project": project,
             "name": settings.get("name"),
@@ -111,8 +217,8 @@ def register_status(server: MCPServer, api: OntotatorClient) -> None:
             "annotations_per_text": settings.get("annotations_per_text"),
             "totals": progress.get("totals"),
             "lede": progress.get("lede"),
-            "stages": progress.get("stages"),
-            "workload": progress.get("workload", []),
+            "stages": stages,
+            "workload": [workload_entry(e) for e in progress.get("workload", [])],
             "needs_decision": summary.get("needs_decision"),
             "final_results": len(warnings.get("selections", [])),
             "export_warnings": len(warnings.get("warnings", [])),
@@ -124,14 +230,20 @@ def register_status(server: MCPServer, api: OntotatorClient) -> None:
         project: Project,
         view: Literal["texts", "people", "both"] = "both",
     ) -> dict[str, Any]:
-        """Assignment progress per text version and per person (open, in progress, submitted)."""
+        """Assignment progress per text version and per person (open, in progress, submitted).
+
+        Long for a large project: 'texts' has one entry per text version.
+        project_overview gives the totals and the workload alone.
+        """
         progress: dict[str, Any] = await api.get(project_path(project, "progress"))
         result: dict[str, Any] = {"totals": progress.get("totals")}
         if view in ("texts", "both"):
             result["texts"] = progress.get("documents", [])
         if view in ("people", "both"):
             result["people"] = progress.get("people", [])
-            result["workload"] = progress.get("workload", [])
+            result["workload"] = [
+                workload_entry(entry) for entry in progress.get("workload", [])
+            ]
         return result
 
     @register(server, scopes="read", effect="read")
@@ -159,36 +271,100 @@ def register_status(server: MCPServer, api: OntotatorClient) -> None:
         paused_by_lead: Annotated[
             bool, Field(description="Only texts a lead paused (pause_texts).")
         ] = False,
+        over_limit: Annotated[
+            bool,
+            Field(
+                description=(
+                    "Only texts with more annotators than their annotations"
+                    " per text (the web filter 'More annotators than the"
+                    " limit')."
+                )
+            ),
+        ] = False,
+        fields: Annotated[
+            list[TextField | Literal["all"]] | None,
+            Field(
+                description=(
+                    "What to return of each text besides case_id and language."
+                    " None: the short form (is_source, document_id, version,"
+                    " stages, next_step, annotations_per_text, over_limit)."
+                    " ['all']: everything, with 'work' (tasks and people),"
+                    " 'final', 'lead_pause', 'plan' and the others."
+                )
+            ),
+        ] = None,
+        limit: Annotated[
+            int, Field(ge=1, le=1000, description="At most this many texts.")
+        ] = 100,
+        offset: Annotated[
+            int,
+            Field(ge=0, description="Skip this many texts ('next_offset')."),
+        ] = 0,
         page: Annotated[
             int | None,
-            Field(ge=1, description="One page of cases; None returns every page."),
+            Field(
+                ge=1,
+                description=(
+                    "Only this page of cases as the web interface pages them;"
+                    " limit and offset then count within it. Usually None:"
+                    " page with limit and offset."
+                ),
+            ),
         ] = None,
     ) -> dict[str, Any]:
-        """The project's texts with IDs, stage, assigned people and final result.
+        """The project's texts with IDs, stage, annotations per text and, on request, people and final result.
 
         Gives the document_id of each text's newest version, which
-        assign_texts and start_consolidation need. 'lead_pause' says a lead
-        paused the text (pause_texts), with the reason; each task's
-        'paused_by' names what pauses it: 'report' and/or 'lead'.
+        assign_texts and start_consolidation need. A document_id is not the
+        case ID. Returns at most 'limit' texts in a short form; 'text_count'
+        counts all that match and 'next_offset' is the offset of the next
+        call (None: that was the last). 'annotations_per_text' is the
+        text's own value where it has one, else the project's; 'over_limit'
+        says the text has more annotators than that. With fields: 'work'
+        lists the tasks, each with its person (username, display_name,
+        pseudonym) and 'paused_by' ('report' and/or 'lead'); 'lead_pause'
+        says a lead paused the text (pause_texts), with the reason. The
+        task 'review' is a consolidation.
         """
+        flags = [
+            name
+            for name, on in (
+                ("lead_paused", paused_by_lead),
+                ("over_limit", over_limit),
+            )
+            if on
+        ]
         filters: dict[str, Any] = {
             "language": language,
             "stage": stage,
             "q": query,
             "proposals": [proposals] if proposals else None,
-            "flags": ["lead_paused"] if paused_by_lead else None,
+            "flags": flags or None,
         }
+        path = project_path(project, "document-rows")
+        header: dict[str, Any] = await api.get(path, page=page or 1, **filters)
+        found = [row for group in header["groups"] for row in group["rows"]]
         if page is None:
-            found, header = await rows(api, project, **filters)
-        else:
-            header = await api.get(
-                project_path(project, "document-rows"), page=page, **filters
-            )
-            found = [row for group in header["groups"] for row in group["rows"]]
+            # Further pages only as far as this call returns texts of them.
+            for number in range(2, int(header.get("page_count", 1)) + 1):
+                if len(found) >= offset + limit:
+                    break
+                more = await api.get(path, page=number, **filters)
+                found += [row for group in more["groups"] for row in group["rows"]]
+        part = found[offset : offset + limit]
+        total = header.get("text_count") if page is None else len(found)
+        end = offset + len(part)
         return {
-            "texts": [text_summary(row) for row in found],
+            "texts": [
+                chosen(text_summary(row), fields, COMPACT_FIELDS) for row in part
+            ],
+            "returned": len(part),
             "text_count": header.get("text_count"),
             "case_count": header.get("group_count"),
+            "offset": offset,
+            "next_offset": end
+            if part and isinstance(total, int) and end < total
+            else None,
             "page": page,
             "page_count": header.get("page_count"),
         }
@@ -253,15 +429,30 @@ def register_status(server: MCPServer, api: OntotatorClient) -> None:
         until: Annotated[
             datetime | None, Field(description="Before this time (exclusive).")
         ] = None,
-        limit: Annotated[int, Field(ge=1, le=500)] = 100,
+        include_details: Annotated[
+            bool,
+            Field(
+                description=(
+                    "Also each event's 'details' (what exactly changed: old"
+                    " and new values, reasons, counts). Off by default: they"
+                    " are most of the answer; narrow with action, person or"
+                    " since first."
+                )
+            ),
+        ] = False,
+        limit: Annotated[int, Field(ge=1, le=500)] = 50,
         offset: Annotated[int, Field(ge=0)] = 0,
     ) -> dict[str, Any]:
         """The project's audit trail: who changed what and with which token, newest first.
 
         Work plan, assignments, members, settings, imports, exports and
-        final results; leads only. People are pseudonyms (with display
-        names); 'api_token' names the token a change was made with. 'total'
-        counts every matching event; page with limit and offset.
+        final results; leads only. Each event in short: id, at, action,
+        actor and target_person (display_name and pseudonym; the audit
+        names nobody's login, so username is null: match by pseudonym; an
+        actor that is no person has 'actor_label'), target_type, target_id
+        and 'api_token', the id and name of the token a change was made
+        with. 'total' counts every matching event; page with limit and
+        offset.
         """
         page: dict[str, Any] = await api.get(
             project_path(project, "audit"),
@@ -273,7 +464,11 @@ def register_status(server: MCPServer, api: OntotatorClient) -> None:
             limit=limit,
             offset=offset,
         )
-        return page
+        return page | {
+            "events": [
+                audit_event(event, include_details) for event in page.get("events", [])
+            ]
+        }
 
     @register(server, scopes="read", effect="read")
     async def list_jobs(

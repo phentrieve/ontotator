@@ -520,7 +520,11 @@ async def test_reopen_texts_dry_run_then_confirm_with_the_token(
         {"project": "p", "texts": texts, "reason": "Guideline 2.3"},
     )
     assert dry["applied"] is False
-    assert dry["would_change"][0]["person"] == "Tom Reis"
+    assert dry["would_change"][0]["person"] == {
+        "username": None,
+        "display_name": "Tom Reis",
+        "pseudonym": "ann-1",
+    }
     assert dry["kept"][0]["why"] == "Not submitted yet."
     # The server's token and a mark of the reason (#471).
     token = marked(PT_A, "Guideline 2.3")
@@ -623,7 +627,7 @@ async def test_undo_reopen_or_withdraw_dry_run_then_confirm(
             "assignment_id": 7,
             "task": "annotate",
             "status": "reopened",
-            "person": "Tom Reis",
+            "person": {"username": None, "display_name": "Tom Reis", "pseudonym": "x"},
         }
     ]
     [post] = fake.calls_to("POST", BULK_UNDO)
@@ -714,7 +718,11 @@ async def test_start_rounds_dry_run_confirm_and_stale_token(
     token = marked(PT_A, "New tool set")
     dry = await call(mcp_client, "start_rounds", args)
     assert dry["applied"] is False and dry["preview_token"] == token
-    assert dry["would_change"][0]["person"] == "Tom Reis"
+    assert dry["would_change"][0]["person"] == {
+        "username": None,
+        "display_name": "Tom Reis",
+        "pseudonym": "ann-1",
+    }
     [post] = fake.calls_to("POST", BULK_START_ROUND)
     assert post.json() == {
         "rows": texts,
@@ -807,7 +815,9 @@ async def test_pause_texts_dry_run_confirm_and_stale_token(
             "case_id": "c1",
             "language": "en",
             "tasks_in_progress": 1,
-            "people": ["Tom Reis"],
+            "people": [
+                {"username": None, "display_name": "Tom Reis", "pseudonym": "ann-0001"}
+            ],
         }
     ]
     assert dry["skipped_texts"][0]["message"] == "Already paused by a lead."
@@ -847,7 +857,9 @@ async def test_release_texts_names_tasks_a_report_still_pauses(
         "case_id": "c1",
         "language": "en",
         "tasks_in_progress": 1,
-        "people": ["Tom Reis"],
+        "people": [
+            {"username": None, "display_name": "Tom Reis", "pseudonym": "ann-0001"}
+        ],
         "paused_because": "Clinic is checking",
         "still_paused_by_report": 1,
     }

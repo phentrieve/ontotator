@@ -822,8 +822,12 @@ async def test_change_annotation_modes_dry_run_confirm_and_stale_token(
             "language": "en",
             "from_mode": "proposals",
             "discarded_submissions": 1,
-            "authors": ["Tom Reis"],
-            "withdrawn_unsubmitted_tasks": ["ann-2"],
+            "authors": [
+                {"username": None, "display_name": "Tom Reis", "pseudonym": "ann-1"}
+            ],
+            "withdrawn_unsubmitted_tasks": [
+                {"username": None, "display_name": None, "pseudonym": "ann-2"}
+            ],
         }
     ]
     assert dry["skipped_texts"][0]["message"].startswith("Final result chosen")

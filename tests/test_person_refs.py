@@ -10,6 +10,7 @@ from auth_harness import grant, logged_in
 from sqlalchemy import insert, update
 from work_plan_support import BASE, assign, doc, plan_env, select_final, submit, write
 
+from ontotator.application.people import person_refs
 from ontotator.assignments.service import AssignmentService
 from ontotator.auth.audit import Actor
 from ontotator.domain.work_plans import PlanFlags, RowKey
@@ -38,6 +39,8 @@ def ref(env: Any, username: str, display_name: str, *, is_me: bool = False):
     return {
         "pseudonym": _user(env, username).pseudonym,
         "display_name": display_name,
+        # Issue 471: the login name goes where the display name goes.
+        "username": username,
         "is_me": is_me,
     }
 
@@ -220,3 +223,57 @@ def test_my_tasks_carry_case_id(env):
     assert response.status_code == 200, response.text
     task = next(t for t in response.json() if t["assignment_id"] == aid)
     assert task["case_id"] == "c2"
+
+
+def test_login_names_only_for_a_lead_and_of_members_of_the_project(env):
+    """Issue 471: API clients name a person by the login name. A reference
+    carries it only where asked for, to a lead, of a current member of the
+    project: what the members list shows, no more."""
+    ana, ben = _user(env, "ana"), _user(env, "ben")
+    # An account that is not a member of the project (an administrator, or
+    # someone who left it).
+    logged_in(env.app, "outsider", assignments=[])
+    outsider = _user(env, "outsider")
+    ids = [ana.id, ben.id, outsider.id]
+    with env.db.transaction() as conn:
+        plain = person_refs(conn, ids, viewer_id=ben.id, viewer_is_lead=True)
+        for_lead = person_refs(
+            conn, ids, viewer_id=ben.id, viewer_is_lead=True, logins_of_project=env.pid
+        )
+        for_ana = person_refs(
+            conn, ids, viewer_id=ana.id, viewer_is_lead=False, logins_of_project=env.pid
+        )
+    # Not asked for (the audit, the job list): nobody's login.
+    assert {ref.username for ref in plain.values()} == {None}
+    assert plain[ana.id].display_name == "Ana Weber"
+    assert (for_lead[ana.id].username, for_lead[ben.id].username) == ("ana", "ben")
+    assert for_lead[outsider.id].username is None
+    assert for_lead[outsider.id].display_name is not None
+    # Anyone but a lead: no login, not even of a member.
+    assert {ref.username for ref in for_ana.values()} == {None}
+    assert for_ana[ben.id].display_name is None
+
+
+def test_the_audit_names_no_login(env):
+    assign(env, doc("c1", "en"), "ana", "annotate")
+    page = env.lead.get(f"{BASE}/audit").json()
+    people = [
+        event[name]
+        for event in page["events"]
+        for name in ("actor", "target_person")
+        if event[name]
+    ]
+    assert people and {person["username"] for person in people} == {None}
+
+
+def test_a_documents_row_names_the_login_of_a_task_for_the_lead(env):
+    assign(env, doc("c1", "en"), "ana", "annotate")
+    page = env.lead.get(f"{BASE}/document-rows").json()
+    [item] = [
+        item
+        for group in page["groups"]
+        for row in group["rows"]
+        for item in row["work"]
+    ]
+    assert item["person"]["username"] == "ana"
+    assert item["person"]["display_name"] == "Ana Weber"

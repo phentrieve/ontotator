@@ -21,7 +21,7 @@ from ontotator_mcp.models import (
     PlanChoice,
     TextRef,
 )
-from ontotator_mcp.tooling import Scope, register
+from ontotator_mcp.tooling import Scope, listing, register
 
 Project = Annotated[str, Field(description="Project key, e.g. 'ward-7'.")]
 Paths = Annotated[
@@ -250,23 +250,23 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         return result | {"user": me}
 
     @register(server, scopes="read", effect="read")
-    async def list_projects() -> list[dict[str, Any]]:
+    async def list_projects() -> dict[str, Any]:
         """The projects the token's owner is a member of, with roles and text counts."""
         projects: list[dict[str, Any]] = await api.get("/api/v1/projects")
-        return projects
+        return listing(projects)
 
     @register(server, scopes="read", effect="read")
-    async def list_ontologies() -> list[dict[str, Any]]:
+    async def list_ontologies() -> dict[str, Any]:
         """Ontology releases on the server with their SHA-256 and translations.
 
         Use the ``sha256`` of a release as a pin in create_project or
         set_ontology_pins.
         """
         listed: list[dict[str, Any]] = await api.get("/api/v1/ontologies")
-        return listed
+        return listing(listed)
 
     @register(server, scopes="admin", effect="read")
-    async def list_ontology_files() -> list[dict[str, Any]]:
+    async def list_ontology_files() -> dict[str, Any]:
         """Every uploaded ontology and translation file, with the projects using it.
 
         ``frozen_without`` names projects that froze their translations before
@@ -274,7 +274,7 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         refresh_translations). Needs a system token.
         """
         listed: list[dict[str, Any]] = await api.get("/api/v1/admin/ontologies/")
-        return listed
+        return listing(listed)
 
     @register(server, scopes="admin", effect="additive", idempotent=True)
     async def upload_ontology_files(paths: Paths) -> dict[str, Any]:
@@ -296,10 +296,10 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         return {"local_files": [str(file) for file in files], "files": result}
 
     @register(server, scopes="read", effect="read")
-    async def list_project_templates() -> list[dict[str, Any]]:
+    async def list_project_templates() -> dict[str, Any]:
         """Project templates (ready task profiles) and the ontologies each needs."""
         listed: list[dict[str, Any]] = await api.get("/api/v1/projects/templates")
-        return listed
+        return listing(listed)
 
     @register(server, scopes="admin", effect="additive")
     async def create_project(
@@ -580,17 +580,19 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
             list[str] | None,
             Field(description="e.g. ['ready','invalid','committed']; all if empty."),
         ] = None,
-    ) -> list[dict[str, Any]]:
+    ) -> dict[str, Any]:
         """The project's staged and committed uploads."""
         listed = await api.get(project_path(project, "uploads"), status=status)
-        return [
-            {
-                key: item.get(key)
-                for key in ("id", "kind", "language", "status", "created_at")
-            }
-            | {"files": [f.get("filename") for f in item.get("files", [])]}
-            for item in listed
-        ]
+        return listing(
+            [
+                {
+                    key: item.get(key)
+                    for key in ("id", "kind", "language", "status", "created_at")
+                }
+                | {"files": [f.get("filename") for f in item.get("files", [])]}
+                for item in listed
+            ]
+        )
 
     # An import cannot be undone, and accept_external_review or a re-delivered
     # translation changes the status of texts imported earlier.
@@ -654,22 +656,23 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         return upload_summary(view)
 
     @register(server, scopes="read", effect="read")
-    async def list_people(project: Project) -> list[dict[str, Any]]:
+    async def list_people(project: Project) -> dict[str, Any]:
         """Project members with roles, languages and open tasks.
 
-        Leads see names and login names; others see pseudonyms only.
+        Leads see names and login names (username, display_name); others
+        see pseudonyms only. The members are in 'items'.
         """
         members: list[dict[str, Any]] = await api.get(project_path(project, "members"))
-        return members
+        return listing(members)
 
     @register(server, scopes="admin", effect="read")
-    async def list_users() -> list[dict[str, Any]]:
+    async def list_users() -> dict[str, Any]:
         """Every user account of the server with projects and languages.
 
         Needs a system token.
         """
         users: list[dict[str, Any]] = await api.get("/api/v1/admin/users/")
-        return users
+        return listing(users)
 
     @register(
         server, scopes=("read", "project-admin"), effect="destructive", idempotent=True

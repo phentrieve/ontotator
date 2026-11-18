@@ -92,7 +92,8 @@ HINTS: dict[str, str] = {
     ),
     "DOCUMENT_NOT_FOUND": (
         "No such text version in this project, or the token's owner may not read"
-        " it. list_texts names the document_id of each text."
+        " it. list_texts names the document_id of each text; a case ID is not a"
+        " document_id."
     ),
     "VERSION_NOT_FOUND": (
         "No such submission or annotation version of this text, or the token's"
@@ -145,9 +146,10 @@ HINTS: dict[str, str] = {
         " each translation (is_source false)."
     ),
     "NOT_A_TRANSLATION/not_a_translation": (
-        "document_id names a source text; this works on translations only."
-        " list_texts gives the document_id of each translation (is_source"
-        " false). A source text gets a new version by importing a package"
+        "document_id names a source text; this works on translations only. A"
+        " case ID is not a document_id, and for a source text the two can be"
+        " the same. list_texts gives the document_id of each translation"
+        " (is_source false). A source text gets a new version by importing a package"
         " (upload_texts)."
     ),
     "VERSION_UPLOAD_NOT_AVAILABLE": (

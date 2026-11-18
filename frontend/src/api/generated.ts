@@ -4257,6 +4257,17 @@ export interface components {
         AnnotationTargetPreview: {
             /** Rows Over Target */
             rows_over_target: number;
+            /** Rows */
+            rows?: components["schemas"]["AnnotationTargetRow"][];
+        };
+        /** AnnotationTargetRow */
+        AnnotationTargetRow: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Annotators */
+            annotators: number;
         };
         /**
          * AnnotationTypeDefinition
@@ -8407,6 +8418,8 @@ export interface components {
             pseudonym: string;
             /** Display Name */
             display_name?: string | null;
+            /** Username */
+            username?: string | null;
             /**
              * Is Me
              * @default false
@@ -9089,6 +9102,12 @@ export interface components {
              * @default 0
              */
             submitted: number;
+            /** Translation Reviews Submitted */
+            translation_reviews_submitted?: number;
+            /** Annotations Submitted */
+            annotations_submitted?: number;
+            /** Reviews Submitted */
+            reviews_submitted?: number;
         };
         /**
          * ProjectAgreement

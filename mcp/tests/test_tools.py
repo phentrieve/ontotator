@@ -632,10 +632,19 @@ async def test_list_texts_reads_every_page(fake: FakeApi, mcp_client: Client) ->
         "2": page([row("c2")], 2, 2),
     }
     fake.on("GET", ROWS, lambda request: pages[request.url.params["page"]])
-    result = await call(mcp_client, "list_texts", {"project": "p", "stage": ["final"]})
+    result = await call(
+        mcp_client,
+        "list_texts",
+        {"project": "p", "stage": ["final"], "fields": ["document_id", "work"]},
+    )
     assert [t["case_id"] for t in result["texts"]] == ["c1", "c2"]
     assert result["texts"][0]["document_id"] == "c1-en-v1"
-    assert result["texts"][0]["work"][0]["person"] == "ann-0001"
+    assert result["texts"][0]["work"][0]["person"] == {
+        "username": None,
+        "display_name": None,
+        "pseudonym": "ann-0001",
+    }
+    assert set(result["texts"][0]) == {"case_id", "language", "document_id", "work"}
     first = fake.calls_to("GET", ROWS)[0].request.url.params
     assert first.get_list("stage") == ["final"]
 
@@ -653,12 +662,18 @@ async def test_list_texts_shows_a_lead_pause_and_filters_on_it(
     paused["work"][0]["pause_causes"] = ["lead"]
     fake.on("GET", ROWS, page([paused, row("c2")], 1, 1))
     result = await call(
-        mcp_client, "list_texts", {"project": "p", "paused_by_lead": True}
+        mcp_client,
+        "list_texts",
+        {"project": "p", "paused_by_lead": True, "fields": ["all"]},
     )
     first, second = result["texts"]
     assert first["lead_pause"] == {
         "reason": "Clinic is checking",
-        "paused_by": "ann-0009",
+        "paused_by": {
+            "username": None,
+            "display_name": "Carla Diaz",
+            "pseudonym": "ann-0009",
+        },
         "paused_at": "2026-11-17T09:30:00Z",
     }
     assert first["work"][0]["paused_by"] == ["lead"]
@@ -956,7 +971,11 @@ async def test_undo_change_final_results_dry_run_then_confirm(
             "submission_id": "s1",
             "version": 1,
             "replaces_submission_id": "s2",
-            "chosen_by": "Mia",
+            "chosen_by": {
+                "username": None,
+                "display_name": "Mia",
+                "pseudonym": "ann-0001",
+            },
             "chosen_at": "2026-11-17T09:00:00Z",
         }
     ]
