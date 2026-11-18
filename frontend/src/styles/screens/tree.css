@@ -161,6 +161,20 @@
   flex-direction: column;
 }
 
+/* "Hide details": the name, id and actions only; the tree takes the rest. */
+.tree-detail.tree-detail--compact {
+  flex: 0 0 auto;
+}
+
+.tree-detail--compact .tree-detail__body {
+  flex: none;
+  padding-bottom: 0;
+}
+
+.tree-detail__toggle {
+  margin-inline-start: auto;
+}
+
 .tree-detail__body {
   flex: 1;
   min-height: 0;

@@ -102,7 +102,7 @@ const reviewView = (annotations: any[], decisions: any[] = []): WorkspaceView =>
 /**
  * A tree for any start term: Root > (the start term, "Beta term" HP:B). Every walk gets its own id.
  */
-const mockTree = () => {
+const mockTree = (extra: { synonyms?: string[]; definition?: string } = {}) => {
   let walks = 0;
   const labelOf = (termId: string) => (termId === "HP:B" ? "Beta term" : `Term ${termId}`);
   const root = { term_id: "HP:R", label: "Root", child_count: 2, role: "finding" as const };
@@ -115,6 +115,7 @@ const mockTree = () => {
     synonyms: [],
     translations: {},
     parents: [root],
+    ...extra,
   });
   const open = vi.spyOn(api, "openTree").mockImplementation(async (req) => {
     walks += 1;
@@ -212,6 +213,27 @@ describe("the tree in the case screen", () => {
     // The id element holds the id alone; the link is its sibling.
     expect(detail.querySelector(".tree-detail__id")?.textContent).toBe("HP:A");
     expect(link.parentElement).toBe(detail.querySelector(".tree-detail__id")?.parentElement);
+  });
+
+  it("hides the details under the tree down to name and id, and remembers that", async () => {
+    window.localStorage.clear();
+    mockTree({ synonyms: ["Alpha synonym"], definition: "A made-up definition." });
+    const { container } = render(<CaseScreen view={baseView([snapshot("a1", "HP:A")])} workspaceId="ws" onClose={vi.fn()} />);
+    const panel = await openPanel(container, "a1");
+    const detail = panel.querySelector<HTMLElement>(".tree-detail")!;
+    expect(await within(detail).findByText("Alpha synonym")).toBeTruthy();
+
+    fireEvent.click(within(detail).getByRole("button", { name: "Hide details" }));
+    expect(within(detail).queryByText("Alpha synonym")).toBeNull();
+    expect(within(detail).queryByText("A made-up definition.")).toBeNull();
+    expect(detail.querySelector(".tree-detail__id")?.textContent).toBe("HP:A");
+    expect(detail.classList.contains("tree-detail--compact")).toBe(true);
+    expect(within(detail).getByRole("button", { name: "Show details" }).getAttribute("aria-expanded")).toBe("false");
+    expect(window.localStorage.getItem("ontotator.treeDetails")).toBe("closed");
+
+    fireEvent.click(within(detail).getByRole("button", { name: "Show details" }));
+    expect(within(detail).getByText("Alpha synonym")).toBeTruthy();
+    window.localStorage.clear();
   });
 
   it("is offered at an own annotation with a term and nowhere else", () => {

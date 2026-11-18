@@ -20,6 +20,15 @@ import {
 import { LanguageFlag } from "../ui/LanguageTag";
 import { MODIFIER_IN_CHANGE } from "./SearchPanel";
 
+/** Whether the details under the tree show more than the name and id; remembered per browser. */
+const DETAILS_KEY = "ontotator.treeDetails";
+const detailsStartOpen = (): boolean => {
+  try { return window.localStorage.getItem(DETAILS_KEY) !== "closed"; } catch { return true; }
+};
+const rememberDetails = (open: boolean) => {
+  try { window.localStorage.setItem(DETAILS_KEY, open ? "open" : "closed"); } catch { /* Blocked storage: not remembered. */ }
+};
+
 export interface TreeBrowserProps {
   /** Out of sight and out of reach for now; the walk and its state are kept. */
   collapsed?: boolean;
@@ -68,6 +77,8 @@ export const TreeBrowser: React.FC<TreeBrowserProps> = ({
   languages = [],
 }) => {
   const [data, setData] = useState<TreeData>(emptyTree);
+  // Closed, the details keep the name and id only and the tree gets the room.
+  const [detailsOpen, setDetailsOpen] = useState(detailsStartOpen);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [focusedKey, setFocusedKey] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -259,7 +270,7 @@ export const TreeBrowser: React.FC<TreeBrowserProps> = ({
             )}
           </div>
 
-          <div className="tree-detail">
+          <div className={detailsOpen ? "tree-detail" : "tree-detail tree-detail--compact"}>
             <div className="tree-detail__body">
               {detail ? (
                 <>
@@ -279,6 +290,7 @@ export const TreeBrowser: React.FC<TreeBrowserProps> = ({
                       </a>
                     )}
                   </div>
+                  {detailsOpen && <div id="tree-detail-more">
                   {detail.definition && <p className="tree-detail__definition">{detail.definition}</p>}
                   {detail.synonyms.length > 0 && (
                     <div className="tree-detail__group">
@@ -325,6 +337,7 @@ export const TreeBrowser: React.FC<TreeBrowserProps> = ({
                       </ul>
                     </div>
                   )}
+                  </div>}
                 </>
               ) : (
                 <p className="tree-detail__empty">
@@ -345,6 +358,11 @@ export const TreeBrowser: React.FC<TreeBrowserProps> = ({
                 Use this term
               </Button>
               {hint && <span id="tree-use-hint" className="tree-detail__hint">{hint}</span>}
+              <Button type="button" size="sm" variant="quiet" className="tree-detail__toggle" aria-expanded={detailsOpen}
+                aria-controls={detailsOpen && detail ? "tree-detail-more" : undefined}
+                onClick={() => { setDetailsOpen(!detailsOpen); rememberDetails(!detailsOpen); }}>
+                {detailsOpen ? "Hide details" : "Show details"}
+              </Button>
             </div>
           </div>
         </div>
