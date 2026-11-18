@@ -2018,6 +2018,16 @@ class Repository:
             raise project_not_found(project_key)
         return ProjectRules.of(row)
 
+    def hide_term_id_prefix(self, project_key: str) -> bool:
+        """Whether the project shows term ids without the ontology prefix."""
+        with self.db.transaction() as conn:
+            value = conn.execute(
+                select(ProjectRow.hide_term_id_prefix).where(
+                    ProjectRow.project_key == project_key
+                )
+            ).scalar_one_or_none()
+        return bool(value)
+
     def get_axes_config(self, project_key: str) -> AxesConfig:
         """AxesConfig synthesized from the task profile, for older callers."""
         return legacy_axes_config(

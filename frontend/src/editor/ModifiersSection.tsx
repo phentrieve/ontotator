@@ -5,6 +5,7 @@ import { IconMore } from "../ui/icons";
 import { SearchPanel, type SearchPanelProps } from "./SearchPanel";
 import { COHORT_TAG, chipText as editorChipText, exclusiveWarnings, quoteOf, sortByLabel, type ModifierLike, type TermInfo } from "./modifiers";
 import "./modifiers.css";
+import { useTermIdDisplay } from "./termIds";
 
 export interface ModifiersSectionProps {
   /** The finding's term label, e.g. "Seizure". */
@@ -35,6 +36,7 @@ export interface ModifiersSectionProps {
  */
 export function ModifiersSection({ finding, modifiers, text, termInfo, readOnly = false, chipText = editorChipText,
   onAdd, onLinkSpan, onRemoveSpan, onRemove, selectedTermId = null, onSelectModifier, searchProps }: ModifiersSectionProps): JSX.Element {
+  const showTermId = useTermIdDisplay();
   const headingId = useId();
   const [searching, setSearching] = useState(false);
   const [status, setStatus] = useState<{ text: string; linkTermId?: string } | null>(null);
@@ -82,7 +84,7 @@ export function ModifiersSection({ finding, modifiers, text, termInfo, readOnly 
       const chosen = selectedTermId ? modifiers.find(modifier => modifier.term_id === selectedTermId) : undefined;
       if (!chosen) return null;
       const quote = chosen.segments?.length ? quoteOf(text, chosen.segments) : null;
-      return <p className="mod-selected">{`${termInfo(chosen.term_id)?.label ?? chosen.term_id} · ${chosen.term_id} · ${quote ? `in the text: “${quote}”` : "no text span"}`}</p>;
+      return <p className="mod-selected">{`${termInfo(chosen.term_id)?.label ?? showTermId(chosen.term_id)} · ${showTermId(chosen.term_id)} · ${quote ? `in the text: “${quote}”` : "no text span"}`}</p>;
     })()}
     {warnings.map(warning => <p key={warning} className="mod-warning">{warning}</p>)}
     {/* The offer to link ends once the modifier has its span, however it got it. */}

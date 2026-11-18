@@ -9,6 +9,7 @@ import { TermName } from "./TermName";
 import { Kbd } from "../ui/Kbd";
 import { sortByLabel } from "./modifiers";
 import "./modifiers.css";
+import { useTermIdDisplay } from "./termIds";
 
 /** The row as a target of the attach mode (E-a): its name, and whether it is the focused target. */
 export interface AttachTarget {
@@ -48,12 +49,13 @@ export function ModifierLine({ modifiers, layerId, termLabel }: {
   layerId: string;
   termLabel: (layer: string | undefined, term: string) => string | null;
 }) {
+  const showTermId = useTermIdDisplay();
   const sorted = sortByLabel(modifiers ?? [], id => {
     const label = termLabel(layerId, id);
     return label ? { label, role: "modifier", exclusiveClass: null } : undefined;
   });
   return sorted.length > 0 ? <p className="mod-lines">Modifiers: {sorted.map((modifier, index) => <span key={modifier.term_id}>
-    {index > 0 && ", "}<b>{termLabel(layerId, modifier.term_id) ?? modifier.term_id}</b></span>)}</p> : null;
+    {index > 0 && ", "}<b>{termLabel(layerId, modifier.term_id) ?? showTermId(modifier.term_id)}</b></span>)}</p> : null;
 }
 
 /** One row of the saved findings list in the editor sidebar. */

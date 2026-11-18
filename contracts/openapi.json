@@ -27161,6 +27161,10 @@
             "type": "boolean",
             "title": "Record Working Time"
           },
+          "hide_term_id_prefix": {
+            "type": "boolean",
+            "title": "Hide Term Id Prefix"
+          },
           "hidden_axis_values": {
             "additionalProperties": {
               "additionalProperties": {
@@ -27327,6 +27331,10 @@
           "record_working_time": {
             "type": "boolean",
             "title": "Record Working Time"
+          },
+          "hide_term_id_prefix": {
+            "type": "boolean",
+            "title": "Hide Term Id Prefix"
           },
           "hidden_axis_values": {
             "additionalProperties": {
@@ -36335,6 +36343,10 @@
             },
             "type": "array",
             "title": "Modifier Layer Ids"
+          },
+          "hide_term_id_prefix": {
+            "type": "boolean",
+            "title": "Hide Term Id Prefix"
           }
         },
         "additionalProperties": false,
