@@ -1,7 +1,7 @@
 import type { DecisionBarView } from "../api/client";
 import { routeHref, type ProjectDocumentsQuery, type Route } from "../app/router";
 import { Button, EmptyState, Tabs } from "../ui";
-import { activeTab, TABS, tabCount, tabRoute, type TabId } from "./filterModel";
+import { activeTab, CAN_TAKE_ANNOTATOR, TABS, tabCount, tabRoute, type TabId } from "./filterModel";
 import { onSpaceActivate } from "../ui/spaceActivates";
 import { isPlainClick, RouteLink } from "./RowCells";
 
@@ -47,12 +47,18 @@ export function DocumentsTabs({ bar, query, projectKey, panelId, onNavigate, upd
 }
 
 const EMPTY_TITLES: Readonly<Record<Exclude<TabId, "all">, string>> = {
-  decision: "Nothing needs your decision", assign: "Nothing to assign", progress: "Nothing in progress", done: "Nothing done yet",
+  decision: "Nothing needs your decision", assign: "No text waits for an assignment", progress: "Nothing in progress", done: "Nothing done yet",
 };
 
 /** Empty tab (spec "States and edge cases"); an empty All tab is an empty project. */
 export function TabEmptyState({ tab, projectKey, onNavigate, onUpload }: { tab: TabId; projectKey: string; onNavigate: (route: Route) => void; onUpload?: (variant: "primary") => JSX.Element }): JSX.Element {
   if (tab === "all") return <EmptyState title="No texts yet" action={onUpload?.("primary")}>Upload texts to start.</EmptyState>;
-  return <EmptyState title={EMPTY_TITLES[tab]}
-    action={<RouteLink route={{ name: "projectDocuments", key: projectKey }} className="btn btn-secondary" onNavigate={onNavigate}>Show all texts</RouteLink>} />;
+  const all = <RouteLink route={{ name: "projectDocuments", key: projectKey }} className="btn btn-secondary" onNavigate={onNavigate}>Show all texts</RouteLink>;
+  // "To assign" lists texts nobody works on. A text whose first annotator is at work is under In progress and may still
+  // take another one (its Next step reads "Assign annotation…"): the empty tab says where those are (review 2, F4).
+  if (tab === "assign") return <EmptyState title={EMPTY_TITLES.assign} action={<>
+    <RouteLink route={{ name: "projectDocuments", key: projectKey, flags: "can_take_annotator" }} className="btn btn-secondary" onNavigate={onNavigate}>Show texts that can take another annotator</RouteLink>
+    {all}
+  </>}>A text that someone already works on can still take another annotator, up to the limit. Such texts are under In progress; Filter › Annotation › {CAN_TAKE_ANNOTATOR} lists them.</EmptyState>;
+  return <EmptyState title={EMPTY_TITLES[tab]} action={all} />;
 }

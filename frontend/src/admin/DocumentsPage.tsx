@@ -820,6 +820,7 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
     onStep={stepCard} onClose={closeCard} onNavigate={route => onNavigate(route)}
     onAssign={(row, task) => { void onAssign(row, task); }}
     onChangePlan={row => setPlanFor(row)} onOpenText={entry => openCard({ key: rowKeyOf(entry), tab: panelTab })} onChanged={reloadAfterAction}
+    onMessage={message => { announce(message); showToast({ message }); }}
     decision={decision} textVersionTools={textVersionTools} canManage me={currentUser ?? null}
     reportRoute={reportId => ({ name: "projectProblemReport", key: projectKey, reportId, documents: query })}
     plan={<><PlanChips row={panelRow} groupRevision={groupOf(panelRow.case_id)?.plan_revision ?? 1} saves={planSaves} size={narrow ? "card" : "table"} /><PlanRowNotice row={panelRow} saves={planSaves} /></>}
@@ -1032,7 +1033,7 @@ function ReviewHistory({ projectKey, documentId, onClose }: { projectKey: string
     {records?.length === 0 && <p>No one has reviewed this translation yet.</p>}
     {records && <ol className="review-history">{records.map(record => <li key={record.id}>
       <p><strong>{labelFor(decisionLabels, record.decision)}</strong> by {record.reviewer_pseudonym}, <time dateTime={record.created_at}>{formatDateTime(record.created_at)}</time></p>
-      <p className="cell-secondary review-guideline">{submissionGuidelineLabel(record.guideline_version, record.guideline_withdrawn, null)}</p>
+      <p className="cell-secondary review-guideline">{submissionGuidelineLabel(record.guideline_version, record.guideline_withdrawn, null, record.guideline_label)}</p>
       <p className="cell-secondary">{[record.reviewer_qualification, record.reviewer_languages.length ? `reads ${record.reviewer_languages.join(", ")}` : ""].filter(Boolean).join(", ")}</p>
       <p>{record.status_before === record.status_after ? `Translation status stayed ${labelFor(translationStatusLabels, record.status_after)}.` : `Translation status changed from ${labelFor(translationStatusLabels, record.status_before)} to ${labelFor(translationStatusLabels, record.status_after)}.`}</p>
       <p>{record.clinical_change ? "Clinical change" : "No clinical change"}{record.categories.length ? `: ${record.categories.map(category => labelFor(categoryLabels, category)).join(", ")}` : ""}</p>

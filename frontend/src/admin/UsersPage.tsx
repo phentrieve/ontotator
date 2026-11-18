@@ -5,6 +5,7 @@ import { CodeOnceDialog } from "./CodeOnceDialog";
 import { ErrorNotice } from "./ErrorNotice";
 import { fieldError } from "./errors";
 import { LanguagesField } from "./LanguagesField";
+import { importPlanOptions, toolProposalOptions } from "./projectFields";
 import { formatDateTime, formatShortDateTime, humanize, labelFor, roleLabels, taskLabels } from "../app/labels";
 import { KIND_LABELS, SCOPE_LABELS } from "../me/TokensSection";
 
@@ -94,6 +95,72 @@ const auditActions: Readonly<Record<string, string>> = {
   "work_plan.update": "Work plan changed",
   "text.annotations_per_text": "Annotators per text changed for one text",
 };
+/**
+ * Changed fields by the names of the screens: a project's Settings (General, Workflow, Annotation, Ontology) and a
+ * person's profile (Users › Edit, Account). A field added later on the server shows as its humanized code.
+ */
+export const fieldLabels: Readonly<Record<string, string>> = {
+  name: "Name",
+  description: "Description",
+  languages: "Languages of the texts",
+  import_plan: "New imports",
+  tool_proposal_mode: "Texts with tool proposals",
+  annotations_per_text: "Annotators per text",
+  annotate_accepted_translations_only: "Annotate only after the translation review is accepted",
+  adjudicator_not_annotator: "Consolidator must not be one of the text's annotators",
+  blind_consolidation: "Hide annotator names during consolidation",
+  record_working_time: "Record working time",
+  allow_spanless_findings: "Findings that point to no text passage",
+  require_spanless_note: "Findings that point to no text passage",
+  require_chosen_axes: "Annotators must confirm every value before submitting",
+  contiguous_mentions_only: "A finding must be one continuous passage",
+  creation_defaults: "Prefilled values",
+  hidden_axis_values: "Values annotators can choose",
+  pins: "Ontology version",
+  profile: "Task profile",
+  display_name: "Display name",
+  email: "E-mail",
+  qualification: "Qualification",
+  orcid: "ORCID",
+  orcid_consent: "Name me (display name and ORCID) as a contributor in exports",
+};
+type Change = { before: unknown; after: unknown };
+const isChange = (value: unknown): value is Change =>
+  value !== null && typeof value === "object" && "before" in value && "after" in value;
+const SPANLESS = ["allow_spanless_findings", "require_spanless_note"];
+/** The one choice the two spanless fields make on Settings › Annotation. */
+const spanlessChoice = (allowed: unknown, note: unknown): string =>
+  allowed === false ? "Not allowed" : note === false ? "Allowed, reason optional" : "Allowed with a reason";
+/** A setting's value as its screen shows it: a checkbox is on or off, a choice has its label. */
+const settingValue = (field: string, value: unknown): string =>
+  typeof value === "boolean" ? (value ? "on" : "off")
+    : Array.isArray(value) ? value.map(String).join(", ") || "none"
+    : field === "import_plan" ? importPlanOptions.find(option => option.value === value)?.label ?? String(value)
+    : field === "tool_proposal_mode" ? toolProposalOptions.find(option => option.value === value)?.label ?? String(value)
+    : isBlank(value) ? "none" : String(value);
+/** Changed fields by their screen names, with "old → new" where the event recorded the values (issue 472). */
+function changedFields(fields: unknown[], recorded: unknown): string {
+  const changes = (recorded !== null && typeof recorded === "object" ? recorded : {}) as Record<string, unknown>;
+  const change = (field: string): Change | null => { const value = changes[field]; return isChange(value) ? value : null; };
+  const [allowed, note] = SPANLESS.map(change);
+  const entries = fields.map(String).map(field => {
+    const label = labelFor(fieldLabels, field);
+    if (SPANLESS.includes(field)) return allowed && note
+      ? `${label}: ${spanlessChoice(allowed.before, note.before)} → ${spanlessChoice(allowed.after, note.after)}` : label;
+    const values = change(field);
+    return values ? `${label}: ${settingValue(field, values.before)} → ${settingValue(field, values.after)}` : label;
+  });
+  // The two spanless fields are one choice; values hold commas, so entries with values are split by semicolons.
+  return [...new Set(entries)].join(entries.some(entry => entry.includes(" → ")) ? "; " : ", ");
+}
+/** "Added: fr. Removed: es." for a change of a person's languages (issue 467); older events recorded no languages. */
+function languageChange(details: Record<string, unknown>): string {
+  if (!Array.isArray(details.before) || !Array.isArray(details.after)) return "";
+  const [before, after] = [details.before.map(String), details.after.map(String)];
+  const added = after.filter(language => !before.includes(language));
+  const removed = before.filter(language => !after.includes(language));
+  return [added.length && `Added: ${added.join(", ")}.`, removed.length && `Removed: ${removed.join(", ")}.`].filter(Boolean).join(" ") || "No change.";
+}
 const isBlank = (value: unknown): boolean =>
   value === null || value === undefined || value === "" || (Array.isArray(value) ? value.length === 0 : typeof value === "object" && Object.keys(value).length === 0);
 const auditValue = (key: string, value: unknown): string =>
@@ -114,7 +181,8 @@ export function auditDetails(event: AuditEvent, userNames?: ReadonlyMap<number, 
   if (Array.isArray(details.roles)) return details.roles.map(role => labelFor(roleLabels, String(role))).join(", ");
   if (typeof details.active === "boolean") return details.active ? "Activated" : "Deactivated";
   if (typeof details.is_system_admin === "boolean") return details.is_system_admin ? "Granted" : "Withdrawn";
-  if (Array.isArray(details.fields)) return details.fields.map(field => humanize(String(field))).join(", ");
+  if (event.action === "user.languages") return languageChange(details);
+  if (Array.isArray(details.fields)) return changedFields(details.fields, details.changes);
   // A move to the newest translations: the files, not the kept conditions (issue 254).
   if (event.action === "project.translations_refresh") return auditEntries({ added: details.added, replaced: details.replaced, removed: details.removed }).join("; ");
   if (typeof details.purpose === "string" && Object.keys(details).length === 1) return `${humanize(details.purpose)} code`;

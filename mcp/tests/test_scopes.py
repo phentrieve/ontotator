@@ -17,7 +17,7 @@ import httpx
 import pytest
 from conftest import call
 from contract import scope, spec
-from fake_api import FakeApi, token_view
+from fake_api import PT_A, FakeApi, marked, token_view
 from mcp import Client
 from shapes import build, page, panel, row, submission, work
 
@@ -125,13 +125,13 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
         "accept_agreeing_texts": {
             "project": "p",
             "confirm": True,
-            "preview_token": "sha256:x",
+            "preview_token": PT_A,
         },
         "change_final_results": {
             "project": "p",
             "texts": [{"case_id": "c", "language": "en"}],
             "confirm": True,
-            "preview_token": "sha256:x",
+            "preview_token": PT_A,
         },
         "undo_change_final_results": {"project": "p", "undo_id": 7, "confirm": True},
         "final_export_check": {"project": "p"},
@@ -162,13 +162,13 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "texts": [{"case_id": "c", "language": "en"}],
             "reason": "Guideline 2.3",
             "confirm": True,
-            "preview_token": "sha256:x",
+            "preview_token": marked(PT_A, "Guideline 2.3"),
         },
         "withdraw_open_tasks": {
             "project": "p",
             "texts": [{"case_id": "c", "language": "en"}],
             "confirm": True,
-            "preview_token": "sha256:x",
+            "preview_token": marked(PT_A),
         },
         "undo_reopen_or_withdraw": {"project": "p", "undo_id": 7, "confirm": True},
         "start_rounds": {
@@ -177,20 +177,20 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "kind": "clean_restart",
             "reason": "New tool set",
             "confirm": True,
-            "preview_token": "sha256:x",
+            "preview_token": marked(PT_A, "New tool set"),
         },
         "pause_texts": {
             "project": "p",
             "texts": [{"case_id": "c", "language": "en"}],
             "reason": "Clinic is checking",
             "confirm": True,
-            "preview_token": "sha256:x",
+            "preview_token": PT_A,
         },
         "release_texts": {
             "project": "p",
             "texts": [{"case_id": "c", "language": "en"}],
             "confirm": True,
-            "preview_token": "sha256:x",
+            "preview_token": PT_A,
         },
         "hand_over_open_tasks": {
             "project": "p",
@@ -250,7 +250,7 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "mode": "scratch",
             "reason": "Proposals were wrong",
             "confirm": True,
-            "preview_token": "sha256:x",
+            "preview_token": PT_A,
         },
         "restore_annotation_mode": {
             "project": "p",

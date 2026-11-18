@@ -91,6 +91,8 @@ describe("historyLines", () => {
       "Task paused: ann-0003",
     ]);
     expect(lines.at(-1)?.reportId).toBe("rep-3");
+    // A consolidation is Finalization work (review 2, F2): its lines are not filed under Annotation.
+    expect(lines.map(line => line.stage)).toEqual(["review", "review", "final", "final", "annotation", "annotation"]);
   });
 
   it("is empty for a row without work, records or final", () => {
@@ -129,6 +131,22 @@ describe("reassignments and mode changes", () => {
       { kind: "final_withdrawn", at: "2026-10-31T10:20:00", from_person: { ...anna, is_me: true }, reason: "Re-annotation" },
     ] });
     expect(lines.map(line => [line.stage, line.text])).toEqual([["final", "Final: withdrawn by you, 31 Oct, 10:20: Re-annotation"]]);
+  });
+  it("keeps a line for a pause of the text and one for its release (review 2, F6)", () => {
+    const lead = { pseudonym: "lead-1", display_name: "Carla Diaz", is_me: true };
+    const changes = [
+      { kind: "text_paused", at: "2026-10-30T09:00:00", by: lead, reason: "Source is checked" },
+      { kind: "text_released", at: "2026-10-30T11:30:00", by: { ...lead, is_me: false }, reason: null },
+    ] as const;
+    // After the release: both lines stay.
+    expect(historyLines(emptyRow, [], { now, changes }).map(line => [line.stage, line.text])).toEqual([
+      ["text", "Text: paused by you, 30 Oct, 09:00: Source is checked"],
+      ["text", "Text: released by Carla Diaz (lead-1), 30 Oct, 11:30"],
+    ]);
+    // While paused: the event line, not a second line from the row; without the events, the row's pause.
+    const paused = { ...emptyRow, lead_pause: { reason: "Source is checked", paused_by: lead, paused_at: "2026-10-30T09:00:00" } };
+    expect(historyLines(paused, [], { now, changes: changes.slice(0, 1) }).map(line => line.text)).toEqual(["Text: paused by you, 30 Oct, 09:00: Source is checked"]);
+    expect(historyLines(paused, null, { now }).map(line => [line.stage, line.text])).toEqual([["text", "Text: paused by you, 30 Oct, 09:00: Source is checked"]]);
   });
   it("names who reopened a task or started a round, when and why", () => {
     const lead = { pseudonym: "lead-1", display_name: "Carla Diaz", is_me: true };

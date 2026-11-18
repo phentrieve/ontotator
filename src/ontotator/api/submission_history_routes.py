@@ -48,10 +48,15 @@ class SubmissionHistorySummary(BaseModel):
     submission_id: str
     document_id: str
     author_label: str
+    # Issue 470: a consolidator also reads the input submissions of their
+    # round; only the reader's own are theirs ("(you)", a link to the viewer).
+    is_me: bool = False
     created_at: datetime
     mode: str
     round_id: str | None = None
     guideline_version: int | None = None
+    # The project's own name of that version ("3.1"), if it has one.
+    guideline_label: str | None = None
     guideline_withdrawn: bool = False
 
 
@@ -166,11 +171,15 @@ def _history(
                 submission_id=row["submission_id"],
                 document_id=doc,
                 author_label=_author(row, blindings[row["submission_id"]]),
+                is_me=row["annotator_id"] == access.pseudonym,
                 created_at=row["created_at"],
                 mode=row["mode"],
                 round_id=bindings.get(row["submission_id"])
                 or row["payload"].get("origin_key", {}).get("round_id"),
                 guideline_version=row["guideline_version"],
+                guideline_label=facts[row["guideline_version"]].label
+                if row["guideline_version"] is not None
+                else None,
                 guideline_withdrawn=row["guideline_version"] is not None
                 and facts[row["guideline_version"]].withdrawn,
             )

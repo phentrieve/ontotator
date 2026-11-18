@@ -117,7 +117,7 @@ def register_content(server: MCPServer, api: OntotatorClient) -> None:
 
         'derived_from' names the version it was corrected or translated
         from, 'translation' the translation run and its checks. The text
-        itself is returned only with include_text. Available only with
+        itself is returned only with include_text. Exists because this MCP server runs with
         ONTOTATOR_MCP_READ_CONTENT=1.
         """
         version: dict[str, Any] = await api.get(
@@ -136,8 +136,8 @@ def register_content(server: MCPServer, api: OntotatorClient) -> None:
         Submitted work and imported tool proposals only, never a draft: a
         lead gets every submission of the text ('submission') and the
         proposal sets ('proposals'), anyone else their own submissions
-        ('own'). get_annotation_version reads one by kind and id. Available
-        only with ONTOTATOR_MCP_READ_CONTENT=1.
+        ('own'). get_annotation_version reads one by kind and id. Exists because this MCP server runs with
+        ONTOTATOR_MCP_READ_CONTENT=1.
         """
         versions: list[dict[str, Any]] = await api.get(
             project_path(project, "documents", seg(document_id), "annotation-versions")
@@ -160,7 +160,7 @@ def register_content(server: MCPServer, api: OntotatorClient) -> None:
 
         Passages are offsets into the text ('start', 'end' in Unicode code
         points); include_text adds the text of each passage. Only a state
-        list_annotation_versions offers can be read. Available only with
+        list_annotation_versions offers can be read. Exists because this MCP server runs with
         ONTOTATOR_MCP_READ_CONTENT=1.
         """
         state: dict[str, Any] = await api.get(
@@ -195,7 +195,8 @@ def register_content(server: MCPServer, api: OntotatorClient) -> None:
         in Unicode code points). Without include_text the earlier text a
         carried round came from ('carried_from') is named without its text;
         with it, that text and the text of each passage are returned.
-        Available only with ONTOTATOR_MCP_READ_CONTENT=1.
+        Exists because this MCP server runs with
+        ONTOTATOR_MCP_READ_CONTENT=1.
         """
         submission: dict[str, Any] = await api.get(
             project_path(

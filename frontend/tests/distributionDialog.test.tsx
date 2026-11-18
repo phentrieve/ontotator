@@ -13,6 +13,14 @@ it("shows distinct slots, every unassignable and actual original load before con
   expect(screen.getByLabelText("z/doc en, person 1")).toHaveProperty("value", "alice"); expect(screen.getByLabelText("z/doc en, person 2")).toHaveProperty("value", "bob");
   expect(screen.getByText(/Only 1 reader.*2 places/)).toBeDefined(); expect(screen.getByText(/Alice.*4.*5/)).toBeDefined();
 });
+it("says that the tasks are assigned in the order of the table, and sends the rows in it (#488)", async () => {
+  render(<DistributionDialog {...props()} />); await propose();
+  expect(screen.getByText("The tasks are assigned in the order of this table. My tasks lists a person's tasks by status, then in the order of assignment.")).toBeDefined();
+  fireEvent.change(screen.getByLabelText("a de, person 1"), { target: { value: "alice" } });
+  fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+  await waitFor(() => expect(api.createAssignments).toHaveBeenCalled());
+  expect(vi.mocked(api.createAssignments).mock.lastCall![1].rows.map(row => row.document_id)).toEqual(["z/doc", "z/doc", "a"]);
+});
 it("omits nobody, prevents duplicate document/person and preserves exact server context with edits", async () => {
   const options = props(); render(<DistributionDialog {...options} />); await propose();
   const second = screen.getByLabelText("z/doc en, person 2");

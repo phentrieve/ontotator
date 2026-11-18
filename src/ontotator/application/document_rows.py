@@ -36,6 +36,7 @@ from ontotator.application.final_causes import (
     latest_review_decisions,
 )
 from ontotator.application.people import person_refs
+from ontotator.application.typography_counts import typography_hint_counts
 from ontotator.auth.audit import Actor
 from ontotator.authz.policy import Access
 from ontotator.authz.scoped import ScopedRepository
@@ -71,6 +72,7 @@ from ontotator.storage.tables import (
     TranslationReviewRow,
     UserRow,
 )
+from ontotator.storage.text_change_carries import carry_lapsed
 from ontotator.storage.text_pause import TextPause, paused_texts
 from ontotator.storage.text_settings import per_text_overrides
 from ontotator.storage.workflow_tables import (
@@ -260,6 +262,10 @@ class ResolutionFact:
     resolution: str
     from_document_id: str
     to_document_id: str
+    # A carry whose task was withdrawn or removed without a submission
+    # (issue 461): it settles nothing any more, the submission can be
+    # carried again.
+    lapsed: bool = False
 
 
 @dataclass(frozen=True)
@@ -373,6 +379,9 @@ class RowFacts:
     # of these sets and of the sets the rounds started from.
     newest_sets: dict[str, int] = field(default_factory=dict)
     proposal_sets: dict[int, ProposalSetFact] = field(default_factory=dict)
+    # Issue 484: typography hints of the newest version of each chain that
+    # has any (document id -> count); computed, never stored.
+    typography_hints: dict[str, int] = field(default_factory=dict)
 
     def per_text(self, key: tuple[str, str]) -> int:
         """The effective "Annotations per text" of the text ``key`` (issue 422)."""
@@ -1048,6 +1057,7 @@ def _resolutions(conn: Connection, pid: int) -> list[ResolutionFact]:
             resolution=row.resolution,
             from_document_id=row.from_document_id,
             to_document_id=row.to_document_id,
+            lapsed=row.lapsed,
         )
         for row in conn.execute(
             select(
@@ -1056,6 +1066,7 @@ def _resolutions(conn: Connection, pid: int) -> list[ResolutionFact]:
                 TextChangeResolutionRow.resolution,
                 TextChangeResolutionRow.from_document_id,
                 TextChangeResolutionRow.to_document_id,
+                carry_lapsed().label("lapsed"),
             )
             .where(TextChangeResolutionRow.project_id == pid)
             .order_by(TextChangeResolutionRow.id)
@@ -1402,6 +1413,13 @@ def load_facts(
         per_text_overrides=per_text_overrides(conn, pid),
         lead_pauses=lead_pauses,
         **_proposal_set_facts(conn, pid, summary=summary),
+        typography_hints={}
+        if lean
+        else typography_hint_counts(
+            conn,
+            pid,
+            (chain.newest.document_id for chain in rules.build_chains(versions)),
+        ),
     )
 
 

@@ -4,7 +4,7 @@ import type { DocumentRowView } from "../../api/client";
 import type { ProjectDocumentsQuery, Route } from "../../app/router";
 import { Button } from "../../ui/Button";
 import { RouteLink } from "../RowCells";
-import { versionName } from "../labels";
+import { pausedWord, versionName } from "../labels";
 import { TextVersions, type TextVersionsTools } from "../TextVersions";
 import { textViewRoute } from "./cardModel";
 import { PersonList, useFocusAfterRemoval } from "./PersonRow";
@@ -63,9 +63,12 @@ export function TranslationPart({ row, projectKey, query, canManage, onAssign, o
     {reviewers.length > 0 && <PersonList label="Translation reviewers">
       {reviewers.map(item => {
         const review = reviewOf(item.document_id);
-        const assigned = assignedLine(item, now, !review);
+        // "Paused by lead" first, as on an annotator's row (issue 464).
+        const paused = pausedWord(item);
+        const assigned = assignedLine(item, now, !review && !paused);
+        const parts = [paused, review, assigned].filter(Boolean);
         return <WorkPersonRow key={item.assignment_id} item={item} caseId={row.case_id} textName={textLabel(row)} canManage={canManage} tools={textVersionTools} onChanged={onChanged}
-          onRemoved={focusAfterRemoval} details={review && assigned ? <>{review} · {assigned}</> : review ?? assigned} />;
+          onRemoved={focusAfterRemoval} details={parts.length > 0 ? parts.map((part, index) => <span key={index}>{index > 0 && " · "}{part}</span>) : undefined} />;
       })}
     </PersonList>}
     {reviewNext && <div className="text-card-next" role="group" aria-labelledby="text-card-translation-next">

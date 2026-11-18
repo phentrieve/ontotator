@@ -97,7 +97,7 @@ The **Documents** page lists every text of the project and what it needs next. O
 
 A task starts with the person's first saved change; opening it is not enough, and neither is ticking checked sentences in a translation review. Until then **Translation** and **Annotation** read *assigned, not started* with the person's name, in the table (*not started* without the name below 1600 px), its tooltip, the narrow cards and the text card, where the person's row shows **Not started**. After the first save they read *in review* or *In progress*. The same holds for a task you reopened, also when you asked a reviewer who had already submitted to correct a translation: it reads *assigned, not started* again until the person saves a change after the reopen. With several people or parallel versions the cell counts them, for example *1 of 2 started*.
 
-A text with fewer annotators than **Annotators per text** shows what its people are doing, not the free place. While someone has an open task, **Annotation** reads for example *assigned, not started · max 2* or *1 of 2 submitted · max 3* (below 1600 px *not started*, *1/2 submitted*; the tooltip has the full state), counted out of the people who hold the text; **Waiting on** names the person, the text is under **In progress**, and **Next step** still offers **Assign annotation…** for another annotator. The same holds after **Start a round…** for a text with one annotator. Only a text nobody is working on reads *1 annotator · max 2* or *Unassigned* and is listed under **To assign** (or under **Needs your decision** once its one annotation is submitted). To give texts in progress another annotator, select them and click **Assign annotation…** in the selection bar: it assigns only where a text still has a free place.
+A text with fewer annotators than **Annotators per text** shows what its people are doing, not the free place. While someone has an open task, **Annotation** reads for example *assigned, not started · max 2* or *1 of 2 submitted · max 3* (below 1600 px *0/1 · max 2*, *1/2 · max 3*: submitted of the people who hold the text, then the limit; the tooltip has the full state), counted out of the people who hold the text; **Waiting on** names the person, the text is under **In progress**, and **Next step** still offers **Assign annotation…** for another annotator. The same holds after **Start a round…** for a text with one annotator. Only a text nobody is working on reads *1 annotator · max 2* or *Unassigned* and is listed under **To assign** (or under **Needs your decision** once its one annotation is submitted). To give texts in progress another annotator, select them and click **Assign annotation…** in the selection bar: it assigns only where a text still has a free place. To list these texts, tick **Can take another annotator** under **Annotation** in **Filter**: it lists every text whose steps include **Assign annotation…**, also while its first annotator is at work. Combine it with the tab **In progress** to see only the texts that someone already works on. When **To assign** is empty, it says so (*No text waits for an assignment*) and offers **Show texts that can take another annotator**.
 
 The counts in **Annotation**, for example *0 of 1 submitted*, count only work on the newest version of the text. After a text change, a submission on the old version no longer counts: neither when it was carried to the new version, nor when the new version was started fresh. Carried work counts once it is submitted on the new version.
 
@@ -143,6 +143,8 @@ Active filters show as chips above the table. Remove one with its ✕, or click 
 
 To list the texts you paused, tick **Paused by lead** under **Flags** ([Pause and release the work on texts](#pause-and-release-the-work-on-texts)).
 
+To find texts with spacing errors or invisible characters, tick **Typography hints** under **Flags** ([Find spacing errors and invisible characters](#find-spacing-errors-and-invisible-characters)).
+
 To find texts with more annotators than **Annotators per text** allows, for example after you lowered the limit, tick **More annotators than the limit** under **Flags**. It counts the unremoved annotation tasks of a text's current version, open and submitted. A text with its own limit ([Assign work for one text](#assign-work-for-one-text)) is measured against that limit, not the project's. To withdraw the extra open tasks, select the texts and use [Withdraw open tasks…](#reopen-or-withdraw-the-tasks-of-several-texts).
 
 ### Sort and page through the table
@@ -156,7 +158,7 @@ To find texts with more annotators than **Annotators per text** allows, for exam
 
 Below 1600 px width each text keeps one line in the table. Where the table is still wider than the page, it scrolls sideways with the **Text** column kept at the left:
 
-- The stage columns show a shorter state and leave out the names, which **Waiting on** already shows. For example *assigned, not started (Ana Weber)* reads *not started*, *1 of 2 submitted* reads *1/2 submitted*, *ready to compare* reads *to compare* and *Final is on old text* reads *on old text*. Submitted work from proposals that waits for the new version's proposals reads *v1 work waits* (*v2 has no proposals yet*).
+- The stage columns show a shorter state and leave out the names, which **Waiting on** already shows. For example *assigned, not started (Ana Weber)* reads *not started*, *1 of 2 submitted* reads *1/2 submitted*, *ready to compare* reads *to compare*, *Check changes, newer result* reads *Check changes* and *Final is on old text* reads *on old text*. Submitted work from proposals that waits for the new version's proposals reads *v1 work waits* (*v2 has no proposals yet*).
 - **Waiting on** shows one name and *+n* for the others.
 - **Text** keeps *source*, the version marker and **NEW** on the line and cuts a long case ID with *…*.
 - Point at a cell to see the full state with the names in its tooltip. Screen readers read the full state.
@@ -204,15 +206,15 @@ What for: see what happened to a text and its technical IDs.
 
 ### Read a text and other people's work in the text view
 
-What for: read a text with other people's findings or the final result, and compare two of them side by side. Leads and consolidators see other people's work; everyone else sees only their own.
+What for: read a text with other people's findings or the final result, and compare two of them side by side. Leads see other people's work; everyone else sees only their own. A consolidator who does not lead the project reads the submissions on the consolidation screen instead ([Read others' work in the text view](consolidator.md#read-others-work-in-the-text-view)).
 
 1. Open the text view with **Open text** in the text card.
 2. Choose the language and version in **Language and version**.
 3. In **Show**, choose **Text only**, a proposal layer, someone's annotations or the result. Its findings are listed under **Findings**: beside the text, or below it on a phone, where the text keeps the full width.
 4. Optional: click **Compare** to open a second pane. Each pane has its own **Language and version** and **Show** directly above its text: **Current text** on the left, **Comparison text** on the right, so both texts start at the same height. Tick **Couple scrolling** to scroll both together. Click **Close comparison** to close it.
-   - When both panes show texts of the same language, for example v1 and its correction v2, tick **Show changes** to see what changed. The older version strikes through the removed passages, the newer version underlines the added ones; the line above the texts counts them. The marks do not change the texts, the findings or **Couple scrolling**. A change of spaces or line breaks only is not marked or counted. If the two texts have little in common, the line reads *The texts differ too much to show the changes* and nothing is marked.
+   - When both panes show texts of the same language, for example v1 and its correction v2, tick **Show changes** to see what changed. The older version strikes through the removed passages, the newer version underlines the added ones; the line above the texts counts them. The marks do not change the texts, the findings or **Couple scrolling**. A changed number of spaces is marked and counted too, for example a double space typed into the text or a removed space at the end. A change of line breaks only, or of the kind of space (a non-breaking space for a space), is not marked or counted. If the two texts have little in common, the line reads *The texts differ too much to show the changes* and nothing is marked.
    - When **Show** has someone's annotations that were carried from an earlier version of the text (after **Carry to v2…** or **Handle text change…**), tick **Show changes since** v1 above the text: changed passages get a dashed frame, added text is underlined, and a **−** marker shows the earlier wording of removed text. **Next ›** and **‹ Previous** step through the passages. The annotator sees the same marks in their task. Not offered while **Compare** is open, which has its own **Show changes**.
-5. Optional: click **Submissions** to open the **Submission history**. Choose a row to show it, then click **Close**. Each finding names its author by pseudonym; leads always see them, also when the project hides annotator names from consolidators.
+5. Optional: click **Submissions** to open the **Submission history**. Choose a row to show it, then click **Close**. Someone who does not lead the project sees their own submissions there and, as a consolidator, the submissions they consolidate as rows without a link; the **Text card** button is shown to leads only. Each finding names its author by pseudonym; leads always see them, also when the project hides annotator names from consolidators. Each submission names the guideline version it was made under, for example *Guidelines v2* or, with your own version of the guideline, *Guidelines 3.1 (v2) (current: 3.2 (v3))* ([Publish the first or a new guideline version](lead-settings.md#publish-the-first-or-a-new-guideline-version)).
 
 **Open my task** goes to your own task on this text.
 
@@ -222,7 +224,7 @@ What for: see each version of a translation, its reviews and its origin.
 
 1. Open the text card and click **Translation**.
 2. The list shows each version with its origin and status, then one row per person who worked on it: the name, the task and the status. Older ones are under **Older versions**; with parallel versions they are grouped by version chain.
-3. Click **View text** to read a version, or **Translation reviews** to see every review decision. In a reviewer's row, **Reopen…** lets them review the version again and **Remove…** removes their assignment. A review of a version you fixed typos in has no **Reopen…**: assign a review of the corrected version instead.
+3. Click **View text** to read a version, or **Translation reviews** to see every review decision, each with the guideline version it was made under (*Guidelines v2*, or *Guidelines 3.1 (v2)* with your own version). In a reviewer's row, **Reopen…** lets them review the version again and **Remove…** removes their assignment. A review of a version you fixed typos in has no **Reopen…**: assign a review of the corrected version instead.
    The buttons that change the text of a version say who does the work, and a grey line under them says the difference in a few words, for example *Ask a reviewer: a reviewer corrects it in a new review. Correct it myself: you edit it here; it is reviewed again. Fix typos: spacing, typos, grammar; the status stays, no review. Upload: a text made elsewhere becomes the next version.* At an accepted version, **Ask a reviewer to correct…** gives the correction to a translation reviewer ([Request a translation correction](#request-a-translation-correction)). At the newest accepted version, **Correct it myself…** lets you correct it yourself ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)). At the newest version of a translation, **Upload a corrected text…** brings in a text made elsewhere as the next version ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)). **Fix typos…** at the newest version fixes spacing, typos or grammar without a review and keeps the status of the text; a version made this way says *Typo fix* under its name, with the lead and the reason ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
 4. Click **Compare with source** to compare the translation with the source text.
 
@@ -243,10 +245,15 @@ Ontotator computes typography hints for a text when you ask for them. A hint nam
 | `ZERO_WIDTH_CHARACTER` | A zero-width space or joiner, or a byte order mark. |
 | `SOFT_HYPHEN` | A soft hyphen. |
 | `CONTROL_CHARACTER` | Another control character. |
+| `DOUBLE_FULL_STOP` | Two full stops in a row, for example *Fieber..* An ellipsis (*...* or *…*) is left alone. |
 
 A non-breaking space is no hint, because it is often correct, for example between a number and its unit. **Show invisible characters** marks it all the same.
 
-There is no page for the hints yet. Read them through the API or the MCP server (token scope `read`):
+On **Documents**, a text whose newest version has hints carries the badge **Typography hints**; point at it to read how many. To list these texts, for example before you assign them, click **Filter** and tick **Typography hints** under **Flags**. The number next to it counts the texts. A text with several parallel translations counts the newest version of each.
+
+A translation reviewer sees the hints of their text before they submit: the confirmation of **Submit review…** names them and shows the places ([Review a translation](annotator.md#review-a-translation)).
+
+Documents does not show where in a text the hints are. Read the positions through the API or the MCP server (token scope `read`):
 
 - One text version: `GET /api/v1/projects/{key}/documents/{document_id}/typography-hints`, or the MCP tool `list_typography_hints` with `document_id`. Each hint has `rule`, `start` and `end`; positions count Unicode code points, as the positions of findings do.
 - The whole project: `GET /api/v1/projects/{key}/typography-hints`, or `list_typography_hints` without `document_id`. It returns the number of hints per rule for each text that has any, 100 texts per page (`limit` up to 200); pass `next_after` as `after` for the next page. Only the newest version of each text is counted unless you ask for `versions=all`.
@@ -357,6 +364,14 @@ Texts that already have a final result are left out, also when you assign one te
 
 **Reads** shows the languages in each person's profile. If someone's profile lists languages but not one the task needs, the dialog asks again; click **Assign anyway** or **Back**. A person with no languages listed counts as unknown and gets no warning. Ontotator sends no e-mail; the work appears in each person's **My tasks**.
 
+The order in which you assign is the order in which a person works. The dialog says so above the summary: *My tasks lists a person's tasks by status, then in the order of assignment. New tasks come after the tasks the person already has.* With several texts it adds *These texts are assigned in the order shown above.*
+
+- **My tasks** lists **Reopened** tasks first, then **In progress**, **Open** and **Submitted**. Within a status the tasks are in the order of assignment, and after a submit the editor opens the next task in that order.
+- Several texts assigned at once are assigned in the order of the **Documents** list when you open the dialog (**Order**: **Case ID**, **Import order** or **Last activity**; a descending order counts as ascending). The line **Texts** in the dialog names them in that order.
+- To give a person a fixed order that is not an order of the list, assign the texts in blocks, first block first, or one by one.
+- A task you give to someone else with **Reassign…** is a new task for that person and comes last. A reopened task moves to the **Reopened** tasks at the top and returns to its place when it is submitted again. A task that follows a corrected text, or that you continue on a new version with **Handle text change…**, keeps its place. Work you carry to a new version from a submission is a new task and comes last.
+- The upload order of the texts plays no part. To have texts done first whose tasks are already assigned, see [Move texts to the front of the queue](#move-texts-to-the-front-of-the-queue).
+
 With **Annotate only after the translation review is accepted** on, you can assign annotators to a text while its translation review is assigned or underway, so both steps are set up at once. The summary says *Still in translation review: the task opens once the review is accepted.* The annotator sees the task in **My tasks** as **Waiting for translation review** and cannot start it; it counts under **Open tasks**. When the review is accepted, the task opens with no further step from you. This also holds for **Distribute evenly…**. A text with no translation review under way still cannot get annotators: assign the review first. With parallel translations of one text, only the translation under review can get a waiting task; the others follow once every translation is accepted, and the dialog's summary says which were left out.
 
 What happens to a waiting task:
@@ -388,7 +403,7 @@ What for: let the annotators revise many texts at once, for example after a guid
 
 Every listed task changes, or none: if the texts changed since the preview, the dialog says *The texts changed since the preview. Check the new preview.* and shows it. Each task is recorded in the audit trail as a single reopen or withdrawal would be, so the history of every text shows it.
 
-**Undo** in the message, for example *Reopened 14 assignments in 12 texts.*, takes the change back: reopened tasks count as submitted again; withdrawn tasks come back with their drafts. Undo is for the lead who made the change, once, within an hour, and only while nothing changed on these texts since: nobody saved a draft, nobody was assigned, the plan, the final result and the text version are the same. Otherwise the message says *Undo is no longer possible: the texts changed since.* Through the API and the MCP server the same Undo is `POST /api/v1/projects/{key}/bulk-task-actions/undo` with the `undo.id` of the applied action, and the MCP tool `undo_reopen_or_withdraw`; with `preview: true` (the tool's dry run) it lists the tasks that would come back and says what blocks it, and changes nothing.
+**Undo** in the message, for example *Reopened 14 assignments in 12 texts.*, takes the change back: reopened tasks count as submitted again; withdrawn tasks come back with their drafts. Undo is for the lead who made the change, once, within an hour, and only while nothing changed on these texts since: nobody saved a draft, nobody was assigned, the plan, the final result and the text version are the same. Otherwise nothing is undone, and the message names the first text in the way and what changed on it, for example *Undo is not possible: 1 of 12 texts changed since (EN100022 en: a task was assigned, reopened, withdrawn or paused, or got a new round). Nothing was undone.* An Undo that is older than an hour or was already used says *Undo is no longer possible: the texts changed since.* Through the API and the MCP server the same Undo is `POST /api/v1/projects/{key}/bulk-task-actions/undo` with the `undo.id` of the applied action, and the MCP tool `undo_reopen_or_withdraw`; with `preview: true` (the tool's dry run) it lists the tasks that would come back and says what blocks it, with each text in the way and what changed on it (`blocked_texts`), and changes nothing.
 
 A message never lies over a dialog you open after it. If you open the next dialog while the message is still showing, the message waits; when you close the dialog, it is back with its **Undo** and stays for its full time again. This holds for every message with **Undo**, also in the annotation view.
 
@@ -465,13 +480,15 @@ A person who has the task open when you pause is told with the next thing they d
 
 On **Documents**, a paused text carries the badge **Paused by lead**; point at it to read who paused it, when and why. Its open work is nobody's turn: **Waiting on** does not name the people, and the stage shows the pause sign. To list the paused texts, tick **Paused by lead** under **Flags** in **Filter**. The text card shows a notice **Paused by lead** with who, when and why, and each paused person's row says *Paused by lead*.
 
+A text whose consolidation is open keeps it while paused. The row reads *consolidating · paused* under **Finalization** and its annotations stay *2 of 2 submitted*, because submitted work is not paused. In the text card, **Finalization** keeps the consolidator's row with *Paused by lead*, and **Consolidate…** is not offered: the open consolidation continues after the release. The same holds when the consolidator reported a problem and that report pauses the consolidation; the row then waits for you with **Decide on report…**. In **History**, the lines of a consolidation stand under **Finalization**.
+
 To release:
 
-1. Select the texts and choose **More actions** › **Release texts…**. Or click **Release…** in the notice of one text card.
+1. Select the texts and choose **More actions** › **Release texts…**. Or click **Release…** in the notice of one text card; the message *Released 1 text.* follows there as well.
 2. Read the preview, for example *Release 3 texts with 4 open tasks · Tom Reis 2, R. Roe 2*. A task that a problem report pauses as well is named in its own group, *1 task stays paused · paused by a problem report as well: decide the report under Problem reports*. Texts that are not paused are skipped.
 3. A reason is optional (**Reason (optional)**). Click the button, for example *Release 4 texts*, tick **I understand** and click again.
 
-Every listed text is paused or released, or none: if the texts changed since the preview, the dialog says *The texts changed since the preview. Check the new preview.* and shows it. Each text gets its own entry in the audit trail, with the reason. There is no **Undo** in the message: **Release texts…** is the way back from a pause, **Pause texts…** from a release, and neither changes any work.
+Every listed text is paused or released, or none: if the texts changed since the preview, the dialog says *The texts changed since the preview. Check the new preview.* and shows it. Each text gets its own entry in the audit trail, with the reason. The text card's **History** keeps a line for each pause and each release under the tag **Text**, also after the release: *paused by you, 17 Nov, 17:24: The clinic is checking the source text* and *released by you, 17 Nov, 18:02*, with the reason of the release when you gave one. There is no **Undo** in the message: **Release texts…** is the way back from a pause, **Pause texts…** from a release, and neither changes any work.
 
 The other actions on paused texts:
 
@@ -487,12 +504,12 @@ The other actions on paused texts:
 
 What for: have some texts done first, for example a batch uploaded later that is now urgent.
 
-**My tasks** lists each person's open tasks by status, then in the project's order: first imported first. To change that order:
+**My tasks** lists each person's tasks by status, then in the order of assignment ([Assign work to the selected texts](#assign-work-to-the-selected-texts)). To put texts first whose tasks are already assigned:
 
 1. Select the texts, then click **Move to front** in the selection bar.
-2. Read the confirmation **Move to the front of the queue** and click the button that names the texts, for example *Move 2 texts to the front*. Or click **Cancel**, or press Escape, to keep the order.
+2. Read the confirmation **Move to the front of the queue**. It says *Tasks already assigned on the 2 selected texts come first in My tasks. Tasks you assign later follow the order of assignment.* Click the button that names the texts, for example *Move 2 texts to the front*. Or click **Cancel**, or press Escape, to keep the order.
 
-The selected texts now come first, in their earlier order among themselves; the other texts follow in theirs. The message says how many texts moved, for example *2 texts moved to the front of the queue.* The order applies to tasks already assigned and to tasks you assign later, and **Import order** under **Order** on **Documents** follows it. A later upload comes last again. Each move is recorded in the audit trail. There is no Undo: to change the order again, move other texts to the front.
+The selected texts now come first, in their earlier order among themselves; the other texts follow in theirs. The message says how many texts moved, for example *2 texts moved to the front of the queue.* In **My tasks**, the tasks of these texts that are already assigned now come first within their status, for every person who has one, in the order of assignment among themselves; a later move goes in front of an earlier one. Tasks you assign afterwards follow the order of assignment. **Import order** under **Order** on **Documents** follows the new order of the texts. A later upload comes last again. Each move is recorded in the audit trail. There is no Undo: to change the order again, move other texts to the front.
 
 ### Assign work for one text
 
@@ -504,7 +521,9 @@ What for: assign a single review or annotation.
 
 With more than five people on a text, the line *Assigned:* names the first five and how many more there are, for example *and 3 more*; the list marks each of them *Already assigned*.
 
-To change the limit of annotators per text from here, click the info button (i) next to the limit and enter the number (1 to 20):
+When every place of the text is taken, the other people turn grey with the reason, for example *no free place (1 per text)*. This is the limit of the text, not of the person. A text that already has more annotators than its limit says both numbers, for example *Limit reached: 10 assigned, limit 8.*
+
+To change the limit of annotators per text from here, click **Change…** next to the limit and enter the number (1 to 20). A number you typed stays when you switch between the two choices below. If the button cannot act, the popover says why, for example *The project setting is already 1.*
 
 - **Only for the selected text** (with several texts: **Only for the selected texts**) gives these texts their own limit, for example 4 annotators on one text for a method comparison in a project with 1. Click the button that names the number of texts, for example *Change for 1 text*. The text keeps its own value for every version, also a corrected one; the project setting and the other texts stay as they are. Entering the project's number again returns the text to the project setting. The popover then explains *Sets the most annotators for this text only (project: 1)*, and for a text that already has its own value its title reads, for example, *Up to 4 annotators for this text (project: 1)*.
 - **For all texts** changes the project setting. Click **Change for all texts**. Texts with their own value keep it.
@@ -519,7 +538,7 @@ The proposal uses the languages in each person's profile: a person is proposed f
 
 1. In the assign dialog, click **Distribute evenly…**. The proposal takes the place of the assign dialog; **Close** without confirming returns to it.
 2. Set **People per document** and click **Propose**.
-3. Check the proposal. Change a person in any cell, or click **Propose again**. Texts nobody can take are listed under **Unassignable documents**.
+3. Check the proposal. The tasks are assigned in the order of the table, and each person sees theirs in that order in **My tasks**. Change a person in any cell, or click **Propose again**. Texts nobody can take are listed under **Unassignable documents**.
 4. Click **Confirm**. This covers only the task shown in the assign dialog. If the selection needs more, the assign dialog comes back on the next step; otherwise it closes and the message says the assignments are saved.
 
 If you chose someone whose profile lists other languages than the text needs, the dialog stays open after **Confirm** and asks; click **Assign anyway**. The other rows are already saved.

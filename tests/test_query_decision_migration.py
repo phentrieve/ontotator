@@ -1,5 +1,5 @@
 """Migration 0049 (issue 483): ``translation_query_decisions``, purely
-additive. It follows 0046 (typo fixes after a review): one head, up and
+additive. It follows 0048 (the label of a guideline version): one head, up and
 down."""
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from ontotator.storage.schema import (
 )
 
 REVISION = "0049"
-PREVIOUS = "0046"
+PREVIOUS = "0048"
 S = "ontotator"
 
 

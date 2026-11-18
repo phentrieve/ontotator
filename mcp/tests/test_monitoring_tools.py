@@ -38,7 +38,9 @@ async def test_list_guidelines_gives_versions_and_read_status(
     fake: FakeApi, mcp_client: Client
 ) -> None:
     reach = build("GuidelineReachView", notified=3, opened=2, members=4)
-    version = build("GuidelineSummary", version=2, reach=reach, not_seen=[])
+    version = build(
+        "GuidelineSummary", version=2, label="3.1", reach=reach, not_seen=[]
+    )
     fake.on(
         "GET",
         f"{P}/guidelines",
@@ -47,6 +49,8 @@ async def test_list_guidelines_gives_versions_and_read_status(
         ),
     )
     listing = await call(mcp_client, "list_guidelines", {"project": "p"})
+    # The upload number and the project's own label of the version (#487).
+    assert (listing["current"]["version"], listing["current"]["label"]) == (2, "3.1")
     assert listing["versions"][0]["reach"] == {
         "notified": 3,
         "opened": 2,

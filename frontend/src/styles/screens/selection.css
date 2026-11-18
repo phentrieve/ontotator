@@ -37,6 +37,13 @@
 .selection-bar--narrow { --selection-bar-inset: var(--space-2); }
 .selection-bar--narrow .selection-bar-actions { margin-inline-start: 0; }
 .selection-bar--narrow .selection-bar-actions .btn { min-height: 32px; }
+/* A phone (issue 472): the bar and a toast above it left half of the list. Tighter buttons fit two rows instead of
+   three, and the summary is small. */
+.selection-bar--narrow { gap: var(--space-1); padding: var(--space-2); }
+.selection-bar--narrow .selection-bar-line { gap: var(--space-1) var(--space-2); }
+.selection-bar--narrow .selection-bar-summary { font-size: var(--size-sm); line-height: var(--leading-sm); }
+.selection-bar--narrow .selection-bar-actions { gap: var(--space-1); }
+.selection-bar--narrow .selection-bar-actions .btn { padding-inline: var(--space-2); font-size: var(--size-sm); }
 
 /* Select by case IDs */
 .select-ids { display: grid; gap: var(--space-2); }

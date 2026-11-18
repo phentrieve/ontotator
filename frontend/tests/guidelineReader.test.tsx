@@ -51,4 +51,18 @@ describe("GuidelineReader", () => {
     render(<GuidelineReader projectKey="p/key" version={9} currentVersion={3} />);
     expect(await screen.findByText("Network down")).toBeDefined();
   });
+
+  it("names a labelled version 3.1 (v2), in the heading and the older-version banner (#487)", async () => {
+    vi.spyOn(api, "getGuideline").mockResolvedValue(guidelineDocument(guidelineSummary(2, { label: "3.1" })));
+    render(<GuidelineReader projectKey="p/key" version={2} currentVersion={3} currentLabel="3.2" />);
+    expect(await screen.findByRole("heading", { level: 2, name: "Guidelines 3.1 (v2)" })).toBeDefined();
+    expect(await screen.findByText("This is 3.1 (v2). The current version is 3.2 (v3).")).toBeDefined();
+  });
+
+  it("a withdrawn version keeps its label", async () => {
+    vi.spyOn(api, "getGuideline").mockResolvedValue(guidelineDocument(withdrawnGuideline(2, null, { label: "3.1" })));
+    render(<GuidelineReader projectKey="p/key" version={2} currentVersion={null} label="3.1" />);
+    expect(await screen.findByText("3.1 (v2) was withdrawn by the project lead.")).toBeDefined();
+    expect(screen.getByRole("heading", { level: 2, name: "Guidelines 3.1 (v2)" })).toBeDefined();
+  });
 });

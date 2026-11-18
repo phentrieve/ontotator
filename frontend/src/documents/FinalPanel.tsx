@@ -11,6 +11,7 @@ import { plural } from "../app/labels";
 import { routeHref, type ProjectDocumentsQuery, type Route } from "../app/router";
 import { Time } from "../app/Time";
 import { submissionGuidelineLabel } from "../guidelines/submissionLabel";
+import type { GuidelineRef } from "../guidelines/versionName";
 import { Button, InlineMessage, type ButtonVariant } from "../ui";
 import { onSpaceActivate } from "../ui/spaceActivates";
 import { useMediaQuery } from "../ui/useMediaQuery";
@@ -75,7 +76,14 @@ export interface DecisionBlockProps {
 }
 
 
-interface Success { text: string; bar: string }
+/** The final result of the text `rowKey` on this page; null without one, undefined when the page does not list the text. */
+function finalOf(page: DocumentRowsPage, rowKey: string): string | null | undefined {
+  const row = page.groups.flatMap(group => group.rows).find(entry => rowKeyOf(entry) === rowKey);
+  return row ? row.final?.submission_id ?? null : undefined;
+}
+
+/** `rowKey` and `submissionId`: the text and the final result the line speaks of (absent when the list could not be refreshed). */
+interface Success { text: string; bar: string; rowKey?: string; submissionId?: string | null }
 /** `stay`: the lead came through "Change final…", so the panel keeps showing this text after the save. */
 interface Pending { rowKey: string; before: DocumentRowsPage; stay: boolean }
 
@@ -113,7 +121,7 @@ export function DecisionBlock(props: DecisionBlockProps): JSX.Element | null {
     if (!saved || !page || page === saved.before) return;
     pending.current = null;
     setBusy(null);
-    setSuccess({ text: savedText(caseOfTextKey(saved.rowKey), languageOfTextKey(saved.rowKey)), bar: remainingText(page.bar) });
+    setSuccess({ text: savedText(caseOfTextKey(saved.rowKey), languageOfTextKey(saved.rowKey)), bar: remainingText(page.bar), rowKey: saved.rowKey, submissionId: finalOf(page, saved.rowKey) });
     const next = saved.stay ? null : nextFinalDecision(page, saved.rowKey);
     if (saved.stay) {
       // "Change final…" was about this text: no jump to the next decision of the list.
@@ -129,6 +137,13 @@ export function DecisionBlock(props: DecisionBlockProps): JSX.Element | null {
     // Only a new page completes a save.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
+
+  // The saved final result is no longer the text's (Undo in the toast brought the earlier one back, or it was withdrawn
+  // or replaced elsewhere): "Final result saved" would be stale (review 2, F7 b).
+  useEffect(() => {
+    if (!success?.rowKey || !page || pending.current) return;
+    if (finalOf(page, success.rowKey) !== success.submissionId) setSuccess(null);
+  }, [page, success]);
 
   // Another row (advance or a new panel target): "none left" belonged to the previous row.
   const shownKey = useRef(rowKey);
@@ -262,7 +277,7 @@ interface ContentProps extends DecisionBlockProps {
   row: DocumentRowView;
   page: DocumentRowsPage;
   data: FinalPanelData;
-  guidelineCurrent: number | null;
+  guidelineCurrent: GuidelineRef | null;
   /** Id of the choice whose save is in flight; every choice is unavailable meanwhile. */
   busy: string | null;
   onSave: (request: FinalConfirmRequest, triggerId: string) => void;
@@ -386,7 +401,7 @@ function AcceptContent(props: ContentProps & { submission: FinalPanelSubmissionV
     </UnresolvedNotice>
     <p className="final-panel-question">{acceptQuestion(submission)}</p>
     <p className="cell-secondary">{submissionLine(submission, row.language, row.parallel_roots, now)}</p>
-    <p className="cell-secondary">{submissionGuidelineLabel(submission.guideline_version, submission.guideline_withdrawn, guidelineCurrent)}</p>
+    <p className="cell-secondary">{submissionGuidelineLabel(submission.guideline_version, submission.guideline_withdrawn, guidelineCurrent, submission.guideline_label)}</p>
     <div className="final-panel-actions">
       {!isFinal && <ChoiceButton id={triggerId} label="Accept result" variant="primary" blocked={!submission.eligible} busy={busy} onAnnounce={onAnnounce}
         onChoose={() => onSave(selectRequest(row, data.submissions, submission, triggerId), triggerId)} />}
@@ -410,7 +425,7 @@ function DecidedContent(props: ContentProps & { onChange: () => void }): JSX.Ele
         {submissionLine(final, row.language, row.parallel_roots, now)}{", "}
         {link(route(final.document_id, final.submission_id), "Open submission")}
       </p>
-      <p className="cell-secondary">{submissionGuidelineLabel(final.guideline_version, final.guideline_withdrawn, guidelineCurrent)}</p>
+      <p className="cell-secondary">{submissionGuidelineLabel(final.guideline_version, final.guideline_withdrawn, guidelineCurrent, final.guideline_label)}</p>
     </>}
     {listed.length > 1 && <div className="final-panel-actions">
       <Button size="sm" onClick={props.onChange}>Change final…</Button>
@@ -489,7 +504,7 @@ function SubmissionTable(props: ContentProps & { listed: FinalPanelSubmissionVie
           return <li key={submission.submission_id} className={isFinal ? "submissions-list-item final-row" : "submissions-list-item"}>
             <span id={nameId} className="submissions-list-label">{submissionName(submission)}</span>
             <span className="cell-secondary">{submissionWhen(submission, now)}</span>
-            <span className="cell-secondary">{submissionGuidelineLabel(submission.guideline_version, submission.guideline_withdrawn, guidelineCurrent)}</span>
+            <span className="cell-secondary">{submissionGuidelineLabel(submission.guideline_version, submission.guideline_withdrawn, guidelineCurrent, submission.guideline_label)}</span>
             <span className="submissions-list-findings">{`${plural(submission.finding_count, "finding")}, only here: ${onlyHereText(submission, row.parallel_roots)}`}</span>
             <div className="submissions-list-line">{actions(submission, nameId, triggerId, isFinal)}</div>
           </li>;
@@ -511,7 +526,7 @@ function SubmissionTable(props: ContentProps & { listed: FinalPanelSubmissionVie
           <th scope="row" id={nameId}>
             {submissionName(submission)}
             <div className="cell-secondary">{submissionWhen(submission, now)}</div>
-            <div className="cell-secondary">{submissionGuidelineLabel(submission.guideline_version, submission.guideline_withdrawn, guidelineCurrent)}</div>
+            <div className="cell-secondary">{submissionGuidelineLabel(submission.guideline_version, submission.guideline_withdrawn, guidelineCurrent, submission.guideline_label)}</div>
           </th>
           <td>{submission.finding_count}</td>
           <td>{onlyHereText(submission, row.parallel_roots)}</td>

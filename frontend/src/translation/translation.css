@@ -40,6 +40,10 @@
 .translation-checks-line .icon { flex: none; }
 .translation-checks--failed .translation-checks-line .icon { color: var(--warning); }
 .translation-checks-calm { color: var(--text-muted); }
+/* Ontotator's check for added passages in brackets (issue 484): a line of its own under the run's checks. */
+.translation-checks-brackets { display: flex; align-items: center; gap: var(--space-2); flex-basis: 100%; margin: 0; padding-bottom: var(--space-1); color: var(--text); }
+.translation-checks-brackets .icon { flex: none; color: var(--warning); }
+.translation-check-passages { margin: 0; padding-left: var(--space-5); }
 .translation-checks-toggle .translation-checks-chevron { transition: transform 0.15s ease-out; }
 .translation-checks-toggle[aria-expanded="true"] .translation-checks-chevron { transform: rotate(90deg); }
 .translation-check-details { max-height: 40vh; overflow: auto; padding: var(--space-3) var(--space-5) var(--space-4); background: var(--surface-raised); }
@@ -170,6 +174,15 @@
 .review-history-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-serif); }
 .review-confirm p { margin: var(--space-4) 0 0; }
 .review-confirm-final { font-weight: var(--weight-strong); }
+/* Typography hints of the text to be saved (issue 484): a line and, behind "Show them", the place of each hint. */
+.review-confirm-hints { margin: var(--space-4) 0; }
+.review-confirm-hints p { margin: 0; }
+.review-confirm-hint-list { display: grid; gap: var(--space-2); margin: var(--space-2) 0 0; padding: 0; list-style: none; max-height: 14rem; overflow-y: auto; }
+.review-confirm-hint-list li { display: grid; gap: 2px; min-width: 0; }
+.review-confirm-hint-rule { color: var(--text-muted); font-size: var(--size-sm); }
+.review-confirm-hint-excerpt { font-family: var(--font-serif); white-space: pre-wrap; overflow-wrap: anywhere; }
+.review-confirm-hint-excerpt mark { padding: 1px 0; background: var(--warning-light); color: inherit; outline: 1px solid var(--warning); }
+.review-confirm-hints .review-confirm-hints-more { margin-top: var(--space-2); color: var(--text-muted); font-size: var(--size-sm); }
 
 @media (min-width: 700px) {
   /* Side by side, head, pane and note of every column share the rows of the columns grid (subgrid):

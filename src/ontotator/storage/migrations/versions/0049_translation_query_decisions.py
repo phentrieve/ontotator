@@ -8,15 +8,15 @@ decided on, the version the decision accepted, the kind of decision
 ``unchanged``: the queried version was accepted as it is), the lead's answer
 to the reviewer, who decided and when.
 
-No existing table, column or row changes. Follows 0046 (typo fixes after a
-review).
+No existing table, column or row changes. Follows 0048 (the label of a
+guideline version).
 """
 
 import sqlalchemy as sa
 from alembic import op
 
 revision = "0049"
-down_revision = "0046"
+down_revision = "0048"
 branch_labels = None
 depends_on = None
 SCHEMA = "ontotator"
