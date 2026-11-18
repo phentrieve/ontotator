@@ -38,7 +38,9 @@ describe("theme tokens", () => {
 
   it("the_system_block_yields_to_an_explicit_choice", () => {
     const plain = css.replace(/\/\*[\s\S]*?\*\//g, "");
-    expect(plain).toMatch(/@media \(prefers-color-scheme: dark\) \{\s*:root:not\(\[data-theme="light"\]\) \{/);
+    // Both dark blocks are for the screen only: a printed page stays light.
+    expect(plain).toMatch(/@media screen and \(prefers-color-scheme: dark\) \{\s*:root:not\(\[data-theme="light"\]\) \{/);
+    expect(plain).toMatch(/@media screen \{\s*:root\[data-theme="dark"\] \{/);
     expect(ruleBody(css, ":root")).toMatch(/(?:^|\s)color-scheme: light dark;/);
     expect(ruleBody(css, ':root[data-theme="dark"]')).toMatch(/(?:^|\s)color-scheme: dark;/);
     expect(ruleBody(css, ':root:not([data-theme="light"])')).toMatch(/(?:^|\s)color-scheme: dark;/);

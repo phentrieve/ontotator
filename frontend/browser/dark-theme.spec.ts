@@ -137,6 +137,11 @@ test.describe("the setting", () => {
     await expect(theme).toHaveValue("dark");
     expect(await bodyBackground(page)).toBe(DARK_SURFACE);
     expect(await rootScheme(page)).toBe("dark");
+    // A printed page stays light: dark text on white paper.
+    await page.emulateMedia({ media: "print" });
+    expect(await bodyBackground(page)).toBe(LIGHT_SURFACE);
+    expect(await tokenColour(page, "--text")).toBe("rgb(31, 26, 20)");
+    await page.emulateMedia({ media: null });
 
     // Light on a dark system.
     await page.emulateMedia({ colorScheme: "dark" });
