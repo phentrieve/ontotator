@@ -22,10 +22,19 @@ export interface SidebarResizerProps {
    * or "start" (a panel on the right, such as "Your review": moving left widens it).
    */
   side?: "start" | "end";
+  /**
+   * "vertical" (default): a divider between two columns, dragged left and right.
+   * "horizontal": a divider between two rows, dragged up and down (↑ / ↓); `width` is then the
+   * height of the panel, and "start" means the panel lies below the divider (moving up enlarges it).
+   */
+  orientation?: "vertical" | "horizontal";
+  /** The panel's size as it is on screen, when `width` is only a default until the first change. */
+  measure?: () => number;
 }
 
 interface Drag {
   pointerId: number;
+  /** Pointer position on the drag axis at the start. */
   startX: number;
   startWidth: number;
   latest: number;
@@ -33,14 +42,16 @@ interface Drag {
 
 /** Vertical separator between the findings column and the text pane (spec section 10). */
 export function SidebarResizer({ width, limits, controls, onChange, onReset, onCommit, label = "Resize findings column",
-  hint = "Resize the findings column (focus the divider)", side = "end" }: SidebarResizerProps) {
+  hint = "Resize the findings column (focus the divider)", side = "end", orientation = "vertical", measure }: SidebarResizerProps) {
+  const rows = orientation === "horizontal";
+  const along = (event: PointerEvent<HTMLDivElement>) => (rows ? event.clientY : event.clientX);
   const drag = useRef<Drag | null>(null);
   const frame = useRef<number | null>(null);
   /** +1: moving right widens the panel; -1: moving left does. */
   const direction = side === "start" ? -1 : 1;
 
   useShortcutHint(
-    ["← / →", "Shift + ← / →", "Home / End", "Enter"],
+    [rows ? "↑ / ↓" : "← / →", rows ? "Shift + ↑ / ↓" : "Shift + ← / →", "Home / End", "Enter"],
     hint,
     { group: "Layout" },
   );
@@ -79,8 +90,9 @@ export function SidebarResizer({ width, limits, controls, onChange, onReset, onC
     }
     let next: number | null = null;
     const step = event.shiftKey ? LARGE_STEP : STEP;
-    if (event.key === "ArrowLeft") next = width - step * direction;
-    else if (event.key === "ArrowRight") next = width + step * direction;
+    const base = measure ? Math.round(measure()) : width;
+    if (event.key === (rows ? "ArrowUp" : "ArrowLeft")) next = base - step * direction;
+    else if (event.key === (rows ? "ArrowDown" : "ArrowRight")) next = base + step * direction;
     else if (event.key === "Home") next = limits.min;
     else if (event.key === "End") next = limits.max;
     if (next == null) return;
@@ -94,14 +106,15 @@ export function SidebarResizer({ width, limits, controls, onChange, onReset, onC
     event.preventDefault();
     event.currentTarget.focus();
     event.currentTarget.setPointerCapture?.(event.pointerId);
-    drag.current = { pointerId: event.pointerId, startX: event.clientX, startWidth: width, latest: width };
+    const start = measure ? Math.round(measure()) : width;
+    drag.current = { pointerId: event.pointerId, startX: along(event), startWidth: start, latest: start };
     onCommit("drag-start");
   };
 
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
     const current = drag.current;
-    if (!current || event.pointerId !== current.pointerId || !Number.isFinite(event.clientX)) return;
-    current.latest = clampSidebarWidth(current.startWidth + direction * (event.clientX - current.startX), limits);
+    if (!current || event.pointerId !== current.pointerId || !Number.isFinite(along(event))) return;
+    current.latest = clampSidebarWidth(current.startWidth + direction * (along(event) - current.startX), limits);
     if (frame.current != null) return;
     frame.current = requestAnimationFrame(() => {
       frame.current = null;
@@ -127,9 +140,9 @@ export function SidebarResizer({ width, limits, controls, onChange, onReset, onC
 
   return (
     <div
-      className="sidebar-resizer"
+      className={rows ? "sidebar-resizer sidebar-resizer--rows" : "sidebar-resizer"}
       role="separator"
-      aria-orientation="vertical"
+      aria-orientation={orientation}
       aria-controls={controls}
       aria-label={label}
       aria-valuenow={width}

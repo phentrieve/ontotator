@@ -217,7 +217,7 @@ export const TreeBrowser: React.FC<TreeBrowserProps> = ({
         : null;
 
   return (
-    <div className="tree-host" hidden={collapsed}>
+    <div className="tree-host" id="ontology-tree" hidden={collapsed}>
       <section ref={sectionRef} className="tree-browser" role="region" aria-label="Ontology tree">
         <header className="tree-browser__header">
           <h2>Ontology tree</h2>

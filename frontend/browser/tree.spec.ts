@@ -587,6 +587,40 @@ test.describe("ontology tree", () => {
     expect(stored).toEqual([]);
   });
 
+  test("the divider above the docked tree sets its height, is kept, and resets on a double click", async ({ page }) => {
+    await openWithSeizure(page, "tree-height", { width: 1440, height: 900 });
+    await page.evaluate(() => window.localStorage.removeItem("ontotator.editor.treeHeight.v1"));
+    await showInTree(page).click();
+    await expect(treePanel(page)).toBeVisible();
+    const divider = page.getByRole("separator", { name: "Resize ontology tree" });
+    await expect(divider).toBeVisible();
+    await expect(divider).toHaveAttribute("aria-orientation", "horizontal");
+
+    const before = await box(page.locator(".tree-host"));
+    const grip = await box(divider);
+    await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2 - 150, { steps: 5 });
+    await page.mouse.up();
+    const taller = await box(page.locator(".tree-host"));
+    expect(Math.abs(taller.height - (before.height + 150))).toBeLessThan(6);
+    // The annotation panel keeps its place above, smaller.
+    await expect(page.locator(".inspector-pane h2")).toBeVisible();
+    expect(await page.evaluate(() => window.localStorage.getItem("ontotator.editor.treeHeight.v1"))).toBe(String(Math.round(taller.height)));
+
+    await divider.focus();
+    await page.keyboard.press("ArrowDown");
+    expect((await box(page.locator(".tree-host"))).height).toBeLessThan(taller.height - 10);
+
+    await divider.dblclick();
+    await expect(page.locator(".app-layout")).not.toHaveClass(/tree-sized/);
+    expect(Math.abs((await box(page.locator(".tree-host"))).height - before.height)).toBeLessThan(2);
+
+    // Two columns: the tree sits beside the panel, and there is no divider to drag.
+    await page.setViewportSize({ width: 1000, height: 900 });
+    await expect(divider).toBeHidden();
+  });
+
   test("in the three-column layout the tree is under the annotation panel at every width, never beside it", async ({ page }) => {
     // A long display name: the case header's identity badge must not take another line.
     const user = await page.request.post(

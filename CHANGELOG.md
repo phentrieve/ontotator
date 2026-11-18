@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Annotation view: in the three-column layout, the divider above the docked ontology tree sets its height (drag, or `↑` / `↓` on the focused divider; double-click resets). The height is kept in the browser. `SidebarResizer` has a horizontal mode for it.
+
 ## [0.11.0] - 2026-11-17
 
 ### Added

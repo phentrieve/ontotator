@@ -265,7 +265,9 @@ describe("the tree in the case screen", () => {
     expect(layout.classList.contains("tree-open")).toBe(true);
     expect(panel.parentElement!.className).toBe("tree-host");
     expect(panel.parentElement!.parentElement).toBe(layout);
-    expect(layout.lastElementChild).toBe(panel.parentElement);
+    // Only the divider that sets the tree's height follows it.
+    expect(panel.parentElement!.nextElementSibling?.getAttribute("aria-label")).toBe("Resize ontology tree");
+    expect(layout.lastElementChild).toBe(panel.parentElement!.nextElementSibling);
     expect(panel.parentElement!.previousElementSibling).toBe(container.querySelector(".inspector-pane"));
     // One control in the header: close. There is nothing to keep open or to store.
     const header = panel.querySelector<HTMLElement>(".tree-browser__header")!;

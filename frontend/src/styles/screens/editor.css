@@ -1105,6 +1105,30 @@
 @media (max-width: 700px) { .sidebar-resizer { display: none; } }
 @media (forced-colors: active) { .sidebar-resizer-grip { background: CanvasText; } .sidebar-resizer:focus-visible { outline-color: Highlight; } }
 
+/* The divider above the ontology tree sets the tree's height: only in the three-column layout, where
+   the tree lies under the inspector. Unset, the rows of .tree-open apply; once dragged, .tree-sized
+   gives the tree --tree-height (editor/treeHeight.ts) and the inspector the rest. */
+.sidebar-resizer.sidebar-resizer--rows { display: none; }
+.sidebar-resizer--rows .sidebar-resizer-grip { position: static; width: 32px; height: 4px; margin: 6px auto 0; }
+@media (min-width: 1025px) {
+  @container case-screen (min-width: 1060px) {
+    .case-screen:not(.case-comparing) .app-layout.tree-open > .sidebar-resizer.sidebar-resizer--rows {
+      display: block;
+      grid-column: 3;
+      grid-row: 2;
+      align-self: start;
+      justify-self: stretch;
+      width: auto;
+      height: 16px;
+      margin: -8px 0 0;
+      cursor: row-resize;
+    }
+    .case-screen:not(.case-comparing) .app-layout.tree-open.tree-sized {
+      grid-template-rows: minmax(160px, 1fr) var(--tree-height);
+    }
+  }
+}
+
 /* The columns follow the room the editor really has, not only the viewport (a page drawer would
    narrow it; in the editor the guidelines open in the inspector instead, from 1060 px). Three
    columns need the text's 420 px beside the findings column (at least 220 px) and the inspector;
