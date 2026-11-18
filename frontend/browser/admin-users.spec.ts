@@ -6,7 +6,7 @@
  * assignments), found on the page through "Filter users": the table holds the accounts of every other spec too.
  */
 import { randomUUID } from "node:crypto";
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page, type Request } from "@playwright/test";
 import { authenticatedRequest, loginThroughForm, openTasksHome, TEST_PASSWORD } from "./helpers";
 
 test.setTimeout(120_000);
@@ -86,7 +86,21 @@ async function serverUser(page: Page, username: string): Promise<Record<string, 
   expect(response.ok(), await response.text()).toBeTruthy();
   return (await response.json() as Record<string, unknown>[]).find(user => user.username === username);
 }
-async function logout(page: Page) {
+/** The API requests of the page that have no answer yet (call before the page makes them). */
+function openRequests(page: Page): Set<Request> {
+  const open = new Set<Request>();
+  page.on("request", request => { if (new URL(request.url()).pathname.startsWith("/api/")) open.add(request); });
+  page.on("requestfinished", request => open.delete(request));
+  page.on("requestfailed", request => open.delete(request));
+  return open;
+}
+/**
+ * Logs out once every request of the page has its answer. Right after a log-in the home page still reads the tasks;
+ * logging out while that request is on its way lets the server answer it with 401, which the browser reports as a
+ * console error. (``waitForLoadState("networkidle")`` does not wait here: the app never navigates.)
+ */
+async function logout(page: Page, open: Set<Request>) {
+  await expect.poll(() => open.size).toBe(0);
   await page.getByRole("button", { name: "Log out", exact: true }).click();
   await expect(page.getByRole("form", { name: "Log in to Ontotator" })).toBeVisible();
 }
@@ -199,6 +213,7 @@ test("Deactivate… logs the person out and refuses their log-in; Activate lets 
 
 test("Reset code: the code is shown once and sets a new password; the old one stops working", async ({ page }) => {
   const errors = collectErrors(page);
+  const open = openRequests(page);
   const { target } = await openUsers(page);
   await more(page, target, "Reset code");
   const confirm = page.getByRole("dialog", { name: `Issue a new reset code for ${DISPLAY_NAME}?`, exact: true });
@@ -215,7 +230,7 @@ test("Reset code: the code is shown once and sets a new password; the old one st
   await expect(handover).toHaveCount(0);
   const history = await historyOf(page, target, () => more(page, target, "History"));
   expect(history[0]).toMatch(/^New sign-in code issued: /);
-  await logout(page);
+  await logout(page, open);
 
   // The person redeems the code with a new password.
   const password = "another browser test passphrase";
@@ -228,7 +243,7 @@ test("Reset code: the code is shown once and sets a new password; the old one st
   await setup.getByLabel("Repeat the new password").fill(password);
   await setup.getByRole("button", { name: "Set password and log in" }).click();
   await expect(page.getByTestId("current-user")).toContainText(DISPLAY_NAME);
-  await logout(page);
+  await logout(page, open);
   expect(errors).toEqual([]);
 
   // The old password is refused, the new one logs in.
