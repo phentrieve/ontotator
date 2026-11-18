@@ -231,12 +231,12 @@ describe("useSidebarWidth", () => {
 });
 
 describe("editor.css sidebar width", () => {
-  it("uses the --sidebar-width variable for the sidebar and both tree grids", () => {
+  it("uses the --sidebar-width variable for the sidebar, both tree grids and the low landscape grid", () => {
     expect(editorCss).toMatch(/\.app-layout\s*\{[^}]*--sidebar-width:\s*260px/);
     expect(editorCss).toMatch(/--sidebar-width:\s*220px/);
     expect(editorCss).not.toMatch(/grid-template-columns:\s*(220|260)px/);
     expect(editorCss).not.toMatch(/\.sidebar\s*\{[^}]*width:\s*(220|260)px/);
-    expect(editorCss.match(/grid-template-columns:\s*var\(--sidebar-width\)/g)?.length).toBe(3);
+    expect(editorCss.match(/grid-template-columns:\s*var\(--sidebar-width\)/g)?.length).toBe(4);
   });
   it("hides the separator at narrow widths and has forced-colours rules", () => {
     expect(editorCss).toMatch(/@media \(max-width: 700px\)\s*\{\s*\.sidebar-resizer\s*\{\s*display:\s*none;/);
