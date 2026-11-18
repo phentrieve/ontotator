@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-D9AuU4np.js";import{n as a,t as o}from"./lib-DkyUfLPF.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-Bi3JTCuq.js";import{n as a,t as o}from"./lib-CtB72lHB.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -507,7 +507,7 @@ What for: record a term that the text mentions.
 
 1. Select the words in the text with the mouse. With the keyboard: click before the first word (or press Tab until the text has focus), hold Shift and move with the arrow keys.
 2. The panel **New finding** shows the marked text. To adjust it, drag the edge handles at its start and end, or focus a handle and press \`←\` or \`→\`.
-   - On a phone, the text stays where it is and a **New finding** bar appears at the bottom of the screen. Tap **Choose term** to go on to the term search, or **Discard**.
+   - On a phone, the text stays where it is and a **New finding** bar appears at the bottom of the screen. Tap **Choose term** to go on to the term search, or **Discard**. On a phone held sideways there is no bar: the panel **New finding** with the term search stands beside the text.
 3. **Search term** is already filled with the marked words, and the hits are listed under **Terms**. Change the words, or type a code such as \`HP:0001250\`, if the right term is not among them.
 4. Press Enter to add the top hit, or click a hit. Enter adds nothing when the top hit is a **Weak match**: click a hit, or choose it with \`↓\` and press Enter.
 5. The finding is created with the project's prefilled values. [Confirm or change them](#set-values-and-confirm-defaults).
@@ -647,7 +647,7 @@ What for: check a tool's proposals one by one and add what the tool missed. Your
 Tools make mistakes. Check every proposal as if you had marked it yourself: the marked text, the term and every value. Negations are a common error: a proposal for "Keine Krampfanfälle" (no seizures) with **Present** is wrong.
 
 1. The list **Review Proposals** shows every proposal. Your additions are under **Your own findings**.
-2. Select a proposal, or move with \`j\` and \`k\`. The text shows where it was found.
+2. Select a proposal, or move with \`j\` and \`k\`. The text shows where it was found. On a phone, where the details replace the text, the details show the sentence around the quoted passage, with the passage marked.
 3. Check the marked text, the term and each value. To look the passage up elsewhere, click **Copy text** next to the quoted passage in the details, or press \`Ctrl+C\` (\`Cmd+C\` on a Mac): both copy the passage of the selected proposal, as for a finding ([Mark text and add a finding](#mark-text-and-add-a-finding)). A proposal with several mentions has **Copy text** at each.
 4. Decide:
    - **Confirm**: the passage, term and all values are right. Values tagged **Defaulted** were not set by the tool but prefilled; Confirm accepts them as shown, so check them too.
@@ -688,7 +688,7 @@ When the carried work comes from an earlier version of the text, for example aft
 
 1. Tick **Show changes since** v1 (or press \`Space\` on it). Each changed passage gets a dashed frame, and added text is underlined. The line next to it counts the passages, for example *1 passage changed*.
 2. Click **Next ›** or **‹ Previous** to scroll to the next or previous passage; it gets a solid frame and the line reads, for example, *1 passage changed · 1 of 1*.
-3. Where text was removed, a small **−** marker stands in the text. Point at it or move to it with \`Tab\` to see the earlier wording, with the removed words struck through. \`Esc\` closes it.
+3. Where text was removed, a small **−** marker stands in the text. Point at it or move to it with \`Tab\` to see the earlier wording, with the removed words struck through. \`Esc\` closes it. On a phone or tablet, tap the marker: the earlier wording stays until you tap the marker again or tap somewhere else.
 
 The marks are only shown over the text: the text stays exactly this version, so you can mark text, add or re-create findings and check carried findings as usual while they are on. A changed sentence the tool did not propose a finding for may need a new finding. The marks compare the two versions word by word, while **Check needed** is decided from the exact characters under each finding, so a finding inside a marked passage is not always marked **Check needed**, and the other way round. Untick the box to hide the marks.
 

@@ -62,6 +62,15 @@
 /* The glyph is not text: the reading text keeps exactly the characters of this version. */
 .change-removed::before { content: "−"; }
 
+/* A larger hit area than the 14 px box, without moving the text (issue 468). With a mouse it only grows upwards
+   and downwards (26 px high): a drag that starts on the letter next to the marker must still mark text. On a touch
+   screen it is 44 px wide and one line high, so it does not reach into the lines above and below. */
+.change-removed { position: relative; }
+.change-removed::after { content: ""; position: absolute; inset: -6px -1px; }
+@media (pointer: coarse) {
+  .change-removed::after { inset: -9px -16px; }
+}
+
 .change-removed:focus-visible {
   outline: var(--focus-width) solid var(--focus-ring);
   outline-offset: var(--focus-offset);

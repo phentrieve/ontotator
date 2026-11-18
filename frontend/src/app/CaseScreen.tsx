@@ -4410,6 +4410,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
               })()}
               replacementChanges={replacementChangesOf(selectedTarget, decisionsMap[refKey(selectedTarget)]?.replacement?.annotation_id)}
               documentText={view.document.text}
+              showSentence={panesLayout}
               currentDecision={decisionsMap[refKey(selectedTarget)] ?? null}
               draftAnnotations={draft.annotations ?? []}
               onDecide={(payload) => { void handleReviewDecision(payload, selectedTarget); }}
@@ -4607,7 +4608,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
           Below the panes, not inside them: the bar sticks to the bottom of the window while the page is unscrolled (issue 452). */}
       {pendingBarShown && (
         <div ref={pendingBarRef} className="pending-bar" role="group" aria-label="New finding">
-          <span className="pending-bar__text">New finding “{quoteSegments(view.document.text, pendingAnnotation!.segments, 40)}”</span>
+          <span className="pending-bar__text">New finding “{quoteSegments(view.document.text, pendingAnnotation!.segments, 80)}”</span>
           <Button type="button" variant="primary" size="sm" onClick={chooseTerm}>Choose term</Button>
           <Button type="button" variant="secondary" size="sm" onClick={discardPending}>Discard</Button>
           <CopyTextButton text={passageRef.current} onAnnounce={announceCarried} compact={narrowBar} />
