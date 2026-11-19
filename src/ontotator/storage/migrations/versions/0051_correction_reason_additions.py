@@ -7,15 +7,15 @@ reason while the review is open. Each row is one addition: the review task,
 the round of the request it adds to, the text, who added it and when. The
 reason of the request itself stays in its audit event and is never changed.
 
-No existing table, column or row changes. Follows 0049 (the lead's decisions
-on queried translation reviews).
+No existing table, column or row changes. Follows 0050 (no built-in maximum
+of "Annotations per text").
 """
 
 import sqlalchemy as sa
 from alembic import op
 
 revision = "0051"
-down_revision = "0049"
+down_revision = "0050"
 branch_labels = None
 depends_on = None
 SCHEMA = "ontotator"

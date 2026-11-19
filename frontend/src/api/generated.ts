@@ -10067,7 +10067,7 @@ export interface components {
              * Format: date-time
              */
             added_at: string;
-            added_by?: components["schemas"]["PersonRefView"] | null;
+            added_by?: components["schemas"]["MemberRefView"] | null;
         };
         /** ReasonRequest */
         ReasonRequest: {

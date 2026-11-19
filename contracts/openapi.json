@@ -29120,7 +29120,7 @@
           "added_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"

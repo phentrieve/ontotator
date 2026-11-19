@@ -1,6 +1,6 @@
 """Migration 0051 (issue 483): ``translation_correction_reason_additions``,
-purely additive. It follows 0049 (the lead's decisions on queries): one
-head, up and down."""
+purely additive. It follows 0050 (no built-in maximum of "Annotations per
+text"): one head, up and down."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from ontotator.storage.schema import (
 )
 
 REVISION = "0051"
-PREVIOUS = "0049"
+PREVIOUS = "0050"
 S = "ontotator"
 
 
@@ -33,7 +33,7 @@ def _table(conn: Connection) -> int:
     return int(found)
 
 
-def test_one_head_follows_the_query_decision_migration() -> None:
+def test_one_head_follows_the_annotations_per_text_migration() -> None:
     scripts = ScriptDirectory.from_config(alembic_config())
     # One head; a later migration follows this one.
     assert scripts.get_heads() == [head_revision()]

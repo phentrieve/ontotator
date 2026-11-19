@@ -182,7 +182,7 @@ class ReasonAdditionView(_View):
     note: str
     added_at: datetime
     # None: added through an API token, or by an account since erased.
-    added_by: PersonRefView | None = None
+    added_by: MemberRefView | None = None
 
 
 class CorrectionRequestView(_View):
