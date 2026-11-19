@@ -113,7 +113,7 @@ def codes(row: dict[str, Any]) -> list[str]:
     return [step["code"] for step in row["steps"]]
 
 
-def test_registry_has_nine_scenarios_and_unknown_is_404(client):
+def test_registry_has_ten_scenarios_and_unknown_is_404(client):
     assert set(BUILDERS) == {
         "D15",
         "DEFAULT_IMPORT",
@@ -122,6 +122,7 @@ def test_registry_has_nine_scenarios_and_unknown_is_404(client):
         "ACCEPTANCE",
         "ROWS",
         "REJECTED_TRANSLATION_FOR_LEAD",
+        "QUERIED_TRANSLATION_FOR_LEAD",
         "ACCEPTED_TRANSLATION_FOR_LEAD",
         "UPLOAD_DIALOG",
     }

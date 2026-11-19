@@ -100,8 +100,8 @@ class Session:
         return view
 
 
-def test_registry_has_two_scenarios_and_unknown_is_404(client):
-    assert set(BUILDERS) == {"REVIEW_FLOW", "ANNOTATION_LOOP"}
+def test_registry_has_its_scenarios_and_unknown_is_404(client):
+    assert set(BUILDERS) == {"REVIEW_FLOW", "ANNOTATION_LOOP", "TRANSLATION_CHECKS"}
     response = client.post("/__test_review_flow__", params={"scenario": "S99"})
     assert response.status_code == 404
 
@@ -122,6 +122,31 @@ def test_review_flow_two_reviews_for_ana_failed_first(client):
         built["assignments"]["failed-translation"],
         built["assignments"]["second-translation"],
     ]
+
+
+def test_translation_checks_added_brackets_and_typography_hints(client):
+    built = scenario(client, "TRANSLATION_CHECKS")
+    assert set(built["assignments"]) == {"added-gloss"}
+    assert set(built["documents"]) == {"spaced-v1", "spaced-v2"}
+    ana = Session(client, built["users"]["ana"])
+    review = f"/api/v1/translation-reviews/{built['assignments']['added-gloss']}"
+    check = ana.get(review)["added_brackets"]
+    assert (check["source_count"], check["translation_count"]) == (1, 3)
+    assert [passage["text"] for passage in check["passages"]] == [
+        "(Ikterus)",
+        "(drei Tage)",
+        "(ASS)",
+    ]
+    assert ana.get(review + "/draft/typography-hints")["total"] == 0
+    lead = Session(client, built["users"]["lead"])
+    page = lead.get(
+        f"/api/v1/projects/{built['project']}/document-rows?flags=typography_hints"
+    )
+    assert [
+        (row["case_id"], row["language"], row["typography_hints"])
+        for group in page["groups"]
+        for row in group["rows"]
+    ] == [("spaced", "de", 2)]
 
 
 def test_annotation_loop_three_annotate_tasks_defaults_and_german_names(client):

@@ -243,6 +243,24 @@ def _editorial_correction(facts: RowFacts, document_id: str) -> dict[str, Any] |
     }
 
 
+def _query_decision(facts: RowFacts, document_id: str) -> dict[str, Any] | None:
+    """The lead's decision on a query that accepted a version (issue 483)."""
+    record = facts.query_decisions.get(document_id)
+    if record is None:
+        return None
+    decided_by = record["decided_by"]
+    return {
+        "kind": record["kind"],
+        "decided_document_id": record["document_id"],
+        "reviewed_document_id": record["reviewed_document_id"],
+        "reviewer_assignment_id": record["assignment_id"],
+        "answer": record["answer"],
+        "edited": record["edited"],
+        "decided_at": record["decided_at"],
+        "decided_by": facts.people.get(decided_by) if decided_by else None,
+    }
+
+
 def _report(facts: RowFacts, report_id: str | None) -> dict[str, Any] | None:
     fact = facts.reports.get(report_id) if report_id is not None else None
     if fact is None:
@@ -575,6 +593,7 @@ def _build_row(ctx: _Context, case_id: str, language: str) -> dict[str, Any]:
                 "discarded": _discard(facts, v.document_id),
                 "upload": _upload(facts, v.document_id),
                 "editorial_correction": _editorial_correction(facts, v.document_id),
+                "query_decision": _query_decision(facts, v.document_id),
             }
             for chain in chains
             for v in chain.versions
@@ -655,6 +674,9 @@ def _build_row(ctx: _Context, case_id: str, language: str) -> dict[str, Any]:
             "override": facts.per_text_overrides.get(key),
         },
         "lead_pause": _lead_pause(ctx, key),
+        "typography_hints": sum(
+            facts.typography_hints.get(chain.newest.document_id, 0) for chain in live
+        ),
         "consolidation_progress": None,
         "unreviewed_translation": steps_rules.unreviewed_translation(
             ctx.step_facts[key]
@@ -1829,9 +1851,13 @@ def case_ids(facts: RowFacts, query: RowQuery) -> tuple[list[str], int, bool]:
 
 
 def sorted_case_ids(facts: RowFacts, case_ids: Sequence[str], sort: str) -> list[str]:
-    """``case_ids`` (deduplicated) in Documents order; unknown IDs last, as given."""
+    """``case_ids`` (deduplicated) in Documents order; unknown IDs last, as given.
+
+    ``sort`` "given" keeps the order of ``case_ids`` (issue 488)."""
     known = {version.case_id for version in facts.versions}
     unique = list(dict.fromkeys(case_ids))
+    if sort == "given":
+        return unique
     ordered = _sort_cases(
         facts, (case_id for case_id in unique if case_id in known), sort
     )

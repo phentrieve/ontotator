@@ -1,5 +1,6 @@
 """``POST document-rows/move-to-front``: selected texts first in the project's
-order, so first in My tasks (issue 339); renumbered positions, one audit."""
+order, their assigned tasks first in My tasks (issue 339; the order of My
+tasks: ``test_task_order.py``); renumbered positions, one audit."""
 
 from __future__ import annotations
 

@@ -72,6 +72,8 @@ def test_a_clean_text_has_no_hints() -> None:
             "a\N{RIGHT-TO-LEFT OVERRIDE}b",
             [("CONTROL_CHARACTER", "\N{RIGHT-TO-LEFT OVERRIDE}")],
         ),
+        ("Kein Fieber.. Husten", [("DOUBLE_FULL_STOP", "..")]),
+        ("Kein Fieber..", [("DOUBLE_FULL_STOP", "..")]),
     ],
 )
 def test_each_rule_reports_the_characters_it_means(
@@ -95,8 +97,25 @@ def test_non_breaking_spaces_are_no_hint(space: str) -> None:
     assert "NON_BREAKING_SPACE" not in TYPOGRAPHY_RULES
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Fieber... Husten",
+        "Fieber.... Husten",
+        "Fieber\N{HORIZONTAL ELLIPSIS} Husten",
+        "Fieber.\N{HORIZONTAL ELLIPSIS}",
+        "Fieber\N{HORIZONTAL ELLIPSIS}.",
+        "siehe ../befund.txt",
+        "siehe ..\\befund.txt",
+        "Fieber. . Husten",
+    ],
+)
+def test_an_ellipsis_or_a_path_is_no_doubled_full_stop(text: str) -> None:
+    assert "DOUBLE_FULL_STOP" not in rules(text)
+
+
 def test_every_rule_code_is_produced() -> None:
-    text = f"A  b ,c\td{NBSP}e{ZWSP}f{SHY}g\x01 \nWort,Wort \n"
+    text = f"A  b ,c\td{NBSP}e{ZWSP}f{SHY}g\x01 \nWort,Wort.. \n"
     assert rules(text) == set(TYPOGRAPHY_RULES)
 
 

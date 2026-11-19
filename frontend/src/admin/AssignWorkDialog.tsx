@@ -180,6 +180,10 @@ function LimitInfo({ projectKey, current, project, texts, textName, onSaved, onF
   </>;
 }
 
+/** Issue 488: in which order a person sees the tasks this dialog creates (My tasks and the editor's next task). */
+export const TASK_ORDER_NOTE = "My tasks lists a person's tasks by status, then in the order of assignment. New tasks come after the tasks the person already has.";
+export const TASK_ORDER_NOTE_TEXTS = "These texts are assigned in the order shown above.";
+
 /** Texts the batch dialog names before "Show all" (issue 129, U4). */
 export const NAMED_TEXTS = 6;
 
@@ -728,6 +732,7 @@ function AssignWorkEditor(props: AssignWorkDialogProps): JSX.Element {
       </InlineConfirm>}
       {me && rowMulti && props.mode === "row" && props.consolidatorRule && <p id={`${id}-rule`} className="assign-muted">If you annotate this text yourself, you cannot consolidate it afterwards (project rule "the consolidator is not an annotator").</p>}
 
+      {task && shown && <p className="assign-muted assign-order-note">{TASK_ORDER_NOTE}{props.mode === "cases" && targetTextNames(shown.targets).length > 1 && ` ${TASK_ORDER_NOTE_TEXTS}`}</p>}
       <div className="assign-summary" role="status" aria-live="polite" aria-label="Summary">{summaryLines.map(line => <p key={line}>{line}</p>)}</div>
 
       {fresh && fresh.targets.length > 0 && (!isRow || randomUseful) && <p className="assign-random"><Button size="sm" disabled={busy} aria-disabled={unacknowledged ? "true" : undefined} aria-describedby={unacknowledged && reason ? reasonId : undefined}

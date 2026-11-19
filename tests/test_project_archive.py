@@ -991,6 +991,95 @@ def test_an_editorial_correction_round_trips(
     assert record(target)[:3] == ("Full stop was missing", previous.document_id, 1)
 
 
+def test_a_query_decision_round_trips(
+    servers: tuple[TestClient, TestClient], tmp_path: Path
+) -> None:
+    """Issue 483: the lead's decision on a queried review travels with the
+    archive: the accepted version, the answer, the review it decides and the
+    lead mapped to their account."""
+    from browser_documents_scenarios_rows import review_translation
+
+    from ontotator.application.query_decisions import (
+        QueryDecisionService,
+        query_decisions,
+    )
+    from ontotator.storage.tables import JobRow, TranslationReviewRow, UserRow
+
+    source, target = servers
+    app: Any = source.app
+    scenario = new_project(app, "arch")
+    english = native_unit(CASE, "en", TEXT, case_id=CASE)
+    german = translation_unit(CASE, "de", GERMAN, source=english)
+    translated = import_texts(scenario, [english, german])[(CASE, "de", 1)]
+    add_user(scenario, "lead", ["lead"])
+    add_user(scenario, "reviewer", ["annotator"], qualification="Physician")
+    lead = app.state.accounts.get_by_username(scenario.users["lead"])
+    queried = review_translation(scenario, translated, "reviewer", "query")
+    previous = app.state.repo.get_variant(scenario.key, translated)
+    saved = QueryDecisionService(_db(source), app.state.jobs).decide(
+        Actor.user(lead.id, lead.username),
+        scenario.key,
+        previous.document_id,
+        kind="reviewer_text",
+        expected_text_sha256=previous.text_sha256,
+        expected_review_id=queried.id,
+        text=GERMAN + " Geprüft.",
+        answer="Taken with one addition.",
+    )
+    # The decision queued the re-anchoring of proposals; an archive waits.
+    with _db(source).snapshot() as conn:
+        (job_id,) = conn.execute(
+            select(JobRow.id).where(JobRow.kind == "reanchor")
+        ).scalars()
+    jobs = app.state.jobs
+    assert jobs.run(jobs.claim(job_id, "archive-test"), "archive-test").status == (
+        "succeeded"
+    )
+    data = _export(source, scenario.key, tmp_path)
+
+    result = project_archive.import_archive(_db(target), OPERATOR, data)
+
+    assert result["verification"]["ok"], result["verification"]
+    assert _counts(_db(target), scenario.key) == _counts(_db(source), scenario.key)
+
+    def record(client: TestClient) -> tuple[Any, ...]:
+        with _db(client).snapshot() as conn:
+            pid = conn.execute(
+                select(ProjectRow.id).where(ProjectRow.project_key == scenario.key)
+            ).scalar_one()
+            row = query_decisions(conn, pid)[saved["document_id"]]
+            lead_pseudonym = conn.execute(
+                select(UserRow.pseudonym).where(UserRow.id == row["decided_by"])
+            ).scalar_one()
+            # The review the decision names is the project's own review.
+            review = conn.execute(
+                select(
+                    TranslationReviewRow.project_id, TranslationReviewRow.decision
+                ).where(TranslationReviewRow.id == row["review_id"])
+            ).one()
+        return (
+            row["kind"],
+            row["answer"],
+            row["edited"],
+            row["document_id"],
+            row["reviewed_document_id"],
+            row["decided_at"],
+            lead_pseudonym,
+            review.project_id == pid,
+            review.decision,
+        )
+
+    assert record(target) == record(source)
+    assert record(target)[:5] == (
+        "reviewer_text",
+        "Taken with one addition.",
+        True,
+        previous.document_id,
+        previous.document_id,
+    )
+    assert record(target)[7:] == (True, "query")
+
+
 def test_an_uploaded_translation_version_round_trips(
     servers: tuple[TestClient, TestClient], tmp_path: Path
 ) -> None:

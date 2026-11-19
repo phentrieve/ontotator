@@ -11,7 +11,7 @@ const snapshot = structuredClone(historical.annotations[0]);
 const evidence = { mention: { evidence_id: "ev-1", segments: [{ start: 8, end: 11 }], cue_segments: [] }, document_id: "target", text_sha256: "text", version: "ev-v1" };
 const withSpan = { ...snapshot, evidence: [evidence], annotation: { ...snapshot.annotation, evidence_refs: [{ evidence_id: "ev-1", version: "ev-v1" }] } };
 const plainDetail: SubmissionHistoryDetail = {
-  summary: { submission_id: "sub-plain", document_id: "target", author_label: "alice", created_at: "2026-10-19T00:16:00Z", mode: "independent", round_id: "round-1", guideline_withdrawn: false },
+  summary: { submission_id: "sub-plain", document_id: "target", author_label: "alice", is_me: true, created_at: "2026-10-19T00:16:00Z", mode: "independent", round_id: "round-1", guideline_withdrawn: false },
   annotations: [withSpan], evidence: [], decisions: [], checked_layer_ids: [], document_checked: true, reanchor_inputs: [], reanchor_resolutions: [], round_inputs: [], round_input_resolutions: [],
 };
 
@@ -20,7 +20,7 @@ const input = (id: string, source: typeof snapshot, target: typeof snapshot | nu
   source_ref: { annotation_id: source.annotation.annotation_id, version: source.version }, source_snapshot: source, target_snapshot: target,
   mapping_status: "carried" as const, source_round_ordinal: 2 });
 const carryDetail: SubmissionHistoryDetail = {
-  summary: { submission_id: "sub-carried", document_id: "target", author_label: "alice", created_at: "2026-10-19T00:57:00Z", mode: "independent", round_id: "round-3", guideline_withdrawn: false },
+  summary: { submission_id: "sub-carried", document_id: "target", author_label: "alice", is_me: true, created_at: "2026-10-19T00:57:00Z", mode: "independent", round_id: "round-3", guideline_withdrawn: false },
   annotations: [snapshot], evidence: [evidence], decisions: [], checked_layer_ids: ["phenotype"], document_checked: false,
   reanchor_inputs: [], reanchor_resolutions: [],
   round_inputs: [input("in-1", snapshot, snapshot), input("in-2", gone, null)],

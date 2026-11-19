@@ -1,13 +1,13 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { api } from '../src/api/client';
-import { SubmissionHistory, type SubmissionHistoryProps } from '../src/variants/SubmissionHistory';
+import { OTHERS_INTRO, SubmissionHistory, type SubmissionHistoryProps } from '../src/variants/SubmissionHistory';
 import { refKey } from '../src/variants/versionState';
 import { final, group, page, row, submission, submissions } from './documents/fixtures';
 import { historical } from './variantFixtures';
 import { guidelineListing, guidelineSummary } from './projectFixtures';
 
-const summary = { submission_id: 'immutable/submission', document_id: 'target', author_label: 'Reader A',
+const summary = { submission_id: 'immutable/submission', document_id: 'target', author_label: 'Reader A', is_me: true,
   created_at: '2026-10-18T12:00:00Z', mode: 'independent' as const, round_id: null, guideline_withdrawn: false };
 const detail = { summary, annotations: historical.annotations, evidence: [], decisions: [], checked_layer_ids: [], document_checked: false,
   reanchor_inputs: [], reanchor_resolutions: [], round_inputs: [], round_input_resolutions: [] };
@@ -64,10 +64,36 @@ it('shows non-leads only their own submissions without the Final column and link
   expect(api.listDocumentRows).not.toHaveBeenCalled();
   expect(within(table).queryByRole('columnheader', { name: 'Final' })).toBeNull();
   expect(within(table).getAllByText('Reader A (you)')).toHaveLength(2);
+  expect(screen.getByText('Your submitted results for this text version. Results are read-only; choose a round to open it in the viewer.')).toBeTruthy();
   expect(within(table).getAllByRole('cell', { name: String(historical.annotations.length) })).toHaveLength(2);
   fireEvent.click(within(table).getAllByRole('link')[0]);
   expect(onNavigate).toHaveBeenCalledWith({ name: 'projectCase', key: 'pkg', caseId: 'case 1', variant: 'target',
     annotations: refKey({ kind: 'own', id: 'immutable/submission' }) });
+});
+
+// Issue 470: a consolidator who is not the lead also gets the submissions of their round.
+it('does not mark or link another person\'s submission for a non-lead, and says whose results these are', async () => {
+  vi.mocked(api.listSubmissionHistory).mockResolvedValue([
+    { ...summary, submission_id: 'input-a', author_label: 'ann-0001', is_me: false },
+    { ...summary, submission_id: 'input-b', author_label: 'Annotator B', is_me: false, created_at: '2026-10-18T12:30:00Z' },
+    { ...summary, submission_id: 'mine', author_label: 'adj-0003', mode: 'review' as const, round_id: 'round-1', created_at: '2026-10-18T13:00:00Z' },
+  ]);
+  const onNavigate = vi.fn();
+  render(<SubmissionHistory {...base} onNavigate={onNavigate} />);
+  const table = await openHistory();
+  expect(within(table).getByText('ann-0001')).toBeTruthy();
+  expect(within(table).getByText('Annotator B')).toBeTruthy();
+  expect(within(table).getByText('adj-0003 (you)')).toBeTruthy();
+  expect(within(table).queryByText(/^(ann-0001|Annotator B) \(you\)$/)).toBeNull();
+  const links = within(table).getAllByRole('link');
+  expect(links).toHaveLength(1);
+  fireEvent.click(links[0]);
+  expect(onNavigate).toHaveBeenCalledWith({ name: 'projectCase', key: 'pkg', caseId: 'case 1', variant: 'target', annotations: refKey({ kind: 'own', id: 'mine' }) });
+  cleanup();
+  render(<SubmissionHistory {...base} />);
+  await openHistory();
+  expect(screen.getByText(OTHERS_INTRO)).toBeTruthy();
+  expect(screen.queryByText(/^Your submitted results/)).toBeNull();
 });
 
 it('ignores late replies after account or exact document replacement', async () => {

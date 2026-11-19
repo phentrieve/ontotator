@@ -801,6 +801,9 @@ def build_submissions(
                 "finding_count": int(row.findings),
                 "author": people[row.annotator_id],
                 "guideline_version": row.guideline_version,
+                "guideline_label": facts[row.guideline_version].label
+                if row.guideline_version is not None
+                else None,
                 "guideline_withdrawn": row.guideline_version is not None
                 and facts[row.guideline_version].withdrawn,
                 "kept_automatically": kept.get(row.submission_id, 0),

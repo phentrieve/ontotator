@@ -157,6 +157,23 @@ export function checkExplanation(code: string): string {
   return Object.hasOwn(checkExplanations, code) ? checkExplanations[code] : unknownCheckExplanation;
 }
 
+/**
+ * Ontotator's own check of the reviewed version (issue 484): more passages in brackets than the source has. It is
+ * no check of the translation run: it is not counted with them and asks for no rationale.
+ */
+export const addedBrackets = {
+  band: "More passages in brackets than in the source:",
+  counts: (translation: number, source: number): string => `${translation} in the translation, ${source} in the source`,
+  title: "Passages in brackets added in translation",
+  explanation: "Ontotator compared this version with the source. A translation sometimes adds a second name in brackets, for example a lay term followed by the Latin or English term. One finding is then named twice. Found:",
+  passagesTerm: "Passages in brackets that the source does not have in this form",
+  truncated: "There are more; only the first ones are listed.",
+  addedTerm: "If the translation added a passage",
+  addedAdvice: "Remove it and choose Accepted with corrections. If you are not sure, choose Query with the category Addition.",
+  rightTerm: "If the passages are right",
+  rightAdvice: "Decide as usual. This check asks for no rationale.",
+} as const;
+
 export function failedChecksTitle(count: number): string {
   return count === 1 ? "1 automatic check failed" : `${count} automatic checks failed`;
 }
