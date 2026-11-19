@@ -573,4 +573,4 @@ What for: see the whole project at a glance.
 
 ![The Progress page with the stage cards and the People table](images/lead-progress.png)
 
-Click **Refresh progress** to update.
+Click **Refresh progress** to update. **Translation reviews** next to it opens the list of all translation reviews of the project, with reviewer, decision and rationale ([Read the translation reviews of a project](lead-results.md#read-the-translation-reviews-of-a-project)).
