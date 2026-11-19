@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { importPackage, loginAs, openCase, selectText } from "./helpers";
+import { importPackage, loginAs, loginExisting, openCase, selectText, submitCase, viewSubmittedResult } from "./helpers";
 
 // The fixture document is "Hypotonia and seizure. A😀é\r\nB": "Hypotonia" 0-9, "and" 10-13, "seizure" 14-21, "B" 30-31.
 // With proposals, "Hypotonia" (HP:0001252) and "seizure" (HP:0001250) are proposals to check.
@@ -10,6 +10,9 @@ const SEIZURE = "HP:0001250";
 const NERVOUS_SYSTEM = "HP:0000707";
 const AREFLEXIA = "HP:0001284";
 const HEARING = "HP:0000365";
+const HYPOTONIA = "HP:0001252";
+const LOOK_NOTE = "Only looking: nothing can be changed from here.";
+const CHOOSE_NOTE = "Only looking: nothing changes until you choose a term and confirm.";
 
 const revision = (page: Page) => page.locator(".status-badge");
 const search = (page: Page) => page.getByLabel("Search term", { exact: true });
@@ -153,7 +156,7 @@ test.describe("copy the marked text", () => {
 });
 
 test.describe("the open tree follows the selection", () => {
-  test("another own finding restarts it, a proposal or no selection closes it, a new finding sets it aside", async ({ page }) => {
+  test("another finding or a proposal restarts it, no selection closes it, a new finding sets it aside", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 1200 });
     await importPackage(page, "", FIXTURE, "tree-follow", { proposals: true });
     await openCase(page, { task: "annotate" });
@@ -177,26 +180,28 @@ test.describe("the open tree follows the selection", () => {
     await page.waitForTimeout(300);
     expect(opens).toEqual([HEARING, AREFLEXIA]);
 
-    // A proposal: nothing to assign there, the tree closes.
-    await page.locator(".sidebar .doc-item").filter({ hasText: "HP:0001252" }).click();
+    // A proposal (issue 523): the tree moves to the proposed term, only to look until a term is confirmed.
+    await page.locator(".sidebar .doc-item").filter({ hasText: HYPOTONIA }).click();
     await expect(page.getByLabel(/Proposal details/i)).toBeVisible();
-    await expect(panel).toHaveCount(0);
-    await expect(page.locator(".tree-host")).toHaveCount(0);
+    await expect(treeItem(page, HYPOTONIA)).toHaveAttribute("aria-current", "true");
+    await expect(panel.getByRole("status")).toHaveText(CHOOSE_NOTE);
+    await expect(panel.getByRole("button", { name: "Use this term", exact: true })).toHaveCount(0);
 
-    // Back on an own finding it stays closed until "Show in tree".
+    // Back on an own finding it follows there and assigns directly again.
     await own(AREFLEXIA).click();
-    await page.waitForTimeout(300);
-    await expect(panel).toHaveCount(0);
-    await showInTree(page).click();
     await expect(treeItem(page, AREFLEXIA)).toHaveAttribute("aria-current", "true");
+    await expect(panel.getByRole("status")).toHaveCount(0);
+    await expect(panel.getByRole("button", { name: "Use this term", exact: true })).toBeVisible();
 
-    // No selection closes it too.
+    // No selection closes it.
     await page.getByRole("button", { name: "Clear selection" }).click();
     await expect(panel).toHaveCount(0);
     await own(HEARING).click();
+    await page.waitForTimeout(300);
+    await expect(panel).toHaveCount(0);
     await showInTree(page).click();
     await expect(treeItem(page, HEARING)).toHaveAttribute("aria-current", "true");
-    expect(opens).toEqual([HEARING, AREFLEXIA, AREFLEXIA, HEARING]);
+    expect(opens).toEqual([HEARING, AREFLEXIA, HYPOTONIA, AREFLEXIA, HEARING]);
 
     // A new finding sets it aside; Esc discards that, and the tree is back on the same walk.
     await selectText(page, 14, 21);
@@ -207,7 +212,7 @@ test.describe("the open tree follows the selection", () => {
     await page.keyboard.press("Escape");
     await expect(panel).toBeVisible();
     await expect(treeItem(page, HEARING)).toHaveAttribute("aria-current", "true");
-    expect(opens).toHaveLength(4);
+    expect(opens).toHaveLength(5);
 
     // "Use this term": the tree stays open and marks the new term as current, without a new walk.
     await own(AREFLEXIA).click();
@@ -220,7 +225,7 @@ test.describe("the open tree follows the selection", () => {
     await expect(treeItem(page, AREFLEXIA)).not.toHaveAttribute("aria-current", "true");
     await expect(page.locator(".inspector-pane h2")).toContainText(NERVOUS_SYSTEM);
     await page.waitForTimeout(300);
-    expect(opens).toEqual([HEARING, AREFLEXIA, AREFLEXIA, HEARING, AREFLEXIA]);
+    expect(opens).toEqual([HEARING, AREFLEXIA, HYPOTONIA, AREFLEXIA, HEARING, AREFLEXIA]);
 
     // Escape in the tree widget closes it; the finding stays selected.
     await treeItem(page, NERVOUS_SYSTEM).click();
@@ -229,7 +234,7 @@ test.describe("the open tree follows the selection", () => {
     await expect(page.locator(".inspector-pane h2")).toContainText(NERVOUS_SYSTEM);
   });
 
-  test("a reference closes the tree, and so does moving to another text", async ({ page }) => {
+  test("a reference moves the tree there to look; moving to another text closes it", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 1200 });
     await loginAs(page, "tree-follow-ref", [SCENARIO_B], { proposals: true });
     await page.goto(`/#/?project=${SCENARIO_B}`);
@@ -239,12 +244,14 @@ test.describe("the open tree follows the selection", () => {
 
     await showInTree(page).click();
     await expect(treeItem(page, SEIZURE)).toHaveAttribute("aria-current", "true");
-    await page.getByRole("button", { name: /MONDO:0005027/ }).click();
+    await page.getByRole("button", { name: /MONDO:0000001/ }).click();
     await expect(page.getByLabel(/Reference details/i)).toBeVisible();
-    await expect(panel).toHaveCount(0);
+    await expect(treeItem(page, "MONDO:0000001")).toHaveAttribute("aria-current", "true");
+    await expect(panel.getByRole("status")).toHaveText(LOOK_NOTE);
+    await expect(panel.getByRole("button", { name: /Use this term/ })).toHaveCount(0);
 
     await ownAnnotations(page).first().click();
-    await showInTree(page).click();
+    await expect(treeItem(page, SEIZURE)).toHaveAttribute("aria-current", "true");
     await expect(panel).toBeVisible();
     await page.locator(".case-navigation").getByRole("button", { name: /Next text/i }).click();
     await expect(page.locator(".case-navigation select option:checked")).toHaveText(/Text 2 of 2/i);
@@ -377,7 +384,7 @@ for (const size of SIZES) {
       expect(errors).toEqual([]);
     });
 
-    test("the tree closes on a proposal and on no selection; 'Show in tree' opens it again", async ({ page }) => {
+    test("the tree follows to a proposal to look and closes on no selection; 'Show in tree' opens it again", async ({ page }) => {
       const errors = consoleErrors(page);
       await importPackage(page, "", FIXTURE, `tree-${size.name}`, { proposals: true });
       await openCase(page, { task: "annotate" });
@@ -391,16 +398,14 @@ for (const size of SIZES) {
       await page.locator(".sidebar .doc-item").filter({ hasText: "HP:0001252" }).click();
       await pane(page, "Details");
       await expect(page.getByLabel(/Proposal details/i)).toBeVisible();
-      await expect(treePanel(page)).toHaveCount(0);
-      await expect(page.locator(".tree-host")).toHaveCount(0);
-      await shot(page, `${size.name}-tree-closed-proposal`);
+      await expect(treeItem(page, HYPOTONIA)).toHaveAttribute("aria-current", "true");
+      await expect(treePanel(page).getByRole("status")).toHaveText(CHOOSE_NOTE);
+      await shot(page, `${size.name}-tree-proposal`);
 
       await pane(page, "Findings");
       await ownAnnotations(page).filter({ hasText: HEARING }).click();
       await pane(page, "Details");
       await expect(page.locator(".inspector-pane h2")).toContainText(HEARING);
-      await expect(treePanel(page)).toHaveCount(0);
-      await showInTree(page).click();
       await expect(treeItem(page, HEARING)).toHaveAttribute("aria-current", "true");
 
       await page.getByRole("button", { name: "Clear selection" }).click();
@@ -417,7 +422,7 @@ for (const size of SIZES) {
       expect(errors).toEqual([]);
     });
 
-    test("the tree closes on a reference; 'Show in tree' opens it again", async ({ page }) => {
+    test("the tree follows to a reference to look; 'Show in tree' opens it again", async ({ page }) => {
       const errors = consoleErrors(page);
       await loginAs(page, `tree-ref-${size.name}`, [SCENARIO_B], { proposals: true });
       await page.goto(`/#/?project=${SCENARIO_B}`);
@@ -428,13 +433,16 @@ for (const size of SIZES) {
       await expect(treeItem(page, SEIZURE)).toHaveAttribute("aria-current", "true");
 
       await pane(page, "Findings");
-      await page.getByRole("button", { name: /MONDO:0005027/ }).click();
+      await page.getByRole("button", { name: /MONDO:0000001/ }).click();
       await pane(page, "Details");
       await expect(page.getByLabel(/Reference details/i)).toBeVisible();
-      await expect(treePanel(page)).toHaveCount(0);
-      await expect(page.locator(".tree-host")).toHaveCount(0);
-      await shot(page, `${size.name}-tree-closed-reference`);
+      await expect(treeItem(page, "MONDO:0000001")).toHaveAttribute("aria-current", "true");
+      await expect(treePanel(page).getByRole("status")).toHaveText(LOOK_NOTE);
+      await expect(treePanel(page).getByRole("button", { name: /Use this term/ })).toHaveCount(0);
+      await shot(page, `${size.name}-tree-reference`);
 
+      await page.keyboard.press("Escape");
+      await expect(treePanel(page)).toHaveCount(0);
       await pane(page, "Findings");
       await ownAnnotations(page).first().click();
       await pane(page, "Details");
@@ -444,6 +452,142 @@ for (const size of SIZES) {
       await expect(treeItem(page, SEIZURE)).toHaveAttribute("aria-current", "true");
       await expectNoSidewaysScroll(page);
       expect(errors).toEqual([]);
+    });
+  });
+
+  // Issue 523: the tree opens only to look from a proposal, a search hit, a reference and a submitted finding;
+  // a term is taken from it only after a confirmation that says what happens.
+  test.describe(`${size.width} px: the tree only to look`, () => {
+    test.beforeEach(async ({ page }) => { await page.setViewportSize({ width: size.width, height: size.height }); });
+    const take = (page: Page) => treePanel(page).getByRole("button", { name: "Use this term instead…" });
+
+    test("an undecided proposal: look at its neighbours, then confirm another term: decided as Changed", async ({ page }) => {
+      const errors = consoleErrors(page);
+      await importPackage(page, "", FIXTURE, `look-proposal-${size.name}`, { proposals: true });
+      await openCase(page, { task: "annotate" });
+      await pane(page, "Findings");
+      await page.locator(".sidebar .doc-item").filter({ hasText: HYPOTONIA }).click();
+      await pane(page, "Details");
+      await page.getByLabel(/Proposal details/i).getByRole("button", { name: "Show in tree" }).click();
+      await expect(treeItem(page, HYPOTONIA)).toHaveAttribute("aria-current", "true");
+      await expect(treePanel(page).getByRole("status")).toHaveText(CHOOSE_NOTE);
+      await expect(take(page)).toBeDisabled();
+
+      // Looking changes nothing.
+      await treeItem(page, AREFLEXIA).click();
+      await expect(treePanel(page).locator(".tree-detail__name")).toHaveText("Areflexia");
+      await expect(revision(page)).toHaveAttribute("title", "Revision 0");
+      await shot(page, `${size.name}-look-proposal`);
+
+      // The confirmation says what happens, takes the focus, and Cancel changes nothing.
+      await take(page).click();
+      const confirm = treePanel(page).getByRole("group", { name: `Proposal: decide as Changed with Areflexia (${AREFLEXIA})` });
+      await expect(confirm).toBeVisible();
+      await expect(confirm.getByRole("button", { name: "Confirm" })).toBeFocused();
+      await shot(page, `${size.name}-look-proposal-confirm`);
+      await page.keyboard.press("Escape");
+      await expect(confirm).toHaveCount(0);
+      await expect(take(page)).toBeFocused();
+      await expect(revision(page)).toHaveAttribute("title", "Revision 0");
+
+      // From the keyboard: Enter opens the confirmation, Enter confirms.
+      await page.keyboard.press("Enter");
+      await expect(confirm.getByRole("button", { name: "Confirm" })).toBeFocused();
+      await page.keyboard.press("Enter");
+      await expect(page.getByText(/^Your replacement for the proposal/)).toBeVisible();
+      await expect(page.locator(".inspector-pane h2")).toContainText(AREFLEXIA);
+      // The tree stays with the copy, which now takes a term directly.
+      await expect(treeItem(page, AREFLEXIA)).toHaveAttribute("aria-current", "true");
+      await expect(treePanel(page).getByRole("status")).toHaveCount(0);
+      await expect(treePanel(page).getByRole("button", { name: "Use this term", exact: true })).toBeDisabled();
+      await pane(page, "Findings");
+      await expect(page.locator(".sidebar .doc-item").filter({ hasText: HYPOTONIA }).first()).toContainText("Replaced");
+      await shot(page, `${size.name}-look-proposal-changed`);
+      expect(errors).toEqual([]);
+    });
+
+    test("a search hit of a new finding: look in the tree, then confirm a term: the finding gets it", async ({ page }) => {
+      const errors = consoleErrors(page);
+      await importPackage(page, "", FIXTURE, `look-new-${size.name}`);
+      await openCase(page, { task: "annotate" });
+      await selectText(page, 14, 21);
+      if (phone) await page.getByRole("group", { name: "New finding", exact: true }).getByRole("button", { name: "Choose term", exact: true }).click();
+      await search(page).fill("Seizure");
+      // The button belongs to the active hit; the pointer makes a hit active.
+      await page.getByRole("option", { name: /^Seizure HP:0001250/ }).hover();
+      await page.getByRole("button", { name: "Show in tree: Seizure" }).click();
+      await expect(treeItem(page, SEIZURE)).toHaveAttribute("aria-selected", "true");
+      await expect(treePanel(page).getByRole("status")).toHaveText(CHOOSE_NOTE);
+      // The search stays: the tree is beside it, not instead of it.
+      await expect(search(page)).toBeAttached();
+      await shot(page, `${size.name}-look-new`);
+
+      await treeItem(page, "HP:0011146").click();
+      await expect(treePanel(page).locator(".tree-detail__name")).toHaveText("Dialeptic seizure");
+      await expect(revision(page)).toHaveAttribute("title", "Revision 0");
+      await take(page).click();
+      const confirm = treePanel(page).getByRole("group", { name: "New finding: choose Dialeptic seizure (HP:0011146)" });
+      await expect(confirm.getByRole("button", { name: "Confirm" })).toBeFocused();
+      await shot(page, `${size.name}-look-new-confirm`);
+      await confirm.getByRole("button", { name: "Confirm" }).click();
+      await expect(revision(page)).toHaveAttribute("title", "Revision 1");
+      await expect(ownAnnotations(page)).toHaveCount(1);
+      await expect(ownAnnotations(page)).toContainText("HP:0011146");
+      await expect(treeItem(page, "HP:0011146")).toHaveAttribute("aria-current", "true");
+      await expect(treePanel(page).getByRole("button", { name: "Use this term", exact: true })).toBeVisible();
+      expect(errors).toEqual([]);
+    });
+
+    test("a submitted own finding: the tree only shows terms, with no button", async ({ page }) => {
+      await importPackage(page, "", FIXTURE, `look-submitted-${size.name}`);
+      await openCase(page, { task: "annotate" });
+      await annotateHere(page, 14, 21, "Seizure", SEIZURE);
+      // The submit's first answer can be the 422 of the unconfirmed values: errors count from here on.
+      await submitCase(page);
+      await viewSubmittedResult(page);
+      const errors = consoleErrors(page);
+      await pane(page, "Findings");
+      await ownAnnotations(page).first().click();
+      await pane(page, "Details");
+      await showInTree(page).click();
+      await expect(treeItem(page, SEIZURE)).toHaveAttribute("aria-current", "true");
+      await expect(treePanel(page).getByRole("status")).toHaveText(LOOK_NOTE);
+      await treeItem(page, "HP:0011146").click();
+      await expect(treePanel(page).locator(".tree-detail__name")).toHaveText("Dialeptic seizure");
+      await expect(treePanel(page).getByRole("button", { name: /Use this term/ })).toHaveCount(0);
+      await shot(page, `${size.name}-look-submitted`);
+      expect(errors).toEqual([]);
+    });
+
+    test("other people's findings in a blinded consolidation: only to look, and no names", async ({ page }) => {
+      test.setTimeout(240_000);
+      const response = await page.request.post("/__test_consolidation__", { params: { started: "true", blind: "true" }, timeout: 120_000 });
+      expect(response.ok(), await response.text()).toBeTruthy();
+      const scenario = await response.json() as { users: Record<string, string>; pseudonyms: Record<string, string>; assignment_id: number };
+      const secrets = ["ann-0001", "ann-0002"].flatMap(name => [scenario.users[name], scenario.pseudonyms[name]]);
+      const leaks: string[] = [];
+      page.on("response", async answer => {
+        if (!new URL(answer.url()).pathname.startsWith("/api/v1/terms/tree/")) return;
+        const body = await answer.text().catch(() => "");
+        for (const secret of secrets) if (body.includes(secret)) leaks.push(`${answer.url()}: ${secret}`);
+      });
+      await loginExisting(page, scenario.users.adj);
+      await page.goto(`/#/tasks/${scenario.assignment_id}`);
+      await expect(page.getByRole("heading", { level: 1, name: /^Consolidate / })).toBeVisible({ timeout: 30_000 });
+      await page.getByRole("button", { name: "Open in full editor", exact: true }).click();
+      await pane(page, "Findings");
+      await expect(page.getByText(/^Selected submitted findings \([1-9]\d*\)$/)).toBeVisible({ timeout: 30_000 });
+      await page.locator('.sidebar [data-list-key^="target:"]').first().click();
+      await pane(page, "Details");
+      await page.getByLabel(/Proposal details/i).getByRole("button", { name: "Show in tree" }).click();
+      await expect(treePanel(page).getByRole("status")).toHaveText(LOOK_NOTE);
+      await expect(treePanel(page).locator(".tree-detail__name")).not.toHaveText("");
+      await expect(treePanel(page).getByRole("button", { name: /Use this term/ })).toHaveCount(0);
+      const opened = await page.evaluate(() => document.querySelector(".tree-host")?.textContent ?? "");
+      expect(secrets.filter(secret => opened.includes(secret))).toEqual([]);
+      expect(await page.locator("body").innerText().then(text => secrets.filter(secret => text.includes(secret)))).toEqual([]);
+      await shot(page, `${size.name}-look-consolidation`);
+      expect(leaks).toEqual([]);
     });
   });
 }
