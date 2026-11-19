@@ -243,6 +243,24 @@ def _editorial_correction(facts: RowFacts, document_id: str) -> dict[str, Any] |
     }
 
 
+def _query_decision(facts: RowFacts, document_id: str) -> dict[str, Any] | None:
+    """The lead's decision on a query that accepted a version (issue 483)."""
+    record = facts.query_decisions.get(document_id)
+    if record is None:
+        return None
+    decided_by = record["decided_by"]
+    return {
+        "kind": record["kind"],
+        "decided_document_id": record["document_id"],
+        "reviewed_document_id": record["reviewed_document_id"],
+        "reviewer_assignment_id": record["assignment_id"],
+        "answer": record["answer"],
+        "edited": record["edited"],
+        "decided_at": record["decided_at"],
+        "decided_by": facts.people.get(decided_by) if decided_by else None,
+    }
+
+
 def _report(facts: RowFacts, report_id: str | None) -> dict[str, Any] | None:
     fact = facts.reports.get(report_id) if report_id is not None else None
     if fact is None:
@@ -575,6 +593,7 @@ def _build_row(ctx: _Context, case_id: str, language: str) -> dict[str, Any]:
                 "discarded": _discard(facts, v.document_id),
                 "upload": _upload(facts, v.document_id),
                 "editorial_correction": _editorial_correction(facts, v.document_id),
+                "query_decision": _query_decision(facts, v.document_id),
             }
             for chain in chains
             for v in chain.versions

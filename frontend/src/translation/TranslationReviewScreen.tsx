@@ -20,7 +20,7 @@ import { ChecksSummary, ReviewSummary, SubmitSummary } from "./ReviewParts";
 import { ReviewForm } from "./ReviewForm";
 import { TypographyHintsNote } from "./typographyHints";
 import { taskText } from "../app/identity";
-import { LeadReason } from "../tasks/LeadReason";
+import { LeadReason, QueryAnswer } from "../tasks/LeadReason";
 import { autoNoteText, chooseDecision, reactToTextEdit, USER_ORIGIN, type DecisionState } from "./decisionOrigin";
 import { acceptedCorrection, annotateThisTextLabel, categoryLabels, comparisonCountsDiffer, couplingEditingNote, couplingNote, decisionConsequence, decisionKeyHint, decisionLabels, decisionOutcomes, formatReviewDate, issueMessages, languageName, leadCorrectionKeyHint, leadCorrectionNote, matchingParagraphStatus, nextTaskLabel, paragraphCountChanged, paragraphCountsDiffer, remainingTasksText, reviewIssueMessage, showMatchingLabel, showMatchingShortcut, showMatchingTitle, translationNote, versionOriginRows } from "./labels";
 import { checkReview, type ClinicalCategory, type ReviewDecisionCode, type ReviewForm as FormValue } from "./reviewRules";
@@ -880,6 +880,8 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
           </div>
           {/* Why the lead asked for this review, where the reviewer decides; a reopen only until it is submitted again. */}
           <LeadReason task={{ ...workspace, status: record ? "submitted" : workspace.assignment.status }} />
+          {/* Issue 483: the lead's decision on this submitted query, with the answer. */}
+          {record && <QueryAnswer answer={workspace.query_answer} />}
           <SourceObligationReview assignmentId={props.assignmentId} username={props.username} documentId={workspace.variant.document_id}
             translationText={text} canResolve={canSubmit && !!form && ['accepted_unchanged', 'accepted_corrected'].includes(form.decision)}
             busy={busy} readOnly={readOnly} error={error} onResolve={submit} onPending={setPendingSourceUpdates} openRef={openSourceUpdate} />

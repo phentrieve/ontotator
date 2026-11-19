@@ -2388,6 +2388,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{key}/documents/{doc}/query-decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Query Decision
+         * @description Issue 483, read only: the queried review of this version with the
+         *     reviewer's proposed text, this version's text and whether a lead can
+         *     decide the query.
+         */
+        get: operations["preview_query_decision_api_v1_projects__key__documents__doc__query_decision_get"];
+        put?: never;
+        /**
+         * Decide Query
+         * @description Issue 483: close a queried translation review as the lead: take the
+         *     reviewer's text as the next version, accepted, or accept this version as
+         *     it is; with an answer the reviewer reads at their submitted task.
+         */
+        post: operations["decide_query_api_v1_projects__key__documents__doc__query_decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/translation-reviews/{assignment_id}/source-obligations": {
         parameters: {
             query?: never;
@@ -6520,6 +6548,7 @@ export interface components {
             discarded?: components["schemas"]["VersionDiscardView"] | null;
             upload?: components["schemas"]["VersionUploadView"] | null;
             editorial_correction?: components["schemas"]["VersionEditorialCorrectionView"] | null;
+            query_decision?: components["schemas"]["VersionQueryDecisionView"] | null;
         };
         /**
          * DocumentsSummaryView
@@ -9694,6 +9723,152 @@ export interface components {
             /** Assessment */
             assessment?: string | null;
         };
+        /**
+         * QueriedReviewView
+         * @description The translation review submitted as a query that the lead decides.
+         */
+        QueriedReviewView: {
+            /** Id */
+            id: number;
+            /** Assignment Id */
+            assignment_id: number;
+            /** Document Id */
+            document_id: string;
+            /** Version */
+            version: number;
+            /** Rationale */
+            rationale: string | null;
+            /** Categories */
+            categories: ("omission" | "addition" | "assertion" | "value" | "anatomy" | "terminology" | "source")[];
+            /** Proposed Text */
+            proposed_text: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * QueryAnswer
+         * @description The lead's decision on the reviewer's query (issue 483), as the
+         *     reviewer reads it at the submitted task.
+         *
+         *     ``reviewer_text``: the proposed text became version
+         *     ``accepted_version`` (``edited``: the lead changed it before saving);
+         *     ``unchanged``: the reviewed version (or its typo fix) was accepted as it
+         *     is. ``answer`` is what the lead wrote.
+         */
+        QueryAnswer: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "reviewer_text" | "unchanged";
+            /** Accepted Version */
+            accepted_version: number;
+            /**
+             * Decided At
+             * Format: date-time
+             */
+            decided_at: string;
+            /** Answer */
+            answer?: string | null;
+            /**
+             * Edited
+             * @default false
+             */
+            edited: boolean;
+        };
+        /**
+         * QueryDecisionPreview
+         * @description Issue 483, read only: the query a lead decides at this version.
+         */
+        QueryDecisionPreview: {
+            /** Document Id */
+            document_id: string;
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Version */
+            version: number;
+            /** Next Version */
+            next_version: number;
+            /** Translation Status */
+            translation_status: string | null;
+            /** Text Sha256 */
+            text_sha256: string;
+            /** Text */
+            text: string;
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason: string | null;
+            review: components["schemas"]["QueriedReviewView"] | null;
+            /** Proposes Changes */
+            proposes_changes: boolean;
+            /** Review On */
+            review_on: boolean;
+            /** Annotate Accepted Only */
+            annotate_accepted_only: boolean;
+            annotations: components["schemas"]["LeadCorrectionAnnotationsView"];
+            /** Open Consolidations */
+            open_consolidations: number;
+            /** Final Result */
+            final_result: boolean;
+        };
+        /**
+         * QueryDecisionRequest
+         * @description Issue 483: the lead's decision on a queried translation review.
+         *
+         *     ``reviewer_text``: ``text`` (the reviewer's proposed text, as the lead
+         *     confirmed it) becomes the next version, accepted. ``unchanged``: the
+         *     version is accepted as it is, and ``answer`` is required.
+         */
+        QueryDecisionRequest: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "reviewer_text" | "unchanged";
+            /** Expected Text Sha256 */
+            expected_text_sha256: string;
+            /** Expected Review Id */
+            expected_review_id: number;
+            /** Text */
+            text?: string | null;
+            /** Answer */
+            answer?: string | null;
+        };
+        /** QueryDecisionResult */
+        QueryDecisionResult: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "reviewer_text" | "unchanged";
+            /** Document Id */
+            document_id: string;
+            /** Version */
+            version: number;
+            /** Decided Document Id */
+            decided_document_id: string;
+            /** Decided Version */
+            decided_version: number;
+            /**
+             * Translation Status
+             * @constant
+             */
+            translation_status: "accepted";
+            /** Text Sha256 */
+            text_sha256: string;
+            /** Edited */
+            edited: boolean;
+        };
         /** ReanchorItem */
         ReanchorItem: {
             /** Proposal Set Id */
@@ -10040,6 +10215,7 @@ export interface components {
             reopened_at?: string | null;
             /** Reopen Reason */
             reopen_reason?: string | null;
+            query_answer?: components["schemas"]["QueryAnswer"] | null;
             added_brackets?: components["schemas"]["BracketCheck"] | null;
         };
         /** RevokedAssignmentView */
@@ -11067,6 +11243,8 @@ export interface components {
             second_review_at?: string | null;
             /** Second Review Reason */
             second_review_reason?: string | null;
+            /** Query Answered At */
+            query_answered_at?: string | null;
             /**
              * Report Answered
              * @default false
@@ -12182,6 +12360,33 @@ export interface components {
             made_by?: string | null;
             /** Note */
             note?: string | null;
+        };
+        /**
+         * VersionQueryDecisionView
+         * @description The lead's decision on a query that accepted this version (issue 483).
+         */
+        VersionQueryDecisionView: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "reviewer_text" | "unchanged";
+            /** Decided Document Id */
+            decided_document_id: string;
+            /** Reviewed Document Id */
+            reviewed_document_id: string;
+            /** Reviewer Assignment Id */
+            reviewer_assignment_id: number;
+            /** Answer */
+            answer?: string | null;
+            /**
+             * Edited
+             * @default false
+             */
+            edited: boolean;
+            /** Decided At */
+            decided_at?: string | null;
+            decided_by?: components["schemas"]["PersonRefView"] | null;
         };
         /** VersionRef */
         VersionRef: {
@@ -16936,6 +17141,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EditorialCorrectionResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_query_decision_api_v1_projects__key__documents__doc__query_decision_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                doc: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueryDecisionPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_query_api_v1_projects__key__documents__doc__query_decision_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                doc: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueryDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueryDecisionResult"];
                 };
             };
             /** @description Validation Error */

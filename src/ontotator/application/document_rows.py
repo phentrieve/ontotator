@@ -316,6 +316,9 @@ class RowFacts:
     # document id -> record of the editorial correction that made the
     # version (issue 453, ``editorial_corrections.editorial_corrections``)
     editorial_corrections: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # document id -> the lead's decision on a query that accepted the version
+    # (issue 483, ``query_decisions.query_decisions``)
+    query_decisions: dict[str, dict[str, Any]] = field(default_factory=dict)
     annotations_per_text: int = 1
     rule_on: bool = True  # annotate_accepted_translations_only
     # user id -> PersonRefView fields (lead viewer: display names included)
@@ -1281,6 +1284,11 @@ def load_facts(
     )
 
     editorial = {} if summary else load_editorial(conn, pid)
+    from ontotator.application.query_decisions import (
+        query_decisions as load_query_decisions,
+    )
+
+    decided_queries = {} if summary else load_query_decisions(conn, pid)
     versions = _versions(conn, pid)
     assignments = _assignments(conn, pid)
     reports = _reports(conn, pid)
@@ -1313,6 +1321,11 @@ def load_facts(
                     item["corrected_by"]
                     for item in editorial.values()
                     if item["corrected_by"]
+                ),
+                *(
+                    item["decided_by"]
+                    for item in decided_queries.values()
+                    if item["decided_by"]
                 ),
                 *(item.reviewer_id for item in latest_reviews.values()),
                 *author_ids.values(),
@@ -1361,6 +1374,7 @@ def load_facts(
         acceptances=acceptances,
         uploads=uploads,
         editorial_corrections=editorial,
+        query_decisions=decided_queries,
         annotations_per_text=project.annotations_per_text,
         rule_on=project.annotate_accepted_translations_only,
         people=people_fields,

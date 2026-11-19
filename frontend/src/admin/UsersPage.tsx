@@ -83,6 +83,7 @@ const auditActions: Readonly<Record<string, string>> = {
   "translation.correction_requested": "Translation correction requested",
   "translation.editorial_correction": "Typo fix in a translation",
   "translation.lead_correction_started": "Lead correction of a translation started",
+  "translation.query_decided": "Query on a translation decided",
   "translation.review": "Translation reviewed",
   "translation.source_reviewed": "Source text reviewed",
   "translation.version_uploaded": "New translation version uploaded",

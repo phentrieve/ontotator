@@ -117,6 +117,7 @@ Each row is one task. The **Task** column says what to do, for example **Annotat
 
 - **Reopened**: the lead reopened your submission. The lead's reason stands under the task, for example *Reopened by the lead on 17 Nov 2026, 14:30: The onset in sentence 2 is missing.* (on a narrow screen under the badge). Without a reason, click the badge to read when it was reopened.
 - A **Translation review** the lead asked for a second time shows the lead's reason under the task, for example *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.* The translation review and the consolidation show the lead's reason again when you open the task.
+- *Answer from the lead* at a submitted **Translation review**: you submitted it as a **Query** and the lead decided. Open the task to read the decision and the answer ([Review a translation](annotator.md#review-a-translation)).
 - A **Consolidation** task shows the lead's reason under the task, for example *Reason from the lead: Term and assertion differ*, if the lead gave one.
 - **Paused**: the task waits for a decision on a problem report. A long reason is cut off here; the task shows all of it. **Answer to your report** means the lead has replied.
 - **Paused by lead**: the lead paused the work on this text and gives the reason below the mark. You can open and read the task (**View paused task**), but not save it, until the lead releases the text ([A task paused by the lead](annotator.md#a-task-paused-by-the-lead)).

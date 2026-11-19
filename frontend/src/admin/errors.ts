@@ -257,6 +257,7 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   WORK_PLAN_INVALID: "Annotation needs an accepted translation.",
   NOT_IN_WORK_PLAN: "This language version is not planned for this task.",
   EDITORIAL_CORRECTION_NOT_AVAILABLE: "This typo fix cannot be saved. Reload the row to see its current state.",
+  QUERY_DECISION_NOT_AVAILABLE: "This query can no longer be decided here. Reload the row to see its current state.",
   LEAD_CORRECTION_NOT_AVAILABLE: "This translation can no longer be corrected here. Reload the row to see its current state.",
   VERSION_NOT_ACCEPTABLE: "This version can no longer be accepted here. Reload the row to see its current state.",
   VERSION_UPLOAD_NOT_AVAILABLE: "A new version cannot be uploaded here any more. Reload the row to see its current state.",

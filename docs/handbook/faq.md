@@ -198,6 +198,10 @@ You assigned a translation review to someone who already reviewed this version, 
 
 **Fix typos…** did not save: a newer version arrived, a translation review of the version is open, it was discarded, or the text is the same as before. The dialog names the reason; your text stays in the dialog until you close it. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
 
+### "This query can no longer be decided here."
+
+**Accept the reviewer’s text…** or **Answer and accept the version as it is…** was refused: the query was already decided, a newer version of the translation arrived, the translation was discarded, or a translation review of the version is open (withdraw it with **Remove…** first). The dialog names the reason. Reload the row to see its current state. See [Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation).
+
 ### A review of a version cannot be reopened or assigned after "Fix typos…"
 
 *A lead fixed typos in this version: v2 is the text to review. Assign a review of the newest version.* A translation review always reviews the corrected text. In the row, use **Assign review…** or **Resolve…** › **Assign a new review…**; the person who reviewed the earlier version can be chosen again. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).

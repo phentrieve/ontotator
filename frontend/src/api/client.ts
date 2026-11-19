@@ -246,6 +246,9 @@ export type SourceObligationView = components["schemas"]["SourceObligationView"]
 export type CorrectionAssignmentRequest = components["schemas"]["CorrectionAssignmentRequest"];
 export type LeadCorrectionRequest = components["schemas"]["LeadCorrectionRequest"];
 export type LeadCorrectionPreview = components["schemas"]["LeadCorrectionPreview"];
+export type QueryDecisionPreview = components["schemas"]["QueryDecisionPreview"];
+export type QueryDecisionRequest = components["schemas"]["QueryDecisionRequest"];
+export type QueryDecisionResult = components["schemas"]["QueryDecisionResult"];
 export type ResolveSourceObligationRequest = components["schemas"]["ResolveSourceObligationRequest"];
 export type ProblemReportRequest = components["schemas"]["ProblemReportRequest"];
 export type ProblemActionRequest = components["schemas"]["ProblemActionRequest"];
@@ -1430,6 +1433,16 @@ export class ApiClient {
 
   async assignTranslationCorrection(projectKey: string, documentId: string, body: CorrectionAssignmentRequest): Promise<AssignmentView> {
     return this.request(`/api/v1/projects/${encodeURIComponent(projectKey)}/documents/${encodeURIComponent(documentId)}/translation-correction-assignment`, { method: "POST", body: JSON.stringify(body) });
+  }
+
+  /** Issue 483: the queried review of this version with the reviewer's proposed text, and whether the lead can decide it. */
+  async getQueryDecisionPreview(projectKey: string, documentId: string): Promise<QueryDecisionPreview> {
+    return this.request(`/api/v1/projects/${encodeURIComponent(projectKey)}/documents/${encodeURIComponent(documentId)}/query-decision`, { method: "GET" });
+  }
+
+  /** Issue 483: the lead takes the reviewer's text as the next version, or accepts the version as it is, with an answer. */
+  async decideQuery(projectKey: string, documentId: string, body: QueryDecisionRequest): Promise<QueryDecisionResult> {
+    return this.request(`/api/v1/projects/${encodeURIComponent(projectKey)}/documents/${encodeURIComponent(documentId)}/query-decision`, { method: "POST", body: JSON.stringify(body) });
   }
 
   /** Issue 341 b: whether a lead correction is available and the annotation work that stays on the version. */

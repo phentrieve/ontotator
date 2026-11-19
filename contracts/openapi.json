@@ -7991,6 +7991,122 @@
         "x-ontotator-project-token": true
       }
     },
+    "/api/v1/projects/{key}/documents/{doc}/query-decision": {
+      "get": {
+        "tags": [
+          "translation-workflow"
+        ],
+        "summary": "Preview Query Decision",
+        "description": "Issue 483, read only: the queried review of this version with the\nreviewer's proposed text, this version's text and whether a lead can\ndecide the query.",
+        "operationId": "preview_query_decision_api_v1_projects__key__documents__doc__query_decision_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "doc",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Doc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryDecisionPreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      },
+      "post": {
+        "tags": [
+          "translation-workflow"
+        ],
+        "summary": "Decide Query",
+        "description": "Issue 483: close a queried translation review as the lead: take the\nreviewer's text as the next version, accepted, or accept this version as\nit is; with an answer the reviewer reads at their submitted task.",
+        "operationId": "decide_query_api_v1_projects__key__documents__doc__query_decision_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "doc",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Doc"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryDecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryDecisionResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
     "/api/v1/translation-reviews/{assignment_id}/source-obligations": {
       "get": {
         "tags": [
@@ -19592,6 +19708,16 @@
                 "type": "null"
               }
             ]
+          },
+          "query_decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VersionQueryDecisionView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -28057,6 +28183,352 @@
         "title": "Provenance",
         "description": "Origin and extraction details for an annotation or statement."
       },
+      "QueriedReviewView": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "assignment_id": {
+            "type": "integer",
+            "title": "Assignment Id"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "rationale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rationale"
+          },
+          "categories": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "omission",
+                "addition",
+                "assertion",
+                "value",
+                "anatomy",
+                "terminology",
+                "source"
+              ]
+            },
+            "type": "array",
+            "title": "Categories"
+          },
+          "proposed_text": {
+            "type": "string",
+            "title": "Proposed Text"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "assignment_id",
+          "document_id",
+          "version",
+          "rationale",
+          "categories",
+          "proposed_text",
+          "created_at"
+        ],
+        "title": "QueriedReviewView",
+        "description": "The translation review submitted as a query that the lead decides."
+      },
+      "QueryAnswer": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "reviewer_text",
+              "unchanged"
+            ],
+            "title": "Kind"
+          },
+          "accepted_version": {
+            "type": "integer",
+            "title": "Accepted Version"
+          },
+          "decided_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Decided At"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
+          "edited": {
+            "type": "boolean",
+            "title": "Edited",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "accepted_version",
+          "decided_at"
+        ],
+        "title": "QueryAnswer",
+        "description": "The lead's decision on the reviewer's query (issue 483), as the\nreviewer reads it at the submitted task.\n\n``reviewer_text``: the proposed text became version\n``accepted_version`` (``edited``: the lead changed it before saving);\n``unchanged``: the reviewed version (or its typo fix) was accepted as it\nis. ``answer`` is what the lead wrote."
+      },
+      "QueryDecisionPreview": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "next_version": {
+            "type": "integer",
+            "title": "Next Version"
+          },
+          "translation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translation Status"
+          },
+          "text_sha256": {
+            "type": "string",
+            "title": "Text Sha256"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QueriedReviewView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proposes_changes": {
+            "type": "boolean",
+            "title": "Proposes Changes"
+          },
+          "review_on": {
+            "type": "boolean",
+            "title": "Review On"
+          },
+          "annotate_accepted_only": {
+            "type": "boolean",
+            "title": "Annotate Accepted Only"
+          },
+          "annotations": {
+            "$ref": "#/components/schemas/LeadCorrectionAnnotationsView"
+          },
+          "open_consolidations": {
+            "type": "integer",
+            "title": "Open Consolidations"
+          },
+          "final_result": {
+            "type": "boolean",
+            "title": "Final Result"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "case_id",
+          "language",
+          "version",
+          "next_version",
+          "translation_status",
+          "text_sha256",
+          "text",
+          "available",
+          "reason",
+          "review",
+          "proposes_changes",
+          "review_on",
+          "annotate_accepted_only",
+          "annotations",
+          "open_consolidations",
+          "final_result"
+        ],
+        "title": "QueryDecisionPreview",
+        "description": "Issue 483, read only: the query a lead decides at this version."
+      },
+      "QueryDecisionRequest": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "reviewer_text",
+              "unchanged"
+            ],
+            "title": "Kind"
+          },
+          "expected_text_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Text Sha256"
+          },
+          "expected_review_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Expected Review Id"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "expected_text_sha256",
+          "expected_review_id"
+        ],
+        "title": "QueryDecisionRequest",
+        "description": "Issue 483: the lead's decision on a queried translation review.\n\n``reviewer_text``: ``text`` (the reviewer's proposed text, as the lead\nconfirmed it) becomes the next version, accepted. ``unchanged``: the\nversion is accepted as it is, and ``answer`` is required."
+      },
+      "QueryDecisionResult": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "reviewer_text",
+              "unchanged"
+            ],
+            "title": "Kind"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "decided_document_id": {
+            "type": "string",
+            "title": "Decided Document Id"
+          },
+          "decided_version": {
+            "type": "integer",
+            "title": "Decided Version"
+          },
+          "translation_status": {
+            "type": "string",
+            "const": "accepted",
+            "title": "Translation Status"
+          },
+          "text_sha256": {
+            "type": "string",
+            "title": "Text Sha256"
+          },
+          "edited": {
+            "type": "boolean",
+            "title": "Edited"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "kind",
+          "document_id",
+          "version",
+          "decided_document_id",
+          "decided_version",
+          "translation_status",
+          "text_sha256",
+          "edited"
+        ],
+        "title": "QueryDecisionResult"
+      },
       "ReanchorItem": {
         "properties": {
           "proposal_set_id": {
@@ -29119,6 +29591,16 @@
               }
             ],
             "title": "Reopen Reason"
+          },
+          "query_answer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QueryAnswer"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "added_brackets": {
             "anyOf": [
@@ -32186,6 +32668,18 @@
               }
             ],
             "title": "Second Review Reason"
+          },
+          "query_answered_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query Answered At"
           },
           "report_answered": {
             "type": "boolean",
@@ -35351,6 +35845,78 @@
         ],
         "title": "VersionOrigin",
         "description": "How a version after the first was made, for its reviewer.\n\n``upload``: a lead uploaded the text (\"Upload new version\u2026\", with the\nupload record's fields); ``review_correction``: a translation reviewer\ncorrected the previous version; ``lead_correction``: a lead did\n(\"Correct the translation\u2026\"); ``editorial_correction``: a lead fixed\nspacing, typos or grammar without a review (\"Fix typos\u2026\", ``note`` is\nthe recorded reason); ``correction``: no record (an import)."
+      },
+      "VersionQueryDecisionView": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "reviewer_text",
+              "unchanged"
+            ],
+            "title": "Kind"
+          },
+          "decided_document_id": {
+            "type": "string",
+            "title": "Decided Document Id"
+          },
+          "reviewed_document_id": {
+            "type": "string",
+            "title": "Reviewed Document Id"
+          },
+          "reviewer_assignment_id": {
+            "type": "integer",
+            "title": "Reviewer Assignment Id"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
+          "edited": {
+            "type": "boolean",
+            "title": "Edited",
+            "default": false
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonRefView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "decided_document_id",
+          "reviewed_document_id",
+          "reviewer_assignment_id"
+        ],
+        "title": "VersionQueryDecisionView",
+        "description": "The lead's decision on a query that accepted this version (issue 483)."
       },
       "VersionRef": {
         "properties": {
