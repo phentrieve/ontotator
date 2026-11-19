@@ -1,5 +1,6 @@
 """Migration 0052 (issue 465): ``typo_fix_carries``, purely additive. It
-follows the head of main when it was written (0050); one head, up and down."""
+follows 0051 (additions to the reason of a translation correction); one head,
+up and down."""
 
 from __future__ import annotations
 
@@ -18,6 +19,7 @@ from ontotator.storage.schema import (
 )
 
 REVISION = "0052"
+PREVIOUS = "0051"
 S = "ontotator"
 
 
@@ -40,10 +42,10 @@ def _table(conn: Connection) -> int:
     return int(found)
 
 
-def test_one_head_and_0052_follows_an_earlier_migration() -> None:
+def test_one_head_and_0052_follows_0051() -> None:
     scripts = ScriptDirectory.from_config(alembic_config())
     assert scripts.get_heads() == [head_revision()]
-    assert _previous() < REVISION
+    assert _previous() == PREVIOUS
 
 
 def test_the_table_comes_with_0052_and_goes_with_its_downgrade(tmp_path: Any) -> None:
