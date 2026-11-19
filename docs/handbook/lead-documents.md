@@ -273,6 +273,16 @@ What for: have a translation corrected by a reviewer.
 
 If the reviewer submits **Accepted with corrections**, the corrected text becomes a new text version. While a lead is correcting the same version themselves, the request is refused with *A lead is correcting this version.* ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
 
+#### Add to the reason of a correction request
+
+What for: tell the reviewer more after you sent the request, for example a second place to look at.
+
+1. Open the text card and click **Translation**. The reviewer's row under **Translation reviewers** shows the request: *Correction requested on 18 Nov 2026, 09:00:* and the reason in quotes.
+2. In that row, click **Add to the reason…**.
+3. Enter the **Addition to the reason** and click **Add to the reason**.
+
+The reason as you sent it stays as it is; it cannot be edited. Each addition is a line of its own below it, with the date and who added it, for example *Added by you on 18 Nov 2026, 10:12: Paragraph 3 as well.* The reviewer reads it below the reason, in **My tasks** and in the review (*Added by the lead on …*). **History** has a line for the request and one for each addition. Only a project lead can add, and only while the review is open: after the reviewer submitted it, or after the task was removed, the addition is refused (*Nothing can be added to this reason any more.*).
+
 ## Work plans and assignments
 
 The work plan says, for each text, whether it gets a translation review and whether and how it is annotated. Planned texts show up in the main list; the others are hidden. Then the tab **All** says how many of its texts the table holds, for example *246 of 307*.

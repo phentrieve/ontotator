@@ -457,6 +457,48 @@ describe("translation part", () => {
     expect(onNavigate).toHaveBeenCalledWith({ name: "projectCase", key: "p", caseId: "case-200", variant: "case-200-de", compare: "case-200-en", documents: query });
   });
 
+  it("issue 483: the reason of a correction request with its additions, and Add to the reason… for the lead", async () => {
+    const request = {
+      reason: "Check the dose.", requested_at: "2026-10-20T09:00:00",
+      additions: [{ note: "Paragraph 3 as well.", added_at: "2026-10-20T10:00:00", added_by: { pseudonym: "lead-0001", display_name: null, is_me: true } }],
+    };
+    const row = assignRow({
+      versions: [version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "accepted" })],
+      work: [work({ assignment_id: 5, document_id: "case-200-de", task: "translation_review", status: "open", author_label: "ann-0003", person: ana, correction_request: request })],
+    });
+    const add = vi.spyOn(api, "addCorrectionReason").mockResolvedValue({ assignment_id: 5, note: "And the footnote.", added_at: "2026-10-21T11:00:00" });
+    const { onChanged } = renderCard({ row, initialSegment: "translation" });
+    const reviewers = within(card()).getByRole("list", { name: "Translation reviewers" });
+    const reason = within(reviewers).getByRole("note", { name: "Reason of the correction request" });
+    expect(reason.textContent).toContain("“Check the dose.”");
+    expect(reason.textContent).toContain("Added by you on ");
+    expect(reason.textContent).toContain(": Paragraph 3 as well.");
+    fireEvent.click(within(reviewers).getByRole("button", { name: "Add to the reason for Ana Weber" }));
+    const dialog = screen.getByRole("dialog", { name: "Add to the reason" });
+    const confirm = within(dialog).getAllByRole("button", { name: "Add to the reason" }).at(-1)!;
+    expect((confirm as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(within(dialog).getByLabelText("Addition to the reason"), { target: { value: "  And the footnote. " } });
+    fireEvent.click(confirm);
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    expect(add).toHaveBeenCalledWith(5, "And the footnote.");
+    expect(screen.queryByRole("dialog", { name: "Add to the reason" })).toBeNull();
+  });
+
+  it("issue 483: no Add to the reason… without a request or for a reader who is not the lead", () => {
+    const row = assignRow({
+      versions: [version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "accepted" })],
+      work: [work({ assignment_id: 5, document_id: "case-200-de", task: "translation_review", status: "open", author_label: "ann-0003", person: ana })],
+    });
+    renderCard({ row, initialSegment: "translation" });
+    expect(within(card()).queryByRole("button", { name: /^Add to the reason/ })).toBeNull();
+    expect(within(card()).queryByRole("note", { name: "Reason of the correction request" })).toBeNull();
+    cleanup();
+    const requested = { ...row, work: [{ ...row.work[0], correction_request: { reason: "Check the dose.", requested_at: "2026-10-20T09:00:00", additions: [] } }] };
+    renderCard({ row: requested, initialSegment: "translation", canManage: false });
+    expect(within(card()).getByRole("note", { name: "Reason of the correction request" })).toBeTruthy();
+    expect(within(card()).queryByRole("button", { name: /^Add to the reason/ })).toBeNull();
+  });
+
   it("after a review: the newest version per chain, older ones collapsed, one Ask a reviewer to correct…, submitted reviews under their version", () => {
     const versions = [
       version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "reviewed", chain_name: "m1", is_newest_in_chain: false }),

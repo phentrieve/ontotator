@@ -236,6 +236,18 @@ describe("My tasks component", () => {
     expect((await screen.findByRole("dialog", { name: "Why reopened" })).textContent).toMatch(/^Second review requested by the lead on .+: Check the dose in paragraph 2\.$/);
   });
 
+  it("issue 483: what the lead added to the reason stands below it, with its date", async () => {
+    vi.mocked(api.listMyTasks).mockResolvedValue([
+      { ...task(5, "open"), task: "translation_review", second_review_at: "2026-11-17T09:30:00Z", second_review_reason: "Units.",
+        second_review_additions: [{ note: "Paragraph 3 as well.", added_at: "2026-11-17T11:00:00Z" }] }]);
+    render(<MyTasks projects={[]} onNavigate={vi.fn()} />);
+    const [row] = await screen.findAllByTestId("task-row");
+    const lines = within(row).getAllByText(/^(Second review requested|Added by the lead)/).map(line => line.textContent);
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatch(/^Second review requested by the lead on .+: Units\.$/);
+    expect(lines[1]).toMatch(/^Added by the lead on .+: Paragraph 3 as well\.$/);
+  });
+
   it("marks a task whose text a lead paused, and names both causes when a report pauses it too (issue 464)", async () => {
     vi.mocked(api.listMyTasks).mockResolvedValue([
       { ...task(21, "in_progress"), held: true, hold_reason: "Clinic is checking", pause_causes: ["lead"], lead_pause_reason: "Clinic is checking" },

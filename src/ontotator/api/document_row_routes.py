@@ -176,6 +176,24 @@ class AnnotationsPerTextView(_View):
     override: int | None = None
 
 
+class ReasonAdditionView(_View):
+    """A lead's addition to the reason of a correction request (issue 483)."""
+
+    note: str
+    added_at: datetime
+    # None: added through an API token, or by an account since erased.
+    added_by: PersonRefView | None = None
+
+
+class CorrectionRequestView(_View):
+    """Why the lead asked for this review with "Ask a reviewer to correct…"
+    (issue 483): the reason as sent, and what the lead added to it since."""
+
+    reason: str
+    requested_at: datetime
+    additions: list[ReasonAdditionView] = Field(default_factory=list)
+
+
 class WorkItemView(_View):
     assignment_id: int
     document_id: str
@@ -214,6 +232,9 @@ class WorkItemView(_View):
     waiting_for_translation_review: bool = False
     # Closed on a version the text moved on from: the lead decides.
     waiting_for_lead: bool = False
+    # A translation review the lead asked for with "Ask a reviewer to
+    # correct…": the reason and its additions; None for other work.
+    correction_request: CorrectionRequestView | None = None
 
 
 class ReportIssueView(_View):
@@ -678,7 +699,10 @@ class RowChangeView(_View):
     results (``from_result`` the one replaced, ``to_result`` the one final
     afterwards; null when the submission is no longer among the row's).
     ``text_paused`` and ``text_released`` (issue 464) are a lead's pause and
-    release of the text, with ``by`` and the ``reason`` given."""
+    release of the text, with ``by`` and the ``reason`` given.
+    ``correction_requested`` is "Ask a reviewer to correct…" and
+    ``correction_reason_added`` an addition to its reason (issue 483), the
+    task and its person as for ``reopened``, the text in ``reason``."""
 
     kind: Literal[
         "reassigned",
@@ -693,6 +717,8 @@ class RowChangeView(_View):
         "final_restored",
         "text_paused",
         "text_released",
+        "correction_requested",
+        "correction_reason_added",
     ]
     at: datetime
     task: str | None = None

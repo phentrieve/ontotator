@@ -7768,6 +7768,61 @@
         "x-ontotator-project-token": true
       }
     },
+    "/api/v1/assignments/{assignment_id}/correction-reason": {
+      "post": {
+        "tags": [
+          "translation-workflow"
+        ],
+        "summary": "Add Correction Reason",
+        "description": "Issue 483: the lead adds to the reason of \"Ask a reviewer to correct\u2026\"\nwhile the review is open. Append-only: the reason as sent never changes.",
+        "operationId": "add_correction_reason_api_v1_assignments__assignment_id__correction_reason_post",
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Assignment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectionReasonAdditionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorrectionReasonAdditionView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
     "/api/v1/projects/{key}/documents/{doc}/lead-correction": {
       "post": {
         "tags": [
@@ -17985,6 +18040,76 @@
           "reason"
         ],
         "title": "CorrectionAssignmentRequest"
+      },
+      "CorrectionReasonAdditionRequest": {
+        "properties": {
+          "note": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "note"
+        ],
+        "title": "CorrectionReasonAdditionRequest",
+        "description": "Issue 483: what the lead adds to the reason of a correction request."
+      },
+      "CorrectionReasonAdditionView": {
+        "properties": {
+          "assignment_id": {
+            "type": "integer",
+            "title": "Assignment Id"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          },
+          "added_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Added At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "assignment_id",
+          "note",
+          "added_at"
+        ],
+        "title": "CorrectionReasonAdditionView",
+        "description": "One addition to the reason of a correction request, as saved."
+      },
+      "CorrectionRequestView": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Requested At"
+          },
+          "additions": {
+            "items": {
+              "$ref": "#/components/schemas/ReasonAdditionView"
+            },
+            "type": "array",
+            "title": "Additions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason",
+          "requested_at"
+        ],
+        "title": "CorrectionRequestView",
+        "description": "Why the lead asked for this review with \"Ask a reviewer to correct\u2026\"\n(issue 483): the reason as sent, and what the lead added to it since."
       },
       "CreateProjectRequest": {
         "properties": {
@@ -28961,6 +29086,57 @@
         ],
         "title": "ReanchorResolution"
       },
+      "ReasonAddition": {
+        "properties": {
+          "note": {
+            "type": "string",
+            "title": "Note"
+          },
+          "added_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Added At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "note",
+          "added_at"
+        ],
+        "title": "ReasonAddition",
+        "description": "A lead's addition to the reason of a correction request (issue 483),\nas the reviewer reads it: what and when. The reviewer reads \"the lead\",\nnot the lead's name, as for the reason itself."
+      },
+      "ReasonAdditionView": {
+        "properties": {
+          "note": {
+            "type": "string",
+            "title": "Note"
+          },
+          "added_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Added At"
+          },
+          "added_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonRefView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "note",
+          "added_at"
+        ],
+        "title": "ReasonAdditionView",
+        "description": "A lead's addition to the reason of a correction request (issue 483)."
+      },
       "ReasonRequest": {
         "properties": {
           "reason": {
@@ -29823,6 +29999,20 @@
             ],
             "title": "Second Review Reason"
           },
+          "second_review_additions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReasonAddition"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Second Review Additions"
+          },
           "reopened_at": {
             "anyOf": [
               {
@@ -30225,7 +30415,9 @@
               "final_changed",
               "final_restored",
               "text_paused",
-              "text_released"
+              "text_released",
+              "correction_requested",
+              "correction_reason_added"
             ],
             "title": "Kind"
           },
@@ -30358,7 +30550,7 @@
           "at"
         ],
         "title": "RowChangeView",
-        "description": "A change of who works on a row, how, or of its final result: its\nHistory line, with who did it, when and (where one was given) why.\n\n``by`` is the person who made the change; a withdrawn final result\n(#343) names the lead in ``from_person`` instead. ``reopened``,\n``reopen_undone`` and ``round_started`` name the task and its person\n(``assignment_id``, ``to_person``); the ``final_*`` kinds name the\nresults (``from_result`` the one replaced, ``to_result`` the one final\nafterwards; null when the submission is no longer among the row's).\n``text_paused`` and ``text_released`` (issue 464) are a lead's pause and\nrelease of the text, with ``by`` and the ``reason`` given."
+        "description": "A change of who works on a row, how, or of its final result: its\nHistory line, with who did it, when and (where one was given) why.\n\n``by`` is the person who made the change; a withdrawn final result\n(#343) names the lead in ``from_person`` instead. ``reopened``,\n``reopen_undone`` and ``round_started`` name the task and its person\n(``assignment_id``, ``to_person``); the ``final_*`` kinds name the\nresults (``from_result`` the one replaced, ``to_result`` the one final\nafterwards; null when the submission is no longer among the row's).\n``text_paused`` and ``text_released`` (issue 464) are a lead's pause and\nrelease of the text, with ``by`` and the ``reason`` given.\n``correction_requested`` is \"Ask a reviewer to correct\u2026\" and\n``correction_reason_added`` an addition to its reason (issue 483), the\ntask and its person as for ``reopened``, the text in ``reason``."
       },
       "RowItemView": {
         "properties": {
@@ -32921,6 +33113,20 @@
               }
             ],
             "title": "Second Review Reason"
+          },
+          "second_review_additions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReasonAddition"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Second Review Additions"
           },
           "query_answered_at": {
             "anyOf": [
@@ -37123,6 +37329,16 @@
             "type": "boolean",
             "title": "Waiting For Lead",
             "default": false
+          },
+          "correction_request": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CorrectionRequestView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,

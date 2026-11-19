@@ -144,6 +144,51 @@ def second_review_requests(
     return found
 
 
+@dataclass(frozen=True)
+class ReasonAddition:
+    """A lead's addition to the reason of a correction request (issue 483),
+    as the reviewer reads it: what and when. The reviewer reads "the lead",
+    not the lead's name, as for the reason itself."""
+
+    note: str
+    added_at: datetime
+
+
+def correction_reason_additions(
+    conn: Connection, rounds: Mapping[int, str | None]
+) -> dict[int, list[tuple[datetime, str, int | None]]]:
+    """The additions to the reason of each assignment's correction request,
+    oldest first, as (added_at, note, added_by) (``rounds``: assignment id ->
+    active round id). Additions to the request of an earlier round of the
+    task are not the current request's."""
+    from ontotator.storage.plan_tables import CorrectionReasonAdditionRow as Row
+
+    wanted = {aid: rid for aid, rid in rounds.items() if rid}
+    if not wanted:
+        return {}
+    found: dict[int, list[tuple[datetime, str, int | None]]] = {}
+    for row in conn.execute(
+        select(Row.assignment_id, Row.round_id, Row.note, Row.added_by, Row.added_at)
+        .where(Row.assignment_id.in_(sorted(wanted)))
+        .order_by(Row.id)
+    ):
+        if row.round_id == wanted[row.assignment_id]:
+            found.setdefault(row.assignment_id, []).append(
+                (row.added_at, row.note, row.added_by)
+            )
+    return found
+
+
+def reason_additions(
+    conn: Connection, rounds: Mapping[int, str | None]
+) -> dict[int, tuple[ReasonAddition, ...]]:
+    """``correction_reason_additions`` as the reviewer reads them."""
+    return {
+        aid: tuple(ReasonAddition(note, at) for at, note, _ in items)
+        for aid, items in correction_reason_additions(conn, rounds).items()
+    }
+
+
 def query_answer_times(
     conn: Connection, assignment_ids: Sequence[int]
 ) -> dict[int, datetime]:
@@ -233,6 +278,9 @@ class TaskSummary:
     # task's current round); None for other tasks.
     second_review_at: datetime | None = None
     second_review_reason: str | None = None
+    # What the lead added to that reason afterwards (issue 483), oldest first;
+    # None without an addition.
+    second_review_additions: tuple[ReasonAddition, ...] | None = None
     # A submitted translation review that asked a query: when the lead decided
     # it (issue 483; the answer is in the review's workspace); None otherwise.
     query_answered_at: datetime | None = None
@@ -1621,6 +1669,14 @@ class AssignmentService:
                     if r["task"] == "translation_review"
                 },
             )
+            additions = reason_additions(
+                conn,
+                {
+                    r["assignment_id"]: r["active_round_id"]
+                    for r in rows
+                    if r["assignment_id"] in second_reviews
+                },
+            )
             query_answers = query_answer_times(
                 conn,
                 [
@@ -1783,6 +1839,7 @@ class AssignmentService:
                         ),
                         second_review_at=second[0] if second else None,
                         second_review_reason=second[1] if second else None,
+                        second_review_additions=additions.get(row["assignment_id"]),
                         query_answered_at=query_answers.get(row["assignment_id"]),
                     )
                 )

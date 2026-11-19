@@ -914,6 +914,30 @@ def _work_item(
         "waiting_for_translation_review": item.assignment_id in ctx.waiting
         and item.assignment_id not in ctx.waiting_for_lead,
         "waiting_for_lead": item.assignment_id in ctx.waiting_for_lead,
+        "correction_request": _correction_request(ctx, item),
+    }
+
+
+def _correction_request(
+    ctx: _Context, item: rules.AssignmentFact
+) -> dict[str, Any] | None:
+    """The lead's request of "Ask a reviewer to correct…" behind a translation
+    review, with the additions to its reason (issue 483); None otherwise."""
+    request = ctx.facts.correction_requests.get(item.assignment_id)
+    if request is None:
+        return None
+    return {
+        "reason": request["reason"],
+        "requested_at": request["requested_at"],
+        "additions": [
+            {
+                "note": addition["note"],
+                "added_at": addition["added_at"],
+                # None: added through an API token, or by an account since erased.
+                "added_by": ctx.facts.people.get(addition["added_by"] or 0),
+            }
+            for addition in request["additions"]
+        ],
     }
 
 

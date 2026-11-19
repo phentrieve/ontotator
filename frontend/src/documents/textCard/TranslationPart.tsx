@@ -1,5 +1,5 @@
 import { textLabel } from "../../app/identity";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { DocumentRowView } from "../../api/client";
 import type { ProjectDocumentsQuery, Route } from "../../app/router";
 import { Button } from "../../ui/Button";
@@ -8,7 +8,8 @@ import { pausedWord, versionName } from "../labels";
 import { TextVersions, type TextVersionsTools } from "../TextVersions";
 import { textViewRoute } from "./cardModel";
 import { PersonList, useFocusAfterRemoval } from "./PersonRow";
-import { assignedLine, WorkPersonRow } from "./WorkPersonRow";
+import { CorrectionReasonDialog, CorrectionRequestReason } from "./CorrectionReasonDialog";
+import { assignedLine, workerName, WorkPersonRow } from "./WorkPersonRow";
 
 /** The document this text was translated from: follow `derived_from` out of the row's own versions. */
 function sourceDocument(row: DocumentRowView, documentId: string): string | null {
@@ -45,6 +46,9 @@ export function TranslationPart({ row, projectKey, query, canManage, onAssign, o
   // Submitted reviews are listed under their version; the rows are the open ones.
   const reviewers = row.work.filter(item => item.task === "translation_review" && item.moved_to_version == null && item.status !== "submitted");
   const focusAfterRemoval = useFocusAfterRemoval();
+  // "Add to the reason…" of a correction request (issue 483): the assignment whose dialog is open.
+  const [adding, setAdding] = useState<number | null>(null);
+  const addingTo = reviewers.find(item => item.assignment_id === adding && item.correction_request);
   const reviewOf = (documentId: string) => {
     const version = row.versions.find(entry => entry.document_id === documentId);
     return version ? `Review of ${versionName(version.version, version.chain_name, row.parallel_roots)}` : null;
@@ -67,10 +71,15 @@ export function TranslationPart({ row, projectKey, query, canManage, onAssign, o
         const paused = pausedWord(item);
         const assigned = assignedLine(item, now, !review && !paused);
         const parts = [paused, review, assigned].filter(Boolean);
+        const request = item.correction_request;
+        const line = parts.length > 0 ? parts.map((part, index) => <span key={index}>{index > 0 && " · "}{part}</span>) : null;
         return <WorkPersonRow key={item.assignment_id} item={item} caseId={row.case_id} textName={textLabel(row)} canManage={canManage} tools={textVersionTools} onChanged={onChanged}
-          onRemoved={focusAfterRemoval} details={parts.length > 0 ? parts.map((part, index) => <span key={index}>{index > 0 && " · "}{part}</span>) : undefined} />;
+          onRemoved={focusAfterRemoval} details={request ? <>{line}<CorrectionRequestReason request={request} /></> : line ?? undefined}
+          open={canManage && request ? <Button size="sm" aria-label={`Add to the reason for ${workerName(item)}`} onClick={() => setAdding(item.assignment_id)}>Add to the reason…</Button> : undefined} />;
       })}
     </PersonList>}
+    {addingTo?.correction_request && <CorrectionReasonDialog assignmentId={addingTo.assignment_id} name={workerName(addingTo)} request={addingTo.correction_request}
+      onCancel={() => setAdding(null)} onAdded={() => { setAdding(null); onChanged(); }} />}
     {reviewNext && <div className="text-card-next" role="group" aria-labelledby="text-card-translation-next">
       <p id="text-card-translation-next" className="text-card-next-label"><strong>Next step:</strong> {`assign someone to review this ${shown?.origin === "machine_translation" ? "machine translation" : "translation"}.`}</p>
       <Button variant="primary" size="sm" onClick={() => onAssign(row, "translation_review")}>Assign review…</Button>

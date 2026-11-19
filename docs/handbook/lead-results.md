@@ -182,6 +182,8 @@ What for: fix a queried, rejected or accepted translation without assigning anot
 
 While your correction of an accepted version is open, **Ask a reviewer to correct…** for the same version is refused (*A lead is correcting this version.*): submit your correction first, or withdraw it with **Remove…** in your row of the **Translation** part.
 
+To give a reviewer you asked with **Ask a reviewer to correct…** more to look at, add to the reason with **Add to the reason…** in their row of the **Translation** part while the review is open ([Add to the reason of a correction request](lead-documents.md#add-to-the-reason-of-a-correction-request)). The reason as sent is never changed. The reason of **Reopen…** has no such addition.
+
 ### Accept a translation that was not reviewed
 
 What for: annotate a translation that was reviewed outside Ontotator. The row's next step is **Translation not accepted**.

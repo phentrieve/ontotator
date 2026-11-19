@@ -1080,6 +1080,75 @@ def test_a_query_decision_round_trips(
     assert record(target)[7:] == (True, "query")
 
 
+def test_an_addition_to_a_correction_reason_round_trips(
+    servers: tuple[TestClient, TestClient], tmp_path: Path
+) -> None:
+    """Issue 483: what the lead added to the reason of "Ask a reviewer to
+    correct…" travels with the archive: the note, its task and round, and the
+    lead mapped to their account."""
+    from browser_documents_scenarios_rows import review_translation
+
+    from ontotator.application.translation_workflow import (
+        TranslationWorkflowService,
+    )
+    from ontotator.assignments.service import correction_reason_additions
+    from ontotator.storage.tables import AssignmentRow, UserRow
+
+    source, target = servers
+    app: Any = source.app
+    scenario = new_project(app, "arch")
+    english = native_unit(CASE, "en", TEXT, case_id=CASE)
+    german = translation_unit(CASE, "de", GERMAN, source=english)
+    translated = import_texts(scenario, [english, german])[(CASE, "de", 1)]
+    add_user(scenario, "lead", ["lead"])
+    add_user(scenario, "reviewer", ["annotator"], qualification="Physician")
+    add_user(scenario, "second", ["annotator"], qualification="Physician")
+    lead = app.state.accounts.get_by_username(scenario.users["lead"])
+    review_translation(scenario, translated, "reviewer", "accepted_unchanged")
+    workflow = TranslationWorkflowService(_db(source), app.state.jobs)
+    actor = Actor.user(lead.id, lead.username)
+    requested = workflow.assign_correction(
+        actor,
+        scenario.key,
+        translated,
+        scenario.users["second"],
+        expected_text_sha256=app.state.repo.get_variant(
+            scenario.key, translated
+        ).text_sha256,
+        reason="Check the dose.",
+        confirm_language=True,
+    )
+    workflow.add_correction_reason(actor, requested.id, "Paragraph 3 as well.")
+    data = _export(source, scenario.key, tmp_path)
+
+    result = project_archive.import_archive(_db(target), OPERATOR, data)
+
+    assert result["verification"]["ok"], result["verification"]
+    assert _counts(_db(target), scenario.key) == _counts(_db(source), scenario.key)
+
+    def record(client: TestClient) -> tuple[Any, ...]:
+        with _db(client).snapshot() as conn:
+            task = conn.execute(
+                select(AssignmentRow.id, AssignmentRow.active_round_id)
+                .join(ProjectRow, ProjectRow.id == AssignmentRow.project_id)
+                .where(
+                    ProjectRow.project_key == scenario.key,
+                    AssignmentRow.task == "translation_review",
+                    AssignmentRow.status != "submitted",
+                )
+            ).one()
+            ((at, note, by),) = correction_reason_additions(
+                conn, {task.id: task.active_round_id}
+            )[task.id]
+            lead_pseudonym = conn.execute(
+                select(UserRow.pseudonym).where(UserRow.id == by)
+            ).scalar_one()
+        return note, at, lead_pseudonym
+
+    assert record(target) == record(source)
+    assert record(target)[0] == "Paragraph 3 as well."
+
+
 def test_an_uploaded_translation_version_round_trips(
     servers: tuple[TestClient, TestClient], tmp_path: Path
 ) -> None:

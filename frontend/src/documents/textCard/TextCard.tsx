@@ -181,8 +181,10 @@ export function TextCard(props: TextCardProps): JSX.Element {
   const list = submissions.data?.submissions ?? null;
 
   // A refreshed rows page with new activity on the row reloads its submissions. A pause or its release is no work on
-  // the text and leaves the activity time alone, but adds a History line: it reloads them too.
-  const activity = `${row.last_activity_at ?? ""}|${row.lead_pause?.paused_at ?? ""}`;
+  // the text and leaves the activity time alone, but adds a History line: it reloads them too, as does an addition to
+  // the reason of a correction request (issue 483).
+  const additions = row.work.reduce((count, item) => count + (item.correction_request?.additions?.length ?? 0), 0);
+  const activity = `${row.last_activity_at ?? ""}|${row.lead_pause?.paused_at ?? ""}|${additions}`;
   const seenActivity = useRef(activity);
   const { reload } = submissions;
   useEffect(() => {

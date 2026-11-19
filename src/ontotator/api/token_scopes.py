@@ -234,6 +234,11 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     # Text changes after annotation (issue 345): the lead moves open work to
     # the new text version, or lets it finish or withdraws it.
     ("POST", "/api/v1/assignments/{assignment_id}/move-to-version"): "project-admin",
+    # Issue 483: the lead adds to the reason of a correction request, a lead's
+    # project work as the request itself.
+    ("POST", "/api/v1/assignments/{assignment_id}/correction-reason"): (
+        "project-admin"
+    ),
     ("POST", "/api/v1/assignments/{assignment_id}/text-change-resolution"): (
         "project-admin"
     ),
@@ -365,6 +370,9 @@ PROJECT_RESOLVED: frozenset[tuple[str, str]] = frozenset(
         # project with AssignmentService._locate.
         ("POST", "/api/v1/assignments/{assignment_id}/move-to-version"),
         ("POST", "/api/v1/assignments/{assignment_id}/text-change-resolution"),
+        # Issue 483: TranslationWorkflowService.add_correction_reason finds
+        # the assignment's project with AssignmentService._locate.
+        ("POST", "/api/v1/assignments/{assignment_id}/correction-reason"),
         # Issue 351: the task itself, its submissions and rounds. The task's
         # project is found by AssignmentService (readable, _locate) or the
         # owner check of the route (_owned_assignment).
