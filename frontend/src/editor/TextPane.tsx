@@ -62,7 +62,7 @@ export interface TextPaneProps {
 }
 
 const mentionsSignature = (mentions: MentionDisplay[]): string =>
-  JSON.stringify(mentions.map((m) => [m.evidence_id, m.kind ?? "", m.colorIndex ?? 0, m.negated ?? false, m.label ?? "", m.segments.map((s) => [s.start, s.end])]));
+  JSON.stringify(mentions.map((m) => [m.evidence_id, m.kind ?? "", m.colorIndex ?? 0, m.colourKey ?? "", m.negated ?? false, m.label ?? "", m.segments.map((s) => [s.start, s.end])]));
 
 /** The older wording of a passage as one line (marker name and tooltip). */
 const beforeWording = (passage: ChangePassage): string => passage.before.map((part) => part.text).join("").replace(/\s+/g, " ").trim();

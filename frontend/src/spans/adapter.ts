@@ -4,6 +4,7 @@
 
 import { SpanEditor } from "../vendor/spans.js";
 import { parseModifierDisplayId } from "../editor/modifiers";
+import { assignMarkColours } from "../editor/markColours";
 import {
   toCodepoint,
   toUtf16,
@@ -23,7 +24,13 @@ export interface MentionDisplay {
   segments: CodepointSegment[];
   is_suggestion?: boolean;
   kind?: "own" | "target" | "source" | "context" | "modifier";
+  /** Preferred palette slot (editor/markColours.ts); the text may move it, see `colourKey`. */
   colorIndex?: number;
+  /**
+   * What the colour stands for (`markColour(...).colourKey`, e.g. the term): marks with one key share a slot,
+   * marks with different keys that overlap or stand next to each other never do (`assignMarkColours`).
+   */
+  colourKey?: string;
   /** The annotation's assertion is "absent": its runs get a hatch. */
   negated?: boolean;
 }
@@ -91,7 +98,8 @@ export function mentionsToVendor(
   invalidIds?: string[],
 ): VendorMention[] {
   const result: VendorMention[] = [];
-  for (const mention of mentions) {
+  // One colouring per text: neighbours with different terms get different slots (issue 524).
+  for (const mention of assignMarkColours(mentions, text)) {
     const spans: VendorSpan[] = [];
     let invalid = false;
     for (const seg of mention.segments) {
