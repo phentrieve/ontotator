@@ -61,10 +61,12 @@ class AssignmentGuidelineView(BaseModel):
     version: int
     kind: Literal["markdown", "text"]
     created_at: datetime
+    label: str | None = None
 
 
 class GuidelineNoticeChangeView(BaseModel):
     version: int
+    label: str | None = None
     change_note: str | None
     created_at: datetime
     withdrawn: bool
@@ -75,6 +77,7 @@ class GuidelineNoticeView(BaseModel):
 
     from_version: int | None
     to_version: int
+    to_label: str | None = None
     changes: list[GuidelineNoticeChangeView]
     more: int
 
@@ -83,9 +86,11 @@ class GuidelineNoticeView(BaseModel):
         return cls(
             from_version=notice.from_version,
             to_version=notice.to_version,
+            to_label=notice.to_label,
             changes=[
                 GuidelineNoticeChangeView(
                     version=change.version,
+                    label=change.label,
                     change_note=change.change_note,
                     created_at=change.created_at,
                     withdrawn=change.withdrawn,

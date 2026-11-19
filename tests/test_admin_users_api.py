@@ -141,6 +141,46 @@ def test_languages_are_validated_and_replaced(app):
     assert admin.patch(path, json={"languages": []}).json()["languages"] == []
 
 
+def test_a_language_change_records_the_languages_before_and_after(app):
+    """The history says which languages were added and removed (#467)."""
+    admin = logged_in(app, "root", system_admin=True)
+    logged_in(app, "alice")
+    path = "/api/v1/admin/users/alice"
+    admin.patch(path, json={"languages": ["es", "de"]})
+    admin.patch(path, json={"languages": ["FR", "de"]})
+
+    events = [
+        event["details"]
+        for event in admin.get(f"{path}/audit").json()
+        if event["action"] == "user.languages"
+    ]
+
+    # Newest first.
+    assert events == [
+        {"before": ["de", "es"], "after": ["de", "fr"]},
+        {"before": [], "after": ["de", "es"]},
+    ]
+
+
+def test_anonymising_takes_the_languages_out_of_the_history(app):
+    """Anonymise erases the languages: also where the trail names them (#467)."""
+    admin = logged_in(app, "root", system_admin=True)
+    logged_in(app, "alice")
+    admin.patch("/api/v1/admin/users/alice", json={"languages": ["de", "fr"]})
+    admin.patch("/api/v1/admin/users/alice", json={"active": False})
+
+    done = admin.post(
+        "/api/v1/admin/users/alice/anonymise", json={"confirm_username": "alice"}
+    )
+
+    assert done.status_code == 200, done.text
+    events = admin.get(f"/api/v1/admin/users/{done.json()['username']}/audit").json()
+    languages = [event for event in events if event["action"] == "user.languages"]
+    # The events stay; the erasure itself clears the stored languages, so it
+    # adds one more event, which must not name them either.
+    assert languages and all(event["details"] == {} for event in languages)
+
+
 def test_invalid_compound_create_and_patch_roll_back(app):
     admin = logged_in(app, "root", system_admin=True)
     bad = admin.post(

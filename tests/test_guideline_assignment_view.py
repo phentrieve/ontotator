@@ -63,11 +63,13 @@ def team(tmp_path) -> SimpleNamespace:
     )
 
 
-def publish(client, body: bytes, expected: str = "", note: str = "") -> None:
+def publish(
+    client, body: bytes, expected: str = "", note: str = "", label: str = ""
+) -> None:
     response = client.post(
         BASE,
         files={"file": ("rules.md", body, "text/markdown")},
-        data={"change_note": note, "expected_latest_version": expected},
+        data={"change_note": note, "expected_latest_version": expected, "label": label},
     )
     assert response.status_code == 201, response.text
 
@@ -97,6 +99,22 @@ def test_assignment_view_carries_current_version(team) -> None:
     team.annotator.post(f"{BASE}/2/reads", json={"event": "notified"})
     assert metadata(team, "d1")["guideline_notice"] is None
     assert metadata(team, "d1")["guideline"]["version"] == 2
+
+
+def test_assignment_view_and_notice_carry_the_labels(team) -> None:
+    """Issue 487: "Guidelines 3.1 (v2)", "Guidelines updated to 3.1 (v2)"."""
+    publish(team.lead, b"# One")
+    publish(team.lead, b"# Two", expected="1", note="Clearer", label="3.1")
+    view = metadata(team, "d1")
+    assert (view["guideline"]["version"], view["guideline"]["label"]) == (2, "3.1")
+    notice = view["guideline_notice"]
+    assert (notice["to_version"], notice["to_label"]) == (2, "3.1")
+    assert [(c["version"], c["label"]) for c in notice["changes"]] == [
+        (2, "3.1"),
+        (1, None),
+    ]
+    rows = team.lead.get(f"/api/v1/projects/{KEY}/assignments").json()
+    assert rows and all(row["guideline"]["label"] == "3.1" for row in rows)
 
 
 def test_notice_only_on_editable_tasks_of_the_owner(team) -> None:

@@ -97,7 +97,8 @@ def _has(conn: Connection) -> tuple[bool, bool]:
 
 def test_one_head_follows_the_lead_pause():
     scripts = ScriptDirectory.from_config(alembic_config())
-    assert scripts.get_heads() == [head_revision()] == [REVISION]
+    # One head; 0048 (the label of a guideline version) follows this one.
+    assert scripts.get_heads() == [head_revision()]
     revision = scripts.get_revision(REVISION)
     assert revision is not None and revision.down_revision == PREVIOUS
 

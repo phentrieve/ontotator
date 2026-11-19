@@ -48,8 +48,11 @@ function refusedSave(error: unknown, short: string): string | null {
   return editorialRefusal(isRecord(error.details) && typeof error.details.reason === "string" ? error.details.reason : null, short);
 }
 
-/** The reasons a click gives; the stored reason is their words plus the optional note ("Spacing; Typo", "Typo: Hypotnie"). */
-export const REASON_CHIPS = ["Spacing", "Typo", "Grammar"] as const;
+/**
+ * The reasons a click gives; the stored reason is their words plus the optional note ("Spacing; Typo", "Typo: Hypotnie").
+ * "Removed addition" (issue 483): words the machine added that the source does not have, e.g. a synonym in brackets.
+ */
+export const REASON_CHIPS = ["Spacing", "Typo", "Grammar", "Removed addition"] as const;
 export function reasonText(chips: readonly string[], note: string): string {
   const chosen = REASON_CHIPS.filter(chip => chips.includes(chip)).join("; ");
   return [chosen, note.trim()].filter(Boolean).join(": ");

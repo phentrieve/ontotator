@@ -103,6 +103,8 @@ def test_consolidator_reads_no_name_or_pseudonym_when_on(cons):
     assert payloads["consolidation"] == _payloads(cons)["consolidation"]
     labels = {row["submission_id"]: row["author_label"] for row in payloads["history"]}
     assert labels == {"sub-first-7c1": "Annotator A", "sub-second-9d2": "Annotator B"}
+    # Issue 470: the inputs a consolidator reads are not their own submissions.
+    assert [row["is_me"] for row in payloads["history"]] == [False, False]
     actors = {
         item["source_snapshot"]["annotation"]["provenance"]["actor"]["actor_id"]
         for item in payloads["inputs"]
