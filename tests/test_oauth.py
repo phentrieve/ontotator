@@ -186,6 +186,46 @@ def test_registration_refuses_unsafe_redirect_uris(app: FastAPI, uri: str) -> No
     assert response.json()["error"] == "invalid_redirect_uri"
 
 
+@pytest.mark.parametrize(
+    "uri",
+    [
+        # A browser reads "\" as "/": it goes to evil.example, while the
+        # consent page would show the host as "evil.example\.claude.ai".
+        "https://evil.example\\.claude.ai/cb",
+        "https://evil.example/cb\\..\\other",
+        # A browser decodes these in the host; the page would show them raw.
+        "https://claude.ai%2eevil.example/cb",
+        "https://evil.example%5c.claude.ai/cb",
+        "https://claude.ai;evil.example/cb",
+        "https://claude.ai!evil.example/cb",
+        "http://127.0.0.1%2eevil.example/cb",
+    ],
+)
+def test_registration_refuses_a_host_a_browser_reads_differently(
+    app: FastAPI, uri: str
+) -> None:
+    """Second review, finding 1: the host shown must be the host visited."""
+    response = TestClient(app).post(
+        "/oauth/register", json={"redirect_uris": [uri], "client_name": "Claude"}
+    )
+    assert response.status_code == 400
+    assert response.json()["error"] == "invalid_redirect_uri"
+
+
+@pytest.mark.parametrize(
+    "uri",
+    [
+        "https://claude.ai/api/mcp/auth_callback",
+        "https://my_host.example.org:8443/cb?x=1",
+        "https://xn--bcher-kva.example/cb",
+        "http://[::1]:33418/callback",
+        "http://127.0.0.1/callback",
+    ],
+)
+def test_registration_keeps_accepting_plain_hosts(app: FastAPI, uri: str) -> None:
+    assert _register(app, redirect_uris=[uri])["redirect_uris"] == [uri]
+
+
 def test_registration_accepts_https_and_loopback(app: FastAPI) -> None:
     registered = _register(
         app, redirect_uris=[REDIRECT, "http://localhost:33418/callback"]
@@ -1130,3 +1170,31 @@ def test_an_mcp_url_without_a_path_is_refused(value: str) -> None:
         mcp_url({"ONTOTATOR_MCP_URL": value}, production=True)
     with pytest.raises(ValueError):
         AppConfig(workspace_dir=".", mcp_url=value)
+
+
+def test_repeated_reuse_writes_the_audit_trail_once(
+    app: FastAPI, lead: TestClient
+) -> None:
+    """Second review, finding 4: whoever holds a used code or refresh token
+    must not be able to fill the append-only audit trail, one row per
+    request, without logging in. Only the reuse that revokes is audited."""
+    client, code, verifier = _code(app, lead)
+    form = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": REDIRECT,
+        "code_verifier": verifier,
+        "client_id": client["client_id"],
+    }
+    assert _token(app, **form).status_code == 200
+    for _ in range(3):
+        assert _token(app, **form).json()["error"] == "invalid_grant"
+    assert len(_audit(app, "oauth.code.reuse")) == 1
+
+    client, tokens, _ = _connected(app, lead)
+    first = _refresh(app, client, tokens["refresh_token"]).json()
+    assert _refresh(app, client, first["refresh_token"]).status_code == 200
+    for _ in range(3):
+        replay = _refresh(app, client, tokens["refresh_token"])
+        assert replay.json()["error"] == "invalid_grant"
+    assert len(_audit(app, "oauth.refresh.reuse")) == 1

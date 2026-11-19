@@ -24,7 +24,10 @@ def test_the_mcp_service_has_no_port_no_volume_and_the_runtime_hardening() -> No
     assert "<<: *runtime" in block  # read_only, cap_drop ALL, no-new-privileges
     assert "ports:" not in block and "expose:" not in block
     assert "volumes:" not in block
-    assert "networks: [backend, npm_proxy_network]" in block
+    # Second review, finding 3: it reaches the API through the proxy and
+    # needs no way to the database, so it is not on the internal network.
+    assert "networks: [npm_proxy_network]" in block
+    assert "backend" not in block
     assert 'command: ["--http", "0.0.0.0:8765"]' in block
     assert "profiles: [mcp]" in block  # opt-in
     assert "pids_limit:" in block and "mem_limit:" in block

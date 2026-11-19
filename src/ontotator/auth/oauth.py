@@ -118,6 +118,12 @@ MAX_STATE_LENGTH = 1000
 _CHALLENGE = re.compile(r"^[A-Za-z0-9_-]{43}$")
 _VERIFIER = re.compile(r"^[A-Za-z0-9._~-]{43,128}$")
 _LOOPBACK = ("localhost", "127.0.0.1", "::1")
+# The host of a redirect URI: DNS labels (punycode for IDN) or a bracketed
+# IPv6 literal. Anything else (a backslash, a percent escape, "!" or ";") a
+# browser may read differently from ``urlsplit``, so the host the consent
+# page shows would not be the host the browser goes to.
+_PLAIN_HOST = re.compile(r"^[A-Za-z0-9_](?:[A-Za-z0-9_.-]*[A-Za-z0-9_])?\.?$")
+_IPV6_NETLOC = re.compile(r"^\[[0-9A-Fa-f:.]+\](?::[0-9]+)?$")
 
 
 class OAuthError(Exception):
@@ -319,6 +325,15 @@ def check_redirect_uri(uri: str) -> str:
     if not parts.hostname or parts.username is not None or "@" in parts.netloc:
         raise OAuthError(
             "invalid_redirect_uri", "A redirect URI needs a host and no user info."
+        )
+    host = parts.netloc.rsplit(":", 1)[0] if parts.port else parts.netloc
+    if "\\" in uri or not (
+        _PLAIN_HOST.fullmatch(host) or _IPV6_NETLOC.fullmatch(parts.netloc)
+    ):
+        raise OAuthError(
+            "invalid_redirect_uri",
+            "A redirect URI needs a plain host name (letters, digits, dots and"
+            " hyphens; punycode for other scripts) or an IP address.",
         )
     if parts.scheme == "https":
         return uri
@@ -731,18 +746,21 @@ class OAuthService:
                 return self._redeem(
                     conn, client, row, redirect_uri, verifier, resource, now
                 )
-            # A second use: the code may have leaked. End what it gave.
-            if row.grant_id is not None:
-                _revoke_grant(conn, row.grant_id, "code_reused", now)
-            record_audit(
-                conn,
-                Actor(None, "oauth:token"),
-                "oauth.code.reuse",
-                target_type="oauth_client",
-                target_id=client.id,
-                details={"client_id": client.client_id, "grant_id": row.grant_id},
-                at=now,
-            )
+            # A second use: the code may have leaked. End what it gave. Only
+            # the use that ends the grant is audited: whoever holds the used
+            # code must not add a row to the trail with every request.
+            if row.grant_id is not None and _revoke_grant(
+                conn, row.grant_id, "code_reused", now
+            ):
+                record_audit(
+                    conn,
+                    Actor(None, "oauth:token"),
+                    "oauth.code.reuse",
+                    target_type="oauth_client",
+                    target_id=client.id,
+                    details={"client_id": client.client_id, "grant_id": row.grant_id},
+                    at=now,
+                )
         # Committed: the grant stays revoked although the request fails.
         raise OAuthError("invalid_grant", "The code was used.")
 
@@ -891,17 +909,19 @@ class OAuthService:
             if again is not None:
                 return again
             # Rotation: a used refresh token is either stolen or replayed.
-            if row.revoked_at is None:
-                _revoke_grant(conn, row.grant_id, "refresh_reused", now)
-            record_audit(
-                conn,
-                Actor(None, "oauth:token"),
-                "oauth.refresh.reuse",
-                target_type="oauth_grant",
-                target_id=row.grant_id,
-                details={"client_id": client.client_id},
-                at=now,
-            )
+            # Audited once, when it ends the grant (as for a reused code).
+            if row.revoked_at is None and _revoke_grant(
+                conn, row.grant_id, "refresh_reused", now
+            ):
+                record_audit(
+                    conn,
+                    Actor(None, "oauth:token"),
+                    "oauth.refresh.reuse",
+                    target_type="oauth_grant",
+                    target_id=row.grant_id,
+                    details={"client_id": client.client_id},
+                    at=now,
+                )
             return None
         if (
             row.revoked_at is not None
@@ -1237,15 +1257,19 @@ def _issue(
     )
 
 
-def _revoke_grant(conn: Connection, grant_id: int, reason: str, at: datetime) -> None:
-    """End a grant and every access token it issued; refresh tokens die with it."""
-    conn.execute(
+def _revoke_grant(conn: Connection, grant_id: int, reason: str, at: datetime) -> bool:
+    """End a grant and every access token it issued; refresh tokens die with it.
+
+    True when the grant was still active (this call ended it).
+    """
+    ended = conn.execute(
         update(OAuthGrantRow)
         .where(OAuthGrantRow.id == grant_id, OAuthGrantRow.revoked_at.is_(None))
         .values(revoked_at=at, revoked_reason=reason)
-    )
+    ).rowcount
     conn.execute(
         update(ApiTokenRow)
         .where(ApiTokenRow.oauth_grant_id == grant_id, ApiTokenRow.revoked_at.is_(None))
         .values(revoked_at=at, revoked_reason=reason)
     )
+    return bool(ended)

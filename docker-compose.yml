@@ -158,7 +158,9 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-    networks: [backend, npm_proxy_network]
+    # Only the proxy's network: it reaches the API through the proxy and has
+    # no way to the database on the internal network.
+    networks: [npm_proxy_network]
 
 volumes:
   postgres-data:

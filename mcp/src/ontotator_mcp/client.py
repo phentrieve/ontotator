@@ -124,12 +124,31 @@ class Bearer(httpx.Auth):
     instead of sending the request unauthenticated.
     """
 
-    def __init__(self, token: Callable[[], str | None]) -> None:
+    def __init__(
+        self, token: Callable[[], str | None], origin: str | None = None
+    ) -> None:
         self._token = token
+        # The only origin the token may go to (ONTOTATOR_URL): a path that is
+        # an absolute URL would otherwise take it to another host.
+        self._origin = None if origin is None else httpx.URL(origin)
+
+    def _foreign(self, url: httpx.URL) -> bool:
+        if self._origin is None:
+            return False
+        return (url.scheme, url.host, url.port) != (
+            self._origin.scheme,
+            self._origin.host,
+            self._origin.port,
+        )
 
     def auth_flow(
         self, request: httpx.Request
     ) -> Generator[httpx.Request, httpx.Response, None]:
+        if self._foreign(request.url):
+            raise OntotatorError(
+                "This request would leave the Ontotator instance; the token is"
+                " sent only to ONTOTATOR_URL, so nothing was sent."
+            )
         token = self._token()
         if not token:
             raise OntotatorError(
@@ -161,7 +180,9 @@ class OntotatorClient:
     ) -> None:
         self.settings = settings
         fixed = settings.token
-        self._auth = Bearer((lambda: fixed) if fixed is not None else caller_token)
+        self._auth = Bearer(
+            (lambda: fixed) if fixed is not None else caller_token, settings.url
+        )
         self._http = httpx.AsyncClient(
             base_url=settings.url,
             headers={
@@ -190,7 +211,9 @@ class OntotatorClient:
     async def token_record(self, token: str) -> httpx.Response:
         """``GET /api/v1/me/token`` with ``token``: how remote mode checks one."""
         try:
-            return await self._http.get("/api/v1/me/token", auth=Bearer(lambda: token))
+            return await self._http.get(
+                "/api/v1/me/token", auth=Bearer(lambda: token, self.settings.url)
+            )
         except httpx.HTTPError as exc:
             raise OntotatorError(
                 redact(

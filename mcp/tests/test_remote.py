@@ -420,3 +420,41 @@ def test_an_unreachable_ontotator_is_not_remembered_as_a_refusal(
     assert _post(client, _rpc("tools/list"), TOKEN_A).status_code == 401
     fake.on("GET", "/api/v1/me/token", token_view(id=1, owner="anna"))
     assert _post(client, _rpc("tools/list"), TOKEN_A).status_code == 200
+
+
+# Second review, finding 2: the token goes to ONTOTATOR_URL and nowhere else,
+# even for a path that is an absolute URL (httpx would send it there).
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "path",
+    [
+        "https://evil.test/api/v1/me/token",
+        "http://ontotator.test/api/v1/me/token",  # another scheme
+        "https://ontotator.test:8443/api/v1/me/token",  # another port
+    ],
+)
+async def test_the_token_is_never_sent_to_another_origin(path: str) -> None:
+    from ontotator_mcp.client import OntotatorClient
+    from ontotator_mcp.errors import OntotatorError
+
+    seen: list[httpx.Request] = []
+
+    def record(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json={})
+
+    api = OntotatorClient(
+        Settings(url=API, token=TOKEN_A), transport=httpx.MockTransport(record)
+    )
+    try:
+        with pytest.raises(OntotatorError) as refused:
+            await api.get(path)
+        assert TOKEN_A not in str(refused.value)
+        assert seen == []
+        # The instance itself still gets the token.
+        await api.get("/api/v1/me/token")
+        assert seen[-1].headers["authorization"] == f"Bearer {TOKEN_A}"
+    finally:
+        await api.aclose()
