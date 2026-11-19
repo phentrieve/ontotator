@@ -629,6 +629,63 @@
 
 .run--color-5 { --run-fill: var(--mark-5-fill); }
 
+/* Overlapping marks (issue 524): one band per colour inside the same lower highlight zone, band 0 at the
+   bottom; editor/markColours.ts keeps different terms that overlap apart in colour and vendor/spans.js
+   (bandClasses) orders the bands by the marks' start in the text. Only the background changes: the line
+   height, the text and the lines of the mark states stay as they are. `run--band-I-N` gives band I the
+   fill of slot N. */
+
+.run--band-0-0 { --run-band-0: var(--mark-0-fill); }
+.run--band-0-1 { --run-band-0: var(--mark-1-fill); }
+.run--band-0-2 { --run-band-0: var(--mark-2-fill); }
+.run--band-0-3 { --run-band-0: var(--mark-3-fill); }
+.run--band-0-4 { --run-band-0: var(--mark-4-fill); }
+.run--band-0-5 { --run-band-0: var(--mark-5-fill); }
+
+.run--band-1-0 { --run-band-1: var(--mark-0-fill); }
+.run--band-1-1 { --run-band-1: var(--mark-1-fill); }
+.run--band-1-2 { --run-band-1: var(--mark-2-fill); }
+.run--band-1-3 { --run-band-1: var(--mark-3-fill); }
+.run--band-1-4 { --run-band-1: var(--mark-4-fill); }
+.run--band-1-5 { --run-band-1: var(--mark-5-fill); }
+
+.run--band-2-0 { --run-band-2: var(--mark-0-fill); }
+.run--band-2-1 { --run-band-2: var(--mark-1-fill); }
+.run--band-2-2 { --run-band-2: var(--mark-2-fill); }
+.run--band-2-3 { --run-band-2: var(--mark-3-fill); }
+.run--band-2-4 { --run-band-2: var(--mark-4-fill); }
+.run--band-2-5 { --run-band-2: var(--mark-5-fill); }
+
+.run--band-3-0 { --run-band-3: var(--mark-0-fill); }
+.run--band-3-1 { --run-band-3: var(--mark-1-fill); }
+.run--band-3-2 { --run-band-3: var(--mark-2-fill); }
+.run--band-3-3 { --run-band-3: var(--mark-3-fill); }
+.run--band-3-4 { --run-band-3: var(--mark-4-fill); }
+.run--band-3-5 { --run-band-3: var(--mark-5-fill); }
+
+.run--bands-2 {
+  --run-highlight: linear-gradient(to bottom, transparent 0 40%,
+    var(--run-band-1) 54% 77%, var(--run-band-0) 77% 100%);
+}
+
+.run--bands-3 {
+  --run-highlight: linear-gradient(to bottom, transparent 0 40%,
+    var(--run-band-2) 54% 69%, var(--run-band-1) 69% 85%, var(--run-band-0) 85% 100%);
+}
+
+/* Four or more colours: two bands, and a top band striped in the third and fourth colour (a separate layer,
+   placed over 54% to 69% of the run). The run's title names every mark. */
+
+.run--bands-more {
+  --run-highlight: linear-gradient(to bottom, transparent 0 69%,
+    var(--run-band-1) 69% 85%, var(--run-band-0) 85% 100%);
+  --run-stripes: repeating-linear-gradient(90deg, var(--run-band-2) 0 4px, var(--run-band-3) 4px 8px);
+  background-image: var(--run-highlight), var(--run-stripes);
+  background-size: 100% 100%, 100% 15%;
+  background-position: 0 0, 0 63.5%;
+  background-repeat: no-repeat;
+}
+
 /* The state of a mark is carried by its line, not by its hue: own annotations are
    underlined solid, proposals under review dashed, read-only references dotted. */
 
@@ -704,6 +761,15 @@
   background-image:
     repeating-linear-gradient(135deg, transparent 0 5px, var(--mark-negated-hatch) 5px 6px),
     var(--run-highlight);
+}
+
+.run--negated.run--bands-more {
+  background-image:
+    repeating-linear-gradient(135deg, transparent 0 5px, var(--mark-negated-hatch) 5px 6px),
+    var(--run-highlight), var(--run-stripes);
+  background-size: auto, 100% 100%, 100% 15%;
+  background-position: 0 0, 0 0, 0 63.5%;
+  background-repeat: repeat, no-repeat, no-repeat;
 }
 
 /* B3-4 (mockup 01 A): while its finding is selected a modifier span has a dotted accent underline, no frame;
