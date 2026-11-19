@@ -48,13 +48,14 @@ from ontotator.authz.memberships import grant_lead_self_role
 from ontotator.authz.policy import Access, Action, Role, Task
 from ontotator.authz.project_authority import require_project_management
 from ontotator.authz.visibility import current_access, require_document
-from ontotator.domain.annotation_limits import MAX_CONSOLIDATION_SOURCES
+from ontotator.domain.annotation_limits import consolidation_source_limit
 from ontotator.domain.canonical import canonical_hash
 from ontotator.domain.errors import AccessDenied, DomainError
 from ontotator.domain.work_rounds import WorkRoundView
 from ontotator.storage.database import Database
 from ontotator.storage.repository import _lock_id
 from ontotator.storage.tables import ProjectRow, UserRow
+from ontotator.storage.text_settings import effective_per_text
 from ontotator.storage.workflow_tables import WorkflowCommandReceiptRow
 
 __all__ = ["ConsolidationStartService", "StartConsolidation", "StartedConsolidation"]
@@ -71,9 +72,9 @@ class StartConsolidation(BaseModel):
     document_id: str = Field(min_length=1)
     # Username of the consolidator; the acting lead may name themself.
     reviewer: str = Field(min_length=1)
-    source_submission_ids: list[str] = Field(
-        min_length=2, max_length=MAX_CONSOLIDATION_SOURCES
-    )
+    # At most ``consolidation_source_limit`` of the text (checked in
+    # ``start``: it follows the text's "Annotations per text").
+    source_submission_ids: list[str] = Field(min_length=2)
     reason: str | None = Field(default=None, max_length=2000)
     confirm_language: bool = False
     request_id: str = Field(min_length=1, max_length=128)
@@ -171,6 +172,17 @@ class ConsolidationStartService:
                 return StartedConsolidation(
                     round=WorkRoundView.model_validate(stored["round"]),
                     role_granted=bool(stored["role_granted"]),
+                )
+            most = consolidation_source_limit(
+                effective_per_text(
+                    conn, pid, body.document_id, int(project["annotations_per_text"])
+                )
+            )
+            if len(sources) > most:
+                raise DomainError(
+                    "ROUND_INPUT_INVALID",
+                    f"Too many source submissions: {len(sources)}. One"
+                    f" consolidation of this text merges at most {most}.",
                 )
             existing = AssignmentService.active_for(
                 conn, pid, body.document_id, target, _TASK

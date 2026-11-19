@@ -137,6 +137,21 @@ def test_a_consolidator_also_gets_the_consolidation_task(app: FastAPI) -> None:
     assert not any(name.startswith("practice-colleague") for name in users)
 
 
+def test_the_servers_maximum_of_annotations_per_text_leaves_practice_alone(
+    app: FastAPI, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Issue 457: the consolidation exercise needs its two annotators, also
+    on a server that allows one annotator per text."""
+    monkeypatch.setenv("ONTOTATOR_MAX_ANNOTATIONS_PER_TEXT", "1")
+    client = _member(app, "cons", ["annotator", "adjudicator"])
+
+    answer = client.post("/api/v1/me/practice")
+
+    assert answer.status_code == 200, answer.text
+    kinds = [task["kind"] for task in answer.json()["project"]["tasks"]]
+    assert kinds == ["scratch", "proposals", "translation_review", "consolidation"]
+
+
 def test_consolidation_decisions_name_their_terms(app: FastAPI) -> None:
     client = _member(app, "cons", ["annotator", "adjudicator"])
     project = client.post("/api/v1/me/practice").json()["project"]

@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { api, type OntologyInfo, type ProjectPin, type ProjectSettings, type TaskProfile } from "../api/client";
 import { Checkbox, InlineMessage, Select, TextInput } from "../ui";
 import { helpHref } from "../help/sections";
-import { MAX_ANNOTATORS_PER_TEXT } from "./assignSummary";
+import { validPerText } from "./assignSummary";
 import { ErrorNotice } from "./ErrorNotice";
 import { SettingsCard } from "./SettingsCard";
 
@@ -180,12 +180,16 @@ export const importPlanOptions: { value: WorkflowDraft["import_plan"]; label: st
  * says where the setting acts and what overrides it. Lowering the number shows how many rows already have more
  * annotators (server preview).
  */
-export function WorkflowFields({ projectKey, value, saved, onChange, disabled }: {
+export function WorkflowFields({ projectKey, value, saved, max, onChange, disabled }: {
   projectKey: string; value: WorkflowDraft; saved: WorkflowDraft; onChange: (value: WorkflowDraft) => void; disabled?: boolean;
+  /** The server's maximum of "Annotators per text" (issue 457); null or absent: no limit. */
+  max?: number | null;
 }): JSX.Element {
   const prefix = useId().replace(/:/g, "");
   const target = value.annotations_per_text;
-  const lowered = Number.isInteger(target) && target >= 1 && target <= MAX_ANNOTATORS_PER_TEXT && target < saved.annotations_per_text;
+  const lowered = validPerText(target) && target < saved.annotations_per_text;
+  // A value saved before the server got its maximum stays valid in the form, so the other settings can still be saved.
+  const fieldMax = max == null ? undefined : Math.max(max, saved.annotations_per_text);
   const [over, setOver] = useState<{ target: number; rows: number } | null>(null);
   useEffect(() => {
     if (!lowered) return;
@@ -218,7 +222,7 @@ export function WorkflowFields({ projectKey, value, saved, onChange, disabled }:
     <SettingsCard title="Annotation and consolidation" hint="Checked when you assign."
       why={<><p>Native source texts are never held back by the translation review; the Assign dialog can override this for one assignment.</p><p>The consolidator rule is checked when you assign consolidation.</p><p>Hidden names apply to every consolidation the next time it opens.</p></>}>
       <div className="settings-card-row">
-        <TextInput id={`${prefix}-annotations`} label="Annotators per text" type="number" min={1} max={MAX_ANNOTATORS_PER_TEXT} step={1} required hint={`1 to ${MAX_ANNOTATORS_PER_TEXT}. Upper limit; fewer is fine.`} value={Number.isFinite(target) ? String(target) : ""} disabled={disabled}
+        <TextInput id={`${prefix}-annotations`} label="Annotators per text" type="number" min={1} max={fieldMax} step={1} required hint={max == null ? "Upper limit; fewer is fine." : `Upper limit; fewer is fine. This server allows at most ${max}.`} value={Number.isFinite(target) ? String(target) : ""} disabled={disabled}
           onChange={event => onChange({ ...value, annotations_per_text: event.target.value === "" ? Number.NaN : Number(event.target.value) })} />
         <div>
           <Checkbox id={`${prefix}-translation-gate`} label="Annotate only after the translation review is accepted"
