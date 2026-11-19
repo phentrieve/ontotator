@@ -21,6 +21,7 @@ from sqlalchemy import (
     Connection,
     RowMapping,
     Select,
+    and_,
     case,
     func,
     insert,
@@ -465,6 +466,50 @@ def _paused(row: RowMapping) -> dict[str, Any]:
     values["pause_causes"] = tuple(pause_causes(values))
     del values["report_held"], values["lead_paused"]
     return values
+
+
+def _last_saves(
+    conn: Connection, user_id: int, assignment_ids: List[int]
+) -> dict[int, datetime]:
+    """When the person last saved the draft of each of their tasks: the
+    annotation or consolidation draft, or the translation review draft. A
+    draft that was only created (revision 0) is not a save."""
+    from ontotator.storage.tables import DraftRow
+
+    if not assignment_ids:
+        return {}
+    result: dict[int, datetime] = {}
+    modes = case(
+        {mode: task for mode, task in TASK_FOR_MODE.items()}, value=DraftRow.mode
+    )
+    for assignment_id, at in conn.execute(
+        select(AssignmentRow.id, func.max(DraftRow.updated_at))
+        .join(UserRow, UserRow.id == AssignmentRow.user_id)
+        .join(
+            DraftRow,
+            and_(
+                DraftRow.project_id == AssignmentRow.project_id,
+                DraftRow.document_id == AssignmentRow.document_id,
+                DraftRow.annotator_id == UserRow.pseudonym,
+                modes == AssignmentRow.task,
+                DraftRow.revision > 0,
+            ),
+        )
+        .where(AssignmentRow.id.in_(assignment_ids), AssignmentRow.user_id == user_id)
+        .group_by(AssignmentRow.id)
+    ).tuples():
+        result[assignment_id] = at
+    for assignment_id, at in conn.execute(
+        select(
+            TranslationReviewDraftRow.assignment_id,
+            TranslationReviewDraftRow.updated_at,
+        ).where(
+            TranslationReviewDraftRow.assignment_id.in_(assignment_ids),
+            TranslationReviewDraftRow.revision > 0,
+        )
+    ).tuples():
+        result[assignment_id] = at
+    return result
 
 
 def _assignment(row: RowMapping) -> Assignment:
@@ -1790,6 +1835,7 @@ class AssignmentService:
                             },
                         )
                     }
+            saved = _last_saves(conn, user_id, [r["assignment_id"] for r in rows])
             result = []
             for row in rows:
                 source = target = None
@@ -1815,7 +1861,15 @@ class AssignmentService:
                 second = second_reviews.get(row["assignment_id"])
                 result.append(
                     TaskSummary(
-                        **_paused(row),
+                        # "Last change" in My tasks: also the person's last
+                        # save, which leaves the assignment row as it is.
+                        **{
+                            **_paused(row),
+                            "updated_at": max(
+                                row["updated_at"],
+                                saved.get(row["assignment_id"], row["updated_at"]),
+                            ),
+                        },
                         waiting_for_translation_review=waiting and not for_lead,
                         waiting_for_lead=waiting and for_lead,
                         translation_finished=row["task"] == "annotate"

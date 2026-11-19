@@ -371,12 +371,12 @@ test("issue 472: the selection bar and a toast leave most of Documents in view (
   await page.getByRole("menu", { name: "More actions" }).getByRole("menuitem", { name: "Reopen…" }).click();
   const reopen = page.getByRole("dialog", { name: "Reopen: 8 texts" });
   await reopen.getByLabel(/^Reason/).fill("Guideline 2.3 changed for vital signs");
-  await reopen.getByRole("button", { name: "Reopen 8 assignments" }).click();
+  await reopen.getByRole("button", { name: "Reopen 8 tasks" }).click();
   await reopen.getByLabel("I understand").check();
-  await reopen.getByRole("button", { name: "Reopen 8 assignments" }).click();
+  await reopen.getByRole("button", { name: "Reopen 8 tasks" }).click();
   await expect(reopen).toBeHidden();
   const toast = page.locator(".ui-toast");
-  await expect(toast).toContainText("Reopened 8 assignments in 6 texts.");
+  await expect(toast).toContainText("Reopened 8 tasks in 6 texts.");
   await expect(toast.getByRole("button", { name: "Undo" })).toBeVisible();
 
   // The toast sits above the bar without covering it, and together they take less than a third of the window.

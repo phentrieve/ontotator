@@ -138,7 +138,7 @@ test('Q1 (B2): the problem dialog keeps New report and Close in a fixed footer',
   await expect(page.locator('.text-container')).toBeVisible();
   // The entry is a "More" menu item; focus returns to the "More actions" button.
   const entry = page.getByRole('button', { name: 'More actions', exact: true });
-  const openEntry = () => moreAction(page, /^Report a text problem…/);
+  const openEntry = () => moreAction(page, /^(Report a text problem…|Text problems)/);
   // No report yet: the entry opens the new report form directly.
   await openEntry();
   const form = page.getByRole('dialog', { name: 'New problem report', exact: true });

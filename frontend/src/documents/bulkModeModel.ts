@@ -29,13 +29,13 @@ const SKIPS: Readonly<Record<string, string>> = {
   no_current_version: "no version of the text is in use",
 };
 
-/** "discards 7 submissions, removes 2 unsubmitted assignments" over the changed texts; "no work to discard" without any. */
+/** "discards 7 submissions, removes 2 unsubmitted tasks" over the changed texts; "no work to discard" without any. */
 export function workText(preview: Pick<BulkModeChangeView, "changes">): string {
   const submissions = preview.changes.reduce((sum, item) => sum + item.submissions.length, 0);
   const open = preview.changes.reduce((sum, item) => sum + item.assignments.filter(task => task.status !== "submitted").length, 0);
   const parts = [
     submissions ? `discards ${plural(submissions, "submission")}` : null,
-    open ? `removes ${plural(open, "unsubmitted assignment")}` : null,
+    open ? `removes ${plural(open, "unsubmitted task")}` : null,
   ].filter(Boolean);
   return parts.length ? parts.join(", ") : "no work to discard";
 }
@@ -87,13 +87,13 @@ export function affectedPeople(preview: Pick<BulkModeChangeView, "changes">): Af
   return [...people.values()].sort((a, b) => discarded(b) - discarded(a) || a.name.localeCompare(b.name));
 }
 
-/** "Tom Reis: 4 submissions are discarded; 1 unsubmitted assignment is removed." */
+/** "Tom Reis: 4 submissions are discarded; 1 unsubmitted task is removed." */
 export function affectedLine(person: AffectedPerson): string {
   const are = (count: number) => count === 1 ? "is" : "are";
   const parts = [
     person.submissions ? `${plural(person.submissions, "submission")} ${are(person.submissions)} discarded` : null,
     person.consolidations ? `${plural(person.consolidations, "consolidation")} ${are(person.consolidations)} discarded` : null,
-    person.removed ? `${plural(person.removed, "unsubmitted assignment")} ${are(person.removed)} removed` : null,
+    person.removed ? `${plural(person.removed, "unsubmitted task")} ${are(person.removed)} removed` : null,
     person.removedConsolidations ? `${plural(person.removedConsolidations, "unsubmitted consolidation")} ${are(person.removedConsolidations)} removed` : null,
   ].filter(Boolean);
   return `${person.name}: ${parts.join("; ")}.`;
@@ -116,7 +116,7 @@ export function modeConsequences(preview: BulkModeChangeView): string[] {
   const open = preview.changes.reduce((sum, item) => sum + item.assignments.filter(task => task.status !== "submitted").length, 0);
   const work = [
     submissions ? `${plural(submissions, "submission")} ${submissions === 1 ? "is" : "are"} discarded` : null,
-    open ? `${plural(open, "unsubmitted assignment")} ${open === 1 ? "is" : "are"} removed (drafts are kept)` : null,
+    open ? `${plural(open, "unsubmitted task")} ${open === 1 ? "is" : "are"} removed (drafts are kept)` : null,
   ].filter(Boolean).join(" and ");
   return [
     `The annotation of ${plural(count, "text")} starts again ${MODE_WORDS[preview.mode]}: assign ${count === 1 ? "it" : "them"} anew.`,
