@@ -100,6 +100,7 @@ async def publish_guideline(
     file: Annotated[UploadFile, File()],
     change_note: Annotated[str, Form()] = "",
     expected_latest_version: Annotated[str, Form(pattern=r"^[0-9]{0,9}$")] = "",
+    label: Annotated[str, Form()] = "",
 ) -> GuidelineSummary:
     _require_management(request, key)
     try:
@@ -125,6 +126,7 @@ async def publish_guideline(
         expected_latest_version=(
             int(expected_latest_version) if expected_latest_version else None
         ),
+        label=label,
     )
 
 

@@ -74,9 +74,11 @@ from ontotator.storage.tables import (
     SubmissionRow,
     UserRow,
 )
+from ontotator.storage.text_change_carries import carry_lapsed
 from ontotator.storage.workflow_tables import (
     RoundInputRow,
     WorkflowCommandReceiptRow,
+    WorkRoundRow,
 )
 
 logger = logging.getLogger(__name__)
@@ -522,6 +524,61 @@ class TextChangeService:
         if source_assignment is not None:
             require_task_writable(conn, source_assignment)
 
+    @staticmethod
+    def _standing_carry(
+        conn: Connection, pid: int, submission_id: str, target_document_id: str
+    ) -> dict[str, Any] | None:
+        """The decision that still settles this submission for the target.
+
+        A ``dismissed`` decision is final. A carry stands unless its task was
+        withdrawn or removed without a submission (``carry_lapsed``, issue
+        461); the row of a lapsed carry stays as the record of that decision.
+        Returns the decision, the task it created (None for ``dismissed``)
+        and when it was made.
+        """
+        row = conn.execute(
+            select(
+                TextChangeResolutionRow.resolution,
+                TextChangeResolutionRow.decided_at,
+                WorkRoundRow.assignment_id,
+            )
+            .outerjoin(
+                WorkRoundRow,
+                (WorkRoundRow.project_id == TextChangeResolutionRow.project_id)
+                & (WorkRoundRow.round_id == TextChangeResolutionRow.round_id),
+            )
+            .where(
+                TextChangeResolutionRow.project_id == pid,
+                TextChangeResolutionRow.submission_id == submission_id,
+                TextChangeResolutionRow.to_document_id == target_document_id,
+                ~carry_lapsed(),
+            )
+            .order_by(TextChangeResolutionRow.id.desc())
+            .limit(1)
+        ).one_or_none()
+        if row is None:
+            return None
+        return {
+            "resolution": row.resolution,
+            "assignment_id": row.assignment_id,
+            "decided_at": row.decided_at.isoformat(),
+        }
+
+    @classmethod
+    def _require_not_carried(
+        cls, conn: Connection, pid: int, submission_id: str, target_document_id: str
+    ) -> None:
+        """One standing decision per submission and target (``already_resolved``).
+
+        The refusal names the earlier decision and its task, for the dry run
+        (``preview``) as for the carry itself.
+        """
+        standing = cls._standing_carry(conn, pid, submission_id, target_document_id)
+        if standing is not None:
+            raise DomainError(
+                "TEXT_CHANGE_NOT_APPLICABLE", {"reason": "already_resolved"} | standing
+            )
+
     def _require_target_proposals(
         self, conn: Connection, key: str, pid: int, target: VariantInfo
     ) -> None:
@@ -549,6 +606,9 @@ class TextChangeService:
 
         Runs the source checks of the operation it previews: a move's open
         work, a carry's current annotation result on a task that is not held.
+        A submission already carried to the target, or dismissed for it, is
+        refused as the carry would be (``already_resolved`` with the earlier
+        decision and its task, issue 461).
         """
         if (assignment_id is None) == (submission_id is None):
             # The route validates this; a caller naming neither or both is a bug.
@@ -592,6 +652,8 @@ class TextChangeService:
             source, target = self._check_target(
                 conn, key, pid, from_id, target_document_id
             )
+            if submission_id is not None:
+                self._require_not_carried(conn, pid, submission_id, target.document_id)
             old = self.repo.get_document(key, source.document_id)
             new = self.repo.get_document(key, target.document_id)
             assert old is not None and new is not None
@@ -983,6 +1045,10 @@ class TextChangeService:
         ``other``: a ``handover`` round for ``username``, who must have no own
         work on the row (I3); ``dismiss``: only the decision is recorded. A
         final on the old version is never touched (I6).
+
+        One decision per submission and target: a second one is refused
+        (``already_resolved``), except after a carry whose task was withdrawn
+        or removed without a submission (issue 461). ``dismiss`` stays final.
         """
         request_hash = canonical_hash(
             {
@@ -1012,17 +1078,7 @@ class TextChangeService:
             source, target = self._check_target(
                 conn, key, pid, submission.origin_key.document_id, target_document_id
             )
-            if (
-                conn.execute(
-                    select(TextChangeResolutionRow.id).where(
-                        TextChangeResolutionRow.project_id == pid,
-                        TextChangeResolutionRow.submission_id == submission_id,
-                        TextChangeResolutionRow.to_document_id == target.document_id,
-                    )
-                ).first()
-                is not None
-            ):
-                raise _not_applicable("already_resolved")
+            self._require_not_carried(conn, pid, submission_id, target.document_id)
             final = conn.execute(
                 select(FinalSelectionRow.submission_id).where(
                     FinalSelectionRow.project_id == pid,

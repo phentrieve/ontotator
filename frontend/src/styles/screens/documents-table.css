@@ -235,5 +235,8 @@ button.documents-text-name { min-height: 24px; padding: 0; border: 0; background
 .editorial-correction-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .editorial-correction-chips .ui-plan-chip + .ui-plan-chip { margin-inline-start: 0; }
 .editorial-correction-work { margin: 0; overflow-wrap: anywhere; }
+/* The lead decides a query (issue 483): the layout of "Fix typos…", with the reviewer's question on top. */
+.query-decision .documents-review-reason { margin-top: 0; }
+.query-decision textarea.form-control { resize: vertical; }
 .upload-version .translation-diff,
 .upload-version .translation-text { height: auto; max-height: min(40vh, 22rem); min-height: 6rem; border: 1px solid var(--border); border-radius: var(--radius); white-space: pre-wrap; overflow: auto; overflow-wrap: anywhere; padding: var(--space-3); font-family: var(--font-serif); font-size: var(--size-reading); line-height: var(--leading-reading); background: var(--surface-raised); }

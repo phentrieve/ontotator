@@ -70,10 +70,37 @@ function longGraphemes(text: string): TextRange[] {
   return found;
 }
 
+/** A space, tab or no-break space: whitespace other than a line break. */
+const HORIZONTAL_SPACE = /[^\S\r\n]/;
+/** The spaces of a whitespace-only change as a reader sees them: no line breaks, every kind of space as a space. */
+const spacing = (text: string): string => text.replace(/[\r\n]+/g, "").replace(/[^\S\r\n]/g, " ");
+
+/**
+ * Per part, whether a reader can see the change (the other display rule of marks, with `displayRanges`). A change
+ * with a letter, digit or sign is seen. A change of spaces only is seen when the number of spaces changed: a double
+ * space typed into the text, a removed space, a space at the end (issue 483). It is not seen, and neither marked nor
+ * counted, when only the kind of whitespace changed (CRLF to LF, a no-break space to a space) or only line breaks did:
+ * its mark would show nothing a reader can find.
+ */
+function visibleChanges(parts: readonly TextDiffPart[]): boolean[] {
+  const visible = parts.map(part => part.op !== "equal" && /\S/.test(part.text));
+  for (let start = 0; start < parts.length;) {
+    if (parts[start].op === "equal") { start++; continue; }
+    let end = start, removed = "", added = "";
+    for (; end < parts.length && parts[end].op !== "equal"; end++) {
+      if (parts[end].op === "delete") removed += parts[end].text; else added += parts[end].text;
+    }
+    if (/\S/.test(removed + added) || spacing(removed) !== spacing(added)) {
+      for (let index = start; index < end; index++) if (HORIZONTAL_SPACE.test(parts[index].text)) visible[index] = true;
+    }
+    start = end;
+  }
+  return visible;
+}
+
 /**
  * Display rules for marks: a range never splits a grapheme (it grows to the grapheme's edges, so a changed person in
- * a ZWJ emoji marks the whole emoji), overlapping ranges merge, and a whitespace-only change (CRLF to LF, a
- * no-break space to a space) is left out: its mark would be invisible, and it is no passage a reader can find.
+ * a ZWJ emoji marks the whole emoji) and overlapping ranges merge. Which changes get a range: `visibleChanges`.
  */
 function displayRanges(text: string, ranges: readonly TextRange[]): TextRange[] {
   if (!ranges.length) return [];
@@ -89,7 +116,7 @@ function displayRanges(text: string, ranges: readonly TextRange[]): TextRange[] 
     if (last && start <= last.end) last.end = Math.max(last.end, end);
     else result.push({ start, end });
   }
-  return result.filter(range => /\S/.test(text.slice(range.start, range.end)));
+  return result;
 }
 
 /**
@@ -100,13 +127,14 @@ function displayRanges(text: string, ranges: readonly TextRange[]): TextRange[] 
 export function changeRanges(before: string, after: string, parts: readonly TextDiffPart[] | null = diffTextBounded(before, after)): { removed: TextRange[]; added: TextRange[] } | null {
   if (!parts) return null;
   const removed: TextRange[] = [], added: TextRange[] = [];
+  const visible = visibleChanges(parts);
   let inBefore = 0, inAfter = 0;
-  for (const part of parts) {
+  parts.forEach((part, index) => {
     const length = part.text.length;
-    if (part.op === "delete") { removed.push({ start: inBefore, end: inBefore + length }); inBefore += length; }
-    else if (part.op === "insert") { added.push({ start: inAfter, end: inAfter + length }); inAfter += length; }
+    if (part.op === "delete") { if (visible[index]) removed.push({ start: inBefore, end: inBefore + length }); inBefore += length; }
+    else if (part.op === "insert") { if (visible[index]) added.push({ start: inAfter, end: inAfter + length }); inAfter += length; }
     else { inBefore += length; inAfter += length; }
-  }
+  });
   return { removed: displayRanges(before, removed), added: displayRanges(after, added) };
 }
 
@@ -149,8 +177,8 @@ const joins = (equal: string): boolean => !/[\r\n]/.test(equal) && (equal.match(
  * Changed passages of `after` against `before`, from the same word diff as `changeRanges`: neighbouring changes with
  * at most two unchanged words between them on one line read as one passage ("Puls regelmäßig, apikal auskultierte
  * Herzfrequenz 120/min, Temperatur"), so the count and the Previous / Next steps follow sentences, not single words.
- * The display rules of `changeRanges` apply: a passage never splits a grapheme, and a passage whose changes are all
- * whitespace (CRLF to LF, a no-break space to a space) is left out. `null` when the texts differ too much
+ * The display rules of `changeRanges` apply: a passage never splits a grapheme, and a passage whose changes a reader
+ * cannot see (CRLF to LF, a no-break space to a space; `visibleChanges`) is left out. `null` when the texts differ too much
  * (`diffTextBounded`): show no marks and say so.
  */
 export function changePassages(before: string, after: string, parts: readonly TextDiffPart[] | null = diffTextBounded(before, after)): ChangePassage[] | null {
@@ -159,7 +187,8 @@ export function changePassages(before: string, after: string, parts: readonly Te
   let current: (ChangePassage & { visible: boolean }) | null = null;
   let gap: string | null = null;
   let inBefore = 0, inAfter = 0;
-  for (const part of parts) {
+  const seen = visibleChanges(parts);
+  for (const [index, part] of parts.entries()) {
     const length = part.text.length;
     if (part.op === "equal") {
       if (current) gap = part.text;
@@ -170,7 +199,7 @@ export function changePassages(before: string, after: string, parts: readonly Te
     if (!current) current = { start: inAfter, end: inAfter, beforeStart: inBefore, beforeEnd: inBefore, before: [], hasRemoved: false, visible: false };
     else if (gap !== null) current.before.push({ text: gap, removed: false });
     gap = null;
-    const visible = /\S/.test(part.text);
+    const visible = seen[index];
     if (visible) current.visible = true;
     if (part.op === "delete") {
       current.before.push({ text: part.text, removed: true });

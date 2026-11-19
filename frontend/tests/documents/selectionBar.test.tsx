@@ -132,7 +132,7 @@ it("Move to front confirms inline, moves the selected texts and keeps the select
   fireEvent.click(move);
   expect(move.getAttribute("aria-expanded")).toBe("true");
   const confirm = within(bar()).getByRole("group", { name: "Move to the front of the queue" });
-  expect(within(confirm).getByText("Open tasks on the 2 selected texts come first in My tasks, before the tasks on texts imported earlier. The other texts keep their order.")).toBeTruthy();
+  expect(within(confirm).getByText("Tasks already assigned on the 2 selected texts come first in My tasks. Tasks you assign later follow the order of assignment. The texts' order under Import order changes with it.")).toBeTruthy();
   expect(api.moveToFront).not.toHaveBeenCalled();
   // One "Move to front" on screen: the confirmation's button names what it does.
   expect(within(bar()).getAllByRole("button", { name: "Move to front" })).toHaveLength(1);

@@ -517,6 +517,20 @@ describe("translation part", () => {
     expect(onAcceptVersion).toHaveBeenCalledWith(row, versions[2]);
   });
 
+  it("issue 483: a version accepted by the lead's decision on a query names the decision and the answer", () => {
+    const lead = { pseudonym: "ann-0002", display_name: "Project lead", is_me: false };
+    const decision = { decided_document_id: "case-200-de", reviewed_document_id: "case-200-de", reviewer_assignment_id: 31, decided_at: "2026-11-18T10:12:00", decided_by: lead };
+    const versions = [
+      version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "reviewed", latest_review_decision: "query", chain_name: "m1", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "m1", translation_status: "accepted",
+        query_decision: { ...decision, kind: "reviewer_text", answer: "Yes, as proposed.", edited: false } }),
+    ];
+    const review = work({ assignment_id: 31, document_id: "case-200-de", task: "translation_review", status: "submitted", author_label: "ann-0003", person: { pseudonym: "ann-0003", display_name: "Ana Weber", is_me: false } });
+    renderCard({ row: assignRow({ versions, work: [review] }), initialSegment: "translation", now: new Date("2026-11-20T12:00:00") });
+    const part = within(card()).getByRole("heading", { name: "Translation" }).closest("section")!;
+    expect(within(part).getByText("Accepted: decision on the query of Ana Weber (ann-0003), the reviewer’s text taken, Project lead (ann-0002), 18 Nov, 10:12 · Answer: Yes, as proposed.")).toBeTruthy();
+  });
+
   it("issue 453: a version made by an editorial correction names who corrected it and why", () => {
     const versions = [
       version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "accepted", chain_name: "m1", is_newest_in_chain: false }),
@@ -745,6 +759,25 @@ describe("one layout for the parts (issues 329, 331, 332)", () => {
     expect([...groupA.querySelectorAll(".text-version-name")].map(name => name.textContent)).toEqual(["Provider A v1", "Provider A v2"]);
     // The chain is in the name: no repeated chain column.
     expect(part.querySelector(".text-version-chain")).toBeNull();
+  });
+
+  it("review 2, F1: a review of a version a lead fixed typos in is not reopened, and only the newest version is asked to be corrected", () => {
+    const fixed = [
+      version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "accepted", latest_review_decision: "accepted_unchanged", chain_name: "m1", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "m1", translation_status: "accepted",
+        editorial_correction: { reason: "Typo", previous_document_id: "case-200-de", inserted_characters: 1, deleted_characters: 1, corrected_at: "2026-11-17T10:12:00", corrected_by: null } }),
+    ];
+    const review = work({ assignment_id: 5, document_id: "case-200-de", task: "translation_review", status: "submitted", author_label: "ann-0003", person: ana });
+    const variant = (document_id: string) => [document_id, { document_id, translation_status: "accepted", text_sha256: "x" }] as const;
+    const tools = { ...textTools([toolAssignment(5, "submitted", { task: "translation_review", pseudonym: "ann-0003" })]),
+      variants: new Map([variant("case-200-de"), variant("case-200-de-v2")]) as unknown as TextVersionsTools["variants"], onRequestCorrection: vi.fn() };
+    renderCard({ row: assignRow({ versions: fixed, work: [review] }), initialSegment: "translation", textVersionTools: tools });
+    const part = within(card()).getByRole("heading", { name: "Translation" }).closest("section")!;
+    within(part).getByText("Older versions (1)").closest("details")!.open = true;
+    const row = within(within(part).getByRole("list", { name: "Assignments on v1" })).getByRole("listitem");
+    // The server refuses the reopening (VARIANT_REVIEW_STALE): the fix is reviewed, so no button offers it.
+    expect(within(row).getAllByRole("button").map(button => button.getAttribute("aria-label"))).toEqual(["Remove Ana Weber’s review assignment"]);
+    expect(within(part).getAllByText("Ask a reviewer to correct…").map(button => button.getAttribute("aria-label"))).toEqual(["Ask a reviewer to correct v2 of case-200 de…"]);
   });
 
   it("moved work is a plain person row saying where it went", () => {

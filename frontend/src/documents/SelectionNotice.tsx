@@ -3,7 +3,7 @@ import { formatTime, personLabel, roundCell } from "../app/submissionLabels";
 import { statusBadgeText, versionName } from "./labels";
 import { pendingRounds, roundName, submissionVersion } from "./SubmissionsTable";
 
-/** Causes the lead acknowledges with "Keep final on v1" (final-result panel). */
+/** Causes the lead acknowledges with "Keep final on v1" or "Keep the current final result" (final-result panel). */
 export const ACKNOWLEDGEABLE_CODES: ReadonlySet<string> = new Set([
   "SELECTED_ROUND_ABANDONED",
   "SELECTED_ROUND_SUPERSEDED",

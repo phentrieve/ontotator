@@ -296,13 +296,20 @@ test("Attach to a finding… adds a modifier term marked as a finding to a decid
   await expect(heading(page)).toBeVisible({ timeout: 30_000 });
   await expect(expandedTitle(page)).toHaveText("focal seizures");
   await decideModifiers(page, "focal seizures", [["Recurrent", "Ana Weber"], ["Severe", "Ben Roth"]]);
-  // Ben's Neonatal onset on "since birth" (S18): a warning, and no target while the sentence's findings are open.
+  // Ben's Neonatal onset on "since birth" (S18): a warning, and no target while the sentence's findings are open. The
+  // action the warning names is there, inactive, with the reason (issue 470).
   await expand(page, "since birth");
   await expect(expanded(page)).toContainText("Ben Roth used the modifier term Neonatal onset as a finding. Keep it only if it names the finding itself; otherwise attach it to a finding.");
-  await expect(expanded(page).getByRole("button", { name: "Attach to a finding…" })).toHaveCount(0);
+  const inactive = expanded(page).getByRole("button", { name: "Attach to a finding…", exact: true });
+  await expect(inactive).toHaveAttribute("aria-disabled", "true");
+  await expect(inactive).toHaveAccessibleDescription("Decide the finding it belongs to first.");
+  await expect(expanded(page).getByText("Decide the finding it belongs to first.", { exact: true })).toBeVisible();
+  await inactive.click({ force: true });
+  await expect(page.getByRole("menu")).toHaveCount(0);
   await decideModifiers(page, "seizures", [["Severe", "Ana Weber"]]);
   await decideModifiers(page, "hypotonia", [["Severe", "Ben Roth"]]);
   await expand(page, "since birth");
+  await expect(expanded(page).getByText("Decide the finding it belongs to first.")).toHaveCount(0);
   await expanded(page).getByRole("button", { name: "Attach to a finding…", exact: true }).click();
   // The decided findings of the same sentence, the nearest first.
   await expect(page.getByRole("menuitem")).toHaveText(["Hypotonia (HP:0001252), “hypotonia”", "Seizure (HP:0001250), “seizures”"]);
@@ -336,6 +343,15 @@ test("submit with warnings: Check before you submit lists them; only Submit with
   await page.getByRole("button", { name: "Submit consolidation", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Submit consolidation?" });
   await expect(dialog.getByText("6 groups, 6 findings, 0 not in result", { exact: true })).toBeVisible();
+  // Issue 470: the kept modifier term is named before the first Submit, with a way to its group.
+  await expect(dialog.getByText("1 finding uses a modifier term (such as Severe) as the finding itself:")).toBeVisible();
+  await expect(dialog.getByRole("listitem")).toHaveText([/^Neonatal onset “since birth”\s*Go to group$/]);
+  await expect(dialog.getByText("Check before you submit")).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Go to group, Neonatal onset “since birth”", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(expandedTitle(page)).toHaveText("since birth");
+  await expect(group(page, "since birth")).toBeFocused();
+  await page.getByRole("button", { name: "Submit consolidation", exact: true }).click();
   const submits: unknown[] = [];
   page.on("request", request => {
     if (request.method() === "POST" && /\/workspaces\/[^/]+\/submit$/.test(new URL(request.url()).pathname)) submits.push(request.postDataJSON());
@@ -344,7 +360,9 @@ test("submit with warnings: Check before you submit lists them; only Submit with
   await dialog.getByRole("button", { name: "Submit", exact: true }).click();
   expect((await refused).status()).toBe(422);
   await expect(dialog.getByText("Check before you submit", { exact: true })).toBeVisible();
-  await expect(dialog.getByRole("listitem")).toHaveText(["1 finding uses a modifier term (such as Severe) as the finding itself."]);
+  // The server's warning names the same finding, once.
+  await expect(dialog.locator(".cons-warning-list > li")).toHaveText([/^1 finding uses a modifier term \(such as Severe\) as the finding itself:\s*Neonatal onset “since birth”\s*Go to group$/]);
+  await expect(dialog.getByRole("button", { name: "Go to group, Neonatal onset “since birth”", exact: true })).toHaveCount(1);
   await expect(dialog.getByRole("button", { name: "Submit", exact: true })).toHaveCount(0);
   // Back closes without submitting; the next Submit asks again.
   await dialog.getByRole("button", { name: "Back", exact: true }).click();

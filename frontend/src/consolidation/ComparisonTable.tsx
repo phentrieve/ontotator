@@ -1,4 +1,5 @@
 /** The comparison table of one group (spec §3, mockup variant B): people as columns, fields as rows. */
+import { useLayoutEffect, useRef } from "react";
 import type { ConsolidationGroupView, ConsolidationPersonView } from "../api/client";
 import { AxisValue } from "../ui/AxisValue";
 import { COHORT_TAG } from "../editor/modifiers";
@@ -46,11 +47,28 @@ export function orderRows(rows: readonly ComparisonRow[]): ComparisonRow[] {
 export function ComparisonTable({ name, group, people, rows, readOnly = false, busy = false, onChoose }: ComparisonTableProps): JSX.Element {
   const members = group.members;
   const names = peopleOf(people, members);
+  // The width of the sticky label column: a pinned value starts after it (.cons-pin-value).
+  const table = useRef<HTMLTableElement>(null);
+  useLayoutEffect(() => {
+    const element = table.current;
+    if (!element) return;
+    const measure = () => element.style.setProperty("--cons-label-width", `${element.querySelector<HTMLElement>("thead td")?.offsetWidth ?? 0}px`);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [rows]);
   const rowClass = (row: ComparisonRow) => row.conflict && !readOnly ? "cons-row--conflict" : row.agreed !== null && members.length > 1 ? "cons-row--agreed" : undefined;
-  // A hint (related terms, issue 303) is its own full-width line right after its row, so it is read once, after the values it explains.
-  const line = (row: ComparisonRow) => row.hint ? [values(row), <tr key={`${row.id}-hint`} className="cons-row-hint">
-    <td colSpan={members.length + 1}>{row.hint}</td>
-  </tr>] : values(row);
+  // A hint (related terms, issue 303) is its own full-width line right after its row, so it is read once, after the
+  // values it explains. Before it, a row to decide among many people says who holds which value (issue 470). Both
+  // stay in view while the table scrolls sideways (.cons-pin).
+  const below = (row: ComparisonRow, key: string, text: string) => <tr key={`${row.id}-${key}`} className={`cons-row-hint cons-row-${key}`}>
+    <td colSpan={members.length + 1}><span className="cons-pin">{text}</span></td>
+  </tr>;
+  const line = (row: ComparisonRow) => [values(row),
+    ...(row.split && row.conflict && !readOnly ? [below(row, "split", row.split)] : []),
+    ...(row.hint ? [below(row, "hint", row.hint)] : [])];
   const values = (row: ComparisonRow) => <tr key={row.id} className={rowClass(row)}>
       <th scope="row">
         {row.conflict && !readOnly && <><IconWarning className="cons-conflict-mark" /><span className="visually-hidden">Conflict: </span></>}
@@ -63,11 +81,11 @@ export function ComparisonTable({ name, group, people, rows, readOnly = false, b
           ? cell.toggles.map((toggle, index) => <span key={toggle.id}>{index > 0 && ", "}{toggle.label}{toggle.cohort && COHORT}</span>)
           : row.kind === "axis" ? <AxisValue value={cell.value || null} /> : cell.display}
       </td>)}
-      {row.agreed !== null || row.info !== null
-        ? <td colSpan={members.length} className={row.agreed !== null && members.length > 1 ? "cons-agreed cons-agreed-once" : "cons-agreed"}>{row.kind === "modifiers" && row.cells[0].toggles?.some(toggle => toggle.cohort)
+      {row.agreed !== null
+        ? <td colSpan={members.length} className={members.length > 1 ? "cons-agreed cons-agreed-once" : "cons-agreed"}><span className="cons-pin cons-pin-value">{row.kind === "modifiers" && row.cells[0].toggles?.some(toggle => toggle.cohort)
           ? <>{row.cells[0].toggles.map((toggle, index) => <span key={toggle.id}>{index > 0 && ", "}{toggle.label}{toggle.cohort && COHORT}</span>)}{allAgree(members)}</>
-          : row.kind === "axis" && row.agreed !== null ? <><AxisValue value={row.cells[0].value || null} />{allAgree(members)}</>
-          : row.agreed ?? `${row.cells[0].display} ${row.info}`}</td>
+          : row.kind === "axis" ? <><AxisValue value={row.cells[0].value || null} />{allAgree(members)}</>
+          : row.agreed}</span></td>
         : row.cells.map((cell, index) => <td key={cell.inputId}>
           {row.kind === "modifiers"
             ? <ModifierList owner={personName(names[index].label)} toggles={cell.toggles ?? []} interactive={row.conflict && !readOnly}
@@ -83,7 +101,7 @@ export function ComparisonTable({ name, group, people, rows, readOnly = false, b
             </span>}
         </td>)}
     </tr>;
-  return <div className="cons-compare-scroll"><table className="cons-compare">
+  return <div className="cons-compare-scroll"><table ref={table} className="cons-compare">
     <caption className="visually-hidden">Comparison of {name}</caption>
     <thead><tr><td />{members.map((member, index) => <th key={member.input_id} scope="col">
       <LaneKey people={people} personId={member.person_id} />{personName(names[index].label)}

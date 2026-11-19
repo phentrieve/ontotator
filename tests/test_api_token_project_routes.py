@@ -91,6 +91,7 @@ def test_the_resolved_routes_are_open_to_project_tokens() -> None:
         ("GET", "/api/v1/rounds/r-1/consolidation"),
         ("GET", "/api/v1/translation-reviews/7"),
         ("GET", "/api/v1/translation-reviews/7/source-obligations"),
+        ("GET", "/api/v1/translation-reviews/7/draft/typography-hints"),
         ("GET", "/api/v1/about"),
         ("GET", "/api/v1/auth/me"),
     ]:
@@ -216,6 +217,7 @@ def test_a_project_token_reads_a_translation_review_of_its_project(
     for path in (
         f"/api/v1/translation-reviews/{row['id']}",
         f"/api/v1/translation-reviews/{row['id']}/source-obligations",
+        f"/api/v1/translation-reviews/{row['id']}/draft/typography-hints",
     ):
         _hidden(tokens.foreign.get(path), "ASSIGNMENT_NOT_FOUND")
         _same_as_session(tokens.own, tokens.lead, path)
