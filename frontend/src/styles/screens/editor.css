@@ -1205,9 +1205,12 @@
       display: none;
     }
     /* The column is the tree's: its rows get more of it than the details below them (55 % to 45 % elsewhere),
-       so that ten rows are in view at 1280 × 600. Hidden details ("Hide details") keep only their own height. */
-    .case-screen:not(.case-comparing) .app-layout.panel-given-to-tree--column .tree-browser__tree { flex-basis: 70%; }
-    .case-screen:not(.case-comparing) .app-layout.panel-given-to-tree--column .tree-detail:not(.tree-detail--compact) { flex-basis: 30%; }
+       so that ten rows are in view at 1280 × 600 with some room to spare: at 70 % the rows had 10.5 rows of 26 px,
+       and once the layout under the user menu's header was 2 px lower, CI showed nine whole rows. Rows can be a
+       little taller where the triangles and term codes fall back to other fonts. Hidden details ("Hide details")
+       keep only their own height. */
+    .case-screen:not(.case-comparing) .app-layout.panel-given-to-tree--column .tree-browser__tree { flex-basis: 71%; }
+    .case-screen:not(.case-comparing) .app-layout.panel-given-to-tree--column .tree-detail:not(.tree-detail--compact) { flex-basis: 29%; }
   }
 }
 
