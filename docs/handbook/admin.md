@@ -49,7 +49,7 @@ What for: give a new person access to Ontotator.
    - **Qualification**, for example *physician*, is needed before the person can submit a translation review.
    - **Languages** are the languages the person reads. Leads see them when they assign work, and **Distribute evenly…** proposes only people who read a text's languages. Leave them empty if you do not know them: no languages count as unknown, not as "reads nothing", and such a person is proposed only where nobody who lists the language is left.
 3. Tick **System administrator** only if the person should manage the whole server.
-4. Optional: under **Add to projects (optional)**, tick a role per project: **Lead**, **Annotator** or **Consolidator**. With many projects, type into **Find project** to narrow the list.
+4. Optional: under **Add to projects (optional)**, tick a role per project: **Lead**, **Annotator** or **Consolidator**. With many projects, type into **Find project** to narrow the list. Projects with the same name also show their project key, for example *Study One (study-one-2026)*.
 5. Click **Create user**.
 6. The setup-code dialog opens. [Hand over the code](#hand-over-a-setup-or-reset-code).
 

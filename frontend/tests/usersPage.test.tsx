@@ -260,6 +260,19 @@ describe("account status, projects at creation, history and erasure", () => {
     expect(screen.getByText("Needed before a new code can be issued.")).toBeTruthy();
   });
 
+  it("tells same-named projects apart by their key in Add to projects (issue 472)", async () => {
+    vi.mocked(api.listProjects).mockResolvedValue([project, { ...project, project_key: "study-one-2026" }, { ...project, project_key: "other", name: "Other study" }]);
+    render(<UsersPage currentUser={currentUser} />); await load(); await fillCreate();
+    expect(await screen.findByRole("checkbox", { name: "Study One (study-one): Annotator" })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Study One (study-one-2026)" }).textContent).toContain("Study One (study-one-2026)");
+    // A name used once stays as it is.
+    expect(screen.getByRole("checkbox", { name: "Other study: Annotator" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Study One (study-one-2026): Annotator" }));
+    fireEvent.click(newForm().getByRole("button", { name: "Create user" }));
+    await screen.findByRole("dialog", { name: "Setup code for bea" });
+    expect(api.adminCreateUser).toHaveBeenCalledWith(expect.objectContaining({ projects: [{ project_key: "study-one-2026", roles: ["annotator"] }] }));
+  });
+
   it("adds the new user to the chosen projects with roles", async () => {
     vi.mocked(api.listProjects).mockResolvedValue([project]);
     render(<UsersPage currentUser={currentUser} />); await load(); await fillCreate();

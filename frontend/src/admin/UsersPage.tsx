@@ -410,6 +410,8 @@ function UsersContent({ currentUser, routeLeaveRef }: UsersPageProps): JSX.Eleme
   // Projects with a ticked role stay in view while filtering.
   const shownProjects = projects.filter(project => !projectQuery || roleFor(project.project_key).length > 0
     || project.name.toLowerCase().includes(projectQuery) || project.project_key.toLowerCase().includes(projectQuery));
+  // Two projects can share a name: those rows also give the project key (issue 472).
+  const projectLabel = (project: { name: string; project_key: string }) => projects.filter(item => item.name === project.name).length > 1 ? `${project.name} (${project.project_key})` : project.name;
   const toggleNewRole = (key: string, role: string, on: boolean) => {
     const roles = on ? [...roleFor(key), role] : roleFor(key).filter(item => item !== role);
     const others = (create.projects ?? []).filter(item => item.project_key !== key);
@@ -470,9 +472,9 @@ function UsersContent({ currentUser, routeLeaveRef }: UsersPageProps): JSX.Eleme
           {/* One grid: the role names head the columns once; each checkbox keeps "Project: Role" as its name. */}
           {projects.length > PROJECT_FILTER_FROM && <TextInput id="new-projects-filter" className="new-user-projects-filter" label="Find project" type="search" value={projectFilter} onChange={event => setProjectFilter(event.target.value)} />}
           <div className="new-user-projects-row" aria-hidden="true"><span />{projectRoles.map(role => <span key={role}>{roleLabels[role]}</span>)}</div>
-          {shownProjects.map(project => <div key={project.project_key} className="new-user-projects-row" role="group" aria-label={project.name}>
-            <span title={project.name}>{project.name}</span>
-            {projectRoles.map(role => <Checkbox key={role} id={`new-${project.project_key}-${role}`} label={<span className="visually-hidden">{roleLabels[role]}</span>} aria-label={`${project.name}: ${roleLabels[role]}`} checked={roleFor(project.project_key).includes(role)} onChange={event => toggleNewRole(project.project_key, role, event.target.checked)} />)}
+          {shownProjects.map(project => <div key={project.project_key} className="new-user-projects-row" role="group" aria-label={projectLabel(project)}>
+            <span title={projectLabel(project)}>{projectLabel(project)}</span>
+            {projectRoles.map(role => <Checkbox key={role} id={`new-${project.project_key}-${role}`} label={<span className="visually-hidden">{roleLabels[role]}</span>} aria-label={`${projectLabel(project)}: ${roleLabels[role]}`} checked={roleFor(project.project_key).includes(role)} onChange={event => toggleNewRole(project.project_key, role, event.target.checked)} />)}
           </div>)}
         </fieldset>}
         {createError !== undefined && !usernameError && !displayNameError && <ErrorNotice error={createError} />}

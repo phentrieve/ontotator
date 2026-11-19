@@ -388,7 +388,7 @@ describe("the tree in the case screen", () => {
     expect(apply).toHaveBeenCalledTimes(1);
     expect(panelNow()).toBe(panel);
     expect(rowOf(panel, "Term HP:A").hasAttribute("aria-current")).toBe(false);
-    await waitFor(() => expect(within(panel).getByText("This is the annotation's current term.")).toBeDefined());
+    await waitFor(() => expect(within(panel).getByText("This is the finding's current term.")).toBeDefined());
     expect(useButton(panel).disabled).toBe(true);
     // Still the same walk.
     expect(open).toHaveBeenCalledTimes(1);

@@ -273,15 +273,15 @@ for (const size of [DESKTOP, PHONE]) {
     await openAction("Reopen…");
     const reopen = page.getByRole("dialog", { name: "Reopen: 8 texts" });
     await reopen.getByLabel(/^Reason/).fill("Guideline 2.3 changed for vital signs");
-    await reopen.getByRole("button", { name: "Reopen 8 assignments" }).click();
+    await reopen.getByRole("button", { name: "Reopen 8 tasks" }).click();
     await reopen.getByLabel("I understand").check();
-    await reopen.getByRole("button", { name: "Reopen 8 assignments" }).click();
+    await reopen.getByRole("button", { name: "Reopen 8 tasks" }).click();
     await expect(reopen).toBeHidden();
     const toast = page.locator(".ui-toast");
     const status = page.getByRole("status").filter({ has: toast });
     // The announcement: the toast is in a polite live region.
     await expect(status).toHaveAttribute("aria-live", "polite");
-    await expect(status).toContainText("Reopened 8 assignments in 6 texts.");
+    await expect(status).toContainText("Reopened 8 tasks in 6 texts.");
     await expect(toast.getByRole("button", { name: "Undo" })).toBeVisible();
 
     // The next dialog, opened right away while the toast is showing.
@@ -310,7 +310,7 @@ for (const size of [DESKTOP, PHONE]) {
       await control.click({ trial: true });
     }
     // The announcement is not taken away: the message is still in the live region.
-    await expect(status).toContainText("Reopened 8 assignments in 6 texts.");
+    await expect(status).toContainText("Reopened 8 tasks in 6 texts.");
 
     // Closing the dialog without acting: the Undo is still valid and reachable, and it works.
     await withdraw.getByRole("button", { name: "Cancel", exact: true }).click();

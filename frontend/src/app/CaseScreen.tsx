@@ -4348,12 +4348,12 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
                 </>}
                 {pendingAnnotation.isSpanless && <Textarea id="spanless-reason" label="Reason for no text span"
                   readOnly={readOnly} required={spanlessNotesRequired} hint={legacySubmissionHint ?? (!spanlessNotesRequired ? "Optional context for this finding." : undefined)} value={spanlessReason}
-                  error={spanlessReasonError && !spanlessReason.trim() ? "A reason is required before adding this annotation." : undefined}
+                  error={spanlessReasonError && !spanlessReason.trim() ? "A reason is required before adding this finding." : undefined}
                   onChange={event => { setSpanlessReason(event.target.value); setSpanlessReasonError(false); }} />}
                 {pendingAnnotation.selectedTerm && <div className="pending-term-continuation">
                   <p>Selected term: <TermName termId={pendingAnnotation.selectedTerm.termId} label={termLabel(pendingAnnotation.layerId, pendingAnnotation.selectedTerm.termId) ?? pendingAnnotation.selectedTerm.label} /></p>
                   <Button disabled={readOnly || queueState === "saving" || (spanlessNotesRequired && !spanlessReason.trim())}
-                    onClick={() => { void createPendingAnnotation(pendingAnnotation.selectedTerm!.termId, pendingAnnotation.selectedTerm!.searchId, pendingAnnotation.selectedTerm!.label); }}>Add annotation</Button>
+                    onClick={() => { void createPendingAnnotation(pendingAnnotation.selectedTerm!.termId, pendingAnnotation.selectedTerm!.searchId, pendingAnnotation.selectedTerm!.label); }}>Add finding</Button>
                 </div>}
                 {!readOnly && !savedPendingReanchor && !pendingAnnotation.carriedInput && <SearchPanel key={pendingAnnotation.annotationId} searchManager={searchManager}
                   annotationId={pendingAnnotation.annotationId} workspaceKey={view.key} layerId={pendingAnnotation.layerId}

@@ -196,7 +196,7 @@ test("new-draft spanless findings require a reason, retain it through search and
   await page.getByLabel("Search term", { exact: true }).fill("Hypotonia");
   const savedResponse = page.waitForResponse(r => r.url().endsWith("/commands") && r.request().method() === "POST" && r.request().postDataJSON().payload.command === "create_annotation");
   await candidate.click();
-  await page.getByRole("button", { name: "Add annotation", exact: true }).click();
+  await page.getByRole("button", { name: "Add finding", exact: true }).click();
   const saved = await (await savedResponse).json();
   expect(saved.annotations[0].annotation.note).toBe("Finding recorded in the clinical summary");
   await expect(page.locator(".status-badge")).toHaveText("Saved");
