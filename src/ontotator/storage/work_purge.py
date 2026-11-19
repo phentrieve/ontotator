@@ -33,6 +33,7 @@ _TABLES = (
     "problem_report_state",
     "problem_reports",
     "text_change_resolutions",
+    "typo_fix_carries",
     "final_selection_events",
     "final_selections",
     "export_selection_snapshots",
@@ -198,6 +199,8 @@ def purge(
         "problem_reports": "report_id = ANY(:rep)",
         "text_change_resolutions": "assignment_id = ANY(:a) OR round_id = ANY(:r)"
         f" OR {_IN_SUBS.format(col='submission_id')}",
+        "typo_fix_carries": f"{_IN_SUBS.format(col='submission_id')}"
+        f" OR {_IN_SUBS.format(col='source_submission_id')}",
         "final_selection_events": "(project_id, payload->>'submission_id') IN"
         " (SELECT * FROM unnest(CAST(:sp AS bigint[]), CAST(:ss AS text[])))",
         "final_selections": _IN_SUBS.format(col="submission_id"),

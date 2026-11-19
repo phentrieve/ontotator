@@ -899,6 +899,17 @@ class FinalResultService:
             )
             in ANNOTATION_KINDS
         }
+        # Issue 465: a typo-fix copy accepted directly is the person's own
+        # annotation; it compares as that annotation did before the fix, with
+        # the other people's work on the text version it was made on.
+        from ontotator.application.typo_fix_carry import first_sources
+
+        document_ids |= {
+            document
+            for _source, document in first_sources(
+                conn, pid, [item["submission_id"] for item in selections]
+            ).values()
+        }
         if not document_ids:
             return []
         rows = conn.execute(

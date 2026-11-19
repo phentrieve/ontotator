@@ -20314,6 +20314,72 @@
         "title": "EditorProposal",
         "description": "Editor projection; producer metadata never changes snapshot hashes."
       },
+      "EditorialCarryPerson": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "submitted",
+              "started"
+            ],
+            "title": "Status"
+          },
+          "carried": {
+            "type": "boolean",
+            "title": "Carried"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "number_changed",
+                  "final_result",
+                  "consolidation",
+                  "translation_not_accepted",
+                  "from_proposals",
+                  "task_paused",
+                  "findings_need_check",
+                  "not_submitted",
+                  "not_carryable"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "findings": {
+            "type": "integer",
+            "title": "Findings"
+          },
+          "needs_check": {
+            "type": "integer",
+            "title": "Needs Check"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "display_name",
+          "status",
+          "carried",
+          "reason",
+          "findings",
+          "needs_check"
+        ],
+        "title": "EditorialCarryPerson",
+        "description": "Issue 465: one person's started or submitted annotation on the\ncorrected version and whether the typo fix moves it to the new version\nby itself (``carried``). ``reason`` says why not: ``number_changed``,\n``final_result``, ``consolidation``, ``translation_not_accepted``,\n``from_proposals``, ``task_paused``,\n``findings_need_check``, ``not_submitted`` (started, not submitted) or\n``not_carryable``; such work keeps the manual flow."
+      },
       "EditorialChange": {
         "properties": {
           "old_start": {
@@ -20541,6 +20607,20 @@
                 "type": "null"
               }
             ]
+          },
+          "annotation_carry": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EditorialCarryPerson"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annotation Carry"
           }
         },
         "type": "object",
@@ -20715,6 +20795,18 @@
           "tasks_following": {
             "type": "integer",
             "title": "Tasks Following"
+          },
+          "annotations_carried": {
+            "type": "integer",
+            "title": "Annotations Carried",
+            "default": 0
+          },
+          "annotation_carry": {
+            "items": {
+              "$ref": "#/components/schemas/EditorialCarryPerson"
+            },
+            "type": "array",
+            "title": "Annotation Carry"
           }
         },
         "type": "object",
@@ -30142,7 +30234,8 @@
               "final_changed",
               "final_restored",
               "text_paused",
-              "text_released"
+              "text_released",
+              "carried_by_typo_fix"
             ],
             "title": "Kind"
           },
@@ -30266,6 +30359,28 @@
               }
             ],
             "title": "Reason"
+          },
+          "from_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Version"
+          },
+          "to_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Version"
           }
         },
         "additionalProperties": false,
@@ -30275,7 +30390,7 @@
           "at"
         ],
         "title": "RowChangeView",
-        "description": "A change of who works on a row, how, or of its final result: its\nHistory line, with who did it, when and (where one was given) why.\n\n``by`` is the person who made the change; a withdrawn final result\n(#343) names the lead in ``from_person`` instead. ``reopened``,\n``reopen_undone`` and ``round_started`` name the task and its person\n(``assignment_id``, ``to_person``); the ``final_*`` kinds name the\nresults (``from_result`` the one replaced, ``to_result`` the one final\nafterwards; null when the submission is no longer among the row's).\n``text_paused`` and ``text_released`` (issue 464) are a lead's pause and\nrelease of the text, with ``by`` and the ``reason`` given."
+        "description": "A change of who works on a row, how, or of its final result: its\nHistory line, with who did it, when and (where one was given) why.\n\n``by`` is the person who made the change; a withdrawn final result\n(#343) names the lead in ``from_person`` instead. ``reopened``,\n``reopen_undone`` and ``round_started`` name the task and its person\n(``assignment_id``, ``to_person``); the ``final_*`` kinds name the\nresults (``from_result`` the one replaced, ``to_result`` the one final\nafterwards; null when the submission is no longer among the row's).\n``text_paused`` and ``text_released`` (issue 464) are a lead's pause and\nrelease of the text, with ``by`` and the ``reason`` given.\n``carried_by_typo_fix`` (issue 465): the submitted annotation of\n``to_person`` moved to the typo fix's new version by itself."
       },
       "RowItemView": {
         "properties": {

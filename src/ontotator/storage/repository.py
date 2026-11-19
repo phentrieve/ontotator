@@ -1781,8 +1781,18 @@ class Repository:
                     SubmissionRow.submission_id.in_(submission_ids)
                 )
             else:
-                # The work export skips discarded submissions (#109).
-                submission_query = submission_query.where(live_submission())
+                from ontotator.storage.overview_tables import TypoFixCarryRow
+
+                # The work export skips discarded submissions (#109) and the
+                # copies a typo fix made of a person's submission (issue
+                # 465): the person's own submission stands for that work.
+                submission_query = submission_query.where(
+                    live_submission(),
+                    ~exists().where(
+                        TypoFixCarryRow.project_id == SubmissionRow.project_id,
+                        TypoFixCarryRow.submission_id == SubmissionRow.submission_id,
+                    ),
+                )
             submission_rows = conn.execute(
                 submission_query.order_by(
                     SubmissionRow.recorded_at, SubmissionRow.submission_id

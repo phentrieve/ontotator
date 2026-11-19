@@ -5,6 +5,32 @@ consolidation is not automatically an adjudicated gold standard. Consolidation
 displays source provenance; annotation from scratch (`independent` mode) shows
 neither proposals nor other people's work.
 
+## Submissions after a typo fix
+
+A lead's editorial correction (**Fix typos…**) makes a new text version
+without a translation review. A submitted annotation moves to that version by
+itself, without a new submit, only when every finding re-anchors without
+doubt and the correction changed no number: the runs of digits of the two
+texts are the same (a digit added, removed or changed anywhere in the text,
+or a number split or joined, counts as a change; a changed separator such as
+*0.5* → *0,5* does not). Texts with a consolidation or a final result or
+with a translation not accepted yet, work from tool proposals and paused
+tasks keep the lead's manual carry.
+
+The system then stores a submission on the new version with the same author
+pseudonym, the same findings placed on the new text, the source's checked
+layers and guideline version, and no edit event. It is not a human submit:
+`typo_fix_carries` records it as a copy of the person's submission, naming
+both submissions, both versions and the editorial correction, and the audit
+event `text_change.typo_fix_carry` names the source submission. The task on
+the old version is withdrawn; its submission stays. The copy counts as the
+same annotation, not a second one: the annotation results export holds the
+person's own submission and leaves the copy out, Documents and Progress count
+one annotation per person, agreement compares the copies as it compared the
+submissions they came from, and no working time is recorded for the copy.
+If the lead reopens the task on the new version and the person submits
+again, that submission is the person's own and counts as such.
+
 ## Before distributing work
 
 Use a versioned task profile and a pinned ontology. State the annotation unit,
@@ -215,6 +241,10 @@ check), the export adds the other people's latest live annotations of it
 results export chooses them, so that texts accepted because everyone agreed
 are not left out. A result carried to a new text version gets no compared
 annotations; its agreement is that of the earlier work it was carried from.
+An annotation a typo fix moved to the new version by itself (below) is
+compared as the person's annotation it was made from: with the other
+people's latest live annotations of the version that person annotated, so
+its agreement is the same as before the fix.
 Proposals a proposal check left uncertain are not counted as findings.
 
 The rows follow the text versions the bundles hold, so a text whose result

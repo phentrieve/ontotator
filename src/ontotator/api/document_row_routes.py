@@ -678,7 +678,9 @@ class RowChangeView(_View):
     results (``from_result`` the one replaced, ``to_result`` the one final
     afterwards; null when the submission is no longer among the row's).
     ``text_paused`` and ``text_released`` (issue 464) are a lead's pause and
-    release of the text, with ``by`` and the ``reason`` given."""
+    release of the text, with ``by`` and the ``reason`` given.
+    ``carried_by_typo_fix`` (issue 465): the submitted annotation of
+    ``to_person`` moved to the typo fix's new version by itself."""
 
     kind: Literal[
         "reassigned",
@@ -693,6 +695,7 @@ class RowChangeView(_View):
         "final_restored",
         "text_paused",
         "text_released",
+        "carried_by_typo_fix",
     ]
     at: datetime
     task: str | None = None
@@ -706,6 +709,10 @@ class RowChangeView(_View):
     from_result: RowResultRefView | None = None
     to_result: RowResultRefView | None = None
     reason: str | None = None
+    # ``carried_by_typo_fix`` (issue 465): the versions the annotation of
+    # ``to_person`` moved between, by the system (``by`` is null).
+    from_version: int | None = None
+    to_version: int | None = None
 
 
 class RowSubmissions(_View):

@@ -188,6 +188,10 @@ export function historyLines(row: DocumentRowView, submissions: readonly RowSubm
       case "text_released":
         push("text", `Text: ${changeText(`released${byText(change.by)}`, when, change.reason)}`);
         break;
+      // Issue 465: a submitted annotation moved to a typo fix by itself (nobody clicked).
+      case "carried_by_typo_fix":
+        push(stage, `${prefix}: ${changeText(`annotation of ${named(change.to_person)} moved to v${change.to_version ?? "?"} by itself after the typo fix`, when)}`);
+        break;
       case "final_withdrawn":
         push("final", `Final: ${changeText(`withdrawn${byText(change.from_person)}`, when, change.reason)}`);
         break;
