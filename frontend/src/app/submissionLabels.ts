@@ -43,6 +43,16 @@ export function formatTime(value: string | number | Date, options: FormatTimeOpt
   return `${date.getDate()} ${MONTHS[date.getMonth()]}${year}, ${pad(date.getHours())}:${pad(date.getMinutes())}${seconds}`;
 }
 
+/**
+ * Label of a text view layer or an annotation version. The server names a submission without its time
+ * ("My annotation, from scratch"); the local time is added here, so no raw timestamp reaches the screen.
+ */
+export function versionRefLabel(ref: { kind: string; label: string; created_at: string }, options: FormatTimeOptions = {}): string {
+  if (ref.kind === "own") return `${ref.label}, ${formatTime(ref.created_at, options)}`;
+  if (ref.kind === "submission") return `${ref.label} · ${formatTime(ref.created_at, options)}`;
+  return ref.label;
+}
+
 const fullFormat = new Intl.DateTimeFormat("en-GB", { dateStyle: "full", timeStyle: "long" });
 
 /** Full timestamp with time zone for `title` attributes. Invalid input is returned unchanged. */

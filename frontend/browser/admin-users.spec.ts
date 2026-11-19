@@ -347,3 +347,41 @@ test("Anonymise…: only for a deactivated account, after typing its username; n
   expect(history.join("\n")).not.toContain(target);
   expect(errors).toEqual([]);
 });
+
+test("with 1,500 more accounts the table shows the first 100, New user opens and Show all lists every account", async ({ page }) => {
+  // At the end of the browser suite the fixture server holds about 2,000 accounts. The rendered table grew with
+  // them until clicking New user… took longer than the action timeout (CI, handbook-screenshots.spec.ts).
+  const extra = 1_500;
+  await page.route("**/api/v1/admin/users/", async route => {
+    const response = await route.fetch();
+    const users = await response.json() as Record<string, unknown>[];
+    const added = Array.from({ length: extra }, (_, index) => ({ ...users[0], id: 9_000_000 + index, username: `bulk-${index}`,
+      display_name: `Bulk ${index}`, pseudonym: `bulk-${index}`, is_system_admin: false, anonymised: false, active: true,
+      projects: [{ project_key: "bulk-project", project_name: "Bulk project", roles: ["lead", "annotator"] }] }));
+    await route.fulfill({ response, json: [...users, ...added] });
+  });
+  const errors = collectErrors(page);
+  const suffix = randomUUID().slice(0, 8);
+  const admin = `users-many-${suffix}`;
+  expect((await page.request.post("/__test_user__", { params: { username: admin, pseudonym: admin, system_admin: "true", assign: "none" } })).ok()).toBeTruthy();
+  await loginThroughForm(page, admin, admin);
+  await page.goto("/#/admin/users");
+  const total = (await (await authenticatedRequest(page, "/api/v1/admin/users/")).json() as unknown[]).length + extra;
+  await expect(table(page)).toContainText(`The first 100 of ${total} users are shown.`);
+  await expect(table(page).locator("tbody tr.users-row")).toHaveCount(100);
+  // What the page costs stays bounded: before, every account was a row (about 37 elements each).
+  expect(await page.evaluate(() => document.getElementsByTagName("*").length)).toBeLessThan(10_000);
+  await page.getByRole("button", { name: "New user…", exact: true }).click();
+  const create = page.getByRole("form", { name: "New user" });
+  await create.getByLabel(/^Username/).fill(`lena-${suffix}`);
+  await expect(create.getByLabel(/^Username/)).toHaveValue(`lena-${suffix}`);
+  await create.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(create).toHaveCount(0);
+  // Filter users searches every account, also those after the first 100.
+  await page.getByLabel("Filter users", { exact: true }).fill("bulk-1499");
+  await expect(table(page).locator("tbody tr.users-row")).toHaveCount(1);
+  await page.getByLabel("Filter users", { exact: true }).fill("");
+  await page.getByRole("button", { name: `Show all ${total}`, exact: true }).click();
+  await expect(table(page).locator("tbody tr.users-row")).toHaveCount(total);
+  expect(errors).toEqual([]);
+});

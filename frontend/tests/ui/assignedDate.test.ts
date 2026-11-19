@@ -1,7 +1,7 @@
 import { cleanup, render } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, expect, it } from "vitest";
-import { assignedText, assignedTitle } from "../../src/app/assignedDate";
+import { assignedText, assignedTitle, relativeDay } from "../../src/app/assignedDate";
 import { AssignedDate } from "../../src/ui/AssignedDate";
 
 afterEach(cleanup);
@@ -38,4 +38,11 @@ it("AssignedDate renders a time element, nothing without a date", () => {
   expect(time?.getAttribute("title")).toBe("Assigned 23 Oct 2026, 10:40 by Lead");
   cleanup();
   expect(render(createElement(AssignedDate, { at: null })).container.innerHTML).toBe("");
+});
+
+it("one rule for every day in a row: submitted reads as assigned does (issue 472)", () => {
+  expect(relativeDay(new Date(2026, 9, 23, 14, 2), NOW)).toBe("today 14:02");
+  expect(relativeDay(new Date(2026, 9, 22, 8, 0), NOW)).toBe("yesterday");
+  expect(relativeDay(new Date(2026, 9, 20, 8, 0), NOW)).toBe("Tue");
+  expect(relativeDay(new Date(2026, 9, 14, 8, 0), NOW)).toBe("14 Oct");
 });

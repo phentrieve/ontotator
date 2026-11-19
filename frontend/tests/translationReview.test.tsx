@@ -121,9 +121,9 @@ it("Retry corrected version metadata: a retry that passes names the version and 
   expect(screen.getByText("Review submitted")).toBeDefined();
   expect(screen.queryByText("A corrected version v7 was created.")).toBeNull();
   expect(screen.getByRole("alert").textContent).toContain("The project is busy right now.");
-  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Retry corrected version metadata" })); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Load the version number again" })); });
   expect(screen.getByText("A corrected version v7 was created.")).toBeDefined();
-  expect(screen.queryByRole("button", { name: "Retry corrected version metadata" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Load the version number again" })).toBeNull();
   expect(screen.queryByRole("alert")).toBeNull();
 });
 it("hides the guidelines notice once the review is submitted here and lists the guideline stamp", async () => {

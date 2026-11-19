@@ -289,10 +289,10 @@ test("the lead pauses the same-text task: its owner sees only the lead's reason,
     await openTask(owner.page, other);
     await expect(banner(owner.page)).toContainText(leadReason);
     await expect(owner.page.getByText(REPORT_TEXT)).toHaveCount(0);
-    await expectEntry(owner.page, "Report a text problem… (Paused)");
+    await expectEntry(owner.page, "Text problems (Paused)");
     await expect(owner.page.locator("body")).not.toContainText(s.labels.reporter);
     // The owner has no report of their own: the dialog opens in the new report view.
-    await moreAction(owner.page, "Report a text problem… (Paused)");
+    await moreAction(owner.page, "Text problems (Paused)");
     const ownerForm = owner.page.getByRole("dialog", { name: "New problem report", exact: true });
     await expect(ownerForm).toBeVisible();
     await expect(ownerForm).not.toContainText(REPORT_TEXT);

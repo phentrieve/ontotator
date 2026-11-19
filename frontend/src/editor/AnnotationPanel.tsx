@@ -19,6 +19,7 @@ import { Kbd } from "../ui/Kbd";
 import { useCoalescedAxisChange } from "./useCoalescedAxisChange";
 import { useValuesLayout } from "./valuesLayout";
 import { quoteOf } from "./modifiers";
+import { prefillQuery } from "./termSearch";
 import { CopyTextButton } from "./CopyTextButton";
 
 export type AxesValues = Record<string, string | null>;
@@ -310,6 +311,8 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
               workspaceKey={workspaceKey}
               currentTermId={currentTerm}
               assignMode="change"
+              /* As for a new finding: the search starts with the marked words (issue 472). */
+              initialQuery={!readOnly && documentText && linkedEvidence[0]?.mention.segments?.length ? prefillQuery(documentText, linkedEvidence[0].mention.segments) : undefined}
               modifierFilter={modifierFilter}
               onSelectCandidate={handleSelectCandidate}
               languages={searchLanguages}

@@ -230,7 +230,7 @@ export const TreeBrowser: React.FC<TreeBrowserProps> = ({
   const hint = !canAssign
     ? "Select one of your annotations to assign a term from the tree."
     : isCurrent
-      ? "This is the annotation's current term."
+      ? "This is the finding's current term."
       : selectedIsModifier
         ? MODIFIER_IN_CHANGE
         : null;

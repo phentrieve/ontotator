@@ -265,7 +265,7 @@ test("reporter dialog at 390 x 844: a full-height sheet, the footer Close stays 
   await expect(entry(page)).toBeVisible();
   // The menu item carries its text and the badge at this width.
   await entry(page).click();
-  await problemItem(page, "Report a text problem… (Paused, 6 open)").click();
+  await problemItem(page, "Text problems (Paused, 6 open)").click();
   const dialog = reportsDialog(page);
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("article")).toHaveCount(6);
@@ -334,7 +334,7 @@ test("axe: reporter dialog (list and new report views) and lead page (default an
   await expect(page.locator(".text-container")).toBeVisible();
   await entry(page).click();
   // The menu item has no icon (the old badge's decorative svg check is gone).
-  await problemItem(page, "Report a text problem… (Paused, 1 open)").click();
+  await problemItem(page, "Text problems (Paused, 1 open)").click();
   const dialog = reportsDialog(page);
   await expect(dialog.getByRole("heading", { name: REPORT_TEXT, level: 3 })).toBeFocused();
   await expect(dialog.getByRole("article", { name: REPORT_TEXT })).toBeVisible();
