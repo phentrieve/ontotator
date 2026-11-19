@@ -785,6 +785,27 @@ describe("creation recovery and lifetime", () => {
 });
 
 describe("workflow settings", () => {
+  it("names the server's maximum of annotators per text; a value saved before it stays valid (issue 457)", async () => {
+    vi.mocked(api.getProjectSettings).mockResolvedValue({ ...settings, annotations_per_text: 3, annotations_per_text_max: 8 });
+    const view = renderSettings();
+    await screen.findByRole("navigation", { name: "Settings sections" });
+    view.show("workflow");
+    const form = screen.getByRole("form", { name: "Workflow" });
+    const count = within(form).getByRole("spinbutton", { name: /Annotators per text/ }) as HTMLInputElement;
+    expect(count.max).toBe("8");
+    expect(within(form).getByText("Upper limit; fewer is fine. This server allows at most 8.")).toBeTruthy();
+    fireEvent.change(count, { target: { value: "9" } });
+    expect(count.validity.rangeOverflow).toBe(true);
+    view.unmount();
+    vi.mocked(api.getProjectSettings).mockResolvedValue({ ...settings, annotations_per_text: 12, annotations_per_text_max: 8 });
+    const later = renderSettings("workflow");
+    const stored = await screen.findByRole("spinbutton", { name: /Annotators per text/ }) as HTMLInputElement;
+    expect(stored.value).toBe("12");
+    expect(stored.validity.valid).toBe(true);
+    expect(screen.getByText("Upper limit; fewer is fine. This server allows at most 8.")).toBeTruthy();
+    later.unmount();
+  });
+
   const WORKFLOW_BODY = { import_plan: "review_and_annotate_translations", annotations_per_text: 1, tool_proposal_mode: "proposals", annotate_accepted_translations_only: true, adjudicator_not_annotator: false, blind_consolidation: false, record_working_time: false };
 
   it("reads in the order a text moves through work, with the new copy (M-8b)", async () => {
@@ -803,8 +824,9 @@ describe("workflow settings", () => {
     fireEvent.click(within(group).getByRole("radio", { name: "Plan nothing; I plan texts on Documents" }));
     const count = within(form).getByRole("spinbutton", { name: /Annotators per text/ });
     expect(count).toHaveProperty("min", "1");
-    expect(count).toHaveProperty("max", "20");
-    expect(within(form).getByText("1 to 20. Upper limit; fewer is fine.")).toBeTruthy();
+    // Issue 457: no built-in maximum.
+    expect(count).toHaveProperty("max", "");
+    expect(within(form).getByText("Upper limit; fewer is fine.")).toBeTruthy();
     fireEvent.change(count, { target: { value: "3" } });
     vi.mocked(api.updateProjectSettings).mockResolvedValue({ ...settings, import_plan: "nothing", annotations_per_text: 3 });
     fireEvent.click(within(form).getByRole("button", { name: "Save changes" }));

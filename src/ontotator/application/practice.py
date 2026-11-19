@@ -588,8 +588,13 @@ class PracticeService:
                 at=now,
             )
         if consolidation:
+            # The exercise needs its two annotators, whatever the server's
+            # maximum for the projects of leads is.
             projects.update_settings(
-                ACTOR, key, ProjectSettingsChange(annotations_per_text=2)
+                ACTOR,
+                key,
+                ProjectSettingsChange(annotations_per_text=2),
+                server_maximum=False,
             )
         self._import(key, pid, content.bundle_bytes(profile, pin, consolidation))
         documents = self._documents(pid)

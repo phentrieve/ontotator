@@ -32,6 +32,8 @@ let waitingFor: ReadonlySet<string> = new Set();
 /** "task:language:case" assigned so far: like the server, these are no targets any more. */
 let taken = new Set<string>();
 
+/** Issue 457: the server's maximum of "Annotations per text"; null: no limit. */
+let maxPerText: number | null = null;
 /** Issue 422: texts with their own "Annotations per text". */
 let ownPerText: ReadonlyMap<string, number> = new Map<string, number>();
 const perTextOf = (id: string) => ownPerText.get(id) ?? perText;
@@ -45,7 +47,7 @@ function preview(body: BatchAssignRequest): BatchPreview & { needs_people?: numb
   if (body.mode === "each") for (const id of ids) blocks.set(id, usernames.slice(0, remainingOf(id)));
   const targets = ids.map(id => ({ case_id: id, language: body.language, document_id: `doc-${id}`, version: 1, remaining: body.task === "annotate" ? remainingOf(id) : 1, per_text: body.task === "annotate" ? perTextOf(id) : 1, usernames: blocks.get(id) ?? [], unreviewed_translation: unreviewedOf(id), waiting_for_translation_review: waitingFor.has(id) }));
   return {
-    task: body.task, language: body.language, versions: targets.length, targets, skipped, per_text: body.task === "annotate" ? sharedPerText(ids) : 1, project_per_text: perText, digest, needs_people: null,
+    task: body.task, language: body.language, versions: targets.length, targets, skipped, per_text: body.task === "annotate" ? sharedPerText(ids) : 1, project_per_text: perText, max_per_text: maxPerText, digest, needs_people: null,
     people: people.map(item => {
       const cases = targets.filter(target => target.usernames.includes(item.username)).map(target => target.case_id);
       return { ...item, gets: cases.length, open_after: item.open_before + cases.length, first_case: cases[0] ?? null, last_case: cases.at(-1) ?? null };
@@ -685,6 +687,24 @@ it("one text with an unreviewed translation: the acknowledgement is there before
   await ready();
 });
 
+it("the Change… popover takes no more annotators per text than the server's maximum (issue 457)", async () => {
+  maxPerText = 8;
+  try {
+    vi.mocked(api.selectionSummary).mockResolvedValue(summary([{ task: "annotate", language: "de", versions: 20, cases: 20 }]));
+    render(<AssignWorkDialog {...casesProps()} />); await ready();
+    fireEvent.click(screen.getByRole("button", { name: "Change… (limit: 1 annotator per text)" }));
+    const popover = screen.getByRole("dialog", { name: "Annotators per text" });
+    const field = within(popover).getByRole("spinbutton", { name: /Annotators per text/ });
+    expect(field).toHaveProperty("max", "8");
+    const change = () => within(popover).getByRole("button", { name: /^Change for/ });
+    fireEvent.change(field, { target: { value: "9" } });
+    expect(change().getAttribute("aria-disabled")).toBe("true");
+    fireEvent.change(field, { target: { value: "8" } });
+    expect(change().getAttribute("aria-disabled")).toBeNull();
+  }
+  finally { maxPerText = null; }
+});
+
 it("the Change… popover changes annotators per text for all texts; the dialog and its selection stay (M2 D5, B7-5)", async () => {
   vi.mocked(api.selectionSummary).mockResolvedValue(summary([{ task: "annotate", language: "de", versions: 20, cases: 20 }]));
   const update = vi.spyOn(api, "updateProjectSettings").mockImplementation(async () => { perText = 2; return {} as never; });
@@ -705,12 +725,14 @@ it("the Change… popover changes annotators per text for all texts; the dialog 
   expect(within(popover).getByRole("button", { name: "Change for all texts" }).getAttribute("aria-disabled")).toBe("true");
   fireEvent.change(field, { target: { value: "0" } });
   expect(within(popover).getByRole("button", { name: "Change for all texts" }).getAttribute("aria-disabled")).toBe("true");
-  // Issue 447: up to 20 annotators per text; 21 is no value.
-  expect(field).toHaveProperty("max", "20");
-  fireEvent.change(field, { target: { value: "21" } });
+  // Issue 457: no built-in maximum; 21 and 30 are values, 2.5 is not.
+  expect(field).toHaveProperty("max", "");
+  for (const value of ["21", "30"]) {
+    fireEvent.change(field, { target: { value } });
+    expect(within(popover).getByRole("button", { name: "Change for all texts" }).getAttribute("aria-disabled")).toBeNull();
+  }
+  fireEvent.change(field, { target: { value: "2.5" } });
   expect(within(popover).getByRole("button", { name: "Change for all texts" }).getAttribute("aria-disabled")).toBe("true");
-  fireEvent.change(field, { target: { value: "20" } });
-  expect(within(popover).getByRole("button", { name: "Change for all texts" }).getAttribute("aria-disabled")).toBeNull();
   fireEvent.change(field, { target: { value: "2" } });
   fireEvent.click(within(popover).getByRole("button", { name: "Change for all texts" }));
   await waitFor(() => expect(update).toHaveBeenCalledWith("p/key", { annotations_per_text: 2 }));
@@ -905,7 +927,7 @@ it("the popover keeps a typed number when the scope changes and says why its but
   expect(field).toHaveProperty("value", "1");
   expect(within(popover).getByText("This text already has the limit 1. Enter another number, or choose \"For all texts\".")).toBeDefined();
   fireEvent.change(field, { target: { value: "0" } });
-  expect(within(popover).getByText("Enter a whole number from 1 to 20.")).toBeDefined();
+  expect(within(popover).getByText("Enter a whole number of 1 or more.")).toBeDefined();
   // Pressing the button changes nothing and the popover stays.
   fireEvent.click(within(popover).getByRole("button", { name: "Change for 1 text" }));
   expect(screen.getByRole("dialog", { name: "Annotators per text" })).toBeDefined();

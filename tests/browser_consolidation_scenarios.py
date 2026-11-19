@@ -384,13 +384,13 @@ def register_consolidation_scenario_route(app: FastAPI) -> None:
     @app.post("/__test_consolidation__")
     def consolidation_scenario(
         started: bool = Query(False),
-        people: int = Query(2, ge=2, le=20),
+        people: int = Query(2, ge=2, le=60),
         scenario: Literal["default", "modifiers"] = Query("default"),
         blind: bool = Query(False),
         standalone: bool = Query(False),
         consolidator: Literal["lead", "adj"] = Query("lead"),
-        open_people: int = Query(0, ge=0, le=18),
-        limit: int | None = Query(None, ge=1, le=20),
+        open_people: int = Query(0, ge=0, le=58),
+        limit: int | None = Query(None, ge=1, le=120),
     ) -> dict[str, Any]:
         if scenario == "modifiers":
             return build_modifiers(app, started, standalone)

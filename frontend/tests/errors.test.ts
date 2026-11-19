@@ -53,6 +53,12 @@ it("names the version and the refused field in guideline refusals", () => {
   expect(Object.hasOwn(ERROR_MESSAGES, "GUIDELINE_INCOMPLETE")).toBe(false);
 });
 
+it("names the server's maximum of annotators per text (issue 457)", () => {
+  expect(errorMessage(new ApiError(422, "raw", "ANNOTATIONS_PER_TEXT_ABOVE_MAXIMUM", { maximum: 8, value: 9, setting: "ONTOTATOR_MAX_ANNOTATIONS_PER_TEXT" })))
+    .toBe("This server allows at most 8 annotators per text. Enter 8 or less.");
+  expect(errorMessage(new ApiError(422, "raw", "ANNOTATIONS_PER_TEXT_ABOVE_MAXIMUM"))).toBe(ERROR_MESSAGES.ANNOTATIONS_PER_TEXT_ABOVE_MAXIMUM);
+});
+
 it("names the queue limit of a refused job (issue 396)", () => {
   expect(errorMessage(new ApiError(429, "raw", "JOB_QUEUE_LIMIT", { max: 3 }))).toBe("You already have 3 jobs waiting. Try again when one of them has started.");
   expect(errorMessage(new ApiError(429, "raw", "JOB_QUEUE_LIMIT"))).toBe(ERROR_MESSAGES.JOB_QUEUE_LIMIT);
