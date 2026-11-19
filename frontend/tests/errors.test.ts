@@ -42,6 +42,11 @@ it("names the version and the refused field in guideline refusals", () => {
   expect(errorMessage(new ApiError(409, "raw", "GUIDELINE_ALREADY_WITHDRAWN", { version: 4 }))).toBe("v4 is already withdrawn.");
   expect(errorMessage(new ApiError(422, "raw", "GUIDELINE_NOTE_INVALID", { field: "change_note" }))).toBe("The change note must be one line of at most 280 characters.");
   expect(errorMessage(new ApiError(422, "raw", "GUIDELINE_NOTE_INVALID", { field: "reason" }))).toBe("The reason must be one line of at most 280 characters.");
+  // A project's own label comes first (#487); without one the texts read as before.
+  expect(errorMessage(new ApiError(409, "raw", "GUIDELINE_UNCHANGED", { version: 2, label: "3.1" }))).toBe("This file is identical to 3.1 (v2). Nothing was published.");
+  expect(errorMessage(new ApiError(409, "raw", "GUIDELINE_UNCHANGED", { version: 2, label: null }))).toBe("This file is identical to v2. Nothing was published.");
+  expect(errorMessage(new ApiError(409, "raw", "GUIDELINE_ALREADY_WITHDRAWN", { version: 2, label: "3.1" }))).toBe("3.1 (v2) is already withdrawn.");
+  expect(errorMessage(new ApiError(422, "raw", "GUIDELINE_NOTE_INVALID", { field: "label" }))).toBe("The version label must be one line of at most 40 characters.");
   expect(errorMessage(new ApiError(413, "raw", "GUIDELINE_TOO_LARGE", { max_bytes: 262144 }))).toBe("The file is larger than 256 KB.");
   expect(errorMessage(new ApiError(422, "raw", "GUIDELINE_FILE_TYPE", { filename: "a.pdf" }))).toBe("Upload a .md or .txt file.");
   expect(errorMessage(new ApiError(409, "raw", "GUIDELINE_UNCHANGED", { version: "x" }))).toBe(ERROR_MESSAGES.GUIDELINE_UNCHANGED);
@@ -57,6 +62,16 @@ it("explains a text change refused because the new version has no proposals (iss
   expect(errorMessage(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "no_target_proposals" })))
     .toBe("The new version has no proposals yet: their automatic transfer may still be running, or they must be imported. Wait for or import the proposals for the new version, then try again.");
   expect(errorMessage(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "from_proposals" }))).toBe(ERROR_MESSAGES.TEXT_CHANGE_NOT_APPLICABLE);
+});
+
+it("names the earlier decision when a submission was already carried or dismissed (issue 461)", () => {
+  const refused = (details: Record<string, unknown>) => errorMessage(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "already_resolved", ...details }));
+  const carried = "This work was already carried to this version. Its task is still there or was submitted. Reload the row.";
+  expect(refused({ resolution: "carried", assignment_id: 12, decided_at: "2026-11-17T10:00:00+00:00" })).toBe(carried);
+  expect(refused({ resolution: "handed_over", assignment_id: 12 })).toBe(carried);
+  expect(refused({ resolution: "dismissed", assignment_id: null })).toBe("It was already decided to start this version fresh. That decision is final.");
+  // A decision about the open task (move, let finish, withdraw) names no resolution: the general sentence.
+  expect(refused({})).toBe(ERROR_MESSAGES.TEXT_CHANGE_NOT_APPLICABLE);
 });
 
 it("names the version to review when a lead fixed typos in the one asked for", () => {

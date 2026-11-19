@@ -1,3 +1,4 @@
+import { currentGuidelineRef, guidelineVersionName, type GuidelineRef } from "../guidelines/versionName";
 import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { api, onSessionRestored, type ProjectSummary, type TaskSummary } from "../api/client";
 import { routeHref, type NavigateOptions, type Route, type TaskStatusTab } from "../app/router";
@@ -138,15 +139,15 @@ export function MyTasks({ project, status, projects, onNavigate, username }: MyT
   // One quiet "Project guidelines v3" link per listed project with a version in force (spec: My tasks).
   const taskProjects = state.kind === "ready" ? [...new Set(state.tasks.map(task => task.project_key))].sort() : [];
   const projectIdentity = JSON.stringify(taskProjects);
-  const [guidelines, setGuidelines] = useState<{ identity: string; versions: ReadonlyMap<string, number> } | null>(null);
+  const [guidelines, setGuidelines] = useState<{ identity: string; versions: ReadonlyMap<string, GuidelineRef> } | null>(null);
   useEffect(() => {
     const keys = JSON.parse(projectIdentity) as string[];
     if (keys.length === 0) return;
     let active = true;
     // A failed read only hides that project's link; the task list stays usable.
-    void Promise.all(keys.map(key => api.listGuidelines(key).then(listing => listing.current?.version ?? null, () => null))).then(versions => {
+    void Promise.all(keys.map(key => api.listGuidelines(key).then(listing => currentGuidelineRef(listing), () => null))).then(versions => {
       if (!active) return;
-      const inForce = new Map<string, number>();
+      const inForce = new Map<string, GuidelineRef>();
       keys.forEach((key, index) => { const version = versions[index]; if (version !== null) inForce.set(key, version); });
       setGuidelines({ identity: projectIdentity, versions: inForce });
     });
@@ -188,17 +189,18 @@ export function MyTasks({ project, status, projects, onNavigate, username }: MyT
   const navigateProject = (value: string) => onNavigate(value === allProjectsValue ? { name: "tasks", status: status ?? "all" }
     : { name: "tasks", project: value, ...(status === undefined ? {} : { status }) });
   const managed = projects.filter(item => item.can_manage && (project === undefined || item.project_key === project));
-  const guidelineVersions = guidelines?.identity === projectIdentity ? guidelines.versions : new Map<string, number>();
+  const guidelineVersions = guidelines?.identity === projectIdentity ? guidelines.versions : new Map<string, GuidelineRef>();
   const listedProjects = new Set(filtered.map(task => task.project_key));
   const guidelineLinks = [...options.keys()].filter(key => listedProjects.has(key) && guidelineVersions.has(key));
   const guidelineLink = (key: string) => {
+    const inForce = guidelineVersions.get(key);
     const route: Route = { name: "projectGuidelines", key };
     // Without a project filter the list may mix projects: the link names its project.
     const name = tasks.find(task => task.project_key === key)?.project_name ?? key;
     return <a href={routeHref(route)} onClick={event => {
       if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
       event.preventDefault(); onNavigate(route);
-    }}>{`Project guidelines v${guidelineVersions.get(key)}${project === undefined ? `, ${name}` : ""}`}</a>;
+    }}>{`Project guidelines ${inForce ? guidelineVersionName(inForce.version, inForce.label) : ""}${project === undefined ? `, ${name}` : ""}`}</a>;
   };
   const columns: Column<TaskSummary>[] = [
     { id: "text", header: "Text", cell: task => <LanguageText text={taskText(task)} code={task.language} /> },
@@ -208,6 +210,9 @@ export function MyTasks({ project, status, projects, onNavigate, username }: MyT
       {failedChecks(task) > 0 && <span className="task-check-flag"><IconWarning /> {failedChecksTitle(failedChecks(task))}</span>}
       {task.consolidation_reason && <p className="cell-secondary task-consolidation-reason">{consolidationReasonText(task.consolidation_reason)}</p>}
       {secondReviewText(task) && <p className="cell-secondary task-lead-reason">{secondReviewText(task)}</p>}
+      {/* The lead's reason for reopening is written out like the one for a second review (review 2, F7 c); on a narrow
+          screen the notice under the "Reopened" badge already says it. */}
+      {!narrow && task.reopen_reason?.trim() && reopenedText(task) && <p className="cell-secondary task-lead-reason">{reopenedText(task)}</p>}
     </> },
     { id: "status", header: "Status", cell: task => <>
       {task.waiting_for_translation_review || task.waiting_for_lead ? <StatusBadge tone="neutral">{task.waiting_for_lead ? WAITING_FOR_LEAD : WAITING_FOR_REVIEW}</StatusBadge>

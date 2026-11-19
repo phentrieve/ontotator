@@ -1,3 +1,4 @@
+import { guidelineVersionName } from "./versionName";
 import { useEffect, useState } from "react";
 import { api, type GuidelineDocument as GuidelineDocumentView, type GuidelineSummary } from "../api/client";
 import { ErrorNotice } from "../admin/ErrorNotice";
@@ -27,6 +28,10 @@ export interface GuidelineReaderProps {
   version: number;
   /** The version in force; `null` when none is (none published or the current one withdrawn). */
   currentVersion: number | null;
+  /** The project's own label of `version` where the caller knows it; the loaded version's label replaces it. */
+  label?: string | null;
+  /** The project's own label of the version in force. */
+  currentLabel?: string | null;
   /** Level of the "Guidelines vN" heading (default 2); Markdown headings start one level below. */
   headingLevel?: 2 | 3;
   /** False when the surrounding container already names the version at `headingLevel` (task drawer). */
@@ -38,7 +43,7 @@ export interface GuidelineReaderProps {
  * or the withdrawn line. Showing a version's text records `opened` for it (spec G16), so the
  * Settings reading view, the task drawer and the guidelines page need no call of their own.
  */
-export function GuidelineReader({ projectKey, version, currentVersion, headingLevel = 2, showHeading = true }: GuidelineReaderProps): JSX.Element {
+export function GuidelineReader({ projectKey, version, currentVersion, label, currentLabel, headingLevel = 2, showHeading = true }: GuidelineReaderProps): JSX.Element {
   const [loaded, setLoaded] = useState<{ key: string; version: number; document: GuidelineDocumentView } | null>(null);
   const [error, setError] = useState<unknown>();
   useEffect(() => {
@@ -55,14 +60,15 @@ export function GuidelineReader({ projectKey, version, currentVersion, headingLe
   const Heading = headingLevel === 3 ? "h3" : "h2";
   const document = loaded?.key === projectKey && loaded.version === version ? loaded.document : null;
   const withdrawn = document !== null && (document.withdrawn != null || document.body === null);
+  const name = guidelineVersionName(version, document ? document.label : label);
   return <div className="guideline-reader">
-    {showHeading && <Heading className="guideline-reader-heading">Guidelines v{version}</Heading>}
+    {showHeading && <Heading className="guideline-reader-heading">Guidelines {name}</Heading>}
     {error !== undefined ? <ErrorNotice error={error} />
       : document === null ? <InlineMessage tone="info">Loading guidelines…</InlineMessage>
-      : withdrawn ? <p className="guideline-reader-withdrawn">v{version} was withdrawn by the project lead.</p>
+      : withdrawn ? <p className="guideline-reader-withdrawn">{name} was withdrawn by the project lead.</p>
       : <>
         <p className="guideline-reader-meta">{[`Published ${formatGuidelineDay(document.created_at)}`, document.change_note].filter(Boolean).join(", ")}</p>
-        {currentVersion !== null && currentVersion !== version && <InlineMessage tone="info">This is v{version}. The current version is v{currentVersion}.</InlineMessage>}
+        {currentVersion !== null && currentVersion !== version && <InlineMessage tone="info">This is {name}. The current version is {guidelineVersionName(currentVersion, currentLabel)}.</InlineMessage>}
         <GuidelineDocument kind={document.kind} body={document.body!} headingOffset={headingLevel - 1} />
       </>}
   </div>;

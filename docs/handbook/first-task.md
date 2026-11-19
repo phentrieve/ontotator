@@ -24,7 +24,7 @@ The editor opens. If you have no task, you see **No texts are assigned to you ye
 
 ## 3. Read the guidelines
 
-The first time you open a task in a project with guidelines, a notice asks you to read them. Click the read button in the notice, for example *Read guidelines v2*. Later you find them under **More** in the toolbar. On a wide screen they open in the right column, as a tab next to **Details**, so the text stays in view; see [The guidelines in the editor](annotator.md#the-guidelines-in-the-editor).
+The first time you open a task in a project with guidelines, a notice asks you to read them. Click the read button in the notice, for example *Read guidelines v2* (or *Read guidelines 3.1 (v2)* when your lead gave the version its own number). Later you find them under **More** in the toolbar. On a wide screen they open in the right column, as a tab next to **Details**, so the text stays in view; see [The guidelines in the editor](annotator.md#the-guidelines-in-the-editor).
 
 The guidelines tell you what to mark and how: which findings count, how much text to mark, how to handle negations or family history. When in doubt, follow the guidelines; if they do not answer your question, ask your lead.
 
@@ -84,7 +84,7 @@ Details: [Submit the text](annotator.md#submit-the-text).
 - Your task shows **Submitted** in **My tasks**. It is read-only now; click **View** to look at it. A translation review you submitted as a **Query** shows *Answer from the lead* there once the lead decided.
 - The next open task opens on its own, or **My tasks** if none is left.
 - The lead sees your submission next to the other annotators' work on the same text, and accepts one result or starts a consolidation. You do not see other people's work.
-- Your task is done. You do not need to do anything else unless the lead reopens it (**Reopened** in **My tasks**; click the badge to read the lead's reason) or you notice a mistake. A translation review the lead asks for a second time names the lead's reason under the task, for example *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.*
+- Your task is done. You do not need to do anything else unless the lead reopens it (**Reopened** in **My tasks**, with the lead's reason under the task name) or you notice a mistake. A translation review the lead asks for a second time names the lead's reason under the task, for example *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.*
 
 If you notice a mistake after submitting: open the task, choose **More** › **Work rounds** and click **Continue from this submission** ([Start a new work round](annotator.md#start-a-new-work-round)). Fix the finding, check the carried findings and submit again.
 

@@ -112,7 +112,9 @@ class _Context:
                 self.resolution_of[resolution.assignment_id] = resolution.resolution
                 if resolution.resolution == "moved":
                     self.moved_to[resolution.assignment_id] = resolution.to_document_id
-            if resolution.submission_id is not None:
+            if resolution.submission_id is not None and not resolution.lapsed:
+                # A lapsed carry (issue 461) settles nothing: rule 3b offers
+                # the carry again.
                 self.submission_resolutions.setdefault(
                     resolution.submission_id, set()
                 ).add(resolution.resolution)
@@ -672,6 +674,9 @@ def _build_row(ctx: _Context, case_id: str, language: str) -> dict[str, Any]:
             "override": facts.per_text_overrides.get(key),
         },
         "lead_pause": _lead_pause(ctx, key),
+        "typography_hints": sum(
+            facts.typography_hints.get(chain.newest.document_id, 0) for chain in live
+        ),
         "consolidation_progress": None,
         "unreviewed_translation": steps_rules.unreviewed_translation(
             ctx.step_facts[key]
@@ -1846,9 +1851,13 @@ def case_ids(facts: RowFacts, query: RowQuery) -> tuple[list[str], int, bool]:
 
 
 def sorted_case_ids(facts: RowFacts, case_ids: Sequence[str], sort: str) -> list[str]:
-    """``case_ids`` (deduplicated) in Documents order; unknown IDs last, as given."""
+    """``case_ids`` (deduplicated) in Documents order; unknown IDs last, as given.
+
+    ``sort`` "given" keeps the order of ``case_ids`` (issue 488)."""
     known = {version.case_id for version in facts.versions}
     unique = list(dict.fromkeys(case_ids))
+    if sort == "given":
+        return unique
     ordered = _sort_cases(
         facts, (case_id for case_id in unique if case_id in known), sort
     )

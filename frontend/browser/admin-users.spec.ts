@@ -1,13 +1,14 @@
 /**
- * Administration › Users (issue 170): Edit, the administrator role, Reset code, Deactivate… / Activate, History and
- * Anonymise…. Creating a user and the setup-code handover are in admin.spec.ts.
+ * Administration › Users (issue 170): Edit, the administrator role, Reset code, Deactivate… / Activate, History (what
+ * its Details say, issues 467 and 472, also on a phone) and Anonymise…. Creating a user and the setup-code handover are in admin.spec.ts.
  *
  * Every test has its own administrator and its own target account (``POST /__test_user__``, no project, no
  * assignments), found on the page through "Filter users": the table holds the accounts of every other spec too.
  */
 import { randomUUID } from "node:crypto";
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page, type Request } from "@playwright/test";
 import { authenticatedRequest, loginThroughForm, openTasksHome, TEST_PASSWORD } from "./helpers";
+import { leadScenario } from "./leadWorkflowHelpers";
 
 test.setTimeout(120_000);
 test.use({ actionTimeout: 15_000 });
@@ -86,7 +87,21 @@ async function serverUser(page: Page, username: string): Promise<Record<string, 
   expect(response.ok(), await response.text()).toBeTruthy();
   return (await response.json() as Record<string, unknown>[]).find(user => user.username === username);
 }
-async function logout(page: Page) {
+/** The API requests of the page that have no answer yet (call before the page makes them). */
+function openRequests(page: Page): Set<Request> {
+  const open = new Set<Request>();
+  page.on("request", request => { if (new URL(request.url()).pathname.startsWith("/api/")) open.add(request); });
+  page.on("requestfinished", request => open.delete(request));
+  page.on("requestfailed", request => open.delete(request));
+  return open;
+}
+/**
+ * Logs out once every request of the page has its answer. Right after a log-in the home page still reads the tasks;
+ * logging out while that request is on its way lets the server answer it with 401, which the browser reports as a
+ * console error. (``waitForLoadState("networkidle")`` does not wait here: the app never navigates.)
+ */
+async function logout(page: Page, open: Set<Request>) {
+  await expect.poll(() => open.size).toBe(0);
   await page.getByRole("button", { name: "Log out", exact: true }).click();
   await expect(page.getByRole("form", { name: "Log in to Ontotator" })).toBeVisible();
 }
@@ -109,6 +124,9 @@ test("Edit: name, e-mail, qualification and languages are saved; the administrat
   await expect(await cell(page, target, "Display name")).toHaveText("Tara Renamed");
   await expect(await cell(page, target, "Languages")).toHaveText("de");
   expect(await serverUser(page, target)).toMatchObject({ display_name: "Tara Renamed", email: "tara@example.org", qualification: "Physician", languages: ["de"], is_system_admin: false });
+
+  // A second change of the languages, for the history below: French for German.
+  expect((await authenticatedRequest(page, `/api/v1/admin/users/${target}`, "PATCH", { languages: ["fr"] })).ok()).toBeTruthy();
 
   // Cancel keeps the saved values.
   await page.getByRole("button", { name: `Edit ${target}`, exact: true }).click();
@@ -143,12 +161,52 @@ test("Edit: name, e-mail, qualification and languages are saved; the administrat
   await page.getByLabel("Filter users", { exact: true }).fill(target);
   const history = await historyOf(page, target, () => more(page, target, "History"));
   expect(history[0]).toBe("Administrator role changed: Granted");
-  // A language change is recorded without the languages themselves.
-  expect(history).toContain("Languages changed: ");
+  // A language change says which languages were added and removed (#467).
+  expect(history).toContain("Languages changed: Added: de.");
+  expect(history).toContain("Languages changed: Added: fr. Removed: de.");
   expect(history.some(entry => entry.startsWith("Profile changed: "))).toBe(true);
   expect(history[history.length - 1]).toMatch(/^Account created: /);
   expect(errors).toEqual([]);
 });
+
+for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+  test(`History at ${viewport.width} px: a settings change has the names of the settings page and the values; Details is wide enough to read`, async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.setViewportSize(viewport);
+    // A fresh project (never another spec's), whose settings the administrator changes.
+    const s = await leadScenario(page, "DEFAULT_IMPORT");
+    const { admin } = await openUsers(page);
+    const changed = await authenticatedRequest(page, `/api/v1/projects/${encodeURIComponent(s.project)}/settings`, "PATCH", { blind_consolidation: true, annotations_per_text: 2 });
+    expect(changed.ok(), await changed.text()).toBeTruthy();
+
+    await more(page, admin, "History");
+    const dialog = page.getByRole("dialog", { name: `History of ${admin}`, exact: true });
+    const line = dialog.getByRole("table", { name: "History", exact: true }).locator("tbody tr").filter({ hasText: "Project settings changed" });
+    await expect(line).toHaveCount(1);
+    const details = line.locator(".audit-details");
+    await expect(details).toHaveText("Annotators per text: 1 → 2; Hide annotator names during consolidation: off → on");
+
+    // Details keeps a readable width (it was about 80 px on a phone, #472), no word is broken, and the page does not scroll sideways.
+    await details.scrollIntoViewIfNeeded();
+    const layout = await details.evaluate(element => {
+      const text = element.firstChild as Text, broken: string[] = [];
+      for (const word of text.data.matchAll(/\S+/g)) {
+        const range = document.createRange();
+        range.setStart(text, word.index); range.setEnd(text, word.index + word[0].length);
+        if (range.getClientRects().length > 1) broken.push(word[0]);
+      }
+      const box = element.getBoundingClientRect();
+      return { width: box.width, left: box.left, right: box.right, broken, pageScroll: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+    });
+    expect(layout.width).toBeGreaterThanOrEqual(220);
+    expect(layout.broken).toEqual([]);
+    expect(layout.pageScroll).toBeLessThanOrEqual(0);
+    // After scrolling the table, the whole cell is on the screen.
+    expect(layout.left).toBeGreaterThanOrEqual(0);
+    expect(layout.right).toBeLessThanOrEqual(viewport.width);
+    expect(errors).toEqual([]);
+  });
+}
 
 test("Deactivate… logs the person out and refuses their log-in; Activate lets them in again", async ({ page, browser }) => {
   const errors = collectErrors(page);
@@ -199,6 +257,7 @@ test("Deactivate… logs the person out and refuses their log-in; Activate lets 
 
 test("Reset code: the code is shown once and sets a new password; the old one stops working", async ({ page }) => {
   const errors = collectErrors(page);
+  const open = openRequests(page);
   const { target } = await openUsers(page);
   await more(page, target, "Reset code");
   const confirm = page.getByRole("dialog", { name: `Issue a new reset code for ${DISPLAY_NAME}?`, exact: true });
@@ -215,7 +274,7 @@ test("Reset code: the code is shown once and sets a new password; the old one st
   await expect(handover).toHaveCount(0);
   const history = await historyOf(page, target, () => more(page, target, "History"));
   expect(history[0]).toMatch(/^New sign-in code issued: /);
-  await logout(page);
+  await logout(page, open);
 
   // The person redeems the code with a new password.
   const password = "another browser test passphrase";
@@ -228,7 +287,7 @@ test("Reset code: the code is shown once and sets a new password; the old one st
   await setup.getByLabel("Repeat the new password").fill(password);
   await setup.getByRole("button", { name: "Set password and log in" }).click();
   await expect(page.getByTestId("current-user")).toContainText(DISPLAY_NAME);
-  await logout(page);
+  await logout(page, open);
   expect(errors).toEqual([]);
 
   // The old password is refused, the new one logs in.

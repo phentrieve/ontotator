@@ -74,13 +74,29 @@ describe("change ranges (Show changes in a reading text)", () => {
     expect(changeRanges("same 😀", "same 😀")).toEqual({ removed: [], added: [] });
   });
 
-  it("leaves out whitespace-only changes: they are neither marked nor counted", () => {
+  it("leaves out changes of the kind of whitespace and of line breaks: they are neither marked nor counted", () => {
     expect(changeRanges("line\r\nnext", "line\nnext")).toEqual({ removed: [], added: [] });
     expect(changeRanges("5\u00a0mg daily", "5 mg daily")).toEqual({ removed: [], added: [] });
-    const before = "one  two\r\nthree", after = "one two\nfour";
+    expect(changeRanges("one\ntwo", "one\n\ntwo")).toEqual({ removed: [], added: [] });
+    const before = "one two\r\nthree", after = "one two\nfour";
     const { removed, added } = changeRanges(before, after)!;
     expect(slices(before, removed).map(part => part.trim())).toEqual(["three"]);
     expect(slices(after, added).map(part => part.trim())).toEqual(["four"]);
+  });
+
+  it("marks a change of the number of spaces: a double space, a removed space, a space at the end (issue 483)", () => {
+    const typed = changeRanges("Fever and cough.", "Fever  and cough.")!;
+    expect(typed.removed).toEqual([{ start: 5, end: 6 }]);
+    expect(typed.added).toEqual([{ start: 5, end: 7 }]);
+    const fixed = changeRanges("Fever  and cough.", "Fever and cough.")!;
+    expect(fixed.removed).toEqual([{ start: 5, end: 7 }]);
+    expect(fixed.added).toEqual([{ start: 5, end: 6 }]);
+    expect(changeRanges("Fever.", "Fever. ")).toEqual({ removed: [], added: [{ start: 6, end: 7 }] });
+    expect(changeRanges("Fever. \n", "Fever.\n")!.removed).toEqual([{ start: 6, end: 7 }]);
+    // A no-break space replaced by two spaces is a change of the number of spaces too.
+    expect(changeRanges("5\u00a0mg", "5  mg")!.added).toEqual([{ start: 1, end: 3 }]);
+    // A space that became a line break: the space is marked where it was, the line break is not.
+    expect(changeRanges("one two", "one\ntwo")).toEqual({ removed: [{ start: 3, end: 4 }], added: [] });
   });
 
   it("never splits a grapheme: a changed part of a ZWJ emoji or a combining mark marks the whole grapheme", () => {

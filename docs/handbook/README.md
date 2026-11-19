@@ -73,7 +73,7 @@ Words you meet in the app, in alphabetical order. The handbook uses one word per
 | Finalization | The third part of the lead's text card, where the lead accepts the final result or starts a consolidation. |
 | Finding | One ontology term marked in a text, with its values, modifiers and zero or more mentions. |
 | Group | In a consolidation: the findings from different submissions on overlapping passages, decided together. |
-| Guidelines | The project's annotation rules. Leads publish numbered versions (v1, v2, …); you read the version in force. |
+| Guidelines | The project's annotation rules. Leads publish numbered versions (v1, v2, …); you read the version in force. A lead can add the version the document gives itself; it is then shown first, for example *3.1 (v2)*. |
 | Layer | Part of the annotation setup with its own ontology. Each required layer must be checked before you submit. A **Reference** layer is read-only; a **Locked** layer cannot be edited. |
 | Mention | A marked passage of text that supports a finding. A finding can have several mentions. |
 | Modifier | An HPO term such as a severity or an onset, attached to a finding. |

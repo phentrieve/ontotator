@@ -84,3 +84,14 @@ test("a step can be skipped without assigning; closing reports it", async ({ pag
   await expect(dialog).toHaveCount(0);
   await expect(lead.locator(".ui-toast")).toContainText("Left unassigned: translation review of");
 });
+
+test("the assign dialog and the proposal say in which order a person sees the tasks (#488)", async ({ page, browser }) => {
+  const { dialog, lead } = await openDialog(page, browser);
+  await expect(dialog.getByRole("table", { name: "Members" })).toBeVisible();
+  await expect(dialog.getByText("My tasks lists a person's tasks by status, then in the order of assignment. New tasks come after the tasks the person already has.", { exact: false })).toBeVisible();
+  await shot(lead, "6-order-note");
+  await dialog.getByRole("button", { name: "Distribute evenly…", exact: true }).click();
+  const distribution = lead.getByRole("dialog", { name: "Propose distribution", exact: true });
+  await distribution.getByRole("button", { name: "Propose", exact: true }).click();
+  await expect(distribution.getByText("The tasks are assigned in the order of this table.", { exact: false })).toBeVisible();
+});

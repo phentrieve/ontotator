@@ -122,7 +122,9 @@ Add your qualification (for example "physician, native German speaker") in your 
 
 The translation tool checked its own output and found a possible problem, for example numbers or units that differ from the source. Click **Details** to read the check, what the tool reported and what to do if the translation is right anyway. Open **Technical details** for the technical code of the check. If Ontotator has no description for a check, ask the project lead what it checks. See [Review a translation](annotator.md#review-a-translation).
 
-The checks run once, on the first version of a translation. In the review of a later version the band reads *The automatic checks ran on v1, not on this version (v2).* and names a check that failed on v1; it asks for nothing there ([Review a later version](annotator.md#review-a-later-version)).
+A line *More passages in brackets than in the source* in the same band is a check of Ontotator itself on the version you review. It asks for no rationale ([Review a translation](annotator.md#review-a-translation)).
+
+The checks of the translation tool run once, on the first version of a translation. In the review of a later version the band reads *The automatic checks ran on v1, not on this version (v2).* and names a check that failed on v1; it asks for nothing there ([Review a later version](annotator.md#review-a-later-version)).
 
 ## Consolidating
 
@@ -143,6 +145,10 @@ The finding was not saved, for example because the connection dropped. Reload th
 The result has findings with values filled in by default, modifier terms used as findings, or modifier warnings. Check them; if they are correct, submit with the warnings. See [Finish a consolidation](consolidator.md#finish-a-consolidation).
 
 ## Leading a project
+
+### The app says "Guidelines v2", but our guideline is version 3.1
+
+The number after *v* counts the guideline files published in this project; it is not the version of your document. When you publish, enter your document's version in **Your version of the guideline (optional)**. The app then shows it first, for example *Guidelines 3.1 (v2)*. A version that is already published keeps its name: publish the text again with your version to change it. See [Publish the first or a new guideline version](lead-settings.md#publish-the-first-or-a-new-guideline-version).
 
 ### I cannot accept a result
 

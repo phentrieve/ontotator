@@ -291,6 +291,12 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     # draft and its decision are made by the person it is assigned to, never
     # by a machine acting as them (issue 345), so these stay with the session.
     ("PUT", "/api/v1/translation-reviews/{assignment_id}/draft"): SESSION,
+    # Reads what the workspace route already returns (the draft text), as
+    # rule codes and positions.
+    (
+        "GET",
+        "/api/v1/translation-reviews/{assignment_id}/draft/typography-hints",
+    ): "read",
     ("PUT", "/api/v1/translation-reviews/{assignment_id}/checked-sentences"): SESSION,
     ("POST", "/api/v1/translation-reviews/{assignment_id}/submit"): SESSION,
     ("GET", "/api/v1/translation-reviews/{assignment_id}/source-obligations"): "read",
@@ -375,6 +381,10 @@ PROJECT_RESOLVED: frozenset[tuple[str, str]] = frozenset(
         ("GET", "/api/v1/rounds/{round_id}/consolidation"),
         # Translation reviews: TranslationReviewService._authority.
         ("GET", "/api/v1/translation-reviews/{assignment_id}"),
+        (
+            "GET",
+            "/api/v1/translation-reviews/{assignment_id}/draft/typography-hints",
+        ),
         ("GET", "/api/v1/translation-reviews/{assignment_id}/source-obligations"),
     }
 )
