@@ -37,7 +37,7 @@ The toolbar shows the text name, its language and the mode:
 | **Annotate from scratch** | You see neither tool proposals nor other people's work. |
 | **Annotate from proposals** | You see a tool's proposals, never other people's work. See [Review tool proposals](#review-tool-proposals). |
 | **Review carried findings**, or the round name such as *Round 2, continued from Round 1* | Findings were carried over from earlier work. See [Review carried findings](#review-carried-findings). |
-| **Check after text change** | The text was corrected and some findings are marked **Check needed**. See [Re-create findings after a text correction](#re-create-findings-after-a-text-correction). If nothing needs a check, the toolbar shows the round instead, such as *Round 1, continued from an earlier version*. |
+| **Check after text change** | The text was corrected and some findings are marked **Check needed**. See [Re-create findings after a text correction](#re-create-findings-after-a-text-correction). If nothing needs a check, the toolbar shows the round instead, such as *Round 1, carried over from the earlier text version*. |
 
 Next to the mode, the save status tells you whether your work is stored: **Saved**, **Saving...** or **Unsaved changes**. Work is saved automatically; there is no save button. If it reads **Offline** or shows an error, click **Retry**.
 
@@ -191,7 +191,7 @@ Before you start: the project must allow findings without a text span. Otherwise
 
 1. In the **Findings** header, click **Add finding without a text span**.
 2. In the panel **New finding without a text span**, fill in **Reason for no text span** (if the project requires a reason).
-3. Search and choose the term. If you chose the term first, click **Add annotation**.
+3. Search and choose the term. If you chose the term first, click **Add finding**.
 4. The finding is listed as **Spanless**.
 
 Click **Cancel** to stop. The reason is kept as the finding's note.
@@ -202,7 +202,7 @@ What for: correct a finding you made.
 
 1. Select the finding.
 2. Use the action you need:
-   - **Change term**, then search a new one: changes the term and keeps the mentions.
+   - **Change term**, then search a new one: changes the term and keeps the mentions. The search starts with the words of the first mention, as for a new finding; type over them to search something else.
    - **Note**: type a comment. It is saved with the finding and the lead can read it.
    - **Delete finding**, then **Yes, delete**: deletes the finding and all its mentions. The message that follows offers **Undo**. Undo puts the finding back with its mentions, values, note and modifiers.
 
@@ -388,7 +388,7 @@ Before you start: a report pauses your task. You cannot save or submit until the
 2. Describe the problem under **What is the problem?**. Only you and project leads can read it.
 3. Click **Report and pause my task**.
 
-The menu item reads **Text problems** when there is something to see, for example your earlier reports. The dialog is named after the text, for example *Problems with CASE-1 de*. It lists **Your reports** and offers **New report**.
+While your task is paused, and after you submitted it, the menu item reads **Text problems**, for example *Text problems (Paused, 1 open)*. The dialog is named after the text, for example *Problems with CASE-1 de*. It lists **Your reports** and offers **New report**.
 
 ## Resume a paused task or withdraw a report
 
@@ -520,7 +520,7 @@ On a touch-only device such as a phone or tablet, **Mark checked sentences** is 
 
 What for: see spacing errors and characters you cannot see otherwise, such as a double space, a tab or a non-breaking space.
 
-1. Tick **Show invisible characters** above the texts. Your choice is remembered in this browser.
+1. Tick **Show invisible characters** above the texts. Your choice is remembered in this browser. While the box is ticked, a line below it names the marks: *Marks: · space, ° non-breaking space, → tab, ¶ line end, ¬ soft hyphen, | zero-width character*.
 2. Read the marks in all texts:
 
    | Mark | Character |

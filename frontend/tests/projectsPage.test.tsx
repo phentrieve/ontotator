@@ -113,3 +113,16 @@ it("shows the project description under its name (M2 D4)", () => {
   expect(within(rowOf("Project p1")).getByText("E3C clinical cases, tool proposals by phentrieve.")).toBeDefined();
   expect(rowOf("Project p2").querySelector(".projects-page__description")).toBeNull();
 });
+
+it("offers New project to a system administrator only, also without any project (issue 510)", () => {
+  vi.spyOn(api, "adminListPracticeProjects").mockReturnValue(new Promise(() => {}));
+  const onNavigate = vi.fn();
+  const view = render(<ProjectsPage projects={projects} currentKey="p1" onNavigate={onNavigate} />);
+  expect(screen.queryByRole("link", { name: "New project" })).toBeNull();
+  view.rerender(<ProjectsPage projects={[]} onNavigate={onNavigate} isAdmin />);
+  const link = screen.getByRole("link", { name: "New project" });
+  expect(link.getAttribute("href")).toBe("#/projects/new");
+  expect(screen.getByRole("heading", { name: "Project archives" })).toBeDefined();
+  fireEvent.click(link);
+  expect(onNavigate).toHaveBeenCalledWith({ name: "projectNew" });
+});

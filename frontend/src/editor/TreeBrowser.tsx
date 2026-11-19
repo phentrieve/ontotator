@@ -87,7 +87,7 @@ export const TreeBrowser: React.FC<TreeBrowserProps> = ({
   currentTermId,
   canAssign,
   mode = "assign",
-  currentHint = "This is the annotation's current term.",
+  currentHint = "This is the finding's current term.",
   focusOnOpen,
   onClose,
   onUseTerm,

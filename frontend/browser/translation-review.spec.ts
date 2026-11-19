@@ -4,7 +4,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Browser, type Locator, type Page } from '@playwright/test';
 import type { components } from '../src/api/generated';
 import { openOlderVersions, openTextCard, rowAction, showSegment, textCard, textNamePattern } from './documentsHelpers';
-import { authenticatedRequest, loginExisting, TEST_PASSWORD } from './helpers';
+import { authenticatedRequest, clickLogOut, loginExisting, TEST_PASSWORD } from './helpers';
 
 test.setTimeout(90_000);
 type ReviewWorkspace = components['schemas']['ReviewWorkspace'];
@@ -323,7 +323,7 @@ test('live qualification refusal retains inputs and the guarded profile link flu
   await page.getByRole('dialog', { name: 'Changes not saved', exact: true }).getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.history.state.ontotatorRouteIndex as number)).toBe(cursor);
   await expect(target(page)).toHaveValue(localOnly);
-  await page.getByRole('button', { name: 'Log out', exact: true }).click();
+  await clickLogOut(page);
   const logoutDialog = page.getByRole('dialog', { name: 'Unsaved changes', exact: true });
   await logoutDialog.getByRole('button', { name: 'Save and log out', exact: true }).click();
   await expect(logoutDialog.getByRole('button', { name: 'Cancel', exact: true })).toBeEnabled();

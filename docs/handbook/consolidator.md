@@ -66,7 +66,7 @@ The screen is read-only after you submitted, when the task is no longer yours, w
 
 A paused consolidation shows a banner above the groups and no decision buttons, no **Add finding** and no submit bar; your decisions so far are kept and can be read. Click **Show more** in the banner to read how it continues:
 
-- *Task paused: …* with the reason of a problem report, yours or one the lead paused your task for. If you reported it yourself, click **Report a text problem** in the header, then **Resume my task…**; otherwise wait for the lead's decision ([Resume a paused task or withdraw a report](annotator.md#resume-a-paused-task-or-withdraw-a-report)).
+- *Task paused: …* with the reason of a problem report, yours or one the lead paused your task for. If you reported it yourself, click **Text problems** in the header, then **Resume my task…**; otherwise wait for the lead's decision ([Resume a paused task or withdraw a report](annotator.md#resume-a-paused-task-or-withdraw-a-report)).
 - *Paused by lead: …* with the lead's reason: the lead paused the work on this text. It opens again when the lead releases the text ([A task paused by the lead](annotator.md#a-task-paused-by-the-lead)).
 
 If the pause arrives while you have the consolidation open, the next decision is not saved and the group says so with the reason, for example *Decision not saved. The project lead paused the work on this text: …*; the banner appears and the buttons go. The full editor of the consolidation shows the same banner and is read-only as well.
@@ -131,7 +131,7 @@ What for: keep a finding with a value or term that nobody chose.
    - **Edit values…**: set each value and the modifiers, then click **Keep with these values**. This is offered only when no row is in conflict.
    - **Other term…**: search and pick a term; the search works as in the editor ([Search a term](annotator.md#search-a-term)) and shows the full definition of the active hit below the hits. If there was no term conflict, it is saved at once; otherwise choose the remaining highlighted rows with ✓ and click **Keep**.
 
-Click **Cancel** to stop without changes.
+In **Edit values…**, click **Cancel** to stop without changes. The term search of **Other term…** has no **Cancel**: press Esc or click outside it to close it without a change.
 
 ## Add a finding everyone missed
 

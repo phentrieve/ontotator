@@ -296,9 +296,9 @@ describe("CaseScreen integration", () => {
     const selected = document.querySelector<HTMLElement>(".pending-term-continuation p")!;
     expect(selected.textContent).toContain("Hypotonia");
     const reason = screen.getByLabelText(/Reason for no text span/);
-    expect(screen.getByRole("button", { name: "Add annotation" })).toHaveProperty("disabled", true);
+    expect(screen.getByRole("button", { name: "Add finding" })).toHaveProperty("disabled", true);
     fireEvent.change(reason, { target: { value: "  Summary outside this excerpt  " } });
-    fireEvent.click(screen.getByRole("button", { name: "Add annotation" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add finding" }));
     await waitFor(() => expect(apply).toHaveBeenCalledWith("ws", expect.objectContaining({ payload: expect.objectContaining({ command: "create_annotation", note: "Summary outside this excerpt" }) })));
     expect(apply).toHaveBeenCalledTimes(1);
   });

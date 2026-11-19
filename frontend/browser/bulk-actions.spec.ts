@@ -49,14 +49,14 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
     await expect(groups.nth(1)).toContainText("Skip 1 text · final result chosen: use Change final… first");
     await expect(groups.nth(2)).toContainText("Keep 2 open tasks · not submitted yet");
     await expect(dialog.getByText("Will change:")).toBeVisible();
-    await expect(dialog.locator(".work-plan-summary")).toHaveText("Will change: 8 assignments in 6 texts");
+    await expect(dialog.locator(".work-plan-summary")).toHaveText("Will change: 8 tasks in 6 texts");
     await groups.nth(0).getByRole("button", { name: "Show all 6" }).click();
     await expect(groups.nth(0)).toContainText("EN100022 en, EN100023 en, EN100024 en, EN100025 en, EN100026 en, EN100027 en");
     await dialog.getByLabel(/^Reason/).fill("Guideline 2.3 changed for vital signs");
     expect(await noHorizontalScroll(page)).toBe(true);
     await shot(page, `336-dialog-after${suffix}`);
 
-    const apply = dialog.getByRole("button", { name: "Reopen 8 assignments" });
+    const apply = dialog.getByRole("button", { name: "Reopen 8 tasks" });
     await apply.click();
     await expect(dialog.getByText("What happens")).toBeVisible();
     await expect(apply).toHaveAttribute("aria-disabled", "true");
@@ -67,7 +67,7 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
     await apply.click();
     await expect(dialog).toBeHidden();
     const toast = page.locator(".ui-toast");
-    await expect(toast).toContainText("Reopened 8 assignments in 6 texts.");
+    await expect(toast).toContainText("Reopened 8 tasks in 6 texts.");
     await expect(toast.getByRole("button", { name: "Undo" })).toBeVisible();
     await expect(bar).toContainText("8 texts in 8 cases selected");
     expect(await noHorizontalScroll(page)).toBe(true);
@@ -94,13 +94,13 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
     await withdraw.getByLabel("Only annotations above the limit of annotators per text").check();
     const withdrawGroups = withdraw.getByRole("list", { name: "Preview" }).getByRole("listitem");
     await expect(withdrawGroups.first()).toContainText("Withdraw 1 open task · R. Roe 1");
-    await expect(withdraw.locator(".work-plan-summary")).toHaveText("Will change: 1 assignment in 1 text");
+    await expect(withdraw.locator(".work-plan-summary")).toHaveText("Will change: 1 task in 1 text");
     await shot(page, `336-withdraw-dialog-after${suffix}`);
-    await withdraw.getByRole("button", { name: "Withdraw 1 assignment" }).click();
+    await withdraw.getByRole("button", { name: "Withdraw 1 task" }).click();
     await withdraw.getByLabel("I understand — withdraw the open tasks").check();
-    await withdraw.getByRole("button", { name: "Withdraw 1 assignment" }).click();
+    await withdraw.getByRole("button", { name: "Withdraw 1 task" }).click();
     await expect(withdraw).toBeHidden();
-    await expect(toast).toContainText("Withdrew 1 assignment in 1 text.");
+    await expect(toast).toContainText("Withdrew 1 task in 1 text.");
     expect(errors).toEqual([]);
   });
 }
