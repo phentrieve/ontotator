@@ -1333,6 +1333,7 @@ def load_facts(
             ],
             viewer_id=viewer_user_id,
             viewer_is_lead=True,  # Documents is lead-only
+            logins_of_project=pid,
         )
     )
     people_fields = {uid: ref.model_dump() for uid, ref in people.items()}
@@ -1384,6 +1385,7 @@ def load_facts(
             conn,
             (item.annotator_id for item in selected.values()),
             viewer_id=viewer_user_id,
+            logins_of_project=pid,
         ),
         author_ids=author_ids,
         decided=_decided(conn, pid),

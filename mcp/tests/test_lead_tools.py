@@ -896,9 +896,13 @@ async def test_change_annotation_modes_dry_run_confirm_and_stale_token(
             "language": "en",
             "from_mode": "proposals",
             "discarded_submissions": 1,
-            "authors": ["Tom Reis"],
+            "authors": [
+                {"username": None, "display_name": "Tom Reis", "pseudonym": "ann-1"}
+            ],
             "withdrawn_tasks": 2,
-            "withdrawn_unsubmitted_tasks": ["ann-2"],
+            "withdrawn_unsubmitted_tasks": [
+                {"username": None, "display_name": None, "pseudonym": "ann-2"}
+            ],
         }
     ]
     # Issue 472: the counts say what they count, beside the lists of people.
