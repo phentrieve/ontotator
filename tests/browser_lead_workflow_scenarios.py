@@ -452,6 +452,60 @@ def rejected_translation_for_lead(app: FastAPI) -> dict[str, Any]:
     )
 
 
+QUERIED_CASES = {
+    "take_text": "case-0101",
+    "answer_only": "case-0102",
+    "rejected": "case-0103",
+}
+# What Ana changes in the texts she queries, and her question.
+QUERY_OLD, QUERY_NEW = "hypotonia", "muscular hypotonia"
+QUERY_RATIONALE = "The source says muscular hypotonia. Is the short form meant?"
+
+
+def queried_translation_for_lead(app: FastAPI) -> dict[str, Any]:
+    """Issue 483: rule on, 3 cases with de review + annotate. Ana queried the
+    de translations of case-0101 and case-0102, each with a proposed text
+    ("hypotonia" became "muscular hypotonia") and a question; she rejected
+    case-0103. The lead decides the queries under "Resolve…"."""
+    from ontotator.application.translation_reviews import TranslationReviewService
+
+    scenario = lead_project(app, "QUERIED_TRANSLATION_FOR_LEAD")
+    scenario.app.state.accounts.update_profile(
+        Actor.cli(), scenario.users["lead"], qualification="Physician"
+    )
+    case_ids = cases(101, 3)
+    docs = import_units(scenario, case_units(case_ids, ("de",)))
+    plan(scenario, case_ids, {"de": REVIEW_AND_ANNOTATE})
+    review = TranslationReviewService(scenario.db, scenario.app.state.jobs)
+    access, _actor = identity(scenario, "ana")
+    for name in ("take_text", "answer_only"):
+        document_id = docs[(QUERIED_CASES[name], "de")]
+        assignment_id = assign(scenario, document_id, "ana", "translation_review")
+        opened = review.open(access, assignment_id)
+        revision = review.save_draft(
+            access,
+            assignment_id,
+            expected_revision=opened.draft.revision,
+            text=opened.text.replace(QUERY_OLD, QUERY_NEW),
+            form={
+                "decision": "query",
+                "clinical_change": True,
+                "categories": ["terminology"],
+                "rationale": QUERY_RATIONALE,
+            },
+        )
+        review.submit(access, assignment_id, expected_revision=revision)
+    review_translation(
+        scenario, docs[(QUERIED_CASES["rejected"], "de")], "ana", "rejected"
+    )
+    return result(
+        scenario,
+        all_rows(case_ids, ("de",)),
+        case_ids={"de": list(case_ids)},
+        cases=dict(QUERIED_CASES),
+    )
+
+
 ACCEPTED_FOR_LEAD_CASES = {
     "accepted": "case-0101",
     "unreviewed": "case-0102",
@@ -569,6 +623,7 @@ BUILDERS: dict[str, Builder] = {
     "ACCEPTANCE": build_acceptance,
     "ROWS": build_rows,
     "REJECTED_TRANSLATION_FOR_LEAD": rejected_translation_for_lead,
+    "QUERIED_TRANSLATION_FOR_LEAD": queried_translation_for_lead,
     "ACCEPTED_TRANSLATION_FOR_LEAD": accepted_translation_for_lead,
     "UPLOAD_DIALOG": build_upload_dialog,
 }

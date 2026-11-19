@@ -245,6 +245,23 @@ def test_handover_settles_the_submission(env):
     assert "assign_annotation" not in _codes(row)
 
 
+def test_withdrawn_carried_task_offers_the_carry_again(env):
+    """Issue 461: the carried task was withdrawn without a submission."""
+    from ontotator.assignments.service import AssignmentService
+    from ontotator.auth.audit import Actor
+
+    work = _submitted(env, "tom")
+    first = _carry(env, work["submission_id"])
+    assert "carry_text_change" not in _codes(_row(env))
+    AssignmentService(env.db).revoke(Actor.cli(), first.assignment_id)
+    (step,) = [s for s in _row(env)["steps"] if s["code"] == "carry_text_change"]
+    assert step["submission_id"] == work["submission_id"]
+    assert step["document_id"] == env.docs[1]
+    # Carried again: the new task stands and nothing waits.
+    _carry(env, work["submission_id"])
+    assert "carry_text_change" not in _codes(_row(env))
+
+
 def test_author_holding_the_target_gets_no_carry_step(env):
     work = _submitted(env, "tom")
     assign(env.scenario, env.docs[1], "tom", "annotate")

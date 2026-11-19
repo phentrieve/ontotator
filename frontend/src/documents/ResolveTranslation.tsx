@@ -4,7 +4,8 @@
  * - `resolve` (rule 4, D5): "Reopen {reviewer}'s review…" (issue 340: the same person reviews again, one per
  *   submitted review of the version), "Assign a new review…", "Correct the translation…" (the lead's own
  *   correction, F1; "Continue your correction" while the lead holds one) and
- *   "Discard the {language} translation…" (reason required, consequences confirmed inline).
+ *   "Discard the {language} translation…" (reason required, consequences confirmed inline). A queried translation
+ *   (issue 483) offers first "Accept the reviewer's text…" and "Answer and accept the version as it is…".
  * - `not_accepted` (rule 4a, D24): "Turn translation review on" or the external-review acceptance with a reason.
  */
 import { useEffect, useId, useRef, useState } from "react";
@@ -15,8 +16,9 @@ import { ErrorNotice } from "../admin/ErrorNotice";
 import { Button, Checkbox, InlineConfirm, InlineMessage, Textarea } from "../ui";
 import { correctionDocumentId, LeadCorrectionPanel, openLeadCorrection } from "./LeadCorrectionPanel";
 import { stepLabel } from "./nextStepLabels";
+import { QUERY_ACTIONS, QueryDecisionDialog, type QueryDecisionKind } from "./QueryDecisionDialog";
 import { shortName } from "./stageLabels";
-import { reasonDocumentId, reasonLead, reopenableReviews, ReviewReason, useReviewReason, workPersonName } from "./reviewReason";
+import { reasonDocumentId, reasonLead, reopenableReviews, reviewerName, ReviewReason, useReviewReason, workPersonName } from "./reviewReason";
 import { ACCEPT_EXTERNAL_LABEL, ACCEPTANCE_RECORDED, consequenceLines, PLAN_CHANGED_MESSAGE, WITHDRAW_CHECKBOX } from "./PlanChips";
 
 export interface ResolveTranslationProps {
@@ -93,6 +95,8 @@ function ResolveOptions(props: ResolveTranslationProps): JSX.Element {
   const [discarding, setDiscarding] = useState(false);
   const [correcting, setCorrecting] = useState(false);
   const [reopening, setReopening] = useState<DocumentRowView["work"][number] | null>(null);
+  const queryButtons = useRef(new Map<QueryDecisionKind, HTMLButtonElement>());
+  const [deciding, setDeciding] = useState<QueryDecisionKind | null>(null);
   const [backToOptions, setBackToOptions] = useState<"discard" | "correct" | number | null>(null);
   const [reason, setReason] = useState("");
   const [consequences, setConsequences] = useState<ConsequencesView | null>(null);
@@ -192,11 +196,16 @@ function ResolveOptions(props: ResolveTranslationProps): JSX.Element {
     return <LeadCorrectionPanel row={row} projectKey={projectKey} onNavigate={onNavigate} headingLevel={headingLevel}
       onCancel={() => { setCorrecting(false); setBackToOptions("correct"); }} />;
   }
+  // Issue 483: a query is decided by the lead; the reviewer's text can be taken as it is.
+  const queried = row.next_step?.code === "resolve_queried";
   return <div className="documents-resolve" role="group" aria-labelledby={`${id}-title`}>
     <Heading id={`${id}-title`} ref={heading} tabIndex={-1} className="inline-confirm-title">{title}</Heading>
     {reviewReason && <ReviewReason record={reviewReason} lead={reasonLead(row, reviewReason)} />}
     {waitingLine(row) && <p className="documents-resolve-waiting">{waitingLine(row)}</p>}
     <div className="documents-resolve-actions">
+      {queried && (Object.keys(QUERY_ACTIONS) as QueryDecisionKind[]).map(kind => <Button key={kind} size="sm"
+        ref={element => { if (element) queryButtons.current.set(kind, element); else queryButtons.current.delete(kind); }}
+        onClick={() => setDeciding(kind)}>{QUERY_ACTIONS[kind]}</Button>)}
       {reviewers.map(item => <Button key={item.assignment_id} size="sm"
         ref={element => { if (element) reopenButtons.current.set(item.assignment_id, element); else reopenButtons.current.delete(item.assignment_id); }}
         onClick={() => { setReason(""); setError(undefined); setReopening(item); }}>{`Reopen ${workPersonName(item)}'s review…`}</Button>)}
@@ -207,6 +216,10 @@ function ResolveOptions(props: ResolveTranslationProps): JSX.Element {
       <Button ref={discardButton} size="sm" onClick={() => setDiscarding(true)}>{discardLabel}…</Button>
       <Button size="sm" onClick={onCancel}>Cancel</Button>
     </div>
+    {deciding && <QueryDecisionDialog kind={deciding} row={row} documentId={correctionDocumentId(row)} projectKey={projectKey}
+      reviewer={reviewReason ? reviewerName(row, reviewReason) : "The reviewer"}
+      onDecided={message => { setDeciding(null); onDone(message, { caseId: row.case_id, revision: props.revision }); }}
+      onClose={() => setDeciding(null)} returnFocus={() => queryButtons.current.get(deciding)} />}
   </div>;
 }
 
