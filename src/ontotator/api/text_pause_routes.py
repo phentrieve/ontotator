@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ontotator.api.identity import PrincipalDep
-from ontotator.api.person_views import PersonRefView
+from ontotator.api.person_views import MemberRefView
 from ontotator.api.routes import get_access
 from ontotator.api.work_plan_routes import (
     MAX_SELECTED_ROWS,
@@ -48,7 +48,7 @@ class TextPauseRequest(BaseModel):
 class TextPauseInfoView(BaseModel):
     reason: str
     # None: paused through an API token or by an account since erased.
-    paused_by: PersonRefView | None = None
+    paused_by: MemberRefView | None = None
     paused_at: datetime
 
 
@@ -60,7 +60,7 @@ class PausedTaskView(BaseModel):
     version: int
     task: Task
     status: Literal["open", "in_progress", "reopened"]
-    person: PersonRefView
+    person: MemberRefView
     # A problem report pauses the task as well: after a release it stays
     # paused until that report is decided.
     paused_by_report: bool

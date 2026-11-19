@@ -129,6 +129,11 @@ def _workload(
         "annotate": "annotations_open",
         "review": "reviews_open",
     }
+    submitted = {
+        "translation_review": "translation_reviews_submitted",
+        "annotate": "annotations_submitted",
+        "review": "reviews_submitted",
+    }
     waiting = {
         item["assignment_id"]
         for row in context.rows.values()
@@ -148,12 +153,17 @@ def _workload(
                 "annotations_waiting": 0,
                 "paused": 0,
                 "submitted": 0,
+                # ``submitted`` by task (issue 485); a task of another kind
+                # counts in ``submitted`` only.
+                **dict.fromkeys(submitted.values(), 0),
             },
         )
         if item.held:
             person["paused"] += 1
         elif item.status == "submitted":
             person["submitted"] += 1
+            if item.task in submitted:
+                person[submitted[item.task]] += 1
         elif item.assignment_id in waiting:
             person["annotations_waiting"] += 1
         elif item.task in columns:

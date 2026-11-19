@@ -201,6 +201,11 @@ class ProgressWorkloadView(BaseModel):
     reviews_open: int = 0
     paused: int = 0
     submitted: int = 0
+    # ``submitted`` by task (issue 485). Factory defaults keep the fields
+    # optional in the generated types (older fixtures and clients omit them).
+    translation_reviews_submitted: int = Field(default_factory=lambda: 0)
+    annotations_submitted: int = Field(default_factory=lambda: 0)
+    reviews_submitted: int = Field(default_factory=lambda: 0)
 
 
 class ProjectProgress(BaseModel):

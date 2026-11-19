@@ -133,6 +133,7 @@ def test_flagged_findings_group_id_facet_and_kept_automatically(cons):
     assert consolidation["author"] == {
         "pseudonym": adj.pseudonym,
         "display_name": "Ada Judicator",
+        "username": "adj",
         "is_me": False,
     }
     panel = env.lead.get(f"{BASE}/document-rows/c1/en/final-panel")
