@@ -489,6 +489,7 @@ class BulkTaskActionService:
             {int(item["user_id"]) for item in [*changes, *(k for k, _ in kept)]},
             viewer_id=self.actor.user_id or 0,
             viewer_is_lead=True,
+            logins_of_project=pid,
         )
 
         def task(item: RowMapping) -> dict[str, Any]:
@@ -934,6 +935,7 @@ class BulkTaskActionService:
                 {int(row["user_id"]) for row in rows},
                 viewer_id=self.actor.user_id or 0,
                 viewer_is_lead=True,
+                logins_of_project=pid,
             )
             view: dict[str, Any] = {
                 "undone": 0,

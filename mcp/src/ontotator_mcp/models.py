@@ -28,7 +28,12 @@ class Pin(_Model):
 class AssignmentRow(_Model):
     """One text version for one person (``AssignmentRowRequest``)."""
 
-    document_id: str = Field(description="Text version ID (list_texts).")
+    document_id: str = Field(
+        description=(
+            "Text version ID (document_id from list_texts). A case ID is not a"
+            " document_id."
+        )
+    )
     username: str = Field(description="Login name of a project member (list_people).")
 
 

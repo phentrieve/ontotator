@@ -64,7 +64,7 @@ def test_routes_are_lead_only(case_env):
         params={"annotations_per_text": 1},
     )
     assert allowed.status_code == 200, allowed.text
-    assert allowed.json() == {"rows_over_target": 0}
+    assert allowed.json() == {"rows_over_target": 0, "rows": []}
 
 
 def test_patch_409_body_carries_consequences(case_env):
