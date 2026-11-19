@@ -93,7 +93,7 @@ test("assign dialog: both numbers on an over-limit text, a labelled Change… th
   await expect(all).toHaveAttribute("aria-disabled", "true");
   await expect(popover.getByText('The project setting is already 1. Enter another number, or choose "Only for the selected text".')).toBeVisible();
   await field.fill("0");
-  await expect(popover.getByText("Enter a whole number from 1 to 20.")).toBeVisible();
+  await expect(popover.getByText("Enter a whole number of 1 or more.")).toBeVisible();
   await field.fill("2");
   await expect(popover.getByText(/already|Enter a whole number/)).toHaveCount(0);
   await all.click();

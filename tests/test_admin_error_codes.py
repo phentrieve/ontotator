@@ -53,6 +53,7 @@ PATHS = (
     "application/translation_reviews.py",
     "application/workspaces.py",
     "domain/errors.py",
+    "domain/annotation_limits.py",
     "domain/project_rules.py",
     "storage/repository.py",
 )

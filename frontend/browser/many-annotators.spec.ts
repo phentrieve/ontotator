@@ -1,5 +1,5 @@
 /**
- * Many annotators on one text (issue 447: "Annotators per text" goes up to 20). A text with eight annotators stays
+ * Many annotators on one text (issue 447; issue 457: "Annotators per text" has no built-in maximum). A text with eight annotators stays
  * usable on Documents (row and text card) and in the consolidation view, at 1440 px and at 390 px: every annotator is
  * there, the comparison table scrolls inside its own box, and the page itself never scrolls sideways. With hidden
  * names the letters go on after the fifth ("Annotator F" …). Scenario: tests/browser_consolidation_scenarios.py
@@ -14,7 +14,7 @@ import { loginExisting } from "./helpers";
 test.setTimeout(300_000);
 test.use({ actionTimeout: 15_000 });
 
-// MANY_ANNOTATORS=20 runs the same checks with twenty people (slow: the scenario submits each annotation).
+// MANY_ANNOTATORS=20 (or 30, up to 60) runs the same checks with that many people (slow: the scenario submits each annotation).
 const PEOPLE = Number(process.env.MANY_ANNOTATORS ?? 8);
 const SHOTS = process.env.SHOTS_DIR;
 const SIZES = [{ name: "desktop", width: 1440, height: 900 }, { name: "phone", width: 390, height: 844 }] as const;
@@ -51,6 +51,13 @@ async function shot(page: Page, name: string): Promise<void> {
   if (!SHOTS) return;
   mkdirSync(SHOTS, { recursive: true });
   await page.screenshot({ path: `${SHOTS}/${name}.png` });
+}
+
+/** "A" … "Z", then "AA", "AB" … as the server names hidden annotators (consolidation_blinding.letters). */
+function letters(index: number): string {
+  let [text, rest] = ["", index];
+  do { text = String.fromCharCode(65 + (rest % 26)) + text; rest = Math.floor(rest / 26) - 1; } while (rest >= 0);
+  return text;
 }
 
 const group = (page: Page, name: string): Locator => page.locator(".cons-group").filter({ has: page.locator(".cons-group-title", { hasText: name }) });
@@ -139,7 +146,7 @@ test("hidden names: the letters go on after the fifth annotator", async ({ page 
   await expect(page.getByRole("heading", { level: 1, name: `Consolidate ${s.case_id} en v1`, exact: true })).toBeVisible({ timeout: 30_000 });
   const hypotonia = await openHypotonia(page);
   const heads = hypotonia.locator("table.cons-compare thead th");
-  await expect(heads).toHaveText(Array.from({ length: PEOPLE }, (_, index) => new RegExp(`Annotator ${String.fromCharCode(65 + index)}$`)));
+  await expect(heads).toHaveText(Array.from({ length: PEOPLE }, (_, index) => new RegExp(`Annotator ${letters(index)}$`)));
   await expectNoPageScroll(page);
   await shot(page, "447-consolidation-blind-desktop");
   expect(errors).toEqual([]);

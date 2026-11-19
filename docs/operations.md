@@ -227,6 +227,24 @@ Reset codes always last 2 hours and have no setting: a reset code opens an exist
 
 Security: a longer validity widens the time in which a setup code that leaked (a forwarded message, a shared mailbox, a screenshot) can be used to take over the new account. What limits this stays as it is: a code works once, a newer code for the same person cancels the older one, the server stores only a hash of it, and a setup code opens an account that holds no work yet. If a code may have leaked, issue a new one for the person on the Users page or with `reset-code`; if a person reports that their code is refused although it has not expired, someone else may have used it: look at the history of the account on the Users page and deactivate it when in doubt. Choose a shorter value when codes travel by channels you do not trust.
 
+### Annotators per text
+
+| Setting | Default | Allowed | Meaning |
+| --- | --- | --- | --- |
+| `ONTOTATOR_MAX_ANNOTATIONS_PER_TEXT` | unset (no limit) | whole number from `1` to `2147483647`; unset or empty for no limit | The most annotators per text a lead can set, for a project and for a single text. |
+
+Ontotator has no maximum of its own for **Annotators per text**: a lead sets any number from 1, as the project setting (**Settings** › **Workflow**) and as a text's own value (assign dialog). Set this to keep leads from planning more annotators on a text than your team wants. It is one value for the whole server; a project has no maximum of its own.
+
+Set it in the environment of the app (`.env.docker` of the Compose stack) and restart the app; it cannot be changed in the browser. The server does not start with a value that is not a whole number from 1.
+
+What it does: saving a larger number is refused with `ANNOTATIONS_PER_TEXT_ABOVE_MAXIMUM` (HTTP 422) and nothing is written; the refusal names the maximum, the refused value and this setting. This holds for the settings page, the assign dialog, the API (`PATCH …/settings`, `PUT …/texts/{case}/{language}/annotations-per-text`, `PUT …/texts/annotations-per-text`) and the MCP server. The settings page names the maximum below the field, the project settings of the API return it as `annotations_per_text_max` (`null`: no limit), and the MCP tool `project_overview` returns the same field.
+
+What it does not do: a number saved before the maximum was set or lowered stays, for a project and for a text, and its texts still take that many annotators. Nobody loses a task. Such a number can be kept or lowered, not raised. The practice project of a person always has its two annotators.
+
+Beyond the type of the database column (`2147483647`) no number is accepted. One consolidation merges at most twice a text's annotators per text, and never fewer than 40 submissions.
+
+With many annotators on a text: the agreement compares every two of them, so a text with 30 annotators has 435 pairs and one with 60 has 1770. In a test with one such text, `GET …/agreement` and the final export took under a second for 60 annotators; the response grew from 0.3 MB (20 annotators) to 2.5 MB (60).
+
 ## Move a project to another server
 
 A project archive carries one complete project between servers (or into a copy on the same server). It is a ZIP with `manifest.json` (format `ontotator-project-archive`, schema version 1, the Ontotator version and database revision that wrote it, the server's instance id, `created_at`, the SHA-256 and size of every other file, and the columns and row counts of every table), one JSONL file per project table under `tables/`, `people.jsonl` (id, username and pseudonym of every account the rows name; the e-mail address only of people named in the project's work, such as members, assignees and authors, since the import matches people by it; a person named only in the audit trail or job records, such as an administrator of the source server, is listed without it and becomes a pseudonym-only person elsewhere), `ontology_files.jsonl` and the stored files under `blobs/<sha256>`: uploaded texts and bundles, captured search resources and, unless left out, the ontology and translation files of the pins. Files are taken only from the columns that refer to them, never from job results or audit details: earlier export results and archives are not included, and archive export and import jobs are not archived. A job the rows refer to that names no project (a T1 import from the command line) is included as a job of the project. Mutation and workflow replay receipts and login sessions are left out. Archives hold clinical texts and e-mail addresses: protect them like backups. Only system administrators export or import, as jobs, here or on the Projects page.

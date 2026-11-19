@@ -10,6 +10,7 @@ import { PlaceholderRow } from "../editor/carried/PlaceholderRow";
 import { CarriedProgress } from "../editor/carried/CarriedProgress";
 import { SidebarResizer } from "../editor/SidebarResizer";
 import { useSidebarWidth } from "../editor/sidebarWidth";
+import { useTreeHeight } from "../editor/treeHeight";
 import { InspectorTabList, inspectorTabIds, useInspectorTabs } from "../editor/InspectorTabs";
 import type { GuidelinesPanel } from "../tasks/TaskGuidelines";
 import { RoundInputEvidenceDialog } from "../tasks/RoundInputEvidenceDialog";
@@ -3472,6 +3473,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const guidelinesTab = tabs.hosted && tabs.tab === "guidelines";
   // The findings column's limits follow the inspector, which is at least 420 px while it holds the guidelines.
   const sidebarWidth = useSidebarWidth(versionContext?.username, { inspectorWithGuidelines: tabs.hosted });
+  // The ontology tree's height under the inspector, set by dragging the divider above it.
+  const treeHeight = useTreeHeight(versionContext?.username, treeWalk && !treeCollapsed ? treeWalk.nonce : null);
   useLayoutEffect(() => {
     tabs.resetDetailsScroll();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new inspector subject resets its scroll
@@ -3982,8 +3985,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
         ))}
       </nav>
       {/* Main Workspace Layout */}
-      <div className={`app-layout mobile-pane-${mobilePane}${treeWalk && !treeCollapsed ? " tree-open" : ""}${tabs.hosted ? " inspector-with-guidelines" : ""}`}
-        style={{ "--sidebar-width": `${sidebarWidth.width}px` } as CSSProperties}>
+      <div className={`app-layout mobile-pane-${mobilePane}${treeWalk && !treeCollapsed ? " tree-open" : ""}${treeHeight.height !== null ? " tree-sized" : ""}${tabs.hosted ? " inspector-with-guidelines" : ""}`}
+        style={{ "--sidebar-width": `${sidebarWidth.width}px`, ...(treeHeight.height !== null ? { "--tree-height": `${treeHeight.height}px` } : {}) } as CSSProperties}>
         {/* Left: Sidebar (Annotations & Review Targets) */}
         <aside className="sidebar density-compact" id="findings-column">
           {/* Narrow layout: attach mode opens on Findings, where the text pane's banner and its Cancel are out of sight. */}
@@ -4601,7 +4604,15 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
             onClose={handleCloseTree}
             onUseTerm={handleUseTreeTerm}
             languages={searchLanguagesFor(treeWalk.layerId)?.active}
+            username={versionContext?.username}
           />
+        )}
+        {/* The divider drawn above the tree sets its height (three columns only, editor.css); after it in the
+            focus order, as the findings column's divider follows that column. */}
+        {treeWalk && !treeCollapsed && (
+          <SidebarResizer orientation="horizontal" side="start" width={treeHeight.value} limits={treeHeight.limits} controls="ontology-tree"
+            onChange={treeHeight.setHeight} onReset={treeHeight.reset} onCommit={treeHeight.commit}
+            label="Resize ontology tree" hint="Resize the ontology tree (focus the divider)" measure={treeHeight.measure} />
         )}
       </div>
       {/* Above 700 px nothing floats over the text (#21): the New finding panel holds the hint and the one Discard.
