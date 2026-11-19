@@ -37,6 +37,9 @@ from ontotator.api.health import ReadinessProbe
 from ontotator.api.health import router as health_router
 from ontotator.api.job_routes import router as job_router
 from ontotator.api.me_routes import router as me_router
+from ontotator.api.oauth_routes import connections_router as oauth_connections_router
+from ontotator.api.oauth_routes import consent_router as oauth_consent_router
+from ontotator.api.oauth_routes import protocol_router as oauth_protocol_router
 from ontotator.api.ontology_routes import router as ontology_router
 from ontotator.api.practice_routes import router as practice_router
 from ontotator.api.practice_routes import sweep as practice_sweep
@@ -62,6 +65,7 @@ from ontotator.api.tree_routes import router as tree_router
 from ontotator.api.upload_routes import router as upload_router
 from ontotator.auth.accounts import AccountService
 from ontotator.auth.api_tokens import ApiTokenService
+from ontotator.auth.oauth import OAuthService
 from ontotator.auth.preferences import UserPreferencesStore
 from ontotator.auth.sessions import SessionService
 from ontotator.authz.memberships import MembershipService
@@ -129,6 +133,8 @@ NOT_FOUND_CODES = frozenset(
         "MODE_CHANGE_NOT_FOUND",
         "TECHNICAL_REPORT_NOT_FOUND",
         "TOKEN_NOT_FOUND",
+        "OAUTH_NOT_ENABLED",
+        "OAUTH_CONNECTION_NOT_FOUND",
     }
 )
 
@@ -356,6 +362,21 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
             app.state.memberships = MembershipService(db)
             app.state.sessions = sessions
             app.state.api_tokens = api_tokens
+            # The OAuth authorization server for the remote MCP server (issue
+            # 388); off (every OAuth endpoint 404) without ONTOTATOR_MCP_URL.
+            # It needs the public origin as its issuer: one taken from a
+            # request's Host header would be the sender's choice.
+            if config.mcp_url and not config.public_origin:
+                logger.warning(
+                    "ONTOTATOR_MCP_URL is set without a public origin, so OAuth "
+                    "for the remote MCP server stays off. Set "
+                    "ONTOTATOR_PUBLIC_ORIGIN (serve --public-origin)."
+                )
+            app.state.oauth = (
+                OAuthService(db, config.mcp_url)
+                if config.mcp_url and config.public_origin
+                else None
+            )
             app.state.preferences = UserPreferencesStore(db)
             app.state.runtime_lease = RuntimeLease(unlimited_db.engine)
             # The secret of the opaque ids for blinded consolidators (issue
@@ -685,6 +706,9 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
     app.include_router(current_token_router)
     app.include_router(project_token_router)
     app.include_router(admin_token_router)
+    app.include_router(oauth_protocol_router)
+    app.include_router(oauth_consent_router)
+    app.include_router(oauth_connections_router)
     app.include_router(me_router)
     app.include_router(practice_router)
     app.include_router(admin_project_router)

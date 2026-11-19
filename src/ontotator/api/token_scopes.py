@@ -73,6 +73,12 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     ("GET", "/api/v1/admin/tokens"): SESSION,
     ("POST", "/api/v1/admin/tokens"): SESSION,
     ("POST", "/api/v1/admin/tokens/{token_id}/revoke"): SESSION,
+    # OAuth consent and connected apps (issue 388): never with a token, so an
+    # access token can neither approve a consent nor revoke a connection.
+    ("GET", "/api/v1/oauth/authorization"): SESSION,
+    ("POST", "/api/v1/oauth/authorization"): SESSION,
+    ("GET", "/api/v1/me/connections"): SESSION,
+    ("POST", "/api/v1/me/connections/{grant_id}/revoke"): SESSION,
     # Ontologies and terms
     ("GET", "/api/v1/ontologies"): "read",
     ("POST", "/api/v1/search"): "read",

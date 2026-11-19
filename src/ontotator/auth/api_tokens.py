@@ -41,6 +41,7 @@ from ontotator.domain.errors import AccessDenied, DomainError
 from ontotator.storage.database import Database
 from ontotator.storage.tables import (
     ApiTokenRow,
+    OAuthGrantRow,
     ProjectMembershipRow,
     ProjectRow,
     UserRow,
@@ -85,6 +86,8 @@ class ApiToken:
     last_used_at: datetime | None
     revoked_at: datetime | None
     revoked_reason: str | None
+    # An OAuth access token (issue 388): the MCP resource it is bound to.
+    resource: str | None = None
 
 
 @dataclass(frozen=True)
@@ -152,6 +155,7 @@ def _view_columns() -> tuple[object, ...]:
         ApiTokenRow.last_used_at,
         ApiTokenRow.revoked_at,
         ApiTokenRow.revoked_reason,
+        OAuthGrantRow.resource,
     )
 
 
@@ -160,6 +164,7 @@ def _views(conn: Connection, *conditions: object) -> list[ApiToken]:
         select(*_view_columns())  # type: ignore[call-overload]
         .join(UserRow, UserRow.id == ApiTokenRow.owner_id)
         .outerjoin(ProjectRow, ProjectRow.id == ApiTokenRow.project_id)
+        .outerjoin(OAuthGrantRow, OAuthGrantRow.id == ApiTokenRow.oauth_grant_id)
         .where(*conditions)
         .order_by(ApiTokenRow.created_at.desc(), ApiTokenRow.id.desc())
     )
@@ -177,6 +182,7 @@ def _views(conn: Connection, *conditions: object) -> list[ApiToken]:
             last_used_at=row.last_used_at,
             revoked_at=row.revoked_at,
             revoked_reason=row.revoked_reason,
+            resource=row.resource,
         )
         for row in conn.execute(statement)
     ]
@@ -356,8 +362,10 @@ class ApiTokenService:
         """Tokens, newest first; filtered by owner, project or both.
 
         ``personal_only`` leaves out project tokens (an owner's own page).
+        OAuth access tokens (issue 388) are never listed: they are short-lived
+        and shown as their grant (Profile > Connected apps).
         """
-        conditions: list[object] = []
+        conditions: list[object] = [ApiTokenRow.oauth_grant_id.is_(None)]
         if owner_id is not None:
             conditions.append(ApiTokenRow.owner_id == owner_id)
         if project_key is not None:
@@ -464,9 +472,16 @@ class ApiTokenService:
                     UserRow.is_system_admin,
                     UserRow.active,
                     UserRow.anonymised_at,
+                    ApiTokenRow.oauth_grant_id,
+                    OAuthGrantRow.revoked_at.label("grant_revoked_at"),
+                    OAuthGrantRow.expires_at.label("grant_expires_at"),
+                    OAuthGrantRow.last_used_at.label("grant_last_used_at"),
                 )
                 .join(UserRow, UserRow.id == ApiTokenRow.owner_id)
                 .outerjoin(ProjectRow, ProjectRow.id == ApiTokenRow.project_id)
+                .outerjoin(
+                    OAuthGrantRow, OAuthGrantRow.id == ApiTokenRow.oauth_grant_id
+                )
                 .where(
                     ApiTokenRow.token_sha256 == token_digest(secret),
                     ApiTokenRow.revoked_at.is_(None),
@@ -475,6 +490,11 @@ class ApiTokenService:
             if row is None or not row.active or row.anonymised_at is not None:
                 return None
             if now >= row.expires_at:
+                return None
+            # An OAuth access token ends with its grant (issue 388).
+            if row.oauth_grant_id is not None and (
+                row.grant_revoked_at is not None or now >= row.grant_expires_at
+            ):
                 return None
             if row.kind == "system" and not row.is_system_admin:
                 return None
@@ -493,6 +513,12 @@ class ApiTokenService:
                     .where(ApiTokenRow.id == row.id)
                     .values(last_used_at=now)
                 )
+                if row.oauth_grant_id is not None:
+                    conn.execute(
+                        update(OAuthGrantRow)
+                        .where(OAuthGrantRow.id == row.oauth_grant_id)
+                        .values(last_used_at=now)
+                    )
             return Principal(
                 user_id=row.user_id,
                 username=row.username,

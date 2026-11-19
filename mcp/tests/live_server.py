@@ -70,6 +70,10 @@ def register_scenario_route(app: FastAPI) -> None:
     app.router.routes.insert(0, app.router.routes.pop())
 
 
+# The remote MCP server the app issues OAuth tokens for (issue 388) is served
+# by the test itself, on a port chosen here.
+
+
 def _free_port() -> int:
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))
@@ -81,11 +85,15 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="ontotator-mcp-it-") as folder:
         root = Path(folder)
         port = _free_port()
+        mcp_url = f"http://127.0.0.1:{_free_port()}/mcp"
         app = create_app(
             AppConfig(
                 workspace_dir=root,
                 database_url=database_url_for(root / "mcp.db"),
                 port=port,
+                mcp_url=mcp_url,
+                # The OAuth issuer; without it OAuth stays off.
+                public_origin=f"http://127.0.0.1:{port}",
             )
         )
         register_scenario_route(app)
@@ -111,6 +119,7 @@ def main() -> None:
                         "url": f"http://127.0.0.1:{port}",
                         "admin_token": admin.secret,
                         "read_token": reader.secret,
+                        "mcp_url": mcp_url,
                     }
                 ),
                 flush=True,

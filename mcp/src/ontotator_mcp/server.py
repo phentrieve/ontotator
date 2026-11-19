@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 import httpx
 from mcp.server.mcpserver import MCPServer
 
 from ontotator_mcp import __version__
 from ontotator_mcp.client import OntotatorClient
-from ontotator_mcp.config import Settings
+from ontotator_mcp.config import HttpSettings, Settings
 from ontotator_mcp.resources import register_resources
 from ontotator_mcp.tools_content import register_content
 from ontotator_mcp.tools_lead import register_lead
@@ -84,11 +85,41 @@ them.
 """
 
 
+REMOTE_NOTE = """
+This is a remote MCP server: it acts as the user whose token each request
+carries. Tools that read or write local files are off here.
+"""
+
+
 def build_server(
-    settings: Settings, *, transport: httpx.AsyncBaseTransport | None = None
+    settings: Settings,
+    *,
+    transport: httpx.AsyncBaseTransport | None = None,
+    http: HttpSettings | None = None,
 ) -> MCPServer:
-    """The server for ``settings``; ``transport`` replaces the network in tests."""
+    """The server for ``settings``; ``transport`` replaces the network in tests.
+
+    With ``http`` (``--http``, issue 388) every request must carry its
+    caller's token, checked against Ontotator, which is also the OAuth
+    authorization server the protected resource metadata names.
+    """
     api = OntotatorClient(settings, transport=transport)
+    remote: dict[str, Any] = {}
+    if http is not None:
+        from urllib.parse import urlsplit
+
+        from ontotator_mcp.remote import OntotatorTokenVerifier, auth_settings
+
+        # The authorization server clients are sent to is a public address:
+        # ONTOTATOR_MCP_ISSUER, else the origin of ONTOTATOR_URL. With an
+        # internal ONTOTATOR_URL the issuer must be set, or the metadata
+        # would publish the internal host.
+        parts = urlsplit(settings.url)
+        issuer = http.issuer or f"{parts.scheme}://{parts.netloc}"
+        remote = {
+            "auth": auth_settings(http, issuer),
+            "token_verifier": OntotatorTokenVerifier(api, http.public_url),
+        }
 
     @asynccontextmanager
     async def lifespan(_server: MCPServer) -> AsyncIterator[None]:
@@ -101,9 +132,11 @@ def build_server(
         "ontotator",
         title="Ontotator",
         instructions=INSTRUCTIONS
-        + (CONTENT_INSTRUCTIONS if settings.read_content else ""),
+        + (CONTENT_INSTRUCTIONS if settings.read_content else "")
+        + (REMOTE_NOTE if http is not None else ""),
         version=__version__,
         lifespan=lifespan,
+        **remote,
     )
     register_setup(server, api)
     register_people(server, api)

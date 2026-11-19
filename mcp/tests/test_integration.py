@@ -864,3 +864,252 @@ async def test_wrong_input_is_named_not_ignored(live: dict[str, str]) -> None:
         )
         assert done["applied"] is True and done["unknown_texts"] == wrong
         assert done["selection"] == f"4 texts of project '{project}'"
+
+
+def _pkce() -> tuple[str, str]:
+    import base64
+    import hashlib
+    import secrets
+
+    verifier = secrets.token_urlsafe(48)
+    digest = hashlib.sha256(verifier.encode()).digest()
+    return verifier, base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
+
+
+def test_a_remote_client_connects_with_oauth_end_to_end(
+    live: dict[str, str],
+) -> None:
+    """Issue 388: register, log in, consent, exchange, then call a tool remotely."""
+    from urllib.parse import parse_qs, urlsplit
+
+    from starlette.testclient import TestClient
+
+    from ontotator_mcp.config import HttpSettings
+    from ontotator_mcp.remote import http_app
+
+    base, mcp_url = live["url"], live["mcp_url"]
+    redirect = "http://127.0.0.1:33418/callback"
+    with httpx.Client(base_url=base, follow_redirects=False) as browser:
+        # The client discovers and registers itself.
+        meta = browser.get("/.well-known/oauth-authorization-server").json()
+        assert meta["code_challenge_methods_supported"] == ["S256"]
+        registered = browser.post(
+            "/oauth/register",
+            json={
+                "client_name": "Integration",
+                "redirect_uris": [redirect],
+                "token_endpoint_auth_method": "none",
+                "grant_types": ["authorization_code", "refresh_token"],
+            },
+        ).json()
+        verifier, challenge = _pkce()
+        params = {
+            "response_type": "code",
+            "client_id": registered["client_id"],
+            "redirect_uri": redirect,
+            "code_challenge": challenge,
+            "code_challenge_method": "S256",
+            "scope": "read",
+            "resource": mcp_url,
+            "state": "s1",
+        }
+        handed = browser.get("/oauth/authorize", params=params)
+        assert handed.status_code == 302
+        assert handed.headers["location"].startswith("/#/oauth/authorize?")
+        # The user logs in to Ontotator itself and consents.
+        login = browser.post(
+            "/api/v1/auth/login",
+            json={"username": "root", "password": "test-only passphrase"},
+            headers={"Origin": base},
+        )
+        assert login.status_code == 200, login.text
+        csrf = {"X-CSRF-Token": login.json()["csrf_token"], "Origin": base}
+        shown = browser.get("/api/v1/oauth/authorization", params=params).json()
+        decision = browser.post(
+            "/api/v1/oauth/authorization",
+            json={"params": shown["params"], "approve": True, "scopes": ["read"]},
+            headers=csrf,
+        ).json()
+    query = parse_qs(urlsplit(decision["redirect_to"]).query)
+    assert query["state"] == ["s1"]
+    tokens = httpx.post(
+        f"{base}/oauth/token",
+        data={
+            "grant_type": "authorization_code",
+            "code": query["code"][0],
+            "redirect_uri": redirect,
+            "code_verifier": verifier,
+            "client_id": registered["client_id"],
+            "resource": mcp_url,
+        },
+    ).json()
+    access = tokens["access_token"]
+
+    settings = Settings(url=base, token=None, poll_interval=0.2)
+    http = HttpSettings.from_env("127.0.0.1:1", {"ONTOTATOR_MCP_URL": mcp_url})
+    app = http_app(build_server(settings, http=http), http)
+    headers = {
+        "Accept": "application/json, text/event-stream",
+        "Content-Type": "application/json",
+        "MCP-Protocol-Version": "2025-06-18",
+    }
+    body = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {"name": "whoami", "arguments": {}},
+        }
+    )
+    origin = mcp_url.rsplit("/", 1)[0]
+    with TestClient(app, base_url=origin) as remote:
+        refused = remote.post("/mcp", content=body, headers=headers)
+        assert refused.status_code == 401
+        answer = remote.post(
+            "/mcp",
+            content=body,
+            headers=headers | {"Authorization": f"Bearer {access}"},
+        )
+        assert answer.status_code == 200, answer.text
+        result = answer.json()["result"]
+        assert result["isError"] is False, result
+        assert result["structuredContent"]["user"]["username"] == "root"
+        assert result["structuredContent"]["token"]["scopes"] == ["read"]
+        # The client ends its grant: the same token no longer works.
+        httpx.post(
+            f"{base}/oauth/revoke",
+            data={"token": access, "client_id": registered["client_id"]},
+        )
+        after = remote.post(
+            "/mcp",
+            content=body,
+            headers=headers | {"Authorization": f"Bearer {access}"},
+        )
+        assert after.status_code == 401
+
+
+@pytest.mark.anyio
+async def test_the_sdk_oauth_client_connects_like_a_connector(
+    live: dict[str, str],
+) -> None:
+    """Issue 388: the MCP SDK's own OAuth client, as a connector would use it.
+
+    It discovers everything from the 401 alone (protected resource metadata,
+    authorization server metadata), registers dynamically, runs PKCE with
+    ``resource``, and calls a tool over Streamable HTTP. The user's part
+    (log in, consent) is done here with the session API the consent page uses.
+    """
+    from urllib.parse import parse_qs, urlsplit
+
+    import httpx2
+    import uvicorn
+    from mcp.client.auth import OAuthClientProvider
+    from mcp.client.streamable_http import streamable_http_client
+    from mcp.shared.auth import (
+        AuthorizationCodeResult,
+        OAuthClientInformationFull,
+        OAuthClientMetadata,
+        OAuthToken,
+    )
+
+    from ontotator_mcp.config import HttpSettings
+    from ontotator_mcp.remote import http_app
+
+    base, mcp_url = live["url"], live["mcp_url"]
+    port = int(urlsplit(mcp_url).port or 0)
+    http = HttpSettings.from_env(f"127.0.0.1:{port}", {"ONTOTATOR_MCP_URL": mcp_url})
+    settings = Settings(url=base, token=None, poll_interval=0.2)
+    server = uvicorn.Server(
+        uvicorn.Config(
+            http_app(build_server(settings, http=http), http),
+            host="127.0.0.1",
+            port=port,
+            log_level="warning",
+        )
+    )
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    while not server.started:
+        time.sleep(0.05)
+
+    browser = httpx.Client(base_url=base, follow_redirects=False)
+    login = browser.post(
+        "/api/v1/auth/login",
+        json={"username": "root", "password": "test-only passphrase"},
+        headers={"Origin": base},
+    )
+    assert login.status_code == 200, login.text
+    csrf = {"X-CSRF-Token": login.json()["csrf_token"], "Origin": base}
+    landed: dict[str, str] = {}
+
+    async def consent(authorization_url: str) -> None:
+        handed = browser.get(authorization_url)
+        assert handed.status_code == 302, handed.text
+        params = dict(parse_qs(handed.headers["location"].split("?", 1)[1]))
+        flat = {key: value[0] for key, value in params.items()}
+        shown = browser.get("/api/v1/oauth/authorization", params=flat).json()
+        assert shown["resource"] == mcp_url
+        decision = browser.post(
+            "/api/v1/oauth/authorization",
+            json={
+                "params": shown["params"],
+                "approve": True,
+                "scopes": shown["allowed_scopes"],
+            },
+            headers=csrf,
+        ).json()
+        query = parse_qs(urlsplit(decision["redirect_to"]).query)
+        landed.update({key: value[0] for key, value in query.items()})
+
+    async def callback() -> AuthorizationCodeResult:
+        return AuthorizationCodeResult(
+            code=landed["code"], state=landed.get("state"), iss=landed.get("iss")
+        )
+
+    class Memory:
+        tokens: OAuthToken | None = None
+        client: OAuthClientInformationFull | None = None
+
+        async def get_tokens(self) -> OAuthToken | None:
+            return self.tokens
+
+        async def set_tokens(self, tokens: OAuthToken) -> None:
+            self.tokens = tokens
+
+        async def get_client_info(self) -> OAuthClientInformationFull | None:
+            return self.client
+
+        async def set_client_info(self, info: OAuthClientInformationFull) -> None:
+            self.client = info
+
+    storage = Memory()
+    provider = OAuthClientProvider(
+        server_url=mcp_url,
+        client_metadata=OAuthClientMetadata(
+            client_name="SDK connector",
+            redirect_uris=["http://127.0.0.1:33418/callback"],
+            grant_types=["authorization_code", "refresh_token"],
+            response_types=["code"],
+            token_endpoint_auth_method="none",
+        ),
+        storage=storage,
+        redirect_handler=consent,
+        callback_handler=callback,
+    )
+    try:
+        async with httpx2.AsyncClient(auth=provider, timeout=30) as http_client:
+            transport = streamable_http_client(mcp_url, http_client=http_client)
+            async with Client(transport) as client:
+                me = await call(client, "whoami", {})
+        assert me["user"]["username"] == "root"
+        assert set(me["token"]["scopes"]) == {
+            "read",
+            "import",
+            "export",
+            "project-admin",
+        }
+        assert storage.tokens is not None and storage.tokens.refresh_token
+    finally:
+        browser.close()
+        server.should_exit = True
+        thread.join(timeout=10)

@@ -1,5 +1,6 @@
 import { SearchPreferencesSection } from "./SearchPreferencesSection";
 import { TokensSection } from "./TokensSection";
+import { ConnectionsSection } from "./ConnectionsSection";
 import { TechnicalReportsSection } from "./TechnicalReportsSection";
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { api, type OwnProfilePatch, type Profile } from "../api/client";
@@ -201,10 +202,11 @@ export function ProfilePage({ backToTask, backToDocuments, section, onSaved, rou
     <SearchPreferencesSection pseudonym={model.baseline.pseudonym} onDirty={setSearchDirty} />
     <PracticeSection onNavigate={onNavigate} />
     <TokensSection key={tokensEpoch} mode={{ kind: "personal" }} />
+    <ConnectionsSection key={`connections-${tokensEpoch}`} />
     <TechnicalReportsSection focus={section === "technical-reports"} />
     <section className="detail-section">
       <h2>Change password</h2>
-      <p>This logs out your other sessions and revokes all your API tokens, the project tokens you created included.</p>
+      <p>This logs out your other sessions and revokes all your API tokens, the project tokens you created included, and disconnects your connected apps.</p>
       <form aria-label="Change password" onSubmit={(event) => { event.preventDefault(); void changePassword(); }}>
         <TextInput id="password-current" label="Current password" type="password" autoComplete="current-password" required value={passwords.current} disabled={!!busy}
           onChange={(event) => { setPasswordSaved(false); setPasswords({ ...passwords, current: event.target.value }); }} />

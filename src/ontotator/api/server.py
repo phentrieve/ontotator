@@ -53,6 +53,7 @@ def app_from_env() -> FastAPI:
         demo_logins=demo_logins(public_origin=runtime.public_origin),
         lock_timeout_ms=runtime.lock_timeout_ms,
         statement_timeout_ms=runtime.statement_timeout_ms,
+        mcp_url=runtime.mcp_url,
     )
     try:
         return _guarded(create_app(config, expose_docs=not production), runtime)

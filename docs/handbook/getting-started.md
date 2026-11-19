@@ -238,7 +238,7 @@ What for: replace your password with a new one.
 5. Enter it again in **Repeat new password**.
 6. Click **Change password**. You see **Password changed. Other sessions were logged out and your API tokens were revoked.**
 
-A new password also revokes all your API tokens, the project tokens you created included: a script that used one needs a new token.
+A new password also revokes all your API tokens, the project tokens you created included: a script that used one needs a new token. It disconnects your connected apps as well.
 
 If you forgot your password, ask an administrator for a reset code and follow [Set your password with a setup or reset code](#set-your-password-with-a-setup-or-reset-code).
 
@@ -259,3 +259,17 @@ The program sends the token in the header `Authorization: Bearer <token>`. It ac
 An AI assistant that speaks MCP, such as Claude Desktop, can use a token too: the Ontotator MCP server lets it set up a project, follow progress and download exports for you. Installing and configuring it is described in the [MCP server guide](../../mcp/README.md). Prefer a project token with a short lifetime for it. The line *Also for the Ontotator MCP server (AI assistant): see the handbook.* under your tokens opens this section.
 
 To stop a token, click **Revoke…** in its row, then **Revoke token**. Every program that uses it stops working at once. All your tokens are also revoked when you change your password, when an administrator issues you a reset code and when your account is deactivated. Losing a project role does not revoke a personal token, but the token at once loses what the role allowed: it can only ever do what you may do yourself right now.
+
+## Connect an AI assistant over the internet
+
+What for: let an AI assistant on the web, such as a claude.ai connector, work with Ontotator as you, without a token to copy. This works only if your administrator has set up the remote MCP server; then **Profile** shows **Connected apps** with the address to use.
+
+1. In the assistant, add a custom connector with the address shown under **Connected apps**, for example `https://editor.example.org/mcp`.
+2. The assistant opens Ontotator in your browser. Log in if you are asked to.
+3. The page **Connect an app** names the app, who you are and the address you will return to. Check that address: Ontotator cannot check the name an app gives itself, so connect only an app you started this from yourself.
+4. Untick what the app should not do. **Read** lets it see your projects, texts, results and progress; **Import**, **Export** and **Project administration** are offered only if you lead a project. Then click **Connect**, or **Cancel** to refuse.
+5. Your browser returns to the assistant, which is now connected.
+
+The app can do only what you ticked and what you may do yourself, and never annotation, review or translation review work. Every change it makes is in the audit trail, like a change made with an API token.
+
+To stop an app, go to **Profile**, **Connected apps**, click **Disconnect…** in its row, then **Disconnect**. It loses access at once. A new password, a reset code and deactivation disconnect all your apps, and a connection ends by itself after 90 days; connect it again from the app to go on.

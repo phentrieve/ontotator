@@ -23,3 +23,5 @@ loadtest
 **/*.sqlite*
 **/secrets/
 **/.env*
+mcp/.venv
+mcp/**/__pycache__

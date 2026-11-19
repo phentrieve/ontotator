@@ -10613,6 +10613,250 @@
         "x-ontotator-scope": "session"
       }
     },
+    "/api/v1/oauth/authorization": {
+      "get": {
+        "tags": [
+          "oauth"
+        ],
+        "summary": "Authorization",
+        "description": "The authorization request the consent page asks the user about.",
+        "operationId": "authorization_api_v1_oauth_authorization_get",
+        "parameters": [
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 20,
+              "title": "Response Type"
+            }
+          },
+          {
+            "name": "client_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "title": "Client Id"
+            }
+          },
+          {
+            "name": "redirect_uri",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 2000,
+              "title": "Redirect Uri"
+            }
+          },
+          {
+            "name": "code_challenge",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "title": "Code Challenge"
+            }
+          },
+          {
+            "name": "code_challenge_method",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 20,
+              "title": "Code Challenge Method"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope"
+            }
+          },
+          {
+            "name": "resource",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Resource"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthorizationView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "session"
+      },
+      "post": {
+        "tags": [
+          "oauth"
+        ],
+        "summary": "Decide Authorization",
+        "description": "Approve (with the scopes left ticked) or decline the request.\n\nApproving creates a single-use code valid for five minutes, audited as\n``oauth.authorize``; the browser follows ``redirect_to`` back to the app.",
+        "operationId": "decide_authorization_api_v1_oauth_authorization_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthorizationDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthorizationRedirect"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "session"
+      }
+    },
+    "/api/v1/me/connections": {
+      "get": {
+        "tags": [
+          "oauth"
+        ],
+        "summary": "List Connections",
+        "description": "The user's connected apps, newest first (ended ones for 30 days).",
+        "operationId": "list_connections_api_v1_me_connections_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Connections"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "session"
+      }
+    },
+    "/api/v1/me/connections/{grant_id}/revoke": {
+      "post": {
+        "tags": [
+          "oauth"
+        ],
+        "summary": "Revoke Connection",
+        "description": "Disconnect an app: its access and refresh tokens stop working at once.",
+        "operationId": "revoke_connection_api_v1_me_connections__grant_id__revoke_post",
+        "parameters": [
+          {
+            "name": "grant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Grant Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "session"
+      }
+    },
     "/api/v1/me/profile": {
       "get": {
         "tags": [
@@ -14678,6 +14922,197 @@
         "title": "AuditTokenRef",
         "description": "The API token a change was made with."
       },
+      "AuthorizationDecision": {
+        "properties": {
+          "params": {
+            "$ref": "#/components/schemas/AuthorizationParams"
+          },
+          "approve": {
+            "type": "boolean",
+            "title": "Approve"
+          },
+          "scopes": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "read",
+                "import",
+                "export",
+                "project-admin",
+                "admin"
+              ]
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Scopes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "params",
+          "approve"
+        ],
+        "title": "AuthorizationDecision"
+      },
+      "AuthorizationParams": {
+        "properties": {
+          "response_type": {
+            "type": "string",
+            "maxLength": 20,
+            "title": "Response Type"
+          },
+          "client_id": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Client Id"
+          },
+          "redirect_uri": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Redirect Uri"
+          },
+          "code_challenge": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Code Challenge"
+          },
+          "code_challenge_method": {
+            "type": "string",
+            "maxLength": 20,
+            "title": "Code Challenge Method"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope"
+          },
+          "resource": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "response_type",
+          "client_id",
+          "redirect_uri",
+          "code_challenge",
+          "code_challenge_method"
+        ],
+        "title": "AuthorizationParams",
+        "description": "The parameters of an authorization request, as the consent page has them."
+      },
+      "AuthorizationRedirect": {
+        "properties": {
+          "redirect_to": {
+            "type": "string",
+            "title": "Redirect To"
+          }
+        },
+        "type": "object",
+        "required": [
+          "redirect_to"
+        ],
+        "title": "AuthorizationRedirect",
+        "description": "Where the browser goes next: back to the app, with a code or an error."
+      },
+      "AuthorizationView": {
+        "properties": {
+          "client_name": {
+            "type": "string",
+            "title": "Client Name"
+          },
+          "client_id": {
+            "type": "string",
+            "title": "Client Id"
+          },
+          "redirect_uri": {
+            "type": "string",
+            "title": "Redirect Uri"
+          },
+          "redirect_host": {
+            "type": "string",
+            "title": "Redirect Host"
+          },
+          "resource": {
+            "type": "string",
+            "title": "Resource"
+          },
+          "requested_scopes": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "read",
+                "import",
+                "export",
+                "project-admin",
+                "admin"
+              ]
+            },
+            "type": "array",
+            "title": "Requested Scopes"
+          },
+          "allowed_scopes": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "read",
+                "import",
+                "export",
+                "project-admin",
+                "admin"
+              ]
+            },
+            "type": "array",
+            "title": "Allowed Scopes"
+          },
+          "params": {
+            "$ref": "#/components/schemas/AuthorizationParams"
+          }
+        },
+        "type": "object",
+        "required": [
+          "client_name",
+          "client_id",
+          "redirect_uri",
+          "redirect_host",
+          "resource",
+          "requested_scopes",
+          "allowed_scopes",
+          "params"
+        ],
+        "title": "AuthorizationView",
+        "description": "What the consent page shows: who asks, for what, and where it goes back."
+      },
       "AxisDefinition": {
         "properties": {
           "id": {
@@ -17228,6 +17663,134 @@
           "plan_sha256"
         ],
         "title": "CommitUpload"
+      },
+      "ConnectionView": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "client_name": {
+            "type": "string",
+            "title": "Client Name"
+          },
+          "redirect_host": {
+            "type": "string",
+            "title": "Redirect Host"
+          },
+          "scopes": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "read",
+                "import",
+                "export",
+                "project-admin",
+                "admin"
+              ]
+            },
+            "type": "array",
+            "title": "Scopes"
+          },
+          "resource": {
+            "type": "string",
+            "title": "Resource"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "revoked_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "client_name",
+          "redirect_host",
+          "scopes",
+          "resource",
+          "created_at",
+          "expires_at",
+          "last_used_at",
+          "revoked_at",
+          "revoked_reason"
+        ],
+        "title": "ConnectionView",
+        "description": "An app the user connected with OAuth (a grant), without any token."
+      },
+      "Connections": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "mcp_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mcp Url"
+          },
+          "connections": {
+            "items": {
+              "$ref": "#/components/schemas/ConnectionView"
+            },
+            "type": "array",
+            "title": "Connections"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "mcp_url",
+          "connections"
+        ],
+        "title": "Connections",
+        "description": "Profile > Connected apps; ``enabled`` is false without ``ONTOTATOR_MCP_URL``."
       },
       "ConsequencesView": {
         "properties": {
@@ -34354,6 +34917,17 @@
               }
             ],
             "title": "Revoked Reason"
+          },
+          "resource": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource"
           }
         },
         "type": "object",

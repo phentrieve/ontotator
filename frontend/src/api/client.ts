@@ -337,6 +337,11 @@ export type ApiTokenScope = ApiToken["scopes"][number];
 export type CreateApiToken = components["schemas"]["CreateTokenRequest"];
 /** A new token; `secret` is shown this once. */
 export type CreatedApiToken = components["schemas"]["CreatedToken"];
+/** OAuth for remote MCP clients (issue 388): the consent page's request, and connected apps. */
+export type OAuthAuthorization = components["schemas"]["AuthorizationView"];
+export type OAuthAuthorizationParams = components["schemas"]["AuthorizationParams"];
+export type OAuthConnections = components["schemas"]["Connections"];
+export type OAuthConnection = components["schemas"]["ConnectionView"];
 export type TechnicalReportRequest = components["schemas"]["TechnicalReportRequest"];
 export type TechnicalReportContext = components["schemas"]["TechnicalReportContext"];
 export type TechnicalReportReceipt = components["schemas"]["TechnicalReportReceipt"];
@@ -902,6 +907,25 @@ export class ApiClient {
   /** Delete a project without work (issue 191); refused with PROJECT_HAS_WORK otherwise. */
   async adminDeleteProject(key: string): Promise<void> {
     return this.request<void>(`/api/v1/admin/projects/${encodeURIComponent(key)}`, { method: "DELETE" });
+  }
+
+  /** The authorization request an app sent the user to consent to (issue 388). */
+  async getOAuthAuthorization(params: Record<string, string>): Promise<OAuthAuthorization> {
+    return this.request<OAuthAuthorization>(`/api/v1/oauth/authorization?${new URLSearchParams(params).toString()}`, { method: "GET" });
+  }
+
+  /** Approve (with the scopes left ticked) or decline; the browser then goes to `redirect_to`. */
+  async decideOAuthAuthorization(params: OAuthAuthorizationParams, approve: boolean, scopes: ApiTokenScope[]): Promise<{ redirect_to: string }> {
+    return this.request<{ redirect_to: string }>("/api/v1/oauth/authorization", { method: "POST", body: JSON.stringify({ params, approve, scopes }) });
+  }
+
+  /** Profile › Connected apps: the user's OAuth grants. */
+  async listConnections(): Promise<OAuthConnections> {
+    return this.request<OAuthConnections>("/api/v1/me/connections", { method: "GET" });
+  }
+
+  async revokeConnection(id: number): Promise<OAuthConnection> {
+    return this.request<OAuthConnection>(`/api/v1/me/connections/${id}/revoke`, { method: "POST" });
   }
 
   /** API tokens (issue 305): the user's own, a project's (leads) and all (admins). */

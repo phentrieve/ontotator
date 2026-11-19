@@ -597,6 +597,139 @@ class LoginAttemptRow(Base):
     at: Mapped[datetime]
 
 
+OAUTH_SCOPES_CHECK = (
+    "cardinality(scopes) > 0 AND scopes <@ ARRAY['read', 'import',"
+    " 'export', 'project-admin']::text[]"
+)
+
+
+class OAuthClientRow(Base):
+    """An OAuth client, registered dynamically (RFC 7591, issue 388).
+
+    Registration is open, as the MCP authorization spec expects: a client is
+    only a name and its redirect URIs until a user consents. Only the
+    SHA-256 of a confidential client's secret is stored. A client that
+    never got a grant is deleted after a week (with its unused codes); the
+    application role may delete rows of this table and of ``oauth_codes``
+    for that, and of no other OAuth table.
+    """
+
+    __tablename__ = "oauth_clients"
+    __table_args__ = (
+        CheckConstraint(
+            "auth_method IN ('none', 'client_secret_post', 'client_secret_basic')",
+            name="auth_method",
+        ),
+        CheckConstraint(
+            "(auth_method = 'none') = (secret_sha256 IS NULL)", name="secret"
+        ),
+        CheckConstraint(
+            "cardinality(redirect_uris) BETWEEN 1 AND 5", name="redirect_uris"
+        ),
+        CheckConstraint("char_length(name) BETWEEN 1 AND 100", name="name"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    client_id: Mapped[str] = mapped_column(unique=True)
+    secret_sha256: Mapped[str | None]
+    name: Mapped[str]
+    redirect_uris: Mapped[list[str]] = mapped_column(ARRAY(Text))
+    auth_method: Mapped[str]
+    # Without ``refresh_token`` here the client gets no refresh tokens.
+    grant_types: Mapped[list[str]] = mapped_column(ARRAY(Text))
+    # The client address the registration came from (an IPv6 /64), which
+    # the hourly limit per address counts; None for one made on the server.
+    registered_from: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class OAuthGrantRow(Base):
+    """A user's consent to one OAuth client (issue 388): Profile > Connected apps.
+
+    Its access tokens are ``api_tokens`` rows (``oauth_grant_id``); its
+    refresh tokens rotate in ``oauth_refresh_tokens``. Revoking the grant
+    revokes both.
+    """
+
+    __tablename__ = "oauth_grants"
+    __table_args__ = (
+        CheckConstraint(OAUTH_SCOPES_CHECK, name="scopes"),
+        CheckConstraint("expires_at > created_at", name="lifetime"),
+        CheckConstraint(
+            "(revoked_at IS NULL) = (revoked_reason IS NULL)", name="revoked"
+        ),
+        Index("ix_oauth_grants_user_id_revoked_at", "user_id", "revoked_at"),
+        Index("ix_oauth_grants_client_id", "client_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    client_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(OAuthClientRow.id))
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(UserRow.id))
+    scopes: Mapped[list[str]] = mapped_column(ARRAY(Text))
+    resource: Mapped[str]
+    # Where the code of this grant went: its host is what Connected apps shows.
+    redirect_uri: Mapped[str]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    expires_at: Mapped[datetime]
+    last_used_at: Mapped[datetime | None]
+    revoked_at: Mapped[datetime | None]
+    revoked_reason: Mapped[str | None]
+
+
+class OAuthCodeRow(Base):
+    """A single-use authorization code (issue 388); only its SHA-256 is stored."""
+
+    __tablename__ = "oauth_codes"
+    __table_args__ = (
+        CheckConstraint(OAUTH_SCOPES_CHECK, name="scopes"),
+        CheckConstraint(
+            "expires_at > created_at"
+            " AND expires_at <= created_at + interval '10 minutes'",
+            name="lifetime",
+        ),
+        Index("ix_oauth_codes_grant_id", "grant_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    code_sha256: Mapped[str] = mapped_column(unique=True)
+    client_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(OAuthClientRow.id))
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(UserRow.id))
+    redirect_uri: Mapped[str]
+    code_challenge: Mapped[str]
+    scopes: Mapped[list[str]] = mapped_column(ARRAY(Text))
+    resource: Mapped[str]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    expires_at: Mapped[datetime]
+    used_at: Mapped[datetime | None]
+    # Set when the user's credentials changed or the account went before
+    # the code was used: it can no longer be exchanged.
+    revoked_at: Mapped[datetime | None]
+    grant_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey(OAuthGrantRow.id)
+    )
+
+
+class OAuthRefreshTokenRow(Base):
+    """A refresh token of a grant (issue 388); used once, then rotated."""
+
+    __tablename__ = "oauth_refresh_tokens"
+    __table_args__ = (
+        CheckConstraint("expires_at > created_at", name="lifetime"),
+        Index("ix_oauth_refresh_tokens_grant_id", "grant_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    grant_id: Mapped[int] = mapped_column(BigInteger, ForeignKey(OAuthGrantRow.id))
+    token_sha256: Mapped[str] = mapped_column(unique=True)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    expires_at: Mapped[datetime]
+    used_at: Mapped[datetime | None]
+    # Random, set when the token is used: its successors are derived from
+    # the token itself and this nonce, so a retry within the grace window
+    # gets the same answer although only digests are stored.
+    successor_nonce: Mapped[str | None]
+
+
 class ApiTokenRow(Base):
     """An API token (issue 305); only the token's SHA-256 is stored.
 
@@ -628,8 +761,12 @@ class ApiTokenRow(Base):
         CheckConstraint(
             "(revoked_at IS NULL) = (revoked_reason IS NULL)", name="revoked"
         ),
+        CheckConstraint(
+            "oauth_grant_id IS NULL OR kind = 'personal'", name="oauth_kind"
+        ),
         Index("ix_api_tokens_owner_id_revoked_at", "owner_id", "revoked_at"),
         Index("ix_api_tokens_project_id", "project_id"),
+        Index("ix_api_tokens_oauth_grant_id", "oauth_grant_id"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
@@ -646,6 +783,10 @@ class ApiTokenRow(Base):
     last_used_at: Mapped[datetime | None]
     revoked_at: Mapped[datetime | None]
     revoked_reason: Mapped[str | None]
+    # An OAuth access token (issue 388): the grant it was issued under.
+    oauth_grant_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey(OAuthGrantRow.id)
+    )
 
 
 class AuditEventRow(Base):

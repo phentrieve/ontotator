@@ -65,6 +65,8 @@ class Call:
 class FakeApi:
     routes: dict[tuple[str, str], Handler | Any] = field(default_factory=dict)
     calls: list[Call] = field(default_factory=list)
+    # The bearer tokens a request may carry (remote mode has several callers).
+    accepted: frozenset[str] = frozenset({TOKEN})
     # Builds the body of a route no test answered; ``contract.synth`` (the
     # smallest instance) unless a test wants more.
     synth: Callable[[dict[str, Any]], Any] = synth
@@ -98,7 +100,8 @@ class FakeApi:
         return [c for c in self.calls if (c.method, c.template) == (method, template)]
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
-        assert request.headers["authorization"] == f"Bearer {TOKEN}"
+        scheme, _, token = request.headers["authorization"].partition(" ")
+        assert scheme == "Bearer" and token in self.accepted, "unexpected token"
         raw = request.url.raw_path.decode().split("?", 1)[0]
         template = match(request.method, raw)
         assert template is not None, f"not in the contract: {request.method} {raw}"
