@@ -20,6 +20,12 @@ export type ImportPlan = components["schemas"]["ImportPlan"];
 export type JobView = components["schemas"]["JobView"];
 export type ProjectJobView = components["schemas"]["ProjectJobView"];
 export type ProjectJobPage = components["schemas"]["ProjectJobPage"];
+export type TranslationReviewListRow = components["schemas"]["TranslationReviewListRow"];
+export type TranslationReviewListPage = components["schemas"]["TranslationReviewListPage"];
+export interface TranslationReviewListFilters {
+  reviewer?: string; decision?: readonly TranslationReviewListRow["decision"][]; language?: readonly string[];
+  sort?: "-submitted" | "submitted"; limit?: number; offset?: number;
+}
 export interface ProjectJobFilters { kind?: readonly string[]; status?: readonly ProjectJobView["status"][]; limit?: number; offset?: number }
 export type ArchiveJobView = components["schemas"]["ArchiveJobView"];
 export type ArchiveJobQueued = components["schemas"]["ArchiveJobQueued"];
@@ -762,6 +768,19 @@ export class ApiClient {
     if (filters.offset !== undefined) query.set("offset", String(filters.offset));
     const search = query.toString();
     return this.request<ProjectJobPage>(`/api/v1/projects/${encodeURIComponent(key)}/jobs${search ? `?${search}` : ""}`, { method: "GET" });
+  }
+
+  /** Submitted and open translation reviews of the project, one page (leads and system admins; issue 483). */
+  async listTranslationReviewList(key: string, filters: TranslationReviewListFilters = {}): Promise<TranslationReviewListPage> {
+    const query = new URLSearchParams();
+    if (filters.reviewer !== undefined) query.set("reviewer", filters.reviewer);
+    for (const decision of filters.decision ?? []) query.append("decision", decision);
+    for (const language of filters.language ?? []) query.append("language", language);
+    if (filters.sort !== undefined) query.set("sort", filters.sort);
+    if (filters.limit !== undefined) query.set("limit", String(filters.limit));
+    if (filters.offset !== undefined) query.set("offset", String(filters.offset));
+    const search = query.toString();
+    return this.request<TranslationReviewListPage>(`/api/v1/projects/${encodeURIComponent(key)}/translation-review-list${search ? `?${search}` : ""}`, { method: "GET" });
   }
 
   async getProgress(key: string): Promise<ProjectProgress> {

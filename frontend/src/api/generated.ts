@@ -955,6 +955,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{key}/translation-review-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Translation Review List
+         * @description Submitted and open translation reviews (leads and system admins).
+         */
+        get: operations["translation_review_list_api_v1_projects__key__translation_review_list_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assignments/{assignment_id}/work-time": {
         parameters: {
             query?: never;
@@ -11952,6 +11972,66 @@ export interface components {
             /** Detail */
             detail?: string | null;
         };
+        /** TranslationReviewListPage */
+        TranslationReviewListPage: {
+            /** Reviews */
+            reviews: components["schemas"]["TranslationReviewListRow"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Reviewers */
+            reviewers: components["schemas"]["PersonRefView"][];
+            /** Languages */
+            languages: string[];
+        };
+        /**
+         * TranslationReviewListRow
+         * @description One translation review of the project.
+         *
+         *     ``decision`` is ``open`` for an assigned review that is not submitted
+         *     (again); then ``review_id``, the form fields and ``submitted_at`` are
+         *     null. ``changed_passages``: the passages the reviewer's text differs in
+         *     from the reviewed text, compared by words (0 when the text is unchanged,
+         *     null when the texts differ too much to count). ``created_variant_id``:
+         *     the version an "accepted with corrections" review created.
+         */
+        TranslationReviewListRow: {
+            /** Review Id */
+            review_id: number | null;
+            /** Assignment Id */
+            assignment_id: number;
+            /** Document Id */
+            document_id: string;
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Version */
+            version: number;
+            reviewer: components["schemas"]["PersonRefView"];
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "accepted_unchanged" | "accepted_corrected" | "query" | "rejected" | "open";
+            /** Clinical Change */
+            clinical_change: boolean | null;
+            /** Categories */
+            categories: ("omission" | "addition" | "assertion" | "value" | "anatomy" | "terminology" | "source")[];
+            /** Rationale */
+            rationale: string | null;
+            /** Changed Passages */
+            changed_passages: number | null;
+            /** Created Variant Id */
+            created_variant_id: string | null;
+            /** Submitted At */
+            submitted_at: string | null;
+            /** Assigned At */
+            assigned_at: string | null;
+        };
         /** TranslationReviewRecord */
         TranslationReviewRecord: {
             /** Id */
@@ -14779,6 +14859,47 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TranslationReviewRecord"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    translation_review_list_api_v1_projects__key__translation_review_list_get: {
+        parameters: {
+            query?: {
+                /** @description The reviewer's pseudonym. */
+                reviewer?: string | null;
+                decision?: ("accepted_unchanged" | "accepted_corrected" | "query" | "rejected" | "open")[] | null;
+                /** @description Languages of the reviewed texts. */
+                language?: string[] | null;
+                /** @description By submitted date; open reviews always come last. */
+                sort?: "-submitted" | "submitted";
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TranslationReviewListPage"];
                 };
             };
             /** @description Validation Error */

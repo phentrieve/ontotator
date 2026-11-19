@@ -198,3 +198,13 @@ it("no longer renders Totals or the documents table", async () => {
   expect(screen.queryByLabelText("Document status")).toBeNull();
   expect(screen.queryByRole("link", { name: "Assign" })).toBeNull();
 });
+
+it("links to the list of translation reviews", async () => {
+  const navigate = vi.fn();
+  render(<ProgressPage projectKey="p" onNavigate={navigate} />);
+  await pipeline();
+  const link = within(screen.getByRole("group", { name: "Progress actions" })).getByRole("link", { name: "Translation reviews" });
+  expect(link.getAttribute("href")).toBe("#/projects/p/translation-reviews");
+  fireEvent.click(link);
+  expect(navigate).toHaveBeenCalledWith({ name: "projectTranslationReviews", key: "p" });
+});

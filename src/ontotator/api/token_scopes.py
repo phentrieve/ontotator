@@ -145,6 +145,8 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     ("GET", f"{P}/documents/{{doc:path}}/submissions/{{submission_id:path}}"): "read",
     ("GET", f"{P}/documents/{{doc:path}}/translation-reviews"): "read",
     ("GET", f"{P}/translation-reviews"): "read",
+    # Issue 483: the lead's list of translation reviews (leads only).
+    ("GET", f"{P}/translation-review-list"): "read",
     ("POST", f"{P}/documents/{{doc:path}}/translation-correction-assignment"): (
         "project-admin"
     ),
