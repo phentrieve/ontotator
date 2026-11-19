@@ -56,6 +56,10 @@ button.mod-row-main:focus-visible {
   font-size: var(--size-sm);
   font-weight: 400;
 }
+/* The line breaks after a comma, not between a name and its code. */
+.mod-lines .mod-line-code {
+  white-space: nowrap;
+}
 .mod-hint {
   margin: 0 0 var(--space-2);
 }

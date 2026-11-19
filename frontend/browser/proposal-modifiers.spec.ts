@@ -44,6 +44,9 @@ async function open(page: Page, size: { width: number; height: number }): Promis
 /** Selects the proposal: its details (with the Modifiers) are shown. */
 async function selectProposal(page: Page) {
   await expect(proposalRow(page)).toContainText("Modifiers: Recurrent · HP:0031796, Severe · HP:0012828");
+  // At 390 px the list is its own pane.
+  const findings = page.getByRole("button", { name: "Findings", exact: true });
+  if (await findings.isVisible()) await findings.click();
   await proposalRow(page).click();
   await expect(panel(page).getByRole("list", { name: "Modifiers of Seizure" })).toBeVisible();
 }
