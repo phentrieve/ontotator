@@ -490,6 +490,16 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
                 ),
             ),
         ] = "",
+        label: Annotated[
+            str,
+            Field(
+                description=(
+                    "The version the guideline document gives itself, e.g. '3.1';"
+                    " one line, at most 40 characters. Shown before the upload"
+                    " number: 'Guidelines 3.1 (v2)'. Empty: none."
+                )
+            ),
+        ] = "",
     ) -> dict[str, Any]:
         """Publish a new version of the project's annotation guideline.
 
@@ -499,7 +509,9 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         ONTOTATOR_MCP_FILES_DIR; without that variable it refuses. Earlier
         versions stay; annotators are asked
         to read the new one. Refused with GUIDELINE_VERSION_CONFLICT if
-        another version was published meanwhile.
+        another version was published meanwhile. 'version' in the result
+        counts the project's uploads and is the identifier; 'label' is the
+        document's own version, if one was given.
         """
         files = api.local_files([path])
         listing = await api.get(project_path(project, "guidelines"))
@@ -512,6 +524,7 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
                 "change_note": change_note,
                 # A form field: empty for a project without a guideline.
                 "expected_latest_version": "" if latest is None else str(latest),
+                "label": label,
             },
         )
         return summary | {"local_files": [str(file) for file in files]}
@@ -806,6 +819,12 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
     ) -> dict[str, Any]:
         """Assign text versions to people, one task per row.
 
+        The tasks are created in the order of the rows. My tasks lists a
+        person's tasks by status, then in the order of assignment, and the
+        editor opens the next task in that order: put the rows in the order
+        the person should work in. New tasks come after the tasks the person
+        already has.
+
         A row that cannot be assigned does not fail the call: it is listed
         under ``refused`` with its code and a hint, and ``warning`` counts
         such rows.
@@ -855,7 +874,13 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
             ),
         ],
         case_ids: Annotated[
-            list[str], Field(description="Cases; empty means every case.")
+            list[str],
+            Field(
+                description=(
+                    "Cases, in the order the people should work in; empty"
+                    " means every case, by case ID."
+                )
+            ),
         ] = [],  # noqa: B006
         task: Literal["annotate", "translation_review"] = "annotate",
         confirm_unreviewed_translation: bool = False,
@@ -873,6 +898,13 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         whose review is not accepted (unreviewed_translation in the dry
         run's targets) is refused with TRANSLATION_NOT_REVIEWED unless
         confirm_unreviewed_translation.
+
+        The tasks are created in the order of case_ids (without case_ids: by
+        case ID). My tasks lists a person's tasks by status, then in the
+        order of assignment, and the editor opens the next task in that
+        order: give case_ids in the order the people should work in. With
+        'split' each person gets a block of consecutive cases. New tasks
+        come after the tasks a person already has.
         """
         body: dict[str, Any] = {
             "task": task,
@@ -880,6 +912,8 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
             "mode": mode,
             "usernames": usernames,
             "case_ids": case_ids or await all_case_ids(api, project),
+            # Issue 488: the caller's order is the order of assignment.
+            "sort": "given" if case_ids else "case",
         }
         preview: dict[str, Any] = await api.post(
             project_path(project, "assignments/batch/preview"), body

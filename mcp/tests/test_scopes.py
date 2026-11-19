@@ -299,6 +299,14 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "expected_previous_sha256": "a" * 64,
             "confirm": True,
         },
+        "decide_translation_query": {
+            "project": "p",
+            "document_id": "d",
+            "decision": "unchanged",
+            "answer": "The short form is meant.",
+            "preview_token": "sha256:" + "a" * 64,
+            "confirm": True,
+        },
         "editorial_correction": {
             "project": "p",
             "document_id": "d",

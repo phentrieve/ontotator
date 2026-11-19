@@ -78,6 +78,8 @@ function DistributionEditor({ projectKey, documents, cases, task, confirmUnrevie
     {error !== undefined && <ErrorNotice error={error} />}
     {proposal && <>
       <h3>Proposal</h3>
+      {/* Issue 488 */}
+      <p>The tasks are assigned in the order of this table. My tasks lists a person's tasks by status, then in the order of assignment.</p>
       <table className="data-table density-compact"><caption className="visually-hidden">Proposed assignments</caption><thead><tr><th>Document</th><th>Languages</th><th>Person</th></tr></thead><tbody>{slots.map((slot, index) => <tr key={JSON.stringify([slot.document_id, slot.place])}><td>{textName(slot.document_id)}</td><td>{languages.get(slot.document_id)?.join(", ") || "Required languages unavailable"}</td><td>
         <select id={`distribution-slot-${index}`} className="form-select" aria-label={`${textName(slot.document_id)}, person ${slot.place + 1}`} value={slot.username} disabled={batch.busy || batch.attempted || stale || busy} onChange={event => setSlots(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, username: event.target.value } : item))}>
           <option value="">Nobody</option>{slot.username && !eligible.some(member => member.username === slot.username) && <option value={slot.username}>{proposal.rows.find(row => row.username === slot.username)?.display_name || "Former member"}</option>}

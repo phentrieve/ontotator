@@ -19,6 +19,7 @@ from ontotator_mcp.tools_people import register_people
 from ontotator_mcp.tools_results import register_results
 from ontotator_mcp.tools_setup import register_setup
 from ontotator_mcp.tools_status import register_status
+from ontotator_mcp.tools_translation_decisions import register_translation_decisions
 from ontotator_mcp.tools_typography import register_typography
 
 INSTRUCTIONS = """\
@@ -30,6 +31,7 @@ machine-proposal imports, accounts, people, assignments, work plan), changes
 while a project runs (reassigning, withdrawing or reopening tasks, handing a
 leaving person's tasks on, new rounds, annotation mode changes, undo of a
 work plan change or of a bulk reopen or withdrawal, translation corrections,
+the lead's decision on a queried translation (decide_translation_query),
 text changes, problem report decisions),
 status (progress, agreement, problem reports) and results (consolidation
 start, accepting agreeing texts, choosing a final result, exports and
@@ -75,7 +77,10 @@ get_annotation_version, get_submission and get_consolidation_inputs read
 texts and submitted annotations (never drafts, and nothing can be written). They return
 clinical text only with include_text; ask for it only when the task needs
 the wording. The same holds for include_text of list_translation_reviews
-and list_typography_hints, which exists only on this server.
+and list_typography_hints, which exists only on this server. The dry runs
+of decide_translation_query and upload_translation_version return the
+changed passages ('diff') on this server; without the variable they count
+them.
 """
 
 
@@ -102,7 +107,8 @@ def build_server(
     )
     register_setup(server, api)
     register_people(server, api)
-    register_lead(server, api)
+    register_lead(server, api, read_content=settings.read_content)
+    register_translation_decisions(server, api, read_content=settings.read_content)
     register_status(server, api)
     register_monitoring(server, api, read_content=settings.read_content)
     register_typography(server, api, read_content=settings.read_content)

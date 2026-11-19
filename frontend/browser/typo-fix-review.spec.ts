@@ -37,6 +37,8 @@ function consoleErrors(page: Page): string[] {
 }
 
 async function login(page: Page, s: LeadScenario, who: LeadPerson) {
+  // Leave the page first: a request it still sends without the cookies would end in a 401 in the console.
+  await page.goto("about:blank");
   await page.context().clearCookies();
   if (who !== "lead") return loginThroughForm(page, s.users[who], s.display_names[who]);
   await loginThroughForm(page, s.users.lead, s.display_names.lead, { lastProject: s.project });
@@ -85,7 +87,7 @@ for (const [name, viewport] of sizes) {
     await rowAction(page, "Resolve…", caseId, "de").click();
     const options = page.getByRole("group", { name: textNamePattern("Resolve queried translation, ", caseId, "de") });
     await expect(options).toContainText("Ana Weber asked a question about this translation.");
-    await expect(options.getByRole("button")).toHaveText(["Assign a new review…", "Correct the translation…", "Discard the de translation…", "Cancel"]);
+    await expect(options.getByRole("button")).toHaveText(["Accept the reviewer’s text…", "Answer and accept the version as it is…", "Assign a new review…", "Correct the translation…", "Discard the de translation…", "Cancel"]);
     await shot(page, `f1-resolve-${name}`);
     await options.getByRole("button", { name: "Assign a new review…", exact: true }).click();
     const assign = page.getByRole("dialog", { name: "Assign translation review", exact: true });

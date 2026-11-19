@@ -14,7 +14,7 @@ import type { ProjectDocumentsQuery, Route } from "../app/router";
 import type { GroupSelectMode } from "../ui/DataTable";
 import { caseHeaderText, type TableSelection } from "./DocumentsTable";
 import { RowActionCell } from "./RowActions";
-import { documentsGroupId, documentsRowId, LastActivityCell, LeadPausedBadge, NewBadge, RowOpenLinks, rowIsNew, rowKeyOf, rowName, rowNeedsDecision, ShortId, VersionMarker, type OpenTextCard } from "./RowCells";
+import { documentsGroupId, documentsRowId, LastActivityCell, LeadPausedBadge, NewBadge, RowOpenLinks, rowIsNew, rowKeyOf, rowName, rowNeedsDecision, ShortId, TypographyHintsBadge, VersionMarker, type OpenTextCard } from "./RowCells";
 import { StagePopover } from "./StagePopover";
 import { isActiveRow, stageText, waitingOnText, type StageName } from "./stageLabels";
 import { LanguageFlag } from "../ui/LanguageTag";
@@ -140,6 +140,7 @@ function DocumentCard({ row, group, projectKey, query, active: current, onOpenPa
         {row.is_source && <span className="documents-source">source</span>}
         <VersionMarker row={row} />
         <LeadPausedBadge row={row} />
+        <TypographyHintsBadge row={row} />
         {active && rowIsNew(row) && <NewBadge />}
         {badge != null && badge !== false && <span className="documents-row-badge">{badge}</span>}
       </div>

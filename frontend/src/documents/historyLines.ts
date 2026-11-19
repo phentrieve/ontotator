@@ -113,6 +113,17 @@ export function historyLines(row: DocumentRowView, submissions: readonly RowSubm
     lines.push({ key: `typos-${entry.document_id}`, stage: "review", text: `Review: ${fix.corrected_at ? changeText(what, timeText(fix.corrected_at, now), fix.reason) : `${what}: ${fix.reason.trim()}`}` });
   }
 
+  // The lead's decision on a query (issue 483): what by whom, date time: the answer to the reviewer.
+  for (const entry of row.versions) {
+    const decision = entry.query_decision;
+    if (!decision) continue;
+    const decided = versionOf(decision.decided_document_id);
+    const what = decision.kind === "unchanged"
+      ? `query decided${byText(decision.decided_by ?? null)}, v${entry.version} accepted as it is`
+      : `query decided${byText(decision.decided_by ?? null)}, the reviewer’s text ${decision.edited ? "taken with changes" : "taken"}${decided ? `, v${decided.version} → v${entry.version}` : ` as v${entry.version}`}`;
+    lines.push({ key: `query-${entry.document_id}`, stage: "review", text: `Review: ${decision.decided_at ? changeText(what, timeText(decision.decided_at, now), decision.answer) : what}` });
+  }
+
   // Annotation: submissions in time order (once loaded), then the tasks not submitted yet.
   const several = row.versions.length > 1;
   if (submissions) {

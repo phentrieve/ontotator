@@ -1,3 +1,4 @@
+import { currentGuidelineRef, type GuidelineRef } from "../guidelines/versionName";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type FinalPanelView, type RowSubmissions } from "../api/client";
 
@@ -14,7 +15,7 @@ export interface FinalPanelState {
   error: unknown | null;
   loading: boolean;
   /** Guideline version in force ("Guidelines v2 (current: v3)"); null when unknown. */
-  guidelineCurrent: number | null;
+  guidelineCurrent: GuidelineRef | null;
   reload: () => void;
 }
 
@@ -29,7 +30,7 @@ export function useFinalPanel(projectKey: string, caseId: string, language: stri
   const identity = JSON.stringify([projectKey, caseId, language]);
   const generation = useRef(0);
   const [state, setState] = useState<Snapshot>({ identity, data: null, error: null, loading: true });
-  const [guidelineCurrent, setGuidelineCurrent] = useState<number | null>(null);
+  const [guidelineCurrent, setGuidelineCurrent] = useState<GuidelineRef | null>(null);
 
   const load = useCallback(() => {
     const current = ++generation.current;
@@ -47,7 +48,7 @@ export function useFinalPanel(projectKey: string, caseId: string, language: stri
   // Version in force, once per project; a failed read only drops the comparison.
   useEffect(() => {
     let active = true;
-    void api.listGuidelines(projectKey).then(listing => listing.current?.version ?? null, () => null).then(version => { if (active) setGuidelineCurrent(version); });
+    void api.listGuidelines(projectKey).then(listing => currentGuidelineRef(listing), () => null).then(current => { if (active) setGuidelineCurrent(current); });
     return () => { active = false; };
   }, [projectKey]);
 

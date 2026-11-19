@@ -137,9 +137,11 @@ HINTS: dict[str, str] = {
         " (withdraw_task), then repeat the call."
     ),
     "VARIANT_REVIEW_STALE": (
-        "The text version is not the one named: a newer version arrived since"
-        " the dry run, or the hash passed is not the text_sha256 the dry run"
-        " returned. Run the dry run again and confirm with its text_sha256."
+        "The text version or its review is not the one named: a newer version or"
+        " review arrived since the dry run, or the value passed is not the one"
+        " the dry run returned. Run the dry run again and confirm with its"
+        " text_sha256. decide_translation_query confirms with its preview_token"
+        " instead."
     ),
     "NOT_A_TRANSLATION": (
         "This works on translations only. list_texts gives the document_id of"
@@ -198,6 +200,44 @@ HINTS: dict[str, str] = {
     "BULK_UNDO_STALE/changed": (
         "The texts changed since the action; nothing was restored. The dry run"
         " (confirm false) names what is in the way."
+    ),
+    # The lead's decision on a queried translation review (#483, #485).
+    "QUERY_DECISION_NOT_AVAILABLE": (
+        "The query on this version cannot be decided; the dry run of"
+        " decide_translation_query (confirm false) names the reason."
+    ),
+    "QUERY_DECISION_NOT_AVAILABLE/already_decided": (
+        "A lead already decided this query; a query is decided once. list_texts"
+        " shows the accepted version of the translation."
+    ),
+    "QUERY_DECISION_NOT_AVAILABLE/not_a_query": (
+        "The latest translation review of this version was not submitted as a"
+        " query, or the version is not waiting for the lead (list_translation_reviews"
+        " shows the decisions). For a rejected translation use"
+        " start_lead_correction; for a text reviewed outside Ontotator,"
+        " upload_translation_version and accept_translation_version."
+    ),
+    "QUERY_DECISION_NOT_AVAILABLE/review_open": (
+        "A translation review or lead correction of this version is open. Let"
+        " it be submitted, or withdraw its task (list_assignments,"
+        " withdraw_task), then repeat the call."
+    ),
+    "QUERY_DECISION_NOT_AVAILABLE/not_newest": (
+        "document_id is not the newest version of its translation. list_texts"
+        " names the newest (document_id, version); repeat the call with it."
+    ),
+    "QUERY_DECISION_NOT_AVAILABLE/discarded": (
+        "This version was discarded; its query cannot be decided. list_texts"
+        " names the current version of the translation."
+    ),
+    "QUERY_DECISION_NOT_AVAILABLE/unchanged": (
+        "The text to save equals the text of the version, so there is no new"
+        " version to make. Accept the version as it is: decision 'unchanged'"
+        " with an answer."
+    ),
+    "QUERY_DECISION_NOT_AVAILABLE/answer_required": (
+        "Accepting the version as it is (decision 'unchanged') needs an answer"
+        " to the reviewer's question: pass answer."
     ),
 }
 

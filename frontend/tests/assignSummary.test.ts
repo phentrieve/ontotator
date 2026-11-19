@@ -1,16 +1,23 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { holdersLine, MAX_ANNOTATORS_PER_TEXT, memberReason, onePersonSummary, partlyAssignedLines, resultMessage, skippedLines, stepLabel } from "../src/admin/assignSummary";
+import { holdersLine, memberReason, onePersonSummary, partlyAssignedLines, resultMessage, skippedLines, stepLabel, validPerText } from "../src/admin/assignSummary";
 
 const ana = { pseudonym: "ann-0004", display_name: "Ana Weber" };
 const ben = { pseudonym: "ann-0007", display_name: "Ben Roth" };
 
 describe("assign summary", () => {
   it("names up to five holders, then the first five and how many more (issue 447)", () => {
-    const names = Array.from({ length: MAX_ANNOTATORS_PER_TEXT }, (_, index) => `Person ${index + 1}`);
+    const names = Array.from({ length: 20 }, (_, index) => `Person ${index + 1}`);
     expect(holdersLine(names.slice(0, 5))).toBe("Person 1; Person 2; Person 3; Person 4; Person 5");
     expect(holdersLine(names.slice(0, 6))).toBe("Person 1; Person 2; Person 3; Person 4; Person 5; and 1 more (marked “Already assigned” below)");
     expect(holdersLine(names)).toBe("Person 1; Person 2; Person 3; Person 4; Person 5; and 15 more (marked “Already assigned” below)");
+  });
+
+  it("annotators per text: a whole number from 1, up to the server's maximum when it has one (issue 457)", () => {
+    expect([1, 20, 21, 30, 5000].map(value => validPerText(value))).toEqual([true, true, true, true, true]);
+    expect([0, -1, 2.5, Number.NaN, Number.POSITIVE_INFINITY].map(value => validPerText(value))).toEqual([false, false, false, false, false]);
+    expect([1, 8, 9].map(value => validPerText(value, 8))).toEqual([true, true, false]);
+    expect(validPerText(9, null)).toBe(true);
   });
 
   it("summarises one person", () => {

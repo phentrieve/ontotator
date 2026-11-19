@@ -1,3 +1,4 @@
+import { guidelineVersionName, MAX_GUIDELINE_LABEL_CHARS } from "../guidelines/versionName";
 import { ApiError, NetworkError } from "../api/client";
 
 /** The server's guideline file refusals; the client-side file checks reuse them verbatim. */
@@ -256,6 +257,7 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   WORK_PLAN_INVALID: "Annotation needs an accepted translation.",
   NOT_IN_WORK_PLAN: "This language version is not planned for this task.",
   EDITORIAL_CORRECTION_NOT_AVAILABLE: "This typo fix cannot be saved. Reload the row to see its current state.",
+  QUERY_DECISION_NOT_AVAILABLE: "This query can no longer be decided here. Reload the row to see its current state.",
   LEAD_CORRECTION_NOT_AVAILABLE: "This translation can no longer be corrected here. Reload the row to see its current state.",
   VERSION_NOT_ACCEPTABLE: "This version can no longer be accepted here. Reload the row to see its current state.",
   VERSION_UPLOAD_NOT_AVAILABLE: "A new version cannot be uploaded here any more. Reload the row to see its current state.",
@@ -264,6 +266,7 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   ASSIGNMENT_BATCH_STALE: "The cases or people changed. Check the new preview.",
   ASSIGNMENT_BATCH_REFUSED: "Some assignments could not be made. Nothing was assigned.",
   DISCARD_REASON_REQUIRED: "Discarding a translation requires a reason.",
+  ANNOTATIONS_PER_TEXT_ABOVE_MAXIMUM: "This server allows fewer annotators per text. Enter a smaller number.",
   ANNOTATIONS_PER_TEXT_REACHED: "This text already has as many annotation assignments as the project's limit (Settings, Workflow).",
   NO_PROPOSALS_ON_VERSION: "This version has no tool proposals, but the annotation of this text started from proposals. Import or re-anchor the proposals for this version first.",
   ANNOTATION_MODE_LOCKED: "The annotation of this text has already started this way, so it cannot change.",
@@ -302,12 +305,21 @@ export function errorMessage(error: unknown): string {
     const limit = error.details.limit;
     if (typeof limit === "number" && Number.isSafeInteger(limit) && limit > 0) return `This text already has ${limit} annotation assignments, the project's limit (Settings, Workflow).`;
   }
+  if (error instanceof ApiError && error.code === "ANNOTATIONS_PER_TEXT_ABOVE_MAXIMUM" && typeof error.details === "object" && error.details !== null) {
+    const maximum = error.details.maximum;
+    if (typeof maximum === "number" && Number.isSafeInteger(maximum) && maximum > 0) return `This server allows at most ${maximum} annotators per text. Enter ${maximum} or less.`;
+  }
   if (error instanceof ApiError && error.code === "JOB_QUEUE_LIMIT" && typeof error.details === "object" && error.details !== null) {
     const max = error.details.max;
     if (typeof max === "number" && Number.isSafeInteger(max) && max > 0) return `You already have ${max} jobs waiting. Try again when one of them has started.`;
   }
   if (error instanceof ApiError && error.code === "TEXT_CHANGE_NOT_APPLICABLE" && typeof error.details === "object" && error.details !== null && error.details.reason === "no_target_proposals") {
     return "The new version has no proposals yet: their automatic transfer may still be running, or they must be imported. Wait for or import the proposals for the new version, then try again.";
+  }
+  // Issue 461: the submission has a decision for this version already; the refusal names it.
+  if (error instanceof ApiError && error.code === "TEXT_CHANGE_NOT_APPLICABLE" && typeof error.details === "object" && error.details !== null && error.details.reason === "already_resolved") {
+    if (error.details.resolution === "dismissed") return "It was already decided to start this version fresh. That decision is final.";
+    if (error.details.resolution === "carried" || error.details.resolution === "handed_over") return "This work was already carried to this version. Its task is still there or was submitted. Reload the row.";
   }
   // Issue 464: the lead paused the text. The refusal names the cause and the lead's reason.
   if (error instanceof ApiError && error.code === "TASK_HELD" && typeof error.details === "object" && error.details !== null
@@ -330,13 +342,15 @@ export function errorMessage(error: unknown): string {
     : "Something went wrong. Please try again.";
 }
 
-/** Guideline refusals that name a version (`v{n}`) or the refused field. */
+/** Guideline refusals that name a version (`v{n}`, or `3.1 (v{n})` with the project's own label) or the refused field. */
 function guidelineMessage(error: unknown): string | null {
   if (!(error instanceof ApiError) || typeof error.details !== "object" || error.details === null) return null;
   const version = error.details.version;
   const named = typeof version === "number" && Number.isSafeInteger(version) && version > 0;
-  if (error.code === "GUIDELINE_UNCHANGED" && named) return `This file is identical to v${version}. Nothing was published.`;
-  if (error.code === "GUIDELINE_ALREADY_WITHDRAWN" && named) return `v${version} is already withdrawn.`;
+  const name = named ? guidelineVersionName(version, typeof error.details.label === "string" ? error.details.label : null) : "";
+  if (error.code === "GUIDELINE_UNCHANGED" && named) return `This file is identical to ${name}. Nothing was published.`;
+  if (error.code === "GUIDELINE_ALREADY_WITHDRAWN" && named) return `${name} is already withdrawn.`;
+  if (error.code === "GUIDELINE_NOTE_INVALID" && error.details.field === "label") return `The version label must be one line of at most ${MAX_GUIDELINE_LABEL_CHARS} characters.`;
   if (error.code === "GUIDELINE_NOTE_INVALID" && error.details.field === "reason") return "The reason must be one line of at most 280 characters.";
   return null;
 }

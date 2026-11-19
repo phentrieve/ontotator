@@ -63,7 +63,7 @@ The header is the same on every page:
 - **Handbook** in the header opens this handbook inside the app. On the Documents, consolidation and translation review screens, **Help** opens the handbook section about that screen; in the editor it is **More** > **Help for this screen**. On the project forms, a link next to the task profile opens the section that explains it. In the text card, **How to use it** next to *Newer set available* opens the section on new tool proposals. Click a screenshot in the handbook to open it at full size in a new tab.
 - Below the chapter list, the handbook shows the app's version and commit, for example `Ontotator 0.3.0 · commit cc65cea`. Quote it when you report a problem.
 
-The sidebar lists **My tasks**, **Projects**, **Profile** and **Technical problem…** (see [Report a technical problem](#report-a-technical-problem)). The number after **My tasks** counts your open tasks, the same tasks as the **To do** tab; it updates as soon as you submit a text. Clicking **My tasks** or **Projects** loads your projects and the count again, so a project you were just added to shows up without reloading the page. Leads also see their project's pages (**Documents**, **Progress**, **Settings**, **Export**). System administrators also see **Administration** with **Users**, **Ontologies**, **Technical reports**, **New project** and **Server settings** (see [Administration](admin.md)). In the editor, the sidebar folds into **Sections**; click it to open it.
+The sidebar lists **My tasks**, **Projects**, **Profile** and **Technical problem…** (see [Report a technical problem](#report-a-technical-problem)). The number after **My tasks** counts your open tasks, the same tasks as the **To do** tab; it updates as soon as you submit a text. Clicking **My tasks** or **Projects** loads your projects and the count again, so a project you were just added to shows up without reloading the page. Leads also see their project's pages (**Documents**, **Progress**, **Settings**, **Export**); the list **Translation reviews** opens from **Progress**. System administrators also see **Administration** with **Users**, **Ontologies**, **Technical reports**, **New project** and **Server settings** (see [Administration](admin.md)). In the editor, the sidebar folds into **Sections**; click it to open it.
 
 ## Report a technical problem
 
@@ -111,10 +111,13 @@ What for: find the texts you have to work on.
 
 ![My tasks with the status tabs and a table of tasks, each with its Text, Task, Status and an action button](images/getting-started-my-tasks.png)
 
+The list is ordered by status: **Reopened** first, then **In progress**, **Open** and **Submitted**. Within a status the tasks are in the order in which the lead assigned them; texts the lead moved to the front come first. Work from the top unless the lead says otherwise. You cannot sort the list yourself.
+
 Each row is one task. The **Task** column says what to do, for example **Annotation, from scratch**, **Annotation, from proposals**, **Consolidation** or **Translation review**. The **Status** column shows **Open**, **In progress**, **Submitted** or **Reopened**.
 
 - **Reopened**: the lead reopened your submission. The lead's reason stands under the task, for example *Reopened by the lead on 17 Nov 2026, 14:30: The onset in sentence 2 is missing.* (on a narrow screen under the badge). Without a reason, click the badge to read when it was reopened.
 - A **Translation review** the lead asked for a second time shows the lead's reason under the task, for example *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.* The translation review and the consolidation show the lead's reason again when you open the task.
+- *Answer from the lead* at a submitted **Translation review**: you submitted it as a **Query** and the lead decided. Open the task to read the decision and the answer ([Review a translation](annotator.md#review-a-translation)).
 - A **Consolidation** task shows the lead's reason under the task, for example *Reason from the lead: Term and assertion differ*, if the lead gave one.
 - **Paused**: the task waits for a decision on a problem report. A long reason is cut off here; the task shows all of it. **Answer to your report** means the lead has replied.
 - **Paused by lead**: the lead paused the work on this text and gives the reason below the mark. You can open and read the task (**View paused task**), but not save it, until the lead releases the text ([A task paused by the lead](annotator.md#a-task-paused-by-the-lead)).
@@ -123,7 +126,7 @@ Each row is one task. The **Task** column says what to do, for example **Annotat
 
 On a phone, each row has two parts: under **Task** the text, what to do and the status below each other, and beside it the **Action**. The reason of a **Paused** or **Reopened** task is written out in full under its badge, so there is no badge to tap. The project is shown under the text when the list mixes several projects; the dates **Assigned** and **Last change** are left out. Nothing needs to be swiped sideways.
 
-If the project has guidelines, a link such as *Project guidelines v2* appears above the table. Read them before you start: they say what to mark and how.
+If the project has guidelines, a link such as *Project guidelines v2* (or *Project guidelines 3.1 (v2)*) appears above the table. Read them before you start: they say what to mark and how.
 
 If you see **No texts are assigned to you yet.**, wait until your lead assigns texts to you.
 
@@ -176,7 +179,7 @@ If you see **Task not found or not yours**, the task was withdrawn or is assigne
 What for: check the annotation rules of the project.
 
 1. Open a task.
-2. Open **More** in the toolbar and choose the guidelines, for example *Guidelines v2*. *(new)* after it means the guidelines changed since you last read them. In a translation review or consolidation, the guidelines are a button in the header instead, with a **New** badge.
+2. Open **More** in the toolbar and choose the guidelines, for example *Guidelines v2*, or *Guidelines 3.1 (v2)* when your lead gave the version its own number: *3.1* is the version of the guideline document, *v2* counts the uploads in the app. *(new)* after it means the guidelines changed since you last read them. In a translation review or consolidation, the guidelines are a button in the header instead, with a **New** badge.
 3. The guidelines open beside the text; in the editor they take the right column as a tab next to **Details** (see [The guidelines in the editor](annotator.md#the-guidelines-in-the-editor)). Click **All versions** to see older versions, or **Close** to hide them.
 
 The first time you open a task in a project with guidelines, a notice asks you to read them. Click the read button in the notice, for example *Read guidelines v2*. The notice also says where you find them later: under **More** › *Guidelines* in the editor, or the guidelines button in the header of a translation review or consolidation.
@@ -195,6 +198,18 @@ What for: keep your name, languages and qualification up to date.
 Your **Username** and **Pseudonym** cannot be changed. Exports show your pseudonym, not your name, unless you tick the box in step 3.
 
 Fill in **Qualification** if you do translation reviews: you cannot submit a translation review without it.
+
+## Choose a light or dark theme
+
+What for: read comfortably, for example in a dim room.
+
+1. Click **Profile** in the sidebar.
+2. Go to **Appearance**.
+3. Under **Theme**, choose **System**, **Light** or **Dark**. The page changes at once; there is nothing to save.
+
+**System** follows the light or dark setting of your device and changes with it. **Light** and **Dark** stay as chosen.
+
+The choice is kept in this browser, for everyone who uses it, and also applies to the login page. On another computer or in another browser, choose again. The images in this handbook show the light theme.
 
 ## Practice in your profile
 

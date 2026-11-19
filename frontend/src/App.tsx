@@ -21,6 +21,7 @@ import { ProjectNewPage } from "./admin/ProjectNewPage";
 import { ProjectSettingsPage } from "./admin/ProjectSettingsPage";
 import { DocumentsPage } from "./admin/DocumentsPage";
 import { ProgressPage } from "./admin/ProgressPage";
+import { TranslationReviewsPage } from "./admin/TranslationReviewsPage";
 import { ExportPage } from "./admin/ExportPage";
 import { ProjectsPage } from "./app/ProjectsPage";
 import { projectDestination } from "./app/ProjectPicker";
@@ -357,6 +358,7 @@ export function App({ user: givenUser, onLogout }: AppProps): JSX.Element {
     }
     case "projectCase": content = <CaseViewer projectKey={route.key} caseId={route.caseId} variant={route.variant} show={route.show} annotations={route.annotations} compare={route.compare} compareShow={route.compare_show} documents={route.documents} username={user.username} onNavigate={go} />; break;
     case "projectProgress": content = <ProgressPage projectKey={route.key} onNavigate={go} />; break;
+    case "projectTranslationReviews": content = <TranslationReviewsPage projectKey={route.key} query={route} onNavigate={go} />; break;
     case "projectExport": {
       const exported = projects.find(project => project.project_key === route.key);
       content = <ExportPage projectKey={route.key} currentUser={user} documentCount={exported?.document_count} onNavigate={go}

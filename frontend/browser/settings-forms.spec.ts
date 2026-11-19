@@ -205,10 +205,15 @@ test("Workflow: every card is saved with one Save and shown again after a reload
   // A lower limit says what happens to the texts over it before it is saved (none here: the project is empty).
   await perText.fill("2");
   await expect(workflow.getByText("Nobody is removed.", { exact: true })).toBeVisible();
-  // Outside 1 to 20 the browser refuses the form.
-  await perText.fill("21");
+  // Below 1 the browser refuses the form. There is no built-in maximum (issue 457): 21 and 30 are values.
+  await perText.fill("0");
   await saveButton(page, "Workflow").click();
-  expect(await perText.evaluate((input: HTMLInputElement) => input.validity.rangeOverflow)).toBe(true);
+  expect(await perText.evaluate((input: HTMLInputElement) => input.validity.rangeUnderflow)).toBe(true);
+  for (const value of ["21", "30"]) {
+    await perText.fill(value);
+    expect(await perText.evaluate((input: HTMLInputElement) => input.validity.valid)).toBe(true);
+  }
+  await expect(workflow.getByText("Upper limit; fewer is fine.", { exact: true })).toBeVisible();
   expect((await serverSettings(page, s)).annotations_per_text).toBe(3);
   await workflow.getByRole("button", { name: "Discard changes", exact: true }).click();
   await expect(perText).toHaveValue("3");

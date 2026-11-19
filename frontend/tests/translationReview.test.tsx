@@ -788,6 +788,38 @@ it("summarises decision, categories and a rationale excerpt before submitting, t
   expect(summary.getByText("Reviewed")).toBeDefined();
   expect(screen.queryByText("reviewed")).toBeNull();
 });
+it("names the typography hints of the saved text in the submit confirmation; they block nothing (issue 484)", async () => {
+  const text = "Über  setzt..";
+  const { submit } = setup(reviewWorkspace({ draft: { revision: 6, text, form: { decision: "accepted_corrected", clinical_change: false } } }));
+  const hints = vi.spyOn(api, "getDraftTypographyHints").mockResolvedValue({ revision: 6, total: 2, truncated: false,
+    counts: { DOUBLE_SPACE: 1, DOUBLE_FULL_STOP: 1 }, hints: [{ rule: "DOUBLE_SPACE", start: 4, end: 6 }, { rule: "DOUBLE_FULL_STOP", start: 11, end: 13 }] });
+  await screen.findByRole("textbox", { name: "Translation (de)" });
+  expect(hints).not.toHaveBeenCalled();
+  fireEvent.click(submitButton());
+  const dialog = within(screen.getByRole("dialog", { name: "Submit this review?" }));
+  expect(await dialog.findByText("2 typography hints in your text: double space, doubled full stop.")).toBeDefined();
+  expect(hints).toHaveBeenCalledWith(17);
+  fireEvent.click(dialog.getByRole("button", { name: "Show them" }));
+  expect(within(dialog.getByRole("list", { name: "Typography hints" })).getAllByRole("listitem").map(item => item.querySelector("mark")!.textContent)).toEqual(["  ", ".."]);
+  await act(async () => { fireEvent.click(dialog.getByRole("button", { name: "Submit review" })); });
+  expect(submit).toHaveBeenCalledWith(17, 6);
+});
+it("shows no hint line for a clean text, for an answer of another draft revision, or when the hints cannot be read", async () => {
+  setup(reviewWorkspace({ draft: { revision: 6, text: "Übersetzt.", form: { decision: "accepted_unchanged", clinical_change: false } } }));
+  const hints = vi.spyOn(api, "getDraftTypographyHints").mockResolvedValueOnce({ revision: 6, total: 0, truncated: false, counts: {}, hints: [] })
+    .mockResolvedValueOnce({ revision: 5, total: 1, truncated: false, counts: { TAB: 1 }, hints: [{ rule: "TAB", start: 0, end: 1 }] })
+    .mockRejectedValueOnce(new Error("offline"));
+  await screen.findByRole("textbox", { name: "Translation (de)" });
+  for (let round = 1; round <= 3; round++) {
+    await act(async () => { fireEvent.click(submitButton()); });
+    const dialog = screen.getByRole("dialog", { name: "Submit this review?" });
+    await waitFor(() => expect(hints).toHaveBeenCalledTimes(round));
+    await act(async () => { await Promise.resolve(); });
+    expect(dialog.textContent).not.toContain("typography");
+    expect(within(dialog).getByRole("button", { name: "Submit review" })).toBeDefined();
+    await act(async () => { fireEvent.click(within(dialog).getByRole("button", { name: "Keep editing" })); });
+  }
+});
 it("explains a blocked submit right at the button with the rules' own issues", async () => {
   setup();
   await screen.findByRole("textbox", { name: "Translation (de)" });

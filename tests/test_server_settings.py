@@ -169,6 +169,37 @@ def test_setup_code_validity_is_bounded(tmp_path: Path, hours: str) -> None:
         settings.setup_code_hours(env)
 
 
+def test_annotations_per_text_have_no_maximum_unless_one_is_set(
+    tmp_path: Path,
+) -> None:
+    env = production_env(tmp_path)
+    assert settings.server_settings(env).max_annotations_per_text is None
+    assert settings.max_annotations_per_text({}) is None
+    # Empty is unset: the Compose file passes an empty value through.
+    env["ONTOTATOR_MAX_ANNOTATIONS_PER_TEXT"] = ""
+    assert settings.server_settings(env).max_annotations_per_text is None
+    for value in ("1", "8", "30", "2147483647"):
+        env["ONTOTATOR_MAX_ANNOTATIONS_PER_TEXT"] = value
+        assert settings.server_settings(env).max_annotations_per_text == int(value)
+        assert settings.max_annotations_per_text(env) == int(value)
+
+
+@pytest.mark.parametrize(
+    "value", ["0", "-1", "2147483648", "9" * 40, "many", "1.5", " 8", "٨"]
+)
+def test_the_maximum_of_annotations_per_text_is_a_whole_number_from_1(
+    tmp_path: Path, value: str
+) -> None:
+    env = production_env(tmp_path)
+    env["ONTOTATOR_MAX_ANNOTATIONS_PER_TEXT"] = value
+    with pytest.raises(
+        settings.SettingsError, match="ONTOTATOR_MAX_ANNOTATIONS_PER_TEXT"
+    ):
+        settings.server_settings(env)
+    with pytest.raises(settings.SettingsError, match="from 1 to 2147483647, or unset"):
+        settings.max_annotations_per_text(env)
+
+
 def test_a_database_limit_must_be_a_whole_number(tmp_path: Path) -> None:
     env = production_env(tmp_path)
     env["ONTOTATOR_LOCK_TIMEOUT_MS"] = "20s"

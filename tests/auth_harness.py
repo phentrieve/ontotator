@@ -74,8 +74,10 @@ def grant(
     return True
 
 
-# Texts whose "annotations per text" count the harness lifts past the stored
-# maximum (20, a DB CHECK) for the assignment it wraps: (project id, document).
+# Texts whose "annotations per text" count the harness lifts past the most it
+# writes to a project (20: the database's own bound until migration 0050; the
+# harness keeps it, so fixture projects' settings stay as they were) for the
+# assignment it wraps: (project id, document).
 _LIFTED: ContextVar[frozenset[tuple[int, str]]] = ContextVar(
     "harness_lifted", default=frozenset()
 )
@@ -140,7 +142,7 @@ def harness_annotation(
                 tool_proposal_mode="scratch",
             )
         )
-    # Beyond the stored maximum (browser fixture projects collect many test
+    # Beyond the harness's maximum (browser fixture projects collect many test
     # users): lift the count for this text and this context only.
     lifted = held + 1 > MAX_PER_TEXT
     token = None

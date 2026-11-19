@@ -13,7 +13,7 @@ from ontotator.application.work_plans import WorkPlanService
 from ontotator.auth.audit import Actor
 from ontotator.authz.policy import Action, Task, can
 from ontotator.domain.annotation_limits import (
-    MAX_ANNOTATIONS_PER_TEXT,
+    ANNOTATIONS_PER_TEXT_CEILING,
     MIN_ANNOTATIONS_PER_TEXT,
 )
 from ontotator.domain.annotation_modes import AnnotationMode
@@ -351,7 +351,7 @@ def annotation_target_preview(
     principal: PrincipalDep,
     request: Request,
     annotations_per_text: int = Query(
-        ge=MIN_ANNOTATIONS_PER_TEXT, le=MAX_ANNOTATIONS_PER_TEXT
+        ge=MIN_ANNOTATIONS_PER_TEXT, le=ANNOTATIONS_PER_TEXT_CEILING
     ),
 ) -> dict[str, Any]:
     return _service(request, key, principal).annotation_target_preview(
@@ -395,7 +395,9 @@ def patch_work_plan(
 class AnnotationsPerTextSet(BaseModel):
     model_config = ConfigDict(extra="forbid")
     # The text's own "Annotations per text"; None follows the project value.
-    value: int | None = Field(ge=MIN_ANNOTATIONS_PER_TEXT, le=MAX_ANNOTATIONS_PER_TEXT)
+    value: int | None = Field(
+        ge=MIN_ANNOTATIONS_PER_TEXT, le=ANNOTATIONS_PER_TEXT_CEILING
+    )
     reason: str | None = Field(default=None, max_length=2000)
 
 
@@ -415,7 +417,9 @@ class AnnotationsPerTextBulkSet(BaseModel):
     model_config = ConfigDict(extra="forbid")
     texts: list[RowRefView] = Field(min_length=1, max_length=MAX_SELECTED_ROWS)
     # The texts' own "Annotations per text"; None follows the project value.
-    value: int | None = Field(ge=MIN_ANNOTATIONS_PER_TEXT, le=MAX_ANNOTATIONS_PER_TEXT)
+    value: int | None = Field(
+        ge=MIN_ANNOTATIONS_PER_TEXT, le=ANNOTATIONS_PER_TEXT_CEILING
+    )
     reason: str | None = Field(default=None, max_length=2000)
 
 

@@ -12,7 +12,7 @@
 import type { ConsolidationGroupView, ConsolidationMemberView, ConsolidationModifierView, ConsolidationPersonView, ConsolidationResolvePayload } from "../api/client";
 import { axisOptionLabel } from "../editor/axisLabels";
 import { sentenceBounds } from "../editor/modifiers";
-import { axisLabel, labelWithQuote, OVERLAPPING, quoted } from "./consolidationText";
+import { axisLabel, labelWithQuote, quoted } from "./consolidationText";
 import { personName } from "./lanes";
 import { chosenModifiers, modifierChoices, modifierKey, modifierText, NO_MODIFIERS, otherTextChosen, press, setText, setWarnings, toggleName, type MemberSet, type ModifierView } from "./modifierSets";
 
@@ -181,8 +181,6 @@ export interface ComparisonRow {
   conflict: boolean;
   /** "Patient (all agree)" when everyone agrees ("Patient" in a one-person group), else null. */
   agreed: string | null;
-  /** Text without conflict: "(overlapping, comes with the chosen finding)". */
-  info: string | null;
   /** No decision, but a ✓ may choose a cell (differing passages, #159); until then the default cell is marked chosen. */
   choosable?: boolean;
   cells: ComparisonCell[];
@@ -190,6 +188,29 @@ export interface ComparisonRow {
   warnings?: string[];
   /** A line shown below the row: which related term is the parent (#303). */
   hint?: string;
+  /** Many people (issue 470): who holds which value of a row to decide, "Hypotonia 14 · Axial hypotonia 6 (C, F, I)". */
+  split?: string;
+}
+
+/** From this many people on the comparison table scrolls sideways, and a row to decide carries its `split` line. */
+export const SPLIT_FROM = 4;
+
+/** A person in the split line: the letter of a hidden name ("Annotator C" → "C"), else the display name. */
+export function shortName(label: string): string {
+  const name = personName(label);
+  return /^Annotator ([A-Z]+)$/.exec(name)?.[1] ?? name;
+}
+
+/**
+ * "Hypotonia 14 · Abnormality of the nervous system 6 (C, F, I, L, O, R)": the values of a row with how many people
+ * hold each, the most frequent first (on a tie, the one of the earlier column); everyone outside the largest group is
+ * named, as the table's column headers name them.
+ */
+export function splitLine(cells: readonly Pick<ComparisonCell, "display">[], names: readonly string[]): string {
+  const groups = new Map<string, string[]>();
+  cells.forEach((cell, index) => groups.set(cell.display, [...(groups.get(cell.display) ?? []), names[index]]));
+  return [...groups].sort((a, b) => b[1].length - a[1].length)
+    .map(([value, who], index) => `${value} ${who.length}${index > 0 ? ` (${who.join(", ")})` : ""}`).join(" · ");
 }
 
 /** " (all agree)" only when there is someone to agree with. */
@@ -215,13 +236,15 @@ function defaultTerm(group: ConsolidationGroupView): string {
 export function comparisonRows(group: ConsolidationGroupView, people: readonly ConsolidationPersonView[], text: string,
   choices: Choices): ComparisonRow[] {
   const members = group.members;
+  const names = peopleOf(people, members).map(person => shortName(person.label));
   const row = (kind: RowKind, id: string, label: string, conflict: boolean, valueOf: (member: ConsolidationMemberView) => string,
-    displayOf: (member: ConsolidationMemberView) => string, info: string | null = null): ComparisonRow => {
+    displayOf: (member: ConsolidationMemberView) => string): ComparisonRow => {
     const cells = members.map(member => ({ inputId: member.input_id, value: valueOf(member), display: displayOf(member),
       chosen: choices[id] === valueOf(member) }));
     const same = cells.every(cell => cell.value === cells[0].value);
-    return { kind, id, label, conflict, info, cells,
-      agreed: !conflict && same && info === null ? `${cells[0].display}${allAgree(members)}` : null };
+    return { kind, id, label, conflict, cells,
+      agreed: !conflict && same ? `${cells[0].display}${allAgree(members)}` : null,
+      ...(conflict && members.length >= SPLIT_FROM ? { split: splitLine(cells, names) } : {}) };
   };
   const termRow = row("term", "term", "Term", needsTerm(group), member => member.term_id, member => member.term_label || member.term_id);
   const hint = relatedTermHint(group);
@@ -229,11 +252,10 @@ export function comparisonRows(group: ConsolidationGroupView, people: readonly C
     hint ? { ...termRow, hint } : termRow,
     ...axesOf(group).map(axis => row("axis", axis, axisLabel(axis), group.differing_axes.includes(axis),
       member => member.axes[axis] ?? "", member => axisOptionLabel(member.axes[axis]))),
-    // Keyed by member: identical spans may differ in their note, which comes with the span. "Overlapping" needs two
-    // identical spans (R-9); differing passages are each shown and choosable (#159).
+    // Keyed by member: identical spans may differ in their note, which comes with the span. Differing passages are
+    // each shown and choosable (#159); the same passage from everyone reads "“hypotonia” (all agree)" (#472).
     textRow(group, row("text", "text", "Text", !!group.span_conflict, member => member.input_id,
-      member => member.spans.length ? quoted(passage(text, member.spans)) : "No text span",
-      group.span_conflict || passagesDiffer(group) || members.filter(member => member.spans.length).length < 2 ? null : OVERLAPPING), choices),
+      member => member.spans.length ? quoted(passage(text, member.spans)) : "No text span"), choices),
   ];
   const modifiers = modifiersRow(group, people, text, choices);
   if (modifiers) rows.push(modifiers);
@@ -244,9 +266,10 @@ export function comparisonRows(group: ConsolidationGroupView, people: readonly C
   return rows;
 }
 
-/** Differing passages (#159): one choosable cell per person; until a ✓ chooses, the passage the result would take is marked. */
+/** The same passage from everyone is agreed. Differing passages (#159): one choosable cell per person; until a ✓ chooses, the passage the result would take is marked. */
 function textRow(group: ConsolidationGroupView, row: ComparisonRow, choices: Choices): ComparisonRow {
-  if (!passagesDiffer(group)) return row;
+  if (!passagesDiffer(group)) return group.span_conflict || group.members.length < 2 ? row
+    : { ...row, agreed: `${row.cells[0].display}${allAgree(group.members)}` };
   const preset = choices.text === undefined ? textMember(group, choices)?.input_id : undefined;
   return { ...row, choosable: true, agreed: null,
     cells: row.cells.map(cell => preset === undefined ? cell : { ...cell, chosen: cell.value === preset }) };
@@ -300,7 +323,7 @@ function modifiersRow(group: ConsolidationGroupView, people: readonly Consolidat
   });
   const same = cells.every(cell => cell.value === cells[0].value);
   const shown = conflict ? chosenModifiers(selection, options) ?? [] : sets[0].modifiers;
-  return { kind: "modifiers", id: "modifiers", label: "Modifiers", conflict, info: null, cells,
+  return { kind: "modifiers", id: "modifiers", label: "Modifiers", conflict, cells,
     agreed: !conflict && same ? `${cells[0].display}${allAgree(group.members)}` : null, warnings: setWarnings(shown) };
 }
 
@@ -424,11 +447,49 @@ export function attachCandidates(group: ConsolidationGroupView, groups: readonly
     });
 }
 
+/** Issue 470: a finding of the standalone modifier's sentence is still to decide (open, or not in the result), so
+ *  "Attach to a finding…" has no target yet. Other modifier terms marked as findings are no targets. */
+export function attachPending(group: ConsolidationGroupView, groups: readonly ConsolidationGroupView[], text: string): boolean {
+  const at = group.start;
+  if (at === null) return false;
+  const [from, to] = sentenceBounds(text, at);
+  const layerId = group.members[0]?.layer_id;
+  return groups.some(other => other.group_id !== group.group_id && !isStandalone(other) && (other.state === "open" || other.state === "leave_out")
+    && other.members[0]?.layer_id === layerId && other.start !== null && other.start >= from && other.start < to);
+}
+
 /** "Severe “schwere”": the term a person marked as a finding, with its text. */
 export function standaloneText(group: ConsolidationGroupView, text: string): string {
   const base = group.members.find(member => member.input_id === group.keep_input_id) ?? group.members[0];
   const label = base.term_label || base.term_id;
   return base.spans.length ? labelWithQuote(label, passage(text, base.spans)) : label;
+}
+
+/** A finding whose term is a modifier term, as the submit dialog names it (issue 470). */
+export interface ModifierFinding {
+  /** "Neonatal onset “since birth”"; an added finding "Severe (HP:0012828), “schwere”, added by you". */
+  label: string;
+  /** The group to jump to; null for a finding added outside the groups. */
+  groupId: string | null;
+}
+
+/**
+ * The findings the submit warning "uses a modifier term as the finding itself" is about. Without `annotationIds` (before
+ * the server answered): the groups where a person's modifier term (S18) was kept as the finding. With them (the
+ * server's warning): the group or added finding of each id; an id the view does not hold is left out.
+ */
+export function modifierFindings(groups: readonly ConsolidationGroupView[], added: readonly ConsolidationMemberView[], text: string,
+  annotationIds?: readonly string[]): ModifierFinding[] {
+  const ofGroup = (group: ConsolidationGroupView): ModifierFinding => ({ label: standaloneText(group, text), groupId: group.group_id });
+  if (!annotationIds) {
+    return groups.filter(group => isStandalone(group) && group.members.some(member => member.term_id === keptTerm(group)?.term_id)).map(ofGroup);
+  }
+  return annotationIds.flatMap(id => {
+    const group = groups.find(value => value.annotation_ids.includes(id));
+    if (group) return [group.result ? { label: labelWithQuote(group.result.term_label || group.result.term_id, groupName(group, text)), groupId: group.group_id } : ofGroup(group)];
+    const finding = added.find(value => value.annotation_id === id);
+    return finding ? [{ label: `${termLabel(finding)}, ${finding.spans.length ? quoted(passage(text, finding.spans)) : "no text span"}, added by you`, groupId: null }] : [];
+  });
 }
 
 /**

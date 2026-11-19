@@ -27,6 +27,7 @@ TypographyRule = Literal[
     "ZERO_WIDTH_CHARACTER",
     "SOFT_HYPHEN",
     "CONTROL_CHARACTER",
+    "DOUBLE_FULL_STOP",
 ]
 TYPOGRAPHY_RULES: tuple[TypographyRule, ...] = get_args(TypographyRule)
 
@@ -70,6 +71,9 @@ _CHARACTER_RULES: tuple[tuple[TypographyRule, re.Pattern[str]], ...] = (
 _DOUBLE_SPACE = re.compile(r"(?<=[^ \r\n]) {2,}(?=[^ \r\n])")
 # The lookbehinds start a match only at the start of a run, so a long run of
 # spaces is looked at once (linear time).
+# Exactly two full stops: not part of an ellipsis ("..." or one that ends in
+# "…") and not the start of a path ("../").
+_DOUBLE_FULL_STOP = re.compile(r"(?<![.…])\.\.(?![.…/\\])")
 _SPACE_BEFORE = re.compile(r"(?<! ) +(?=[,;:!?.])")
 _LINE_END_SPACE = re.compile(r"(?<![ \t])[ \t]+(?=\r?\n)")
 _END_WHITESPACE = " \t\r\n"
@@ -218,6 +222,10 @@ def typography_hints(text: str) -> list[TypographyHint]:
     hints.extend(
         TypographyHint("DOUBLE_SPACE", *match.span())
         for match in _DOUBLE_SPACE.finditer(text)
+    )
+    hints.extend(
+        TypographyHint("DOUBLE_FULL_STOP", *match.span())
+        for match in _DOUBLE_FULL_STOP.finditer(text)
     )
     hints.extend(_space_before(text))
     hints.extend(_missing_space(text))

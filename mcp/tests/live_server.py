@@ -44,11 +44,13 @@ def register_scenario_route(app: FastAPI) -> None:
     text consolidated by ``adj`` with annotator names hidden, with personal
     ``read`` tokens of ``adj`` and of the annotator ``ann-0001`` in
     ``tokens``; every other name is a Documents scenario
-    (``browser_documents_scenarios.registry``)."""
+    (``browser_documents_scenarios.registry``) or a lead workflow scenario
+    (``browser_lead_workflow_scenarios.BUILDERS``)."""
 
     @app.post("/__test_scenario__")
     def scenario(name: str = Query(...)) -> dict[str, object]:
         import browser_consolidation_scenarios as consolidation
+        import browser_lead_workflow_scenarios as lead_workflow
         from browser_documents_scenarios import registry
 
         people: tuple[str, ...] = ()
@@ -59,6 +61,8 @@ def register_scenario_route(app: FastAPI) -> None:
             people = ("adj", "ann-0001")
         elif name in registry():
             built = registry()[name](app)
+        elif name in lead_workflow.BUILDERS:
+            built = lead_workflow.BUILDERS[name](app)
         else:
             raise HTTPException(404, f"Unknown scenario {name!r}")
         issued = app.state.api_tokens.create(

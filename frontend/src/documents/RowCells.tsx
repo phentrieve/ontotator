@@ -16,6 +16,7 @@ import { StatusBadge } from "../ui/StatusBadge";
 import {
   middleEllipsis,
   leadPauseLine,
+  typographyHintsTitle,
   personLabel,
   submissionLabel,
   versionName,
@@ -198,6 +199,13 @@ export function LeadPausedBadge({ row }: { row: Pick<DocumentRowView, "lead_paus
   return <span className="documents-lead-paused" title={leadPauseLine(row.lead_pause)}><StatusBadge tone="warning">Paused by lead</StatusBadge></span>;
 }
 
+/** "Typography hints" on a text whose newest version has spacing errors or invisible characters (issue 484); the title says how many. */
+export function TypographyHintsBadge({ row }: { row: Pick<DocumentRowView, "typography_hints"> }): JSX.Element | null {
+  const count = row.typography_hints ?? 0;
+  if (count === 0) return null;
+  return <span className="documents-typography-hints" title={typographyHintsTitle(count)}><StatusBadge tone="neutral">Typography hints</StatusBadge></span>;
+}
+
 /** Small info badge "NEW"; accessible text "New since your last visit". */
 export function NewBadge(): JSX.Element {
   return <StatusBadge tone="info"><span aria-hidden="true">NEW</span><span className="visually-hidden">New since your last visit</span></StatusBadge>;
@@ -251,6 +259,7 @@ export function RowHeaderCell({ row, badge, onOpenCard, showCaseId = false, more
       {sibling && <span className="visually-hidden">Same case as the open text</span>}
       <VersionMarker row={row} />
       <LeadPausedBadge row={row} />
+      <TypographyHintsBadge row={row} />
       {active && rowIsNew(row) && <NewBadge />}
       {badge != null && badge !== false && <span className="documents-row-badge">{badge}</span>}
     </span>

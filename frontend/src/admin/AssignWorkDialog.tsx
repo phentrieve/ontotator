@@ -9,7 +9,7 @@ import { Button, Checkbox, Dialog, InlineConfirm, InlineMessage, Popover, Select
 import { DistributionDialog } from "./DistributionDialog";
 import { ErrorNotice } from "./ErrorNotice";
 import { errorMessage } from "./errors";
-import { holdersLine, leftLines, MAX_ANNOTATORS_PER_TEXT, memberReason, memberUnavailable, onePersonSummary, partlyAssignedLines, personName, resultMessage, skippedLines, stepLabel, stepName, stepShortLabel, stepsOverview } from "./assignSummary";
+import { holdersLine, leftLines, memberReason, memberUnavailable, onePersonSummary, partlyAssignedLines, personName, resultMessage, skippedLines, stepLabel, stepName, stepShortLabel, stepsOverview, validPerText } from "./assignSummary";
 
 export type AssignWorkTask = "translation_review" | "annotate";
 export type AssignWorkDialogProps =
@@ -70,8 +70,10 @@ const annotators = (n: number) => n === 1 ? "1 annotator" : `${n} annotators`;
  * project's follows the project again), "For all texts" changes the project setting. Lowering it only warns; no assignment
  * is ever removed. Saving reloads the member list with the new limit; the dialog and its selection stay.
  */
-function LimitInfo({ projectKey, current, project, texts, textName, onSaved, onFailed }: {
+function LimitInfo({ projectKey, current, project, max, texts, textName, onSaved, onFailed }: {
   projectKey: string;
+  /** The server's maximum (issue 457); null or absent: no limit. */
+  max?: number | null;
   /** The limit of the selected texts (their own value, else the project's). */
   current: number;
   /** The project setting. */
@@ -101,7 +103,7 @@ function LimitInfo({ projectKey, current, project, texts, textName, onSaved, onF
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
   const target = Number(value);
-  const valid = Number.isInteger(target) && target >= 1 && target <= MAX_ANNOTATORS_PER_TEXT;
+  const valid = validPerText(target, max);
   const forTexts = scope === "texts" && texts.length > 0;
   // Texts with different limits: no single "current" value; each text is compared with its own.
   const mixed = texts.some(text => text.limit !== current);
@@ -121,7 +123,7 @@ function LimitInfo({ projectKey, current, project, texts, textName, onSaved, onF
   const rows = !forTexts && valid && target < project && over?.target === target ? over.rows : null;
   const close = () => { if (!busy) { setOpen(false); setError(undefined); setScopeState(texts.length ? "texts" : "project"); setValue(String(current)); setTyped(false); setTouched(false); } };
   /** Why "Change for …" cannot act with this number in this scope; null while it can. */
-  const idle = !valid ? `Enter a whole number from 1 to ${MAX_ANNOTATORS_PER_TEXT}.`
+  const idle = !valid ? (max == null ? "Enter a whole number of 1 or more." : `Enter a whole number from 1 to ${max}.`)
     : !unchanged ? null
     : forTexts ? `${texts.length === 1 ? "This text already has" : "These texts already have"} the limit ${target}. Enter another number, or choose "For all texts".`
     : `The project setting is already ${target}. Enter another number${texts.length ? `, or choose "${texts.length === 1 ? "Only for the selected text" : "Only for the selected texts"}"` : ""}.`;
@@ -159,7 +161,7 @@ function LimitInfo({ projectKey, current, project, texts, textName, onSaved, onF
           : <p>This is a <strong>project setting</strong>: the most annotators any text can get. Fewer is fine.</p>}
         {/* R-11: a compact inline number field, as high as the small buttons. */}
         <p className="assign-limit-field"><label htmlFor={`${id}-per-text`}>Annotators per text</label>
-          <input id={`${id}-per-text`} className="form-control assign-limit-input" type="number" min={1} max={MAX_ANNOTATORS_PER_TEXT} step={1} required value={value} disabled={busy}
+          <input id={`${id}-per-text`} className="form-control assign-limit-input" type="number" min={1} max={max ?? undefined} step={1} required value={value} disabled={busy}
             onChange={event => { setValue(event.target.value); setTyped(true); setTouched(true); }}
             onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); void save(); } }} /></p>
         {texts.length > 0 && <div role="radiogroup" aria-label="Change it for" className="assign-limit-scope">
@@ -179,6 +181,10 @@ function LimitInfo({ projectKey, current, project, texts, textName, onSaved, onF
     </Popover>
   </>;
 }
+
+/** Issue 488: in which order a person sees the tasks this dialog creates (My tasks and the editor's next task). */
+export const TASK_ORDER_NOTE = "My tasks lists a person's tasks by status, then in the order of assignment. New tasks come after the tasks the person already has.";
+export const TASK_ORDER_NOTE_TEXTS = "These texts are assigned in the order shown above.";
 
 /** Texts the batch dialog names before "Show all" (issue 129, U4). */
 export const NAMED_TEXTS = 6;
@@ -566,7 +572,7 @@ function AssignWorkEditor(props: AssignWorkDialogProps): JSX.Element {
   if (shown && props.mode === "row" && !limitTexts.length) limitTexts.push({ case_id: props.row.case_id, language: props.row.language,
     limit: props.row.annotations_per_text?.effective ?? shown.per_text, assigned: props.row.work.filter(item => item.task === "annotate" && item.moved_to_version == null).length });
   const limitInfo = shown && <LimitInfo key={`${shown.per_text}:${shown.project_per_text}`} projectKey={props.projectKey} current={shown.per_text}
-    project={shown.project_per_text} texts={task === "annotate" ? limitTexts : []}
+    project={shown.project_per_text} max={shown.max_per_text} texts={task === "annotate" ? limitTexts : []}
     textName={props.mode === "row" ? textLabel(props.row) : undefined}
     onFailed={() => setReload(count => count + 1)}
     onSaved={(value, scope, texts) => { reset(); setLimitSaved(scope === "project" ? `Annotators per text: ${value}, for all texts.` : `Annotators per text: ${value}, for ${texts === 1 && props.mode === "row" ? textLabel(props.row) : plural(texts, "text")}.`); setReload(count => count + 1); props.onLimitChanged?.(); }} />;
@@ -728,6 +734,7 @@ function AssignWorkEditor(props: AssignWorkDialogProps): JSX.Element {
       </InlineConfirm>}
       {me && rowMulti && props.mode === "row" && props.consolidatorRule && <p id={`${id}-rule`} className="assign-muted">If you annotate this text yourself, you cannot consolidate it afterwards (project rule "the consolidator is not an annotator").</p>}
 
+      {task && shown && <p className="assign-muted assign-order-note">{TASK_ORDER_NOTE}{props.mode === "cases" && targetTextNames(shown.targets).length > 1 && ` ${TASK_ORDER_NOTE_TEXTS}`}</p>}
       <div className="assign-summary" role="status" aria-live="polite" aria-label="Summary">{summaryLines.map(line => <p key={line}>{line}</p>)}</div>
 
       {fresh && fresh.targets.length > 0 && (!isRow || randomUseful) && <p className="assign-random"><Button size="sm" disabled={busy} aria-disabled={unacknowledged ? "true" : undefined} aria-describedby={unacknowledged && reason ? reasonId : undefined}
