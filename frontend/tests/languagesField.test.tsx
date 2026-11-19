@@ -19,6 +19,13 @@ function Form({ onSave, initial = [] }: { onSave: (languages: string[]) => void;
 }
 
 describe("LanguagesField", () => {
+  it("says that a code is wanted, not the name of the language (issue 472)", () => {
+    render(<LanguagesField {...props({ hint: "Languages the person reads." })} />);
+    const input = screen.getByLabelText("Languages you can read");
+    const hint = document.getElementById(input.getAttribute("aria-describedby")!.split(" ")[0])!;
+    expect(hint.textContent).toBe("Languages the person reads. Type a language code, for example de (not “German”), then press Enter or Add language.");
+  });
+
   it("labels the input and suggests common codes without preselecting a language", () => {
     const state = props();
     render(<LanguagesField {...state} />);

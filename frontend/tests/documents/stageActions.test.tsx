@@ -17,7 +17,7 @@ it("a submitted annotation gets Reopen… under Annotation, which opens the reop
   const text = row({ case_id: "z", language: "en", versions: [version({ document_id: "z/doc" })] });
   render(<StageActions row={text} stage="annotation" textVersionTools={tools("submitted")} />);
   fireEvent.click(screen.getByRole("button", { name: "Reopen…, Alice (A)" }));
-  expect(screen.getByRole("dialog", { name: "Reopen z en" })).toBeTruthy();
+  expect(screen.getByRole("dialog", { name: /^Reopen z en for / })).toBeTruthy();
   cleanup();
   render(<StageActions row={text} stage="review" textVersionTools={tools("submitted")} />);
   expect(screen.queryByRole("button", { name: /^Reopen/ })).toBeNull();
@@ -41,7 +41,7 @@ it("a submitted translation review of the newest version gets Reopen… under Tr
     work: [work({ assignment_id: 21, document_id: "z/de", task: "translation_review", status: "submitted" })] });
   render(<StageActions row={text} stage="review" textVersionTools={reviewTools} />);
   fireEvent.click(screen.getByRole("button", { name: "Reopen…, Alice (A)" }));
-  expect(screen.getByRole("dialog", { name: "Reopen z de" })).toBeTruthy();
+  expect(screen.getByRole("dialog", { name: /^Reopen z de for / })).toBeTruthy();
   cleanup();
   render(<StageActions row={text} stage="annotation" textVersionTools={reviewTools} />);
   expect(screen.queryByRole("button", { name: /^Reopen/ })).toBeNull();

@@ -273,7 +273,7 @@ describe("TreeBrowser: one walk", () => {
 
     // The selected node is the annotation's current term.
     expect(useButton().disabled).toBe(true);
-    expect(screen.getByText("This is the annotation's current term.")).toBeDefined();
+    expect(screen.getByText("This is the finding's current term.")).toBeDefined();
 
     fireEvent.click(item("Status epilepticus"));
     expect(item("Status epilepticus").getAttribute("aria-selected")).toBe("true");

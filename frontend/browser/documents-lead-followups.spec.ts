@@ -113,15 +113,15 @@ test("assign dialog: both numbers on an over-limit text, a labelled Change… th
   await bar.getByRole("button", { name: "More actions" }).click();
   await page.getByRole("menu", { name: "More actions" }).getByRole("menuitem", { name: "Reopen…" }).click();
   const reopen = page.getByRole("dialog", { name: "Reopen: 8 texts" });
-  await expect(reopen.locator(".work-plan-summary")).toHaveText("Will change: 8 assignments in 6 texts");
+  await expect(reopen.locator(".work-plan-summary")).toHaveText("Will change: 8 tasks in 6 texts");
   await reopen.getByLabel(/^Reason/).fill("Guideline 2.3 changed for vital signs");
-  const apply = reopen.getByRole("button", { name: "Reopen 8 assignments" });
+  const apply = reopen.getByRole("button", { name: "Reopen 8 tasks" });
   await apply.click();
   await reopen.getByLabel("I understand").check();
   await apply.click();
   await expect(reopen).toBeHidden();
   const toast = page.locator(".ui-toast");
-  await expect(toast).toContainText("Reopened 8 assignments in 6 texts.");
+  await expect(toast).toContainText("Reopened 8 tasks in 6 texts.");
   await withdrawTask(page, s.project, "EN100022", "reopened");
   await toast.getByRole("button", { name: "Undo" }).click();
   await expect(toast).toContainText(
