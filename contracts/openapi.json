@@ -6388,7 +6388,7 @@
             "required": true,
             "schema": {
               "type": "integer",
-              "maximum": 20,
+              "maximum": 2147483647,
               "minimum": 1,
               "title": "Annotations Per Text"
             }
@@ -13761,7 +13761,7 @@
             "anyOf": [
               {
                 "type": "integer",
-                "maximum": 20.0,
+                "maximum": 2147483647.0,
                 "minimum": 1.0
               },
               {
@@ -13842,7 +13842,7 @@
             "anyOf": [
               {
                 "type": "integer",
-                "maximum": 20.0,
+                "maximum": 2147483647.0,
                 "minimum": 1.0
               },
               {
@@ -15461,6 +15461,17 @@
           "project_per_text": {
             "type": "integer",
             "title": "Project Per Text"
+          },
+          "max_per_text": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Per Text"
           },
           "digest": {
             "type": "string",
@@ -28357,6 +28368,17 @@
             "title": "Annotation Policy Revision",
             "default": 1
           },
+          "annotations_per_text_max": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annotations Per Text Max"
+          },
           "frozen_translations": {
             "anyOf": [
               {
@@ -28473,7 +28495,7 @@
             "anyOf": [
               {
                 "type": "integer",
-                "maximum": 20.0,
+                "maximum": 2147483647.0,
                 "minimum": 1.0
               },
               {
@@ -32424,7 +32446,6 @@
               "type": "string"
             },
             "type": "array",
-            "maxItems": 40,
             "minItems": 2,
             "title": "Source Submission Ids"
           },

@@ -23,7 +23,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "0053"
-down_revision = "0049"
+down_revision = "0050"
 branch_labels = None
 depends_on = None
 SCHEMA = "ontotator"

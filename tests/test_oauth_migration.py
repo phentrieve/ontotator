@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from ontotator.storage.schema import upgrade
 
 REVISION = "0053"
-PREVIOUS = "0049"
+PREVIOUS = "0050"
 S = "ontotator"
 
 
