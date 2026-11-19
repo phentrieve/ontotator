@@ -17,6 +17,11 @@ export interface UsersPageProps {
 type Handover = CodeResponse & { kind: "setup" | "reset"; username: string };
 type PendingChange = { username: string; change: AdminUserPatch; kind: "admin" | "deactivate"; fromEdit: boolean };
 type EditState = { baseline: AdminUser; draft: AdminUser };
+/**
+ * Rows the users table shows before "Show all": every row costs the browser, and a thousand rows made
+ * opening New user and typing in it take seconds.
+ */
+const SHOWN_USERS = 100;
 /** From this many projects the New user grid gets a "Find project" field. */
 const PROJECT_FILTER_FROM = 8;
 /** Member languages drive the language warnings and Distribute evenly; none listed counts as unknown (issue 193). */
@@ -227,6 +232,9 @@ function UsersContent({ currentUser, routeLeaveRef }: UsersPageProps): JSX.Eleme
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<unknown>();
   const [filter, setFilter] = useState("");
+  const [allUsers, setAllUsers] = useState(false);
+  // Accounts created on this page stay in view beyond the first rows.
+  const [createdHere, setCreatedHere] = useState<ReadonlySet<string>>(new Set());
   const [projectFilter, setProjectFilter] = useState("");
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [create, setCreate] = useState<CreateUserRequest>(emptyCreate);
@@ -303,7 +311,7 @@ function UsersContent({ currentUser, routeLeaveRef }: UsersPageProps): JSX.Eleme
     try {
       const response = await api.adminCreateUser({ ...create, email: create.email?.trim() || null, qualification: create.qualification?.trim() || null });
       if (epoch !== lifetime.current) return;
-      replaceUser(response.user); setCreate(emptyCreate()); setCreating(false); showCode(response, "setup", response.user.username);
+      replaceUser(response.user); setCreatedHere(names => new Set(names).add(response.user.username)); setCreate(emptyCreate()); setCreating(false); showCode(response, "setup", response.user.username);
     } catch (error: unknown) {
       if (epoch === lifetime.current) setCreateError(error);
     } finally {
@@ -444,7 +452,11 @@ function UsersContent({ currentUser, routeLeaveRef }: UsersPageProps): JSX.Eleme
       {users !== null && <DataTable label="Users" columns={columns}
         // A click on the row (not on its buttons) highlights it; a second click clears it.
         rowProps={user => ({ className: ["users-row", user.username === notice?.username && "users-row--changed"].filter(Boolean).join(" "), selected: user.username === selectedUser,
-          onClick: event => { if (!(event.target as Element).closest("button, a, input, summary")) setSelectedUser(current => current === user.username ? null : user.username); } })} rows={users.filter(user => user.username.toLowerCase().includes(query) || user.display_name.toLowerCase().includes(query))} rowKey={user => user.username} empty={<EmptyState title={query ? "No matching users." : "No users to display."} />} />}
+          onClick: event => { if (!(event.target as Element).closest("button, a, input, summary")) setSelectedUser(current => current === user.username ? null : user.username); } })} rows={users.filter(user => user.username.toLowerCase().includes(query) || user.display_name.toLowerCase().includes(query))} rowKey={user => user.username} empty={<EmptyState title={query ? "No matching users." : "No users to display."} />}
+        rowLimit={allUsers ? undefined : { count: SHOWN_USERS, keep: user => createdHere.has(user.username) || user.username === notice?.username, more: total => <div className="users-more">
+          <span>The first {SHOWN_USERS} of {total} users are shown. Type into Filter users to find someone.</span>
+          <Button size="sm" disabled={pageBlocked} onClick={() => setAllUsers(true)}>Show all {total}</Button>
+        </div> }} />}
     </section>
     {creating && <Dialog open title="New user" onClose={busy ? undefined : () => setCreating(false)}>
       <form aria-label="New user" onSubmit={event => { event.preventDefault(); void createUser(); }}>
