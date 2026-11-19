@@ -766,9 +766,11 @@ async def test_assign_texts_names_the_correction_for_a_review_accepted_version(
 async def test_a_text_gets_its_own_annotations_per_text(
     fake: FakeApi, mcp_client: Client
 ) -> None:
-    """Issue 422: one idempotent PUT per text; None follows the project again."""
+    """Issue 422: one idempotent PUT per text; None follows the project again.
+    Issue 457: no built-in maximum (30 is sent); the server's own maximum
+    comes back as its refusal."""
     template = f"{P}/texts/{{case_id}}/{{language}}/annotations-per-text"
-    for value in (4, 20, None):
+    for value in (4, 30, None):
         await call(
             mcp_client,
             "set_annotations_per_text",
@@ -783,7 +785,7 @@ async def test_a_text_gets_its_own_annotations_per_text(
     sent = fake.calls_to("PUT", template)
     assert [c.json() for c in sent] == [
         {"value": 4, "reason": "method comparison"},
-        {"value": 20, "reason": "method comparison"},
+        {"value": 30, "reason": "method comparison"},
         {"value": None, "reason": "method comparison"},
     ]
     assert str(sent[0].request.url).endswith(
@@ -797,9 +799,37 @@ async def test_a_text_gets_its_own_annotations_per_text(
                 "project": "p",
                 "case_id": "c",
                 "language": "de",
-                "annotations_per_text": 21,
+                "annotations_per_text": 0,
             },
         )
+    assert len(fake.calls_to("PUT", template)) == 3
+    fake.on(
+        "PUT",
+        template,
+        refusal(
+            422,
+            "ANNOTATIONS_PER_TEXT_ABOVE_MAXIMUM",
+            {
+                "maximum": 8,
+                "value": 9,
+                "setting": "ONTOTATOR_MAX_ANNOTATIONS_PER_TEXT",
+            },
+        ),
+    )
+    with pytest.raises(ToolFailed) as raised:
+        await call(
+            mcp_client,
+            "set_annotations_per_text",
+            {
+                "project": "p",
+                "case_id": "c",
+                "language": "de",
+                "annotations_per_text": 9,
+            },
+        )
+    message = str(raised.value)
+    assert "ANNOTATIONS_PER_TEXT_ABOVE_MAXIMUM" in message
+    assert '"maximum":8' in message
 
 
 async def test_tool_texts_state_the_selection_limit(mcp_client: Client) -> None:
@@ -866,8 +896,12 @@ async def test_change_annotation_modes_dry_run_confirm_and_stale_token(
             "language": "en",
             "from_mode": "proposals",
             "discarded_submissions": 1,
-            "authors": ["Tom Reis"],
-            "withdrawn_unsubmitted_tasks": ["ann-2"],
+            "authors": [
+                {"username": None, "display_name": "Tom Reis", "pseudonym": "ann-1"}
+            ],
+            "withdrawn_unsubmitted_tasks": [
+                {"username": None, "display_name": None, "pseudonym": "ann-2"}
+            ],
         }
     ]
     assert dry["skipped_texts"][0]["message"].startswith("Final result chosen")

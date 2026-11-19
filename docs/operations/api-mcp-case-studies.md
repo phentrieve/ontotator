@@ -137,7 +137,7 @@ The data warehouse loads the final results every night with `ci-export`, and Dr.
 | Step | Route | Scope | MCP tool | Status |
 | --- | --- | --- | --- | --- |
 | Overview: settings, totals per stage, workload, open decisions, export warnings | `GET P/settings`, `GET P/progress`, `GET P/documents/summary`, `GET P/workflow-warnings` | `read` | `project_overview` | covered |
-| Texts by language, stage, query or proposals, page by page | `GET P/document-rows` (paged, filtered) | `read` | `list_texts` | covered |
+| Texts by language, stage, query, proposals or over the limit, page by page | `GET P/document-rows` (paged, filtered) | `read` | `list_texts` (`limit`, `offset`, `fields`) | covered |
 | Progress per text and person | `GET P/progress` | `read` | `get_progress` | covered (not paged: one large answer for big projects) |
 | Agreement over the project: summary (macro mean, pooled), per pair of annotators, per text | `GET P/agreement` (leads, like the final export: it names the annotators) | `read` | `agreement_summary` | covered: the figures of the final export's `agreement.csv` and `agreement-summary.csv` for the current final results, in one call |
 | Agreement of one text before a result is chosen | `GET P/document-rows/{case}/{language}/final-panel` | `read` | `set_final_result` (dry run) | covered |
