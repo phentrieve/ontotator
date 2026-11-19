@@ -820,7 +820,8 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         says what is in the way (blocked, with the reason): something
         changed on the texts since (a task, draft, round, final result, plan
         row or version), a text no longer plans the task, or a person left
-        the project. With confirm every task comes back, or none: a blocked
+        the project. blocked_texts names each text in the way and what
+        changed on it (texts: how many texts the action changed). With confirm every task comes back, or none: a blocked
         undo changes nothing (the answer is then the dry run, ``refused``).
         An undo that is unknown, expired or already used is refused with
         BULK_UNDO_STALE. start_rounds and a reopened translation review
@@ -851,6 +852,8 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
                 ),
                 "task_count": found.get("task_count", len(tasks)),
                 "blocked": found.get("blocked"),
+                "texts": found.get("texts", 0),
+                "blocked_texts": _cut(found.get("blocked_texts", []), MAX_BULK_LISTED),
             }
 
         preview: dict[str, Any] = await api.post(
@@ -859,11 +862,21 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         if not confirm:
             return summary(preview, False)
         if preview.get("blocked"):
+            named = preview.get("blocked_texts") or []
+            # As the web message: how many texts are in the way, and the first.
+            what = (
+                f"{len(named)} of {preview.get('texts', len(named))} texts changed"
+                f" since the action ({named[0]['case_id']} {named[0]['language']}:"
+                f" {named[0]['message']}"
+                + (f" And {len(named) - 1} more, see blocked_texts." * (len(named) > 1))
+                + ")"
+                if named
+                else "The texts changed since the action (blocked)"
+            )
             return summary(preview, False) | {
                 "refused": True,
-                "note": "The texts changed since the action (blocked); nothing"
-                " was restored. reopen_task, withdraw_task and assign_texts"
-                " change one task.",
+                "note": f"Undo is not possible: {what}; nothing was restored."
+                " reopen_task, withdraw_task and assign_texts change one task.",
             }
         applied: dict[str, Any] = await api.post(path, {"undo_id": undo_id})
         return summary(applied, True)

@@ -60,6 +60,16 @@ it('one toolbar with Documents, case id, language and version, Show, Compare, Te
   expect(toolbar.textContent).not.toContain('·');
 });
 
+// Issue 470: the text card is on the Documents page, which only leads open.
+it('offers no Text card link to someone who does not lead the project', async () => {
+  vi.mocked(api.listProjects).mockResolvedValue([{ project_key: 'pkg', roles: ['adjudicator'], can_manage: false } as any]);
+  vi.mocked(api.listTextLayers).mockResolvedValue(annotatorLayers);
+  await viewer();
+  const toolbar = screen.getByRole('group', { name: 'Text view' });
+  expect(within(toolbar).queryByRole('link', { name: 'Text card' })).toBeNull();
+  expect(within(toolbar).getByRole('button', { name: 'Submissions' })).toBeTruthy();
+});
+
 it('the version select lists source and newer versions with origin words', async () => {
   await viewer();
   const select = screen.getByLabelText<HTMLSelectElement>('Language and version');

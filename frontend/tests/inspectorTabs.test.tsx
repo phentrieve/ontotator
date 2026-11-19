@@ -244,7 +244,7 @@ describe("guidelines in the editor's inspector", () => {
     });
     const close = vi.fn();
     render(<CaseScreen view={view} workspaceId="ws-pc" onClose={vi.fn()} guidelines={{
-      open: true, version: 1, request: 1, reader: <p>Mark the shortest span.</p>, footer: <button type="button">Close</button>,
+      open: true, version: 1, versionName: "v1", request: 1, reader: <p>Mark the shortest span.</p>, footer: <button type="button">Close</button>,
       close, returnFocus: createRef<HTMLElement>(), drawer: null,
     }} />);
     const guidelinesTab = () => screen.getByRole("tab", { name: "Guidelines v1" });
@@ -269,7 +269,7 @@ describe("guidelines in the editor's inspector", () => {
   it("an older version shown (no inspector) or below 1060 px: the screen renders the drawer instead", () => {
     stubViewport(1000);
     render(<CaseScreen view={proposalView()} workspaceId="ws-pc" onClose={vi.fn()} guidelines={{
-      open: true, version: 1, request: 1, reader: <p>Rules</p>, footer: null, close: vi.fn(), returnFocus: createRef<HTMLElement>(),
+      open: true, version: 1, versionName: "v1", request: 1, reader: <p>Rules</p>, footer: null, close: vi.fn(), returnFocus: createRef<HTMLElement>(),
       drawer: <div data-testid="drawer">Drawer</div>,
     }} />);
     expect(screen.getByTestId("drawer")).toBeDefined();

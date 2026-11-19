@@ -122,7 +122,9 @@ Add your qualification (for example "physician, native German speaker") in your 
 
 The translation tool checked its own output and found a possible problem, for example numbers or units that differ from the source. Click **Details** to read the check, what the tool reported and what to do if the translation is right anyway. Open **Technical details** for the technical code of the check. If Ontotator has no description for a check, ask the project lead what it checks. See [Review a translation](annotator.md#review-a-translation).
 
-The checks run once, on the first version of a translation. In the review of a later version the band reads *The automatic checks ran on v1, not on this version (v2).* and names a check that failed on v1; it asks for nothing there ([Review a later version](annotator.md#review-a-later-version)).
+A line *More passages in brackets than in the source* in the same band is a check of Ontotator itself on the version you review. It asks for no rationale ([Review a translation](annotator.md#review-a-translation)).
+
+The checks of the translation tool run once, on the first version of a translation. In the review of a later version the band reads *The automatic checks ran on v1, not on this version (v2).* and names a check that failed on v1; it asks for nothing there ([Review a later version](annotator.md#review-a-later-version)).
 
 ## Consolidating
 
@@ -143,6 +145,10 @@ The finding was not saved, for example because the connection dropped. Reload th
 The result has findings with values filled in by default, modifier terms used as findings, or modifier warnings. Check them; if they are correct, submit with the warnings. See [Finish a consolidation](consolidator.md#finish-a-consolidation).
 
 ## Leading a project
+
+### The app says "Guidelines v2", but our guideline is version 3.1
+
+The number after *v* counts the guideline files published in this project; it is not the version of your document. When you publish, enter your document's version in **Your version of the guideline (optional)**. The app then shows it first, for example *Guidelines 3.1 (v2)*. A version that is already published keeps its name: publish the text again with your version to change it. See [Publish the first or a new guideline version](lead-settings.md#publish-the-first-or-a-new-guideline-version).
 
 ### I cannot accept a result
 
@@ -191,6 +197,10 @@ You assigned a translation review to someone who already reviewed this version, 
 ### "Fix typos…" did not save
 
 **Fix typos…** did not save: a newer version arrived, a translation review of the version is open, it was discarded, or the text is the same as before. The dialog names the reason; your text stays in the dialog until you close it. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
+
+### "This query can no longer be decided here."
+
+**Accept the reviewer’s text…** or **Answer and accept the version as it is…** was refused: the query was already decided, a newer version of the translation arrived, the translation was discarded, or a translation review of the version is open (withdraw it with **Remove…** first). The dialog names the reason. Reload the row to see its current state. See [Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation).
 
 ### A review of a version cannot be reopened or assigned after "Fix typos…"
 

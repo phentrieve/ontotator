@@ -1,3 +1,4 @@
+import { guidelineVersionName } from "./versionName";
 import { useEffect, useId, useState } from "react";
 import { api, type GuidelineListing, type GuidelineSummary } from "../api/client";
 import { ErrorNotice } from "../admin/ErrorNotice";
@@ -41,7 +42,7 @@ function GuidelinesView({ projectKey, version, canManage, onNavigate }: Guidelin
     return <a href={routeHref(route)} aria-current={item.version === shown ? "page" : undefined} onClick={event => {
       if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
       event.preventDefault(); onNavigate(route);
-    }}>v{item.version}</a>;
+    }}>{guidelineVersionName(item.version, item.label)}</a>;
   };
   const facts = (item: GuidelineSummary): string => [
     `Published ${formatGuidelineDay(item.created_at)}`,
@@ -57,12 +58,12 @@ function GuidelinesView({ projectKey, version, canManage, onNavigate }: Guidelin
       : listing.versions.length === 0 ? <p className="guidelines-empty">This project has no guidelines yet.</p>
       : <>
         {version === undefined && current === null && <p className="guidelines-empty">No guideline is in force.</p>}
-        {shown !== null && <GuidelineReader projectKey={projectKey} version={shown} currentVersion={current} />}
+        {shown !== null && <GuidelineReader projectKey={projectKey} version={shown} currentVersion={current} label={listing.versions.find(item => item.version === shown)?.label} currentLabel={listing.current?.label} />}
         <div className="guidelines-versions">
           <h2 id={versionsId}>Versions</h2>
           <ul aria-labelledby={versionsId}>
             {listing.versions.map(item => <li key={item.version}>
-              {item.withdrawn ? `v${item.version}, Withdrawn ${formatGuidelineDay(item.withdrawn.at)}` : <>{versionLink(item)}{facts(item)}</>}
+              {item.withdrawn ? `${guidelineVersionName(item.version, item.label)}, Withdrawn ${formatGuidelineDay(item.withdrawn.at)}` : <>{versionLink(item)}{facts(item)}</>}
             </li>)}
           </ul>
         </div>

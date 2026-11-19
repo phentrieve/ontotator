@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, AuthError, ConflictError, type DocumentRowView, type DocumentRowsPage, type FinalPanelView, type RowSubmissions, type WorkRoundView } from "../../src/api/client";
 import { formatTime } from "../../src/app/submissionLabels";
 import { DecisionBlock, type DecisionBlockProps } from "../../src/documents/FinalPanel";
-import { AGREEMENT_EXPLANATION, agreementText, compareSummary, consolidateHint, detailDifferenceLines, relatedTermLines, consolidationBreakdown, remainingText, noMoreFinalsText, consolidationStartedToast, nextFinalDecision, nextOtherDecision, unresolvedLines } from "../../src/documents/finalPanelText";
+import { AGREEMENT_EXPLANATION, agreementText, compareSummary, consolidateHint, detailDifferenceLines, relatedTermLines, consolidationBreakdown, remainingText, noMoreFinalsText, consolidationStartedToast, keepLabel, nextFinalDecision, nextOtherDecision, unresolvedLines } from "../../src/documents/finalPanelText";
 import { notifyFinalSelectionChanged } from "../../src/variants/finalSelectionState";
 import { refKey } from "../../src/variants/versionState";
 import { guidelineListing, guidelineSummary } from "../projectFixtures";
@@ -503,6 +503,17 @@ describe("review changes", () => {
     await screen.findByRole("button", { name: "Keep final on v1" });
     const lines = [...block().querySelectorAll(".selection-notice-lines > li")].map(line => line.textContent);
     expect(lines).toContain("v2 was queried in review. No action needed.");
+  });
+
+  it("a text with one version offers Keep the current final result, not a version (issue 469)", async () => {
+    const target = reviewRow("case-116", "de");
+    const single = { ...target, versions: [target.versions[0]] };
+    expect(keepLabel(single)).toBe("Keep the current final result");
+    expect(keepLabel(target)).toBe("Keep final on v1");
+    panels[rowKey("case-116", "de")] = finalPanel({ submissions: [anaSubmission("case-116", "de")], causes: single.issues });
+    renderPanel("case-116:de", page([group("case-116", [single])]));
+    expect(await screen.findByRole("button", { name: "Keep the current final result" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^Keep final on/ })).toBeNull();
   });
 
   it("makes Keep unavailable for the lead's own final while the rule is on", async () => {

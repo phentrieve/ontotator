@@ -212,7 +212,9 @@ def test_accepted_corrected_parent_raises_no_text_cause():
     assert corrects_selected_text("accepted", "accepted_unchanged")
     assert corrects_selected_text(None, None)
     assert not corrects_selected_text("reviewed", "rejected")
-    assert not corrects_selected_text("accepted", "query")
+    assert not corrects_selected_text("reviewed", "query")
+    # Issue 483: a queried correction the lead accepted as it is counts again.
+    assert corrects_selected_text("accepted", "query")
 
 
 def _status(env, document):
