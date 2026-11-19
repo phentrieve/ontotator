@@ -1111,8 +1111,9 @@ class WorkPlanService:
 
     def annotation_target_preview(
         self, key: str, annotations_per_text: int
-    ) -> dict[str, int]:
-        """Rows with more non-revoked annotators on a target version than ``n``."""
+    ) -> dict[str, Any]:
+        """Rows with more non-revoked annotators on a target version than ``n``:
+        their number and the rows themselves."""
         with self.db.transaction() as conn:
             pid = self._lock(conn, key, exclusive=False)["id"]
             counts = dict(
@@ -1134,15 +1135,27 @@ class WorkPlanService:
             discarded = set(store.discarded(conn, pid))
             # Texts with their own limit keep it (issue 422).
             own = per_text_overrides(conn, pid)
-            over = sum(
-                any(
-                    counts.get(_target(chain).document_id, 0) > annotations_per_text
-                    for chain in _live(chains, discarded)
+            rows = []
+            for row_key, chains in _chains(conn, pid).items():
+                if (row_key.case_id, row_key.language) in own:
+                    continue
+                annotators = max(
+                    (
+                        counts.get(_target(chain).document_id, 0)
+                        for chain in _live(chains, discarded)
+                    ),
+                    default=0,
                 )
-                for row_key, chains in _chains(conn, pid).items()
-                if (row_key.case_id, row_key.language) not in own
-            )
-            return {"rows_over_target": over}
+                if annotators > annotations_per_text:
+                    rows.append(
+                        {
+                            "case_id": row_key.case_id,
+                            "language": row_key.language,
+                            "annotators": annotators,
+                        }
+                    )
+            rows.sort(key=lambda row: (row["case_id"], row["language"]))
+            return {"rows_over_target": len(rows), "rows": rows}
 
     def set_annotations_per_text(
         self,

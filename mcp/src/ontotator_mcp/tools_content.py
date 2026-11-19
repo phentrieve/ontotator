@@ -19,12 +19,15 @@ from mcp.server.mcpserver import MCPServer
 from pydantic import Field
 
 from ontotator_mcp.client import OntotatorClient, project_path, seg
-from ontotator_mcp.tooling import register
+from ontotator_mcp.tooling import NOT_A_CASE_ID, listing, register
 
 Project = Annotated[str, Field(description="Project key, e.g. 'ward-7'.")]
 DocumentId = Annotated[
     str,
-    Field(description="ID of one text version (document_id from list_texts)."),
+    Field(
+        description="ID of one text version (document_id from list_texts)."
+        + NOT_A_CASE_ID
+    ),
 ]
 IncludeText = Annotated[
     bool,
@@ -130,19 +133,19 @@ def register_content(server: MCPServer, api: OntotatorClient) -> None:
     @register(server, scopes="read", effect="read")
     async def list_annotation_versions(
         project: Project, document_id: DocumentId
-    ) -> list[dict[str, Any]]:
+    ) -> dict[str, Any]:
         """The annotation states of a text version the token's owner may read: kind, id, label, time.
 
         Submitted work and imported tool proposals only, never a draft: a
         lead gets every submission of the text ('submission') and the
         proposal sets ('proposals'), anyone else their own submissions
-        ('own'). get_annotation_version reads one by kind and id. Exists because this MCP server runs with
-        ONTOTATOR_MCP_READ_CONTENT=1.
+        ('own'), in 'items'. get_annotation_version reads one by kind and id.
+        Exists because this MCP server runs with ONTOTATOR_MCP_READ_CONTENT=1.
         """
         versions: list[dict[str, Any]] = await api.get(
             project_path(project, "documents", seg(document_id), "annotation-versions")
         )
-        return versions
+        return listing(versions)
 
     @register(server, scopes="read", effect="read")
     async def get_annotation_version(

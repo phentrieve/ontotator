@@ -700,8 +700,15 @@ def test_annotation_target_preview_counts_rows_over_target(env):
     assign(env, doc("c1", "en"), "anno", "annotate")
     assign(env, doc("c1", "en"), "anno2", "annotate")
     assign(env, doc("c2", "en"), "anno", "annotate")
-    assert service(env).annotation_target_preview("proj", 1) == {"rows_over_target": 1}
-    assert service(env).annotation_target_preview("proj", 2) == {"rows_over_target": 0}
+    # Issue 471: the texts themselves, not only their number.
+    assert service(env).annotation_target_preview("proj", 1) == {
+        "rows_over_target": 1,
+        "rows": [{"case_id": "c1", "language": "en", "annotators": 2}],
+    }
+    assert service(env).annotation_target_preview("proj", 2) == {
+        "rows_over_target": 0,
+        "rows": [],
+    }
 
 
 def test_settings_change_without_new_fields_keeps_stored_values(env):

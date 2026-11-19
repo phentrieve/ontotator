@@ -230,7 +230,8 @@ async def test_list_annotation_versions_returns_the_offered_states(
     found = await call(
         content_client, "list_annotation_versions", {"project": "p", "document_id": DOC}
     )
-    assert [(ref["kind"], ref["id"]) for ref in found] == [
+    assert found["count"] == 2
+    assert [(ref["kind"], ref["id"]) for ref in found["items"]] == [
         ("submission", "s1"),
         ("proposals", "7"),
     ]
