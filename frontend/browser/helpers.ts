@@ -55,6 +55,36 @@ export async function loginThroughForm(page: Page, username: string, shown?: str
   await routerReady(page);
 }
 
+/** The user menu at the top right of the shell (issue 510): its button, named "User menu: {name}, {role}". */
+export const userMenuButton = (page: Page) => page.locator(".shell-header").getByRole("button", { name: /^User menu/ });
+
+/** Open the user menu (an open one is kept) and return it. */
+export async function openUserMenu(page: Page) {
+  const menu = page.getByRole("menu", { name: /^User menu/ });
+  if (!await menu.isVisible()) await userMenuButton(page).click();
+  await expect(menu).toBeVisible();
+  return menu;
+}
+
+/** Choose "Profile", "My technical reports", "Technical problem…" or "Log out" in the user menu. */
+export async function chooseUserMenu(page: Page, name: string) {
+  await (await openUserMenu(page)).getByRole("menuitem", { name, exact: true }).click();
+}
+
+/** User menu › Log out. An editor with unsaved work asks first; the caller answers that dialog. */
+export async function clickLogOut(page: Page) {
+  await chooseUserMenu(page, "Log out");
+}
+
+/** The gear at the top right: only system administrators have it. Its name may carry the open technical reports. */
+export const administrationGear = (page: Page) => page.locator(".shell-header").getByRole("link", { name: /^Administration/ });
+
+/** Open the area Administration through the gear; it starts on Users. */
+export async function openAdministration(page: Page) {
+  await administrationGear(page).click();
+  await expect(page.getByRole("navigation", { name: "Administration", exact: true })).toBeVisible();
+}
+
 /** Log in an already provisioned ordinary account without adding any roles/work. */
 export async function loginExisting(page: Page, username: string) {
   await loginThroughForm(page, username);

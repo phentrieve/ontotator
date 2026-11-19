@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -104,5 +104,14 @@ describe("ThemeSetting", () => {
     window.localStorage.setItem(THEME_STORAGE_KEY, "light");
     fireEvent(window, new StorageEvent("storage", { key: "something.else", newValue: "x" }));
     expect(select.value).toBe("dark");
+  });
+
+  it("follows the choice made in the user menu of the same tab (issue 510)", () => {
+    render(<ThemeSetting />);
+    const select = screen.getByRole("combobox", { name: "Theme" }) as HTMLSelectElement;
+    act(() => chooseTheme("dark"));
+    expect(select.value).toBe("dark");
+    act(() => chooseTheme("system"));
+    expect(select.value).toBe("system");
   });
 });

@@ -165,7 +165,8 @@ test('own history is genuinely submitted, read-only and return-to-draft preserve
   expect(own).toBeTruthy();
   await openVersions(page);
   await page.getByLabel('Annotations', { exact: true }).selectOption(token(own!));
-  await expect(page.getByText(`Viewing ${own!.label} (read-only)`, { exact: true })).toBeVisible();
+  // The web interface adds the local date and time to the server's label (issue 472).
+  await expect(page.getByText(new RegExp(`^Viewing ${own!.label}, \\d{1,2} [A-Z][a-z]{2}, \\d\\d:\\d\\d \\(read-only\\)$`))).toBeVisible();
   await expect(page.locator('.readonly-annotations')).toContainText('HP:0001252');
   const writes: string[] = [];
   page.on('request', request => { if (request.method() === 'POST' && /\/workspaces\/.+\/(commands|decisions|submit)/.test(request.url())) writes.push(request.url()); });

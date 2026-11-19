@@ -420,7 +420,7 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
     await expect(keep).toHaveCount(0);
     await expect(add).toHaveCount(0);
     await kim.getByRole("button", { name: "Show more" }).click();
-    await expect(kim.getByText("To continue, open “Report a text problem” and choose “Resume my task…”", { exact: false })).toBeVisible();
+    await expect(kim.getByText("To continue, open “Text problems” and choose “Resume my task…”", { exact: false })).toBeVisible();
     expect(await noHorizontalScroll(kim)).toBe(true);
     await shot(kim, `464-consolidation-paused-by-report${suffix}`);
     await kim.goto(`${task}?view=editor`);

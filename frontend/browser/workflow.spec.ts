@@ -1,14 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import {
-  importPackage,
-  LAUNCH_URL,
-  loginAs,
-  mentionWithOffsets,
-  openCase,
-  selectText,
-  submitCase, viewSubmittedResult, LEAD_REOPEN_NOTE,
-  TEST_PASSWORD,
-} from "./helpers";
+import { clickLogOut, importPackage, LAUNCH_URL, LEAD_REOPEN_NOTE, loginAs, mentionWithOffsets, openCase, selectText, submitCase, TEST_PASSWORD, viewSubmittedResult } from "./helpers";
 
 const importFixture = (page: Page, annotator: string, options: { proposals?: boolean } = {}) => importPackage(page, "", "browser-fixture-workflow", annotator, options);
 
@@ -60,7 +51,7 @@ test("login: a wrong password is refused; a setup code sets the password and log
   await setup.getByRole("button", { name: "Set password and log in" }).click();
   await expect(page.getByTestId("current-user")).toContainText(username);
 
-  await page.getByRole("button", { name: "Log out" }).click();
+  await clickLogOut(page);
   await expect(page.getByRole("form", { name: "Log in to Ontotator" })).toBeVisible();
   await expect(page.getByTestId("current-user")).toHaveCount(0);
 });

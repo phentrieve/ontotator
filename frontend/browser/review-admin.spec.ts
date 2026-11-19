@@ -14,7 +14,7 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { authenticatedRequest, loginThroughForm, TEST_PASSWORD } from "./helpers";
+import { authenticatedRequest, clickLogOut, loginThroughForm, TEST_PASSWORD } from "./helpers";
 import { leadScenario } from "./leadWorkflowHelpers";
 
 test.setTimeout(120_000);
@@ -140,7 +140,7 @@ for (const size of SIZES) {
       await expect(members.getByRole("checkbox", { name: `${s.users.lead}: Lead`, exact: true })).toBeChecked();
       await shot(page, `B-lead-refused-${size.name}`);
       expect(await leads()).toEqual([s.users.lead]);
-      await page.getByRole("button", { name: "Log out", exact: true }).click();
+      await clickLogOut(page);
       await expect(page.getByRole("form", { name: "Log in to Ontotator" })).toBeVisible();
 
       // The administrator becomes the second lead, removes the first and then unticks their own Lead box.

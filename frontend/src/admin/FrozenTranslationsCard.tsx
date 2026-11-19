@@ -38,6 +38,8 @@ export function FrozenTranslationsCard({ frozen, projectKey, onRefreshed }: Froz
   if (!frozen) {
     return <SettingsCard title="Translations" hint="Not frozen yet." why={why}>
       <p className="settings-card-text">The first term search or opening a text in the editor takes the translation files on the server then.</p>
+      {/* Issue 472: "Not frozen yet" right after "Move to this release" is intended, and said. */}
+      <p className="settings-card-text">This is also what you see after a move to another ontology release: the move ends the earlier freeze, and the next use freezes again.</p>
     </SettingsCard>;
   }
   const notIncluded = frozen.not_included ?? [];

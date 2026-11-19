@@ -65,9 +65,13 @@ describe("Show invisible characters", () => {
     const mirror = document.querySelector(".translation-editor-mirror")!;
     expect(document.querySelectorAll(".invisible-char")).toHaveLength(0);
     const sourceBefore = source.textContent, mirrorBefore = mirror.textContent;
+    // Issue 472: the key of the marks is on the screen while they are shown, and only then.
+    expect(document.querySelector(".invisibles-key")).toBeNull();
 
     fireEvent.click(box);
     expect(box.checked).toBe(true);
+    expect(within(screen.getByRole("group", { name: "Text view" })).getByText(/^Marks:/).textContent)
+      .toBe("Marks: \u00B7 space, \u00B0 non-breaking space, \u2192 tab, \u00B6 line end, \u00AC soft hyphen, | zero-width character");
     expect(window.localStorage.getItem(KEY)).toBe("1");
     // Source: every kind is marked, and the characters are those of the text.
     expect(source.classList.contains("show-invisibles")).toBe(true);

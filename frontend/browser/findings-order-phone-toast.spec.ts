@@ -181,11 +181,14 @@ for (const size of [PHONE, { width: 375, height: 667 }, { width: 667, height: 37
 
 test("issue 452: a passage marked where the bar appears is moved clear of it, by no more than needed", async ({ page }) => {
   const errors = consoleErrors(page);
-  // A window so low that the first line of the text is at its bottom edge, where the bar goes.
-  const s = await openLoop(page, { width: 390, height: 270 });
+  // A window so low that the first line of the text is at its bottom edge, where the bar goes. (258 px since the
+  // shell header got lower at this width: the user menu button is narrower than "Log out" was, so the breadcrumb
+  // wraps less, issue 510.)
+  const height = 258;
+  const s = await openLoop(page, { width: 390, height });
   const text = s.texts["loop-en"];
   const line = (await textPane(page).locator(".run").first().boundingBox())!;
-  expect(line.y + line.height, "the text's first line is where the bar will be").toBeGreaterThan(270 - 40);
+  expect(line.y + line.height, "the text's first line is where the bar will be").toBeGreaterThan(height - 40);
   await selectText(page, text.indexOf("patient"), text.indexOf("patient") + "patient".length);
   await expect(pendingBar(page)).toBeVisible();
   const marked = page.locator(".text-container .run--marked").first();
@@ -270,15 +273,15 @@ for (const size of [DESKTOP, PHONE]) {
     await openAction("Reopen…");
     const reopen = page.getByRole("dialog", { name: "Reopen: 8 texts" });
     await reopen.getByLabel(/^Reason/).fill("Guideline 2.3 changed for vital signs");
-    await reopen.getByRole("button", { name: "Reopen 8 assignments" }).click();
+    await reopen.getByRole("button", { name: "Reopen 8 tasks" }).click();
     await reopen.getByLabel("I understand").check();
-    await reopen.getByRole("button", { name: "Reopen 8 assignments" }).click();
+    await reopen.getByRole("button", { name: "Reopen 8 tasks" }).click();
     await expect(reopen).toBeHidden();
     const toast = page.locator(".ui-toast");
     const status = page.getByRole("status").filter({ has: toast });
     // The announcement: the toast is in a polite live region.
     await expect(status).toHaveAttribute("aria-live", "polite");
-    await expect(status).toContainText("Reopened 8 assignments in 6 texts.");
+    await expect(status).toContainText("Reopened 8 tasks in 6 texts.");
     await expect(toast.getByRole("button", { name: "Undo" })).toBeVisible();
 
     // The next dialog, opened right away while the toast is showing.
@@ -307,7 +310,7 @@ for (const size of [DESKTOP, PHONE]) {
       await control.click({ trial: true });
     }
     // The announcement is not taken away: the message is still in the live region.
-    await expect(status).toContainText("Reopened 8 assignments in 6 texts.");
+    await expect(status).toContainText("Reopened 8 tasks in 6 texts.");
 
     // Closing the dialog without acting: the Undo is still valid and reachable, and it works.
     await withdraw.getByRole("button", { name: "Cancel", exact: true }).click();
