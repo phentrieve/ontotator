@@ -199,6 +199,18 @@ Your **Username** and **Pseudonym** cannot be changed. Exports show your pseudon
 
 Fill in **Qualification** if you do translation reviews: you cannot submit a translation review without it.
 
+## Choose a light or dark theme
+
+What for: read comfortably, for example in a dim room.
+
+1. Click **Profile** in the sidebar.
+2. Go to **Appearance**.
+3. Under **Theme**, choose **System**, **Light** or **Dark**. The page changes at once; there is nothing to save.
+
+**System** follows the light or dark setting of your device and changes with it. **Light** and **Dark** stay as chosen.
+
+The choice is kept in this browser, for everyone who uses it, and also applies to the login page. On another computer or in another browser, choose again. The images in this handbook show the light theme.
+
 ## Practice in your profile
 
 What for: start, continue or remove your practice project at any time.

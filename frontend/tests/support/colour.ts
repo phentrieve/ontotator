@@ -131,3 +131,26 @@ export function deltaE2000Lab([l1, a1, b1]: Lab, [l2, a2, b2]: Lab): number {
 export function deltaE2000(a: string, b: string): number {
   return deltaE2000Lab(hexToLab(a), hexToLab(b));
 }
+
+/** The declarations of the first rule whose selector is exactly ``selector`` (comments removed). */
+export function ruleBody(css: string, selector: string): string {
+  const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const at = withoutComments.indexOf(`${selector} {`);
+  if (at < 0) throw new Error(`Missing rule ${selector}`);
+  // The selector must start a rule, not end a longer one.
+  if (at > 0 && !/[\s{}]/.test(withoutComments[at - 1])) throw new Error(`${selector} is part of a longer selector`);
+  const open = withoutComments.indexOf("{", at);
+  return withoutComments.slice(open + 1, withoutComments.indexOf("}", open));
+}
+
+/** "--name" -> value for every custom property declared in ``body``, in source order. */
+export function declarations(body: string): Record<string, string> {
+  const found: Record<string, string> = {};
+  for (const decl of body.matchAll(/(--[a-z0-9-]+)\s*:\s*((?:url\("[^"]*"\)|[^;])+);/g)) found[decl[1]] = decl[2].trim();
+  return found;
+}
+
+/** The six-digit hex values among ``values``, lower-cased, as ``parseColourTokens`` returns them. */
+export function hexTokens(values: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(Object.entries(values).filter(([, value]) => /^#[0-9a-fA-F]{6}$/.test(value)).map(([name, value]) => [name, value.toLowerCase()]));
+}
