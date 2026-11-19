@@ -183,7 +183,7 @@ What happens next: the lead reads the result with your notes and flags, and acce
 What for: change text spans or add findings that the comparison table cannot express.
 
 1. Click **Open in full editor**.
-2. The editor shows the mode **Consolidate** and the list **Selected submitted findings** with each finding's author, or *Annotator A*, *Annotator B* and so on if the project hides annotator names. *Replaced by* on a submitted finding shows which result finding took its place; point at it for a short explanation, click it to jump to that finding. The editor works as described in the [annotator reference](annotator.md), except that it has no submit button.
+2. The editor shows the mode **Consolidate** and the list **Selected submitted findings** with each finding's author, or *Annotator A*, *Annotator B* and so on if the project hides annotator names. *Replaced by* on a submitted finding shows which result finding took its place; point at it for a short explanation, click it to jump to that finding. The editor works as described in the [annotator reference](annotator.md), except that it has no submit button. **Show in tree** on a submitted finding or a reference opens the ontology tree at its term only to look: you take no term from there. The tree shows terms only, nothing about the people.
 3. Click **Back to consolidation** at the end of the toolbar to return. Next to it the editor says *Submit on the consolidation screen.*
 
 Groups you changed here are tagged **edited in editor** on the consolidation screen. You submit the consolidation only there, with **Submit consolidation** (see [Finish a consolidation](#finish-a-consolidation)).

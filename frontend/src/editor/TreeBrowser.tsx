@@ -19,6 +19,7 @@ import {
 } from "./treeState";
 import { LanguageFlag } from "../ui/LanguageTag";
 import { MODIFIER_IN_CHANGE } from "./SearchPanel";
+import { takeEffect, treeModeNote, type TreeMode } from "./treeMode";
 
 /**
  * Whether the details under the tree show more than the name and id. Kept per user in this
@@ -45,13 +46,20 @@ export interface TreeBrowserProps {
   startTermId: string;
   /** The term that annotation carries right now. */
   currentTermId: string | null;
-  /** False while that annotation is not the one being edited. */
+  /** False while nothing can be changed from this walk: the tree only shows terms. */
   canAssign: boolean;
+  /**
+   * How a term is taken (issue 523): "assign" at once with "Use this term"; "proposal" and "new" only after a
+   * confirmation that says what happens; "look" not at all.
+   */
+  mode?: TreeMode;
+  /** The hint beside the button while the term that is current is selected. */
+  currentHint?: string;
   /** Move the keyboard focus into the tree once it has loaded. */
   focusOnOpen: boolean;
   onClose: () => void;
   /** Assign the term. The walk's id binds the selection to what was shown. */
-  onUseTerm: (termId: string, browseId: string) => Promise<void>;
+  onUseTerm: (termId: string, browseId: string, label?: string) => Promise<void>;
   /** The active search languages: only their translated names are shown (F14). */
   languages?: readonly string[];
   /** Whose choice of "Hide details" this is; without it the choice lasts for this walk only. */
@@ -78,6 +86,8 @@ export const TreeBrowser: React.FC<TreeBrowserProps> = ({
   startTermId,
   currentTermId,
   canAssign,
+  mode = "assign",
+  currentHint = "This is the annotation's current term.",
   focusOnOpen,
   onClose,
   onUseTerm,
@@ -97,6 +107,10 @@ export const TreeBrowser: React.FC<TreeBrowserProps> = ({
   const [reveal, setReveal] = useState<{ key: string; focus: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // The confirmation of "Use this term instead…" is open for this term.
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const takeButton = useRef<HTMLButtonElement | null>(null);
+  const confirmButton = useRef<HTMLButtonElement | null>(null);
 
   const sectionRef = useRef<HTMLElement | null>(null);
   const opened = useRef(false);
@@ -161,6 +175,8 @@ export const TreeBrowser: React.FC<TreeBrowserProps> = ({
   };
 
   const select = (key: string) => {
+    // The confirmation names one term: another one closes it.
+    if (key !== selectedKey) setConfirming(null);
     setSelectedKey(key);
     setFocusedKey(key);
     if (!details[termOfKey(key)]) void loadNode(key, {});
@@ -212,37 +228,68 @@ export const TreeBrowser: React.FC<TreeBrowserProps> = ({
     return role === "modifier" || role === "cohort";
   };
   const selectedIsModifier = selectedTermId !== null && isModifier(selectedTermId);
-  const canUse = canAssign && browseId !== null && selectedTermId !== null && !isCurrent && !saving;
+  const treeMode: TreeMode = canAssign ? mode : "look";
+  const takeMode = treeMode === "proposal" || treeMode === "new" ? treeMode : null;
+  const modeNote = treeModeNote(treeMode);
+  // The confirmation names the term: it waits for the term's details.
+  const canUse = treeMode !== "look" && browseId !== null && selectedTermId !== null && !isCurrent && !saving
+    && (!takeMode || detail !== null);
+
+  // Back from the confirmation, the focus returns to the button that opened it (once that is rendered again).
+  const [takeFocus, setTakeFocus] = useState(0);
+  const focusTake = () => setTakeFocus((count) => count + 1);
+  useEffect(() => {
+    if (takeFocus) takeButton.current?.focus();
+  }, [takeFocus]);
+  useEffect(() => {
+    if (confirming) confirmButton.current?.focus();
+  }, [confirming]);
+  // The walk can no longer take a term (a decision came in meanwhile): an open confirmation goes.
+  useEffect(() => {
+    if (!takeMode) setConfirming(null);
+  }, [takeMode]);
 
   const assignTerm = async () => {
     if (!canUse || !selectedTermId || !browseId) return;
+    const confirmed = confirming === selectedTermId;
     setSaving(true);
     setError(null);
     try {
-      await onUseTerm(selectedTermId, browseId);
+      if (takeMode) await onUseTerm(selectedTermId, browseId, detail?.label);
+      else await onUseTerm(selectedTermId, browseId);
+      setConfirming(null);
+      // The confirmation is gone: the focus goes back into the tree, on the term just taken.
+      if (confirmed && selectedKey) setReveal({ key: selectedKey, focus: true });
     } catch (reason) {
       setError(messageOf(reason));
+      if (confirmed) { setConfirming(null); focusTake(); }
     } finally {
       setSaving(false);
     }
   };
 
-  const hint = !canAssign
-    ? "Select one of your annotations to assign a term from the tree."
-    : isCurrent
-      ? "This is the annotation's current term."
-      : selectedIsModifier
-        ? MODIFIER_IN_CHANGE
-        : null;
+  const cancelConfirm = () => {
+    setConfirming(null);
+    focusTake();
+  };
+
+  const hint = isCurrent
+    ? currentHint
+    : selectedIsModifier
+      ? MODIFIER_IN_CHANGE
+      : null;
 
   return (
     <div className="tree-host" id="ontology-tree" hidden={collapsed}>
-      <section ref={sectionRef} className="tree-browser" role="region" aria-label="Ontology tree">
+      <section ref={sectionRef} className="tree-browser" role="region" aria-label="Ontology tree"
+        aria-describedby={modeNote ? "tree-mode-note" : undefined}>
         <header className="tree-browser__header">
           <h2>Ontology tree</h2>
           <IconButton label="Close tree" icon={<IconClose />} size="sm" onClick={onClose} />
         </header>
 
+        {/* Read out as the tree opens in this state, and with the region's name when the focus enters it. */}
+        {modeNote && <p id="tree-mode-note" className="tree-mode-note" role="status" data-tree-mode={treeMode}>{modeNote}</p>}
         {startStatus && START_NOTICE[startStatus] && (
           <div className="tree-notice" role="status">
             {`${startTermId} ${START_NOTICE[startStatus]}. The tree starts at the top.`}
@@ -362,20 +409,39 @@ export const TreeBrowser: React.FC<TreeBrowserProps> = ({
                 </p>
               )}
             </div>
-            <div className="tree-detail__actions">
-              <Button
-                type="button"
-                variant="primary"
-                disabled={!canUse}
-                aria-describedby={hint ? "tree-use-hint" : undefined}
-                onClick={() => {
-                  void assignTerm();
-                }}
-              >
-                Use this term
-              </Button>
-              {hint && <span id="tree-use-hint" className="tree-detail__hint">{hint}</span>}
-            </div>
+            {/* Looking only: nothing to take, no button. */}
+            {treeMode !== "look" && (takeMode && confirming && confirming === selectedTermId && detail ? (
+              <div className="tree-detail__actions tree-detail__actions--confirm" role="group" aria-labelledby="tree-take-effect"
+                onKeyDown={(event) => {
+                  if (event.key !== "Escape") return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  cancelConfirm();
+                }}>
+                <p id="tree-take-effect" className="tree-detail__effect">{takeEffect(takeMode, detail.label, detail.term_id)}</p>
+                <Button ref={confirmButton} type="button" variant="primary" disabled={saving} onClick={() => { void assignTerm(); }}>
+                  Confirm
+                </Button>
+                <Button type="button" disabled={saving} onClick={cancelConfirm}>Cancel</Button>
+              </div>
+            ) : (
+              <div className="tree-detail__actions">
+                <Button
+                  ref={takeButton}
+                  type="button"
+                  variant="primary"
+                  disabled={!canUse}
+                  aria-describedby={hint ? "tree-use-hint" : undefined}
+                  onClick={() => {
+                    if (!takeMode) { void assignTerm(); return; }
+                    if (canUse && selectedTermId) setConfirming(selectedTermId);
+                  }}
+                >
+                  {takeMode ? "Use this term instead…" : "Use this term"}
+                </Button>
+                {hint && <span id="tree-use-hint" className="tree-detail__hint">{hint}</span>}
+              </div>
+            ))}
           </div>
         </div>
       </section>
