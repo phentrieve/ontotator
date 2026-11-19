@@ -413,3 +413,48 @@ describe("account status, projects at creation, history and erasure", () => {
     expect(auditActor("odd")).toBe("odd");
   });
 });
+
+describe("users table with many accounts", () => {
+  const manyUsers = (count: number) => Array.from({ length: count }, (_, index): AdminUser =>
+    ({ ...alex, id: 100 + index, username: `person-${String(index).padStart(3, "0")}`, display_name: `Person ${index}` }));
+  // CSS queries: role queries over a large table are slow in jsdom.
+  const bodyRows = () => document.querySelectorAll("table tbody tr.users-row");
+  const button = (text: string) => [...document.querySelectorAll("button")].find(item => item.textContent === text);
+
+  it("shows the first 100 accounts until Show all, so New user opens at once with many accounts", async () => {
+    vi.mocked(api.adminListUsers).mockResolvedValue([root, ...manyUsers(249)]);
+    render(<UsersPage currentUser={currentUser} />);
+    await screen.findByText("Person 98");
+    expect(bodyRows()).toHaveLength(100);
+    expect(document.querySelector(".users-more")?.textContent).toBe("The first 100 of 250 users are shown. Type into Filter users to find someone.Show all 250");
+    expect(screen.queryByText("Person 99")).toBeNull();
+    // Filtering searches all accounts, not only the shown ones.
+    fireEvent.change(document.querySelector("#users-filter")!, { target: { value: "person" } });
+    expect(bodyRows()).toHaveLength(100);
+    expect(document.querySelector(".users-more")?.textContent).toContain("The first 100 of 249 users are shown.");
+    fireEvent.change(document.querySelector("#users-filter")!, { target: { value: "person-24" } });
+    expect([...bodyRows()].map(row => row.firstElementChild?.textContent)).toEqual(Array.from({ length: 9 }, (_, index) => `person-24${index}`));
+    expect(document.querySelector(".users-more")).toBeNull();
+    fireEvent.change(document.querySelector("#users-filter")!, { target: { value: "" } });
+    // The page is blocked while New user is open, the button too.
+    fireEvent.click(button("New user…")!);
+    expect(button("Show all 250")?.disabled).toBe(true);
+    fireEvent.click(button("Cancel")!);
+    fireEvent.click(button("Show all 250")!);
+    expect(bodyRows()).toHaveLength(250);
+    expect(document.querySelector(".users-more")).toBeNull();
+  });
+
+  it("keeps an account created on the page in view beyond the first 100", async () => {
+    vi.mocked(api.adminListUsers).mockResolvedValue([root, ...manyUsers(149)]);
+    render(<UsersPage currentUser={currentUser} />);
+    await screen.findByText("Person 98");
+    await fillCreate();
+    fireEvent.click(button("Create user")!);
+    const dialog = await screen.findByRole("dialog", { name: "Setup code for bea" });
+    fireEvent.click(within(dialog).getByLabelText("I have handed over or stored the code"));
+    fireEvent.click(within(dialog.querySelector(".modal-actions") as HTMLElement).getByRole("button", { name: "Close" }));
+    expect([...bodyRows()].map(row => row.firstElementChild?.textContent).slice(-2)).toEqual(["person-098", "bea"]);
+    expect(document.querySelector(".users-more")?.textContent).toContain("of 151 users");
+  });
+});
