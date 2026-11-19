@@ -66,6 +66,7 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
     profile.write_text('{"schema": "ontotator-task-profile/v1"}')
     return {
         "whoami": {},
+        "list_my_tasks": {},
         "list_projects": {},
         "list_ontologies": {},
         "list_ontology_files": {},
@@ -229,6 +230,7 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "submission_id": "s1",
             "include_text": True,
         },
+        "get_consolidation_inputs": {"assignment_id": 4, "include_text": True},
         "withdraw_guideline": {"project": "p", "version": 2},
         "start_new_round": {
             "project": "p",
@@ -421,6 +423,17 @@ def _flows(fake: FakeApi) -> None:
                 workflow_revision=1,
             )
         ],
+    )
+    # get_consolidation_inputs: a consolidation task with one round.
+    fake.on(
+        "GET",
+        "/api/v1/assignments/{assignment_id}",
+        build("AssignmentView", id=4, task="review", document_id="c-en-v1"),
+    )
+    fake.on(
+        "GET",
+        "/api/v1/assignments/{assignment_id}/rounds",
+        [build("WorkRoundView", round_id="r1", kind="consolidation")],
     )
     fake.on(
         "GET",
