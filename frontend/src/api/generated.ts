@@ -6828,6 +6828,35 @@ export interface components {
             notes?: string[];
         };
         /**
+         * EditorialCarryPerson
+         * @description Issue 465: one person's started or submitted annotation on the
+         *     corrected version and whether the typo fix moves it to the new version
+         *     by itself (``carried``). ``reason`` says why not: ``number_changed``,
+         *     ``final_result``, ``consolidation``, ``translation_not_accepted``,
+         *     ``from_proposals``, ``task_paused``,
+         *     ``findings_need_check``, ``not_submitted`` (started, not submitted) or
+         *     ``not_carryable``; such work keeps the manual flow.
+         */
+        EditorialCarryPerson: {
+            /** Username */
+            username: string;
+            /** Display Name */
+            display_name: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "submitted" | "started";
+            /** Carried */
+            carried: boolean;
+            /** Reason */
+            reason: ("number_changed" | "final_result" | "consolidation" | "translation_not_accepted" | "from_proposals" | "task_paused" | "findings_need_check" | "not_submitted" | "not_carryable") | null;
+            /** Findings */
+            findings: number;
+            /** Needs Check */
+            needs_check: number;
+        };
+        /**
          * EditorialChange
          * @description A changed passage, in Unicode code points of the old and the new text.
          */
@@ -6897,6 +6926,8 @@ export interface components {
             diff: components["schemas"]["EditorialChange"][] | null;
             findings: components["schemas"]["EditorialFindings"] | null;
             proposals: components["schemas"]["EditorialProposals"] | null;
+            /** Annotation Carry */
+            annotation_carry?: components["schemas"]["EditorialCarryPerson"][] | null;
         };
         /**
          * EditorialCorrectionPreviewRequest
@@ -6947,6 +6978,13 @@ export interface components {
             deleted_characters: number;
             /** Tasks Following */
             tasks_following: number;
+            /**
+             * Annotations Carried
+             * @default 0
+             */
+            annotations_carried: number;
+            /** Annotation Carry */
+            annotation_carry?: components["schemas"]["EditorialCarryPerson"][];
         };
         /** EditorialFindings */
         EditorialFindings: {
@@ -10487,6 +10525,8 @@ export interface components {
          *     afterwards; null when the submission is no longer among the row's).
          *     ``text_paused`` and ``text_released`` (issue 464) are a lead's pause and
          *     release of the text, with ``by`` and the ``reason`` given.
+         *     ``carried_by_typo_fix`` (issue 465): the submitted annotation of
+         *     ``to_person`` moved to the typo fix's new version by itself.
          *     ``correction_requested`` is "Ask a reviewer to correct…" and
          *     ``correction_reason_added`` an addition to its reason (issue 483), the
          *     task and its person as for ``reopened``, the text in ``reason``.
@@ -10496,7 +10536,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "reassigned" | "mode_changed" | "mode_restored" | "final_withdrawn" | "reopened" | "reopen_undone" | "round_started" | "final_chosen" | "final_changed" | "final_restored" | "text_paused" | "text_released" | "correction_requested" | "correction_reason_added";
+            kind: "reassigned" | "mode_changed" | "mode_restored" | "final_withdrawn" | "reopened" | "reopen_undone" | "round_started" | "final_chosen" | "final_changed" | "final_restored" | "text_paused" | "text_released" | "carried_by_typo_fix" | "correction_requested" | "correction_reason_added";
             /**
              * At
              * Format: date-time
@@ -10519,6 +10559,10 @@ export interface components {
             to_result?: components["schemas"]["RowResultRefView"] | null;
             /** Reason */
             reason?: string | null;
+            /** From Version */
+            from_version?: number | null;
+            /** To Version */
+            to_version?: number | null;
         };
         /** RowItemView */
         RowItemView: {

@@ -11,7 +11,8 @@ export type LeadScenarioName =
   | "REJECTED_TRANSLATION_FOR_LEAD"
   | "QUERIED_TRANSLATION_FOR_LEAD"
   | "ACCEPTED_TRANSLATION_FOR_LEAD"
-  | "UPLOAD_DIALOG";
+  | "UPLOAD_DIALOG"
+  | "TYPO_FIX_CARRY";
 
 /** The people of every lead workflow scenario. */
 export type LeadPerson = "lead" | "ana" | "ben" | "annotator";
@@ -58,6 +59,8 @@ export interface LeadScenario {
   >;
   report_id?: string;
   report_reason?: string;
+  /** TYPO_FIX_CARRY: the version-1 document id per language (issue 465). */
+  documents?: { de?: string };
 }
 
 /**

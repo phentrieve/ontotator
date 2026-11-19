@@ -63,6 +63,7 @@ APPEND_ONLY_TABLES = (
     "translation_query_decisions",
     "translation_correction_reason_additions",
     "text_change_resolutions",
+    "typo_fix_carries",
     "draft_snapshots",
     "guideline_versions",
     "guideline_withdrawals",

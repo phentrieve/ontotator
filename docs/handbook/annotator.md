@@ -324,6 +324,10 @@ If the finding no longer fits, click **Dismiss with reason**, fill in **Reason f
 
 To see which passages the correction changed, tick **Show changes since** v1 above the text ([See what changed since the earlier version](#see-what-changed-since-the-earlier-version)).
 
+### After a typo fix by the lead
+
+When the lead fixes only spacing or a typo in a text you already submitted (**Fix typos…**), your annotation can move to the new version by itself: when every one of your findings is placed on the new text without doubt and no number in the text changed. You do nothing. In **My tasks** the text then shows its new version, for example *case-0465 de v2 corrected*, as **Submitted**; the task on the old version is gone. **View** shows the corrected text with your findings, placed on it. It is still your annotation: nothing was added or removed. If a finding marked words the lead changed, or a number changed, your annotation stays on the old version and the lead moves it the usual way; you then check the carried findings ([Review carried findings](#review-carried-findings)).
+
 ## Submit the text
 
 What for: hand your finished work to the lead.

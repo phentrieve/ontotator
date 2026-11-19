@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api, ApiError, type EditorialCorrectionPreview, type EditorialCorrectionResult, type VariantText } from "../../src/api/client";
-import { editorialConsequences, EditorialCorrectionDialog, editorialRefusal, numberNotice, PREVIEW_DELAY_MS, reasonText } from "../../src/documents/EditorialCorrectionDialog";
+import { CARRY_REASONS, editorialConsequences, EditorialCorrectionDialog, editorialRefusal, numberNotice, PREVIEW_DELAY_MS, reasonText } from "../../src/documents/EditorialCorrectionDialog";
 import { planRow, stepOf, version } from "./fixtures";
 
 const v2 = version({ document_id: "case-0101-de-v2", version: 2, chain_name: "DeepL", origin: "correction", derived_from: "case-0101-de", translation_status: "accepted" });
@@ -207,4 +207,55 @@ it("has words for every refusal reason", () => {
     expect(editorialRefusal(reason, "v2"), reason).toBeTruthy();
   }
   expect(editorialRefusal("something_else", "v2")).toBeNull();
+});
+
+/** Issue 465: one person's work in the preview's per-person list. */
+const person = (display_name: string, carried: boolean, reason: string | null = null, status: "submitted" | "started" = "submitted") => ({
+  username: display_name.toLowerCase().replace(" ", "."), display_name, status, carried, reason, findings: 1, needs_check: reason === "findings_need_check" ? 1 : 0,
+}) as NonNullable<EditorialCorrectionPreview["annotation_carry"]>[number];
+
+it("consequences: says per person whose submitted annotation moves by itself and whose not, and why", () => {
+  // Both move: nothing stays, so the line is quiet.
+  expect(editorialConsequences(checkedPreview(NEW, {
+    annotations: { submitted: 2, open: 0 }, annotation_carry: [person("Ana Weber", true), person("Tom Reis", true)],
+  }))).toEqual({ attention: false, lines: ["Move to v3 by themselves, nobody submits again: the annotations of Ana Weber and Tom Reis."] });
+  // One moves; one stays because a finding needs a check, one because the text has a final result; a started task stays.
+  const mixed = editorialConsequences(checkedPreview(NEW, {
+    annotations: { submitted: 3, open: 1 },
+    annotation_carry: [person("Ana Weber", true), person("Eva Roth", false, "not_submitted", "started"), person("Luc Bauer", false, "findings_need_check"), person("Tom Reis", false, "findings_need_check")],
+  }));
+  expect(mixed.attention).toBe(true);
+  expect(mixed.lines).toEqual([
+    "Moves to v3 by itself, nobody submits again: the annotation of Ana Weber.",
+    "Not moved by themselves, a finding marks words you changed: Luc Bauer and Tom Reis.",
+    "3 annotations stay on v2. After saving, use Handle text change… and Carry to v3… on this row to move them.",
+  ]);
+  // A changed number keeps every annotation on the version.
+  expect(editorialConsequences(checkedPreview(NEW, {
+    annotations: { submitted: 1, open: 0 }, annotation_carry: [person("Tom Reis", false, "number_changed")],
+  })).lines).toEqual([
+    "Not moved by itself, the fix changes a number: Tom Reis.",
+    "1 annotation stays on v2. After saving, use Carry to v3… on this row to move it.",
+  ]);
+});
+
+it("has words for every reason an annotation does not move by itself", () => {
+  for (const reason of ["number_changed", "final_result", "consolidation", "translation_not_accepted", "from_proposals", "task_paused", "findings_need_check", "not_carryable"]) {
+    expect(CARRY_REASONS[reason], reason).toBeTruthy();
+  }
+});
+
+it("shows in the dialog who moves by itself, and says so after saving", async () => {
+  const carry = [person("Ana Weber", true), person("Tom Reis", false, "number_changed")];
+  vi.mocked(api.previewEditorialCorrection).mockImplementation(async (_key, _id, text) => (text === undefined ? preview({ annotations: { submitted: 2, open: 0 } })
+    : checkedPreview(text, { annotations: { submitted: 2, open: 0 }, annotation_carry: carry })));
+  vi.mocked(api.editorialCorrection).mockResolvedValue({ document_id: "case-0101-de~de~v3", version: 3, annotations_carried: 1 } as EditorialCorrectionResult);
+  const { props, dialog, editor } = await renderDialog();
+  await type(editor, NEW);
+  expect(await within(dialog).findByText(/Moves to v3 by itself, nobody submits again: the annotation of Ana Weber\./)).toBeTruthy();
+  expect(within(dialog).getByText(/Not moved by itself, the fix changes a number: Tom Reis\./)).toBeTruthy();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Spacing" }));
+  fireEvent.click(within(dialog).getByRole("button", { name: "Save as v3" }));
+  await waitFor(() => expect(props.onCorrected).toHaveBeenCalled());
+  expect(props.onCorrected.mock.calls[0][0]).toMatch(/1 annotation moved to v3\.$/);
 });

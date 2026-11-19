@@ -148,6 +148,14 @@ describe("reassignments and mode changes", () => {
     expect(historyLines(paused, [], { now, changes: changes.slice(0, 1) }).map(line => line.text)).toEqual(["Text: paused by you, 30 Oct, 09:00: Source is checked"]);
     expect(historyLines(paused, null, { now }).map(line => [line.stage, line.text])).toEqual([["text", "Text: paused by you, 30 Oct, 09:00: Source is checked"]]);
   });
+  it("names an annotation that moved to a typo fix by itself (issue 465)", () => {
+    const lines = historyLines(emptyRow, [], { now, changes: [
+      { kind: "carried_by_typo_fix", at: "2026-10-30T09:00:00", task: "annotate", assignment_id: 9, by: null, to_person: ben, from_version: 1, to_version: 2 },
+    ] });
+    expect(lines.map(line => [line.stage, line.text])).toEqual([
+      ["annotation", "Annotation: annotation of Ben Roth (ann-2) moved to v2 by itself after the typo fix, 30 Oct, 09:00"],
+    ]);
+  });
   it("names who reopened a task or started a round, when and why", () => {
     const lead = { pseudonym: "lead-1", display_name: "Carla Diaz", is_me: true };
     const lines = historyLines(emptyRow, [], { now, changes: [

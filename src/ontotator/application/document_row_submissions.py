@@ -464,8 +464,9 @@ def _row_changes(
 
     Tasks and rounds come from the audit trail (``assignment.reopen``,
     ``assignment.reopen_undone``, ``round.create``: the reason is stored
-    only there; a correction request and each addition to its reason,
-    issue 483), the final result from its event log. ``ordinals`` numbers
+    only there; ``text_change.typo_fix_carry``: a submitted annotation that
+    moved to a typo fix by itself, issue 465; a correction request and each
+    addition to its reason, issue 483), the final result from its event log. ``ordinals`` numbers
     the row's rounds; ``results`` names a submission as a final result.
     """
     reassigned = conn.execute(
@@ -539,6 +540,7 @@ def _row_changes(
                     "assignment.reopen",
                     "assignment.reopen_undone",
                     "round.create",
+                    "text_change.typo_fix_carry",
                     "translation.correction_requested",
                     "translation.correction_reason_added",
                 ]
@@ -650,6 +652,13 @@ def _row_changes(
             }
         elif row.action == "assignment.reopen":
             change |= {"kind": "reopened", "reason": details.get("reason")}
+        elif row.action == "text_change.typo_fix_carry":
+            # Issue 465: the annotation moved to a typo fix by itself.
+            change |= {
+                "kind": "carried_by_typo_fix",
+                "from_version": details.get("from_version"),
+                "to_version": details.get("to_version"),
+            }
         elif row.action == "translation.correction_requested":
             # "Ask a reviewer to correct…", and each addition to its reason
             # (issue 483): the reason is stored only in the audit trail.

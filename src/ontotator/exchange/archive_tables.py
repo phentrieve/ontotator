@@ -115,6 +115,8 @@ ARCHIVED: tuple[ArchivedTable, ...] = (
     ArchivedTable("discarded_submissions"),
     ArchivedTable("documents_visits"),
     ArchivedTable("text_change_resolutions"),
+    # Submissions a typo fix carried to its new version (issue 465).
+    ArchivedTable("typo_fix_carries"),
     ArchivedTable("draft_snapshots"),
     ArchivedTable("work_plans"),
     ArchivedTable("work_plan_rows"),

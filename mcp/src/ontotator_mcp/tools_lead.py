@@ -963,8 +963,11 @@ def register_lead(
         opened move to the new version), the annotation work, open
         consolidations and a final result that stay on the current version
         (handle them with the text-change tools), findings of submitted
-        annotations and tool proposals that are carried or need a check, and
-        the text_sha256 of the current version; confirm sends that hash back
+        annotations and tool proposals that are carried or need a check,
+        annotation_carry (per person with started or submitted work: whether
+        the submitted annotation moves to the new version by itself, which
+        it does when every finding is placed and no number changes, and the
+        reason when not), and the text_sha256 of the current version; confirm sends that hash back
         as expected_text_sha256 and is refused if the text changed since.
         Only the token's owner as lead of the project can do this; a source
         text is not corrected here.

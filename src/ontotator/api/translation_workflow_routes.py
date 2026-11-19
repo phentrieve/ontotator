@@ -228,6 +228,39 @@ class EditorialProposals(BaseModel):
     needs_check: int
 
 
+class EditorialCarryPerson(BaseModel):
+    """Issue 465: one person's started or submitted annotation on the
+    corrected version and whether the typo fix moves it to the new version
+    by itself (``carried``). ``reason`` says why not: ``number_changed``,
+    ``final_result``, ``consolidation``, ``translation_not_accepted``,
+    ``from_proposals``, ``task_paused``,
+    ``findings_need_check``, ``not_submitted`` (started, not submitted) or
+    ``not_carryable``; such work keeps the manual flow."""
+
+    username: str
+    display_name: str
+    status: Literal["submitted", "started"]
+    carried: bool
+    reason: (
+        Literal[
+            "number_changed",
+            "final_result",
+            "consolidation",
+            "translation_not_accepted",
+            "from_proposals",
+            "task_paused",
+            "findings_need_check",
+            "not_submitted",
+            "not_carryable",
+        ]
+        | None
+    )
+    # Findings of the submission (editable layers) and how many of them
+    # cannot be placed on the new text.
+    findings: int
+    needs_check: int
+
+
 class EditorialCorrectionPreview(BaseModel):
     """What an editorial correction of this version would do (read only)."""
 
@@ -263,6 +296,9 @@ class EditorialCorrectionPreview(BaseModel):
     diff: list[EditorialChange] | None
     findings: EditorialFindings | None
     proposals: EditorialProposals | None
+    # With a text or replacements: per person, whether the annotation moves
+    # to the new version by itself (issue 465).
+    annotation_carry: list[EditorialCarryPerson] | None = None
 
 
 class EditorialCorrectionResult(BaseModel):
@@ -277,6 +313,10 @@ class EditorialCorrectionResult(BaseModel):
     inserted_characters: int
     deleted_characters: int
     tasks_following: int
+    # Issue 465: submitted annotations the fix moved to the new version, and
+    # per person what happened to their work.
+    annotations_carried: int = 0
+    annotation_carry: list[EditorialCarryPerson] = Field(default_factory=list)
 
 
 class QueriedReviewView(BaseModel):

@@ -1195,6 +1195,8 @@ class TextChangeService:
         # Never set by the automatic carry (plan D2): it falls back to the
         # lead's manual carry, which asks.
         confirm_unreviewed_translation: bool = False,
+        # The carry after a typo fix (issue 465): every input completed.
+        complete: bool = False,
     ) -> CarryResult:
         pid = int(project_row["id"])
         assignments = AssignmentService(self.db, now=lambda: now)
@@ -1243,9 +1245,12 @@ class TextChangeService:
             )
             existing = None
         if existing is None:
-            AssignmentService._require_annotation_slot(
-                conn, project_row, target.document_id
-            )
+            if not complete:
+                # The carry after a typo fix moves an annotation that had
+                # its slot on the old version, as a task that follows does.
+                AssignmentService._require_annotation_slot(
+                    conn, project_row, target.document_id
+                )
             eligibility = assignments.check_assignable(
                 conn,
                 project_row,
@@ -1282,6 +1287,7 @@ class TextChangeService:
             expected_workflow_revision=int(locked["workflow_revision"]),
             lead=True,
             owner=owner,
+            complete_carried=complete,
         )
         carried = len(self.repo.get_round_input_inventory(key, round_view.round_id))
         workspace = round_view.workspace_key

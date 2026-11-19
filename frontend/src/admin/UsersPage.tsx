@@ -84,6 +84,7 @@ const auditActions: Readonly<Record<string, string>> = {
   "text_change.carry": "Text change carried over",
   "text_change.move": "Text change moved",
   "text_change.resolve": "Text change resolved",
+  "text_change.typo_fix_carry": "Annotation moved to a typo fix automatically",
   "translation.accept_external_review": "External translation review accepted",
   "translation.correction_reason_added": "Added to the reason of a translation correction",
   "translation.correction_requested": "Translation correction requested",
