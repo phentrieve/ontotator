@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-5D86T1H7.js";import{n as a,t as o}from"./lib-DFS3PI5I.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-BewpU9cf.js";import{n as a,t as o}from"./lib-DkBW2HBT.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -1509,7 +1509,7 @@ Repeat steps 5 and 6 for every finding in the text.
 In a task *Annotation, from proposals*, the column **Review Proposals** lists findings a tool suggested. Tools make mistakes, especially with negations: a tool may propose "Keine Krampfanfälle" (no seizures) as **Present**.
 
 1. Select the first proposal. The text shows where it was found, and the line *Source* names the tool that made it.
-2. Check three things: the marked text, the term and every value.
+2. Check three things: the marked text, the term and every value. To see broader and narrower terms of the proposed term, click **Show in tree**; the tree only shows terms until you confirm one.
 3. Click **Confirm** if all three are right, **Reject** if the proposal is wrong, or **Edit & Replace** to correct it in a copy, listed under the proposal, then click **Done, back to the proposal**. Changing a value or the text span in the copy replaces the proposal; confirming a default alone does not. Changed your mind? Click **Discard copy**: the copy is removed and the proposal is open again. A changed copy asks first. Only if you really cannot decide, click **Unresolved** and write a **Reviewer note** saying why.
 4. The next open proposal is selected. Go on until every proposal is decided.
 5. Then read the whole text for findings the tool missed. Mark text that has no proposal and add the finding as in step 5. It appears under **Your own findings**, next to the proposals.
