@@ -454,7 +454,8 @@ test.describe("half-width editor", () => {
     await selectText(page, 18, 25);
     await page.getByLabel("Search term", { exact: true }).fill("seizure");
     await page.locator(".candidate-card").filter({ hasText: "HP:0001250" }).first().click();
-    await expect(page.getByRole("button", { name: "Show in tree" })).toBeVisible();
+    // Exact: while the search is still open, its hit has "Show in tree: Seizure" (issue 523). Wait for the finding's button.
+    await expect(page.getByRole("button", { name: "Show in tree", exact: true })).toBeVisible();
   }
 
   test("960 × 1000: tree open and closed, guidelines drawer open and closed", async ({ page }) => {
