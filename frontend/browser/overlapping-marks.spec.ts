@@ -170,6 +170,10 @@ for (const scheme of ["light", "dark"] as const) {
         const [periorbitalFill] = await colours(periorbital);
         const [facialFill] = await colours(facial);
         expect(periorbitalFill).not.toBe(facialFill);
+        // The fills are the tokens of this scheme (frontend/src/styles/tokens.css, slots 2 and 3).
+        expect([periorbitalFill, facialFill]).toEqual(scheme === "dark"
+          ? ["rgb(110, 47, 18)", "rgb(44, 71, 143)"]
+          : ["rgb(249, 203, 168)", "rgb(202, 214, 253)"]);
         // "oedema": Facial oedema's band above Periorbital oedema's band.
         expect(await colours(oedema)).toEqual([facialFill, periorbitalFill]);
         // Bands never move the text: the banded piece starts on the line of its neighbour (only the 3 px line of
