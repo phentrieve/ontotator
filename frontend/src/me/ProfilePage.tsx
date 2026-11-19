@@ -1,5 +1,6 @@
 import { SearchPreferencesSection } from "./SearchPreferencesSection";
 import { TokensSection } from "./TokensSection";
+import { ThemeSetting } from "./ThemeSetting";
 import { TechnicalReportsSection } from "./TechnicalReportsSection";
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { api, type OwnProfilePatch, type Profile } from "../api/client";
@@ -197,6 +198,10 @@ export function ProfilePage({ backToTask, backToDocuments, section, onSaved, rou
         {saved && <InlineMessage tone="success">Saved.</InlineMessage>}
         <Button type="submit" variant="primary" disabled={!!busy} loading={busy === "profile"}>Save</Button>
       </form>
+    </section>
+    <section className="detail-section">
+      <h2>Appearance</h2>
+      <ThemeSetting />
     </section>
     <SearchPreferencesSection pseudonym={model.baseline.pseudonym} onDirty={setSearchDirty} />
     <PracticeSection onNavigate={onNavigate} />
