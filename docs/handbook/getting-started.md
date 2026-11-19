@@ -63,7 +63,7 @@ The header is the same on every page:
 - **Handbook** in the header opens this handbook inside the app. On the Documents, consolidation and translation review screens, **Help** opens the handbook section about that screen; in the editor it is **More** > **Help for this screen**. On the project forms, a link next to the task profile opens the section that explains it. In the text card, **How to use it** next to *Newer set available* opens the section on new tool proposals. Click a screenshot in the handbook to open it at full size in a new tab.
 - Below the chapter list, the handbook shows the app's version and commit, for example `Ontotator 0.3.0 · commit cc65cea`. Quote it when you report a problem.
 
-The sidebar lists **My tasks**, **Projects**, **Profile** and **Technical problem…** (see [Report a technical problem](#report-a-technical-problem)). The number after **My tasks** counts your open tasks, the same tasks as the **To do** tab; it updates as soon as you submit a text. Clicking **My tasks** or **Projects** loads your projects and the count again, so a project you were just added to shows up without reloading the page. Leads also see their project's pages (**Documents**, **Progress**, **Settings**, **Export**). System administrators also see **Administration** with **Users**, **Ontologies**, **Technical reports**, **New project** and **Server settings** (see [Administration](admin.md)). In the editor, the sidebar folds into **Sections**; click it to open it.
+The sidebar lists **My tasks**, **Projects**, **Profile** and **Technical problem…** (see [Report a technical problem](#report-a-technical-problem)). The number after **My tasks** counts your open tasks, the same tasks as the **To do** tab; it updates as soon as you submit a text. Clicking **My tasks** or **Projects** loads your projects and the count again, so a project you were just added to shows up without reloading the page. Leads also see their project's pages (**Documents**, **Progress**, **Settings**, **Export**); the list **Translation reviews** opens from **Progress**. System administrators also see **Administration** with **Users**, **Ontologies**, **Technical reports**, **New project** and **Server settings** (see [Administration](admin.md)). In the editor, the sidebar folds into **Sections**; click it to open it.
 
 ## Report a technical problem
 
@@ -198,6 +198,18 @@ What for: keep your name, languages and qualification up to date.
 Your **Username** and **Pseudonym** cannot be changed. Exports show your pseudonym, not your name, unless you tick the box in step 3.
 
 Fill in **Qualification** if you do translation reviews: you cannot submit a translation review without it.
+
+## Choose a light or dark theme
+
+What for: read comfortably, for example in a dim room.
+
+1. Click **Profile** in the sidebar.
+2. Go to **Appearance**.
+3. Under **Theme**, choose **System**, **Light** or **Dark**. The page changes at once; there is nothing to save.
+
+**System** follows the light or dark setting of your device and changes with it. **Light** and **Dark** stay as chosen.
+
+The choice is kept in this browser, for everyone who uses it, and also applies to the login page. On another computer or in another browser, choose again. The images in this handbook show the light theme.
 
 ## Practice in your profile
 

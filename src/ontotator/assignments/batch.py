@@ -53,6 +53,7 @@ from ontotator.domain.batch_layout import TooFewPeople, layout
 from ontotator.domain.errors import DomainError
 from ontotator.domain.next_steps import REVIEWER_NEEDED_STATUSES
 from ontotator.domain.work_plans import RowKey
+from ontotator.settings import max_annotations_per_text
 from ontotator.storage import work_plan_store
 from ontotator.storage.database import Database
 from ontotator.storage.proposal_queries import newest_proposal_counts
@@ -724,6 +725,7 @@ class BatchAssignmentService:
             "people": self._people(conn, pid, task, spec, flat, holders),
             "per_text": per_text,
             "project_per_text": facts.annotations_per_text,
+            "max_per_text": max_annotations_per_text(),
             "digest": digest,
             "needs_people": needs_people,
         }

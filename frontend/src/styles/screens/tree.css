@@ -161,6 +161,71 @@
   flex-direction: column;
 }
 
+/* The name with the "Hide details" / "Show details" switch at its end. The switch is as high as
+   the line, so the name sits where it does without it. */
+.tree-detail__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.tree-detail__head .tree-detail__name {
+  flex: 1;
+  min-width: 0;
+}
+
+.tree-detail__head .tree-detail__toggle {
+  flex-shrink: 0;
+  margin-block: -4px;
+  margin-inline-end: -6px;
+  white-space: nowrap;
+}
+
+/* "Hide details": name, id and switch on one line (they wrap when the name is long), then the
+   actions; the tree takes the rest. In a very low pane the line gives way too, so the rows of
+   the tree never lose all their room to it. */
+.tree-detail.tree-detail--compact {
+  flex: 0 1 auto;
+}
+
+.tree-detail--compact .tree-detail__body {
+  flex: 0 1 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  /* Not the 60 px the open details keep up to 1024 px, nor their fixed 60 px on a phone (end of this file). */
+  min-height: 0;
+  height: auto;
+  padding-block: 8px;
+}
+
+.tree-detail--compact .tree-detail__head {
+  display: contents;
+}
+
+.tree-detail--compact .tree-detail__head .tree-detail__name {
+  flex: 0 1 auto;
+}
+
+.tree-detail--compact .tree-detail__ids {
+  margin-bottom: 0;
+}
+
+.tree-detail--compact .tree-detail__toggle {
+  order: 1;
+  margin-inline-start: auto;
+}
+
+.tree-detail__body {
+  flex: none;
+  padding-bottom: 0;
+}
+
+.tree-detail__toggle {
+  margin-inline-start: auto;
+}
+
 .tree-detail__body {
   flex: 1;
   min-height: 0;

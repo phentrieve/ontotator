@@ -1,12 +1,14 @@
-"""More than five annotators on one text (issue 447).
+"""Many annotators on one text (issues 447 and 457).
 
-"Annotations per text" goes up to 20, as the project setting and as a text's
-own value. One text takes 6 and 20 annotators; the next one is refused, as is
-a setting of 21. What reads every annotator of a text holds at 20: the
+"Annotations per text" has no built-in maximum (it was 5, then 20), as the
+project setting and as a text's own value; a server may set one
+(``ONTOTATOR_MAX_ANNOTATIONS_PER_TEXT``), and a value above it is refused
+with the maximum named. One text takes 6, 20 and 30 annotators; the next one
+is refused. What reads every annotator of a text holds at 20 and at 30: the
 Documents row and the final panel's agreement, the consolidation round (one
 person per source, lanes 1 to 4, letters past E while names are hidden), the
-project agreement (every pair of two people: 190 for 20) and the final
-export's agreement.csv.
+project agreement (every pair of two people: 190 for 20, 435 for 30) and the
+final export's agreement.csv.
 """
 
 from __future__ import annotations
@@ -29,12 +31,15 @@ from work_plan_support import BASE, _user, doc, plan_env, select_final
 
 from ontotator.application.consolidation_blinding import letters
 from ontotator.domain.annotation_limits import (
-    MAX_ANNOTATIONS_PER_TEXT,
-    MAX_CONSOLIDATION_SOURCES,
+    ANNOTATIONS_PER_TEXT_CEILING,
+    consolidation_source_limit,
 )
 from ontotator.storage.tables import ProjectRow
 
-LIMIT = MAX_ANNOTATIONS_PER_TEXT
+# The built-in maximum until issue 457; BEYOND is past it.
+LIMIT = 20
+BEYOND = 30
+CAP_ENV = "ONTOTATOR_MAX_ANNOTATIONS_PER_TEXT"
 SETTINGS = f"{BASE}/settings"
 
 
@@ -133,39 +138,117 @@ def _statements(env: Any, call: Any) -> int:
     return seen
 
 
-def test_the_setting_takes_20_and_refuses_21(tmp_path):
+def _above(response: Any, maximum: int, value: int) -> None:
+    assert response.status_code == 422, response.text
+    assert response.json() == {
+        "code": "ANNOTATIONS_PER_TEXT_ABOVE_MAXIMUM",
+        "details": {"maximum": maximum, "value": value, "setting": CAP_ENV},
+    }
+
+
+def test_the_setting_has_no_built_in_maximum(tmp_path):
     env = plan_env(tmp_path)
-    for value in (6, LIMIT):
+    assert env.lead.get(SETTINGS).json()["annotations_per_text_max"] is None
+    for value in (6, LIMIT, LIMIT + 1, BEYOND, 5000):
         response = _set(env, value)
         assert response.status_code == 200, response.text
         assert response.json()["annotations_per_text"] == value
-    for value in (0, LIMIT + 1):
+    # The minimum stays; beyond the column's type is no value.
+    for value in (0, ANNOTATIONS_PER_TEXT_CEILING + 1):
         assert _set(env, value).status_code == 422
-    assert env.lead.get(SETTINGS).json()["annotations_per_text"] == LIMIT
+    assert env.lead.get(SETTINGS).json()["annotations_per_text"] == 5000
     preview = f"{BASE}/work-plans/annotation-target-preview"
-    assert env.lead.get(preview, params={"annotations_per_text": LIMIT}).is_success
-    refused = env.lead.get(preview, params={"annotations_per_text": LIMIT + 1})
-    assert refused.status_code == 422
+    assert env.lead.get(preview, params={"annotations_per_text": BEYOND}).is_success
+    assert env.lead.get(preview, params={"annotations_per_text": 0}).status_code == 422
 
 
-def test_a_texts_own_value_takes_20_and_refuses_21(tmp_path):
+def test_a_texts_own_value_has_no_built_in_maximum(tmp_path):
     env = plan_env(tmp_path)
     one = f"{BASE}/texts/c1/en/annotations-per-text"
     several = f"{BASE}/texts/annotations-per-text"
     texts = [{"case_id": "c2", "language": "en"}]
-    for value in (6, LIMIT):
+    for value in (6, LIMIT, LIMIT + 1, BEYOND):
         assert env.lead.put(one, json={"value": value}).json()["effective"] == value
         body = env.lead.put(several, json={"texts": texts, "value": value}).json()
         assert [t["effective"] for t in body["texts"]] == [value]
-    assert env.lead.put(one, json={"value": LIMIT + 1}).status_code == 422
-    over = env.lead.put(several, json={"texts": texts, "value": LIMIT + 1})
+    assert env.lead.put(one, json={"value": 0}).status_code == 422
+    over = env.lead.put(
+        several, json={"texts": texts, "value": ANNOTATIONS_PER_TEXT_CEILING + 1}
+    )
     assert over.status_code == 422
     row = _row(env)
-    assert row["annotations_per_text"]["override"] == LIMIT
-    assert row["stages"]["annotation"]["detail"]["target"] == LIMIT
+    assert row["annotations_per_text"]["override"] == BEYOND
+    assert row["stages"]["annotation"]["detail"]["target"] == BEYOND
 
 
-@pytest.mark.parametrize("count", [6, LIMIT])
+def test_the_server_maximum_refuses_a_larger_setting_and_names_itself(
+    tmp_path, monkeypatch
+):
+    env = plan_env(tmp_path)
+    assert _set(env, 12).status_code == 200  # stored before the maximum is set
+    monkeypatch.setenv(CAP_ENV, "8")
+    settings = env.lead.get(SETTINGS).json()
+    assert settings["annotations_per_text_max"] == 8
+    assert settings["annotations_per_text"] == 12
+    # A larger value is refused and names the maximum; nothing is written.
+    _above(_set(env, 9), 8, 9)
+    _above(_set(env, 13), 8, 13)
+    assert env.lead.get(SETTINGS).json()["annotations_per_text"] == 12
+    # The stored value sent again (the settings form sends every field) is
+    # no change, so other settings can still be saved.
+    kept = env.lead.patch(
+        SETTINGS, json={"annotations_per_text": 12, "import_plan": "nothing"}
+    )
+    assert kept.status_code == 200, kept.text
+    assert kept.json()["annotations_per_text"] == 12
+    assert kept.json()["import_plan"] == "nothing"
+    # At the maximum and below it is fine; from there 12 is refused too.
+    for value in (8, 3):
+        assert _set(env, value).status_code == 200
+    _above(_set(env, 12), 8, 12)
+    # Unset again: no limit.
+    monkeypatch.delenv(CAP_ENV)
+    assert _set(env, BEYOND).status_code == 200
+
+
+def test_the_server_maximum_refuses_a_larger_value_of_a_text(tmp_path, monkeypatch):
+    env = plan_env(tmp_path)
+    one = f"{BASE}/texts/c1/en/annotations-per-text"
+    several = f"{BASE}/texts/annotations-per-text"
+    texts = [
+        {"case_id": "c1", "language": "en"},
+        {"case_id": "c2", "language": "en"},
+    ]
+    assert env.lead.put(one, json={"value": 12}).status_code == 200
+    monkeypatch.setenv(CAP_ENV, "8")
+    _above(env.lead.put(one, json={"value": 9}), 8, 9)
+    # Several texts: one refusal, and no text is changed.
+    _above(env.lead.put(several, json={"texts": texts, "value": 9}), 8, 9)
+    assert _row(env)["annotations_per_text"]["override"] == 12
+    assert _row(env, "c2")["annotations_per_text"]["override"] is None
+    # The same value again changes nothing and is not refused.
+    assert env.lead.put(one, json={"value": 12}).json()["effective"] == 12
+    # Up to the maximum, and back to the project value.
+    body = env.lead.put(several, json={"texts": texts, "value": 8}).json()
+    assert [t["effective"] for t in body["texts"]] == [8, 8]
+    assert env.lead.put(one, json={"value": None}).status_code == 200
+    # The assign dialog reads the maximum with its preview.
+    body = {
+        "task": "annotate",
+        "language": "en",
+        "case_ids": ["c1"],
+        "mode": "each",
+        "usernames": [],
+    }
+    preview = env.lead.post(f"{BASE}/assignments/batch/preview", json=body)
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["max_per_text"] == 8
+    monkeypatch.delenv(CAP_ENV)
+    preview = env.lead.post(f"{BASE}/assignments/batch/preview", json=body)
+    assert preview.json()["max_per_text"] is None
+
+
+@pytest.mark.parametrize("count", [6, LIMIT, BEYOND])
 def test_one_text_takes_as_many_annotators_as_the_limit(tmp_path, count):
     env = plan_env(tmp_path)
     target, names, tasks = _full_text(env, count)
@@ -226,15 +309,28 @@ def _start(env: Any, target: str, reviewer: str, sources: list[str]) -> Any:
     )
 
 
+def test_the_source_limit_follows_the_texts_annotations_per_text():
+    """Twice the annotators of the text, and never below 40 (the fixed bound
+    before issue 457)."""
+    assert [consolidation_source_limit(n) for n in (1, 5, 20, 21, 30, 500)] == [
+        40,
+        40,
+        40,
+        42,
+        60,
+        1000,
+    ]
+
+
 def test_a_consolidation_takes_21_sources_and_refuses_41(tmp_path):
-    """A text at the limit of 20 with a submitted consolidation has 21
-    eligible submissions; one consolidation merges all of them (the bound of
-    sources was 20 and is 40)."""
+    """A text with 20 annotators and a submitted consolidation has 21
+    eligible submissions; one consolidation merges all of them. The bound is
+    twice the text's annotations per text: 40 here, 60 once the text takes
+    30 annotators."""
     from test_consolidation_submit_gating import submit_acknowledged
 
     from ontotator.storage.tables import DraftRow
 
-    assert MAX_CONSOLIDATION_SOURCES == 40
     env = plan_env(tmp_path)
     target, _names, tasks = _full_text(env, LIMIT)
     sids = _submit_all(env, target, tasks)
@@ -267,20 +363,32 @@ def test_a_consolidation_takes_21_sources_and_refuses_41(tmp_path):
     assert shown.status_code == 200, shown.text
     assert len(shown.json()["people"]) == LIMIT + 1
 
-    # 41 sources are no body, whatever they name.
-    over = [f"sub-{number}" for number in range(MAX_CONSOLIDATION_SOURCES + 1)]
-    refused = _start(env, target, "adj", over)
+    # 41 sources are refused, whatever they name: the refusal says how many
+    # one consolidation of this text merges.
+    too_many = "Too many source submissions"
+    over = [f"sub-{number}" for number in range(61)]
+    refused = _start(env, target, "adj", over[:41])
     assert refused.status_code == 422, refused.text
-    assert [e["type"] for e in refused.json()["detail"]] == ["too_long"]
-    # 40 pass the body; the command then refuses what they name.
-    at_bound = _start(env, target, "adj", over[:MAX_CONSOLIDATION_SOURCES])
-    assert "detail" not in at_bound.json(), at_bound.text
+    assert refused.json() == {
+        "code": "ROUND_INPUT_INVALID",
+        "details": "Too many source submissions: 41. One"
+        " consolidation of this text merges at most 40.",
+    }
+    # 40 pass the bound; the command then refuses what they name.
+    at_bound = _start(env, target, "adj", over[:40])
+    assert at_bound.status_code != 200
+    assert too_many not in at_bound.text
+    # The text takes 30 annotators: 60 sources pass the bound, 61 do not.
+    put = env.lead.put(f"{BASE}/texts/c1/en/annotations-per-text", json={"value": 30})
+    assert put.status_code == 200, put.text
+    assert too_many not in _start(env, target, "adj", over[:60]).text
+    assert "merges at most 60" in _start(env, target, "adj", over).text
 
 
-def test_documents_reads_20_annotators_in_as_many_statements_as_2(tmp_path):
+def test_documents_reads_many_annotators_in_as_many_statements_as_2(tmp_path):
     """No query per annotator in the Documents page and the final panel."""
     counts = []
-    for count in (2, LIMIT):
+    for count in (2, LIMIT, BEYOND):
         env = plan_env(tmp_path / str(count))
         target, _names, tasks = _full_text(env, count)
         _submit_all(env, target, tasks)
@@ -290,7 +398,7 @@ def test_documents_reads_20_annotators_in_as_many_statements_as_2(tmp_path):
                 _statements(env, lambda env=env: panel(env)),
             )
         )
-    assert counts[0] == counts[1]
+    assert counts[0] == counts[1] == counts[2]
 
 
 def test_hidden_names_have_a_letter_for_every_annotator():
@@ -304,9 +412,10 @@ def test_hidden_names_have_a_letter_for_every_annotator():
     ]
 
 
-def test_agreement_counts_every_pair_of_20_annotators(tmp_path):
+@pytest.mark.parametrize("count", [LIMIT, BEYOND])
+def test_agreement_counts_every_pair_of_many_annotators(tmp_path, count):
     env = plan_env(tmp_path)
-    target, _names, tasks = _full_text(env, LIMIT)
+    target, _names, tasks = _full_text(env, count)
     sids = _submit_all(env, target, tasks)
     with env.db.transaction() as conn:  # accept one directly, without a round
         conn.execute(
@@ -318,8 +427,9 @@ def test_agreement_counts_every_pair_of_20_annotators(tmp_path):
     answer = env.lead.get(f"{BASE}/agreement")
     assert answer.status_code == 200, answer.text
     body = answer.json()
-    pairs = LIMIT * (LIMIT - 1) // 2
-    assert len(body["pairs"]) == len(body["annotator_pairs"]) == pairs == 190
+    pairs = count * (count - 1) // 2
+    assert pairs == {LIMIT: 190, BEYOND: 435}[count]
+    assert len(body["pairs"]) == len(body["annotator_pairs"]) == pairs
     assert body["summary"]["pooled"]["pairs"] == pairs
     assert body["summary"]["pooled"]["texts"] == 1
     (text,) = body["texts"]

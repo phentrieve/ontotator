@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-D2AOM7QY.js";import{n as a,t as o}from"./lib-BXZAN-XU.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-DP7ZTwPk.js";import{n as a,t as o}from"./lib-Btquzpda.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -542,6 +542,10 @@ What for: pick a broader or narrower term than the one you have.
 3. Click **Use this term** to give the selected finding this term.
 4. Click **Close tree**.
 
+In a wide window the tree sits under the annotation panel. To give the tree more or less room, drag the divider between the two (**Resize ontology tree**) up or down, or focus it and press \`↑\` or \`↓\`. A double click or \`Enter\` restores the usual split. The height is kept in this browser.
+
+To give the tree more room, click **Hide details** next to the name of the term below the tree: only its name and code stay, on one line. **Show details** brings the definition, synonyms and other parents back. Your choice is kept in this browser.
+
 The tree follows your work: select another finding and it opens at that finding's term. After **Use this term** it stays open and marks the new term as the current one. While you search a term for a new finding it steps aside and comes back afterwards. Select a proposal or a reference, or clear the selection, and it closes.
 
 ## Set values and confirm defaults
@@ -827,7 +831,7 @@ Then decide:
 | **Query** | The meaning may differ clinically and you are not sure. | Not accepted. The lead reads your rationale and decides: they take the text you proposed, or accept the translation as it is, and answer you. Annotation tasks already assigned keep waiting until then. |
 | **Rejected** | The translation changes the clinical meaning. | Not accepted. The lead decides: a new review, a correction or discarding it. Annotation tasks already assigned keep waiting. |
 
-A problem in the source that does not affect the translation is no reason for a **Query**. Examples: a dose that looks too low but is what the source says, a footnote digit stuck to a year, a word broken by a hyphen at a line end. If the translation gives the source correctly, accept it (**Accepted unchanged**, or **Accepted with corrections** if you corrected something else) and put your remark in the **Rationale**. It is kept with your review, and the lead reads it under **Translation reviews** in the text card. A **Query** holds the annotation of the text until the lead decides; keep it for a translation you are not sure about.
+A problem in the source that does not affect the translation is no reason for a **Query**. Examples: a dose that looks too low but is what the source says, a footnote digit stuck to a year, a word broken by a hyphen at a line end. If the translation gives the source correctly, accept it (**Accepted unchanged**, or **Accepted with corrections** if you corrected something else) and put your remark in the **Rationale**. It is kept with your review. The lead reads the **Rationale** of every review, also of an accepted one, under **Translation reviews** in the text card and in the list of all translation reviews. A **Query** holds the annotation of the text until the lead decides; keep it for a translation you are not sure about.
 
 Steps:
 
@@ -1468,7 +1472,7 @@ The guidelines tell you what to mark and how: which findings count, how much tex
 
 ## 4. Get to know the screen
 
-The editor has three columns: the list of **Findings** on the left, in the order of the text, the text in the middle and the details of the selected finding on the right. The toolbar shows the mode, for example **Annotate from scratch**, and the save status. Everything is saved automatically; **Saved** means your work is stored. In a project that records working time, the toolbar also shows a timer with **Pause timer**; see [Working time](annotator.md#working-time). See [The editor screen](annotator.md#the-editor-screen).
+The editor has three columns: the list of **Findings** on the left, in the order of the text, the text in the middle and the details of the selected finding on the right. The toolbar shows the mode, for example **Annotate from scratch**, and the save status. Everything is saved automatically; **Saved** means your work is stored. In a project that records working time, the toolbar also shows a timer with **Pause timer**; see [Working time](annotator.md#working-time). The dividers between the columns, and the one above the ontology tree when it is open, can be dragged to share out the room. See [The editor screen](annotator.md#the-editor-screen).
 
 ## 5. Mark a finding
 
@@ -1598,7 +1602,7 @@ The header is the same on every page:
 - **Handbook** in the header opens this handbook inside the app. On the Documents, consolidation and translation review screens, **Help** opens the handbook section about that screen; in the editor it is **More** > **Help for this screen**. On the project forms, a link next to the task profile opens the section that explains it. In the text card, **How to use it** next to *Newer set available* opens the section on new tool proposals. Click a screenshot in the handbook to open it at full size in a new tab.
 - Below the chapter list, the handbook shows the app's version and commit, for example \`Ontotator 0.3.0 · commit cc65cea\`. Quote it when you report a problem.
 
-The sidebar lists **My tasks**, **Projects**, **Profile** and **Technical problem…** (see [Report a technical problem](#report-a-technical-problem)). The number after **My tasks** counts your open tasks, the same tasks as the **To do** tab; it updates as soon as you submit a text. Clicking **My tasks** or **Projects** loads your projects and the count again, so a project you were just added to shows up without reloading the page. Leads also see their project's pages (**Documents**, **Progress**, **Settings**, **Export**). System administrators also see **Administration** with **Users**, **Ontologies**, **Technical reports**, **New project** and **Server settings** (see [Administration](admin.md)). In the editor, the sidebar folds into **Sections**; click it to open it.
+The sidebar lists **My tasks**, **Projects**, **Profile** and **Technical problem…** (see [Report a technical problem](#report-a-technical-problem)). The number after **My tasks** counts your open tasks, the same tasks as the **To do** tab; it updates as soon as you submit a text. Clicking **My tasks** or **Projects** loads your projects and the count again, so a project you were just added to shows up without reloading the page. Leads also see their project's pages (**Documents**, **Progress**, **Settings**, **Export**); the list **Translation reviews** opens from **Progress**. System administrators also see **Administration** with **Users**, **Ontologies**, **Technical reports**, **New project** and **Server settings** (see [Administration](admin.md)). In the editor, the sidebar folds into **Sections**; click it to open it.
 
 ## Report a technical problem
 
@@ -1733,6 +1737,18 @@ What for: keep your name, languages and qualification up to date.
 Your **Username** and **Pseudonym** cannot be changed. Exports show your pseudonym, not your name, unless you tick the box in step 3.
 
 Fill in **Qualification** if you do translation reviews: you cannot submit a translation review without it.
+
+## Choose a light or dark theme
+
+What for: read comfortably, for example in a dim room.
+
+1. Click **Profile** in the sidebar.
+2. Go to **Appearance**.
+3. Under **Theme**, choose **System**, **Light** or **Dark**. The page changes at once; there is nothing to save.
+
+**System** follows the light or dark setting of your device and changes with it. **Light** and **Dark** stay as chosen.
+
+The choice is kept in this browser, for everyone who uses it, and also applies to the login page. On another computer or in another browser, choose again. The images in this handbook show the light theme.
 
 ## Practice in your profile
 
@@ -2440,7 +2456,7 @@ With more than five people on a text, the line *Assigned:* names the first five 
 
 When every place of the text is taken, the other people turn grey with the reason, for example *no free place (1 per text)*. This is the limit of the text, not of the person. A text that already has more annotators than its limit says both numbers, for example *Limit reached: 10 assigned, limit 8.*
 
-To change the limit of annotators per text from here, click **Change…** next to the limit and enter the number (1 to 20). A number you typed stays when you switch between the two choices below. If the button cannot act, the popover says why, for example *The project setting is already 1.*
+To change the limit of annotators per text from here, click **Change…** next to the limit and enter the number (1 or more; if the server has its own maximum, the field takes no more than that). A number you typed stays when you switch between the two choices below. If the button cannot act, the popover says why, for example *The project setting is already 1.*
 
 - **Only for the selected text** (with several texts: **Only for the selected texts**) gives these texts their own limit, for example 4 annotators on one text for a method comparison in a project with 1. Click the button that names the number of texts, for example *Change for 1 text*. The text keeps its own value for every version, also a corrected one; the project setting and the other texts stay as they are. Entering the project's number again returns the text to the project setting. The popover then explains *Sets the most annotators for this text only (project: 1)*, and for a text that already has its own value its title reads, for example, *Up to 4 annotators for this text (project: 1)*.
 - **For all texts** changes the project setting. Click **Change for all texts**. Texts with their own value keep it.
@@ -2490,7 +2506,7 @@ What for: see the whole project at a glance.
 
 ![The Progress page with the stage cards and the People table](images/lead-progress.png)
 
-Click **Refresh progress** to update.
+Click **Refresh progress** to update. **Translation reviews** next to it opens the list of all translation reviews of the project, with reviewer, decision and rationale ([Read the translation reviews of a project](lead-results.md#read-the-translation-reviews-of-a-project)).
 `,g=`# Lead: results, decisions and export
 
 This chapter is for project leads. It covers choosing the final result of each text, consolidations, the decisions on translations, text changes and problem reports, and the export. Back to the [lead overview](lead.md).
@@ -2629,6 +2645,21 @@ Every listed text changes, or none: if a text or a final result changed since th
 - **Accept agreeing results…** has no undo. To go back, use **Withdraw final…** or **Change final…** in the text card ([Withdraw a final result](#withdraw-a-final-result), [Change a final result](#change-a-final-result)).
 
 ## Translation and text-change decisions
+
+### Read the translation reviews of a project
+
+What for: judge one reviewer's work, and read what reviewers wrote, without opening every text card.
+
+1. In the sidebar, click **Progress**, then **Translation reviews**.
+2. The list has one row per submitted translation review, newest first, and one per review that is assigned but not submitted (*Open*, always last). Each row shows the text (case ID, language, version), the reviewer, the decision, whether the change is clinically relevant, the categories, the rationale, the number of changed passages and when it was submitted.
+3. Filter with **Person**, **Decision** and **Language**; **Order** turns the list to **Oldest first**. The address keeps the filters, so the list is as you left it when you come back from a text. The list shows 25 reviews per page; **Previous** and **Next** change the page.
+4. Click **Compare versions** in the row of a review that was accepted with corrections. The text view opens with the reviewed version on the left and the corrected version on the right; tick **Show changes** to see the passages ([Read a text and other people's work in the text view](lead-documents.md#read-a-text-and-other-peoples-work-in-the-text-view)). Every other row has **Open text**, which opens the reviewed version: a query or a rejection creates no version, and an unchanged text has nothing to compare.
+
+Read the **Rationale** column also for accepted reviews. A reviewer who accepts a translation may note a problem there that does not change the translation, for example an odd dose that the source also has. No other page shows such a remark.
+
+The **Changes** column counts each changed place once, by words: a replaced wording is one passage. **Show changes** counts added and removed passages separately, so its numbers can be higher. A change of spaces or line breaks only is not counted. *Not counted* means the two texts differ too much to count.
+
+Only leads and system administrators can open the list. To decide a query or a rejection, go on with the next section.
 
 ### Resolve a rejected or queried translation
 
@@ -3100,7 +3131,7 @@ A text's own plan can override this until work on it starts.
 What for: decide how many people annotate each text and who may consolidate.
 
 1. Open **Settings**, tab **Workflow**, card **Annotation and consolidation**.
-2. Set **Annotators per text** (1 to 20). It is an upper limit; fewer is fine. A single text can have its own number, also 1 to 20 ([Assign work to the selected texts](lead-documents.md#assign-work-to-the-selected-texts)). The agreement compares every two annotators of a text, so a text with 20 annotators adds 190 pairs to agreement.csv.
+2. Set **Annotators per text** (1 or more). It is an upper limit; fewer is fine. Ontotator has no maximum of its own. The administrator of the server can set one: the hint below the field then names it, for example *This server allows at most 8.*, and a larger number is refused. A number saved before the server got its maximum stays until you change it. A single text can have its own number, with the same bounds ([Assign work to the selected texts](lead-documents.md#assign-work-to-the-selected-texts)). The agreement compares every two annotators of a text, so a text with 20 annotators adds 190 pairs to agreement.csv, and one with 30 adds 435.
 3. Tick **Annotate only after the translation review is accepted** if translations must be reviewed before annotation. Nobody can then annotate a translation that is not accepted; you can still assign annotators while the review is underway ([Assign work to the selected texts](lead-documents.md#assign-work-to-the-selected-texts)).
 4. Tick **Consolidator must not be one of the text's annotators** if annotators may not consolidate their own texts.
 5. Tick **Hide annotator names during consolidation** if consolidators should decide without knowing who marked what. Off by default.
