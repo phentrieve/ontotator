@@ -26,12 +26,19 @@ export interface ComparisonTableProps {
   onChoose: (rowId: string, value: string) => void;
 }
 
+/** Issue 525: "Severe HP:0012828 “schwere”": the term ID after the label, muted, without "·" (DN-10). */
+function ToggleLabel({ toggle }: { toggle: ModifierToggleCell }): JSX.Element {
+  const term = toggle.term;
+  if (!term || !term.label || term.label === term.id || !toggle.label.startsWith(term.label)) return <>{toggle.label}</>;
+  return <>{term.label} <span className="cons-muted">{term.id}</span>{toggle.label.slice(term.label.length)}</>;
+}
+
 /** A member's modifiers, one line each; in a conflicting row each carries its ✓ toggle (DN-1), read-only the kept ones
  *  their "kept" tag. No "·" (DN-10). */
 function ModifierList({ owner, toggles, interactive, kept, busy, onPress }: { owner: string; toggles: readonly ModifierToggleCell[]; interactive: boolean;
   kept: boolean; busy: boolean; onPress: (id: string) => void }): JSX.Element {
   return <ul className="cons-mod-list" aria-label={`Modifiers of ${owner}`}>{toggles.map(toggle => <li key={toggle.id}><span className="cons-value">
-    <span>{toggle.label}{toggle.majority && ` ${toggle.majority}`}{toggle.cohort && COHORT}
+    <span><ToggleLabel toggle={toggle} />{toggle.majority && ` ${toggle.majority}`}{toggle.cohort && COHORT}
       {toggle.otherText && <> <span className="cons-muted">other text chosen</span></>}</span>
     {kept && toggle.pressed && <span className="cons-tag">kept</span>}
     {interactive && <button type="button" className="cons-take" aria-pressed={toggle.pressed} aria-disabled={busy || undefined} aria-label={toggle.name}
@@ -77,13 +84,13 @@ export function ComparisonTable({ name, group, people, rows, readOnly = false, b
       </th>
       {/* B5-2: an agreed value stands under every person, so agreement is obvious; a narrow table shows it once across. */}
       {row.agreed !== null && members.length > 1 && row.cells.map(cell => <td key={cell.inputId} className="cons-agreed cons-agreed-each">
-        {row.kind === "modifiers" && cell.toggles?.some(toggle => toggle.cohort)
-          ? cell.toggles.map((toggle, index) => <span key={toggle.id}>{index > 0 && ", "}{toggle.label}{toggle.cohort && COHORT}</span>)
+        {row.kind === "modifiers" && cell.toggles?.length
+          ? cell.toggles.map((toggle, index) => <span key={toggle.id}>{index > 0 && ", "}<ToggleLabel toggle={toggle} />{toggle.cohort && COHORT}</span>)
           : row.kind === "axis" ? <AxisValue value={cell.value || null} /> : cell.display}
       </td>)}
       {row.agreed !== null
-        ? <td colSpan={members.length} className={members.length > 1 ? "cons-agreed cons-agreed-once" : "cons-agreed"}><span className="cons-pin cons-pin-value">{row.kind === "modifiers" && row.cells[0].toggles?.some(toggle => toggle.cohort)
-          ? <>{row.cells[0].toggles.map((toggle, index) => <span key={toggle.id}>{index > 0 && ", "}{toggle.label}{toggle.cohort && COHORT}</span>)}{allAgree(members)}</>
+        ? <td colSpan={members.length} className={members.length > 1 ? "cons-agreed cons-agreed-once" : "cons-agreed"}><span className="cons-pin cons-pin-value">{row.kind === "modifiers" && row.cells[0].toggles?.length
+          ? <>{row.cells[0].toggles.map((toggle, index) => <span key={toggle.id}>{index > 0 && ", "}<ToggleLabel toggle={toggle} />{toggle.cohort && COHORT}</span>)}{allAgree(members)}</>
           : row.kind === "axis" ? <><AxisValue value={row.cells[0].value || null} />{allAgree(members)}</>
           : row.agreed}</span></td>
         : row.cells.map((cell, index) => <td key={cell.inputId}>

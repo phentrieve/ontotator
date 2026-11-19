@@ -196,7 +196,7 @@ it('a text with an accepted final opens on it and lists modifiers, the note and 
   const findings = await screen.findByRole('region', { name: 'Findings' });
   expect(api.getAnnotationVersion).toHaveBeenCalledWith('pkg', 'target', 'final', 'sel-1');
   expect(screen.getByLabelText<HTMLSelectElement>('Show').value).toBe('final:sel-1');
-  await waitFor(() => expect(within(findings).getByText('Modifiers: Mild · “Immutable”')).toBeTruthy());
+  await waitFor(() => expect(within(findings).getByText('Modifiers: Mild · HP:0012825 · “Immutable”')).toBeTruthy());
   expect(within(findings).getByText('No text span')).toBeTruthy();
   expect(within(findings).getByText('Note: Mentioned by the nurse.')).toBeTruthy();
 });

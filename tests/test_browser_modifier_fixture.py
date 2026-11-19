@@ -74,3 +74,17 @@ def test_with_finding(client: TestClient) -> None:
 def test_standalone(client: TestClient) -> None:
     _, view = build(client, standalone=1)
     assert findings(view) == {"standalone-severe": ("HP:0012828", "schwere")}
+
+
+def test_proposal_with_modifiers(client: TestClient) -> None:
+    """Issue 525: the tool proposal carries Severe on "schwere" and a spanless Recurrent."""
+    _, view = build(client, proposal=1, proposal_modifiers=1)
+    assert view["key"]["mode"] == "proposal_check"
+    assert view["draft"]["annotations"] == []
+    (proposal,) = view["available_inputs"]
+    start = TEXT.index("schwere")
+    assert proposal["annotation"]["term_id"] == "HP:0001250"
+    assert [
+        (m["term_id"], [(s["start"], s["end"]) for s in m.get("segments", [])])
+        for m in proposal["annotation"]["modifiers"]
+    ] == [("HP:0012828", [(start, start + len("schwere"))]), ("HP:0031796", [])]

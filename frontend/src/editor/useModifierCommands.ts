@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { AddModifierPayload, ConvertToModifierPayload, Draft, RemoveModifierPayload, SetModifierSegmentsPayload } from "../api/client";
 import { useToast } from "../ui/Toast";
 import type { Seg } from "./modifiers";
+import type { TargetProposal } from "./ReviewActions";
 
 type ModifierPayload = AddModifierPayload | SetModifierSegmentsPayload | RemoveModifierPayload | ConvertToModifierPayload;
 
@@ -18,8 +19,11 @@ export interface ModifierCommandDeps {
   undoFromToast?: (revision: number, fallback: () => Promise<unknown> | void) => Promise<void>;
 }
 
-/** "Link a text span" waits for the next text selection for this modifier. */
-export interface LinkSpanMode { annotationId: string; termId: string; term: string; finding: string }
+/**
+ * "Link a text span" waits for the next text selection for this modifier. Issue 525: with `proposal`, the modifier is
+ * an open proposal's (`annotationId` is the proposal's): the span goes to its Edit & Replace copy.
+ */
+export interface LinkSpanMode { annotationId: string; termId: string; term: string; finding: string; proposal?: TargetProposal }
 
 /** The modifier commands of the editor (C3), the editor's Undo toast (a removed modifier, a deleted finding) and the link-a-span mode. */
 export function useModifierCommands({ mutate, segmentsOf, reportError, undoFromToast }: ModifierCommandDeps) {

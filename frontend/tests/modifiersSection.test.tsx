@@ -37,7 +37,7 @@ describe("ModifiersSection", () => {
     renderSection({ modifiers: [SEVERE, { term_id: "HP:0031796" }, { term_id: "HP:0040282", segments: [{ start: 34, end: 37 }] }] });
     const section = document.querySelector("[data-modifiers-section]") as HTMLElement;
     expect(within(section).getByRole("heading", { level: 3, name: "Modifiers" })).toBeDefined();
-    expect(chips().map(chip => chip.textContent)).toEqual(["Frequent “oft” · Cohort term", "Recurrent" + "no text span · Link a text span", "Severe “schwere”"]);
+    expect(chips().map(chip => chip.textContent)).toEqual(["Frequent · HP:0040282 “oft” · Cohort term", "Recurrent · HP:0031796" + "no text span · Link a text span", "Severe · HP:0012828 “schwere”"]);
     expect(chips()[0].querySelector(".mod-cohort")!.textContent).toBe("Cohort term");
   });
 
@@ -103,13 +103,23 @@ describe("ModifiersSection", () => {
 
   it("read-only shows the chips without actions", () => {
     renderSection({ readOnly: true });
-    expect(chips().map(chip => chip.textContent)).toEqual(["Severe “schwere”"]);
+    expect(chips().map(chip => chip.textContent)).toEqual(["Severe · HP:0012828 “schwere”"]);
     expect(screen.queryByRole("button", { name: /Actions/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "+ Add modifier…" })).toBeNull();
   });
 
   it("takes another chip wording (consolidation)", () => {
-    renderSection({ readOnly: true, chipText: (label, quote) => quote ? `${label} “${quote}”` : label });
-    expect(chips()[0].textContent).toBe("Severe “schwere”");
+    renderSection({ readOnly: true, chipText: (label, quote) => quote ? `${label} “${quote}”` : label, codeSeparator: " " });
+    expect(chips()[0].textContent).toBe("Severe HP:0012828 “schwere”");
+  });
+
+  it("names every modifier's term ID after its name, muted; a term without a label shows its ID once (issue 525)", () => {
+    renderSection({ readOnly: true, modifiers: [SEVERE, { term_id: "HP:9999999" }] });
+    const [unknown, severe] = chips();
+    expect(severe.querySelector(".mod-row-label")!.textContent).toBe("Severe");
+    expect(severe.querySelector(".mod-row-code")!.textContent).toBe(" · HP:0012828");
+    expect(severe.querySelector(".mod-row-label")!.nextElementSibling!.className).toBe("mod-row-code");
+    expect(unknown.textContent).toBe("HP:9999999");
+    expect(unknown.querySelector(".mod-row-code")).toBeNull();
   });
 });

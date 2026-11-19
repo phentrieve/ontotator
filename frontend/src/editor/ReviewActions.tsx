@@ -11,7 +11,7 @@ import { IconCheck, IconClose, IconPencil, IconQuestion, IconUndo, IconWarning }
 import { findingAxes } from "./axisLabels";
 import { AxisValue } from "../ui/AxisValue";
 import type { AxisDefinition } from "./AnnotationPanel";
-import { ModifiersSection } from "./ModifiersSection";
+import { ModifiersSection, type ModifiersSectionProps } from "./ModifiersSection";
 import { quoteOf, type TermInfo } from "./modifiers";
 import { sentenceAround } from "./passageContext";
 import { CopyTextButton } from "./CopyTextButton";
@@ -93,6 +93,11 @@ export interface ReviewActionsProps {
   onDraftUnresolved?: () => void;
   /** Label and role of a modifier term of the proposal (read-only chips, DN-9 A). */
   termInfo?: (termId: string) => TermInfo | undefined;
+  /**
+   * Issue 525: the controls of the proposal's Modifiers while it is open (no decision, no copy). The first change runs
+   * Edit & Replace and goes to the copy; absent: read-only rows.
+   */
+  modifierControls?: Pick<ModifiersSectionProps, "onAdd" | "onRemove" | "onLinkSpan" | "onRemoveSpan" | "searchProps">;
 }
 
 type NoteSaveSession = {
@@ -152,6 +157,7 @@ export const ReviewActions: React.FC<ReviewActionsProps> = ({
   requireChosenAxes = false,
   onDraftUnresolved,
   termInfo,
+  modifierControls,
 }) => {
   const targetIdentity = JSON.stringify([target.annotation_id, target.version]);
   const { metadata: sourceMetadata, label: sourceLabel } = useProposalMetadata(source);
@@ -287,8 +293,16 @@ export const ReviewActions: React.FC<ReviewActionsProps> = ({
             ));
           })()}
         </dl>
-        {!!source?.annotation.modifiers?.length && <ModifiersSection readOnly finding={termLabel ?? target.term_id ?? target.annotation_id}
-          modifiers={source.annotation.modifiers} text={documentText} termInfo={termInfo ?? (() => undefined)} />}
+        {/* Issue 525: an open proposal's modifiers change in place; a decided one (or one with a copy) lists them only. */}
+        {(() => {
+          const editable = !readOnly && !currentDecision && !hasCopy && !!modifierControls;
+          const modifiers = source?.annotation.modifiers ?? [];
+          if (!modifiers.length && !editable) return null;
+          return <ModifiersSection readOnly={!editable} finding={termLabel ?? target.term_id ?? target.annotation_id}
+            modifiers={modifiers} text={documentText} termInfo={termInfo ?? (() => undefined)}
+            hint={editable ? "A change makes your copy of the proposal (Edit & Replace)." : undefined}
+            {...(editable ? modifierControls : {})} />;
+        })()}
       </div>
       {!!target.axes_defaulted?.length && requireChosenAxes && <p className="field-hint" role="alert">This project requires every axis to be chosen. Defaulted values on this immutable proposal still block submission. Ask the project lead to resolve this rule conflict, or make a clinically justified replacement decision.</p>}
 
