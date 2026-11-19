@@ -110,7 +110,7 @@ import { useModifierCommands } from "../editor/useModifierCommands";
 import { attachCandidates, findingDescription, modifierDisplayId, modifierMarks, parseModifierDisplayId, quoteOf, type AttachFinding, type Seg } from "../editor/modifiers";
 import { Toast } from "../ui/Toast";
 import { type MentionDisplay, type SelectionPayload } from "../spans/adapter";
-import { markColourSlot } from "../editor/markColours";
+import { markColour } from "../editor/markColours";
 import { IconCheck, IconClose, IconLock, IconMore, IconPencil, IconQuestion, IconRedo, IconRetry, IconUndo } from "../ui/icons";
 import { historyControls, stepText, type LastHistoryCommand } from "../editor/history";
 import { MenuButton, type MenuItem } from "../ui/MenuButton";
@@ -607,7 +607,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
           evidence_id: ev.mention.evidence_id,
           segments: ev.mention.segments.map((s) => ({ start: s.start, end: s.end })),
           kind: "own" as const,
-          colorIndex: markColourSlot({ termId, layerId: owner?.annotation.layer_id, kind: "own" }),
+          ...markColour({ termId, layerId: owner?.annotation.layer_id, kind: "own" }),
           negated: owner ? isNegated(owner.annotation) : false,
         };
       });
@@ -720,7 +720,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
         (s) => s.annotation.annotation_id === target.annotation_id && s.version === target.version
       );
       if (!snap) continue;
-      const colorIdx = markColourSlot({
+      const colour = markColour({
         termId: target.term_id ?? target.annotation_id,
         layerId: target.layer_id,
         kind: "target",
@@ -730,7 +730,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
           evidence_id: `target:${target.annotation_id}:${target.version}:${ev.mention.evidence_id}:${ev.version}`,
           segments: ev.mention.segments,
           kind: "target" as const,
-          colorIndex: colorIdx,
+          ...colour,
           negated: isNegated(snap.annotation),
         });
       }
@@ -782,7 +782,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     sourceId: sourceKey(s),
     segments: ev.mention.segments,
     kind: "source" as const,
-    colorIndex: markColourSlot({ termId: s.annotation.term_id, layerId: s.annotation.layer_id, kind: "source" }),
+    ...markColour({ termId: s.annotation.term_id, layerId: s.annotation.layer_id, kind: "source" }),
     negated: isNegated(s.annotation),
   }))), [visibleSources]);
   const selectSource = (id: string) => {
@@ -3097,7 +3097,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     if (!snap?.annotation.modifiers?.length || !layerSelection.visibleLayerIds.includes(snap.annotation.layer_id)
       || outcome === "changed" || outcome === "rejected") return [];
     return modifierMarks([{ annotationId: t.annotation_id, term: findingNameOf(snap), termId: snap.annotation.term_id,
-      colorIndex: markColourSlot({ termId: snap.annotation.term_id, layerId: snap.annotation.layer_id, kind: "target" }),
+      ...markColour({ termId: snap.annotation.term_id, layerId: snap.annotation.layer_id, kind: "target" }),
       modifiers: snap.annotation.modifiers }], view.document.text, infoFor(snap.annotation.layer_id))
       // The "target:" prefix makes a click select the proposal (handlePickMention).
       .map(mark => ({ ...mark, evidence_id: `target:${t.annotation_id}:${t.version}:${mark.evidence_id}` }));
@@ -3847,7 +3847,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
       const ann = snapshot.annotation;
       if (!ann.modifiers?.length) return [];
       return modifierMarks([{ annotationId: ann.annotation_id, term: findingNameOf(snapshot), termId: ann.term_id,
-        colorIndex: markColourSlot({ termId: ann.term_id, layerId: ann.layer_id, kind: "own" }), modifiers: ann.modifiers }],
+        ...markColour({ termId: ann.term_id, layerId: ann.layer_id, kind: "own" }), modifiers: ann.modifiers }],
       view.document.text, infoFor(ann.layer_id));
     }),
     ...proposalModifierMarks,

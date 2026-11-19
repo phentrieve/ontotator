@@ -40,9 +40,12 @@ LEAD_SCOPES = ["read", "import", "export", "project-admin"]
 def register_scenario_route(app: FastAPI) -> None:
     """``POST /__test_scenario__``: a fresh scenario project and a token of
     its lead. ``consolidation`` is the two-annotator text with findings of
-    ``browser_consolidation_scenarios``; every other name is a Documents
-    scenario (``browser_documents_scenarios.registry``) or a lead workflow
-    scenario (``browser_lead_workflow_scenarios.BUILDERS``)."""
+    ``browser_consolidation_scenarios``; ``blind-consolidation`` the same
+    text consolidated by ``adj`` with annotator names hidden, with personal
+    ``read`` tokens of ``adj`` and of the annotator ``ann-0001`` in
+    ``tokens``; every other name is a Documents scenario
+    (``browser_documents_scenarios.registry``) or a lead workflow scenario
+    (``browser_lead_workflow_scenarios.BUILDERS``)."""
 
     @app.post("/__test_scenario__")
     def scenario(name: str = Query(...)) -> dict[str, object]:
@@ -50,8 +53,12 @@ def register_scenario_route(app: FastAPI) -> None:
         import browser_lead_workflow_scenarios as lead_workflow
         from browser_documents_scenarios import registry
 
+        people: tuple[str, ...] = ()
         if name == "consolidation":
             built = consolidation.build(app, started=False)
+        elif name == "blind-consolidation":
+            built = consolidation.build(app, started=True, blind=True)
+            people = ("adj", "ann-0001")
         elif name in registry():
             built = registry()[name](app)
         elif name in lead_workflow.BUILDERS:
@@ -65,7 +72,17 @@ def register_scenario_route(app: FastAPI) -> None:
             scopes=LEAD_SCOPES,
             lifetime_days=1,
         )
-        return {**built, "token": issued.secret}
+        tokens = {
+            person: app.state.api_tokens.create(
+                Actor.cli(),
+                built["users"][person],
+                name=f"mcp integration {person}",
+                scopes=["read"],
+                lifetime_days=1,
+            ).secret
+            for person in people
+        }
+        return {**built, "token": issued.secret, "tokens": tokens}
 
     app.router.routes.insert(0, app.router.routes.pop())
 

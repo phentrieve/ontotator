@@ -4,7 +4,7 @@
 
 What it does not do: annotation, review and translation review stay in the web interface. No tool reads or writes annotators' drafts or the findings of their submissions (`get_text_detail` lists submissions by author, time and mode only), and the server refuses the annotation routes to every API token anyway. No tool returns the text of a document either: no tool of the default server has an argument that adds text to its answer, and `list_translation_reviews` and `get_text_detail` leave out the text a reviewer proposed and the rationale.
 
-That is the default. With `ONTOTATOR_MCP_READ_CONTENT=1` four more tools read a text version and submitted annotations; see [Content tools](#content-tools-opt-in). Drafts and other unsubmitted work stay out of reach in either case.
+That is the default. With `ONTOTATOR_MCP_READ_CONTENT=1` five more tools read a text version and submitted annotations; see [Content tools](#content-tools-opt-in). Drafts and other unsubmitted work stay out of reach in either case.
 
 ## Install
 
@@ -95,6 +95,7 @@ A token can do only what both its scopes and its owner's roles allow. Many tools
 | Tool | Token scopes | Effect | What it does |
 | --- | --- | --- | --- |
 | `whoami` | read or import or export or project-admin | reads | The API token in use (kind, scopes, project, expiry) and who it acts as. |
+| `list_my_tasks` | read | reads | The token owner's own tasks, as the web interface's task list shows them. |
 | `list_projects` | read | reads | The projects the token's owner is a member of, with roles and text counts. |
 | `list_ontologies` | read | reads | Ontology releases on the server with their SHA-256 and translations. |
 | `list_ontology_files` | admin | reads | Every uploaded ontology and translation file, with the projects using it. |
@@ -202,7 +203,7 @@ Names are the same in every tool:
 
 ### Content tools (opt-in)
 
-By default no tool puts clinical text or the findings of a submission into the model's context. Start the MCP server with `ONTOTATOR_MCP_READ_CONTENT=1` to add four read-only tools. It is a setting of `ontotator-mcp` on your computer (the `env` of its entry in the MCP client's configuration), not of the Ontotator server; `whoami` says whether it is on. Without the variable the tools are not registered: a client does not see them and cannot call them. Use them to compare two submissions of one text before a final result exists, to compare annotations across two versions of a text, or to fetch one text version without exporting the project.
+By default no tool puts clinical text or the findings of a submission into the model's context. Start the MCP server with `ONTOTATOR_MCP_READ_CONTENT=1` to add five read-only tools. It is a setting of `ontotator-mcp` on your computer (the `env` of its entry in the MCP client's configuration), not of the Ontotator server; `whoami` says whether it is on. Without the variable the tools are not registered: a client does not see them and cannot call them. Use them to compare two submissions of one text before a final result exists, to compare annotations across two versions of a text, or to fetch one text version without exporting the project.
 
 | Tool | Token scopes | Effect | What it does |
 | --- | --- | --- | --- |
@@ -210,10 +211,12 @@ By default no tool puts clinical text or the findings of a submission into the m
 | `list_annotation_versions` | read | reads | The annotation states of a text version the token's owner may read: kind, id, label, time. |
 | `get_annotation_version` | read | reads | One annotation state of a text version: its annotations (term, values, note) and evidence. |
 | `get_submission` | read | reads | One submitted result: its annotations, evidence, proposal decisions and carried inputs. |
+| `get_consolidation_inputs` | read | reads | The inputs of your own consolidation task: the submitted annotations it consolidates. |
 
 - **Text only on request.** `get_text_version` returns the text only with `include_text=true`. `get_annotation_version` and `get_submission` return passages as offsets (`start`, `end`, counted in Unicode code points); with `include_text=true` each passage also carries its `text`, and `get_submission` returns the earlier text a carried round came from (`carried_from.text`), which it otherwise names without the text. Terms, values and annotators' notes are always part of the result: they are what the tools are for.
 - **Submitted work only.** The tools read immutable states: submissions and imported tool proposals. A draft, an open round or an unfinished consolidation has no ID these tools accept (`VERSION_NOT_FOUND`), and the routes that open a draft need a browser session.
 - **What the token's owner may read.** Each tool returns what its HTTP route returns for the token's owner, no more: a lead reads every submission of a text, anyone else their own submissions and the ones their tasks give them. With **Hide annotator names during consolidation** on, a consolidator's token gets *Annotator A*, *Annotator B* and opaque IDs in place of names and pseudonyms, as in the web interface. The MCP server neither adds nor removes anything there.
+- **A consolidator reads the inputs of their own consolidation.** `get_consolidation_inputs` takes the `assignment_id` of one of your consolidation tasks (`list_my_tasks`, task `review`) and returns each round of the task with its inputs, the same the consolidation screen of the web interface reads (`GET /api/v1/assignments/{id}/rounds` and `GET /api/v1/rounds/{round_id}/inputs`). With **Hide annotator names during consolidation** on, the authors are `annotator-a`, `annotator-b`, … and every ID is the opaque ID the web interface shows you; pass an input's `source_submission_id` to `get_submission` as it is. Another person's task, a task that is not a consolidation, and a task of another project than a project token's are refused. Your own decisions in the open consolidation are not part of it.
 - A token with `read` is enough. Prefer a project token with a short lifetime, and turn the variable on only for the client and the work that need it.
 
 `list_typography_hints` is always available too, and returns no text by default: a hint is a rule code (for example `DOUBLE_SPACE` or `ZERO_WIDTH_CHARACTER`) with `start` and `end` in Unicode code points. With a `document_id` it lists the hints of that version; without one it counts the hints per rule for each text of the project the token's owner may read, one page of texts per call (`next_after`), the newest version of each text unless `all_versions=true`. Only a server started with `ONTOTATOR_MCP_READ_CONTENT=1` offers `include_text`, which adds the characters of each hint (`text`) and 30 code points on each side (`context`); without the variable the argument does not exist. The server computes hints on request; they are not stored and block nothing.

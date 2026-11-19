@@ -5,7 +5,7 @@ import type { AnnotationSnapshot, AnnotationVersion, EditorProposal } from '../a
 import { TextPane } from '../editor/TextPane';
 import { TermName } from '../editor/TermName';
 import { AiBadge } from '../editor/AiBadge';
-import { markColourSlot } from '../editor/markColours';
+import { markColour } from '../editor/markColours';
 import { isNegated } from '../editor/negation';
 import { modifierMarks } from '../editor/modifiers';
 import type { MentionDisplay } from '../spans/adapter';
@@ -46,14 +46,14 @@ export function ReadOnlyAnnotationView({ header, text, annotations, evidence, la
         if (!ev) continue;
         const id = `${index}:${refIndex}`;
         result.push({ evidence_id: id, segments: ev.mention.segments,
-          kind: 'source', colorIndex: markColourSlot({ termId: annotation.term_id, layerId: annotation.layer_id, kind: 'source' }),
+          kind: 'source', ...markColour({ termId: annotation.term_id, layerId: annotation.layer_id, kind: 'source' }),
           negated: isNegated(annotation) });
         if (ev.mention.cue_segments?.length) result.push({ evidence_id: `${id}:cue`, segments: ev.mention.cue_segments,
-          kind: 'source', colorIndex: markColourSlot({ termId: annotation.term_id, layerId: annotation.layer_id, kind: 'source' }) });
+          kind: 'source', ...markColour({ termId: annotation.term_id, layerId: annotation.layer_id, kind: 'source' }) });
       }
       // Linked modifiers ("mild") are marked as in the editor (R-4).
       if (annotation.modifiers?.length) result.push(...modifierMarks([{ annotationId: `${index}`, term: labelFor(annotation.layer_id, annotation.term_id) ?? annotation.term_id,
-        termId: annotation.term_id, colorIndex: markColourSlot({ termId: annotation.term_id, layerId: annotation.layer_id, kind: 'source' }), modifiers: annotation.modifiers }],
+        termId: annotation.term_id, ...markColour({ termId: annotation.term_id, layerId: annotation.layer_id, kind: 'source' }), modifiers: annotation.modifiers }],
       text, id => { const label = labelFor(annotation.layer_id, id); return label ? { label, role: 'modifier', exclusiveClass: null } : undefined; }));
     });
     return result;
