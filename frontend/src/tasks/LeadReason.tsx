@@ -7,6 +7,8 @@ export interface LeadReasonFacts {
   reopen_reason?: string | null;
   second_review_at?: string | null;
   second_review_reason?: string | null;
+  /** What the lead added to the reason since (issue 483), oldest first. */
+  second_review_additions?: readonly { note: string; added_at: string }[] | null;
 }
 
 const on = (at: string | null | undefined) => at ? ` on ${formatDateTime(at)}` : "";
@@ -15,6 +17,12 @@ const on = (at: string | null | undefined) => at ? ` on ${formatDateTime(at)}` :
 export function secondReviewText(task: LeadReasonFacts): string | null {
   if (!task.second_review_at && !task.second_review_reason) return null;
   return `Second review requested by the lead${on(task.second_review_at)}${task.second_review_reason ? `: ${task.second_review_reason}` : "."}`;
+}
+
+/** "Added by the lead on 18 Nov 2026, 09:05: Paragraph 3 as well.", one line per addition, below the request; none without a request. */
+export function reasonAdditionLines(task: LeadReasonFacts): string[] {
+  if (!secondReviewText(task)) return [];
+  return (task.second_review_additions ?? []).map(addition => `Added by the lead${on(addition.added_at)}: ${addition.note}`);
 }
 
 /**
@@ -29,7 +37,7 @@ export function reopenedText(task: LeadReasonFacts): string | null {
 
 /** The lead's reasons for a task, in the order they were given. */
 export function leadReasonLines(task: LeadReasonFacts): string[] {
-  return [secondReviewText(task), reopenedText(task)].filter((line): line is string => line !== null);
+  return [secondReviewText(task), ...reasonAdditionLines(task), reopenedText(task)].filter((line): line is string => line !== null);
 }
 
 /**

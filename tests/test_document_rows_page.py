@@ -386,6 +386,7 @@ WORK_KEYS = {
     "unreviewed_translation",
     "waiting_for_translation_review",
     "waiting_for_lead",
+    "correction_request",
 }
 FINAL_KEYS = {
     "author",

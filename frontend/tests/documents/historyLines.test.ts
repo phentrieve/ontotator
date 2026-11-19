@@ -234,4 +234,16 @@ describe("reassignments and mode changes", () => {
     const edited = { ...taken, versions: [taken.versions[0], { ...taken.versions[1], query_decision: { ...decision, kind: "reviewer_text" as const, answer: null, edited: true } }] };
     expect(historyLines(edited, [], { now }).at(-1)?.text).toBe("Review: query decided by you, the reviewer’s text taken with changes, v1 → v2, 21 Oct, 17:24");
   });
+
+  it("issue 483: a correction request and each addition to its reason are lines of their own", () => {
+    const lead = { pseudonym: "lead-1", display_name: "Carla Diaz", is_me: true };
+    const lines = historyLines(emptyRow, [], { now, changes: [
+      { kind: "correction_requested", at: "2026-10-30T09:00:00", task: "translation_review", assignment_id: 8, by: lead, to_person: anna, reason: "Check the dose." },
+      { kind: "correction_reason_added", at: "2026-10-30T09:30:00", task: "translation_review", assignment_id: 8, by: { ...lead, is_me: false }, to_person: anna, reason: "Paragraph 3 as well." },
+    ] });
+    expect(lines.map(line => [line.stage, line.text])).toEqual([
+      ["review", "Review: correction requested from Anna Early (ann-1) by you, 30 Oct, 09:00: Check the dose."],
+      ["review", "Review: addition to the correction request for Anna Early (ann-1) by Carla Diaz (lead-1), 30 Oct, 09:30: Paragraph 3 as well."],
+    ]);
+  });
 });

@@ -255,6 +255,42 @@ class QueryDecisionRow(Base):
     decided_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
+class CorrectionReasonAdditionRow(Base):
+    """A lead's addition to the reason of a correction request (issue 483).
+
+    Append-only, one row per addition. ``assignment_id`` is the translation
+    review the lead asked for with "Ask a reviewer to correct…", ``round_id``
+    the round that request started: the addition belongs to that request and
+    is not shown with a later one. The reason of the request itself stays in
+    its audit event (``translation.correction_requested``) and never changes.
+    """
+
+    __tablename__ = "translation_correction_reason_additions"
+    __table_args__ = (
+        CheckConstraint("btrim(note) <> ''", name="note_required"),
+        Index(
+            "ix_translation_correction_reason_additions_assignment_id",
+            "assignment_id",
+        ),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.projects.id")
+    )
+    assignment_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.assignments.id")
+    )
+    # ``work_rounds.round_id`` of the request. No foreign key: the rounds
+    # refuse TRUNCATE by their own trigger, which a referencing table would
+    # pre-empt (as for ``QueryDecisionRow.review_id``).
+    round_id: Mapped[str]
+    note: Mapped[str]
+    added_by: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.users.id")
+    )
+    added_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
 class TextSettingRow(Base):
     """Per-text settings of a language version (issue 422).
 

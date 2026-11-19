@@ -464,7 +464,8 @@ def _row_changes(
 
     Tasks and rounds come from the audit trail (``assignment.reopen``,
     ``assignment.reopen_undone``, ``round.create``: the reason is stored
-    only there), the final result from its event log. ``ordinals`` numbers
+    only there; a correction request and each addition to its reason,
+    issue 483), the final result from its event log. ``ordinals`` numbers
     the row's rounds; ``results`` names a submission as a final result.
     """
     reassigned = conn.execute(
@@ -534,7 +535,13 @@ def _row_changes(
         .where(
             AuditEventRow.project_id == pid,
             AuditEventRow.action.in_(
-                ["assignment.reopen", "assignment.reopen_undone", "round.create"]
+                [
+                    "assignment.reopen",
+                    "assignment.reopen_undone",
+                    "round.create",
+                    "translation.correction_requested",
+                    "translation.correction_reason_added",
+                ]
             ),
             AuditEventRow.target_type.in_(["assignment", "work_round"]),
             AssignmentRow.project_id == pid,
@@ -643,6 +650,12 @@ def _row_changes(
             }
         elif row.action == "assignment.reopen":
             change |= {"kind": "reopened", "reason": details.get("reason")}
+        elif row.action == "translation.correction_requested":
+            # "Ask a reviewer to correct…", and each addition to its reason
+            # (issue 483): the reason is stored only in the audit trail.
+            change |= {"kind": "correction_requested", "reason": details.get("reason")}
+        elif row.action == "translation.correction_reason_added":
+            change |= {"kind": "correction_reason_added", "reason": details.get("note")}
         else:
             change["kind"] = "reopen_undone"
         changes.append(change)
