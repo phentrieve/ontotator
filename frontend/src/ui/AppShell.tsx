@@ -2,6 +2,8 @@ import { useEffect, useRef, type ReactNode } from "react";
 import type { CurrentUser } from "../api/client";
 import { personLabel } from "../app/identity";
 import { Button } from "./Button";
+import { IconSortDown } from "./icons";
+import { MenuButton, type MenuItem } from "./MenuButton";
 import { ShortcutHelpHost } from "./ShortcutHelp";
 import { onSpaceActivate } from "./spaceActivates";
 
@@ -15,8 +17,10 @@ export interface Crumb {
 }
 export interface AppShellProps {
   user: CurrentUser | null;
-  onLogout?: () => void;
+  /** The items of the user menu at the top right (Profile … Log out); without them the name is plain text. */
+  userMenu?: MenuItem[];
   breadcrumb?: Crumb[];
+  /** Header controls between Handbook and the user menu, e.g. the gear to Administration. */
   actions?: ReactNode;
   nav?: ReactNode;
   navLabel?: string;
@@ -29,7 +33,14 @@ export interface AppShellProps {
   children: ReactNode;
 }
 
-export function AppShell({ user, onLogout, breadcrumb, actions, nav, navLabel = "Sections", density = "compact", role, homeHref, onHome, children }: AppShellProps): JSX.Element {
+/** "Maria Demo" gives "MD", one word its first two letters; shown where the header has no room for the name. */
+export function initials(name: string): string {
+  const words = name.trim().split(/[\s._-]+/u).filter(Boolean);
+  const letters = words.length > 1 ? [words[0], words[words.length - 1]].map(word => [...word][0]) : [...(words[0] ?? "")].slice(0, 2);
+  return letters.join("").toLocaleUpperCase() || "?";
+}
+
+export function AppShell({ user, userMenu, breadcrumb, actions, nav, navLabel = "Sections", density = "compact", role, homeHref, onHome, children }: AppShellProps): JSX.Element {
   const mainRef = useRef<HTMLElement>(null);
   const sectionsRef = useRef<HTMLDetailsElement>(null);
   const hasNav = nav != null && nav !== false;
@@ -45,6 +56,11 @@ export function AppShell({ user, onLogout, breadcrumb, actions, nav, navLabel = 
   // On phones the reading header has no room for Handbook; the Sections menu carries it there (CSS).
   const navigation = hasNav ? <nav className="app-nav" aria-label={navLabel}>{nav}
     {density === "reading" && <a className="shell-nav-link shell-nav-help" href={HANDBOOK_HREF}>Handbook</a>}</nav> : null;
+  const name = personLabel(user);
+  const identity = <span className="current-user" data-testid="current-user">
+    <span className="current-user-name">{name}</span>
+    {role && <span className="cell-secondary">{role}</span>}
+  </span>;
   return <div className={`shell${density === "reading" ? " shell-reading" : ""}`}>
     <a className="skip-link" href="#main" onClick={(event) => {
       event.preventDefault();
@@ -78,14 +94,17 @@ export function AppShell({ user, onLogout, breadcrumb, actions, nav, navLabel = 
         </ol></nav>}
       </div>
       <div className="shell-actions">
+        <a className="btn btn-quiet btn-sm shell-help" href={HANDBOOK_HREF} onKeyDown={onSpaceActivate}>Handbook</a>
         {actions}
         {/* Identity (D1): "Display name (pseudonym)"; the username stays out of the shell. */}
-        {user && <span className="current-user" data-testid="current-user">
-          <span className="current-user-name">{personLabel(user)}</span>
-          {role && <span className="cell-secondary">{role}</span>}
-        </span>}
-        <a className="btn btn-quiet btn-sm shell-help" href={HANDBOOK_HREF} onKeyDown={onSpaceActivate}>Handbook</a>
-        {onLogout && <Button size="sm" onClick={onLogout}>Log out</Button>}
+        {user && !userMenu?.length && identity}
+        {user && !!userMenu?.length && <MenuButton className="btn-quiet shell-user-menu" buttonLabel={name} items={userMenu}
+          label={`User menu: ${[name, role].filter(Boolean).join(", ")}`}
+          content={<>
+            {identity}
+            <span className="shell-user-initials" aria-hidden="true">{initials(user.display_name?.trim() || user.pseudonym)}</span>
+            <IconSortDown />
+          </>} />}
       </div>
     </header>
     <div className="shell-body">

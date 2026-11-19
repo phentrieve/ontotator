@@ -9,6 +9,10 @@ export interface MenuItem {
   description?: string;
   /** Not available now: stays in the menu and focusable (`aria-disabled`), choosing it does nothing. */
   disabled?: boolean;
+  /** One choice of a named group (`group`), e.g. the theme: a `menuitemradio`; choosing it keeps the menu open. */
+  checked?: boolean;
+  /** Neighbouring items with the same group name form one labelled group (`role="group"`), set off by a line. */
+  group?: string;
 }
 export interface MenuButtonProps {
   /** Accessible name of the button and the menu, e.g. "2 more actions for case-107 de". */
@@ -49,7 +53,7 @@ export function MenuButton({ label, items, buttonLabel, icon, content, className
   const menu = useRef<HTMLDivElement>(null);
   const menuId = useId();
   const [position, setPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
-  const menuItems = () => [...(menu.current?.querySelectorAll<HTMLButtonElement>("[role=menuitem]") ?? [])];
+  const menuItems = () => [...(menu.current?.querySelectorAll<HTMLButtonElement>("[role^=menuitem]") ?? [])];
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -80,7 +84,25 @@ export function MenuButton({ label, items, buttonLabel, icon, content, className
   }, [open]);
 
   const close = () => { setOpen(null); button.current?.focus(); };
-  const choose = (item: MenuItem) => { if (item.disabled) return; close(); item.onSelect(); };
+  const choose = (item: MenuItem) => {
+    if (item.disabled) return;
+    // A radio choice shows its effect at once; the menu stays open at it.
+    if (item.checked === undefined) close();
+    item.onSelect();
+  };
+  const entry = (item: MenuItem) => <button key={item.id} type="button" role={item.checked === undefined ? "menuitem" : "menuitemradio"} tabIndex={-1}
+    className="ui-menu-item" onClick={() => choose(item)} aria-checked={item.checked}
+    aria-disabled={item.disabled ? true : undefined}
+    aria-label={item.description ? item.label : undefined} aria-describedby={item.description ? `${menuId}-${item.id}` : undefined}>
+    {item.label}{item.description && <span id={`${menuId}-${item.id}`} className="ui-menu-item-description">{item.description}</span>}
+  </button>;
+  // Runs of items with the same group name.
+  const runs: { group?: string; items: MenuItem[] }[] = [];
+  for (const item of items) {
+    const last = runs.at(-1);
+    if (last && last.group === item.group) last.items.push(item);
+    else runs.push({ group: item.group, items: [item] });
+  }
   const onButtonKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
     event.preventDefault();
@@ -109,11 +131,11 @@ export function MenuButton({ label, items, buttonLabel, icon, content, className
       onClick={() => open ? setOpen(null) : setOpen("first")} onKeyDown={onButtonKeyDown}>{content ?? (icon ? <>{icon}<span>{buttonLabel}</span></> : buttonLabel)}</Button>
     {open && <div ref={menu} id={menuId} role="menu" aria-label={label} className="ui-menu" onKeyDown={onMenuKeyDown}
       style={{ position: "fixed", top: `${position.top}px`, left: `${position.left}px` }}>
-      {items.map((item) => <button key={item.id} type="button" role="menuitem" tabIndex={-1} className="ui-menu-item" onClick={() => choose(item)}
-        aria-disabled={item.disabled ? true : undefined}
-        aria-label={item.description ? item.label : undefined} aria-describedby={item.description ? `${menuId}-${item.id}` : undefined}>
-        {item.label}{item.description && <span id={`${menuId}-${item.id}`} className="ui-menu-item-description">{item.description}</span>}
-      </button>)}
+      {runs.map((run, index) => run.group === undefined ? run.items.map(entry)
+        : <div key={`group-${index}`} role="group" aria-label={run.group} className="ui-menu-group">
+          <span className="ui-menu-group-label" aria-hidden="true">{run.group}</span>
+          <div className="ui-menu-group-items">{run.items.map(entry)}</div>
+        </div>)}
     </div>}
   </span>;
 }
