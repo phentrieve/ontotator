@@ -131,5 +131,7 @@ export function roundStartingPoint(round: Pick<RoundFacts, "kind" | "round_ordin
  */
 export function roundBadge(round: Pick<RoundFacts, "kind" | "round_ordinal" | "source_round_ordinal"> | null | undefined): string | undefined {
   if ((round?.kind !== "carry_forward" && round?.kind !== "text_change") || !round.round_ordinal) return undefined;
-  return `Round ${round.round_ordinal}, continued from ${sourceRound(round) ?? (round.kind === "text_change" ? "an earlier version" : "an earlier submission")}`;
+  // The same round on a newer text version: "continued from Round 1 of an earlier version" was hard to read (issue 472).
+  if (round.kind === "text_change" || round.source_round_ordinal === round.round_ordinal) return `Round ${round.round_ordinal}, carried over from the earlier text version`;
+  return `Round ${round.round_ordinal}, continued from ${sourceRound(round) ?? "an earlier submission"}`;
 }

@@ -1,5 +1,8 @@
 /* Projects page (F8). Wide: a DataTable. Narrow (below 700 px): every row becomes a card, cells stacked with the column name as a muted label. */
 .projects-page .form-group { margin-bottom: var(--space-4); }
+/* The heading and, for administrators, New project on one row; the button wraps under a long heading on a phone. */
+.projects-page__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); }
+.projects-page__head h1 { margin: 0; }
 .projects-page__name { font-weight: var(--weight-strong); overflow-wrap: anywhere; }
 .projects-page__current { display: inline-flex; align-items: center; gap: var(--space-1); margin-inline-start: var(--space-2); color: var(--accent); font-size: var(--size-sm); font-weight: var(--weight-strong); }
 /* Open and Settings stay on one line at 1280 px with long names (#47 A-19); the Project cells keep the row's background. */

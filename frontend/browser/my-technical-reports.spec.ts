@@ -1,10 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
-import { authenticatedRequest, loginAs, loginExisting } from "./helpers";
+import { authenticatedRequest, chooseUserMenu, loginAs, loginExisting } from "./helpers";
 
 // Issue 269: a user sees the technical reports they sent under Profile › My technical reports.
 
 async function sendReport(page: Page, text: string): Promise<string> {
-  await page.getByRole("button", { name: "Report a technical problem…" }).click();
+  await chooseUserMenu(page, "Technical problem…");
   const dialog = page.getByRole("dialog", { name: "Report a technical problem" });
   await dialog.getByLabel("What happened?").fill(text);
   await dialog.getByRole("button", { name: "Send report" }).click();
@@ -51,7 +51,7 @@ test("the report dialog links to the own reports, which show Open and Done", asy
 
   // Before sending, "My reports" leads here too.
   await page.evaluate(() => { window.location.hash = "#/?status=all"; });
-  await page.getByRole("button", { name: "Report a technical problem…" }).click();
+  await chooseUserMenu(page, "Technical problem…");
   await page.getByRole("dialog", { name: "Report a technical problem" }).getByRole("link", { name: "My reports" }).click();
   await expect(page.getByRole("heading", { name: "My technical reports" })).toBeInViewport();
 

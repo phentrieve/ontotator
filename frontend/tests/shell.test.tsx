@@ -3,6 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, notifySessionRestored, type CurrentUser, type ProjectSummary, type TaskSummary } from "../src/api/client";
 import userEvent from "@testing-library/user-event";
 import { Shell, type ShellProps } from "../src/app/Shell";
+import { chooseUserMenu, openUserMenu, administrationGear } from "./support/userMenu";
+import { THEME_STORAGE_KEY } from "../src/ui/theme";
+import { closeTechnicalReport } from "../src/reports/technicalReport";
 import { NotFound } from "../src/app/NotFound";
 import { routeHref } from "../src/app/router";
 import { notifyDocumentsChanged } from "../src/documents/documentsEvents";
@@ -45,8 +48,11 @@ describe("role-based shell", () => {
     const nav = screen.getByRole("navigation", { name: "Sections" });
     expect(nav.closest("details")?.open).toBe(true);
     expect(within(nav).getByRole("link", { name: "Export" })).toBeDefined();
-    await input.click(within(nav).getByRole("link", { name: "Profile" }));
-    expect(state.onNavigate).toHaveBeenCalledWith({ name: "me" });
+    // The work sidebar holds no personal and no administration entry; both are in the header (issue 510).
+    expect(within(nav).queryByRole("link", { name: "Profile" })).toBeNull();
+    expect(within(nav).queryByRole("link", { name: "Users" })).toBeNull();
+    await input.click(within(nav).getByRole("link", { name: "Projects" }));
+    expect(state.onNavigate).toHaveBeenCalledWith({ name: "projects" });
     expect(window.location.hash).toBe("#/tasks/42");
     expect(screen.getAllByRole("banner")).toHaveLength(1);
     fireEvent.keyDown(summary, { key: "Escape" });
@@ -75,11 +81,16 @@ describe("role-based shell", () => {
     render(<Shell {...annotator} />);
     expect(within(screen.getByRole("banner")).getByRole("link", { name: "Ontotator" }).getAttribute("href")).toBe(routeHref({ name: "tasks", status: "all" }));
   });
-  it("shows an annotator only My tasks and Profile, using the real AppShell once", () => {
+  const sidebar = () => within(screen.getByRole("navigation", { name: "Sections" })).getAllByRole("link").map((link) => link.textContent);
+  const menuEntries = () => [...openUserMenu().querySelectorAll("[role^=menuitem]")].map((item) => item.textContent);
+
+  it("shows a member two sidebar entries plus the project switcher, using the real AppShell once", () => {
     render(<Shell {...props({ projects: [project("assigned", false)] })} />);
     const nav = screen.getByRole("navigation", { name: "Sections" });
-    expect(within(nav).getAllByRole("link").map((link) => link.textContent)).toEqual(["My tasks", "Projects", "Profile"]);
+    expect(sidebar()).toEqual(["My tasks", "Projects"]);
+    expect(within(nav).getAllByRole("button").map(button => button.getAttribute("aria-label"))).toEqual(["Choose project"]);
     expect(within(nav).queryByRole("navigation")).toBeNull();
+    expect(administrationGear()).toBeNull();
     expect(screen.getAllByRole("banner")).toHaveLength(1);
     expect(screen.getAllByRole("main")).toHaveLength(1);
     expect(screen.getByTestId("current-user").textContent).toBe("Alex (a1)Annotator");
@@ -87,12 +98,111 @@ describe("role-based shell", () => {
     expect(screen.getByText("Page content")).toBeDefined();
   });
 
-  it("shows an admin Users, Ontologies and New project without unmanageable project links", () => {
-    render(<Shell {...props({ user: { ...user, is_system_admin: true }, projects: [project("hidden", false)] })} />);
-    expect(screen.getByRole("link", { name: "Users" }).getAttribute("href")).toBe("#/admin/users");
-    expect(screen.getByRole("link", { name: "Ontologies" }).getAttribute("href")).toBe("#/admin/ontologies");
-    expect(screen.getByRole("link", { name: "New project" }).getAttribute("href")).toBe("#/projects/new");
-    expect(screen.queryByRole("link", { name: "Settings" })).toBeNull();
+  it("shows a lead the pages of the current project under the two entries, and no gear", () => {
+    render(<Shell {...props({ projects: [project("led", true)], route: { name: "projectDocuments", key: "led" } })} />);
+    expect(sidebar()).toEqual(["My tasks", "Projects", "Documents", "Progress", "Settings", "Export"]);
+    expect(administrationGear()).toBeNull();
+  });
+
+  it("gives an administrator the gear and no administration entry in the work sidebar", () => {
+    const state = props({ user: { ...user, is_system_admin: true }, projects: [project("hidden", false)] });
+    render(<Shell {...state} />);
+    expect(sidebar()).toEqual(["My tasks", "Projects"]);
+    expect(screen.queryByRole("region", { name: "Administration" })).toBeNull();
+    const gear = within(screen.getByRole("banner")).getByRole("link", { name: "Administration" });
+    expect(gear.getAttribute("href")).toBe("#/admin/users");
+    expect(gear.hasAttribute("aria-current")).toBe(false);
+    fireEvent.click(gear);
+    expect(state.onNavigate).toHaveBeenCalledWith({ name: "adminUsers" });
+    expect(window.location.hash).toBe("#/tasks/42");
+  });
+
+  it("keeps Projects for an administrator without a project: New project is on that page", () => {
+    render(<Shell {...props({ user: { ...user, is_system_admin: true } })} />);
+    expect(sidebar()).toEqual(["My tasks", "Projects"]);
+  });
+
+  it.each(["adminUsers", "adminOntologies", "adminReports", "adminSettings"] as const)("gives Administration its own sidebar on %s", (name) => {
+    const state = props({ user: { ...user, is_system_admin: true }, projects: [project("led", true)], route: { name } });
+    render(<Shell {...state} />);
+    expect(screen.queryByRole("navigation", { name: "Sections" })).toBeNull();
+    const nav = screen.getByRole("navigation", { name: "Administration" });
+    const links = within(nav).getAllByRole("link");
+    expect(links.map(link => [link.textContent?.trim(), link.getAttribute("href")])).toEqual([
+      ["Back to Projects", "#/projects"], ["Users", "#/admin/users"], ["Ontologies", "#/admin/ontologies"],
+      ["Technical reports", "#/admin/reports"], ["Server settings", "#/admin/settings"],
+    ]);
+    expect(links.filter(link => link.getAttribute("aria-current") === "page").map(link => link.getAttribute("href"))).toEqual([routeHref({ name })]);
+    expect(within(nav).getByRole("heading", { name: "Administration" })).toBeDefined();
+    // No project switcher and no project pages in this area.
+    expect(within(nav).queryByRole("button")).toBeNull();
+    expect(within(screen.getByRole("banner")).getByRole("link", { name: "Administration" }).getAttribute("aria-current")).toBe("location");
+    fireEvent.click(within(nav).getByRole("link", { name: "Back to Projects" }));
+    expect(state.onNavigate).toHaveBeenCalledWith({ name: "projects" });
+  });
+
+  it("keeps the work sidebar for a non-administrator on an administration address", () => {
+    render(<Shell {...props({ projects: [project("assigned", false)], route: { name: "adminUsers" } })} />);
+    expect(sidebar()).toEqual(["My tasks", "Projects"]);
+    expect(screen.queryByRole("navigation", { name: "Administration" })).toBeNull();
+  });
+
+  it.each([false, true])("puts Profile, the reports, the theme and Log out in one user menu (administrator: %s)", (admin) => {
+    const state = props({ user: { ...user, is_system_admin: admin } });
+    render(<Shell {...state} />);
+    const button = within(screen.getByRole("banner")).getByRole("button", { name: admin ? "User menu: Alex (a1), System administrator" : "User menu: Alex (a1)" });
+    expect(button.getAttribute("aria-haspopup")).toBe("menu");
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+    expect(menuEntries()).toEqual(["Profile", "My technical reports", "Technical problem…", "System", "Light", "Dark", "Log out"]);
+    expect(button.getAttribute("aria-expanded")).toBe("true");
+    expect(within(screen.getByRole("group", { name: "Theme" })).getAllByRole("menuitemradio").map(item => item.getAttribute("aria-checked"))).toEqual(["true", "false", "false"]);
+    chooseUserMenu("Profile");
+    expect(state.onNavigate).toHaveBeenLastCalledWith({ name: "me" });
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(document.activeElement).toBe(button);
+    chooseUserMenu("My technical reports");
+    expect(state.onNavigate).toHaveBeenLastCalledWith({ name: "me", section: "technical-reports" });
+    expect(state.onLogout).not.toHaveBeenCalled();
+  });
+
+  it("opens the report dialog from the user menu", async () => {
+    render(<Shell {...props()} />);
+    chooseUserMenu("Technical problem…");
+    try {
+      expect(await screen.findByRole("dialog", { name: "Report a technical problem" })).toBeDefined();
+    } finally { act(() => closeTechnicalReport()); }
+  });
+
+  it("works the user menu with the keyboard: arrows, Escape, focus back on the button", async () => {
+    render(<Shell {...props()} />);
+    const input = userEvent.setup();
+    const button = screen.getByRole("button", { name: /^User menu/ });
+    button.focus();
+    await input.keyboard("{ArrowDown}");
+    expect(document.activeElement?.textContent).toBe("Profile");
+    await input.keyboard("{ArrowUp}");
+    expect(document.activeElement?.textContent).toBe("Log out");
+    await input.keyboard("{ArrowUp}");
+    expect(document.activeElement?.textContent).toBe("Dark");
+    await input.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(document.activeElement).toBe(button);
+  });
+
+  it("changes the theme from the user menu at once and keeps the menu open", async () => {
+    render(<Shell {...props()} />);
+    const menu = openUserMenu();
+    try {
+      fireEvent.click(within(menu).getByRole("menuitemradio", { name: "Dark" }));
+      expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+      expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("dark");
+      expect(within(menu).getByRole("menuitemradio", { name: "Dark" }).getAttribute("aria-checked")).toBe("true");
+      expect(within(menu).getByRole("menuitemradio", { name: "System" }).getAttribute("aria-checked")).toBe("false");
+      expect(screen.getByRole("menu")).toBe(menu);
+      fireEvent.click(within(menu).getByRole("menuitemradio", { name: "System" }));
+      expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
+      expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
+    } finally { document.documentElement.removeAttribute("data-theme"); }
   });
 
   it("lists authorized projects and shows sections only for the current project", () => {
@@ -142,7 +252,7 @@ describe("role-based shell", () => {
       preventedByShell = bubbled.defaultPrevented;
       bubbled.preventDefault();
     }, { once: true });
-    fireEvent(screen.getByRole("link", { name: "Profile" }), event);
+    fireEvent(screen.getByRole("link", { name: /^My tasks/ }), event);
     expect(preventedByShell).toBe(false);
     expect(state.onNavigate).not.toHaveBeenCalled();
   });
@@ -154,7 +264,7 @@ describe("role-based shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Back to tasks" }));
     expect(back).toHaveBeenCalledOnce();
     expect(state.onNavigate).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Log out" }));
+    chooseUserMenu("Log out");
     expect(state.onLogout).toHaveBeenCalledOnce();
     expect(window.location.hash).toBe("#/tasks/42");
   });
@@ -189,7 +299,7 @@ describe("role-based shell", () => {
   it("marks the tasks page current even with its project filter", () => {
     render(<Shell {...props({ route: { name: "tasks", project: "first" } })} />);
     expect(screen.getByRole("link", { name: "My tasks" }).getAttribute("aria-current")).toBe("page");
-    expect(screen.getByRole("link", { name: "Profile" }).hasAttribute("aria-current")).toBe(false);
+    expect(screen.getAllByRole("link").filter(link => link.hasAttribute("aria-current"))).toHaveLength(1);
   });
 
   it("puts the project switcher first in the nav and no project control in the header", () => {
