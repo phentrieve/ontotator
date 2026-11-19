@@ -56,6 +56,16 @@ describe("changePassages display rules and bound", () => {
     expect(passage.before.map(part => part.text).join("")).toBe("\u{1f468}\u200d\u{1f469}\u200d\u{1f467}");
   });
 
+  it("counts a change of the number of spaces as a passage (issue 483)", () => {
+    const [typed, ...rest] = changePassages("Fever and cough.", "Fever  and cough.");
+    expect(rest).toEqual([]);
+    expect({ start: typed.start, end: typed.end, hasRemoved: typed.hasRemoved }).toEqual({ start: 5, end: 7, hasRemoved: true });
+    expect(typed.before).toEqual([{ text: " ", removed: true }]);
+    // A space removed at the end of the text: nothing was added, the passage is a removal.
+    const [removed] = changePassages("Fever. ", "Fever.");
+    expect({ start: removed.start, end: removed.end, hasRemoved: removed.hasRemoved }).toEqual({ start: 6, end: 6, hasRemoved: true });
+  });
+
   it("is null when the texts differ too much", () => {
     const words = (prefix: string) => Array.from({ length: 30 }, (_, index) => `${prefix}${index}`).join(" ");
     expect(boundedPassages(words("a"), words("b"), undefined)).not.toBeNull();
@@ -106,6 +116,38 @@ describe("TextPane passages", () => {
     expect(screen.queryByRole("tooltip")).toBeNull();
     fireEvent.mouseOver(marker);
     expect(screen.getByRole("tooltip")).toBeTruthy();
+  });
+
+  it("keeps the tooltip after a tap or click on the marker until it is dismissed (issue 468)", () => {
+    vi.useFakeTimers();
+    try {
+      render(<><TextPane {...base} text={V2} passages={passages} passagesSince="v1" /><button type="button">Elsewhere</button></>);
+      const marker = screen.getByRole("button", { name: /^Changed text/ });
+      // A touch tap: the pointer arrives, the click follows, and the pointer "leaves" at once.
+      const tap = () => { fireEvent.mouseOver(marker); fireEvent.click(marker); fireEvent.mouseOut(marker); };
+      tap();
+      act(() => { vi.advanceTimersByTime(2000); });
+      expect(screen.getByRole("tooltip").textContent).toContain("In v1:");
+      // Inside the tooltip: it stays, also when the pointer leaves it.
+      fireEvent.click(screen.getByRole("tooltip"));
+      fireEvent.mouseLeave(screen.getByRole("tooltip"));
+      expect(screen.getByRole("tooltip")).toBeTruthy();
+      // The marker again closes it; a tap elsewhere and Esc do too.
+      fireEvent.click(marker);
+      expect(screen.queryByRole("tooltip")).toBeNull();
+      tap();
+      expect(screen.getByRole("tooltip")).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Elsewhere" }));
+      expect(screen.queryByRole("tooltip")).toBeNull();
+      tap();
+      fireEvent.keyDown(document.body, { key: "Escape" });
+      expect(screen.queryByRole("tooltip")).toBeNull();
+      // Without a click, hover still closes when the pointer leaves.
+      fireEvent.mouseOver(marker);
+      fireEvent.mouseOut(marker);
+      act(() => { vi.advanceTimersByTime(300); });
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    } finally { vi.useRealTimers(); }
   });
 
   it("keeps the marker focused when the marks are redrawn", () => {

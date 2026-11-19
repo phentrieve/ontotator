@@ -175,6 +175,7 @@ def serialize_review_export(
             guideline_version=record.guideline_version,
             guideline_ref=reference,
             guideline_withdrawn=record.guideline_withdrawn,
+            guideline_label=record.guideline_label,
         )
         lines.append(json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n")
     return "".join(lines).encode("utf-8")

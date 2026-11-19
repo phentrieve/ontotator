@@ -117,6 +117,26 @@ describe("GroupCard", () => {
     expect(within(toggle).getByText("Conflict")).toBeTruthy();
   });
 
+  // #472: the count follows the choices; with all of them made the row says that nothing is saved yet.
+  it("the count of fields to decide goes down with each choice, and back up when a group starts over", () => {
+    renderCard(hypotoniaThree(), { people: THREE });
+    const toggle = screen.getByRole("button", { expanded: true });
+    fireEvent.click(screen.getByRole("button", { name: "Take Absent from Mia Berg for Assertion" }));
+    expect(toggle.textContent).toContain("1 field to decide");
+    expect(toggle.textContent).not.toContain("2 fields to decide");
+    // Still a group with a conflict.
+    expect(within(toggle).getByText("Conflict")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Take Hypotonia from Tom Reis for Term" }));
+    expect(toggle.textContent).toContain("chosen, not saved yet");
+    expect(toggle.textContent).not.toContain("to decide");
+    expect(document.querySelector(".cons-result")?.textContent).toContain("Not saved yet.");
+  });
+
+  it("a group without a conflict keeps reading to decide", () => {
+    renderCard(byId("g-micro"));
+    expect(screen.getByRole("button", { expanded: true }).textContent).toContain("to decide");
+  });
+
   it("a choice only stages; Keep saves once every conflicting row has a choice (M-7d)", () => {
     const { props } = renderCard(hypotoniaThree(), { people: THREE });
     const take = screen.getByRole("button", { name: "Take Absent from Mia Berg for Assertion" });
@@ -616,12 +636,36 @@ describe("GroupCard, modifiers", () => {
       expect(props.onResolve).toHaveBeenLastCalledWith(expect.objectContaining({ input_ids: ["sev-a"], action: "keep" }), expect.any(String));
     });
 
-    it("without a resolved finding in the sentence, Attach is not offered", () => {
+    // Issue 470: the warning says "attach it to a finding", so the action is there and says why it does nothing yet.
+    it("without a resolved finding in the sentence, Attach is shown inactive with the reason", () => {
       const value = standalone();
       const { props } = renderCard(value, { ...mod, groups: [value, { ...seizureKept, state: "open", annotation_ids: [] }] });
-      expect(screen.queryByRole("button", { name: "Attach to a finding…" })).toBeNull();
+      const attach = screen.getByRole("button", { name: "Attach to a finding…" });
+      expect(attach.getAttribute("aria-disabled")).toBe("true");
+      expect(attach.getAttribute("aria-haspopup")).toBeNull();
+      expect(document.getElementById(attach.getAttribute("aria-describedby")!)?.textContent).toBe("Decide the finding it belongs to first.");
+      fireEvent.click(attach);
+      expect(screen.queryByRole("menu")).toBeNull();
+      expect(props.onResolve).not.toHaveBeenCalled();
       fireEvent.click(screen.getByRole("button", { name: "Not in result" }));
       expect(props.onResolve).toHaveBeenCalledWith({ input_ids: ["sev-a"], action: "leave_out" }, "not in result");
+    });
+
+    it("a sentence without another finding says so instead", () => {
+      const value = standalone();
+      renderCard(value, { ...mod, groups: [value] });
+      const attach = screen.getByRole("button", { name: "Attach to a finding…" });
+      expect(attach.getAttribute("aria-disabled")).toBe("true");
+      expect(document.getElementById(attach.getAttribute("aria-describedby")!)?.textContent).toBe("This sentence has no finding to attach it to.");
+    });
+
+    it("read-only, or on a group that is no modifier term, there is no Attach", () => {
+      const value = standalone();
+      renderCard(value, { ...mod, groups: [value], readOnly: true });
+      expect(screen.queryByRole("button", { name: "Attach to a finding…" })).toBeNull();
+      cleanup();
+      renderCard(hypotoniaThree(), { people: THREE });
+      expect(screen.queryByRole("button", { name: "Attach to a finding…" })).toBeNull();
     });
   });
 });

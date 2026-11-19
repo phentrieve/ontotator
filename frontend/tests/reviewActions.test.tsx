@@ -63,6 +63,17 @@ describe("ReviewActions", () => {
       expect(writeText).toHaveBeenLastCalledWith("seizure");
     } finally { vi.unstubAllGlobals(); }
   });
+  it("shows the sentence around each quoted passage only when asked (issue 468)", () => {
+    const mention = (id: string, segments: { start: number; end: number }[]) => ({ version: "v1", mention: { evidence_id: id, segments } });
+    const props = { target: sampleTarget, currentDecision: null, draftAnnotations: [], onDecide: vi.fn(),
+      documentText: "Muscle tone is reduced. No seizure today.", evidence: [mention("e1", [{ start: 27, end: 34 }])] as never };
+    const { container, rerender } = render(<ReviewActions {...props} />);
+    expect(container.querySelector(".review-actions__sentence")).toBeNull();
+    rerender(<ReviewActions {...props} showSentence />);
+    const sentence = container.querySelector(".review-actions__sentence")!;
+    expect(sentence.textContent).toBe("In the text: No seizure today.");
+    expect(sentence.querySelector("mark")?.textContent).toBe("seizure");
+  });
   it("offers no Copy text for a proposal without a text span", () => {
     render(<ReviewActions target={{ ...sampleTarget, evidence_count: 0 }} currentDecision={null} draftAnnotations={[]} onDecide={vi.fn()} evidence={[]} />);
     expect(screen.getByText("No text mention (spanless)")).toBeDefined();

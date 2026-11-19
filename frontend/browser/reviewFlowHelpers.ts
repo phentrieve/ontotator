@@ -3,7 +3,7 @@ import { loginThroughForm } from "./helpers";
 import type { LeadPerson, LeadScenario } from "./leadWorkflowHelpers";
 
 /** Scenarios of ``POST /__test_review_flow__`` (tests/browser_review_flow_scenarios.py). */
-export type ReviewFlowScenarioName = "REVIEW_FLOW" | "ANNOTATION_LOOP";
+export type ReviewFlowScenarioName = "REVIEW_FLOW" | "ANNOTATION_LOOP" | "TRANSLATION_CHECKS";
 
 /** REVIEW_FLOW: the two cases whose de translation reviews Ana owns, in task order. */
 export type ReviewFlowCase = "failed-translation" | "second-translation";

@@ -154,6 +154,48 @@ describe("Settings › Guidelines", () => {
     expect(screen.queryByRole("button", { name: /^Publish as/ })).toBeNull();
   });
 
+  it("publishes with the project's own version and names it first everywhere (#487)", async () => {
+    renderSection(guidelineListing([guidelineSummary(3, { label: "3.1" }), guidelineSummary(2), guidelineSummary(1)]));
+    expect(await screen.findByRole("heading", { level: 2, name: "In force Guidelines 3.1 (v3)" })).toBeDefined();
+    expect(within(versionsTable()).getByRole("rowheader", { name: /^3\.1 \(v3\)/ })).toBeDefined();
+    expect(within(versionsTable()).getByRole("button", { name: "Read 3.1 (v3)" })).toBeDefined();
+    expect(within(versionsTable()).getByRole("button", { name: "Read v2" })).toBeDefined();
+    openPublish();
+    const file = markdown();
+    choose(file);
+    const own = await screen.findByLabelText("Your version of the guideline (optional)") as HTMLInputElement;
+    expect(own.maxLength).toBe(40);
+    expect(screen.getByText("The version your document gives itself, for example 3.1. It is shown before the upload number: Guidelines 3.1 (v4).")).toBeDefined();
+    fireEvent.change(own, { target: { value: " 3.2 " } });
+    expect(screen.getByText(/It is shown before the upload number: Guidelines 3\.2 \(v4\)\.$/)).toBeDefined();
+    vi.mocked(api.publishGuideline).mockResolvedValue(guidelineSummary(4, { label: "3.2" }));
+    fireEvent.click(screen.getByRole("button", { name: "Publish as v4" }));
+    expect(await screen.findByText("Published 3.2 (v4). Annotators and reviewers see the update notice when they next open a task.")).toBeDefined();
+    expect(api.publishGuideline).toHaveBeenCalledWith(KEY, { file, changeNote: "", expectedLatestVersion: 3, label: "3.2" });
+  });
+
+  it("the withdraw dialog names a labelled version and says the label stays (#487)", async () => {
+    renderSection(guidelineListing([guidelineSummary(3, { label: "3.1" }), guidelineSummary(2, { label: "3.0" })]));
+    await screen.findByRole("heading", { level: 2, name: "In force Guidelines 3.1 (v3)" });
+    fireEvent.click(within(inForce()).getByRole("button", { name: "More actions, 3.1 (v3)" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Withdraw 3.1 (v3)…" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Withdraw 3.1 (v3)?" }));
+    expect(dialog.getByText(/The version number, your version, who published it and when stay; results made under 3\.1 \(v3\) keep showing “Guidelines 3\.1 \(v3\) \(withdrawn\)”/)).toBeDefined();
+    expect(dialog.getByText("No guideline is in force until you publish a new version. 3.0 (v2) does not come back automatically.")).toBeDefined();
+    fireEvent.click(dialog.getByRole("button", { name: "Withdraw 3.1 (v3)" }));
+    expect(await screen.findByText("3.1 (v3) withdrawn.")).toBeDefined();
+  });
+
+  it("Republish carries the earlier version's label into the form (#487)", async () => {
+    vi.mocked(api.getGuideline).mockImplementation(async (_key, version) => guidelineDocument(guidelineSummary(version, { label: "3.0" })));
+    renderSection(guidelineListing([guidelineSummary(3, { label: "3.1" }), guidelineSummary(2, { label: "3.0" })]));
+    await screen.findByRole("heading", { level: 2, name: "In force Guidelines 3.1 (v3)" });
+    fireEvent.click(within(versionsTable()).getByRole("button", { name: "More actions, 3.0 (v2)" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Republish 3.0 (v2)…" }));
+    expect((await screen.findByLabelText("Your version of the guideline (optional)") as HTMLInputElement).value).toBe("3.0");
+    expect((screen.getByLabelText("What changed? (optional)") as HTMLInputElement).value).toBe("Republished 3.0 (v2)");
+  });
+
   it("keeps file and note on a version conflict and reloads the list", async () => {
     renderSection(guidelineListing([]));
     await screen.findByRole("heading", { name: "No guidelines yet" });

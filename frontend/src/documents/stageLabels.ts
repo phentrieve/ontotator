@@ -101,13 +101,27 @@ const NARROW_STATES: readonly (readonly [RegExp, string])[] = [
   [/^Submitted on (v\d+)$/, "$1 submitted"],
   [/^Finishing on (v\d+)$/, "finishing $1"],
   [/^ready to compare$/, "to compare"],
+  // What changed ("newer result", "text corrected") stays in the title.
+  [/^Check changes, .+$/, "Check changes"],
   [/^consolidating \(.+\)$/, "consolidating"],
+  // The ⏸ glyph (and the row's "Paused by lead" badge) says the pause where "· paused" would be cut.
+  [/^consolidating · paused(?: \(.+\))?$/, "consolidating"],
 ];
 
 /** The narrow table's short state (`NARROW_STATES`); null when the state fits as it is. */
 export function narrowStageState(state: string): string | null {
   for (const [pattern, short] of NARROW_STATES) if (pattern.test(state)) return state.replace(pattern, short);
   return null;
+}
+
+/**
+ * Why the row's open consolidation is paused: the lead paused the text (issue 464) or a problem report pauses the
+ * consolidator's task; null while it runs or none is open. The server keeps the Annotation cell "consolidating" then.
+ */
+export function consolidationPause(row: { stages?: { annotation: StageCellView } | null }): "lead" | "report" | null {
+  const cell = row.stages?.annotation;
+  if (cell?.state !== "consolidating") return null;
+  return cell.detail.note === "lead_pause" ? "lead" : cell.detail.note === "report_pause" ? "report" : null;
 }
 
 /** The short form of a person in a cell: the display name, else the pseudonym. */
@@ -223,7 +237,10 @@ function annotationText(cell: StageCellView): StageText {
       return { symbol: started === "none" ? "○" : "◐", word, detail: join(people, detail.round_ordinal != null ? `Round ${detail.round_ordinal}` : null, change, waiting) };
     }
     case "paused": return pausedText(cell);
-    case "consolidating": return { symbol: "◐", word: "Consolidating", detail: people };
+    case "consolidating":
+      if (detail.note === "lead_pause") return { symbol: "⏸", word: "Consolidation paused by lead", detail: join(people, quoted(detail.excerpt)) };
+      if (detail.note === "report_pause") return { symbol: "⏸", word: "Consolidation paused", detail: join(people, quoted(detail.excerpt)) };
+      return { symbol: "◐", word: "Consolidating", detail: people };
     case "old_text_open":
       return { symbol: "⚠", word: "In progress on old text", detail: people ? `${people} ${several ? "work" : "works"} on ${version(detail.from_version) ?? "the old text"}` : "" };
     case "old_text_submitted":

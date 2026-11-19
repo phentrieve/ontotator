@@ -12,14 +12,14 @@ The downgrade restores the bound of 20. It refuses while a project or a text
 holds a value above 20: lowering the value is a lead's decision (it decides
 which texts are over their limit), not the migration's.
 
-Follows 0046 (a review after a typo fix reviews the fixed version).
+Follows 0049 (the lead's decision on a queried translation review).
 """
 
 import sqlalchemy as sa
 from alembic import op
 
 revision = "0050"
-down_revision = "0046"
+down_revision = "0049"
 branch_labels = None
 depends_on = None
 SCHEMA = "ontotator"

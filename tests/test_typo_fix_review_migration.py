@@ -1,6 +1,7 @@
 """Migration 0046 (review 2, F1), data only: a typo fix left ``reviewed``
 behind a review of the old text becomes ``accepted`` like the version it
-fixes. It follows 0045 (the lead pause): one head."""
+fixes. It follows 0045 (the lead pause); 0049 (query decisions) follows it:
+one head."""
 
 from __future__ import annotations
 
@@ -24,6 +25,7 @@ PREVIOUS = "0045"
 
 def test_one_head_follows_the_lead_pause() -> None:
     scripts = ScriptDirectory.from_config(alembic_config())
+    # One head; later migrations follow this one.
     assert scripts.get_heads() == [head_revision()]
     revision = scripts.get_revision(REVISION)
     assert revision is not None and revision.down_revision == PREVIOUS
@@ -60,10 +62,14 @@ def test_a_fix_behind_an_accepted_version_becomes_accepted(
             # The downgrade changes no data.
             assert stuck.document(v2)[2] == "reviewed"
             command.upgrade(alembic_config(conn), REVISION)
+        with owner.begin() as conn:
+            assert current_revision(conn) == REVISION
+            # Later migrations follow; the application reads at the head.
+            command.upgrade(alembic_config(conn), "head")
     finally:
         owner.dispose()
     with db.transaction() as conn:
-        assert current_revision(conn) == REVISION
+        assert current_revision(conn) == head_revision()
         statuses = dict(
             conn.execute(
                 text(
