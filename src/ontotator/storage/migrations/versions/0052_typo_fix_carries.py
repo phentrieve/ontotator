@@ -9,7 +9,7 @@ copy, the submission it was made from, both versions and the editorial
 correction that caused it. Readers use it to count the copy as the same
 annotation, not as a second one.
 
-No existing table, column or row changes. Follows 0049 (query decisions);
+No existing table, column or row changes. Follows 0050 (annotations per text);
 when other migrations land first, it follows the then-current head.
 """
 
@@ -17,7 +17,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "0052"
-down_revision = "0049"
+down_revision = "0050"
 branch_labels = None
 depends_on = None
 SCHEMA = "ontotator"

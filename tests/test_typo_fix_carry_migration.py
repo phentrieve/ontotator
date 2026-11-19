@@ -1,5 +1,5 @@
 """Migration 0052 (issue 465): ``typo_fix_carries``, purely additive. It
-follows 0049 (query decisions) on main; one head, up and down."""
+follows the head of main when it was written (0050); one head, up and down."""
 
 from __future__ import annotations
 
