@@ -674,7 +674,7 @@
 }
 
 /* Four or more colours: two bands, and a top band striped in the third and fourth colour (a separate layer,
-   placed over 54% to 69% of the run). The run's title names every mark. */
+   placed over 54% to 69% of the run). A fifth colour has no band of its own. */
 
 .run--bands-more {
   --run-highlight: linear-gradient(to bottom, transparent 0 69%,

@@ -48,6 +48,18 @@ const THREE: Example = {
   ],
 };
 
+const FOUR_TEXT = "On examination: generalized tonic-clonic seizure activity.";
+const FOUR: Example = {
+  name: "four",
+  text: FOUR_TEXT,
+  findings: [
+    { id: "generalized", termId: "HP:0002197", label: "Generalized-onset seizure", segments: [at(FOUR_TEXT, "generalized tonic-clonic seizure")] },
+    { id: "tonic-clonic", termId: "HP:0002069", label: "Bilateral tonic-clonic seizure", segments: [at(FOUR_TEXT, "tonic-clonic seizure")] },
+    { id: "clonic", termId: "HP:0020221", label: "Clonic seizure", segments: [at(FOUR_TEXT, "clonic seizure")] },
+    { id: "seizure", termId: "HP:0001250", label: "Seizure", segments: [at(FOUR_TEXT, "seizure")] },
+  ],
+};
+
 const shots = process.env.OVERLAP_SHOTS;
 async function shot(page: Page, name: string): Promise<void> {
   const path = shots ? `${shots}/${name}.png` : test.info().outputPath(`${name}.png`);
@@ -123,6 +135,19 @@ async function openExample(page: Page, example: Example, size: { width: number; 
   await expect(textPane(page)).toHaveText(example.text);
   return writes;
 }
+
+test("four overlapping findings: two bands and a striped top band", async ({ page }) => {
+  const writes = await openExample(page, FOUR, DESKTOP);
+  const seizure = run(page, "seizure");
+  await expect(seizure).toHaveClass(/\brun--bands-more\b/);
+  expect(new Set(await bandFills(seizure)).size).toBe(4);
+  // All four findings are on the piece: a click there offers them as before.
+  expect((await seizure.getAttribute("data-mentions"))!.split(",")).toHaveLength(4);
+  const [a, b] = [await box(run(page, "generalized ")), await box(seizure)];
+  expect(Math.abs(a.y - b.y)).toBeLessThan(0.5);
+  await shot(page, "overlap-four-1440-light");
+  expect(writes).toEqual([]);
+});
 
 // A label lookup still running when a test ends is not an error of the test.
 test.afterEach(async ({ page }) => { await page.unrouteAll({ behavior: "ignoreErrors" }); });

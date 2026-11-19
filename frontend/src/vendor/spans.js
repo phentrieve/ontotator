@@ -71,7 +71,7 @@ export const MAX_BANDS = 3;
  * `run--bands-K` (K = 2 or 3) and `run--band-I-N` (band I has slot N). The bands follow the marks' start in
  * the text, then their id, so a mark keeps its place among the others in every piece it shares. Marks of one
  * slot share a band. With more than three colours the run gets `run--bands-more`: two bands and a striped
- * third band of the third and fourth colour; the run's title still names every mark.
+ * third band of the third and fourth colour; a fifth colour has no band of its own.
  * `run--color-N` (the first colour) stays on a banded run, for anything that reads the run's main fill.
  */
 export function bandClasses(runMentions, mentionStarts = new Map()) {
