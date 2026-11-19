@@ -20,6 +20,7 @@ def test_a_complete_wheel_misses_nothing() -> None:
     assert check_wheel.missing_wheel_files(complete) == []
     assert "ontotator/storage/migrations/env.py" in check_wheel.REQUIRED_WHEEL_FILES
     assert "ontotator/web/index.html" in check_wheel.REQUIRED_WHEEL_FILES
+    assert "ontotator/web/theme.js" in check_wheel.REQUIRED_WHEEL_FILES
 
 
 def test_missing_files_and_asset_kinds_are_reported() -> None:

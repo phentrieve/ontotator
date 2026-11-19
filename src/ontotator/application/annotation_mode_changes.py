@@ -430,13 +430,17 @@ class AnnotationModeChangeService:
             return result
         viewer = self.actor.user_id if self.actor.user_id is not None else -1
         authors = lead_pseudonym_refs(
-            conn, (item.annotator_id for item in submissions), viewer_id=viewer
+            conn,
+            (item.annotator_id for item in submissions),
+            viewer_id=viewer,
+            logins_of_project=pid,
         )
         people = person_refs(
             conn,
             (item.user_id for item in assignments),
             viewer_id=viewer,
             viewer_is_lead=True,
+            logins_of_project=pid,
         )
         views: dict[RowKey, dict[str, Any]] = {
             row: {
@@ -610,13 +614,17 @@ class AnnotationModeChangeService:
         assignments = self._live_assignments(conn, pid, documents, lock=lock)
         viewer = self.actor.user_id if self.actor.user_id is not None else -1
         authors = lead_pseudonym_refs(
-            conn, (row.annotator_id for row in submissions), viewer_id=viewer
+            conn,
+            (row.annotator_id for row in submissions),
+            viewer_id=viewer,
+            logins_of_project=pid,
         )
         people = person_refs(
             conn,
             (row.user_id for row in assignments),
             viewer_id=viewer,
             viewer_is_lead=True,
+            logins_of_project=pid,
         )
         return {
             "case_id": text.case_id,
@@ -791,7 +799,10 @@ class AnnotationModeChangeService:
         else:
             submissions = []
         authors = lead_pseudonym_refs(
-            conn, (s.annotator_id for s in submissions), viewer_id=viewer
+            conn,
+            (s.annotator_id for s in submissions),
+            viewer_id=viewer,
+            logins_of_project=pid,
         )
         users = [
             row["changed_by"],

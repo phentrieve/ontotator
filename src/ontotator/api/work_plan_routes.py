@@ -226,8 +226,19 @@ class PlanRowsSet(BaseModel):
     confirm: bool = False
 
 
+class AnnotationTargetRow(BaseModel):
+    case_id: str
+    language: str
+    # Annotators (unrevoked annotation tasks) on the text's current version;
+    # the highest when several versions are current.
+    annotators: int
+
+
 class AnnotationTargetPreview(BaseModel):
     rows_over_target: int
+    # The texts counted in ``rows_over_target`` (issue 471), by case and
+    # language.
+    rows: list[AnnotationTargetRow] = Field(default_factory=list)
 
 
 class MoveToFrontRequest(BaseModel):
@@ -342,7 +353,7 @@ def annotation_target_preview(
     annotations_per_text: int = Query(
         ge=MIN_ANNOTATIONS_PER_TEXT, le=ANNOTATIONS_PER_TEXT_CEILING
     ),
-) -> dict[str, int]:
+) -> dict[str, Any]:
     return _service(request, key, principal).annotation_target_preview(
         key, annotations_per_text
     )
