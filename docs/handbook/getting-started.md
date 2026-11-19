@@ -109,6 +109,8 @@ What for: find the texts you have to work on.
 2. Choose a tab: **To do**, **Submitted** or **All**. The tab **Paused** appears only while one of your tasks is paused.
 3. If you work in several projects, choose a project in **Filter my tasks by project**, or **All my tasks**.
 
+**Last change** is when you last saved or submitted the task, or when the lead last changed it, for example by reopening it.
+
 ![My tasks with the status tabs and a table of tasks, each with its Text, Task, Status and an action button](images/getting-started-my-tasks.png)
 
 The list is ordered by status: **Reopened** first, then **In progress**, **Open** and **Submitted**. Within a status the tasks are in the order in which the lead assigned them; texts the lead moved to the front come first. Work from the top unless the lead says otherwise. You cannot sort the list yourself.

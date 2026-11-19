@@ -47,6 +47,9 @@ describe("values annotators can choose (shown-value toggles, M-8c)", () => {
     const actualDefault = toggle(group, "Absent");
     expect(actualDefault.disabled).toBe(true);
     expect(actualDefault.title).toBe("The default value cannot be hidden");
+    // Issue 472: the reason for the greyed value stands in the row, not only in the tooltip.
+    expect(within(group).getByText("“Absent” is prefilled and cannot be hidden.")).toBeTruthy();
+    expect(within(axisGroup("layer-b", "assertion")).queryByText(/is prefilled and cannot be hidden/)).toBeNull();
     fireEvent.click(actualDefault);
     expect(change).not.toHaveBeenCalled();
     expect(toggle(group, "Present").disabled).toBe(false);

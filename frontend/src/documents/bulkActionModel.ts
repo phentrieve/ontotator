@@ -104,18 +104,18 @@ export function previewGroups(preview: BulkTaskActionView): PreviewGroup[] {
   return groups;
 }
 
-/** "Will change: 14 assignments in 12 texts" (mockup 336-A), or why nothing changes. */
+/** "Will change: 14 tasks in 12 texts" (mockup 336-A), or why nothing changes. */
 export function willChangeText(preview: BulkTaskActionView): string {
   const tasks = preview.changes.length;
   if (!tasks && preview.action === "start_round") return "No submitted annotation in the selected texts can start a round.";
   if (!tasks) return preview.action === "reopen" ? "Nothing to reopen in the selected texts." : "No open tasks to withdraw in the selected texts.";
-  return `${plural(tasks, "assignment")} in ${plural(textsOf(preview.changes).length, "text")}`;
+  return `${plural(tasks, "task")} in ${plural(textsOf(preview.changes).length, "text")}`;
 }
 
-/** The dialog's action button: "Reopen 14 assignments", "Withdraw 3 assignments", "Start 14 rounds". */
+/** The dialog's action button: "Reopen 14 tasks", "Withdraw 3 tasks", "Start 14 rounds". */
 export function applyLabel(action: BulkAction, tasks: number): string {
   if (action === "start_round") return `Start ${plural(tasks, "round")}`;
-  return `${action === "reopen" ? "Reopen" : "Withdraw"} ${plural(tasks, "assignment")}`;
+  return `${action === "reopen" ? "Reopen" : "Withdraw"} ${plural(tasks, "task")}`;
 }
 
 /**
@@ -142,11 +142,11 @@ function actionConsequences(preview: BulkTaskActionView): string[] {
     const tasks = plural(preview.changes.length, "task");
     return preview.kind === "clean_restart" ? [
       `${who} ${people === 1 ? "gets" : "get"} ${tasks} back in My tasks, in a new round without any of the earlier findings. Tasks from tool proposals start again from the newest proposals, all open.`,
-      `The submitted work of ${preview.changes.length === 1 ? "this task" : `these ${tasks}`} is set aside: it no longer counts as submitted and is not carried into the new round. The earlier rounds stay readable under More › Work rounds.`,
+      `The submitted work of ${preview.changes.length === 1 ? "this task" : `these ${tasks}`} is set aside: it no longer counts as submitted and is not carried into the new round. Each person still reads their earlier rounds in the task, under More › Work rounds.`,
       "This cannot be undone here, and no action on a single text brings the set-aside work back into the task.",
     ] : [
       `${who} ${people === 1 ? "gets" : "get"} ${tasks} back in My tasks, in a new round that starts with what they submitted.`,
-      "The earlier submissions no longer count as submitted: each task must be submitted again. The earlier rounds stay readable under More › Work rounds.",
+      "The earlier submissions no longer count as submitted: each task must be submitted again. Each person still reads their earlier rounds in the task, under More › Work rounds.",
       "This cannot be undone here. There is no way back for a single text either: the person submits the new round.",
     ];
   }
@@ -165,11 +165,11 @@ function actionConsequences(preview: BulkTaskActionView): string[] {
   ];
 }
 
-/** "Reopened 14 assignments in 12 texts." / "Withdrew 3 assignments in 2 texts." */
+/** "Reopened 14 tasks in 12 texts." / "Withdrew 3 tasks in 2 texts." */
 export function appliedText(result: BulkTaskActionView): string {
   const texts = plural(textsOf(result.changes).length, "text");
   if (result.action === "start_round") return `Started ${plural(result.changes.length, "round")} in ${texts}.`;
-  return `${result.action === "reopen" ? "Reopened" : "Withdrew"} ${plural(result.changes.length, "assignment")} in ${texts}.`;
+  return `${result.action === "reopen" ? "Reopened" : "Withdrew"} ${plural(result.changes.length, "task")} in ${texts}.`;
 }
 
 /** A menu entry that does nothing for the selection gives its reason (decision 336-C); null when it acts. Reads the counts only (`summary_only`). */

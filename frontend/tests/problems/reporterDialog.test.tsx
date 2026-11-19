@@ -28,7 +28,7 @@ const footer = () => {
   expect(actions).not.toBeNull();
   return within(actions!);
 };
-const entry = () => screen.getByRole("button", { name: /^Report a text problem/ });
+const entry = () => screen.getByRole("button", { name: /^(Report a text problem|Text problems)/ });
 
 function setup({ reports = [] as ProblemReportView[], assignment = task(), metadata }: { reports?: ProblemReportView[]; assignment?: AssignmentView; metadata?: AssignmentView } = {}) {
   const list = vi.spyOn(api, "listTaskProblemReports").mockResolvedValue(reports);
@@ -51,7 +51,7 @@ describe("reporter toolbar entry", () => {
     expect(screen.getByText("1 open")).toBeTruthy();
     cleanup();
     setup({ reports: [report()], assignment: pausedTask() });
-    const button = await screen.findByRole("button", { name: "Report a text problem Task paused, 1 open report" });
+    const button = await screen.findByRole("button", { name: "Text problems Task paused, 1 open report" });
     const badge = button.querySelector(".problem-badge")!;
     expect(badge.textContent).toBe("Paused, 1 open");
     expect(badge.querySelector("svg")).not.toBeNull();
