@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { administrationGear } from "./support/userMenu";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -66,11 +67,9 @@ it("keeps the shell around a crashed screen, and the next screen renders again",
   const alert = await screen.findByRole("alert", {}, { timeout: 3000 });
   expect(within(alert).getByRole("heading", { name: "Something went wrong while displaying this page." })).toBeDefined();
   expect(within(alert).getByRole("button", { name: "Report a technical problem…" })).toBeDefined();
-  // The sidebar stays, and another screen renders again.
+  // The shell stays, and another screen renders again.
   vi.spyOn(api, "adminListUsers").mockResolvedValue([]);
-  const disclosure = document.querySelector<HTMLDetailsElement>(".shell-reading-navigation");
-  if (disclosure && !disclosure.open) fireEvent.click(disclosure.querySelector("summary")!);
-  fireEvent.click(screen.getByRole("link", { name: "Users" }));
+  fireEvent.click(administrationGear()!);
   expect(await screen.findByRole("heading", { name: "Users" })).toBeDefined();
   await waitFor(() => expect(screen.queryByText("Something went wrong while displaying this page.")).toBeNull());
 });

@@ -30,7 +30,7 @@ Reload the page in the browser, then repeat the last action. If the message asks
 
 ### I see an error message that is not explained here
 
-Click **Technical problem…** in the sidebar, or **Report a technical problem…** in the editor under **More**. Describe what you did. Ontotator adds the last error it received. The report goes to the system administrators and does not pause your task. See [Report a technical problem](getting-started.md#report-a-technical-problem).
+Open the user menu at the top right and click **Technical problem…**, or use **Report a technical problem…** in the editor under **More**. Describe what you did. Ontotator adds the last error it received. The report goes to the system administrators and does not pause your task. See [Report a technical problem](getting-started.md#report-a-technical-problem).
 
 ### The page says "Something went wrong while displaying this text."
 
@@ -270,7 +270,7 @@ The message says why, and nothing was imported. An incomplete or damaged file (*
 
 ### A user sent a technical report
 
-Open **Administration** › **Technical reports**. Mark it as done when it is handled. Reports are not sent anywhere; copy one into an issue by hand and leave out clinical content. See [Handle technical reports](admin.md#handle-technical-reports).
+Click the gear at the top right and open **Technical reports**. Mark it as done when it is handled. Reports are not sent anywhere; copy one into an issue by hand and leave out clinical content. See [Handle technical reports](admin.md#handle-technical-reports).
 
 ### The administrator lost the password
 

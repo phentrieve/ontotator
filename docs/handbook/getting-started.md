@@ -47,9 +47,10 @@ If your session ends while you work, a login box opens with **Your session has e
 
 What for: end your session, for example on a shared computer.
 
-1. Click **Log out** in the header.
-2. If a dialog **Unsaved changes** opens, click **Save and log out**.
-3. If a dialog **Unsaved profile changes** opens, click **Save and log out** to keep your changes, or **Discard and log out**.
+1. Open the user menu: the button with your name at the top right.
+2. Click **Log out**.
+3. If a dialog **Unsaved changes** opens, click **Save and log out**.
+4. If a dialog **Unsaved profile changes** opens, click **Save and log out** to keep your changes, or **Discard and log out**.
 
 ## Find your way around
 
@@ -59,17 +60,20 @@ The header is the same on every page:
 
 - **Ontotator** on the left takes you to the start page.
 - The breadcrumb shows where you are, for example **My tasks** or **Documents**.
-- On the right are your display name, your pseudonym, your roles and **Log out**.
+- At the top right is the user menu: a button with your display name, your pseudonym and your roles. It holds **Profile**, **My technical reports**, **Technical problem…**, the **Theme** (**System**, **Light** or **Dark**) and **Log out**. Open it with a click, or with Enter or the arrow keys; Escape closes it. On a phone the button in the editor shows your initials.
+- System administrators also see a gear next to it. It opens **Administration** (see [Administration](admin.md)). A number on the gear counts the open technical reports.
 - **Handbook** in the header opens this handbook inside the app. On the Documents, consolidation and translation review screens, **Help** opens the handbook section about that screen; in the editor it is **More** > **Help for this screen**. On the project forms, a link next to the task profile opens the section that explains it. In the text card, **How to use it** next to *Newer set available* opens the section on new tool proposals. Click a screenshot in the handbook to open it at full size in a new tab.
 - Below the chapter list, the handbook shows the app's version and commit, for example `Ontotator 0.3.0 · commit cc65cea`. Quote it when you report a problem.
 
-The sidebar lists **My tasks**, **Projects**, **Profile** and **Technical problem…** (see [Report a technical problem](#report-a-technical-problem)). The number after **My tasks** counts your open tasks, the same tasks as the **To do** tab; it updates as soon as you submit a text. Clicking **My tasks** or **Projects** loads your projects and the count again, so a project you were just added to shows up without reloading the page. Leads also see their project's pages (**Documents**, **Progress**, **Settings**, **Export**); the list **Translation reviews** opens from **Progress**. System administrators also see **Administration** with **Users**, **Ontologies**, **Technical reports**, **New project** and **Server settings** (see [Administration](admin.md)). In the editor, the sidebar folds into **Sections**; click it to open it.
+![The user menu, open at the top right: Profile, My technical reports, Technical problem…, the theme choice and Log out](images/getting-started-user-menu.png)
+
+The sidebar is for your work. It lists the project switcher, **My tasks** and **Projects**. The number after **My tasks** counts your open tasks, the same tasks as the **To do** tab; it updates as soon as you submit a text. Clicking **My tasks** or **Projects** loads your projects and the count again, so a project you were just added to shows up without reloading the page. Leads also see their project's pages (**Documents**, **Progress**, **Settings**, **Export**); the list **Translation reviews** opens from **Progress**. In the editor, the sidebar folds into **Sections**; click it to open it. The user menu and the gear stay at the top right there too.
 
 ## Report a technical problem
 
 What for: tell the system administrators about an error message, a page that does not load, a crash, or give general feedback. For a problem with the text of a task, such as a cut-off or wrong text, use [Report a text problem](annotator.md#report-a-text-problem) instead.
 
-1. Click **Technical problem…** in the sidebar. In the editor, open **More** and choose **Report a technical problem…**. If a text cannot be displayed, the message *Something went wrong while displaying this text.* offers **Report a technical problem…** too, and so does *Something went wrong while displaying this page.* when another screen, such as My tasks or Documents, cannot be displayed.
+1. Open the user menu at the top right and click **Technical problem…**. In the editor, you can also open **More** and choose **Report a technical problem…**. If a text cannot be displayed, the message *Something went wrong while displaying this text.* offers **Report a technical problem…** too, and so does *Something went wrong while displaying this page.* when another screen, such as My tasks or Documents, cannot be displayed.
 2. Under **What happened?**, write what you did and what you saw.
 3. Click **Send report**.
 4. The dialog shows *Sent as TR-12.* (your reference). Quote it if you ask an administrator about your report. Click **See my reports** to open the list of your reports.
@@ -84,7 +88,7 @@ The report stays inside Ontotator; nothing is sent by e-mail or elsewhere. Do no
 
 What for: look up a report you sent and whether it was handled.
 
-1. Click **Profile** in the sidebar and scroll to **My technical reports**. From the report dialog, click **My reports** (before sending) or **See my reports** (after sending).
+1. Open the user menu at the top right and click **My technical reports**. It opens your **Profile** at that section. From the report dialog, click **My reports** (before sending) or **See my reports** (after sending).
 2. The table shows each report you sent, newest first: **Ref.** (for example *TR-12*), **Sent**, **What happened** (your text; open a long text to read all of it) and **Status**. If you sent 100 reports or more, the newest 100 are shown; click **Show older reports** below the table for the rest.
 
 **Open** means the administrators have not handled the report yet; **Done** means an administrator marked it as handled. Only you and the system administrators see your reports. Administrators do not answer in Ontotator; if you need an answer, contact an administrator and quote the reference.
@@ -192,7 +196,7 @@ The guidelines are your project's rules: what counts as a finding, how much text
 
 What for: keep your name, languages and qualification up to date.
 
-1. Click **Profile** in the sidebar.
+1. Open the user menu at the top right and click **Profile**.
 2. Change **Display name**, **E-mail**, **Languages you can read**, **Qualification** or **ORCID**.
 3. To be named in exports, tick **Name me (display name and ORCID) as a contributor in exports**.
 4. Click **Save**. You see **Saved.**
@@ -205,9 +209,10 @@ Fill in **Qualification** if you do translation reviews: you cannot submit a tra
 
 What for: read comfortably, for example in a dim room.
 
-1. Click **Profile** in the sidebar.
-2. Go to **Appearance**.
-3. Under **Theme**, choose **System**, **Light** or **Dark**. The page changes at once; there is nothing to save.
+1. Open the user menu at the top right.
+2. Under **Theme**, choose **System**, **Light** or **Dark**. The page changes at once; there is nothing to save. The menu stays open, so you can compare.
+
+The same setting is on your **Profile** under **Appearance**.
 
 **System** follows the light or dark setting of your device and changes with it. **Light** and **Dark** stay as chosen.
 
@@ -217,7 +222,7 @@ The choice is kept in this browser, for everyone who uses it, and also applies t
 
 What for: start, continue or remove your practice project at any time.
 
-1. Click **Profile** in the sidebar.
+1. Open the user menu at the top right and click **Profile**.
 2. Go to **Practice**.
 3. Without a practice project, click **Start practice**.
 4. With a practice project, you see the progress, for example *1 of 4 tasks done*, and the date it will be deleted:
@@ -234,7 +239,7 @@ A practice project keeps the translations it started with. If your administrator
 
 What for: search ontology terms in your own languages too.
 
-1. Click **Profile** in the sidebar.
+1. Open the user menu at the top right and click **Profile**.
 2. Go to **Search preferences**.
 3. Tick **Search translated names** to search the translated names of terms.
 4. Choose your **Preferred search languages**.
@@ -245,7 +250,7 @@ What for: search ontology terms in your own languages too.
 
 What for: replace your password with a new one.
 
-1. Click **Profile** in the sidebar.
+1. Open the user menu at the top right and click **Profile**.
 2. Go to **Change password**.
 3. Enter your **Current password**.
 4. Enter a **New password** with 12 to 256 characters. It must differ from your username.
@@ -260,7 +265,7 @@ If you forgot your password, ask an administrator for a reset code and follow [S
 
 What for: let a script or another program read or export your projects without your password.
 
-1. Click **Profile** in the sidebar.
+1. Open the user menu at the top right and click **Profile**.
 2. Go to **API tokens** and click **New token…**.
 3. Enter a **Token name** that says what uses it.
 4. Tick the scopes the program needs: **Read**, **Import**, **Export** or **Project administration**.

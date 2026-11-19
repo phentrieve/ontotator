@@ -1,4 +1,5 @@
 import { assigned, assignedList } from "./assignments";
+import { chooseUserMenu, openUserMenu } from "./support/userMenu";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api, ApiClient, AuthError, isSessionExpired, onSessionExpired, type CurrentUser, type ProjectSummary } from "../src/api/client";
@@ -263,7 +264,7 @@ describe("the login gate", () => {
 
     await waitFor(() => expect(login).toHaveBeenCalledWith("alice", "correct horse battery"));
     expect((await screen.findByTestId("current-user")).querySelector(".current-user-name")?.textContent).toBe("Alice (ann-0007)");
-    expect(screen.getByRole("button", { name: "Log out" })).toBeDefined();
+    expect(within(openUserMenu()).getByRole("menuitem", { name: "Log out" })).toBeDefined();
     await screen.findByRole("table");
   });
 
@@ -325,7 +326,8 @@ describe("the login gate", () => {
     oneCaseServer();
     render(<AuthGate />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Log out" }));
+    await screen.findByRole("button", { name: /^User menu/ });
+    chooseUserMenu("Log out");
 
     await screen.findByRole("form", { name: "Log in to Ontotator" });
     expect(logout).toHaveBeenCalledTimes(1);

@@ -19,6 +19,7 @@ from mcp.server.mcpserver import MCPServer
 from pydantic import Field
 
 from ontotator_mcp.client import OntotatorClient, project_path, seg
+from ontotator_mcp.errors import OntotatorError
 from ontotator_mcp.tooling import NOT_A_CASE_ID, listing, register
 
 Project = Annotated[str, Field(description="Project key, e.g. 'ward-7'.")]
@@ -47,6 +48,25 @@ CONTENT_TOOLS = (
     "list_annotation_versions",
     "get_annotation_version",
     "get_submission",
+    "get_consolidation_inputs",
+)
+# What get_consolidation_inputs keeps of a round and of the task.
+ROUND_FIELDS = (
+    "round_id",
+    "kind",
+    "state",
+    "active",
+    "round_ordinal",
+    "input_count",
+    "input_submission_ids",
+)
+TASK_FIELDS = (
+    "project_key",
+    "document_id",
+    "external_id",
+    "status",
+    "active_round_id",
+    "held",
 )
 
 
@@ -220,3 +240,59 @@ def register_content(server: MCPServer, api: OntotatorClient) -> None:
             texts.setdefault(carried["document_id"], carried["text"])
         add_span_texts(submission, texts)
         return submission
+
+    @register(server, scopes="read", effect="read")
+    async def get_consolidation_inputs(
+        assignment_id: Annotated[
+            int,
+            Field(
+                ge=1,
+                description="ID of your own consolidation task (assignment_id"
+                " from list_my_tasks, task 'review').",
+            ),
+        ],
+        include_text: IncludeText = False,
+    ) -> dict[str, Any]:
+        """The inputs of your own consolidation task: the submitted annotations it consolidates.
+
+        For the consolidator the task is assigned to, as the consolidation
+        screen of the web interface reads them: each round of the task with
+        its inputs (term, values, note, passages, the submission each came
+        from). With "Hide annotator names during consolidation" on, authors
+        are 'annotator-a', 'annotator-b', … and every ID is the opaque ID
+        the web interface shows you; pass a 'source_submission_id' to
+        get_submission as it is. Anyone else's task, and a task that is not
+        a consolidation, is refused. Passages are offsets into the text
+        ('start', 'end' in Unicode code points); include_text adds the text
+        of each passage on the task's text version. Your own decisions in
+        the open consolidation are not part of it. Exists because this MCP
+        server runs with ONTOTATOR_MCP_READ_CONTENT=1.
+        """
+        base = f"/api/v1/assignments/{seg(assignment_id)}"
+        # The owner check of the route: only the token owner's own task.
+        task: dict[str, Any] = await api.get(base)
+        if task.get("task") != "review":
+            raise OntotatorError(
+                f"Task {assignment_id} is a '{task.get('task')}' task, not a"
+                " consolidation; this tool reads only the inputs of a"
+                " consolidation task (task 'review'). Nothing was read."
+            )
+        rounds: list[dict[str, Any]] = await api.get(f"{base}/rounds")
+        listed = []
+        for item in rounds:
+            inputs: list[dict[str, Any]] = await api.get(
+                f"/api/v1/rounds/{seg(item['round_id'])}/inputs"
+            )
+            listed.append(
+                {name: item.get(name) for name in ROUND_FIELDS} | {"inputs": inputs}
+            )
+        project, document_id = task["project_key"], task["document_id"]
+        if include_text:
+            texts = {document_id: (await text_of(project, document_id))["text"]}
+            for entry in listed:
+                add_span_texts({"round_inputs": entry["inputs"]}, texts)
+        return {
+            "assignment_id": assignment_id,
+            **{name: task.get(name) for name in TASK_FIELDS},
+            "rounds": listed,
+        }

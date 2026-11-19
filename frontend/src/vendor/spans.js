@@ -62,6 +62,32 @@ export function decomposeRuns(textLength, mentions, extraCuts = []) {
   return runs;
 }
 
+/** At most this many bands of colour in one run; from the fourth colour on, the top band is striped. */
+export const MAX_BANDS = 3;
+
+/**
+ * The colour classes of a run (issue 524). One colour: `run--color-N`, the fill of slot N. A run that belongs
+ * to marks of several colours gets one band per colour, stacked in the highlight from the bottom up:
+ * `run--bands-K` (K = 2 or 3) and `run--band-I-N` (band I has slot N). The bands follow the marks' start in
+ * the text, then their id, so a mark keeps its place among the others in every piece it shares. Marks of one
+ * slot share a band. With more than three colours the run gets `run--bands-more`: two bands and a striped
+ * third band of the third and fourth colour; a fifth colour has no band of its own.
+ * `run--color-N` (the first colour) stays on a banded run, for anything that reads the run's main fill.
+ */
+export function bandClasses(runMentions, mentionStarts = new Map()) {
+  const coloured = runMentions
+    .filter((m) => typeof m.colorIndex === "number")
+    .sort((a, b) => (mentionStarts.get(a.mention_id) ?? 0) - (mentionStarts.get(b.mention_id) ?? 0)
+      || (a.mention_id < b.mention_id ? -1 : a.mention_id > b.mention_id ? 1 : 0));
+  const slots = [...new Set(coloured.map((m) => m.colorIndex))];
+  if (!slots.length) return [];
+  const classes = [`run--color-${slots[0]}`];
+  if (slots.length === 1) return classes;
+  classes.push(slots.length > MAX_BANDS ? "run--bands-more" : `run--bands-${slots.length}`);
+  slots.slice(0, MAX_BANDS + 1).forEach((slot, band) => classes.push(`run--band-${band}-${slot}`));
+  return classes;
+}
+
 /** Trim a raw drag-selection down to its visible characters. */
 export function trimToVisible(text, start, end) {
   let a = Math.max(0, Math.min(start, end));
@@ -496,17 +522,7 @@ export class SpanEditor {
       const edges = isHot ? this._hotEdges(start, start + node.textContent.length) : null;
       node.classList.toggle("run--hot-start", Boolean(edges?.atStart));
       node.classList.toggle("run--hot-end", Boolean(edges?.atEnd));
-      if (ids.length > 1) {
-        const runMentions = ids
-          .map((id) => this.mentions.find((m) => m.mention_id === id))
-          .filter(Boolean);
-        const activeMention = runMentions.find((m) => this.activeIds.has(m.mention_id));
-        const primary = activeMention || runMentions[0];
-        for (let i = 0; i < 6; i += 1) node.classList.remove(`run--color-${i}`);
-        if (primary && typeof primary.colorIndex === "number") {
-          node.classList.add(`run--color-${primary.colorIndex}`);
-        }
-      }
+      // The colours and bands of a run do not change with the selection (issue 524): the frame shows it.
     }
   }
 
@@ -560,6 +576,7 @@ export class SpanEditor {
       target.appendChild(marker);
     };
     const { starts, ends } = this._handlesByOffset();
+    const mentionStarts = new Map(this.mentions.map((m) => [m.mention_id, normaliseSpans(m.spans || [])[0]?.start ?? 0]));
     if (!runs.length) appendParagraph(0);
     for (const run of runs) {
       appendParagraph(run.start);
@@ -595,11 +612,7 @@ export class SpanEditor {
         const titles = runMentions.map((m) => m.label).filter(Boolean);
         if (titles.length) node.title = titles.join("; ");
         if (runMentions.some((m) => m.negated)) node.classList.add("run--negated");
-        const activeMention = runMentions.find((m) => this.activeIds.has(m.mention_id));
-        const primaryMention = activeMention || runMentions[0];
-        if (primaryMention && typeof primaryMention.colorIndex === "number") {
-          node.classList.add(`run--color-${primaryMention.colorIndex}`);
-        }
+        for (const name of bandClasses(runMentions, mentionStarts)) node.classList.add(name);
       }
 
       node.appendChild(document.createTextNode(this.text.slice(run.start, run.end)));

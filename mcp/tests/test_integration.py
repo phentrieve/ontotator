@@ -864,3 +864,76 @@ async def test_wrong_input_is_named_not_ignored(live: dict[str, str]) -> None:
         )
         assert done["applied"] is True and done["unknown_texts"] == wrong
         assert done["selection"] == f"4 texts of project '{project}'"
+
+
+@pytest.mark.anyio
+async def test_a_blinded_consolidator_reads_the_inputs_of_their_task(
+    live: dict[str, str],
+) -> None:
+    """Issue 471 point 7: with annotator names hidden, the consolidator's
+    personal token finds their consolidation task, reads its inputs and
+    each input's submission, under the opaque IDs and "Annotator A" of the
+    web interface; an annotator of the inputs reads none of it."""
+    made = _scenario(live, "blind-consolidation")
+    project = made["project"]
+    # Who must not be named, and the real IDs that must not come back.
+    hidden = [
+        value
+        for person in ("ann-0001", "ann-0002")
+        for value in (made["users"][person], made["pseudonyms"][person])
+    ] + list(made["submissions"])
+    async with Client(
+        _server(live, made["tokens"]["adj"], read_content=True)
+    ) as consolidator:
+        tasks = await call(consolidator, "list_my_tasks", {})
+        [task] = [
+            t
+            for t in tasks["items"]
+            if t["project_key"] == project and t["task"] == "review"
+        ]
+        found = await call(
+            consolidator,
+            "get_consolidation_inputs",
+            {"assignment_id": task["assignment_id"], "include_text": True},
+        )
+        [round_] = found["rounds"]
+        assert round_["kind"] == "consolidation"
+        inputs = round_["inputs"]
+        assert len(inputs) > 10
+        authors = {
+            i["source_snapshot"]["annotation"]["provenance"]["actor"]["actor_id"]
+            for i in inputs
+        }
+        assert authors == {"annotator-a", "annotator-b"}
+        # Each passage with its text, on request.
+        segment = inputs[0]["source_snapshot"]["evidence"][0]["mention"]["segments"][0]
+        assert segment["text"] == made["text"][segment["start"] : segment["end"]]
+        sources = sorted({i["source_submission_id"] for i in inputs})
+        assert len(sources) == 2
+        assert all(s.startswith("sub-z") for s in sources)
+        # get_submission takes the opaque IDs as they are.
+        labels = set()
+        whole = json.dumps(found)
+        for sid in sources:
+            submission = await call(
+                consolidator,
+                "get_submission",
+                {
+                    "project": project,
+                    "document_id": found["document_id"],
+                    "submission_id": sid,
+                },
+            )
+            labels.add(submission["summary"]["author_label"])
+            whole += json.dumps(submission)
+        assert labels == {"Annotator A", "Annotator B"}
+        assert [value for value in hidden if value in whole] == []
+    async with Client(
+        _server(live, made["tokens"]["ann-0001"], read_content=True)
+    ) as annotator:
+        with pytest.raises(ToolFailed, match="ASSIGNMENT_NOT_FOUND"):
+            await call(
+                annotator,
+                "get_consolidation_inputs",
+                {"assignment_id": task["assignment_id"]},
+            )

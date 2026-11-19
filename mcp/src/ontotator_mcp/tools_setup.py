@@ -43,6 +43,20 @@ ANY_SCOPE: tuple[Scope, ...] = ("read", "import", "export", "project-admin")
 # A token closer than this to its expiry is reported for replacement.
 EXPIRY_WARNING_DAYS = 14
 MAX_LISTED = 50
+# What list_my_tasks keeps of a task of the web interface's task list.
+MY_TASK = (
+    "assignment_id",
+    "project_key",
+    "document_id",
+    "case_id",
+    "language",
+    "version",
+    "task",
+    "status",
+    "active_round_id",
+    "held",
+    "updated_at",
+)
 
 
 def _cut(items: Any, limit: int = MAX_LISTED) -> Any:
@@ -248,6 +262,19 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         me = await api.get("/api/v1/auth/me")
         me.pop("csrf_token", None)
         return result | {"user": me}
+
+    @register(server, scopes="read", effect="read")
+    async def list_my_tasks() -> dict[str, Any]:
+        """The token owner's own tasks, as the web interface's task list shows them.
+
+        Each task: 'assignment_id', project, text ('document_id', case,
+        language, version), 'task' ('annotate', 'translation_review' or
+        'review', the consolidation) and 'status'. The assignment_id of a
+        consolidation task is what get_consolidation_inputs takes (a content
+        tool). Needs a personal token: a project token is refused.
+        """
+        tasks: list[dict[str, Any]] = await api.get("/api/v1/me/tasks")
+        return listing([{name: item.get(name) for name in MY_TASK} for item in tasks])
 
     @register(server, scopes="read", effect="read")
     async def list_projects() -> dict[str, Any]:
