@@ -1387,7 +1387,8 @@ describe("CaseScreen integration", () => {
         await addHypotonia(rendered.container);
         await waitFor(() => expect((document.activeElement as HTMLElement).hasAttribute("data-confirm-defaults")).toBe(true));
         expect(document.activeElement!.textContent).toContain("Confirm defaults (3)");
-        expect(announcer()).toBe("Hypotonia added. Values from defaults: Present, Patient, Current. Confirm defaults or change a value.");
+        // The announcement is rendered after the focus moves (a state update of the same effect).
+        await waitFor(() => expect(announcer()).toBe("Hypotonia added. Values from defaults: Present, Patient, Current. Confirm defaults or change a value."));
       });
 
       it("after adding a term focuses the first required empty value instead", async () => {
@@ -1398,7 +1399,8 @@ describe("CaseScreen integration", () => {
         await addHypotonia(rendered.container);
         await waitFor(() => expect((document.activeElement as HTMLElement).closest('[data-axis-field="assertion"]')).not.toBeNull());
         expect((document.activeElement as HTMLInputElement).type).toBe("radio");
-        expect(announcer()).toBe("Hypotonia added. Values from defaults: Patient, Current. Confirm defaults or change a value.");
+        // The announcement is rendered after the focus moves (a state update of the same effect).
+        await waitFor(() => expect(announcer()).toBe("Hypotonia added. Values from defaults: Patient, Current. Confirm defaults or change a value."));
       });
 
       it("D confirms all defaults in one set_axes and returns focus to the text after the mark", async () => {

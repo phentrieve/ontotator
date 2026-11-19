@@ -4604,6 +4604,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
             onClose={handleCloseTree}
             onUseTerm={handleUseTreeTerm}
             languages={searchLanguagesFor(treeWalk.layerId)?.active}
+            username={versionContext?.username}
           />
         )}
         {/* The divider drawn above the tree sets its height (three columns only, editor.css); after it in the
