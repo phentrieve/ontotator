@@ -169,7 +169,7 @@ async def test_setup_import_status_and_export(
         )
         assert created["name"] == "MCP smoke"
         assert PROJECT in {
-            p["project_key"] for p in await call(client, "list_projects", {})
+            p["project_key"] for p in (await call(client, "list_projects", {}))["items"]
         }
 
         check = await call(
@@ -200,7 +200,7 @@ async def test_setup_import_status_and_export(
             "set_member_roles",
             {"project": PROJECT, "username": "ann1", "roles": ["annotator"]},
         )
-        people = await call(client, "list_people", {"project": PROJECT})
+        people = (await call(client, "list_people", {"project": PROJECT}))["items"]
         assert "ann1" in {p["username"] for p in people}
 
         # Taking a role away is a dry run until confirmed.
@@ -208,11 +208,11 @@ async def test_setup_import_status_and_export(
         dry = await call(client, "set_member_roles", remove)
         assert dry["applied"] is False
         assert dry["plan"]["removed_roles"] == ["annotator"]
-        people = await call(client, "list_people", {"project": PROJECT})
+        people = (await call(client, "list_people", {"project": PROJECT}))["items"]
         assert "ann1" in {p["username"] for p in people}
         done = await call(client, "set_member_roles", remove | {"confirm": True})
         assert done["applied"] is True
-        people = await call(client, "list_people", {"project": PROJECT})
+        people = (await call(client, "list_people", {"project": PROJECT}))["items"]
         assert "ann1" not in {p["username"] for p in people}
         await call(
             client,
@@ -359,7 +359,7 @@ async def test_setup_import_status_and_export(
         # Nothing is submitted (that needs the browser): only the imported
         # tool proposals are offered. Their passages are offsets; with
         # include_text each carries the text it marks.
-        [offered] = await call(reader, "list_annotation_versions", about)
+        [offered] = (await call(reader, "list_annotation_versions", about))["items"]
         assert offered["kind"] == "proposals"
         one = about | {"kind": "proposals", "version_id": offered["id"]}
         plain = await call(reader, "get_annotation_version", one)
@@ -441,7 +441,9 @@ async def test_no_default_tool_returns_text_of_a_project(
                     content, "get_text_version", about | {"include_text": True}
                 )
                 needles += _needles(version["text"])
-                for offered in await call(content, "list_annotation_versions", about):
+                for offered in (await call(content, "list_annotation_versions", about))[
+                    "items"
+                ]:
                     found = await call(
                         content,
                         "get_annotation_version",
@@ -458,11 +460,13 @@ async def test_no_default_tool_returns_text_of_a_project(
                         for segment in evidence["mention"]["segments"]
                         if " " in segment["text"]
                     ]
-            reviews = await call(
-                content,
-                "list_translation_reviews",
-                {"project": project, "include_text": True},
-            )
+            reviews = (
+                await call(
+                    content,
+                    "list_translation_reviews",
+                    {"project": project, "include_text": True},
+                )
+            )["items"]
             needles += [n for r in reviews for n in _needles(r["proposed_text"])]
         needles = sorted(set(needles))
         assert len(needles) >= 3, needles
@@ -570,7 +574,10 @@ async def test_a_bulk_reopen_and_a_withdrawal_can_be_undone(
         assert sorted(t["assignment_id"] for t in would["would_restore"]) == sorted(
             changed
         )
-        assert {t["person"] for t in would["would_restore"]} == {"Tom Reis", "R. Roe"}
+        restored = [t["person"] for t in would["would_restore"]]
+        assert {p["display_name"] for p in restored} == {"Tom Reis", "R. Roe"}
+        # One person, three names (#471): the login name comes with them.
+        assert all(p["username"] and p["pseudonym"] for p in restored)
         # The dry run changed nothing.
         assert await _statuses(client, project) == reopened
         undone = await call(client, "undo_reopen_or_withdraw", undo | {"confirm": True})
@@ -745,11 +752,13 @@ async def test_a_version_is_uploaded_from_a_reviews_proposed_text(
     project = made["project"]
     document_id = f"{made['cases']['take_text']}~de~v1"
     async with Client(_server(live, made["token"])) as client:
-        [review] = await call(
-            client,
-            "list_translation_reviews",
-            {"project": project, "document_id": document_id},
-        )
+        [review] = (
+            await call(
+                client,
+                "list_translation_reviews",
+                {"project": project, "document_id": document_id},
+            )
+        )["items"]
         fixes = [{"old": "muscular hypotonia", "new": "low muscle tone"}]
         upload = {
             "project": project,

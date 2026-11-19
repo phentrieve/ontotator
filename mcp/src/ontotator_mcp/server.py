@@ -52,6 +52,21 @@ whoami to check the connection. Tools that read or write local files only
 use paths inside the folders of ONTOTATOR_MCP_FILES_DIR and refuse without
 that variable; the other tools work without it. Long imports and exports are jobs: tools
 wait for them by default; get_job polls one.
+
+Answers are short by default. list_texts returns at most 100 texts in a
+short form: ask for more with 'fields', page with 'limit' and 'offset'
+('next_offset'). project_audit leaves out each event's details
+(include_details) and project_overview the links (include_links). A tool
+that lists things returns {'items': [...], 'count': n}, also when nothing
+is found.
+
+Names. A person is always 'username', 'display_name' and 'pseudonym'; a
+name the server does not return is null (project_audit names nobody's
+login: match by pseudonym). Arguments take the username.
+The task 'review' is a consolidation: results say 'review', and arguments
+that take task names accept 'consolidation' as well. A case ID is not a
+document_id: a document_id names one version of one text, so take it from
+list_texts (for a source text the two can be the same string).
 """
 
 # Added to the instructions when ONTOTATOR_MCP_READ_CONTENT=1.

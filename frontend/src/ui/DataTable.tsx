@@ -70,6 +70,11 @@ export interface DataTableProps<T> {
   sort?: DataTableSort;
   /** Called with the column id when a sortable header is activated; turns off client-side sorting. */
   onSort?: (column: string) => void;
+  /**
+   * Without `groups`: only the first `count` sorted rows and the later ones `keep` names, then a full-width row
+   * with `more(total)`.
+   */
+  rowLimit?: { count: number; more: (total: number) => ReactNode; keep?: (row: T) => boolean };
 }
 const groupSelectionModeOf = (event: MouseEvent<HTMLInputElement>): GroupSelectMode =>
   event.shiftKey ? "range" : event.ctrlKey || event.metaKey ? "toggle-keep-anchor" : "toggle";
@@ -90,7 +95,7 @@ function moveSelection(event: KeyboardEvent<HTMLInputElement>, selector: string)
 const SELECT_BOXES = { label: "input.data-table-group-select, input.data-table-row-select", group: "input.data-table-group-select", row: "input.data-table-row-select" } as const;
 const indeterminateRef = (value: boolean) => (element: HTMLInputElement | null) => { if (element) element.indeterminate = value; };
 export function DataTable<T>({ label, columns, rows, rowKey, initialSort, empty, rowProps, className, groups, renderExpanded, busy, groupSelection,
-  rowSelection, groupLayout, selectionHeader, rowEdge, sort: serverSort, onSort }: DataTableProps<T>): JSX.Element {
+  rowSelection, groupLayout, selectionHeader, rowEdge, sort: serverSort, onSort, rowLimit }: DataTableProps<T>): JSX.Element {
   const [clientSort, setSort] = useState(initialSort);
   const sort = onSort ? serverSort : clientSort;
   const labelLayout = (groupLayout ?? (rowSelection ? "label" : "header")) === "label";
@@ -153,7 +158,10 @@ export function DataTable<T>({ label, columns, rows, rowKey, initialSort, empty,
     }) : emptyBody;
   } else {
     const sortedRows = sortRows(rows);
-    body = sortedRows.length ? <tbody>{sortedRows.map(renderRow)}</tbody> : emptyBody;
+    const limited = rowLimit !== undefined && sortedRows.length > rowLimit.count;
+    const shownRows = limited ? sortedRows.filter((row, index) => index < rowLimit.count || rowLimit.keep?.(row)) : sortedRows;
+    body = sortedRows.length ? <tbody>{shownRows.map(renderRow)}
+      {limited && <tr className="data-table-more"><td colSpan={span}>{rowLimit.more(sortedRows.length)}</td></tr>}</tbody> : emptyBody;
   }
   const sortable = (column: Column<T>) => Boolean(column.sortValue || (onSort && column.sortable));
   const sortBy = (column: Column<T>) => onSort

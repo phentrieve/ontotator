@@ -35,6 +35,18 @@ it("row_props_select_and_handle_events", () => {
   expect(selected.getAttribute("aria-selected")).toBe("true"); expect(selected.className).toContain("is-selected"); expect(selected.className).toContain("custom");
   expect(selected.hasAttribute("selected")).toBe(false); fireEvent.click(selected); expect(click).toHaveBeenCalledOnce();
 });
+it("row_limit_shows_the_first_sorted_rows_then_the_more_row", () => {
+  const { rerender } = render(<DataTable label="Cases" columns={columns} rows={rows} rowKey={(row) => row.id} rowLimit={{ count: 2, more: (total) => `2 of ${total}` }} />);
+  expect(names()).toEqual(["Alpha", "Beta", "2 of 3"]);
+  expect(screen.getAllByRole("row").at(-1)?.querySelector("td")?.getAttribute("colspan")).toBe("2");
+  // The limit applies after sorting: the first rows of the sorted order are shown.
+  fireEvent.click(screen.getByRole("button", { name: "Count" })); fireEvent.click(screen.getByRole("button", { name: "Count" }));
+  expect(names()).toEqual(["Alpha", "Gamma", "2 of 3"]);
+  rerender(<DataTable label="Cases" columns={columns} rows={rows} rowKey={(row) => row.id} rowLimit={{ count: 1, more: () => "more", keep: (row) => row.id === "b" }} />);
+  expect(names()).toEqual(["Alpha", "Beta", "more"]);
+  rerender(<DataTable label="Cases" columns={columns} rows={rows} rowKey={(row) => row.id} rowLimit={{ count: 3, more: () => "more" }} />);
+  expect(names()).toEqual(["Alpha", "Gamma", "Beta"]);
+});
 describe("groups_expansion_and_row_headers", () => {
   type Row = { id: string; group: string; name: string; n: number };
   const rows: Row[] = [{ id: "a1", group: "A", name: "de", n: 2 }, { id: "a2", group: "A", name: "en", n: 1 }, { id: "b1", group: "B", name: "fr", n: 3 }];

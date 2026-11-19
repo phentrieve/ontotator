@@ -33,6 +33,8 @@ REQUIRED_WHEEL_FILES = [
     "ontotator/storage/migrations/script.py.mako",
     *(f"ontotator/storage/migrations/versions/{name}" for name in MIGRATION_FILES),
     "ontotator/web/index.html",
+    # Applies the chosen theme before the app starts; index.html loads it.
+    "ontotator/web/theme.js",
     "ontotator/web/licenses/source-serif-4-OFL.txt",
     "ontotator/web/licenses/source-sans-3-OFL.txt",
 ]

@@ -356,6 +356,7 @@ def undo(
         {int(item["previous"]["actor_id"]) for item in entries},
         viewer_id=actor.user_id,
         viewer_is_lead=True,
+        logins_of_project=pid,
     )
     restores: list[dict[str, Any]] = []
     blocked: list[dict[str, Any]] = []

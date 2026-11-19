@@ -8,6 +8,10 @@ import "@fontsource-variable/source-serif-4/opsz-italic.css";
 import "@fontsource-variable/source-sans-3/index.css";
 import "@fontsource-variable/source-sans-3/wght-italic.css";
 import "./styles/index.css";
+import { applyTheme, readTheme } from "./ui/theme";
+
+// The theme chosen on Profile; public/theme.js has normally applied it before the first paint already.
+applyTheme(readTheme());
 
 const rootEl = document.getElementById("root");
 if (rootEl) {

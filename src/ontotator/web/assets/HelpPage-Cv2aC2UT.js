@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-D3LPZRTY.js";import{n as a,t as o}from"./lib-Caon1unn.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-CjtmWtUo.js";import{n as a,t as o}from"./lib-CFifmfOu.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -151,7 +151,7 @@ Other users do not see this group. If they open such a page by its address, they
 What for: check who has an account, whether they finished setup and when they last logged in.
 
 1. In the sidebar, open **Administration** › **Users**.
-2. Type a username or display name into **Filter users**.
+2. Type a username or display name into **Filter users**. With more than 100 accounts, the table shows the first 100; **Show all** shows the rest.
 3. Read the table. **Setup** shows **Pending** until the person has set a password. **Last login** shows **Never** if they have not logged in yet. **Active** reads **Yes**, **No** or **Anonymised**. **Projects** shows how many projects the person belongs to; click it to see the projects and the person's roles in each.
 4. Click a row to highlight it. Click it again to clear the highlight.
 5. Click **Refresh users** to reload the list.
@@ -1747,6 +1747,18 @@ What for: keep your name, languages and qualification up to date.
 Your **Username** and **Pseudonym** cannot be changed. Exports show your pseudonym, not your name, unless you tick the box in step 3.
 
 Fill in **Qualification** if you do translation reviews: you cannot submit a translation review without it.
+
+## Choose a light or dark theme
+
+What for: read comfortably, for example in a dim room.
+
+1. Click **Profile** in the sidebar.
+2. Go to **Appearance**.
+3. Under **Theme**, choose **System**, **Light** or **Dark**. The page changes at once; there is nothing to save.
+
+**System** follows the light or dark setting of your device and changes with it. **Light** and **Dark** stay as chosen.
+
+The choice is kept in this browser, for everyone who uses it, and also applies to the login page. On another computer or in another browser, choose again. The images in this handbook show the light theme.
 
 ## Practice in your profile
 

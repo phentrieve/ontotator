@@ -25,7 +25,7 @@ from ontotator_mcp.errors import (
     stale_note,
 )
 from ontotator_mcp.models import Replacement, TextRef
-from ontotator_mcp.tooling import register, tool_message
+from ontotator_mcp.tooling import NOT_A_CASE_ID, people, register, tool_message
 from ontotator_mcp.tools_people import assignment_summary
 from ontotator_mcp.tools_setup import _cut, unknown_texts
 from ontotator_mcp.tools_status import rows
@@ -34,7 +34,8 @@ from ontotator_mcp.tools_translation_decisions import change_summary, text_from_
 Project = Annotated[str, Field(description="Project key, e.g. 'ward-7'.")]
 AssignmentId = Annotated[int, Field(description="The task's ID (list_assignments).")]
 DocumentId = Annotated[
-    str, Field(description="Text version ID (list_texts, versions).")
+    str,
+    Field(description="Text version ID (list_texts, versions)." + NOT_A_CASE_ID),
 ]
 Confirm = Annotated[
     bool, Field(description="False: dry run, changes nothing. True: apply.")
@@ -330,28 +331,19 @@ def register_lead(
         }
 
         def summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
-            def people(items: list[dict[str, Any]], key: str) -> list[str]:
-                names = [
-                    (item.get(key) or {}).get("display_name")
-                    or (item.get(key) or {}).get("pseudonym")
-                    for item in items
-                ]
-                return sorted({str(name) for name in names if name})
-
             changes = [
                 {
                     "case_id": item.get("case_id"),
                     "language": item.get("language"),
                     "from_mode": item.get("from_mode"),
                     "discarded_submissions": len(item.get("submissions", [])),
-                    "authors": people(item.get("submissions", []), "author"),
+                    "authors": people(
+                        sub.get("author") for sub in item.get("submissions", [])
+                    ),
                     "withdrawn_unsubmitted_tasks": people(
-                        [
-                            task
-                            for task in item.get("assignments", [])
-                            if task.get("status") != "submitted"
-                        ],
-                        "person",
+                        task.get("person")
+                        for task in item.get("assignments", [])
+                        if task.get("status") != "submitted"
                     ),
                 }
                 for item in found.get("changes", [])
@@ -749,7 +741,7 @@ def register_lead(
             Field(
                 description=(
                     "The newest version of the translation (list_texts,"
-                    " versions); the new version follows it."
+                    " versions); the new version follows it." + NOT_A_CASE_ID
                 )
             ),
         ],
@@ -809,7 +801,15 @@ def register_lead(
             str | None, Field(description="Person or group who made the text.")
         ] = None,
         note: Annotated[
-            str | None, Field(description="Free note (shown on the row).")
+            str | None,
+            Field(
+                description=(
+                    "Free note on how the text was made. Shown on the lead's"
+                    " row of the text and to a translation reviewer of this"
+                    " version (Translation details, 'Note'); write nothing"
+                    " in it the reviewer should not read."
+                )
+            ),
         ] = None,
         expected_previous_sha256: Annotated[
             str | None,
@@ -907,7 +907,7 @@ def register_lead(
             Field(
                 description=(
                     "The newest version of the translation (list_texts,"
-                    " versions); the corrected version follows it."
+                    " versions); the corrected version follows it." + NOT_A_CASE_ID
                 )
             ),
         ],
@@ -1088,17 +1088,39 @@ def register_lead(
     async def annotation_target_preview(
         project: Project,
         annotations_per_text: Annotated[int, Field(ge=1)],
+        limit: Annotated[
+            int, Field(ge=1, le=2000, description="Name at most this many texts.")
+        ] = 200,
     ) -> dict[str, Any]:
-        """How many texts already have more annotation tasks than a new target.
+        """Which texts already have more annotators than a new target.
 
         Check this before lowering annotations_per_text with
         update_project_settings: those texts keep their extra tasks.
+        'rows_over_target' counts them and 'texts' names them (case_id,
+        language, 'annotators': the number on the current version), by case
+        and language. Texts with their own annotations per text are left
+        out: they keep their value. For the texts over the limit as it is
+        now, use list_texts with over_limit.
         """
         preview: dict[str, Any] = await api.get(
             project_path(project, "work-plans/annotation-target-preview"),
             annotations_per_text=annotations_per_text,
         )
-        return preview
+        result: dict[str, Any] = {"rows_over_target": preview.get("rows_over_target")}
+        found = preview.get("rows")
+        if found is None:
+            # A server older than this change counts the texts only.
+            return result | {
+                "texts": None,
+                "note": (
+                    "This Ontotator server does not name the texts yet (it is"
+                    " older than this MCP server; see whoami)."
+                ),
+            }
+        return result | {
+            "texts": found[:limit],
+            "texts_not_listed": max(len(found) - limit, 0),
+        }
 
     @register(server, scopes="project-admin", effect="changes", idempotent=True)
     async def set_annotations_per_text(
@@ -1145,7 +1167,11 @@ def register_lead(
         project: Project,
         assignment_id: AssignmentId,
         target_document_id: Annotated[
-            str, Field(description="The new text version (list_texts, versions).")
+            str,
+            Field(
+                description="The new text version (list_texts, versions)."
+                + NOT_A_CASE_ID
+            ),
         ],
         confirm_unreviewed_translation: bool = False,
         confirm: Confirm = False,
@@ -1185,7 +1211,11 @@ def register_lead(
         project: Project,
         assignment_id: AssignmentId,
         target_document_id: Annotated[
-            str, Field(description="The new text version (list_texts, versions).")
+            str,
+            Field(
+                description="The new text version (list_texts, versions)."
+                + NOT_A_CASE_ID
+            ),
         ],
         resolution: Annotated[
             Literal["finish_then_carry", "withdrawn"],
@@ -1238,7 +1268,11 @@ def register_lead(
             str, Field(description="A submission on an old version of the text.")
         ],
         target_document_id: Annotated[
-            str, Field(description="The new text version (list_texts, versions).")
+            str,
+            Field(
+                description="The new text version (list_texts, versions)."
+                + NOT_A_CASE_ID
+            ),
         ],
         mode: Annotated[
             Literal["author", "other", "dismiss"],

@@ -11,7 +11,7 @@ from pydantic import Field
 from ontotator_mcp.client import OntotatorClient, project_path, seg
 from ontotator_mcp.errors import OntotatorError, check_preview_token, stale_note
 from ontotator_mcp.models import TextRef
-from ontotator_mcp.tooling import register, tool_message
+from ontotator_mcp.tooling import person, register, tool_message
 from ontotator_mcp.tools_setup import unknown_texts
 
 Project = Annotated[str, Field(description="Project key, e.g. 'ward-7'.")]
@@ -371,8 +371,7 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
                     "submission_id": item.get("submission_id"),
                     "version": item.get("version"),
                     "replaces_submission_id": item.get("from_submission_id"),
-                    "chosen_by": (item.get("selected_by") or {}).get("display_name")
-                    or (item.get("selected_by") or {}).get("pseudonym"),
+                    "chosen_by": person(item.get("selected_by")),
                     "chosen_at": item.get("selected_at"),
                 }
                 for item in found.get("restores", [])
