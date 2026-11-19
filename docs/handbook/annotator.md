@@ -140,6 +140,10 @@ What for: pick a broader or narrower term than the one you have.
 3. Click **Use this term** to give the selected finding this term.
 4. Click **Close tree**.
 
+In a wide window the tree sits under the annotation panel. To give the tree more or less room, drag the divider between the two (**Resize ontology tree**) up or down, or focus it and press `↑` or `↓`. A double click or `Enter` restores the usual split. The height is kept in this browser.
+
+To give the tree more room, click **Hide details** next to the name of the term below the tree: only its name and code stay, on one line. **Show details** brings the definition, synonyms and other parents back. Your choice is kept in this browser.
+
 The tree follows your work: select another finding and it opens at that finding's term. After **Use this term** it stays open and marks the new term as the current one. While you search a term for a new finding it steps aside and comes back afterwards. Select a proposal or a reference, or clear the selection, and it closes.
 
 ## Set values and confirm defaults
@@ -425,7 +429,7 @@ Then decide:
 | **Query** | The meaning may differ clinically and you are not sure. | Not accepted. The lead reads your rationale and decides: they take the text you proposed, or accept the translation as it is, and answer you. Annotation tasks already assigned keep waiting until then. |
 | **Rejected** | The translation changes the clinical meaning. | Not accepted. The lead decides: a new review, a correction or discarding it. Annotation tasks already assigned keep waiting. |
 
-A problem in the source that does not affect the translation is no reason for a **Query**. Examples: a dose that looks too low but is what the source says, a footnote digit stuck to a year, a word broken by a hyphen at a line end. If the translation gives the source correctly, accept it (**Accepted unchanged**, or **Accepted with corrections** if you corrected something else) and put your remark in the **Rationale**. It is kept with your review, and the lead reads it under **Translation reviews** in the text card. A **Query** holds the annotation of the text until the lead decides; keep it for a translation you are not sure about.
+A problem in the source that does not affect the translation is no reason for a **Query**. Examples: a dose that looks too low but is what the source says, a footnote digit stuck to a year, a word broken by a hyphen at a line end. If the translation gives the source correctly, accept it (**Accepted unchanged**, or **Accepted with corrections** if you corrected something else) and put your remark in the **Rationale**. It is kept with your review. The lead reads the **Rationale** of every review, also of an accepted one, under **Translation reviews** in the text card and in the list of all translation reviews. A **Query** holds the annotation of the text until the lead decides; keep it for a translation you are not sure about.
 
 Steps:
 

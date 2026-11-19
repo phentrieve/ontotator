@@ -41,17 +41,21 @@ def register_scenario_route(app: FastAPI) -> None:
     """``POST /__test_scenario__``: a fresh scenario project and a token of
     its lead. ``consolidation`` is the two-annotator text with findings of
     ``browser_consolidation_scenarios``; every other name is a Documents
-    scenario (``browser_documents_scenarios.registry``)."""
+    scenario (``browser_documents_scenarios.registry``) or a lead workflow
+    scenario (``browser_lead_workflow_scenarios.BUILDERS``)."""
 
     @app.post("/__test_scenario__")
     def scenario(name: str = Query(...)) -> dict[str, object]:
         import browser_consolidation_scenarios as consolidation
+        import browser_lead_workflow_scenarios as lead_workflow
         from browser_documents_scenarios import registry
 
         if name == "consolidation":
             built = consolidation.build(app, started=False)
         elif name in registry():
             built = registry()[name](app)
+        elif name in lead_workflow.BUILDERS:
+            built = lead_workflow.BUILDERS[name](app)
         else:
             raise HTTPException(404, f"Unknown scenario {name!r}")
         issued = app.state.api_tokens.create(

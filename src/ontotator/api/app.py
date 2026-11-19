@@ -637,6 +637,11 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
     )
 
     app.include_router(translation_review_router)
+    from ontotator.api.translation_review_list_routes import (
+        router as translation_review_list_router,
+    )
+
+    app.include_router(translation_review_list_router)
     from ontotator.api.work_time_routes import router as work_time_router
 
     app.include_router(work_time_router)

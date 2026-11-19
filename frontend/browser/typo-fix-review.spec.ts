@@ -37,6 +37,8 @@ function consoleErrors(page: Page): string[] {
 }
 
 async function login(page: Page, s: LeadScenario, who: LeadPerson) {
+  // Leave the page first: a request it still sends without the cookies would end in a 401 in the console.
+  await page.goto("about:blank");
   await page.context().clearCookies();
   if (who !== "lead") return loginThroughForm(page, s.users[who], s.display_names[who]);
   await loginThroughForm(page, s.users.lead, s.display_names.lead, { lastProject: s.project });
