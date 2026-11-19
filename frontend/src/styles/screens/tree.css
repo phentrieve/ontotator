@@ -128,6 +128,16 @@
   background: var(--warning-light);
 }
 
+/* Issue 523: the tree opened only to look says so under its header. */
+.tree-mode-note {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  background: var(--accent-light);
+  border-bottom: 1px solid var(--border);
+}
+
 .tree-loading {
   padding: 12px;
   font-size: 0.85rem;
@@ -295,6 +305,18 @@
 .tree-detail__actions .btn {
   flex-shrink: 0;
   white-space: nowrap;
+}
+
+/* The confirmation of "Use this term instead…": what happens on one line, Confirm and Cancel below it. */
+.tree-detail__actions--confirm {
+  flex-wrap: wrap;
+}
+
+.tree-detail__effect {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
 }
 
 .tree-detail__hint {

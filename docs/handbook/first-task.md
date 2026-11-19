@@ -57,7 +57,7 @@ Repeat steps 5 and 6 for every finding in the text.
 In a task *Annotation, from proposals*, the column **Review Proposals** lists findings a tool suggested. Tools make mistakes, especially with negations: a tool may propose "Keine Krampfanfälle" (no seizures) as **Present**.
 
 1. Select the first proposal. The text shows where it was found, and the line *Source* names the tool that made it.
-2. Check three things: the marked text, the term and every value.
+2. Check three things: the marked text, the term and every value. To see broader and narrower terms of the proposed term, click **Show in tree**; the tree only shows terms until you confirm one.
 3. Click **Confirm** if all three are right, **Reject** if the proposal is wrong, or **Edit & Replace** to correct it in a copy, listed under the proposal, then click **Done, back to the proposal**. Changing a value or the text span in the copy replaces the proposal; confirming a default alone does not. Changed your mind? Click **Discard copy**: the copy is removed and the proposal is open again. A changed copy asks first. Only if you really cannot decide, click **Unresolved** and write a **Reviewer note** saying why.
 4. The next open proposal is selected. Go on until every proposal is decided.
 5. Then read the whole text for findings the tool missed. Mark text that has no proposal and add the finding as in step 5. It appears under **Your own findings**, next to the proposals.
