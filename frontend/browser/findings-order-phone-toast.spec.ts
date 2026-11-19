@@ -181,11 +181,14 @@ for (const size of [PHONE, { width: 375, height: 667 }, { width: 667, height: 37
 
 test("issue 452: a passage marked where the bar appears is moved clear of it, by no more than needed", async ({ page }) => {
   const errors = consoleErrors(page);
-  // A window so low that the first line of the text is at its bottom edge, where the bar goes.
-  const s = await openLoop(page, { width: 390, height: 270 });
+  // A window so low that the first line of the text is at its bottom edge, where the bar goes. (258 px since the
+  // shell header got lower at this width: the user menu button is narrower than "Log out" was, so the breadcrumb
+  // wraps less, issue 510.)
+  const height = 258;
+  const s = await openLoop(page, { width: 390, height });
   const text = s.texts["loop-en"];
   const line = (await textPane(page).locator(".run").first().boundingBox())!;
-  expect(line.y + line.height, "the text's first line is where the bar will be").toBeGreaterThan(270 - 40);
+  expect(line.y + line.height, "the text's first line is where the bar will be").toBeGreaterThan(height - 40);
   await selectText(page, text.indexOf("patient"), text.indexOf("patient") + "patient".length);
   await expect(pendingBar(page)).toBeVisible();
   const marked = page.locator(".text-container .run--marked").first();

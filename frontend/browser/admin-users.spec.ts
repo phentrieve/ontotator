@@ -7,7 +7,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { expect, test, type Locator, type Page, type Request } from "@playwright/test";
-import { authenticatedRequest, loginThroughForm, openTasksHome, TEST_PASSWORD } from "./helpers";
+import { authenticatedRequest, clickLogOut, loginThroughForm, openTasksHome, TEST_PASSWORD } from "./helpers";
 import { leadScenario } from "./leadWorkflowHelpers";
 
 test.setTimeout(120_000);
@@ -102,7 +102,7 @@ function openRequests(page: Page): Set<Request> {
  */
 async function logout(page: Page, open: Set<Request>) {
   await expect.poll(() => open.size).toBe(0);
-  await page.getByRole("button", { name: "Log out", exact: true }).click();
+  await clickLogOut(page);
   await expect(page.getByRole("form", { name: "Log in to Ontotator" })).toBeVisible();
 }
 
