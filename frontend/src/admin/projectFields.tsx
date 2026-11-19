@@ -165,11 +165,11 @@ export function ProfileUpload({ onChange, disabled, id = "project-profile-file",
 export type ToolProposalMode = "proposals" | "scratch";
 export interface WorkflowDraft { import_plan: ProjectSettings["import_plan"]; annotations_per_text: number; tool_proposal_mode: ToolProposalMode; annotate_accepted_translations_only: boolean; adjudicator_not_annotator: boolean; blind_consolidation: boolean; record_working_time: boolean }
 export const workflowOf = (settings: ProjectSettings): WorkflowDraft => ({ import_plan: settings.import_plan ?? "review_and_annotate_translations", annotations_per_text: settings.annotations_per_text ?? 1, tool_proposal_mode: settings.tool_proposal_mode ?? "proposals", annotate_accepted_translations_only: settings.annotate_accepted_translations_only ?? true, adjudicator_not_annotator: settings.adjudicator_not_annotator, blind_consolidation: settings.blind_consolidation ?? false, record_working_time: settings.record_working_time ?? false });
-const toolProposalOptions: { value: ToolProposalMode; label: string; help: string }[] = [
+export const toolProposalOptions: { value: ToolProposalMode; label: string; help: string }[] = [
   { value: "proposals", label: "Annotators work from the proposals", help: "confirm, reject, correct, add" },
   { value: "scratch", label: "Annotators start from scratch", help: "proposals hidden" },
 ];
-const importPlanOptions: { value: WorkflowDraft["import_plan"]; label: string }[] = [
+export const importPlanOptions: { value: WorkflowDraft["import_plan"]; label: string }[] = [
   { value: "review_and_annotate_translations", label: "Plan review and annotation for every translation" },
   { value: "nothing", label: "Plan nothing; I plan texts on Documents" },
 ];

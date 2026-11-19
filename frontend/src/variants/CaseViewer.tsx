@@ -207,7 +207,7 @@ export function CaseViewer({ projectKey, caseId, variant, show, annotations, com
     <label className="text-view-field"><span>Show</span><ShowSelect entries={layers.entries ?? []} value={selection} otherLabel={ref?.label} onChange={key => move(current.document_id, key)} /></label>
   </>;
   return <section className={`case-viewer${compareOpen ? " case-comparing" : ""}`} aria-label="Case viewer">
-    <TextViewToolbar projectKey={projectKey} caseId={detail.case_id} language={current.language} documents={documents} onNavigate={onNavigate}>
+    <TextViewToolbar projectKey={projectKey} caseId={detail.case_id} language={current.language} documents={documents} onNavigate={onNavigate} canManage={access.canManage}>
       {!compareOpen && identitySelects}
       {access.allowed && <Button ref={compareButton} size="sm" aria-expanded={compareOpen} onClick={() => compareOpen ? closeComparison() : setCompareIdentity(identity)}>Compare</Button>}
       <SubmissionHistory projectKey={projectKey} caseId={caseId} documentId={current.document_id} language={current.language} version={current.version}

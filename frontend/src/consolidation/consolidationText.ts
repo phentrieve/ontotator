@@ -24,13 +24,14 @@ export function finalizationState(open: number, total: number, submitted: boolea
   return { state: `consolidating, ${open} of ${total} groups open`, tone: "now" };
 }
 
-export const OVERLAPPING = "(overlapping, comes with the chosen finding)";
-
-/** "2 fields to decide" / "1 field to decide"; "to decide" when nothing conflicts (Keep or Take). */
+/** "2 fields to decide" / "1 field to decide", counting the rows without a choice (#472); "to decide" when nothing conflicts (Keep or Take). */
 export const fieldsToDecide = (count: number) => count === 0 ? "to decide" : count === 1 ? "1 field to decide" : `${count} fields to decide`;
 
 /** "Not in result" (M2 M-7f; was "Leave out"): the finding is not in the consolidated result. */
 export const NOT_IN_RESULT = "not in result";
+
+/** Every row to decide has its choice, and "Keep" has not saved it yet (#472). */
+export const CHOSEN_NOT_SAVED = "chosen, not saved yet";
 
 /** The state word of a group card: what is left to decide, or how it was resolved. */
 export function groupStatus(group: Pick<ConsolidationGroupView, "state" | "attached_to"> & Partial<Pick<ConsolidationGroupView, "edited" | "kinds">>, conflicts: number): string {
@@ -97,6 +98,10 @@ export function addedHeading(own: boolean, addedBy: string | null | undefined): 
 export function standaloneWarning(present: readonly ConsolidationPersonView[], term: string): string {
   return `${namesOf(present)} used the modifier term ${term} as a finding. Keep it only if it names the finding itself; otherwise attach it to a finding.`;
 }
+
+/** Issue 470: why "Attach to a finding…" is inactive on a modifier term marked as a finding. */
+export const ATTACH_DECIDE_FIRST = "Decide the finding it belongs to first.";
+export const ATTACH_NO_FINDING = "This sentence has no finding to attach it to.";
 
 export const REOPEN_EDITED_WARNING = "Reopening drops your edit from the editor.";
 

@@ -80,7 +80,7 @@ class Guidelines:
             actor = Actor.user(uid, "gl-lead")
         self.actor = actor
 
-    def publish(self, text: str) -> int:
+    def publish(self, text: str, label: str | None = None) -> int:
         summary = self.svc.upload(
             self.actor,
             self.key,
@@ -88,6 +88,7 @@ class Guidelines:
             data=text.encode("utf-8"),
             change_note=None,
             expected_latest_version=self.latest,
+            label=label,
         )
         self.latest = summary.version
         return summary.version
@@ -420,8 +421,10 @@ def test_stamp_survives_withdrawal_and_views_mark_it(case_env) -> None:
     env = case_env
     leader = env.app.state.accounts.get_by_username("leader")
     guidelines = Guidelines(env.db, "proj", Actor.user(leader.id, "leader"))
-    for text in ("First", "Second", "Third"):
-        guidelines.publish(text)
+    # The second version has the project's own label (#487); it stays when
+    # the version is withdrawn.
+    for text, label in (("First", None), ("Second", "3.1"), ("Third", None)):
+        guidelines.publish(text, label)
     _stamped_seed(env, "alice", "under-v2", 2)
     seed_submission(env, "alice", "unstamped")
     guidelines.withdraw(2)
@@ -431,6 +434,8 @@ def test_stamp_survives_withdrawal_and_views_mark_it(case_env) -> None:
     by_id = {item["submission_id"]: item for item in listing.json()}
     assert by_id["under-v2"]["guideline_version"] == 2
     assert by_id["under-v2"]["guideline_withdrawn"] is True
+    assert by_id["under-v2"]["guideline_label"] == "3.1"
+    assert by_id["unstamped"]["guideline_label"] is None
     assert by_id["unstamped"]["guideline_version"] is None
     assert by_id["unstamped"]["guideline_withdrawn"] is False
     detail = env.lead.get(path(SOURCE, "submissions/under-v2"))
@@ -443,6 +448,8 @@ def test_stamp_survives_withdrawal_and_views_mark_it(case_env) -> None:
     lines = {item["submission_id"]: item for item in rows.json()["submissions"]}
     assert lines["under-v2"]["guideline_version"] == 2
     assert lines["under-v2"]["guideline_withdrawn"] is True
+    assert lines["under-v2"]["guideline_label"] == "3.1"
+    assert lines["unstamped"]["guideline_label"] is None
     assert lines["unstamped"]["guideline_version"] is None
     assert lines["unstamped"]["guideline_withdrawn"] is False
 
@@ -453,17 +460,19 @@ def test_stamp_survives_withdrawal_on_translation_review_records(review_env) -> 
         renv.db, "proj", Actor.user(renv.accesses["leader"].user_id, "leader")
     )
     reviews.publish("First")
-    reviews.publish("Second")
+    reviews.publish("Second", "3.1")
     decide(renv, "accepted_unchanged")
     reviews.publish("Third")
     reviews.withdraw(2)
     (record,) = renv.service.records(renv.accesses["leader"], "proj", "target")
     assert record.guideline_version == 2
     assert record.guideline_withdrawn is True
+    assert record.guideline_label == "3.1"
     opened = renv.service.open(renv.accesses["alice"], renv.ids["alice"])
     assert opened.submitted_record is not None
     assert opened.submitted_record.guideline_version == 2
     assert opened.submitted_record.guideline_withdrawn is True
+    assert opened.submitted_record.guideline_label == "3.1"
 
 
 def test_stamp_is_not_part_of_the_payload(tmp_path) -> None:

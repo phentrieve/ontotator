@@ -204,4 +204,34 @@ describe("reassignments and mode changes", () => {
       ["review", "Review: typos fixed in v3 by Luc Martin (ann-0005), 21 Oct, 17:24: Spacing"],
     ]);
   });
+  it("issue 483: the lead's decision on a query is one line with who, when and the answer", () => {
+    const lead = { pseudonym: "ann-0001", display_name: "Project Lead", is_me: true };
+    const ana = { pseudonym: "ann-0003", display_name: "Ana Weber", is_me: false };
+    const decision = { decided_document_id: "c-de", reviewed_document_id: "c-de", reviewer_assignment_id: 1, decided_at: "2026-10-21T17:24:00", decided_by: lead };
+    const review = work({ assignment_id: 1, document_id: "c-de", task: "translation_review", status: "submitted", author_label: "ann-0003", person: ana });
+    const taken = row({
+      case_id: "c", language: "de",
+      versions: [
+        version({ document_id: "c-de", origin: "machine_translation", translation_status: "reviewed", latest_review_decision: "query", is_newest_in_chain: false }),
+        version({ document_id: "c-de-v2", version: 2, origin: "correction", derived_from: "c-de", translation_status: "accepted", query_decision: { ...decision, kind: "reviewer_text", answer: "Yes, as proposed.", edited: false } }),
+      ],
+      work: [review],
+    });
+    expect(historyLines(taken, [], { now }).map(line => [line.stage, line.text])).toEqual([
+      ["review", "Review: Ana Weber (ann-0003), Query"],
+      ["review", "Review: query decided by you, the reviewer’s text taken, v1 → v2, 21 Oct, 17:24: Yes, as proposed."],
+    ]);
+    const kept = row({
+      case_id: "c", language: "de",
+      versions: [version({ document_id: "c-de", origin: "machine_translation", translation_status: "accepted", latest_review_decision: "query",
+        query_decision: { ...decision, kind: "unchanged", answer: "The short form is meant.", edited: false, decided_by: { ...lead, is_me: false } } })],
+      work: [review],
+    });
+    expect(historyLines(kept, [], { now }).map(line => line.text)).toEqual([
+      "Review: Ana Weber (ann-0003), Query",
+      "Review: query decided by Project Lead (ann-0001), v1 accepted as it is, 21 Oct, 17:24: The short form is meant.",
+    ]);
+    const edited = { ...taken, versions: [taken.versions[0], { ...taken.versions[1], query_decision: { ...decision, kind: "reviewer_text" as const, answer: null, edited: true } }] };
+    expect(historyLines(edited, [], { now }).at(-1)?.text).toBe("Review: query decided by you, the reviewer’s text taken with changes, v1 → v2, 21 Oct, 17:24");
+  });
 });

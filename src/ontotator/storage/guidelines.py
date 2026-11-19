@@ -23,6 +23,7 @@ class GuidelineFact:
     kind: GuidelineKind
     sha256: str
     withdrawn: bool
+    label: str | None = None
 
 
 def current_guideline_version(conn: Connection, project_id: int) -> int | None:
@@ -44,7 +45,7 @@ def current_guideline_version(conn: Connection, project_id: int) -> int | None:
 
 
 def guideline_facts(conn: Connection, project_id: int) -> dict[int, GuidelineFact]:
-    """Kind, hash and withdrawn flag of every version of the project."""
+    """Kind, hash, label and withdrawn flag of every version of the project."""
     withdrawn = (
         select(GuidelineWithdrawalRow.version)
         .where(
@@ -58,6 +59,7 @@ def guideline_facts(conn: Connection, project_id: int) -> dict[int, GuidelineFac
             GuidelineVersionRow.version,
             GuidelineVersionRow.kind,
             GuidelineVersionRow.body_sha256,
+            GuidelineVersionRow.label,
             withdrawn.label("withdrawn"),
         ).where(GuidelineVersionRow.project_id == project_id)
     )
@@ -66,6 +68,7 @@ def guideline_facts(conn: Connection, project_id: int) -> dict[int, GuidelineFac
             kind=cast(GuidelineKind, row.kind),
             sha256=row.body_sha256,
             withdrawn=bool(row.withdrawn),
+            label=row.label,
         )
         for row in rows
     }

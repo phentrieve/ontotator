@@ -855,6 +855,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/translation-reviews/{assignment_id}/draft/typography-hints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Draft Typography Hints
+         * @description Spacing errors and invisible characters of the saved draft text.
+         *
+         *     Rule codes and positions only, as the hints of a text version; shown in
+         *     the confirmation of "Submit review…". They block nothing.
+         */
+        get: operations["draft_typography_hints_api_v1_translation_reviews__assignment_id__draft_typography_hints_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/translation-reviews/{assignment_id}/checked-sentences": {
         parameters: {
             query?: never;
@@ -2359,6 +2382,34 @@ export interface paths {
          *     version of this translation, with this version's status.
          */
         post: operations["editorial_correction_api_v1_projects__key__documents__doc__editorial_correction_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{key}/documents/{doc}/query-decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Query Decision
+         * @description Issue 483, read only: the queried review of this version with the
+         *     reviewer's proposed text, this version's text and whether a lead can
+         *     decide the query.
+         */
+        get: operations["preview_query_decision_api_v1_projects__key__documents__doc__query_decision_get"];
+        put?: never;
+        /**
+         * Decide Query
+         * @description Issue 483: close a queried translation review as the lead: take the
+         *     reviewer's text as the next version, accepted, or accept this version as
+         *     it is; with an answer the reviewer reads at their submitted task.
+         */
+        post: operations["decide_query_api_v1_projects__key__documents__doc__query_decision_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4567,6 +4618,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Label */
+            label?: string | null;
         };
         /** AssignmentOpenRequest */
         AssignmentOpenRequest: {
@@ -4753,7 +4806,7 @@ export interface components {
              * @default case
              * @enum {string}
              */
-            sort: "case" | "import" | "activity";
+            sort: "case" | "import" | "activity" | "given";
             filters?: components["schemas"]["DocumentRowFilters"];
             /**
              * Mode
@@ -4800,7 +4853,7 @@ export interface components {
              * @default case
              * @enum {string}
              */
-            sort: "case" | "import" | "activity";
+            sort: "case" | "import" | "activity" | "given";
             filters?: components["schemas"]["DocumentRowFilters"];
             /**
              * Mode
@@ -4955,6 +5008,11 @@ export interface components {
              * @default
              */
             expected_latest_version: string;
+            /**
+             * Label
+             * @default
+             */
+            label: string;
         };
         /** Body_upload_ontologies_api_v1_admin_ontologies__post */
         Body_upload_ontologies_api_v1_admin_ontologies__post: {
@@ -4965,6 +5023,32 @@ export interface components {
         Body_upload_ontology_results_api_v1_admin_ontologies_upload_results_post: {
             /** Files[] */
             "files[]": string[];
+        };
+        /**
+         * BracketCheck
+         * @description ``passages`` is empty unless the translation has more passages.
+         */
+        BracketCheck: {
+            /** Source Count */
+            source_count: number;
+            /** Translation Count */
+            translation_count: number;
+            /** Passages */
+            passages: components["schemas"]["BracketedPassage"][];
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+        };
+        /** BracketedPassage */
+        BracketedPassage: {
+            /** Start */
+            start: number;
+            /** End */
+            end: number;
+            /** Text */
+            text: string;
         };
         /** BulkAcceptance */
         BulkAcceptance: {
@@ -6286,7 +6370,7 @@ export interface components {
             /** Waiting On */
             waiting_on?: string | string[] | null;
             /** Flags */
-            flags?: ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator") | ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator")[] | null;
+            flags?: ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator" | "typography_hints") | ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator" | "typography_hints")[] | null;
             /** Proposals */
             proposals?: ("with" | "without") | ("with" | "without")[] | null;
         };
@@ -6413,6 +6497,8 @@ export interface components {
             proposal_set_unrecorded?: boolean;
             annotations_per_text?: components["schemas"]["AnnotationsPerTextView"] | null;
             lead_pause?: components["schemas"]["LeadPauseView"] | null;
+            /** Typography Hints */
+            typography_hints?: number;
             consolidation_progress?: components["schemas"]["ConsolidationProgressView"] | null;
             /**
              * Unreviewed Translation
@@ -6473,6 +6559,7 @@ export interface components {
             discarded?: components["schemas"]["VersionDiscardView"] | null;
             upload?: components["schemas"]["VersionUploadView"] | null;
             editorial_correction?: components["schemas"]["VersionEditorialCorrectionView"] | null;
+            query_decision?: components["schemas"]["VersionQueryDecisionView"] | null;
         };
         /**
          * DocumentsSummaryView
@@ -6563,6 +6650,30 @@ export interface components {
         DraftResponse: {
             /** Revision */
             revision: number;
+        };
+        /** DraftTypographyHintsView */
+        DraftTypographyHintsView: {
+            /**
+             * Revision
+             * @description Draft revision the hints were computed for.
+             */
+            revision: number;
+            /** Total */
+            total: number;
+            /**
+             * Counts
+             * @description Number of hints per rule code.
+             */
+            counts: {
+                [key: string]: number;
+            };
+            /** Hints */
+            hints: components["schemas"]["TypographyHintView"][];
+            /**
+             * Truncated
+             * @description True when 'hints' holds fewer than 'total'.
+             */
+            truncated: boolean;
         };
         /** Duplicate */
         Duplicate: {
@@ -6948,6 +7059,8 @@ export interface components {
             author?: components["schemas"]["MemberRefView"] | null;
             /** Guideline Version */
             guideline_version?: number | null;
+            /** Guideline Label */
+            guideline_label?: string | null;
             /**
              * Guideline Withdrawn
              * @default false
@@ -7212,6 +7325,8 @@ export interface components {
         GuidelineDocument: {
             /** Version */
             version: number;
+            /** Label */
+            label?: string | null;
             /**
              * Kind
              * @enum {string}
@@ -7258,6 +7373,8 @@ export interface components {
         GuidelineNoticeChangeView: {
             /** Version */
             version: number;
+            /** Label */
+            label?: string | null;
             /** Change Note */
             change_note: string | null;
             /**
@@ -7277,6 +7394,8 @@ export interface components {
             from_version: number | null;
             /** To Version */
             to_version: number;
+            /** To Label */
+            to_label?: string | null;
             /** Changes */
             changes: components["schemas"]["GuidelineNoticeChangeView"][];
             /** More */
@@ -7309,6 +7428,8 @@ export interface components {
         GuidelineSummary: {
             /** Version */
             version: number;
+            /** Label */
+            label?: string | null;
             /**
              * Kind
              * @enum {string}
@@ -9642,6 +9763,152 @@ export interface components {
             /** Assessment */
             assessment?: string | null;
         };
+        /**
+         * QueriedReviewView
+         * @description The translation review submitted as a query that the lead decides.
+         */
+        QueriedReviewView: {
+            /** Id */
+            id: number;
+            /** Assignment Id */
+            assignment_id: number;
+            /** Document Id */
+            document_id: string;
+            /** Version */
+            version: number;
+            /** Rationale */
+            rationale: string | null;
+            /** Categories */
+            categories: ("omission" | "addition" | "assertion" | "value" | "anatomy" | "terminology" | "source")[];
+            /** Proposed Text */
+            proposed_text: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * QueryAnswer
+         * @description The lead's decision on the reviewer's query (issue 483), as the
+         *     reviewer reads it at the submitted task.
+         *
+         *     ``reviewer_text``: the proposed text became version
+         *     ``accepted_version`` (``edited``: the lead changed it before saving);
+         *     ``unchanged``: the reviewed version (or its typo fix) was accepted as it
+         *     is. ``answer`` is what the lead wrote.
+         */
+        QueryAnswer: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "reviewer_text" | "unchanged";
+            /** Accepted Version */
+            accepted_version: number;
+            /**
+             * Decided At
+             * Format: date-time
+             */
+            decided_at: string;
+            /** Answer */
+            answer?: string | null;
+            /**
+             * Edited
+             * @default false
+             */
+            edited: boolean;
+        };
+        /**
+         * QueryDecisionPreview
+         * @description Issue 483, read only: the query a lead decides at this version.
+         */
+        QueryDecisionPreview: {
+            /** Document Id */
+            document_id: string;
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Version */
+            version: number;
+            /** Next Version */
+            next_version: number;
+            /** Translation Status */
+            translation_status: string | null;
+            /** Text Sha256 */
+            text_sha256: string;
+            /** Text */
+            text: string;
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason: string | null;
+            review: components["schemas"]["QueriedReviewView"] | null;
+            /** Proposes Changes */
+            proposes_changes: boolean;
+            /** Review On */
+            review_on: boolean;
+            /** Annotate Accepted Only */
+            annotate_accepted_only: boolean;
+            annotations: components["schemas"]["LeadCorrectionAnnotationsView"];
+            /** Open Consolidations */
+            open_consolidations: number;
+            /** Final Result */
+            final_result: boolean;
+        };
+        /**
+         * QueryDecisionRequest
+         * @description Issue 483: the lead's decision on a queried translation review.
+         *
+         *     ``reviewer_text``: ``text`` (the reviewer's proposed text, as the lead
+         *     confirmed it) becomes the next version, accepted. ``unchanged``: the
+         *     version is accepted as it is, and ``answer`` is required.
+         */
+        QueryDecisionRequest: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "reviewer_text" | "unchanged";
+            /** Expected Text Sha256 */
+            expected_text_sha256: string;
+            /** Expected Review Id */
+            expected_review_id: number;
+            /** Text */
+            text?: string | null;
+            /** Answer */
+            answer?: string | null;
+        };
+        /** QueryDecisionResult */
+        QueryDecisionResult: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "reviewer_text" | "unchanged";
+            /** Document Id */
+            document_id: string;
+            /** Version */
+            version: number;
+            /** Decided Document Id */
+            decided_document_id: string;
+            /** Decided Version */
+            decided_version: number;
+            /**
+             * Translation Status
+             * @constant
+             */
+            translation_status: "accepted";
+            /** Text Sha256 */
+            text_sha256: string;
+            /** Edited */
+            edited: boolean;
+        };
         /** ReanchorItem */
         ReanchorItem: {
             /** Proposal Set Id */
@@ -9988,6 +10255,8 @@ export interface components {
             reopened_at?: string | null;
             /** Reopen Reason */
             reopen_reason?: string | null;
+            query_answer?: components["schemas"]["QueryAnswer"] | null;
+            added_brackets?: components["schemas"]["BracketCheck"] | null;
         };
         /** RevokedAssignmentView */
         RevokedAssignmentView: {
@@ -10295,6 +10564,8 @@ export interface components {
             author?: components["schemas"]["MemberRefView"] | null;
             /** Guideline Version */
             guideline_version?: number | null;
+            /** Guideline Label */
+            guideline_label?: string | null;
             /**
              * Guideline Withdrawn
              * @default false
@@ -10854,6 +11125,11 @@ export interface components {
             /** Author Label */
             author_label: string;
             /**
+             * Is Me
+             * @default false
+             */
+            is_me: boolean;
+            /**
              * Created At
              * Format: date-time
              */
@@ -10864,6 +11140,8 @@ export interface components {
             round_id?: string | null;
             /** Guideline Version */
             guideline_version?: number | null;
+            /** Guideline Label */
+            guideline_label?: string | null;
             /**
              * Guideline Withdrawn
              * @default false
@@ -11005,6 +11283,8 @@ export interface components {
             second_review_at?: string | null;
             /** Second Review Reason */
             second_review_reason?: string | null;
+            /** Query Answered At */
+            query_answered_at?: string | null;
             /**
              * Report Answered
              * @default false
@@ -11595,6 +11875,8 @@ export interface components {
              * @default false
              */
             guideline_withdrawn: boolean;
+            /** Guideline Label */
+            guideline_label?: string | null;
         };
         /** TranslationRunView */
         TranslationRunView: {
@@ -11752,7 +12034,7 @@ export interface components {
              * Rule
              * @enum {string}
              */
-            rule: "DOUBLE_SPACE" | "SPACE_BEFORE_PUNCTUATION" | "MISSING_SPACE_AFTER_PUNCTUATION" | "TRAILING_WHITESPACE_LINE" | "TRAILING_WHITESPACE_TEXT" | "TAB" | "ZERO_WIDTH_CHARACTER" | "SOFT_HYPHEN" | "CONTROL_CHARACTER";
+            rule: "DOUBLE_SPACE" | "SPACE_BEFORE_PUNCTUATION" | "MISSING_SPACE_AFTER_PUNCTUATION" | "TRAILING_WHITESPACE_LINE" | "TRAILING_WHITESPACE_TEXT" | "TAB" | "ZERO_WIDTH_CHARACTER" | "SOFT_HYPHEN" | "CONTROL_CHARACTER" | "DOUBLE_FULL_STOP";
             /**
              * Start
              * @description First code point of the hint (zero-based, Unicode code points, as annotation spans).
@@ -12118,6 +12400,33 @@ export interface components {
             made_by?: string | null;
             /** Note */
             note?: string | null;
+        };
+        /**
+         * VersionQueryDecisionView
+         * @description The lead's decision on a query that accepted this version (issue 483).
+         */
+        VersionQueryDecisionView: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "reviewer_text" | "unchanged";
+            /** Decided Document Id */
+            decided_document_id: string;
+            /** Reviewed Document Id */
+            reviewed_document_id: string;
+            /** Reviewer Assignment Id */
+            reviewer_assignment_id: number;
+            /** Answer */
+            answer?: string | null;
+            /**
+             * Edited
+             * @default false
+             */
+            edited: boolean;
+            /** Decided At */
+            decided_at?: string | null;
+            decided_by?: components["schemas"]["MemberRefView"] | null;
         };
         /** VersionRef */
         VersionRef: {
@@ -14187,6 +14496,37 @@ export interface operations {
             };
         };
     };
+    draft_typography_hints_api_v1_translation_reviews__assignment_id__draft_typography_hints_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assignment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftTypographyHintsView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     save_checked_sentences_api_v1_translation_reviews__assignment_id__checked_sentences_put: {
         parameters: {
             query?: never;
@@ -15546,7 +15886,7 @@ export interface operations {
                 final_state?: ("none" | "after_annotation" | "after_review" | "choose" | "confirm" | "old_text" | "may_be_outdated" | "final")[] | null;
                 /** @description "me" or a pseudonym */
                 waiting_on?: string[] | null;
-                flags?: ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator")[] | null;
+                flags?: ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator" | "typography_hints")[] | null;
                 proposals?: ("with" | "without")[] | null;
             };
             header?: never;
@@ -15606,7 +15946,7 @@ export interface operations {
                 final_state?: ("none" | "after_annotation" | "after_review" | "choose" | "confirm" | "old_text" | "may_be_outdated" | "final")[] | null;
                 /** @description "me" or a pseudonym */
                 waiting_on?: string[] | null;
-                flags?: ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator")[] | null;
+                flags?: ("guidelines_unclear" | "over_limit" | "lead_paused" | "can_take_annotator" | "typography_hints")[] | null;
                 proposals?: ("with" | "without")[] | null;
             };
             header?: never;
@@ -16841,6 +17181,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EditorialCorrectionResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_query_decision_api_v1_projects__key__documents__doc__query_decision_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                doc: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueryDecisionPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_query_api_v1_projects__key__documents__doc__query_decision_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                doc: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueryDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueryDecisionResult"];
                 };
             };
             /** @description Validation Error */

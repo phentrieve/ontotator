@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from ontotator.api.encoded_routes import EncodedParameterRoute
 from ontotator.api.identity import PrincipalDep
 from ontotator.api.routes import get_access
+from ontotator.api.typography_routes import TypographyHintView
 from ontotator.application.translation_reviews import (
     CheckedSentences,
     CheckedSentencesSave,
@@ -37,6 +38,15 @@ class DraftResponse(BaseModel):
     revision: int
 
 
+class DraftTypographyHintsView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    revision: int = Field(description="Draft revision the hints were computed for.")
+    total: int
+    counts: dict[str, int] = Field(description="Number of hints per rule code.")
+    hints: list[TypographyHintView]
+    truncated: bool = Field(description="True when 'hints' holds fewer than 'total'.")
+
+
 def _service(request: Request) -> TranslationReviewService:
     return TranslationReviewService(request.app.state.repo.db, request.app.state.jobs)
 
@@ -56,6 +66,28 @@ def save_review(
         revision=_service(request).save_draft(
             get_access(request), assignment_id, **body.model_dump()
         )
+    )
+
+
+@router.get("/translation-reviews/{assignment_id}/draft/typography-hints")
+def draft_typography_hints(
+    assignment_id: int, request: Request, principal: PrincipalDep
+) -> DraftTypographyHintsView:
+    """Spacing errors and invisible characters of the saved draft text.
+
+    Rule codes and positions only, as the hints of a text version; shown in
+    the confirmation of "Submit review…". They block nothing.
+    """
+    found = _service(request).draft_typography_hints(get_access(request), assignment_id)
+    return DraftTypographyHintsView(
+        revision=found.revision,
+        total=found.total,
+        counts=found.counts,
+        hints=[
+            TypographyHintView(rule=hint.rule, start=hint.start, end=hint.end)
+            for hint in found.hints
+        ],
+        truncated=found.truncated,
     )
 
 

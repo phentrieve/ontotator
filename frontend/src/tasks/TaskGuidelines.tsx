@@ -1,3 +1,4 @@
+import { guidelineVersionName } from "../guidelines/versionName";
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { api, type AssignmentView, type GuidelineNotice } from "../api/client";
 import { routeHref } from "../app/router";
@@ -41,6 +42,8 @@ export interface GuidelinesPanel {
   /** The guidelines are open: in the host's column or, where it has none, in `drawer`. */
   open: boolean;
   version: number;
+  /** The shown version as the tab names it: "v2", or "3.1 (v2)" with the project's own label. */
+  versionName: string;
   /** Grows with every request to show the guidelines, so the host brings them forward and focuses them again. */
   request: number;
   /** The text of the shown version, with its "Guidelines vN" heading (h2). */
@@ -64,6 +67,7 @@ const guidelineState = (value: AssignmentView) => JSON.stringify([value.guidelin
 export function TaskGuidelines({ assignment, readOnly, children, onRefresh, place }: TaskGuidelinesProps): JSX.Element {
   const projectKey = assignment.project_key;
   const current = assignment.guideline?.version ?? null;
+  const currentLabel = assignment.guideline?.label ?? null;
   const [latestSeen, setLatestSeen] = useState<{ key: string; version: number | null } | null>(null);
   const [drawer, setDrawer] = useState<{ open: boolean; version: number | null; request: number }>({ open: false, version: null, request: 0 });
   const [notice, setNotice] = useState<{ key: string; value: GuidelineNotice } | null>(null);
@@ -131,37 +135,47 @@ export function TaskGuidelines({ assignment, readOnly, children, onRefresh, plac
   };
   const closeDrawer = () => setDrawer(value => ({ ...value, open: false }));
 
+  // The project's own label of a version this task knows: the one in force and those of the notice.
+  const labelOf = (version: number): string | null => {
+    if (version === current) return currentLabel;
+    const noticed = notice?.key === projectKey ? notice.value : null;
+    if (noticed?.to_version === version) return noticed.to_label ?? null;
+    return noticed?.changes.find(change => change.version === version)?.label ?? null;
+  };
+  const currentName = current === null ? "" : guidelineVersionName(current, currentLabel);
   const seenLoaded = latestSeen?.key === projectKey;
   const isNew = current !== null && seenLoaded && (latestSeen.version === null || current > latestSeen.version);
   const buttonPart = current === null ? null
     : <Button ref={button} size="sm" className="task-guidelines-entry" icon={<IconBook />} onClick={() => openDrawer(current)}
-      aria-label={`Guidelines v${current}, open the project guidelines${isNew ? ", updated" : ""}`}>
-      Guidelines v{current}{isNew && <> <span className="task-guidelines-badge">New</span></>}
+      aria-label={`Guidelines ${currentName}, open the project guidelines${isNew ? ", updated" : ""}`}>
+      Guidelines {currentName}{isNew && <> <span className="task-guidelines-badge">New</span></>}
     </Button>;
 
   const itemPart: MenuItem | null = current === null ? null
-    : { id: "guidelines", label: `Guidelines v${current}${isNew ? " (new)" : ""}`, onSelect: () => openDrawer(current) };
+    : { id: "guidelines", label: `Guidelines ${currentName}${isNew ? " (new)" : ""}`, onSelect: () => openDrawer(current) };
 
   const shown = !readOnly && current !== null && notice?.key === projectKey ? notice.value : null;
   const noticePart = shown && <GuidelineNoticeMessage notice={shown} place={place} onRead={() => { setNotice(null); openDrawer(shown.to_version); }} onClose={() => setNotice(null)} />;
 
   const version = drawer.version;
+  const versionLabel = version === null ? null : labelOf(version);
+  const versionName = version === null ? "" : guidelineVersionName(version, versionLabel);
   const footer = <>
     <a className="btn btn-secondary" href={routeHref({ name: "projectGuidelines", key: projectKey })} onKeyDown={onSpaceActivate} target="_blank" rel="noopener noreferrer">All versions</a>
     <Button onClick={closeDrawer}>Close</Button>
   </>;
   // Remounted when the version in force changes or a focus reload runs, so a withdrawal of the shown version replaces its text.
   const readerKey = `${version}:${current ?? "none"}:${readerLoad}`;
-  const drawerPart = version !== null && <Drawer open={drawer.open} title={`Guidelines v${version}`} onClose={closeDrawer} returnFocusRef={returnFocus} footer={footer}>
+  const drawerPart = version !== null && <Drawer open={drawer.open} title={`Guidelines ${versionName}`} onClose={closeDrawer} returnFocusRef={returnFocus} footer={footer}>
     <div className="task-guidelines-reader">
-      <GuidelineReader key={readerKey} projectKey={projectKey} version={version} currentVersion={current} headingLevel={2} showHeading={false} />
+      <GuidelineReader key={readerKey} projectKey={projectKey} version={version} currentVersion={current} label={versionLabel} currentLabel={currentLabel} headingLevel={2} showHeading={false} />
     </div>
   </Drawer>;
   // The panel names the version in its own heading: the tab above it says only "Guidelines vN".
   const panelPart: GuidelinesPanel | null = version === null ? null : {
-    open: drawer.open, version, request: drawer.request, footer, close: closeDrawer, returnFocus, drawer: drawerPart || null,
+    open: drawer.open, version, versionName, request: drawer.request, footer, close: closeDrawer, returnFocus, drawer: drawerPart || null,
     reader: <div className="task-guidelines-reader">
-      <GuidelineReader key={readerKey} projectKey={projectKey} version={version} currentVersion={current} headingLevel={2} />
+      <GuidelineReader key={readerKey} projectKey={projectKey} version={version} currentVersion={current} label={versionLabel} currentLabel={currentLabel} headingLevel={2} />
     </div>,
   };
 
@@ -169,17 +183,19 @@ export function TaskGuidelines({ assignment, readOnly, children, onRefresh, plac
 }
 
 function GuidelineNoticeMessage({ notice, place, onRead, onClose }: { notice: GuidelineNotice; place: TaskGuidelinesProps["place"]; onRead: () => void; onClose: () => void }): JSX.Element {
-  const read = <Button variant="quiet" size="sm" onClick={onRead}>Read guidelines v{notice.to_version}</Button>;
+  const to = guidelineVersionName(notice.to_version, notice.to_label);
+  const changeName = (change: GuidelineNotice["changes"][number]) => guidelineVersionName(change.version, change.label);
+  const read = <Button variant="quiet" size="sm" onClick={onRead}>Read guidelines {to}</Button>;
   if (notice.from_version === null) {
-    return <InlineMessage tone="info" title={`This project has guidelines (v${notice.to_version})`} onDismiss={onClose}>
+    return <InlineMessage tone="info" title={`This project has guidelines (${to})`} onDismiss={onClose}>
       <p className="task-guidelines-notice-text">{`Read them before you start; they are available at any time under ${entryPlaces[place]}.`}</p>
       {read}
     </InlineMessage>;
   }
-  return <InlineMessage tone="info" title={`Guidelines updated to v${notice.to_version}`} onDismiss={onClose}>
+  return <InlineMessage tone="info" title={`Guidelines updated to ${to}`} onDismiss={onClose}>
     <ul className="task-guidelines-changes">
       {notice.changes.map(change => <li key={change.version}>
-        {change.withdrawn ? `v${change.version}: withdrawn` : change.change_note ? `v${change.version}: ${change.change_note}` : `v${change.version}`}
+        {change.withdrawn ? `${changeName(change)}: withdrawn` : change.change_note ? `${changeName(change)}: ${change.change_note}` : changeName(change)}
       </li>)}
     </ul>
     {notice.more > 0 && <p className="task-guidelines-notice-text">{`and ${notice.more} earlier ${notice.more === 1 ? "change" : "changes"}`}</p>}
