@@ -477,6 +477,7 @@ A project lead who corrects a translation themselves sees only **Accepted with c
 When the lead asked for the review with **Ask a reviewer to correct…**, or reopened a review you had submitted, the lead's words stand above **Decision**:
 
 - *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.* The same line is under the task name in **My tasks**.
+- *Added by the lead on 17 Nov 2026, 16:05: Paragraph 3 as well.* The lead can add to the reason while your review is open; each addition stands below the reason, with its date, here and in **My tasks**.
 - *Reopened by the lead on 18 Nov 2026, 10:00: The unit is mg in my copy.* In **My tasks** it stands under the task name, as the reason for a second review does; on a narrow screen it stands under the **Reopened** badge. Without a reason from the lead it ends with *No reason given.*
 
 A reopened review starts again from the text of its version; your earlier decision is listed under **Previous reviews**.

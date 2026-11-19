@@ -2300,6 +2300,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assignments/{assignment_id}/correction-reason": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Correction Reason
+         * @description Issue 483: the lead adds to the reason of "Ask a reviewer to correct…"
+         *     while the review is open. Append-only: the reason as sent never changes.
+         */
+        post: operations["add_correction_reason_api_v1_assignments__assignment_id__correction_reason_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{key}/documents/{doc}/lead-correction": {
         parameters: {
             query?: never;
@@ -6040,6 +6061,45 @@ export interface components {
              * @default false
              */
             confirm_language: boolean;
+        };
+        /**
+         * CorrectionReasonAdditionRequest
+         * @description Issue 483: what the lead adds to the reason of a correction request.
+         */
+        CorrectionReasonAdditionRequest: {
+            /** Note */
+            note: string;
+        };
+        /**
+         * CorrectionReasonAdditionView
+         * @description One addition to the reason of a correction request, as saved.
+         */
+        CorrectionReasonAdditionView: {
+            /** Assignment Id */
+            assignment_id: number;
+            /** Note */
+            note: string;
+            /**
+             * Added At
+             * Format: date-time
+             */
+            added_at: string;
+        };
+        /**
+         * CorrectionRequestView
+         * @description Why the lead asked for this review with "Ask a reviewer to correct…"
+         *     (issue 483): the reason as sent, and what the lead added to it since.
+         */
+        CorrectionRequestView: {
+            /** Reason */
+            reason: string;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /** Additions */
+            additions?: components["schemas"]["ReasonAdditionView"][];
         };
         /** CreateProjectRequest */
         CreateProjectRequest: {
@@ -10018,6 +10078,35 @@ export interface components {
             /** Reviewer Id */
             reviewer_id: string;
         };
+        /**
+         * ReasonAddition
+         * @description A lead's addition to the reason of a correction request (issue 483),
+         *     as the reviewer reads it: what and when. The reviewer reads "the lead",
+         *     not the lead's name, as for the reason itself.
+         */
+        ReasonAddition: {
+            /** Note */
+            note: string;
+            /**
+             * Added At
+             * Format: date-time
+             */
+            added_at: string;
+        };
+        /**
+         * ReasonAdditionView
+         * @description A lead's addition to the reason of a correction request (issue 483).
+         */
+        ReasonAdditionView: {
+            /** Note */
+            note: string;
+            /**
+             * Added At
+             * Format: date-time
+             */
+            added_at: string;
+            added_by?: components["schemas"]["MemberRefView"] | null;
+        };
         /** ReasonRequest */
         ReasonRequest: {
             /** Reason */
@@ -10313,6 +10402,8 @@ export interface components {
             second_review_at?: string | null;
             /** Second Review Reason */
             second_review_reason?: string | null;
+            /** Second Review Additions */
+            second_review_additions?: components["schemas"]["ReasonAddition"][] | null;
             /** Reopened At */
             reopened_at?: string | null;
             /** Reopen Reason */
@@ -10436,13 +10527,16 @@ export interface components {
          *     release of the text, with ``by`` and the ``reason`` given.
          *     ``carried_by_typo_fix`` (issue 465): the submitted annotation of
          *     ``to_person`` moved to the typo fix's new version by itself.
+         *     ``correction_requested`` is "Ask a reviewer to correct…" and
+         *     ``correction_reason_added`` an addition to its reason (issue 483), the
+         *     task and its person as for ``reopened``, the text in ``reason``.
          */
         RowChangeView: {
             /**
              * Kind
              * @enum {string}
              */
-            kind: "reassigned" | "mode_changed" | "mode_restored" | "final_withdrawn" | "reopened" | "reopen_undone" | "round_started" | "final_chosen" | "final_changed" | "final_restored" | "text_paused" | "text_released" | "carried_by_typo_fix";
+            kind: "reassigned" | "mode_changed" | "mode_restored" | "final_withdrawn" | "reopened" | "reopen_undone" | "round_started" | "final_chosen" | "final_changed" | "final_restored" | "text_paused" | "text_released" | "carried_by_typo_fix" | "correction_requested" | "correction_reason_added";
             /**
              * At
              * Format: date-time
@@ -11351,6 +11445,8 @@ export interface components {
             second_review_at?: string | null;
             /** Second Review Reason */
             second_review_reason?: string | null;
+            /** Second Review Additions */
+            second_review_additions?: components["schemas"]["ReasonAddition"][] | null;
             /** Query Answered At */
             query_answered_at?: string | null;
             /**
@@ -12817,6 +12913,7 @@ export interface components {
              * @default false
              */
             waiting_for_lead: boolean;
+            correction_request?: components["schemas"]["CorrectionRequestView"] | null;
         };
         /** WorkRoundView */
         WorkRoundView: {
@@ -17138,6 +17235,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AssignmentView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_correction_reason_api_v1_assignments__assignment_id__correction_reason_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assignment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CorrectionReasonAdditionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorrectionReasonAdditionView"];
                 };
             };
             /** @description Validation Error */

@@ -163,6 +163,13 @@ export function historyLines(row: DocumentRowView, submissions: readonly RowSubm
       case "reopened":
         push(stage, `${prefix}: ${changeText(`task of ${named(change.to_person)} reopened${byText(change.by)}`, when, change.reason)}`);
         break;
+      // "Ask a reviewer to correct…" and each addition to its reason (issue 483): the reason as sent stays.
+      case "correction_requested":
+        push(stage, `${prefix}: ${changeText(`correction requested from ${named(change.to_person)}${byText(change.by)}`, when, change.reason)}`);
+        break;
+      case "correction_reason_added":
+        push(stage, `${prefix}: ${changeText(`addition to the correction request for ${named(change.to_person)}${byText(change.by)}`, when, change.reason)}`);
+        break;
       case "reopen_undone":
         push(stage, `${prefix}: ${changeText(`reopening of the task of ${named(change.to_person)} undone${byText(change.by)}`, when)}`);
         break;

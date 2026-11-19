@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-AhqutLhk.js";import{n as a,t as o}from"./lib-F6fcqsb4.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-BV79AtLl.js";import{n as a,t as o}from"./lib-BcXD9gNf.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -229,7 +229,7 @@ What for: check what was changed on an account and by whom.
 
 1. On **Users**, click **More…** in the row and choose **History**. For anonymised accounts, click the **History** button in the row.
 2. Read the table: **When**, **By**, **What**, **Whom**, **Project**, **Details**. **What** names the change in plain words, for example *Project settings changed*, *Final result withdrawn*, *Final export created* or *Phenopackets created*. Research exports are listed too, for example *Edit log exported* or *Working time exported*. A text given its own number of annotators reads *Annotators per text changed for one text*, with the text, the old and new value and the project value under **Details**. *Languages changed* says which languages were added and removed (*Added: fr. Removed: es.*). *Project settings changed* names each setting as the settings page does, with the old and the new value (*Hide annotator names during consolidation: off → on*); the description, the prefilled values and the values annotators can choose are named without values. Entries from before these values were recorded show the names only. On a phone, scroll the table sideways to read **Details**.
-3. Changes made with an API token name it under **Details** (*Via API token*); the single requests a token made are left out here. The dialog shows the newest 200 entries. For the whole trail, use the command \`ontotator admin audit\`, see [Server operations](../operations.md#users-ontologies-and-projects). An editorial correction of a translation is recorded as *Typo fix in a translation*; its details carry the reason and the changed passages. A submitted annotation that such a fix moved to the new version by itself is recorded as *Annotation moved to a typo fix automatically*, naming the submission it came from; the system made that change, so it names no person who did it. A lead's decision on a queried translation review is recorded as *Query on a translation decided*, with the kind of decision and the answer to the reviewer.
+3. Changes made with an API token name it under **Details** (*Via API token*); the single requests a token made are left out here. The dialog shows the newest 200 entries. For the whole trail, use the command \`ontotator admin audit\`, see [Server operations](../operations.md#users-ontologies-and-projects). An editorial correction of a translation is recorded as *Typo fix in a translation*; its details carry the reason and the changed passages. A submitted annotation that such a fix moved to the new version by itself is recorded as *Annotation moved to a typo fix automatically*, naming the submission it came from; the system made that change, so it names no person who did it. A lead's decision on a queried translation review is recorded as *Query on a translation decided*, with the kind of decision and the answer to the reviewer. A lead's addition to the reason of a correction request is recorded as *Added to the reason of a translation correction*, with the text added.
 
 ## Anonymise a deactivated account
 
@@ -880,6 +880,7 @@ A project lead who corrects a translation themselves sees only **Accepted with c
 When the lead asked for the review with **Ask a reviewer to correct…**, or reopened a review you had submitted, the lead's words stand above **Decision**:
 
 - *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.* The same line is under the task name in **My tasks**.
+- *Added by the lead on 17 Nov 2026, 16:05: Paragraph 3 as well.* The lead can add to the reason while your review is open; each addition stands below the reason, with its date, here and in **My tasks**.
 - *Reopened by the lead on 18 Nov 2026, 10:00: The unit is mg in my copy.* In **My tasks** it stands under the task name, as the reason for a second review does; on a narrow screen it stands under the **Reopened** badge. Without a reason from the lead it ends with *No reason given.*
 
 A reopened review starts again from the text of its version; your earlier decision is listed under **Previous reviews**.
@@ -1383,6 +1384,10 @@ You assigned a translation review to someone who already reviewed this version, 
 
 **Accept the reviewer’s text…** or **Answer and accept the version as it is…** was refused: the query was already decided, a newer version of the translation arrived, the translation was discarded, or a translation review of the version is open (withdraw it with **Remove…** first). The dialog names the reason. Reload the row to see its current state. See [Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation).
 
+### "Nothing can be added to this reason any more."
+
+**Add to the reason…** was refused: the reviewer submitted the review, the task was removed, or the task is no longer the one you asked for with **Ask a reviewer to correct…**. An addition is possible only while the requested review is open. Reload the row to see its current state. See [Add to the reason of a correction request](lead-documents.md#add-to-the-reason-of-a-correction-request).
+
 ### A review of a version cannot be reopened or assigned after "Fix typos…"
 
 *A lead fixed typos in this version: v2 is the text to review. Assign a review of the newest version.* A translation review always reviews the corrected text. In the row, use **Assign review…** or **Resolve…** › **Assign a new review…**; the person who reviewed the earlier version can be chosen again. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
@@ -1546,7 +1551,7 @@ Details: [Submit the text](annotator.md#submit-the-text).
 - Your task shows **Submitted** in **My tasks**. It is read-only now; click **View** to look at it. A translation review you submitted as a **Query** shows *Answer from the lead* there once the lead decided.
 - The next open task opens on its own, or **My tasks** if none is left.
 - The lead sees your submission next to the other annotators' work on the same text, and accepts one result or starts a consolidation. You do not see other people's work.
-- Your task is done. You do not need to do anything else unless the lead reopens it (**Reopened** in **My tasks**, with the lead's reason under the task name) or you notice a mistake. A translation review the lead asks for a second time names the lead's reason under the task, for example *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.*
+- Your task is done. You do not need to do anything else unless the lead reopens it (**Reopened** in **My tasks**, with the lead's reason under the task name) or you notice a mistake. A translation review the lead asks for a second time names the lead's reason under the task, for example *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.* If the lead adds to that reason later, each addition stands below it with its date (*Added by the lead on …*).
 
 If you notice a mistake after submitting: open the task, choose **More** › **Work rounds** and click **Continue from this submission** ([Start a new work round](annotator.md#start-a-new-work-round)). Fix the finding, check the carried findings and submit again.
 
@@ -1681,7 +1686,7 @@ The list is ordered by status: **Reopened** first, then **In progress**, **Open*
 Each row is one task. The **Task** column says what to do, for example **Annotation, from scratch**, **Annotation, from proposals**, **Consolidation** or **Translation review**. The **Status** column shows **Open**, **In progress**, **Submitted** or **Reopened**.
 
 - **Reopened**: the lead reopened your submission. The lead's reason stands under the task, for example *Reopened by the lead on 17 Nov 2026, 14:30: The onset in sentence 2 is missing.* (on a narrow screen under the badge). Without a reason, click the badge to read when it was reopened.
-- A **Translation review** the lead asked for a second time shows the lead's reason under the task, for example *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.* The translation review and the consolidation show the lead's reason again when you open the task.
+- A **Translation review** the lead asked for a second time shows the lead's reason under the task, for example *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.* What the lead added to it later stands below it, for example *Added by the lead on 17 Nov 2026, 16:05: Paragraph 3 as well.* The translation review and the consolidation show the lead's reason again when you open the task.
 - *Answer from the lead* at a submitted **Translation review**: you submitted it as a **Query** and the lead decided. Open the task to read the decision and the answer ([Review a translation](annotator.md#review-a-translation)).
 - A **Consolidation** task shows the lead's reason under the task, for example *Reason from the lead: Term and assertion differ*, if the lead gave one.
 - **Paused**: the task waits for a decision on a problem report. A long reason is cut off here; the task shows all of it. **Answer to your report** means the lead has replied.
@@ -2234,6 +2239,16 @@ What for: have a translation corrected by a reviewer.
 
 If the reviewer submits **Accepted with corrections**, the corrected text becomes a new text version. While a lead is correcting the same version themselves, the request is refused with *A lead is correcting this version.* ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
 
+#### Add to the reason of a correction request
+
+What for: tell the reviewer more after you sent the request, for example a second place to look at.
+
+1. Open the text card and click **Translation**. The reviewer's row under **Translation reviewers** shows the request: *Correction requested on 18 Nov 2026, 09:00:* and the reason in quotes.
+2. In that row, click **Add to the reason…**.
+3. Enter the **Addition to the reason** and click **Add to the reason**.
+
+The reason as you sent it stays as it is; it cannot be edited. Each addition is a line of its own below it, with the date and who added it, for example *Added by you on 18 Nov 2026, 10:12: Paragraph 3 as well.* The reviewer reads it below the reason, in **My tasks** and in the review (*Added by the lead on …*). **History** has a line for the request and one for each addition. Only a project lead can add, and only while the review is open: after the reviewer submitted it, or after the task was removed, the addition is refused (*Nothing can be added to this reason any more.*).
+
 ## Work plans and assignments
 
 The work plan says, for each text, whether it gets a translation review and whether and how it is annotated. Planned texts show up in the main list; the others are hidden. Then the tab **All** says how many of its texts the table holds, for example *246 of 307*.
@@ -2718,6 +2733,8 @@ What for: fix a queried, rejected or accepted translation without assigning anot
 6. After the correction of an accepted version, assign the review of the new version as usual. The annotation work on the old version is handled with **Handle text change…** and *Carry to v2…* ([Handle a text change for open annotation work](#handle-a-text-change-for-open-annotation-work)); with **Annotate only after the translation review is accepted** on, the row offers them once the new version is accepted.
 
 While your correction of an accepted version is open, **Ask a reviewer to correct…** for the same version is refused (*A lead is correcting this version.*): submit your correction first, or withdraw it with **Remove…** in your row of the **Translation** part.
+
+To give a reviewer you asked with **Ask a reviewer to correct…** more to look at, add to the reason with **Add to the reason…** in their row of the **Translation** part while the review is open ([Add to the reason of a correction request](lead-documents.md#add-to-the-reason-of-a-correction-request)). The reason as sent is never changed. The reason of **Reopen…** has no such addition.
 
 ### Accept a translation that was not reviewed
 

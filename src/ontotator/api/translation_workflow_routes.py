@@ -35,6 +35,21 @@ class CorrectionAssignmentRequest(BaseModel):
     confirm_language: bool = False
 
 
+class CorrectionReasonAdditionRequest(BaseModel):
+    """Issue 483: what the lead adds to the reason of a correction request."""
+
+    model_config = ConfigDict(extra="forbid")
+    note: str = Field(min_length=1, max_length=2000)
+
+
+class CorrectionReasonAdditionView(BaseModel):
+    """One addition to the reason of a correction request, as saved."""
+
+    assignment_id: int
+    note: str
+    added_at: datetime
+
+
 class LeadCorrectionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_text_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
@@ -417,6 +432,24 @@ def assign_correction(
         Actor.user(principal.user_id, principal.username), key, doc, **body.model_dump()
     )
     return _views(request, [row])[0]
+
+
+@router.post("/assignments/{assignment_id}/correction-reason")
+def add_correction_reason(
+    assignment_id: int,
+    body: CorrectionReasonAdditionRequest,
+    request: Request,
+    principal: PrincipalDep,
+) -> CorrectionReasonAdditionView:
+    """Issue 483: the lead adds to the reason of "Ask a reviewer to correct…"
+    while the review is open. Append-only: the reason as sent never changes."""
+    return CorrectionReasonAdditionView.model_validate(
+        _service(request).add_correction_reason(
+            Actor.user(principal.user_id, principal.username),
+            assignment_id,
+            body.note,
+        )
+    )
 
 
 @router.post("/projects/{key}/documents/{doc:path}/lead-correction")

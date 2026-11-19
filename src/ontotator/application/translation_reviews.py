@@ -12,8 +12,10 @@ from sqlalchemy import Connection, RowMapping, func, insert, select, update
 from ontotator.assignments.service import (
     Assignment,
     AssignmentService,
+    ReasonAddition,
     latest_reopen,
     move_waiting_tasks,
+    reason_additions,
     second_review_requests,
 )
 from ontotator.auth.audit import Actor, record_audit
@@ -312,6 +314,9 @@ class ReviewWorkspace:
     # latest "Reopen…" while the task is reopened.
     second_review_at: datetime | None = None
     second_review_reason: str | None = None
+    # What the lead added to that reason afterwards (issue 483), oldest first;
+    # None without an addition.
+    second_review_additions: tuple[ReasonAddition, ...] | None = None
     reopened_at: datetime | None = None
     reopen_reason: str | None = None
     # The lead's decision on this submitted query, with the answer; None
@@ -635,6 +640,13 @@ class TranslationReviewService:
             second = second_review_requests(
                 conn, {assignment.id: assignment.active_round_id}
             ).get(assignment.id)
+            additions = (
+                reason_additions(conn, {assignment.id: assignment.active_round_id}).get(
+                    assignment.id
+                )
+                if second
+                else None
+            )
             reopen = (
                 latest_reopen(conn, assignment.id)
                 if assignment.status == "reopened"
@@ -680,6 +692,7 @@ class TranslationReviewService:
                 else ReviewText(previous, self._text(conn, pid, previous)),
                 second_review_at=second[0] if second else None,
                 second_review_reason=second[1] if second else None,
+                second_review_additions=additions,
                 reopened_at=reopen[0] if reopen else None,
                 reopen_reason=reopen[1] if reopen else None,
                 query_answer=self._query_answer(conn, submitted),
