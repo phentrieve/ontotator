@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-CjKuFwH-.js";import{n as a,t as o}from"./lib-xNpq_Jtu.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index--x_MiTk3.js";import{n as a,t as o}from"./lib-CG9JF-CB.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -545,6 +545,10 @@ What for: pick a broader or narrower term than the one you have.
 4. Click **Close tree**.
 
 In a wide window the tree sits under the annotation panel. To give the tree more or less room, drag the divider between the two (**Resize ontology tree**) up or down, or focus it and press \`↑\` or \`↓\`. A double click or \`Enter\` restores the usual split. The height is kept in this browser.
+
+In a low window (for example 1280 × 600) the open tree takes the whole right column. The annotation panel shrinks to one line above the tree: the marked words and the term of the finding. **Use this term** changes the term in that line too. **Show finding** brings the whole panel back above the tree, with the divider; **Hide finding** gives the tree the column again. When you close the tree, the panel is back as before.
+
+On a tablet or a phone held sideways, the tree stands in place of the annotation panel, beside the text. The selected finding stays marked in the findings list and in the text. Close the tree to bring the panel back.
 
 To give the tree more room, click **Hide details** next to the name of the term below the tree: only its name and code stay, on one line. **Show details** brings the definition, synonyms and other parents back. Your choice is kept in this browser.
 
