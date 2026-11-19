@@ -215,6 +215,9 @@ def register_status(server: MCPServer, api: OntotatorClient) -> None:
             "name": settings.get("name"),
             "languages": settings.get("languages"),
             "annotations_per_text": settings.get("annotations_per_text"),
+            # The server's maximum for this setting and for a text's own
+            # value; None: no limit.
+            "annotations_per_text_max": settings.get("annotations_per_text_max"),
             "totals": progress.get("totals"),
             "lede": progress.get("lede"),
             "stages": stages,

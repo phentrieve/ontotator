@@ -4942,6 +4942,8 @@ export interface components {
             per_text: number;
             /** Project Per Text */
             project_per_text: number;
+            /** Max Per Text */
+            max_per_text?: number | null;
             /** Digest */
             digest: string;
             /** Needs People */
@@ -9579,6 +9581,8 @@ export interface components {
              * @default 1
              */
             annotation_policy_revision: number;
+            /** Annotations Per Text Max */
+            annotations_per_text_max?: number | null;
             frozen_translations?: components["schemas"]["FrozenTranslations"] | null;
         };
         /** ProjectSettingsChange */

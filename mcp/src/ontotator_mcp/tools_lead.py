@@ -1087,7 +1087,7 @@ def register_lead(
     @register(server, scopes="read", effect="read")
     async def annotation_target_preview(
         project: Project,
-        annotations_per_text: Annotated[int, Field(ge=1, le=20)],
+        annotations_per_text: Annotated[int, Field(ge=1)],
         limit: Annotated[
             int, Field(ge=1, le=2000, description="Name at most this many texts.")
         ] = 200,
@@ -1131,11 +1131,14 @@ def register_lead(
             int | None,
             Field(
                 ge=1,
-                le=20,
                 description=(
                     "The text's own number of annotators (target and limit),"
                     " e.g. 4 for a method comparison; None returns the text to"
-                    " the project's annotations_per_text."
+                    " the project's annotations_per_text. At least 1; no"
+                    " built-in maximum. A server may set one"
+                    " (annotations_per_text_max in project_overview; None: no"
+                    " limit); a larger value is refused with"
+                    " ANNOTATIONS_PER_TEXT_ABOVE_MAXIMUM, which names it."
                 ),
             ),
         ],

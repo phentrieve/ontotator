@@ -266,9 +266,7 @@ class TextSettingRow(Base):
     __tablename__ = "text_settings"
     __table_args__ = (
         UniqueConstraint("project_id", "case_id", "language"),
-        CheckConstraint(
-            "annotations_per_text BETWEEN 1 AND 20", name="annotations_per_text"
-        ),
+        CheckConstraint("annotations_per_text >= 1", name="annotations_per_text"),
         CheckConstraint(
             "NOT paused OR (pause_reason IS NOT NULL AND paused_at IS NOT NULL)",
             name="pause",

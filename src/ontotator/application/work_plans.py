@@ -37,6 +37,7 @@ from ontotator.auth.audit import Actor, record_audit
 from ontotator.authz.policy import Access, Action
 from ontotator.authz.project_authority import require_project_management
 from ontotator.domain import document_rows as rules
+from ontotator.domain.annotation_limits import require_annotations_per_text
 from ontotator.domain.annotation_modes import AnnotationMode
 from ontotator.domain.errors import AccessDenied, DomainError
 from ontotator.domain.work_plans import (
@@ -56,6 +57,7 @@ from ontotator.domain.work_plans import (
     validate,
 )
 from ontotator.projects.assignments import revoke_assignments
+from ontotator.settings import max_annotations_per_text
 from ontotator.storage import work_plan_store as store
 from ontotator.storage.database import Database
 from ontotator.storage.final_tables import FinalSelectionRow
@@ -1189,10 +1191,13 @@ class WorkPlanService:
         whole request (``DOCUMENT_NOT_FOUND`` with the texts) and nothing is
         written. Each text is compared with its own stored value, so texts
         that already have ``value`` are left alone; one audit entry per
-        changed text.
+        changed text. A value above the server's maximum is refused
+        (``ANNOTATIONS_PER_TEXT_ABOVE_MAXIMUM``), unless every text already
+        has it.
         """
         wanted = list(dict.fromkeys(rows))
         reason = (reason or "").strip() or None
+        maximum = max_annotations_per_text()
         with self.db.transaction() as conn:
             project = self._lock(conn, key, exclusive=True)
             pid = project["id"]
@@ -1208,6 +1213,8 @@ class WorkPlanService:
             for row in wanted:
                 old = stored.get((row.case_id, row.language))
                 changed = old != value
+                if changed and value is not None:
+                    require_annotations_per_text(value, maximum)
                 if changed:
                     write_per_text(
                         conn,
