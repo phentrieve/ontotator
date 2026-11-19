@@ -3,11 +3,12 @@
 from collections.abc import Iterator
 
 import pytest
+from alembic import command
 from pg_harness import unmigrated_database_url
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.exc import IntegrityError
 
-from ontotator.storage.schema import upgrade
+from ontotator.storage.schema import alembic_config, current_revision, upgrade
 
 REVISION = "0053"
 PREVIOUS = "0050"
@@ -134,3 +135,44 @@ def test_the_application_role_deletes_unused_clients_and_codes_only(
         assert not _may_delete(conn, "oauth_grants")
         assert not _may_delete(conn, "oauth_refresh_tokens")
         assert not _may_delete(conn, "api_tokens")
+
+
+def test_the_downgrade_removes_oauth_and_its_access_tokens(migrated: Engine) -> None:
+    """Later migrations' tests step back below this one. An OAuth access
+    token must not outlive its grant as a plain personal token then."""
+    with migrated.begin() as conn:
+        grant = _grant(conn, ["read"])
+        conn.execute(
+            text(
+                f"INSERT INTO {S}.api_tokens (token_sha256, name, kind, owner_id,"
+                " scopes, expires_at, oauth_grant_id) SELECT :digest, 'Claude',"
+                f" 'personal', id, ARRAY['read'], now() + interval '1 hour', :grant"
+                f" FROM {S}.users"
+            ),
+            {"digest": "e" * 64, "grant": grant},
+        )
+    with migrated.begin() as conn:
+        command.downgrade(alembic_config(conn), PREVIOUS)
+    with migrated.begin() as conn:
+        assert current_revision(conn) == PREVIOUS
+        for table in (
+            "oauth_clients",
+            "oauth_grants",
+            "oauth_codes",
+            "oauth_refresh_tokens",
+        ):
+            assert (
+                conn.execute(
+                    text("SELECT to_regclass(:name)"), {"name": f"{S}.{table}"}
+                ).scalar_one()
+                is None
+            )
+        tokens = dict(
+            conn.execute(
+                text(f"SELECT token_sha256, revoked_at IS NOT NULL FROM {S}.api_tokens")
+            ).all()
+        )
+        assert tokens == {"d" * 64: False, "e" * 64: True}
+        command.upgrade(alembic_config(conn), REVISION)
+    with migrated.begin() as conn:
+        assert current_revision(conn) == REVISION

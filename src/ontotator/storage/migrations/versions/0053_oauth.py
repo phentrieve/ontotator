@@ -14,6 +14,9 @@ stored. The application role may revoke, mark used and record last use
 grants by their id. It may delete ``oauth_clients`` and ``oauth_codes``
 rows, which the server does only for a client that never got a grant
 (open registration would otherwise fill the table for good).
+
+The downgrade drops all of it and revokes the OAuth access tokens first;
+production migrates forward only.
 """
 
 from datetime import datetime
@@ -214,4 +217,26 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    raise NotImplementedError("Migrations are forward-only (T2 index D-d)")
+    """Remove OAuth again (tests of later migrations step back below it).
+
+    An OAuth access token would otherwise stay behind as a plain personal
+    token without its grant, so every one still usable is revoked first.
+    """
+    op.execute(
+        f"UPDATE {SCHEMA}.api_tokens SET revoked_at = now(),"
+        " revoked_reason = 'oauth_removed'"
+        " WHERE oauth_grant_id IS NOT NULL AND revoked_at IS NULL"
+    )
+    op.drop_index("ix_api_tokens_oauth_grant_id", "api_tokens", schema=SCHEMA)
+    op.drop_constraint("ck_api_tokens_oauth_kind", "api_tokens", schema=SCHEMA)
+    op.drop_constraint(
+        "fk_api_tokens_oauth_grant_id", "api_tokens", type_="foreignkey", schema=SCHEMA
+    )
+    op.drop_column("api_tokens", "oauth_grant_id", schema=SCHEMA)
+    for table in (
+        "oauth_refresh_tokens",
+        "oauth_codes",
+        "oauth_grants",
+        "oauth_clients",
+    ):
+        op.drop_table(table, schema=SCHEMA)
