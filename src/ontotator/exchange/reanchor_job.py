@@ -304,6 +304,14 @@ class EditorialProducer(BaseModel):
     correction_id: StrictInt = Field(gt=0)
 
 
+class QueryDecisionProducer(BaseModel):
+    """A lead took the reviewer's text of a queried review (issue 483)."""
+
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["query_decision"] = "query_decision"
+    decision_id: StrictInt = Field(gt=0)
+
+
 class CorrectionPair(BaseModel):
     model_config = ConfigDict(extra="forbid")
     old_document_id: str = Field(min_length=1)
@@ -313,7 +321,11 @@ class CorrectionPair(BaseModel):
 class ReanchorPayload(CorrectionPair):
     project: str = Field(min_length=1)
     producer: Annotated[
-        ImportProducer | ReviewProducer | UploadProducer | EditorialProducer,
+        ImportProducer
+        | ReviewProducer
+        | UploadProducer
+        | EditorialProducer
+        | QueryDecisionProducer,
         Field(discriminator="kind"),
     ]
 
@@ -451,6 +463,31 @@ def enqueue_editorial_pair(
     )
 
 
+def enqueue_query_decision_pair(
+    jobs: JobQueue,
+    project: str,
+    project_id: int,
+    old: str,
+    new: str,
+    decision_id: int,
+    actor: Actor,
+) -> int:
+    payload = ReanchorPayload(
+        project=project,
+        old_document_id=old,
+        new_document_id=new,
+        producer=QueryDecisionProducer(decision_id=decision_id),
+    )
+    # Part of the saved decision: never refused for the queue limit.
+    return jobs.enqueue(
+        "reanchor",
+        payload.model_dump(mode="json"),
+        project_id=project_id,
+        actor=actor,
+        queue_limit=False,
+    )
+
+
 @dataclass(frozen=True)
 class PairJob:
     job_id: int
@@ -572,6 +609,35 @@ def _authority(conn: Connection, pair: PairJob, project_id: int) -> None:
         ):
             raise DomainError("REANCHOR_PRODUCER_INVALID")
         # The correction added a text to the project, as an upload does.
+        require_project_management(
+            conn, actor, payload.project, project_id, Action.IMPORT_DOCUMENTS
+        )
+    elif isinstance(payload.producer, QueryDecisionProducer):
+        from ontotator.storage.plan_tables import QueryDecisionRow
+
+        decision = conn.execute(
+            select(
+                QueryDecisionRow.project_id,
+                QueryDecisionRow.document_id,
+                QueryDecisionRow.accepted_document_id,
+                QueryDecisionRow.decided_by,
+                QueryDecisionRow.kind,
+            ).where(QueryDecisionRow.id == payload.producer.decision_id)
+        ).one_or_none()
+        if (
+            decision is None
+            or actor.user_id is None
+            or tuple(decision)
+            != (
+                project_id,
+                payload.old_document_id,
+                payload.new_document_id,
+                actor.user_id,
+                "reviewer_text",
+            )
+        ):
+            raise DomainError("REANCHOR_PRODUCER_INVALID")
+        # The decision added a text to the project, as an upload does.
         require_project_management(
             conn, actor, payload.project, project_id, Action.IMPORT_DOCUMENTS
         )

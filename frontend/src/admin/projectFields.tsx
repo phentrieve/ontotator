@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { api, type OntologyInfo, type ProjectPin, type ProjectSettings, type TaskProfile } from "../api/client";
 import { Checkbox, InlineMessage, Select, TextInput } from "../ui";
 import { helpHref } from "../help/sections";
-import { MAX_ANNOTATORS_PER_TEXT } from "./assignSummary";
+import { validPerText } from "./assignSummary";
 import { ErrorNotice } from "./ErrorNotice";
 import { SettingsCard } from "./SettingsCard";
 
@@ -165,11 +165,11 @@ export function ProfileUpload({ onChange, disabled, id = "project-profile-file",
 export type ToolProposalMode = "proposals" | "scratch";
 export interface WorkflowDraft { import_plan: ProjectSettings["import_plan"]; annotations_per_text: number; tool_proposal_mode: ToolProposalMode; annotate_accepted_translations_only: boolean; adjudicator_not_annotator: boolean; blind_consolidation: boolean; record_working_time: boolean }
 export const workflowOf = (settings: ProjectSettings): WorkflowDraft => ({ import_plan: settings.import_plan ?? "review_and_annotate_translations", annotations_per_text: settings.annotations_per_text ?? 1, tool_proposal_mode: settings.tool_proposal_mode ?? "proposals", annotate_accepted_translations_only: settings.annotate_accepted_translations_only ?? true, adjudicator_not_annotator: settings.adjudicator_not_annotator, blind_consolidation: settings.blind_consolidation ?? false, record_working_time: settings.record_working_time ?? false });
-const toolProposalOptions: { value: ToolProposalMode; label: string; help: string }[] = [
+export const toolProposalOptions: { value: ToolProposalMode; label: string; help: string }[] = [
   { value: "proposals", label: "Annotators work from the proposals", help: "confirm, reject, correct, add" },
   { value: "scratch", label: "Annotators start from scratch", help: "proposals hidden" },
 ];
-const importPlanOptions: { value: WorkflowDraft["import_plan"]; label: string }[] = [
+export const importPlanOptions: { value: WorkflowDraft["import_plan"]; label: string }[] = [
   { value: "review_and_annotate_translations", label: "Plan review and annotation for every translation" },
   { value: "nothing", label: "Plan nothing; I plan texts on Documents" },
 ];
@@ -180,12 +180,16 @@ const importPlanOptions: { value: WorkflowDraft["import_plan"]; label: string }[
  * says where the setting acts and what overrides it. Lowering the number shows how many rows already have more
  * annotators (server preview).
  */
-export function WorkflowFields({ projectKey, value, saved, onChange, disabled }: {
+export function WorkflowFields({ projectKey, value, saved, max, onChange, disabled }: {
   projectKey: string; value: WorkflowDraft; saved: WorkflowDraft; onChange: (value: WorkflowDraft) => void; disabled?: boolean;
+  /** The server's maximum of "Annotators per text" (issue 457); null or absent: no limit. */
+  max?: number | null;
 }): JSX.Element {
   const prefix = useId().replace(/:/g, "");
   const target = value.annotations_per_text;
-  const lowered = Number.isInteger(target) && target >= 1 && target <= MAX_ANNOTATORS_PER_TEXT && target < saved.annotations_per_text;
+  const lowered = validPerText(target) && target < saved.annotations_per_text;
+  // A value saved before the server got its maximum stays valid in the form, so the other settings can still be saved.
+  const fieldMax = max == null ? undefined : Math.max(max, saved.annotations_per_text);
   const [over, setOver] = useState<{ target: number; rows: number } | null>(null);
   useEffect(() => {
     if (!lowered) return;
@@ -218,7 +222,7 @@ export function WorkflowFields({ projectKey, value, saved, onChange, disabled }:
     <SettingsCard title="Annotation and consolidation" hint="Checked when you assign."
       why={<><p>Native source texts are never held back by the translation review; the Assign dialog can override this for one assignment.</p><p>The consolidator rule is checked when you assign consolidation.</p><p>Hidden names apply to every consolidation the next time it opens.</p></>}>
       <div className="settings-card-row">
-        <TextInput id={`${prefix}-annotations`} label="Annotators per text" type="number" min={1} max={MAX_ANNOTATORS_PER_TEXT} step={1} required hint={`1 to ${MAX_ANNOTATORS_PER_TEXT}. Upper limit; fewer is fine.`} value={Number.isFinite(target) ? String(target) : ""} disabled={disabled}
+        <TextInput id={`${prefix}-annotations`} label="Annotators per text" type="number" min={1} max={fieldMax} step={1} required hint={max == null ? "Upper limit; fewer is fine." : `Upper limit; fewer is fine. This server allows at most ${max}.`} value={Number.isFinite(target) ? String(target) : ""} disabled={disabled}
           onChange={event => onChange({ ...value, annotations_per_text: event.target.value === "" ? Number.NaN : Number(event.target.value) })} />
         <div>
           <Checkbox id={`${prefix}-translation-gate`} label="Annotate only after the translation review is accepted"

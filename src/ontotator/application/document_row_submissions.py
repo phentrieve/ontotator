@@ -42,12 +42,17 @@ from ontotator.storage.workflow_tables import (
 
 
 def lead_pseudonym_refs(
-    conn: Connection, pseudonyms: Iterable[str], *, viewer_id: int
+    conn: Connection,
+    pseudonyms: Iterable[str],
+    *,
+    viewer_id: int,
+    logins_of_project: int | None = None,
 ) -> dict[str, dict[str, Any]]:
     """PersonRefView fields per pseudonym for a lead viewer (D1).
 
     Submissions and rounds name their author by pseudonym only; a pseudonym
-    without an account keeps the pseudonym alone.
+    without an account keeps the pseudonym alone. ``logins_of_project`` as
+    in ``person_refs``.
     """
     wanted = sorted(set(pseudonyms))
     if not wanted:
@@ -55,7 +60,13 @@ def lead_pseudonym_refs(
     ids = conn.execute(
         select(UserRow.id).where(UserRow.pseudonym.in_(wanted))
     ).scalars()
-    refs = person_refs(conn, ids, viewer_id=viewer_id, viewer_is_lead=True)
+    refs = person_refs(
+        conn,
+        ids,
+        viewer_id=viewer_id,
+        viewer_is_lead=True,
+        logins_of_project=logins_of_project,
+    )
     known = {ref.pseudonym: ref.model_dump() for ref in refs.values()}
     return {
         pseudonym: known.get(
@@ -569,6 +580,7 @@ def _row_changes(
         },
         viewer_id=viewer_user_id,
         viewer_is_lead=True,
+        logins_of_project=pid,
     )
 
     def person(user_id: int | None) -> dict[str, Any] | None:
@@ -750,6 +762,7 @@ def build_submissions(
             *(row.pseudonym for row in open_reviews),
         ],
         viewer_id=viewer_user_id,
+        logins_of_project=pid,
     )
     owner = {
         row.submission_id: row.round_id or archived_owner.get(row.submission_id)
@@ -801,6 +814,9 @@ def build_submissions(
                 "finding_count": int(row.findings),
                 "author": people[row.annotator_id],
                 "guideline_version": row.guideline_version,
+                "guideline_label": facts[row.guideline_version].label
+                if row.guideline_version is not None
+                else None,
                 "guideline_withdrawn": row.guideline_version is not None
                 and facts[row.guideline_version].withdrawn,
                 "kept_automatically": kept.get(row.submission_id, 0),

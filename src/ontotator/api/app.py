@@ -535,6 +535,7 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
                     "VERSION_NOT_ACCEPTABLE": 409,
                     "VERSION_UPLOAD_NOT_AVAILABLE": 409,
                     "EDITORIAL_CORRECTION_NOT_AVAILABLE": 409,
+                    "QUERY_DECISION_NOT_AVAILABLE": 409,
                     "LANGUAGE_CONFIRMATION_REQUIRED": 409,
                     "REASSIGN_CONFIRMATION_REQUIRED": 409,
                     "ADJUDICATOR_IS_ANNOTATOR": 409,
@@ -636,6 +637,11 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
     )
 
     app.include_router(translation_review_router)
+    from ontotator.api.translation_review_list_routes import (
+        router as translation_review_list_router,
+    )
+
+    app.include_router(translation_review_list_router)
     from ontotator.api.work_time_routes import router as work_time_router
 
     app.include_router(work_time_router)

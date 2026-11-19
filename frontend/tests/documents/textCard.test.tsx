@@ -517,6 +517,20 @@ describe("translation part", () => {
     expect(onAcceptVersion).toHaveBeenCalledWith(row, versions[2]);
   });
 
+  it("issue 483: a version accepted by the lead's decision on a query names the decision and the answer", () => {
+    const lead = { pseudonym: "ann-0002", display_name: "Project lead", is_me: false };
+    const decision = { decided_document_id: "case-200-de", reviewed_document_id: "case-200-de", reviewer_assignment_id: 31, decided_at: "2026-11-18T10:12:00", decided_by: lead };
+    const versions = [
+      version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "reviewed", latest_review_decision: "query", chain_name: "m1", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "m1", translation_status: "accepted",
+        query_decision: { ...decision, kind: "reviewer_text", answer: "Yes, as proposed.", edited: false } }),
+    ];
+    const review = work({ assignment_id: 31, document_id: "case-200-de", task: "translation_review", status: "submitted", author_label: "ann-0003", person: { pseudonym: "ann-0003", display_name: "Ana Weber", is_me: false } });
+    renderCard({ row: assignRow({ versions, work: [review] }), initialSegment: "translation", now: new Date("2026-11-20T12:00:00") });
+    const part = within(card()).getByRole("heading", { name: "Translation" }).closest("section")!;
+    expect(within(part).getByText("Accepted: decision on the query of Ana Weber (ann-0003), the reviewer’s text taken, Project lead (ann-0002), 18 Nov, 10:12 · Answer: Yes, as proposed.")).toBeTruthy();
+  });
+
   it("issue 453: a version made by an editorial correction names who corrected it and why", () => {
     const versions = [
       version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "accepted", chain_name: "m1", is_newest_in_chain: false }),

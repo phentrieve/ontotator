@@ -151,7 +151,9 @@ export function finalizationState(row: DocumentRowView, _now: Date): State {
     // A preselected result (a submitted consolidation, the accept rule) or full agreement waits for acceptance, not a comparison.
     case "choose": return (cell.detail.submitted ?? 0) < 2 ? { state: cellLabel(row, "final"), tone: "now" }
       : { state: cell.detail.label_rule === "accept" || (cell.detail.all_match && !earlyFinal(row)) ? "ready to accept" : "ready to compare", tone: "now" };
-    case "confirm": return { state: "ready to accept", tone: "now" };
+    // A final result that something changed under (issue 469): the phone card's words, "Check changes, newer result".
+    // "ready to accept" is a text without a final result.
+    case "confirm": { const text = stageText("final", cell, row); return { state: [text.word, text.detail].filter(Boolean).join(", "), tone: "now" }; }
     case "final": {
       const day = dayMonth(row.final?.selected_at ?? cell.detail.at);
       return { state: day ? `accepted ${day}` : "accepted", tone: "done" };

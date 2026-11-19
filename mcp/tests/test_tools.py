@@ -252,6 +252,34 @@ async def test_publish_guideline_names_the_latest_version_it_saw(
     form = post.request.content.decode()
     # The route takes a form field: empty when the project has no guideline.
     assert f'name="expected_latest_version"\r\n\r\n{sent}\r\n' in form
+    # No label given: the field is sent empty, which the server reads as none.
+    assert 'name="label"\r\n\r\n\r\n' in form
+
+
+async def test_publish_guideline_sends_the_label(
+    fake: FakeApi, settings: Settings, tmp_path: Path
+) -> None:
+    guide = tmp_path / "guide.md"
+    guide.write_text("# Guide")
+    fake.on(
+        "GET",
+        f"{P}/guidelines",
+        build("GuidelineListing", latest_version=1, current=None, versions=[]),
+    )
+    fake.on(
+        "POST", f"{P}/guidelines", build("GuidelineSummary", version=2, label="3.1")
+    )
+    limited = replace(settings, files_dirs=(tmp_path.resolve(),))
+    server = build_server(limited, transport=httpx.MockTransport(fake))
+    async with Client(server) as client:
+        summary = await call(
+            client,
+            "publish_guideline",
+            {"project": "p", "path": str(guide), "label": "3.1"},
+        )
+    [post] = fake.calls_to("POST", f"{P}/guidelines")
+    assert 'name="label"\r\n\r\n3.1\r\n' in post.request.content.decode()
+    assert (summary["version"], summary["label"]) == (2, "3.1")
 
 
 async def test_guideline_notes_state_their_limit(
@@ -590,6 +618,8 @@ async def test_distribute_texts_previews_then_assigns_with_the_digest(
     [batch] = fake.calls_to("POST", f"{P}/assignments/batch")
     assert batch.json()["expected_preview_digest"] == "d1"
     assert batch.json()["case_ids"] == ["c1", "c2"]
+    # Every case: by case ID.
+    assert batch.json()["sort"] == "case"
     assert batch.json()["confirm_unreviewed_translation"] is False
     for preview in fake.calls_to("POST", f"{P}/assignments/batch/preview"):
         assert "confirm_unreviewed_translation" not in preview.json()
@@ -602,6 +632,55 @@ async def test_distribute_texts_previews_then_assigns_with_the_digest(
     )
     [batch] = fake.calls_to("POST", f"{P}/assignments/batch")
     assert batch.json()["confirm_unreviewed_translation"] is True
+
+
+async def test_distribute_texts_keeps_the_order_of_case_ids(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    """Issue 488: the caller's order is the order of assignment, and so the
+    order in each person's My tasks."""
+    fake.on(
+        "POST",
+        f"{P}/assignments/batch/preview",
+        build("BatchPreview", digest="d1", per_text=1),
+    )
+    args = {
+        "project": "p",
+        "language": "en",
+        "usernames": ["ann1"],
+        "mode": "one",
+        "case_ids": ["c9", "c2", "c5"],
+        "confirm": True,
+    }
+    await call(mcp_client, "distribute_texts", args)
+    [preview] = fake.calls_to("POST", f"{P}/assignments/batch/preview")
+    [batch] = fake.calls_to("POST", f"{P}/assignments/batch")
+    for sent in (preview.json(), batch.json()):
+        assert sent["case_ids"] == ["c9", "c2", "c5"]
+        assert sent["sort"] == "given"
+
+
+async def test_assign_texts_sends_the_rows_in_their_order(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    fake.on("POST", f"{P}/assignments", build("AssignResponse"))
+    rows = [
+        {"document_id": "c9-de", "username": "ann1"},
+        {"document_id": "c2-en", "username": "ann1"},
+        {"document_id": "c5-de", "username": "ann1"},
+    ]
+    await call(mcp_client, "assign_texts", {"project": "p", "assignments": rows})
+    [sent] = fake.calls_to("POST", f"{P}/assignments")
+    assert sent.json()["rows"] == rows
+
+
+async def test_assign_tools_say_in_which_order_the_tasks_appear(
+    mcp_client: Client,
+) -> None:
+    tools = {tool.name: tool for tool in (await mcp_client.list_tools()).tools}
+    for name in ("assign_texts", "distribute_texts"):
+        description = " ".join((tools[name].description or "").split())
+        assert "in the order of assignment" in description, name
 
 
 async def test_work_plan_sets_the_mode_with_the_previewed_revisions(
@@ -632,10 +711,19 @@ async def test_list_texts_reads_every_page(fake: FakeApi, mcp_client: Client) ->
         "2": page([row("c2")], 2, 2),
     }
     fake.on("GET", ROWS, lambda request: pages[request.url.params["page"]])
-    result = await call(mcp_client, "list_texts", {"project": "p", "stage": ["final"]})
+    result = await call(
+        mcp_client,
+        "list_texts",
+        {"project": "p", "stage": ["final"], "fields": ["document_id", "work"]},
+    )
     assert [t["case_id"] for t in result["texts"]] == ["c1", "c2"]
     assert result["texts"][0]["document_id"] == "c1-en-v1"
-    assert result["texts"][0]["work"][0]["person"] == "ann-0001"
+    assert result["texts"][0]["work"][0]["person"] == {
+        "username": None,
+        "display_name": None,
+        "pseudonym": "ann-0001",
+    }
+    assert set(result["texts"][0]) == {"case_id", "language", "document_id", "work"}
     first = fake.calls_to("GET", ROWS)[0].request.url.params
     assert first.get_list("stage") == ["final"]
 
@@ -653,12 +741,18 @@ async def test_list_texts_shows_a_lead_pause_and_filters_on_it(
     paused["work"][0]["pause_causes"] = ["lead"]
     fake.on("GET", ROWS, page([paused, row("c2")], 1, 1))
     result = await call(
-        mcp_client, "list_texts", {"project": "p", "paused_by_lead": True}
+        mcp_client,
+        "list_texts",
+        {"project": "p", "paused_by_lead": True, "fields": ["all"]},
     )
     first, second = result["texts"]
     assert first["lead_pause"] == {
         "reason": "Clinic is checking",
-        "paused_by": "ann-0009",
+        "paused_by": {
+            "username": None,
+            "display_name": "Carla Diaz",
+            "pseudonym": "ann-0009",
+        },
         "paused_at": "2026-11-17T09:30:00Z",
     }
     assert first["work"][0]["paused_by"] == ["lead"]
@@ -956,7 +1050,11 @@ async def test_undo_change_final_results_dry_run_then_confirm(
             "submission_id": "s1",
             "version": 1,
             "replaces_submission_id": "s2",
-            "chosen_by": "Mia",
+            "chosen_by": {
+                "username": None,
+                "display_name": "Mia",
+                "pseudonym": "ann-0001",
+            },
             "chosen_at": "2026-11-17T09:00:00Z",
         }
     ]

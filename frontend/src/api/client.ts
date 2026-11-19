@@ -20,6 +20,12 @@ export type ImportPlan = components["schemas"]["ImportPlan"];
 export type JobView = components["schemas"]["JobView"];
 export type ProjectJobView = components["schemas"]["ProjectJobView"];
 export type ProjectJobPage = components["schemas"]["ProjectJobPage"];
+export type TranslationReviewListRow = components["schemas"]["TranslationReviewListRow"];
+export type TranslationReviewListPage = components["schemas"]["TranslationReviewListPage"];
+export interface TranslationReviewListFilters {
+  reviewer?: string; decision?: readonly TranslationReviewListRow["decision"][]; language?: readonly string[];
+  sort?: "-submitted" | "submitted"; limit?: number; offset?: number;
+}
 export interface ProjectJobFilters { kind?: readonly string[]; status?: readonly ProjectJobView["status"][]; limit?: number; offset?: number }
 export type ArchiveJobView = components["schemas"]["ArchiveJobView"];
 export type ArchiveJobQueued = components["schemas"]["ArchiveJobQueued"];
@@ -246,6 +252,9 @@ export type SourceObligationView = components["schemas"]["SourceObligationView"]
 export type CorrectionAssignmentRequest = components["schemas"]["CorrectionAssignmentRequest"];
 export type LeadCorrectionRequest = components["schemas"]["LeadCorrectionRequest"];
 export type LeadCorrectionPreview = components["schemas"]["LeadCorrectionPreview"];
+export type QueryDecisionPreview = components["schemas"]["QueryDecisionPreview"];
+export type QueryDecisionRequest = components["schemas"]["QueryDecisionRequest"];
+export type QueryDecisionResult = components["schemas"]["QueryDecisionResult"];
 export type ResolveSourceObligationRequest = components["schemas"]["ResolveSourceObligationRequest"];
 export type ProblemReportRequest = components["schemas"]["ProblemReportRequest"];
 export type ProblemActionRequest = components["schemas"]["ProblemActionRequest"];
@@ -299,6 +308,8 @@ export type VersionRef = components["schemas"]["VersionRef"];
 export type TextLayerEntry = components["schemas"]["TextLayerEntry"];
 export type AnnotationVersion = components["schemas"]["AnnotationVersion"];
 export type ReviewWorkspace = components["schemas"]["ReviewWorkspace"];
+export type DraftTypographyHints = components["schemas"]["DraftTypographyHintsView"];
+export type BracketCheck = components["schemas"]["BracketCheck"];
 export type TranslationReviewRecord = components["schemas"]["TranslationReviewRecord"];
 export type ReanchorItem = components["schemas"]["ReanchorItem"];
 export type PendingReanchorRef = components["schemas"]["PendingReanchorRef"];
@@ -346,7 +357,7 @@ export type GuidelineSummary = components["schemas"]["GuidelineSummary"];
 export type GuidelineListing = components["schemas"]["GuidelineListing"];
 export type GuidelineDocument = components["schemas"]["GuidelineDocument"];
 export type GuidelineNotice = components["schemas"]["GuidelineNoticeView"];
-export type GuidelinePublishInput = { file: File; changeNote: string; expectedLatestVersion: number | null };
+export type GuidelinePublishInput = { file: File; changeNote: string; expectedLatestVersion: number | null; /** The project's own name of the version ("3.1"); empty or absent: none. */ label?: string };
 export type GuidelineWithdrawBody = { reason: string | null; expected_latest_version: number };
 export type CreateProjectRequest = components["schemas"]["CreateProjectRequest"];
 export type ProjectPin = components["schemas"]["ProjectPin"];
@@ -582,6 +593,7 @@ export class ApiClient {
     const body = new FormData();
     body.append("file", input.file);
     body.append("change_note", input.changeNote);
+    if (input.label) body.append("label", input.label);
     // An empty value means "no version exists yet" (first upload).
     body.append("expected_latest_version", input.expectedLatestVersion === null ? "" : String(input.expectedLatestVersion));
     return this.request(`/api/v1/projects/${encodeURIComponent(key)}/guidelines`, { method: "POST", body });
@@ -751,6 +763,19 @@ export class ApiClient {
     if (filters.offset !== undefined) query.set("offset", String(filters.offset));
     const search = query.toString();
     return this.request<ProjectJobPage>(`/api/v1/projects/${encodeURIComponent(key)}/jobs${search ? `?${search}` : ""}`, { method: "GET" });
+  }
+
+  /** Submitted and open translation reviews of the project, one page (leads and system admins; issue 483). */
+  async listTranslationReviewList(key: string, filters: TranslationReviewListFilters = {}): Promise<TranslationReviewListPage> {
+    const query = new URLSearchParams();
+    if (filters.reviewer !== undefined) query.set("reviewer", filters.reviewer);
+    for (const decision of filters.decision ?? []) query.append("decision", decision);
+    for (const language of filters.language ?? []) query.append("language", language);
+    if (filters.sort !== undefined) query.set("sort", filters.sort);
+    if (filters.limit !== undefined) query.set("limit", String(filters.limit));
+    if (filters.offset !== undefined) query.set("offset", String(filters.offset));
+    const search = query.toString();
+    return this.request<TranslationReviewListPage>(`/api/v1/projects/${encodeURIComponent(key)}/translation-review-list${search ? `?${search}` : ""}`, { method: "GET" });
   }
 
   async getProgress(key: string): Promise<ProjectProgress> {
@@ -1005,6 +1030,11 @@ export class ApiClient {
 
   async openTranslationReview(assignmentId: number): Promise<ReviewWorkspace> {
     return this.request<ReviewWorkspace>(`/api/v1/translation-reviews/${assignmentId}`, { method: "GET" });
+  }
+
+  /** Typography hints of the saved draft text: rule codes and positions in code points (issue 484). */
+  async getDraftTypographyHints(assignmentId: number): Promise<DraftTypographyHints> {
+    return this.request<DraftTypographyHints>(`/api/v1/translation-reviews/${assignmentId}/draft/typography-hints`, { method: "GET" });
   }
 
   async saveTranslationReviewDraft(assignmentId: number, body: TranslationReviewDraftRequest): Promise<TranslationReviewDraftResponse> {
@@ -1422,6 +1452,16 @@ export class ApiClient {
 
   async assignTranslationCorrection(projectKey: string, documentId: string, body: CorrectionAssignmentRequest): Promise<AssignmentView> {
     return this.request(`/api/v1/projects/${encodeURIComponent(projectKey)}/documents/${encodeURIComponent(documentId)}/translation-correction-assignment`, { method: "POST", body: JSON.stringify(body) });
+  }
+
+  /** Issue 483: the queried review of this version with the reviewer's proposed text, and whether the lead can decide it. */
+  async getQueryDecisionPreview(projectKey: string, documentId: string): Promise<QueryDecisionPreview> {
+    return this.request(`/api/v1/projects/${encodeURIComponent(projectKey)}/documents/${encodeURIComponent(documentId)}/query-decision`, { method: "GET" });
+  }
+
+  /** Issue 483: the lead takes the reviewer's text as the next version, or accepts the version as it is, with an answer. */
+  async decideQuery(projectKey: string, documentId: string, body: QueryDecisionRequest): Promise<QueryDecisionResult> {
+    return this.request(`/api/v1/projects/${encodeURIComponent(projectKey)}/documents/${encodeURIComponent(documentId)}/query-decision`, { method: "POST", body: JSON.stringify(body) });
   }
 
   /** Issue 341 b: whether a lead correction is available and the annotation work that stays on the version. */

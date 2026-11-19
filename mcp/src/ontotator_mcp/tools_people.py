@@ -25,7 +25,15 @@ from pydantic import Field
 from ontotator_mcp.client import OntotatorClient, project_path, seg
 from ontotator_mcp.errors import OntotatorError, check_preview_token, stale_note
 from ontotator_mcp.models import NewUser, TextRef
-from ontotator_mcp.tooling import register, tool_message
+from ontotator_mcp.tooling import (
+    NOT_A_CASE_ID,
+    api_tasks,
+    listing,
+    people,
+    register,
+    tool_message,
+)
+from ontotator_mcp.tooling import person as person_names
 from ontotator_mcp.tools_setup import OPEN_STATES, _cut, unknown_texts
 
 Project = Annotated[str, Field(description="Project key, e.g. 'ward-7'.")]
@@ -44,7 +52,7 @@ CODE_COLUMNS = ("username", "display_name", "email", "code", "expires_at")
 HANDOVER_TASKS = ("annotate", "translation_review")
 # Bulk actions on the tasks of many texts (issue 336): their entries listed in full.
 MAX_BULK_LISTED = 50
-TaskKind = Literal["annotate", "translation_review", "review"]
+TaskKind = Literal["annotate", "translation_review", "consolidation", "review"]
 Texts = Annotated[
     list[TextRef],
     Field(
@@ -61,7 +69,8 @@ Tasks = Annotated[
     Field(
         description=(
             "Which tasks of the texts: annotate (default), translation_review,"
-            " review (consolidation)."
+            " consolidation. 'review' is the older name of consolidation and"
+            " still works; results name the task 'review'."
         )
     ),
 ]
@@ -91,12 +100,11 @@ def bulk_summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
     expires_at), which undo_reopen_or_withdraw takes."""
 
     def brief(item: dict[str, Any]) -> dict[str, Any]:
-        person = item.get("person") or {}
         entry = {
             key: item.get(key)
             for key in ("case_id", "language", "assignment_id", "task", "status")
         }
-        entry["person"] = person.get("display_name") or person.get("pseudonym")
+        entry["person"] = person_names(item.get("person"))
         if "message" in item:
             entry["why"] = tool_message(item)
         return entry
@@ -127,17 +135,13 @@ def pause_summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
     """The preview or result of pausing or releasing texts, lists cut to
     MAX_BULK_LISTED: per text its tasks in progress and their people."""
 
-    def person(item: dict[str, Any]) -> Any:
-        ref = item.get("person") or {}
-        return ref.get("display_name") or ref.get("pseudonym")
-
     def text(item: dict[str, Any]) -> dict[str, Any]:
         tasks = item.get("tasks", [])
         entry: dict[str, Any] = {
             "case_id": item.get("case_id"),
             "language": item.get("language"),
             "tasks_in_progress": len(tasks),
-            "people": sorted({name for name in map(person, tasks) if name}),
+            "people": people(task.get("person") for task in tasks),
         }
         if item.get("pause"):
             entry["paused_because"] = item["pause"].get("reason")
@@ -268,6 +272,8 @@ def assignment_summary(item: dict[str, Any]) -> dict[str, Any]:
             "id",
             "document_id",
             "username",
+            "display_name",
+            "pseudonym",
             "task",
             "status",
             "annotation_mode",
@@ -534,17 +540,17 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
                 ),
             ),
         ],
-    ) -> list[dict[str, Any]]:
+    ) -> dict[str, Any]:
         """Active accounts outside the project that set_member_roles can add.
 
-        As the People page's search: at most ten results; a lead finds
+        As the People page's search: at most ten results ('items'); a lead finds
         people who share a project with them by part of the name, anybody
         else only by exact username or e-mail.
         """
         found: list[dict[str, Any]] = await api.get(
             project_path(project, "member-candidates"), q=query
         )
-        return found
+        return listing(found)
 
     @register(server, scopes="read", effect="read")
     async def list_assignments(
@@ -553,7 +559,8 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
             str | None, Field(description="Only this person's tasks.")
         ] = None,
         document_id: Annotated[
-            str | None, Field(description="Only tasks on this text version.")
+            str | None,
+            Field(description="Only tasks on this text version." + NOT_A_CASE_ID),
         ] = None,
         status: Annotated[
             list[Literal["open", "in_progress", "submitted", "reopened"]] | None,
@@ -565,7 +572,9 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         """The project's tasks with their IDs, person, text version and state.
 
         Gives the assignment_id that reassign_task, withdraw_task,
-        remove_task and reopen_task need.
+        remove_task and reopen_task need. Each task names its person
+        (username, display_name, pseudonym); the task 'review' is a
+        consolidation.
         """
         listed: list[dict[str, Any]] = await api.get(
             project_path(project, "assignments"),
@@ -741,7 +750,9 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         texts. There is no ``undo`` when a translation review was reopened
         (its draft restarted from the current text) or nothing changed.
         """
-        body = {"rows": texts, "reason": reason} | ({"tasks": tasks} if tasks else {})
+        body = {"rows": texts, "reason": reason} | (
+            {"tasks": api_tasks(tasks)} if tasks else {}
+        )
         return await _bulk(project, "reopen", body, confirm, preview_token)
 
     @register(server, scopes="project-admin", effect="destructive")
@@ -787,7 +798,7 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
             "over_limit_only": over_limit_only,
         }
         if tasks:
-            body["tasks"] = tasks
+            body["tasks"] = api_tasks(tasks)
         if reason:
             body["reason"] = reason
         return await _bulk(project, "withdraw", body, confirm, preview_token)
@@ -820,7 +831,8 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         says what is in the way (blocked, with the reason): something
         changed on the texts since (a task, draft, round, final result, plan
         row or version), a text no longer plans the task, or a person left
-        the project. With confirm every task comes back, or none: a blocked
+        the project. blocked_texts names each text in the way and what
+        changed on it (texts: how many texts the action changed). With confirm every task comes back, or none: a blocked
         undo changes nothing (the answer is then the dry run, ``refused``).
         An undo that is unknown, expired or already used is refused with
         BULK_UNDO_STALE. start_rounds and a reopened translation review
@@ -836,8 +848,7 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
                 }
                 | {
                     "status": item.get("status"),
-                    "person": (item.get("person") or {}).get("display_name")
-                    or (item.get("person") or {}).get("pseudonym"),
+                    "person": person_names(item.get("person")),
                 }
                 for item in found.get("tasks", [])
             ]
@@ -851,6 +862,8 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
                 ),
                 "task_count": found.get("task_count", len(tasks)),
                 "blocked": found.get("blocked"),
+                "texts": found.get("texts", 0),
+                "blocked_texts": _cut(found.get("blocked_texts", []), MAX_BULK_LISTED),
             }
 
         preview: dict[str, Any] = await api.post(
@@ -859,11 +872,21 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         if not confirm:
             return summary(preview, False)
         if preview.get("blocked"):
+            named = preview.get("blocked_texts") or []
+            # As the web message: how many texts are in the way, and the first.
+            what = (
+                f"{len(named)} of {preview.get('texts', len(named))} texts changed"
+                f" since the action ({named[0]['case_id']} {named[0]['language']}:"
+                f" {named[0]['message']}"
+                + (f" And {len(named) - 1} more, see blocked_texts." * (len(named) > 1))
+                + ")"
+                if named
+                else "The texts changed since the action (blocked)"
+            )
             return summary(preview, False) | {
                 "refused": True,
-                "note": "The texts changed since the action (blocked); nothing"
-                " was restored. reopen_task, withdraw_task and assign_texts"
-                " change one task.",
+                "note": f"Undo is not possible: {what}; nothing was restored."
+                " reopen_task, withdraw_task and assign_texts change one task.",
             }
         applied: dict[str, Any] = await api.post(path, {"undo_id": undo_id})
         return summary(applied, True)
@@ -1113,15 +1136,18 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
     async def list_problem_reports(
         project: Project,
         document_id: Annotated[
-            str | None, Field(description="Only reports on this text version.")
+            str | None,
+            Field(description="Only reports on this text version." + NOT_A_CASE_ID),
         ] = None,
         limit: Annotated[int, Field(ge=1, le=500)] = 100,
         offset: Annotated[int, Field(ge=0)] = 0,
-    ) -> list[dict[str, Any]]:
+    ) -> dict[str, Any]:
         """Problem reports annotators filed in the project.
 
         An open report pauses work and is a warning of the final export;
-        the lead decides on it in the web interface.
+        the lead decides on it with act_on_problem_report or in the web
+        interface. The reports are in 'items'; 'count' is the number
+        returned, so page with limit and offset while it equals limit.
         """
         listed: list[dict[str, Any]] = await api.get(
             project_path(project, "problem-reports"),
@@ -1129,4 +1155,4 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
             limit=limit,
             offset=offset,
         )
-        return listed
+        return listing(listed)

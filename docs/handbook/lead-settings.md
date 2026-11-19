@@ -244,7 +244,7 @@ A text's own plan can override this until work on it starts.
 What for: decide how many people annotate each text and who may consolidate.
 
 1. Open **Settings**, tab **Workflow**, card **Annotation and consolidation**.
-2. Set **Annotators per text** (1 to 20). It is an upper limit; fewer is fine. A single text can have its own number, also 1 to 20 ([Assign work to the selected texts](lead-documents.md#assign-work-to-the-selected-texts)). The agreement compares every two annotators of a text, so a text with 20 annotators adds 190 pairs to agreement.csv.
+2. Set **Annotators per text** (1 or more). It is an upper limit; fewer is fine. Ontotator has no maximum of its own. The administrator of the server can set one: the hint below the field then names it, for example *This server allows at most 8.*, and a larger number is refused. A number saved before the server got its maximum stays until you change it. A single text can have its own number, with the same bounds ([Assign work to the selected texts](lead-documents.md#assign-work-to-the-selected-texts)). The agreement compares every two annotators of a text, so a text with 20 annotators adds 190 pairs to agreement.csv, and one with 30 adds 435.
 3. Tick **Annotate only after the translation review is accepted** if translations must be reviewed before annotation. Nobody can then annotate a translation that is not accepted; you can still assign annotators while the review is underway ([Assign work to the selected texts](lead-documents.md#assign-work-to-the-selected-texts)).
 4. Tick **Consolidator must not be one of the text's annotators** if annotators may not consolidate their own texts.
 5. Tick **Hide annotator names during consolidation** if consolidators should decide without knowing who marked what. Off by default.
@@ -327,10 +327,13 @@ Before you start: published versions cannot be edited, only withdrawn. Check the
 2. Without guidelines, the form is already open (**No guidelines yet**). Otherwise, click **Publish a new version**.
 3. Choose a `.md` or `.txt` file (UTF-8, up to 256 KB) in **Guideline file (.md or .txt, up to 256 KB)**.
 4. Check the preview.
-5. Optional: describe the change in **What changed? (optional)**.
-6. Click the publish button, for example *Publish as v2*. Or click **Discard**.
+5. Optional: enter the version your document gives itself, for example *3.1*, in **Your version of the guideline (optional)** (one line, up to 40 characters).
+6. Optional: describe the change in **What changed? (optional)**.
+7. Click the publish button, for example *Publish as v2*. Or click **Discard**.
 
 Everyone sees a notice in their next task.
+
+The number after *v* counts the uploads of this project: the first file you publish is v1, the next one v2, also when you publish an earlier text again. It is not the version of your document. If your document has its own version, enter it in step 5: the app then shows it before the upload number everywhere, for example *Guidelines 3.1 (v2)*, *Guidelines updated to 3.1 (v2)* in the notice, and *Guidelines 3.1 (v2) (current: 3.2 (v3))* on a submitted result. Without it, everything reads *Guidelines v2*. Your version cannot be changed after publishing. To correct it, publish the text again with the right one.
 
 ## See who has read the guidelines
 
@@ -348,13 +351,13 @@ What for: go back to an earlier text.
 
 1. Open **Settings**, tab **Guidelines**.
 2. In the row of the old version, click **More…**, then the republish item, for example *Republish v1…*.
-3. The form opens with the old text. Click the publish button, for example *Publish as v3*.
+3. The form opens with the old text and, if the old version had one, its own version in **Your version of the guideline (optional)**. Click the publish button, for example *Publish as v3*.
 
 ## Withdraw a guideline version
 
 What for: remove a version that must no longer be read, for example because it contains a mistake.
 
-Warning: the text of the withdrawn version is deleted for good. The version number stays, and results made under it show it as withdrawn. No guideline is in force until you publish or republish one.
+Warning: the text of the withdrawn version is deleted for good. The version number and your own version of it stay, and results made under it show it as withdrawn, for example *Guidelines 3.1 (v2) (withdrawn)*. No guideline is in force until you publish or republish one.
 
 1. Open **Settings**, tab **Guidelines**.
 2. In the version's row, click **More…**, then the withdraw item, for example *Withdraw v2…*.

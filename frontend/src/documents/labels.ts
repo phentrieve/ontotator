@@ -109,3 +109,8 @@ export function leadPauseLine(pause: { reason: string; paused_by?: { pseudonym: 
   const who = !pause.paused_by ? null : pause.paused_by.is_me ? "you" : pause.paused_by.display_name?.trim() || pause.paused_by.pseudonym;
   return `${[who, formatDateTime(pause.paused_at)].filter(Boolean).join(", ")}: ${pause.reason}`;
 }
+
+/** Title of the "Typography hints" flag of a row (issue 484). */
+export function typographyHintsTitle(count: number): string {
+  return `${count} typography ${count === 1 ? "hint" : "hints"} in the newest version: spacing errors or invisible characters`;
+}

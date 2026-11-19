@@ -358,6 +358,7 @@ def test_detail_and_owner(env, tmp_path):
     assert c1_de["owner"]["person"] == {
         "pseudonym": pseudonym(env, "ana"),
         "display_name": "Ana Weber",
+        "username": "ana",
         "is_me": False,
     }
 

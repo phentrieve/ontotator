@@ -17,6 +17,11 @@ from urllib.parse import urlsplit
 from sqlalchemy.engine import URL, make_url
 from sqlalchemy.exc import ArgumentError
 
+from ontotator.domain.annotation_limits import (
+    ANNOTATIONS_PER_TEXT_CEILING,
+    MIN_ANNOTATIONS_PER_TEXT,
+)
+
 LOCK_TIMEOUT_MS = 20_000
 STATEMENT_TIMEOUT_MS = 60_000
 SETUP_CODE_HOURS_ENV = "ONTOTATOR_SETUP_CODE_HOURS"
@@ -24,6 +29,7 @@ SETUP_CODE_HOURS_ENV = "ONTOTATOR_SETUP_CODE_HOURS"
 # weekend and a short leave. Reset codes keep their fixed two hours.
 SETUP_CODE_HOURS = 168
 MAX_SETUP_CODE_HOURS = 720
+MAX_ANNOTATIONS_PER_TEXT_ENV = "ONTOTATOR_MAX_ANNOTATIONS_PER_TEXT"
 
 
 class SettingsError(ValueError):
@@ -44,6 +50,8 @@ class ServerSettings:
     lock_timeout_ms: int = LOCK_TIMEOUT_MS
     statement_timeout_ms: int = STATEMENT_TIMEOUT_MS
     setup_code_hours: int = SETUP_CODE_HOURS
+    # None: no limit (issue 457).
+    max_annotations_per_text: int | None = None
 
 
 def _milliseconds(name: str, default: int, env: Mapping[str, str]) -> int:
@@ -77,6 +85,35 @@ def setup_code_hours(env: Mapping[str, str] | None = None) -> int:
         raise SettingsError(
             f"{SETUP_CODE_HOURS_ENV} must be a whole number of hours from 1 to"
             f" {MAX_SETUP_CODE_HOURS}"
+        )
+    return int(raw)
+
+
+def max_annotations_per_text(env: Mapping[str, str] | None = None) -> int | None:
+    """The most "Annotations per text" a project or a text may be set to.
+
+    None (the setting is unset or empty): no limit (issue 457). Read when a
+    value is saved, so the server and its jobs agree; the server also checks
+    it at start. A value stored before the setting was lowered stays.
+
+    Raises:
+        SettingsError: unless it is a whole number from 1 to 2147483647 (the
+            column's type).
+    """
+    env = os.environ if env is None else env
+    raw = env.get(MAX_ANNOTATIONS_PER_TEXT_ENV, "")
+    if not raw:
+        return None
+    if (
+        not raw.isascii()
+        or not raw.isdigit()
+        or len(raw) > 10
+        or not MIN_ANNOTATIONS_PER_TEXT <= int(raw) <= ANNOTATIONS_PER_TEXT_CEILING
+    ):
+        raise SettingsError(
+            f"{MAX_ANNOTATIONS_PER_TEXT_ENV} must be a whole number from"
+            f" {MIN_ANNOTATIONS_PER_TEXT} to {ANNOTATIONS_PER_TEXT_CEILING},"
+            " or unset for no limit"
         )
     return int(raw)
 
@@ -154,6 +191,7 @@ def server_settings(env: Mapping[str, str] | None = None) -> ServerSettings:
             "ONTOTATOR_STATEMENT_TIMEOUT_MS", STATEMENT_TIMEOUT_MS, env
         ),
         setup_code_hours=setup_code_hours(env),
+        max_annotations_per_text=max_annotations_per_text(env),
     )
 
 

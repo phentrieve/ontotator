@@ -238,7 +238,7 @@ function SettingsEditor({ initial, ontologies, projectKey, currentUser, onSaved,
     case "people": content = <div ref={bindSection} tabIndex={-1} className="settings-section"><MembersSection projectKey={projectKey} currentUser={currentUser} /><TokensSection mode={{ kind: "project", projectKey }} /></div>; break;
     case "workflow": content = <form ref={bindSection} tabIndex={-1} className="settings-section" aria-label="Workflow" onSubmit={event => submit(event, "Workflow")}>
       <fieldset disabled={busy !== null}><legend className="visually-hidden">Workflow</legend>
-        <WorkflowFields projectKey={projectKey} value={workflow} saved={workflowOf(model)} disabled={busy !== null} onChange={value => { setWorkflow(value); setSaved(null); }} />
+        <WorkflowFields projectKey={projectKey} value={workflow} saved={workflowOf(model)} max={model.annotations_per_text_max} disabled={busy !== null} onChange={value => { setWorkflow(value); setSaved(null); }} />
         {saveBar("Workflow")}
       </fieldset>
     </form>; break;

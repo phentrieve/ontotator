@@ -37,6 +37,7 @@ from ontotator.auth.audit import Actor, record_audit
 from ontotator.authz.policy import Access, Action
 from ontotator.authz.project_authority import require_project_management
 from ontotator.domain import document_rows as rules
+from ontotator.domain.annotation_limits import require_annotations_per_text
 from ontotator.domain.annotation_modes import AnnotationMode
 from ontotator.domain.errors import AccessDenied, DomainError
 from ontotator.domain.work_plans import (
@@ -56,6 +57,7 @@ from ontotator.domain.work_plans import (
     validate,
 )
 from ontotator.projects.assignments import revoke_assignments
+from ontotator.settings import max_annotations_per_text
 from ontotator.storage import work_plan_store as store
 from ontotator.storage.database import Database
 from ontotator.storage.final_tables import FinalSelectionRow
@@ -1109,8 +1111,9 @@ class WorkPlanService:
 
     def annotation_target_preview(
         self, key: str, annotations_per_text: int
-    ) -> dict[str, int]:
-        """Rows with more non-revoked annotators on a target version than ``n``."""
+    ) -> dict[str, Any]:
+        """Rows with more non-revoked annotators on a target version than ``n``:
+        their number and the rows themselves."""
         with self.db.transaction() as conn:
             pid = self._lock(conn, key, exclusive=False)["id"]
             counts = dict(
@@ -1132,15 +1135,27 @@ class WorkPlanService:
             discarded = set(store.discarded(conn, pid))
             # Texts with their own limit keep it (issue 422).
             own = per_text_overrides(conn, pid)
-            over = sum(
-                any(
-                    counts.get(_target(chain).document_id, 0) > annotations_per_text
-                    for chain in _live(chains, discarded)
+            rows = []
+            for row_key, chains in _chains(conn, pid).items():
+                if (row_key.case_id, row_key.language) in own:
+                    continue
+                annotators = max(
+                    (
+                        counts.get(_target(chain).document_id, 0)
+                        for chain in _live(chains, discarded)
+                    ),
+                    default=0,
                 )
-                for row_key, chains in _chains(conn, pid).items()
-                if (row_key.case_id, row_key.language) not in own
-            )
-            return {"rows_over_target": over}
+                if annotators > annotations_per_text:
+                    rows.append(
+                        {
+                            "case_id": row_key.case_id,
+                            "language": row_key.language,
+                            "annotators": annotators,
+                        }
+                    )
+            rows.sort(key=lambda row: (row["case_id"], row["language"]))
+            return {"rows_over_target": len(rows), "rows": rows}
 
     def set_annotations_per_text(
         self,
@@ -1176,10 +1191,13 @@ class WorkPlanService:
         whole request (``DOCUMENT_NOT_FOUND`` with the texts) and nothing is
         written. Each text is compared with its own stored value, so texts
         that already have ``value`` are left alone; one audit entry per
-        changed text.
+        changed text. A value above the server's maximum is refused
+        (``ANNOTATIONS_PER_TEXT_ABOVE_MAXIMUM``), unless every text already
+        has it.
         """
         wanted = list(dict.fromkeys(rows))
         reason = (reason or "").strip() or None
+        maximum = max_annotations_per_text()
         with self.db.transaction() as conn:
             project = self._lock(conn, key, exclusive=True)
             pid = project["id"]
@@ -1195,6 +1213,8 @@ class WorkPlanService:
             for row in wanted:
                 old = stored.get((row.case_id, row.language))
                 changed = old != value
+                if changed and value is not None:
+                    require_annotations_per_text(value, maximum)
                 if changed:
                     write_per_text(
                         conn,
@@ -1238,8 +1258,10 @@ class WorkPlanService:
 
         Every version of the selected texts ``(case_id, language)`` gets the
         lowest positions, in their current order; the other documents follow
-        in theirs. My tasks lists open work by status, then by this order, so
-        the selected texts come first. Positions are renumbered ``0..n-1``
+        in theirs. My tasks lists a person's tasks by status, then in the
+        order of assignment (issue 488); the tasks already assigned on the
+        texts named in this move's audit event come first there
+        (``assignments.service._in_task_order``). Positions are renumbered ``0..n-1``
         (an upload appends after the highest). Unknown texts are ignored; one
         ``project.queue_order`` audit event names the moved texts.
         """

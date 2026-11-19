@@ -1,0 +1,24 @@
+/* Translation reviews: the lead's list of submitted and open translation reviews (issue 483). */
+
+.translation-reviews-lede { max-width: 60rem; margin: var(--space-2) 0 var(--space-4); color: var(--text-muted); }
+.translation-reviews-count { margin: var(--space-3) 0 var(--space-2); font-size: var(--size-sm); color: var(--text-muted); }
+.translation-reviews-table tbody th { min-width: 9rem; font-weight: var(--weight-strong); overflow-wrap: break-word; }
+.translation-reviews-table td { overflow-wrap: break-word; }
+.translation-reviews-rationale { min-width: 14rem; max-width: 32rem; white-space: pre-wrap; }
+.translation-reviews-action { white-space: nowrap; }
+.translation-reviews-action a { display: inline-block; min-height: 24px; }
+.translation-reviews-paging { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
+.translation-reviews-note { max-width: 60rem; margin-top: var(--space-3); font-size: var(--size-sm); }
+
+@media (max-width: 700px) {
+  /* One card per review. */
+  .translation-reviews-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .translation-reviews-table, .translation-reviews-table tbody, .translation-reviews-table tr { display: block; }
+  .translation-reviews-table tr { padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
+  .translation-reviews-table th, .translation-reviews-table td { display: block; min-width: 0; padding: 0; border: 0; overflow-wrap: anywhere; }
+  .translation-reviews-table td { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: var(--space-2); font-size: var(--size-sm); }
+  .translation-reviews-table td::before { content: attr(data-label); color: var(--text-muted); }
+  .translation-reviews-rationale { min-width: 0; max-width: none; }
+  .translation-reviews-table td.translation-reviews-action { display: block; margin-top: var(--space-2); white-space: normal; }
+  .translation-reviews-table td.translation-reviews-action::before { content: none; }
+}

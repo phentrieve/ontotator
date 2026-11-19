@@ -205,6 +205,56 @@ class EditorialCorrectionRow(Base):
     corrected_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
+class QueryDecisionRow(Base):
+    """A lead's decision on a translation review submitted as a query (issue 483).
+
+    Append-only, one row per decided review. ``kind``: ``reviewer_text`` (the
+    reviewer's proposed text, as the lead confirmed it, became the next
+    version, accepted) or ``unchanged`` (the queried version was accepted as
+    it is). ``document_id`` is the version the lead decided on (the queried
+    one, or its typo fix), ``accepted_document_id`` the version the decision
+    accepted. ``answer`` is what the lead wrote to the reviewer; ``edited``
+    says that the lead changed the reviewer's text before saving it.
+    """
+
+    __tablename__ = "translation_query_decisions"
+    __table_args__ = (
+        ForeignKeyConstraint(*_DOCUMENT_FK),
+        ForeignKeyConstraint(
+            ["project_id", "accepted_document_id"],
+            [f"{SCHEMA}.documents.project_id", f"{SCHEMA}.documents.document_id"],
+        ),
+        UniqueConstraint("review_id"),
+        CheckConstraint("kind IN ('reviewer_text', 'unchanged')", name="kind"),
+        CheckConstraint(
+            "kind <> 'unchanged' OR btrim(coalesce(answer, '')) <> ''",
+            name="answer_required",
+        ),
+        Index(
+            "ix_translation_query_decisions_project_accepted",
+            "project_id",
+            "accepted_document_id",
+        ),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.projects.id")
+    )
+    # The decided review (``translation_reviews.id``). No foreign key, as for
+    # every reference to a review: the review history refuses TRUNCATE by its
+    # own trigger, which a referencing table would pre-empt.
+    review_id: Mapped[int] = mapped_column(BigInteger)
+    document_id: Mapped[str]
+    accepted_document_id: Mapped[str]
+    kind: Mapped[str]
+    answer: Mapped[str | None]
+    edited: Mapped[bool] = mapped_column(server_default=text("false"))
+    decided_by: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.users.id")
+    )
+    decided_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
 class TextSettingRow(Base):
     """Per-text settings of a language version (issue 422).
 
@@ -216,9 +266,7 @@ class TextSettingRow(Base):
     __tablename__ = "text_settings"
     __table_args__ = (
         UniqueConstraint("project_id", "case_id", "language"),
-        CheckConstraint(
-            "annotations_per_text BETWEEN 1 AND 20", name="annotations_per_text"
-        ),
+        CheckConstraint("annotations_per_text >= 1", name="annotations_per_text"),
         CheckConstraint(
             "NOT paused OR (pause_reason IS NOT NULL AND paused_at IS NOT NULL)",
             name="pause",

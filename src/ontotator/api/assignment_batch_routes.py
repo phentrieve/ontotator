@@ -100,7 +100,9 @@ class BatchAssignRequest(BaseModel):
     # the selected texts in ``language`` are targeted.
     case_ids: list[str] = Field(default_factory=list, max_length=MAX_SELECTED_CASES)
     rows: list[RowRefView] = Field(default_factory=list, max_length=MAX_SELECTED_ROWS)
-    sort: Literal["case", "import", "activity"] = "case"
+    # The tasks are created in this order, and each person sees them in it
+    # in My tasks (issue 488). "given": the order of ``case_ids`` or ``rows``.
+    sort: Literal["case", "import", "activity", "given"] = "case"
     # The Documents filters of the dialog; the case order depends on ``sort``
     # only, and every selected case keeps its place whatever the filters hide.
     filters: DocumentRowFilters = Field(default_factory=DocumentRowFilters)
@@ -212,6 +214,8 @@ class BatchPreview(BaseModel):
     per_text: int
     # The project's "Annotations per text" (the texts without an override).
     project_per_text: int
+    # The server's maximum of "Annotations per text"; None: no limit.
+    max_per_text: int | None = None
     digest: str
     # "Split evenly" with too few people: the most open slots of one target
     # ("Choose at least n annotators for n annotations per text"); no usernames.

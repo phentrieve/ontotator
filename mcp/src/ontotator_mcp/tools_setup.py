@@ -21,7 +21,7 @@ from ontotator_mcp.models import (
     PlanChoice,
     TextRef,
 )
-from ontotator_mcp.tooling import Scope, register
+from ontotator_mcp.tooling import Scope, listing, register
 
 Project = Annotated[str, Field(description="Project key, e.g. 'ward-7'.")]
 Paths = Annotated[
@@ -250,23 +250,23 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         return result | {"user": me}
 
     @register(server, scopes="read", effect="read")
-    async def list_projects() -> list[dict[str, Any]]:
+    async def list_projects() -> dict[str, Any]:
         """The projects the token's owner is a member of, with roles and text counts."""
         projects: list[dict[str, Any]] = await api.get("/api/v1/projects")
-        return projects
+        return listing(projects)
 
     @register(server, scopes="read", effect="read")
-    async def list_ontologies() -> list[dict[str, Any]]:
+    async def list_ontologies() -> dict[str, Any]:
         """Ontology releases on the server with their SHA-256 and translations.
 
         Use the ``sha256`` of a release as a pin in create_project or
         set_ontology_pins.
         """
         listed: list[dict[str, Any]] = await api.get("/api/v1/ontologies")
-        return listed
+        return listing(listed)
 
     @register(server, scopes="admin", effect="read")
-    async def list_ontology_files() -> list[dict[str, Any]]:
+    async def list_ontology_files() -> dict[str, Any]:
         """Every uploaded ontology and translation file, with the projects using it.
 
         ``frozen_without`` names projects that froze their translations before
@@ -274,7 +274,7 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         refresh_translations). Needs a system token.
         """
         listed: list[dict[str, Any]] = await api.get("/api/v1/admin/ontologies/")
-        return listed
+        return listing(listed)
 
     @register(server, scopes="admin", effect="additive", idempotent=True)
     async def upload_ontology_files(paths: Paths) -> dict[str, Any]:
@@ -296,10 +296,10 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         return {"local_files": [str(file) for file in files], "files": result}
 
     @register(server, scopes="read", effect="read")
-    async def list_project_templates() -> list[dict[str, Any]]:
+    async def list_project_templates() -> dict[str, Any]:
         """Project templates (ready task profiles) and the ontologies each needs."""
         listed: list[dict[str, Any]] = await api.get("/api/v1/projects/templates")
-        return listed
+        return listing(listed)
 
     @register(server, scopes="admin", effect="additive")
     async def create_project(
@@ -463,6 +463,16 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
                 ),
             ),
         ] = "",
+        label: Annotated[
+            str,
+            Field(
+                description=(
+                    "The version the guideline document gives itself, e.g. '3.1';"
+                    " one line, at most 40 characters. Shown before the upload"
+                    " number: 'Guidelines 3.1 (v2)'. Empty: none."
+                )
+            ),
+        ] = "",
     ) -> dict[str, Any]:
         """Publish a new version of the project's annotation guideline.
 
@@ -472,7 +482,9 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         ONTOTATOR_MCP_FILES_DIR; without that variable it refuses. Earlier
         versions stay; annotators are asked
         to read the new one. Refused with GUIDELINE_VERSION_CONFLICT if
-        another version was published meanwhile.
+        another version was published meanwhile. 'version' in the result
+        counts the project's uploads and is the identifier; 'label' is the
+        document's own version, if one was given.
         """
         files = api.local_files([path])
         listing = await api.get(project_path(project, "guidelines"))
@@ -485,6 +497,7 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
                 "change_note": change_note,
                 # A form field: empty for a project without a guideline.
                 "expected_latest_version": "" if latest is None else str(latest),
+                "label": label,
             },
         )
         return summary | {"local_files": [str(file) for file in files]}
@@ -580,17 +593,19 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
             list[str] | None,
             Field(description="e.g. ['ready','invalid','committed']; all if empty."),
         ] = None,
-    ) -> list[dict[str, Any]]:
+    ) -> dict[str, Any]:
         """The project's staged and committed uploads."""
         listed = await api.get(project_path(project, "uploads"), status=status)
-        return [
-            {
-                key: item.get(key)
-                for key in ("id", "kind", "language", "status", "created_at")
-            }
-            | {"files": [f.get("filename") for f in item.get("files", [])]}
-            for item in listed
-        ]
+        return listing(
+            [
+                {
+                    key: item.get(key)
+                    for key in ("id", "kind", "language", "status", "created_at")
+                }
+                | {"files": [f.get("filename") for f in item.get("files", [])]}
+                for item in listed
+            ]
+        )
 
     # An import cannot be undone, and accept_external_review or a re-delivered
     # translation changes the status of texts imported earlier.
@@ -654,22 +669,23 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         return upload_summary(view)
 
     @register(server, scopes="read", effect="read")
-    async def list_people(project: Project) -> list[dict[str, Any]]:
+    async def list_people(project: Project) -> dict[str, Any]:
         """Project members with roles, languages and open tasks.
 
-        Leads see names and login names; others see pseudonyms only.
+        Leads see names and login names (username, display_name); others
+        see pseudonyms only. The members are in 'items'.
         """
         members: list[dict[str, Any]] = await api.get(project_path(project, "members"))
-        return members
+        return listing(members)
 
     @register(server, scopes="admin", effect="read")
-    async def list_users() -> list[dict[str, Any]]:
+    async def list_users() -> dict[str, Any]:
         """Every user account of the server with projects and languages.
 
         Needs a system token.
         """
         users: list[dict[str, Any]] = await api.get("/api/v1/admin/users/")
-        return users
+        return listing(users)
 
     @register(
         server, scopes=("read", "project-admin"), effect="destructive", idempotent=True
@@ -776,6 +792,12 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
     ) -> dict[str, Any]:
         """Assign text versions to people, one task per row.
 
+        The tasks are created in the order of the rows. My tasks lists a
+        person's tasks by status, then in the order of assignment, and the
+        editor opens the next task in that order: put the rows in the order
+        the person should work in. New tasks come after the tasks the person
+        already has.
+
         A row that cannot be assigned does not fail the call: it is listed
         under ``refused`` with its code and a hint, and ``warning`` counts
         such rows.
@@ -825,7 +847,13 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
             ),
         ],
         case_ids: Annotated[
-            list[str], Field(description="Cases; empty means every case.")
+            list[str],
+            Field(
+                description=(
+                    "Cases, in the order the people should work in; empty"
+                    " means every case, by case ID."
+                )
+            ),
         ] = [],  # noqa: B006
         task: Literal["annotate", "translation_review"] = "annotate",
         confirm_unreviewed_translation: bool = False,
@@ -843,6 +871,13 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         whose review is not accepted (unreviewed_translation in the dry
         run's targets) is refused with TRANSLATION_NOT_REVIEWED unless
         confirm_unreviewed_translation.
+
+        The tasks are created in the order of case_ids (without case_ids: by
+        case ID). My tasks lists a person's tasks by status, then in the
+        order of assignment, and the editor opens the next task in that
+        order: give case_ids in the order the people should work in. With
+        'split' each person gets a block of consecutive cases. New tasks
+        come after the tasks a person already has.
         """
         body: dict[str, Any] = {
             "task": task,
@@ -850,6 +885,8 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
             "mode": mode,
             "usernames": usernames,
             "case_ids": case_ids or await all_case_ids(api, project),
+            # Issue 488: the caller's order is the order of assignment.
+            "sort": "given" if case_ids else "case",
         }
         preview: dict[str, Any] = await api.post(
             project_path(project, "assignments/batch/preview"), body

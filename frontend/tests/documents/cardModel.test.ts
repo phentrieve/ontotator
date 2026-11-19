@@ -152,8 +152,11 @@ describe("Finalization", () => {
     const byReport = { annotation: cell("consolidating", "decision", { note: "report_pause" }), final: cell("after_review", "waiting") };
     expect(finalizationState(cardRow(byReport), now)).toEqual({ state: "consolidating · paused", tone: "now" });
   });
-  it("confirm reads ready to accept", () => {
-    expect(finalizationState(cardRow({ final: cell("confirm", "decision") }), now)).toEqual({ state: "ready to accept", tone: "now" });
+  it("confirm reads as the phone card: Check changes and what changed (issue 469)", () => {
+    expect(finalizationState(cardRow({ final: cell("confirm", "decision", { causes: ["SELECTED_NEWER_RESULT"] }) }), now)).toEqual({ state: "Check changes, newer result", tone: "now" });
+    expect(finalizationState(cardRow({ final: cell("confirm", "decision", { causes: ["SELECTED_TEXT_CORRECTED", "SELECTED_NEWER_RESULT"] }) }), now).state).toBe("Check changes, text corrected, newer result");
+    // Without a cause the words stand alone; never "ready to accept", which is a text without a final result.
+    expect(finalizationState(cardRow({ final: cell("confirm", "decision") }), now)).toEqual({ state: "Check changes", tone: "now" });
   });
   it("accepted shows the date", () => {
     const chosen = final({ case_id: "case-200", language: "de", document_id: "case-200-de", submission_id: "s-1", selected_at: "2026-10-18T10:05:00Z" });

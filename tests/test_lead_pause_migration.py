@@ -44,6 +44,7 @@ def _columns(conn: Connection) -> set[str]:
 
 def test_one_head():
     scripts = ScriptDirectory.from_config(alembic_config())
+    # One head; 0046 and 0047 (carry a submission again, issue 461) follow this one.
     assert scripts.get_heads() == [head_revision()]
     assert _previous() == PREVIOUS
     previous = scripts.get_revision(PREVIOUS)

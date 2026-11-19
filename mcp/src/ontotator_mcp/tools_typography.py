@@ -22,8 +22,8 @@ DocumentId = Annotated[
     Field(
         description=(
             "ID of one text version (document_id from list_texts): its hints"
-            " with positions. None: the number of hints of each text of the"
-            " project."
+            " with positions; a case ID is not a document_id. None: the number"
+            " of hints of each text of the project."
         )
     ),
 ]

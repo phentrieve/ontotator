@@ -157,7 +157,7 @@ it("shows the author as display name and pseudonym for leads", () => {
 });
 
 it("shows Guidelines v2 (current: v3)", () => {
-  renderTable({ guidelineCurrent: 3, rows: [
+  renderTable({ guidelineCurrent: { version: 3 }, rows: [
     submission({ submission_id: "a", document_id: "d1", guideline_version: 2 }),
     submission({ submission_id: "b", document_id: "d1", guideline_version: 3, recorded_at: "2026-10-19T11:00:00Z" }),
     submission({ submission_id: "c", document_id: "d1", guideline_version: 1, guideline_withdrawn: true, recorded_at: "2026-10-19T11:30:00Z" }),
@@ -168,8 +168,18 @@ it("shows Guidelines v2 (current: v3)", () => {
   expect(within(rows[1]).getByText("Guidelines v3")).toBeTruthy();
   expect(within(rows[2]).getByText("Guidelines v1 (withdrawn)")).toBeTruthy();
   cleanup();
-  renderTable({ layout: "list", guidelineCurrent: 3, rows: [submission({ submission_id: "a", document_id: "d1", guideline_version: 2 })] });
+  renderTable({ layout: "list", guidelineCurrent: { version: 3 }, rows: [submission({ submission_id: "a", document_id: "d1", guideline_version: 2 })] });
   expect(screen.getByText("Guidelines v2 (current: v3)")).toBeTruthy();
+});
+
+it("shows the project's own label first: Guidelines 3.1 (v2) (current: 3.2 (v3)) (#487)", () => {
+  renderTable({ guidelineCurrent: { version: 3, label: "3.2" }, rows: [
+    submission({ submission_id: "a", document_id: "d1", guideline_version: 2, guideline_label: "3.1" }),
+    submission({ submission_id: "b", document_id: "d1", guideline_version: 3, guideline_label: "3.2", recorded_at: "2026-10-19T11:00:00Z" }),
+  ] });
+  const rows = bodyRows();
+  expect(within(rows[0]).getByText("Guidelines 3.1 (v2) (current: 3.2 (v3))")).toBeTruthy();
+  expect(within(rows[1]).getByText("Guidelines 3.2 (v3)")).toBeTruthy();
 });
 
 it("shows Guidelines: not recorded", () => {
