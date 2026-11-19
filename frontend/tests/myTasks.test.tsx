@@ -55,6 +55,14 @@ describe("My tasks component", () => {
     expect(within(rows[1]).queryByText("Answer to your report")).toBeNull();
   });
 
+  it("marks a submitted query the lead decided (issue 483)", async () => {
+    vi.mocked(api.listMyTasks).mockResolvedValue([{ ...task(3, "submitted"), query_answered_at: "2026-11-18T10:12:00Z" }, task(1, "submitted")]);
+    render(<MyTasks projects={[]} onNavigate={vi.fn()} />);
+    const rows = await screen.findAllByTestId("task-row");
+    expect(within(rows[0]).getByText("Answer from the lead")).toBeDefined();
+    expect(within(rows[1]).queryByText("Answer from the lead")).toBeNull();
+  });
+
   it("links the answer badge to the answered report (#18)", async () => {
     const onNavigate = vi.fn();
     vi.mocked(api.listMyTasks).mockResolvedValue([{ ...task(3, "open"), report_answered: true, answered_report_id: "r-7" }]);
@@ -161,6 +169,32 @@ describe("My tasks component", () => {
     expect(screen.getByText("Reopened")).toBeDefined();
   });
 
+  it("on a narrow screen stacks text, task and status with its reason beside the action (review F6)", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: query === "(max-width: 700px)", addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    vi.mocked(api.listMyTasks).mockResolvedValue([
+      { ...task(4, "reopened"), reopened_at: "2026-10-26T09:00:00Z", reopen_reason: "Check the onset." },
+      { ...task(5, "in_progress"), held: true, hold_reason: "The text names two doses." },
+      { ...task(2, "open", "q", "Project Q"), consolidation_reason: "Assertion differs" }]);
+    try {
+      render(<MyTasks projects={[]} onNavigate={vi.fn()} />);
+      const rows = await screen.findAllByTestId("task-row");
+      expect(screen.getAllByRole("columnheader").map(cell => cell.textContent)).toEqual(["Task", "Action"]);
+      expect(rows.map(row => row.querySelectorAll("td").length)).toEqual([2, 2, 2]);
+      const [reopened, paused, consolidation] = rows.map(row => row.querySelector("td")!.textContent);
+      // The reopen reason is written out; there is no badge to tap.
+      expect(reopened).toMatch(/doc-4.*Project P.*Annotation.*Reopened.*The project lead reopened this task on .+\. Reason: Check the onset\./);
+      expect(screen.queryByRole("button", { name: "Reopened, why" })).toBeNull();
+      // Narrow: the notice under the badge says it once.
+      expect(rows[0].querySelector(".task-lead-reason")).toBeNull();
+      expect(paused).toMatch(/In progress.*Paused.*The text names two doses\./);
+      // Two projects are listed: each row names its project.
+      expect(consolidation).toMatch(/doc-2.*Project Q \(q\).*Consolidation.*Reason from the lead: Assertion differs.*Open/);
+      expect(within(rows[0]).getByRole("link", { name: "Continue" })).toBeDefined();
+      expect(within(rows[1]).getByRole("link", { name: "View paused task" })).toBeDefined();
+      expect(within(rows[2]).getByRole("link", { name: "Start" })).toBeDefined();
+    } finally { vi.unstubAllGlobals(); }
+  });
+
   it("names when and why the lead reopened a task under its status (#34)", async () => {
     vi.mocked(api.listMyTasks).mockResolvedValue([
       { ...task(4, "reopened"), reopened_at: "2026-10-26T09:00:00Z", reopen_reason: "Check the onset." }, task(5, "reopened"), task(3, "open")]);
@@ -168,6 +202,10 @@ describe("My tasks component", () => {
     const rows = await screen.findAllByTestId("task-row");
     // The row keeps only the badge; the sentence opens from its info button.
     expect(rows[0].textContent).not.toContain("reopened this task");
+    // Review 2, F7 c: the reason is written out under the task name, as the reason for a second review is; a
+    // reopening without a reason adds no line.
+    expect(rows[0].querySelector(".task-lead-reason")!.textContent).toMatch(/^Reopened by the lead on .+: Check the onset\.$/);
+    expect(rows[1].querySelector(".task-lead-reason")).toBeNull();
     expect(within(rows[2]).queryByRole("button", { name: "Reopened, why" })).toBeNull();
     fireEvent.click(within(rows[0]).getByRole("button", { name: "Reopened, why" }));
     expect((await screen.findByRole("dialog", { name: "Why reopened" })).textContent).toMatch(/The project lead reopened this task on .+\. Reason: Check the onset\./);
@@ -182,6 +220,39 @@ describe("My tasks component", () => {
     const rows = await screen.findAllByTestId("task-row");
     expect(within(rows[0]).getByText("Reason from the lead: Term and assertion differ")).toBeDefined();
     expect(within(rows[1]).queryByText(/^Reason from the lead/)).toBeNull();
+  });
+
+  it("shows the lead's reason for a second review under the task name, and as the reason of its Reopened badge", async () => {
+    vi.mocked(api.listMyTasks).mockResolvedValue([
+      { ...task(4, "reopened"), task: "translation_review", second_review_at: "2026-11-17T09:30:00Z", second_review_reason: "Check the dose in paragraph 2." },
+      { ...task(5, "open"), task: "translation_review", second_review_at: "2026-11-17T09:30:00Z", second_review_reason: "Units." }, task(3, "open")]);
+    render(<MyTasks projects={[]} onNavigate={vi.fn()} />);
+    const rows = await screen.findAllByTestId("task-row");
+    expect(within(rows[0]).getByText(/^Second review requested by the lead on .+: Check the dose in paragraph 2\.$/)).toBeDefined();
+    expect(within(rows[1]).getByText(/^Second review requested by the lead on .+: Units\.$/)).toBeDefined();
+    expect(within(rows[2]).queryByText(/^Second review requested/)).toBeNull();
+    // The request set the status "Reopened"; the badge never says "No reason given." beside the reason.
+    fireEvent.click(within(rows[0]).getByRole("button", { name: "Reopened, why" }));
+    expect((await screen.findByRole("dialog", { name: "Why reopened" })).textContent).toMatch(/^Second review requested by the lead on .+: Check the dose in paragraph 2\.$/);
+  });
+
+  it("marks a task whose text a lead paused, and names both causes when a report pauses it too (issue 464)", async () => {
+    vi.mocked(api.listMyTasks).mockResolvedValue([
+      { ...task(21, "in_progress"), held: true, hold_reason: "Clinic is checking", pause_causes: ["lead"], lead_pause_reason: "Clinic is checking" },
+      { ...task(22, "open"), held: true, hold_reason: "Text is cut off", pause_causes: ["report", "lead"], lead_pause_reason: "Clinic is checking" },
+    ]);
+    render(<MyTasks projects={[]} onNavigate={vi.fn()} />);
+    const rows = await screen.findAllByTestId("task-row");
+    expect(within(rows[0]).getByText("Paused by lead")).toBeDefined();
+    expect(within(rows[0]).queryByText("Paused")).toBeNull();
+    expect(within(rows[0]).getByText("Clinic is checking")).toBeDefined();
+    expect(within(rows[0]).getByRole("link", { name: "View paused task" })).toBeDefined();
+    // Report first, then the lead: each cause with its own reason.
+    expect(within(rows[1]).getByText("Paused")).toBeDefined();
+    expect(within(rows[1]).getByText("Text is cut off")).toBeDefined();
+    expect(within(rows[1]).getByText("Paused by lead")).toBeDefined();
+    expect(within(rows[1]).getByText("Clinic is checking")).toBeDefined();
+    expect(tabNames()).toEqual(["To do, 2", "Paused, 2", "Submitted, 0", "All, 2"]);
   });
 
   it("shows pauses alongside underlying status and keeps saved work accessible", async () => {
@@ -574,13 +645,14 @@ describe("My tasks guideline links", () => {
   it("links Project guidelines v3 once per project with a version in force", async () => {
     vi.spyOn(api, "listMyTasks").mockResolvedValue([...tasks, task(5, "open", "r", "Project R")]);
     vi.mocked(api.listGuidelines).mockImplementation(async key => key === "p" ? guidelineListing([guidelineSummary(3), guidelineSummary(2)])
-      : key === "q" ? guidelineListing([guidelineSummary(1)]) : guidelineListing([withdrawnGuideline(2), guidelineSummary(1)]));
+      : key === "q" ? guidelineListing([guidelineSummary(1, { label: "3.1" })]) : guidelineListing([withdrawnGuideline(2), guidelineSummary(1)]));
     const onNavigate = vi.fn();
     const { rerender } = render(<MyTasks projects={[]} onNavigate={onNavigate} />);
     await screen.findAllByTestId("task-row");
     const links = await screen.findAllByRole("link", { name: /^Project guidelines/ });
     // Ordered as the project filter options; R has no version in force (its current one is withdrawn).
-    expect(links.map(link => link.textContent)).toEqual(["Project guidelines v3, Project P", "Project guidelines v1, Project Q"]);
+    // Q's version has the project's own label, shown before the upload number (#487).
+    expect(links.map(link => link.textContent)).toEqual(["Project guidelines v3, Project P", "Project guidelines 3.1 (v1), Project Q"]);
     expect(links.map(link => link.getAttribute("href"))).toEqual(["#/projects/p/guidelines", "#/projects/q/guidelines"]);
     expect(vi.mocked(api.listGuidelines).mock.calls.map(([key]) => key).sort()).toEqual(["p", "q", "r"]);
     fireEvent.click(links[0]);

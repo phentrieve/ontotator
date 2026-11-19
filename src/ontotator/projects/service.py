@@ -16,6 +16,10 @@ from ontotator.auth.audit import Actor, record_audit
 from ontotator.authz.memberships import grant_roles
 from ontotator.authz.policy import Action
 from ontotator.authz.project_authority import require_project_management
+from ontotator.domain.annotation_limits import (
+    MAX_ANNOTATIONS_PER_TEXT,
+    MIN_ANNOTATIONS_PER_TEXT,
+)
 from ontotator.domain.annotation_modes import AnnotationMode
 from ontotator.domain.canonical import canonical_hash
 from ontotator.domain.documents import Document
@@ -144,6 +148,43 @@ class EarlierTranslations(BaseModel):
 FrozenTranslations.model_rebuild()
 
 
+# Settings whose value before and after a change goes into the audit entry
+# (#472): the history shows "old → new". Free text (the description) and the
+# nested value rules are named only.
+_AUDITED_SETTING_VALUES = frozenset(
+    {
+        "name",
+        "languages",
+        "allow_spanless_findings",
+        "require_spanless_note",
+        "require_chosen_axes",
+        "adjudicator_not_annotator",
+        "blind_consolidation",
+        "contiguous_mentions_only",
+        "annotate_accepted_translations_only",
+        "record_working_time",
+        "annotations_per_text",
+        "import_plan",
+        "tool_proposal_mode",
+    }
+)
+# One choice on the settings page: the history needs both to name it.
+_SPANLESS_SETTINGS = ("allow_spanless_findings", "require_spanless_note")
+
+
+def _setting_changes(
+    row: Mapping[str, Any], fields: Mapping[str, Any]
+) -> dict[str, dict[str, Any]]:
+    """``{setting: {"before": …, "after": …}}`` for the changed plain settings."""
+    names = set(fields) & _AUDITED_SETTING_VALUES
+    if names & set(_SPANLESS_SETTINGS):
+        names |= set(_SPANLESS_SETTINGS)
+    return {
+        name: {"before": row[name], "after": fields.get(name, row[name])}
+        for name in sorted(names)
+    }
+
+
 class ProjectSettingsChange(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str = ""
@@ -163,7 +204,9 @@ class ProjectSettingsChange(BaseModel):
     hidden_axis_values: HiddenValues = Field(default_factory=dict)
     creation_defaults: CreationDefaults = Field(default_factory=dict)
     # ``None`` keeps the stored value (the settings page sends full replaces).
-    annotations_per_text: int | None = Field(None, ge=1, le=5)
+    annotations_per_text: int | None = Field(
+        None, ge=MIN_ANNOTATIONS_PER_TEXT, le=MAX_ANNOTATIONS_PER_TEXT
+    )
     import_plan: ImportPlanSetting | None = None
     tool_proposal_mode: AnnotationMode | None = None
 
@@ -823,6 +866,7 @@ class ProjectService:
                             for name in fields
                             if name != "annotation_policy_revision"
                         ),
+                        "changes": _setting_changes(row, fields),
                         "annotation_policy_revision": fields.get(
                             "annotation_policy_revision",
                             row["annotation_policy_revision"],

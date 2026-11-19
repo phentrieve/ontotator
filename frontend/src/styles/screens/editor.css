@@ -1105,6 +1105,34 @@
 @media (max-width: 700px) { .sidebar-resizer { display: none; } }
 @media (forced-colors: active) { .sidebar-resizer-grip { background: CanvasText; } .sidebar-resizer:focus-visible { outline-color: Highlight; } }
 
+/* The divider above the ontology tree sets the tree's height: only in the three-column layout, where
+   the tree lies under the inspector. Unset, the rows of .tree-open apply; once dragged, .tree-sized
+   gives the tree --tree-height (editor/treeHeight.ts) and the inspector the rest. */
+.sidebar-resizer.sidebar-resizer--rows { display: none; }
+.sidebar-resizer--rows .sidebar-resizer-grip { position: static; width: 32px; height: 4px; margin: 6px auto 0; }
+/* The focus ring stays inside the strip: outside it, the window's edge would cut it. */
+.sidebar-resizer--rows:focus-visible { outline-offset: calc(-1 * var(--focus-width)); }
+@media (min-width: 1025px) {
+  @container case-screen (min-width: 1060px) {
+    .case-screen:not(.case-comparing) .app-layout.tree-open > .sidebar-resizer.sidebar-resizer--rows {
+      display: block;
+      grid-column: 3;
+      grid-row: 2;
+      align-self: start;
+      justify-self: stretch;
+      width: auto;
+      height: 16px;
+      margin: -8px 0 0;
+      cursor: row-resize;
+    }
+    .case-screen:not(.case-comparing) .app-layout.tree-open.tree-sized {
+      /* The limits of treeHeight.ts once more, so that a height from a higher window can push
+         neither part out before the script has measured: 220 px for the tree, 160 px for the panel. */
+      grid-template-rows: minmax(160px, 1fr) clamp(220px, var(--tree-height), 100% - 160px);
+    }
+  }
+}
+
 /* The columns follow the room the editor really has, not only the viewport (a page drawer would
    narrow it; in the editor the guidelines open in the inspector instead, from 1060 px). Three
    columns need the text's 420 px beside the findings column (at least 220 px) and the inspector;
@@ -1488,6 +1516,20 @@
   font-size: var(--size-reading);
   line-height: var(--leading-reading);
   overflow-wrap: anywhere;
+}
+/* "Copy text" under the quote keeps the panel's gap to the hint below it. */
+.pending-quote + .btn {
+  margin-bottom: var(--space-2);
+}
+/* "Copy text", "Copied", "Copy failed" share one cell: the button is as wide as the longest. */
+.copy-text__labels {
+  display: inline-grid;
+}
+.copy-text__labels > span {
+  grid-area: 1 / 1;
+}
+.copy-text__label--off {
+  visibility: hidden;
 }
 
 @media (forced-colors: active) {
@@ -2064,6 +2106,23 @@
   font-family: var(--font-serif);
   font-size: var(--size-base);
   line-height: var(--leading-base);
+}
+
+/* The sentence around the quoted passage (one pane at a time, issue 468): the passage is marked by weight and fill. */
+.review-actions__sentence {
+  margin: 0 0 var(--space-2);
+  padding-inline-start: var(--space-2);
+  border-inline-start: 2px solid var(--border-strong);
+  color: var(--text-muted);
+  font-family: var(--font-serif);
+  font-size: var(--size-sm);
+  line-height: var(--leading-sm);
+  overflow-wrap: anywhere;
+}
+.review-actions__sentence mark {
+  background: var(--accent-light);
+  color: var(--text);
+  font-weight: var(--weight-strong);
 }
 
 .review-actions__quote-button {
@@ -2758,9 +2817,15 @@ details.case-version-controls > .btn { vertical-align: bottom; }
 }
 /* End of Values block */
 
-/* <=700 px: a new mark keeps the text pane; this bar leads to the term search (spec B.5). */
+/* <=700 px: a new mark keeps the text pane; this bar leads to the term search (spec B.5). It follows the panes
+   and sticks to the bottom of the window: the workspace is one window high below the header, so its own bottom
+   edge is below the fold until the page is scrolled (issue 452). */
 .pending-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
   display: flex;
+  flex-wrap: wrap;
   flex-shrink: 0;
   align-items: center;
   gap: var(--space-2);
@@ -2768,12 +2833,17 @@ details.case-version-controls > .btn { vertical-align: bottom; }
   border-top: 1px solid var(--border);
   background: var(--surface-raised);
 }
+/* The marked words on their own line above the buttons, up to two lines (issue 472): beside the buttons a phone
+   had room for a word or two. */
 .pending-bar__text {
-  flex: 1;
+  flex: 1 1 100%;
   min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .back-to-text {
   margin: var(--space-2) var(--space-3) 0;
@@ -3089,3 +3159,37 @@ details.case-version-controls > .btn { vertical-align: bottom; }
 .work-timer--hidden .work-timer__value,
 .work-timer--paused .work-timer__value { color: var(--text-muted); }
 .case-viewer .carried-checks { padding: var(--space-2) var(--space-3); margin-bottom: 0; }
+
+/* Phone and tablet layouts (up to 1024 px), used by touch: Undo, Redo and Previous / Next text are at least
+   44 × 44 px, and Undo and Redo stand apart (issue 472). */
+@media (max-width: 1024px) {
+  .case-history { gap: var(--space-1); }
+  .case-history > .btn-icon,
+  .case-navigation > .btn-icon {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* A low window in the two-column layout (a phone in landscape, issue 466): the stacked rows (260 px of text over
+   180 px of panel) do not fit under the header, and the term search of a new mark was half below the fold. The
+   panel stands beside the text there and both get the full height. With the tree open the stacked layout stays. */
+@media (min-width: 701px) and (max-width: 1024px) and (max-height: 560px) {
+  .app-layout:not(.tree-open) {
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .app-layout:not(.tree-open) > .sidebar { grid-row: 1; }
+  .app-layout:not(.tree-open) > .inspector-pane {
+    grid-column: 3;
+    grid-row: 1;
+    min-height: 0;
+    border-top: 0;
+    border-left: 1px solid var(--border);
+  }
+}
+
+/* A touch screen without a keyboard: no key hints on the editor's buttons (issue 468). */
+@media (hover: none) and (pointer: coarse) {
+  .case-screen .btn kbd.kbd { display: none; }
+}

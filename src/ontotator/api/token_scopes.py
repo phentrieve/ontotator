@@ -60,6 +60,7 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     ("GET", "/api/v1/preferences"): SESSION,
     ("PUT", "/api/v1/preferences"): SESSION,
     ("POST", "/api/v1/technical-reports"): SESSION,
+    ("GET", "/api/v1/me/technical-reports"): SESSION,
     # A token reads its own record (expiry, scopes) with any non-admin scope.
     ("GET", "/api/v1/me/token"): ("read", "import", "export", "project-admin"),
     # API tokens: never with a token
@@ -115,6 +116,14 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     ("POST", f"{P}/document-rows/selection-summary"): "read",
     ("POST", f"{P}/document-rows/keys"): "read",
     ("POST", f"{P}/document-rows/move-to-front"): "project-admin",
+    # Bulk lead actions on the selected texts' tasks (issue 336).
+    ("POST", f"{P}/bulk-task-actions/reopen"): "project-admin",
+    ("POST", f"{P}/bulk-task-actions/withdraw"): "project-admin",
+    ("POST", f"{P}/bulk-task-actions/undo"): "project-admin",
+    ("POST", f"{P}/bulk-task-actions/start-round"): "project-admin",
+    # Lead pause (issue 464).
+    ("POST", f"{P}/text-pauses/pause"): "project-admin",
+    ("POST", f"{P}/text-pauses/release"): "project-admin",
     ("GET", f"{P}/document-rows/{{case_id:path}}/{{language}}/submissions"): "read",
     ("GET", f"{P}/document-rows/{{case_id:path}}/{{language}}/final-panel"): "read",
     ("GET", f"{P}/documents/summary"): "read",
@@ -129,6 +138,9 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     ("GET", f"{P}/documents/{{doc:path}}/reanchor-items"): "read",
     ("GET", f"{P}/documents/{{doc:path}}/text"): "read",
     ("GET", f"{P}/documents/{{doc:path}}/variant"): "read",
+    # Typography hints (issue 454): the scope and the rule of the text itself.
+    ("GET", f"{P}/documents/{{doc:path}}/typography-hints"): "read",
+    ("GET", f"{P}/typography-hints"): "read",
     ("GET", f"{P}/documents/{{doc:path}}/submissions"): "read",
     ("GET", f"{P}/documents/{{doc:path}}/submissions/{{submission_id:path}}"): "read",
     ("GET", f"{P}/documents/{{doc:path}}/translation-reviews"): "read",
@@ -139,7 +151,31 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     # The lead takes a rejected translation over (issue 345): project work of
     # the lead, as the correction assignment above.
     ("POST", f"{P}/documents/{{doc:path}}/lead-correction"): "project-admin",
+    # Issue 341 b: what the lead correction would start (read only).
+    ("GET", f"{P}/documents/{{doc:path}}/lead-correction"): "read",
+    # Issue 453: an editorial correction changes a text; a lead's project
+    # work, as the lead correction above.
+    ("POST", f"{P}/documents/{{doc:path}}/editorial-correction"): "project-admin",
+    # Its dry run: only a token that may correct needs it.
+    (
+        "POST",
+        f"{P}/documents/{{doc:path}}/editorial-correction/preview",
+    ): "project-admin",
+    # Issue 483: the lead decides a queried review; a lead's project work,
+    # as the editorial correction above.
+    ("POST", f"{P}/documents/{{doc:path}}/query-decision"): "project-admin",
+    # Its preview: only a token that may decide needs it.
+    ("GET", f"{P}/documents/{{doc:path}}/query-decision"): "project-admin",
     ("POST", f"{P}/variants/{{document_id:path}}/discard"): "project-admin",
+    # Issue 341 d: accept exactly one version, as the discard above.
+    ("POST", f"{P}/variants/{{document_id:path}}/accept"): "project-admin",
+    # Its dry run: only a token that may accept needs it.
+    ("GET", f"{P}/variants/{{document_id:path}}/accept"): "project-admin",
+    # Issue 341 a: upload a new version of one translation; it adds a text
+    # (as an import) and is a lead's project work (as the acceptance above).
+    ("POST", f"{P}/variants/{{document_id:path}}/versions"): "project-admin",
+    # Its dry run: only a token that may upload needs it.
+    ("POST", f"{P}/variants/{{document_id:path}}/versions/preview"): "project-admin",
     ("GET", f"{P}/proposal-sets/{{set_id}}"): "read",
     ("GET", f"{P}/workflow-warnings"): "read",
     # Import
@@ -187,9 +223,15 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     ("PUT", f"{P}/work-plans/bulk"): "project-admin",
     ("PUT", f"{P}/work-plans/rows"): "project-admin",
     ("PATCH", f"{P}/work-plans/{{case_id:path}}/{{language}}"): "project-admin",
+    ("PUT", f"{P}/texts/annotations-per-text"): "project-admin",
+    (
+        "PUT",
+        f"{P}/texts/{{case_id:path}}/{{language}}/annotations-per-text",
+    ): "project-admin",
     ("GET", f"{P}/annotation-mode-changes"): "read",
     ("POST", f"{P}/annotation-mode-changes"): "project-admin",
     ("POST", f"{P}/annotation-mode-changes/preview"): "project-admin",
+    ("POST", f"{P}/annotation-mode-changes/bulk"): "project-admin",
     ("POST", f"{P}/annotation-mode-changes/{{change_id}}/restore"): "project-admin",
     ("POST", f"{P}/consolidations"): "project-admin",
     ("POST", f"{P}/submissions/{{submission_id:path}}/carry"): "project-admin",
@@ -200,6 +242,10 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
         "project-admin"
     ),
     ("PUT", f"{P}/final-selections"): "project-admin",
+    ("POST", f"{P}/final-selections/withdraw"): "project-admin",
+    ("POST", f"{P}/final-selections/accept-agreeing"): "project-admin",
+    ("POST", f"{P}/final-selections/bulk-change"): "project-admin",
+    ("POST", f"{P}/final-selections/bulk-change/undo"): "project-admin",
     # Agreement behind the final results (issue 353): leads, like the export.
     ("GET", f"{P}/agreement"): "read",
     # Problem reports
@@ -213,6 +259,7 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     ("POST", "/api/v1/assignments/{assignment_id}/open"): SESSION,
     ("POST", "/api/v1/rounds/{round_id}/open"): SESSION,
     ("GET", "/api/v1/rounds/{round_id}/inputs"): "read",
+    ("GET", "/api/v1/rounds/{round_id}/source-text"): "read",
     ("GET", "/api/v1/rounds/{round_id}/consolidation"): "read",
     ("POST", "/api/v1/workspaces/open"): SESSION,
     ("POST", "/api/v1/workspaces/review-inputs"): SESSION,
@@ -250,6 +297,12 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     # draft and its decision are made by the person it is assigned to, never
     # by a machine acting as them (issue 345), so these stay with the session.
     ("PUT", "/api/v1/translation-reviews/{assignment_id}/draft"): SESSION,
+    # Reads what the workspace route already returns (the draft text), as
+    # rule codes and positions.
+    (
+        "GET",
+        "/api/v1/translation-reviews/{assignment_id}/draft/typography-hints",
+    ): "read",
     ("PUT", "/api/v1/translation-reviews/{assignment_id}/checked-sentences"): SESSION,
     ("POST", "/api/v1/translation-reviews/{assignment_id}/submit"): SESSION,
     ("GET", "/api/v1/translation-reviews/{assignment_id}/source-obligations"): "read",
@@ -330,9 +383,14 @@ PROJECT_RESOLVED: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/api/v1/problem-reports/{report_id}/actions"),
         # Rounds: _visible_round (api.work_round_routes).
         ("GET", "/api/v1/rounds/{round_id}/inputs"),
+        ("GET", "/api/v1/rounds/{round_id}/source-text"),
         ("GET", "/api/v1/rounds/{round_id}/consolidation"),
         # Translation reviews: TranslationReviewService._authority.
         ("GET", "/api/v1/translation-reviews/{assignment_id}"),
+        (
+            "GET",
+            "/api/v1/translation-reviews/{assignment_id}/draft/typography-hints",
+        ),
         ("GET", "/api/v1/translation-reviews/{assignment_id}/source-obligations"),
     }
 )

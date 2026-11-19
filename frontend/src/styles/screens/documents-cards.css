@@ -44,6 +44,8 @@
 .document-card-title:focus, .document-case-card-title:focus { outline: none; }
 .document-card-title:focus-visible, .document-case-card-title:focus-visible { outline: var(--focus-width) solid var(--focus-ring); outline-offset: var(--focus-offset); }
 .document-card-owner { justify-content: space-between; }
+/* The card's line holds the label too ("Waiting on: Tom Reis"): the table cell's cap would cut the name to "To…". */
+.document-card-owner .documents-waiting-on { flex: 1 1 auto; min-width: 0; max-width: none; }
 /* The row action spans the card (at least 32px high). */
 .document-card .documents-action--block { width: 100%; min-height: 32px; justify-content: center; white-space: normal; }
 .document-card-notice { min-width: 0; }
@@ -66,3 +68,6 @@
   .documents-details-button { color: LinkText; }
   .document-card--active { border-color: Highlight; }
 }
+
+/* "Withdraw final…" (issue 343): the consequences as a bulleted list above the Reason. */
+.withdraw-final-consequences { list-style: disc; padding-inline-start: var(--space-5); margin: 0 0 var(--space-4); display: grid; gap: var(--space-1); }

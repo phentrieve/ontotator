@@ -10,6 +10,7 @@ import { PlaceholderRow } from "../editor/carried/PlaceholderRow";
 import { CarriedProgress } from "../editor/carried/CarriedProgress";
 import { SidebarResizer } from "../editor/SidebarResizer";
 import { useSidebarWidth } from "../editor/sidebarWidth";
+import { useTreeHeight } from "../editor/treeHeight";
 import { InspectorTabList, inspectorTabIds, useInspectorTabs } from "../editor/InspectorTabs";
 import type { GuidelinesPanel } from "../tasks/TaskGuidelines";
 import { RoundInputEvidenceDialog } from "../tasks/RoundInputEvidenceDialog";
@@ -17,6 +18,7 @@ import { ComparePane } from "../variants/ComparePane";
 import { Toolbar } from "../ui/Toolbar";
 import { VariantSelectors } from "../variants/VariantSelectors";
 import { ReadOnlyAnnotationView } from "../variants/ReadOnlyAnnotationView";
+import { useChangesSince, type ChangesSource } from "../editor/ChangesSince";
 import { useCaseVersions } from "../variants/useCaseVersions";
 import { VariantDetails, variantDescription } from "../variants/CaseViewer";
 import { annotationOptions, pickVariant, refForKey } from "../variants/versionState";
@@ -98,6 +100,7 @@ import { TermName } from "../editor/TermName";
 import { TextPane } from "../editor/TextPane";
 import { Kbd } from "../ui/Kbd";
 import { TreeBrowser } from "../editor/TreeBrowser";
+import { CopyTextButton } from "../editor/CopyTextButton";
 import { useTermLabels } from "../editor/useTermLabels";
 import { ModifiersSection } from "../editor/ModifiersSection";
 import { AttachModePanel, attachCopy } from "../editor/AttachModePanel";
@@ -108,7 +111,7 @@ import { Toast } from "../ui/Toast";
 import { type MentionDisplay, type SelectionPayload } from "../spans/adapter";
 import { markColourSlot } from "../editor/markColours";
 import { IconCheck, IconClose, IconLock, IconMore, IconPencil, IconQuestion, IconRedo, IconRetry, IconUndo } from "../ui/icons";
-import { stepText } from "../editor/history";
+import { historyControls, stepText, type LastHistoryCommand } from "../editor/history";
 import { MenuButton, type MenuItem } from "../ui/MenuButton";
 import { isNegated } from "../editor/negation";
 import { Dialog } from "../ui/Dialog";
@@ -233,6 +236,12 @@ export interface CaseScreenProps {
   guidelines?: GuidelinesPanel | null;
   held?: boolean;
   holdReason?: string | null;
+  /** The paused banner's title: "Paused by lead" when the lead paused the text (issue 464); default "Task paused". */
+  holdTitle?: string;
+  /** What stays available while paused; default: saved work is readable, local input is kept. */
+  holdKept?: string;
+  /** A save was refused because the task is paused (it was paused while the editor was open): the caller reloads the task's state. */
+  onTaskHeld?: () => void;
   saveBeforeReportRef?: React.MutableRefObject<(() => Promise<void>) | null>;
   roundInputs?: readonly import("../api/client").RoundInputView[];
   roundKind?: import("../api/client").WorkRoundView["kind"];
@@ -250,6 +259,8 @@ export interface CaseScreenProps {
   headerTimer?: React.ReactNode;
   /** Called whenever an edit is sent; the working time resumes on it. */
   onEdit?: () => void;
+  /** The earlier version the round's carried work came from: offers "Show changes since vN" over the text (issue 421). */
+  changesSource?: ChangesSource | null;
 }
 
 const NO_ROUND_INPUTS: readonly import("../api/client").RoundInputView[] = [];
@@ -268,7 +279,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   onSubmitted,
   annotatorName,
   leaveGuardRef,
-  readOnly: serverReadOnly = false, routeLeaveRef, assignmentNavigation, onReadonlyRequired, versionContext, menuItems = [], userPseudonym, guidelineNotice, guidelines = null, held = false, holdReason, saveBeforeReportRef, roundInputs = NO_ROUND_INPUTS, roundKind, roundActive = true, roundBadge, roundTitle, documentVersion, roundOrdinal, headerTimer, onEdit,
+  readOnly: serverReadOnly = false, routeLeaveRef, assignmentNavigation, onReadonlyRequired, versionContext, menuItems = [], userPseudonym, guidelineNotice, guidelines = null, held = false, holdReason, holdTitle, holdKept, onTaskHeld, saveBeforeReportRef, roundInputs = NO_ROUND_INPUTS, roundKind, roundActive = true, roundBadge, roundTitle, documentVersion, roundOrdinal, headerTimer, onEdit, changesSource,
 }) => {
   const versionIdentity = JSON.stringify([versionContext?.username, versionContext?.assignmentId, versionContext?.canBrowseVersions, workspaceId, view.key]);
   const [acceptedSubmission, setAcceptedSubmission] = useState<{ identity: string; value: Submission } | null>(null);
@@ -283,6 +294,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const [comparisonIdentity, setComparisonIdentity] = useState<string | null>(null);
   const compareOpen = !!versionContext?.canBrowseVersions && comparisonIdentity === versionIdentity;
   const [leftTextElement, setLeftTextElement] = useState<HTMLDivElement | null>(null);
+  // Issue 421: a pure overlay; marking, resizing and checking carry on while it is on.
+  const changesSince = useChangesSince(changesSource, view.document.text, leftTextElement);
   const reanchorContext = useReanchorContext(view.document.text, leftTextElement, JSON.stringify([versionIdentity,display?.selection ?? "draft"]));
   const compareButton = useRef<HTMLButtonElement | null>(null);
   const closeComparison = () => { setComparisonIdentity(null); compareButton.current?.focus(); };
@@ -467,6 +480,9 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const searchManager = useMemo(() => new SearchManager(api), []);
   // "+ Add modifier…" searches on its own, so an open "Change term" search keeps its hits.
   const modifierSearchManager = useMemo(() => new SearchManager(api), []);
+  // A search refused because the task was paused meanwhile (issue 464): the caller reloads the task's state.
+  const taskHeld = useRef(onTaskHeld); taskHeld.current = onTaskHeld;
+  useEffect(() => { searchManager.onTaskHeld = modifierSearchManager.onTaskHeld = () => taskHeld.current?.(); }, [searchManager, modifierSearchManager]);
   const modifierLayerIds = new Set(view.modifier_layer_ids ?? []);
   const infoFor = (layerId: string) => (termId: string) => termLabel.info(layerId, termId);
   useEffect(() => {
@@ -496,6 +512,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const rootRef = useRef<HTMLDivElement>(null);
   // At ≤700 px the editor shows one pane at a time; marking text does not switch panes on its own.
   const panesLayout = useMediaQuery("(max-width: 700px)");
+  // At phone widths the "New finding" bar's quote needs the room: its "Copy text" is an icon.
+  const narrowBar = useMediaQuery("(max-width: 420px)");
   // Below 1024 px the header keeps one bar: "Next open item" moves into "More", the mode text hides.
   const narrowHeader = useMediaQuery("(max-width: 1023px)");
   // Back to the text after a cancelled new finding: runs after the text pane re-rendered its runs,
@@ -778,6 +796,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
       readOnlyRef.current = true;
       onReadonlyRequired?.();
     }
+    // Paused while this editor was open (issue 464): the banner names the cause; the local input stays.
+    if (error instanceof ApiError && error.code === "TASK_HELD") onTaskHeld?.();
     throw error;
   };
   const reportError = (error: unknown) => {
@@ -1405,11 +1425,18 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const pendingCarriedCount = carried.states.filter(state => state.unchecked).length;
   /**
    * Row order of the findings list (spec section 1): carried findings and placeholder rows first, in
-   * round-input order, then every other finding in draft order, including findings on hidden layers
-   * (going there makes their layer visible). The rendered list uses the same order.
+   * round-input order, then every other finding in text order (start of its first segment, findings
+   * without a text span last; issue 436), including findings on hidden layers (going there makes
+   * their layer visible). The rendered list, "Next unchecked" and the attach targets use the same order.
    */
-  const carriedListOrder = useMemo(() => orderCarriedFirst(carried.states,
-    (draft.annotations ?? []).map(snapshot => snapshot.annotation.annotation_id)), [carried.states, draft.annotations]);
+  const carriedListOrder = useMemo(() => {
+    const annotations = draft.annotations ?? [];
+    const starts = new Map(annotations.map(({ annotation }) => {
+      const segments = (annotation.evidence_refs ?? []).flatMap(ref => allEvidenceMap[ref.evidence_id]?.mention.segments ?? []);
+      return [annotation.annotation_id, segments.length ? Math.min(...segments.map(segment => segment.start)) : null] as const;
+    }));
+    return orderCarriedFirst(carried.states, annotations.map(snapshot => snapshot.annotation.annotation_id), id => starts.get(id) ?? null);
+  }, [carried.states, draft.annotations, allEvidenceMap]);
   // Version of the open text: from the round (prop), the case versions or the document list. A text
   // with the source's hash is the source's text, so its version is the source version.
   const currentTextVersion = documentVersion
@@ -1735,9 +1762,11 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     return known;
   };
   const currentHistory = history && history.revision === draft.revision ? history : null;
+  // The last undo, redo or reset and the revision it made: what the controls offer until its history is read.
+  const [lastHistoryCommand, setLastHistoryCommand] = useState<LastHistoryCommand | null>(null);
   const stepName = (step: HistoryStepView) => stepText(step, (layerId, termId) => termLabel(layerId, termId) ?? undefined);
 
-  const enqueueHistory = (payload: Record<string, unknown>): Promise<Draft> => {
+  const enqueueHistory = (payload: { command: LastHistoryCommand["command"]; step?: number }): Promise<Draft> => {
     assertWritable();
     setActionError(null);
     const mutationId = crypto.randomUUID();
@@ -1747,6 +1776,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
       envelope ??= { mutation_id: mutationId, expected_revision: expectedRevision, payload };
       const updated = await api.applyHistory(workspaceId, envelope).catch(assignmentFailure);
       latestDraft.current = updated; setDraft(updated);
+      setLastHistoryCommand({ revision: updated.revision, command: payload.command });
       return updated;
     });
   };
@@ -1843,15 +1873,17 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     if (ok) await runHistory("reset_changes");
   };
 
-  const undoStep = currentHistory?.undo ?? null;
-  const redoStep = currentHistory?.redo ?? null;
-  const undoTitle = undoStep ? `Undo: ${stepName(undoStep)}` : "Nothing to undo";
-  const redoTitle = redoStep ? `Redo: ${stepName(redoStep)}` : "Nothing to redo";
+  // Between a save and the read of its history the controls keep working: an Undo pressed right after a change,
+  // or a Redo right after an Undo, is not dropped (runHistory saves and reads the history first). Only the
+  // current history names the step.
+  const { undo: undoStep, redo: redoStep, canUndo, canRedo } = historyControls(history, draft.revision, lastHistoryCommand);
+  const undoTitle = undoStep ? `Undo: ${stepName(undoStep)}` : canUndo ? "Undo the last change" : "Nothing to undo";
+  const redoTitle = redoStep ? `Redo: ${stepName(redoStep)}` : canRedo ? "Redo the last undone change" : "Nothing to redo";
   // Inside a text field the browser's own text undo keeps working (shortcuts skip typing targets).
   useShortcut(["Ctrl+z", "Meta+z"], () => { void runHistory("undo_step"); },
-    { scope: "screen", description: "Undo the last change", group: "Editor", enabled: historyEnabled && !!undoStep && !historyBusy, listWhenDisabled: historyEnabled });
+    { scope: "screen", description: "Undo the last change", group: "Editor", enabled: historyEnabled && canUndo && !historyBusy, listWhenDisabled: historyEnabled });
   useShortcut(["Ctrl+Shift+z", "Meta+Shift+z", "Ctrl+y"], () => { void runHistory("redo_step"); },
-    { scope: "screen", description: "Redo the last undone change", group: "Editor", enabled: historyEnabled && !!redoStep && !historyBusy, listWhenDisabled: historyEnabled });
+    { scope: "screen", description: "Redo the last undone change", group: "Editor", enabled: historyEnabled && canRedo && !historyBusy, listWhenDisabled: historyEnabled });
 
   useEffect(() => {
     if (!saveBeforeReportRef) return;
@@ -2241,22 +2273,50 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const handleCloseTree = () => {
     const active = document.activeElement;
     if (active instanceof HTMLElement && active.closest(".tree-host")) {
-      tabs.showDetailsNow();
-      inspectorRef.current?.querySelector<HTMLElement>(".annotation-tree-button")?.focus();
+      const button = inspectorRef.current?.querySelector<HTMLElement>(".annotation-tree-button");
+      // Closed because the selection was cleared (Escape on a tree button), the button is gone: the text takes the focus.
+      if (button) { tabs.showDetailsNow(); button.focus(); } else leftTextElement?.focus();
     }
     setTreeWalk(null);
   };
 
   // An open tree follows the selection: another own annotation with a term starts a new
-  // walk there. Anything else (a proposal, a reference, nothing) leaves the tree as it is.
+  // walk there. Anything else (a proposal, a reference, nothing) closes it: there it could
+  // assign nothing. While a new finding's term is searched it only steps aside (see above).
   const followAnnotationId = treeAnnotation?.annotation.term_id ? treeAnnotation.annotation.annotation_id : null;
   useEffect(() => {
-    if (!treeWalk || !treeAnnotation || !followAnnotationId) return;
+    if (!treeWalk || pendingAnnotation) return;
+    if (!treeAnnotation || !followAnnotationId) { handleCloseTree(); return; }
     if (followAnnotationId === treeWalk.annotationId) return;
     startTreeWalk(treeAnnotation, false);
     // Only a change of the selected annotation moves the tree, not an edit of it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [followAnnotationId]);
+
+  // Ctrl+C (Cmd+C) with nothing else selected copies the active passage, to look it up elsewhere: the marked
+  // text of a new finding, else the selected (or first) mention of the selected finding or, in a task from
+  // proposals, of the selected tool proposal. Several segments are joined by a space, as a web search reads them.
+  // A selection of its own (a field, the page) copies as usual.
+  const passageRef = useRef("");
+  const passageRefs = selectedAnnotation?.annotation.evidence_refs ?? [];
+  const targetEvidence = selectedTarget && !selectedAnnotation ? targetSnapshot?.evidence ?? [] : [];
+  const targetMention = targetEvidence.find(ev => selectedTarget
+    && `target:${selectedTarget.annotation_id}:${selectedTarget.version}:${ev.mention.evidence_id}:${ev.version}` === selectedEvidenceId) ?? targetEvidence[0];
+  const passageSegments = pendingAnnotation?.segments?.length ? pendingAnnotation.segments
+    : allEvidenceMap[(passageRefs.find(ref => ref.evidence_id === selectedEvidenceId) ?? passageRefs[0])?.evidence_id ?? ""]?.mention.segments
+      ?? targetMention?.mention.segments;
+  passageRef.current = passageSegments?.length ? quoteOf(view.document.text, passageSegments, " ") : "";
+  useEffect(() => {
+    const copyPassage = (event: ClipboardEvent) => {
+      const active = document.activeElement;
+      if ((active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) && active.selectionStart !== active.selectionEnd) return;
+      if (window.getSelection()?.toString() || !passageRef.current || !event.clipboardData) return;
+      event.clipboardData.setData("text/plain", passageRef.current);
+      event.preventDefault();
+    };
+    document.addEventListener("copy", copyPassage);
+    return () => document.removeEventListener("copy", copyPassage);
+  }, []);
 
   /** One set_axes for `annotationId` (default: the selected finding); false when nothing was sent. */
   const handleUpdateAxes = async (axesValues: Partial<AxesValues>, confirmedAxisIds?: string[], annotationId = selectedAnnotationId): Promise<boolean> => {
@@ -3413,6 +3473,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const guidelinesTab = tabs.hosted && tabs.tab === "guidelines";
   // The findings column's limits follow the inspector, which is at least 420 px while it holds the guidelines.
   const sidebarWidth = useSidebarWidth(versionContext?.username, { inspectorWithGuidelines: tabs.hosted });
+  // The ontology tree's height under the inspector, set by dragging the divider above it.
+  const treeHeight = useTreeHeight(versionContext?.username, treeWalk && !treeCollapsed ? treeWalk.nonce : null);
   useLayoutEffect(() => {
     tabs.resetDetailsScroll();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new inspector subject resets its scroll
@@ -3505,6 +3567,29 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     setMobilePane("details");
     setSearchFocusRequest(count => count + 1);
   };
+  // At <=700 px the workspace starts under the header and is one window high, so its bottom edge is below the
+  // fold while the page is unscrolled (issue 452). The "New finding" bar therefore sticks to the bottom of the
+  // window (CSS), and the text does not move when a passage is marked. Only when the bar would lie over the
+  // marked passage does the page scroll, by just that much; the bar stays at the window's bottom meanwhile.
+  const pendingBarShown = panesLayout && !attachActive && pendingIsMarkedSpan && !readOnly && mobilePane === "text";
+  const pendingBarRef = useRef<HTMLDivElement>(null);
+  const pendingBarMark = pendingBarShown ? pendingAnnotation?.evidenceId : undefined;
+  // A passive effect: the text pane has drawn the mark by then (its effects run first).
+  useEffect(() => {
+    const bar = pendingBarRef.current;
+    if (!pendingBarShown || !bar || !pendingBarMark) return;
+    const marks = [...(rootRef.current?.querySelectorAll<HTMLElement>(".text-container .run--marked") ?? [])]
+      .filter(run => (run.dataset.mentions ?? "").split(",").includes(pendingBarMark));
+    if (!marks.length) return;
+    const overlap = Math.max(...marks.map(run => run.getBoundingClientRect().bottom)) - bar.getBoundingClientRect().top;
+    if (overlap <= 0) return;
+    for (let scroller = bar.parentElement; scroller; scroller = scroller.parentElement) {
+      if (scroller.scrollHeight > scroller.clientHeight && /auto|scroll/.test(getComputedStyle(scroller).overflowY)) {
+        scroller.scrollBy({ top: Math.ceil(overlap) + 8 });
+        break;
+      }
+    }
+  }, [pendingBarShown, pendingBarMark]);
 
   const shortcutOptions = { scope: "screen" as const, root: rootRef };
   // Keys that wait for a selection stay in the ? help, marked "not available right now": the finding keys
@@ -3815,9 +3900,9 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
 
           {historyEnabled && <span className="case-history" role="group" aria-label="Undo and redo">
             <IconButton size="sm" variant="quiet" label="Undo last change" title={undoTitle} icon={<IconUndo />}
-              disabled={!undoStep || historyBusy} onClick={() => { void runHistory("undo_step"); }} />
+              disabled={!canUndo || historyBusy} onClick={() => { void runHistory("undo_step"); }} />
             <IconButton size="sm" variant="quiet" label="Redo last change" title={redoTitle} icon={<IconRedo />}
-              disabled={!redoStep || historyBusy} onClick={() => { void runHistory("redo_step"); }} />
+              disabled={!canRedo || historyBusy} onClick={() => { void runHistory("redo_step"); }} />
           </span>}
 
           <MenuButton label="More actions" buttonLabel="More" icon={<IconMore />} items={[
@@ -3854,7 +3939,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
         </div>
       </Toolbar>
 
-      {held && <PausedNotice reason={holdReason} kept="Saved work remains readable. Your local input is kept." />}
+      {held && <PausedNotice title={holdTitle} reason={holdReason} kept={`Saved work remains readable. Your local input is kept.${holdKept ? ` ${holdKept}` : ""}`} />}
       {!!versionError && <><ErrorNotice error={versionError} /><Button onClick={retryVersions}>Retry version list</Button></>}
       {display && <InlineMessage tone="info"><span>Viewing {display.label} (read-only)</span>
         <Button disabled={versionBusy} onClick={() => { void chooseAnnotationVersion("draft"); }}>Back to my draft</Button>
@@ -3900,8 +3985,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
         ))}
       </nav>
       {/* Main Workspace Layout */}
-      <div className={`app-layout mobile-pane-${mobilePane}${treeWalk && !treeCollapsed ? " tree-open" : ""}${tabs.hosted ? " inspector-with-guidelines" : ""}`}
-        style={{ "--sidebar-width": `${sidebarWidth.width}px` } as CSSProperties}>
+      <div className={`app-layout mobile-pane-${mobilePane}${treeWalk && !treeCollapsed ? " tree-open" : ""}${treeHeight.height !== null ? " tree-sized" : ""}${tabs.hosted ? " inspector-with-guidelines" : ""}`}
+        style={{ "--sidebar-width": `${sidebarWidth.width}px`, ...(treeHeight.height !== null ? { "--tree-height": `${treeHeight.height}px` } : {}) } as CSSProperties}>
         {/* Left: Sidebar (Annotations & Review Targets) */}
         <aside className="sidebar density-compact" id="findings-column">
           {/* Narrow layout: attach mode opens on Findings, where the text pane's banner and its Cancel are out of sight. */}
@@ -4131,7 +4216,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
 
         {/* Center: Text View */}
         <TextPane
-          header={versionControls}
+          header={changesSince ? <>{versionControls}{changesSince.bar}</> : versionControls}
+          changes={changesSince?.changes} passages={changesSince?.passages} passagesSince={changesSince?.since} currentPassage={changesSince?.current}
           onTextElement={setLeftTextElement}
           contextSegments={reanchorContext.contextSegments}
           text={view.document.text}
@@ -4158,20 +4244,12 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
           resyncToken={textResyncToken}
           scrollRequest={textScrollRequest}
         />
-        {/* Above 700 px nothing floats over the text (#21): the New finding panel holds the hint and the one Discard. */}
-        {panesLayout && !attachActive && pendingIsMarkedSpan && !readOnly && mobilePane === "text" && (
-          <div className="pending-bar" role="group" aria-label="New finding">
-            <span className="pending-bar__text">New finding “{quoteSegments(view.document.text, pendingAnnotation!.segments, 40)}”</span>
-            <Button type="button" variant="primary" size="sm" onClick={chooseTerm}>Choose term</Button>
-            <Button type="button" variant="secondary" size="sm" onClick={discardPending}>Discard</Button>
-          </div>
-        )}
 
         {/* Right: Annotation & Search Panel + Review Actions */}
         <div className="inspector-pane density-compact" ref={inspectorRef}>
           {/* With the guidelines open (from 1060 px): "Details | Guidelines vN" at the top; Details stays mounted while hidden. */}
           {tabs.hosted && guidelines && <InspectorTabList idBase={inspectorIdBase} tab={tabs.tab}
-            version={guidelines.version} onSelect={tabs.select} onClose={guidelines.close} />}
+            version={guidelines.versionName} onSelect={tabs.select} onClose={guidelines.close} />}
           <div className="inspector-details" {...(tabs.hosted ? { role: "tabpanel", id: inspectorIds.detailsPanel,
             "aria-labelledby": inspectorIds.detailsTab, hidden: guidelinesTab } : {})}>
           {/* Always mounted so the text change is announced; aria-live, not role="status", which the save state owns.
@@ -4242,9 +4320,15 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
                     Discard<span aria-hidden="true"> <Kbd>Esc</Kbd></span>
                   </Button>}
                 </div>
+                {/* One pane at a time (≤700 px): the paused banner above the panes is out of view here, so a person whose
+                    save was just refused reads the reason where they work (review 2, F3). Wider windows show the banner. */}
+                {held && panesLayout && <InlineMessage tone="warning">
+                  <span><strong>{holdTitle ?? "Task paused"}:</strong> {(holdReason?.trim() || "A project problem needs attention.").replace(/[.!?…]?$/, end => end || ".")} Nothing can be saved now. What you marked is kept until you leave the task.</span>
+                </InlineMessage>}
                 {pendingIsMarkedSpan
                   ? <>
                     <p className="pending-quote">“{quoteSegments(view.document.text, pendingAnnotation.segments)}”</p>
+                    <CopyTextButton text={passageRef.current} onAnnounce={announceCarried} />
                     <p className="form-hint">Adjust the marked text with its edge handles, or mark new text to replace it.</p>
                   </>
                   : <p>
@@ -4329,6 +4413,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
               })()}
               replacementChanges={replacementChangesOf(selectedTarget, decisionsMap[refKey(selectedTarget)]?.replacement?.annotation_id)}
               documentText={view.document.text}
+              showSentence={panesLayout}
               currentDecision={decisionsMap[refKey(selectedTarget)] ?? null}
               draftAnnotations={draft.annotations ?? []}
               onDecide={(payload) => { void handleReviewDecision(payload, selectedTarget); }}
@@ -4358,6 +4443,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
               onDeselect={handleDeselectAll}
               onRepeatDecision={outcome => { repeatDecision(selectedTarget, outcome); }}
               onMoveMention={proposalCopyCanMove(selectedTarget) ? index => { void moveProposalMention(selectedTarget, index).catch(reportError); } : undefined}
+              onCopyAnnounce={announceCarried}
               onShowMention={ev => {
                 const evidenceId = `target:${selectedTarget.annotation_id}:${selectedTarget.version}:${ev.mention.evidence_id}:${ev.version}`;
                 setSelectedEvidenceId(evidenceId);
@@ -4460,6 +4546,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
               onDeselect={handleDeselectAll}
               onShowInTree={handleShowInTree}
               onSelectEvidence={(evId) => setSelectedEvidenceId(evId)}
+              onCopyAnnounce={announceCarried}
               onUpdateTerm={(...args) => { void handleUpdateTerm(...args).catch(reportError); }}
               onUpdateAxes={(axesValues) => handleUpdateAxes(axesValues, undefined, selectedAnnotationId)
                 .catch(error => { reportError(error); throw error; })}
@@ -4517,9 +4604,27 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
             onClose={handleCloseTree}
             onUseTerm={handleUseTreeTerm}
             languages={searchLanguagesFor(treeWalk.layerId)?.active}
+            username={versionContext?.username}
           />
         )}
+        {/* The divider drawn above the tree sets its height (three columns only, editor.css); after it in the
+            focus order, as the findings column's divider follows that column. */}
+        {treeWalk && !treeCollapsed && (
+          <SidebarResizer orientation="horizontal" side="start" width={treeHeight.value} limits={treeHeight.limits} controls="ontology-tree"
+            onChange={treeHeight.setHeight} onReset={treeHeight.reset} onCommit={treeHeight.commit}
+            label="Resize ontology tree" hint="Resize the ontology tree (focus the divider)" measure={treeHeight.measure} />
+        )}
       </div>
+      {/* Above 700 px nothing floats over the text (#21): the New finding panel holds the hint and the one Discard.
+          Below the panes, not inside them: the bar sticks to the bottom of the window while the page is unscrolled (issue 452). */}
+      {pendingBarShown && (
+        <div ref={pendingBarRef} className="pending-bar" role="group" aria-label="New finding">
+          <span className="pending-bar__text">New finding “{quoteSegments(view.document.text, pendingAnnotation!.segments, 80)}”</span>
+          <Button type="button" variant="primary" size="sm" onClick={chooseTerm}>Choose term</Button>
+          <Button type="button" variant="secondary" size="sm" onClick={discardPending}>Discard</Button>
+          <CopyTextButton text={passageRef.current} onAnnounce={announceCarried} compact={narrowBar} />
+        </div>
+      )}
       </div>
 
       </>}

@@ -62,23 +62,24 @@ describe("StagePopover", () => {
 
   it("shows the stage's admin actions and Open full details", () => {
     const onOpenDetails = vi.fn();
-    render(<Harness stage="review" onOpenDetails={onOpenDetails} actions={<button type="button">Request correction…</button>} />);
+    render(<Harness stage="review" onOpenDetails={onOpenDetails} actions={<button type="button">Ask a reviewer to correct…</button>} />);
     openPopover();
     const dialog = screen.getByRole("dialog", { name: "Translation activity, case-108 de" });
     // Review lines need no submissions.
     expect(within(dialog).getAllByRole("listitem")[0].textContent).toContain("Ana Weber");
     expect(api.getRowSubmissions).not.toHaveBeenCalled();
-    expect(within(dialog).getByRole("button", { name: "Request correction…" })).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "Ask a reviewer to correct…" })).toBeTruthy();
     fireEvent.click(within(dialog).getByRole("button", { name: "Open full details" }));
     expect(onOpenDetails).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("says when the stage has no activity yet", () => {
+  it("says when the stage has no activity yet", async () => {
     render(<Harness stage="final" />);
     openPopover();
     const dialog = screen.getByRole("dialog", { name: "Finalization activity, case-108 de" });
-    expect(within(dialog).getByText("No finalization activity yet.")).toBeTruthy();
+    // Finalization reads the submissions too: a consolidation's lines are filed there (review 2, F2).
+    expect(await within(dialog).findByText("No finalization activity yet.")).toBeTruthy();
     expect(within(dialog).queryByRole("list")).toBeNull();
   });
 

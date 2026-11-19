@@ -398,7 +398,7 @@ def build_readme(
         "                    the bundles hold, earlier versions included (F1).",
         "agreement-summary.csv",
         "                    The same for the project: mean over the texts and",
-        "                    pooled over all pairs.",
+        "                    pooled over all pairs, and per pair of modes.",
         "proposals.csv       Per tool and annotator what became of the proposals;",
         "                    per tool its precision and recall against the final",
         "                    results.",
@@ -488,7 +488,9 @@ def build_readme(
             "the same passage, tolerant an overlapping one; term_f1 compares the "
             "terms with their values. Span annotation has no countable negatives, "
             "so only F1 values are given, no kappa. modifier_agreement is the "
-            "share of matched findings with the same modifiers.",
+            "share of matched findings with the same modifiers. mode_a and mode_b "
+            'are "scratch" (annotation from scratch) or "proposals" (annotation '
+            "from proposals).",
             "- ",
             "  ",
         ),
@@ -506,19 +508,24 @@ def build_readme(
             "  ",
         ),
         *_wrap(
-            'agreement-summary.csv has two rows. "macro_mean" averages each value '
-            "over the pairs of a text, then over the texts; its count columns are "
-            'empty on purpose, since a mean of counts means nothing. "pooled" '
-            "computes each value from the counts summed over all pairs and lists "
-            'those sums. Without any pair both rows have "pairs" 0 and empty '
-            "values.",
+            'agreement-summary.csv has two rows per value of "modes": "all" '
+            '(every pair), "scratch-scratch", "proposals-proposals" and "mixed". '
+            "Two people annotating from proposals start from the same proposals, "
+            "so their agreement runs higher; compare the mode rows when a project "
+            'mixes both. "macro_mean" averages each value over the pairs of a '
+            "text, then over the texts; its count columns are empty on purpose, "
+            'since a mean of counts means nothing. "pooled" computes each value '
+            "from the counts summed over the pairs and lists those sums. Without "
+            'any pair both rows have "pairs" 0 and empty values.',
             "- ",
             "  ",
         ),
         *_wrap(
             "proposals.csv names each tool and version as the imported proposals "
-            'recorded them. Rows "annotator" count the decisions of each person\'s '
-            'proposal checks; rows "source" compare the tool\'s proposals with the '
+            "recorded them; proposals copied to a corrected text version count "
+            'for the tool that produced them. Rows "annotator" count the '
+            "decisions of each person's proposal checks; "
+            'rows "source" compare the tool\'s proposals with the '
             "selected final result of the same text (tolerant matching): "
             "precision = matched / proposals, recall = matched / final_findings. "
             "Recall counts every text with a selected result on which a proposal "

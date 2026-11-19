@@ -22,6 +22,7 @@ from ontotator.domain import document_rows as rules
 from ontotator.domain.errors import DomainError
 from ontotator.domain.submission_labels import round_ordinals, submission_kind
 from ontotator.packages.models import PackageManifest
+from ontotator.storage.final_tables import FinalSelectionEventRow
 from ontotator.storage.guidelines import guideline_facts
 from ontotator.storage.live_submissions import live_submission
 from ontotator.storage.mode_change_tables import AnnotationModeChangeRow
@@ -440,8 +441,21 @@ def _row_changes(
     case_id: str,
     language: str,
     viewer_user_id: int,
+    *,
+    ordinals: Mapping[str, int],
+    results: Mapping[str, dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Reassignments and mode changes of the row, oldest first."""
+    """What leads and annotators changed on the row, oldest first:
+    reassignments, mode changes, reopened tasks (and a bulk reopen that was
+    undone), new rounds, every change of the final result (chosen,
+    replaced, a change undone, withdrawn (#343)), and each pause and release
+    of the text by a lead (issue 464).
+
+    Tasks and rounds come from the audit trail (``assignment.reopen``,
+    ``assignment.reopen_undone``, ``round.create``: the reason is stored
+    only there), the final result from its event log. ``ordinals`` numbers
+    the row's rounds; ``results`` names a submission as a final result.
+    """
     reassigned = conn.execute(
         select(
             AuditEventRow.at,
@@ -475,12 +489,92 @@ def _row_changes(
             AnnotationModeChangeRow.language == language,
         )
     ).all()
+    payload = FinalSelectionEventRow.payload
+    finals = conn.execute(
+        select(FinalSelectionEventRow.created_at, payload)
+        .where(
+            FinalSelectionEventRow.project_id == pid,
+            payload["case_id"].astext == case_id,
+            payload["language"].astext == language,
+        )
+        .order_by(FinalSelectionEventRow.id)
+    ).all()
+    task_events = conn.execute(
+        select(
+            AuditEventRow.at,
+            AuditEventRow.action,
+            AuditEventRow.actor_user_id,
+            AuditEventRow.target_id,
+            AuditEventRow.details,
+            AssignmentRow.id.label("assignment_id"),
+            AssignmentRow.task,
+            AssignmentRow.user_id,
+        )
+        .join(
+            AssignmentRow,
+            cast(AssignmentRow.id, Text)
+            == func.coalesce(
+                # A round names its task in the details; a reopen is the
+                # event of the task itself.
+                AuditEventRow.details["assignment_id"].astext,
+                AuditEventRow.target_id,
+            ),
+        )
+        .where(
+            AuditEventRow.project_id == pid,
+            AuditEventRow.action.in_(
+                ["assignment.reopen", "assignment.reopen_undone", "round.create"]
+            ),
+            AuditEventRow.target_type.in_(["assignment", "work_round"]),
+            AssignmentRow.project_id == pid,
+            AssignmentRow.document_id.in_(documents),
+        )
+        .order_by(AuditEventRow.id)
+    ).all()
+    # Issue 464: the lead paused or released the text. The audit trail keeps
+    # every pause and release (the text's settings only the pause in place).
+    pauses = conn.execute(
+        select(
+            AuditEventRow.at,
+            AuditEventRow.action,
+            AuditEventRow.actor_user_id,
+            AuditEventRow.details,
+        )
+        .where(
+            AuditEventRow.project_id == pid,
+            AuditEventRow.action.in_(["text.pause", "text.release"]),
+            AuditEventRow.target_type == "text",
+            AuditEventRow.target_id == f"{case_id} {language}",
+        )
+        .order_by(AuditEventRow.id)
+    ).all()
     people = person_refs(
         conn,
-        {*(row.user_id for row in reassigned), *replacements.values()},
+        {
+            *(row.actor_user_id for row in pauses if row.actor_user_id is not None),
+            *(row.user_id for row in reassigned),
+            *replacements.values(),
+            *(
+                row.payload.get("restored_by") or row.payload["actor_id"]
+                for row in finals
+            ),
+            *(row.changed_by for row in modes),
+            *(row.restored_by for row in modes if row.restored_by is not None),
+            *(row.user_id for row in task_events),
+            *(
+                row.actor_user_id
+                for row in task_events
+                if row.actor_user_id is not None
+            ),
+        },
         viewer_id=viewer_user_id,
         viewer_is_lead=True,
     )
+
+    def person(user_id: int | None) -> dict[str, Any] | None:
+        ref = people.get(user_id) if user_id is not None else None
+        return None if ref is None else ref.model_dump()
+
     changes: list[dict[str, Any]] = [
         {
             "kind": "reassigned",
@@ -501,6 +595,7 @@ def _row_changes(
                 "from_mode": row.from_mode,
                 "to_mode": row.to_mode,
                 "reason": row.reason,
+                "by": person(row.changed_by),
             }
         )
         if row.restored_at is not None:
@@ -510,8 +605,83 @@ def _row_changes(
                     "at": row.restored_at,
                     "from_mode": row.to_mode,
                     "to_mode": row.from_mode,
+                    "by": person(row.restored_by),
                 }
             )
+    for row in task_events:
+        details = row.details or {}
+        change = {
+            "at": row.at,
+            "task": row.task,
+            "assignment_id": row.assignment_id,
+            "by": person(row.actor_user_id),
+            "to_person": person(row.user_id),
+        }
+        if row.action == "round.create":
+            # A new round of work that was submitted before. The first round
+            # is the ordinary start of a task, and a consolidation is not a
+            # round of its annotations: neither is a change.
+            ordinal = ordinals.get(row.target_id)
+            if details.get("kind") == "consolidation" or (ordinal or 0) < 2:
+                continue
+            change |= {
+                "kind": "round_started",
+                "round_ordinal": ordinal,
+                "reason": details.get("reason"),
+            }
+        elif row.action == "assignment.reopen":
+            change |= {"kind": "reopened", "reason": details.get("reason")}
+        else:
+            change["kind"] = "reopen_undone"
+        changes.append(change)
+    for row in pauses:
+        changes.append(
+            {
+                "kind": "text_paused"
+                if row.action == "text.pause"
+                else "text_released",
+                "at": row.at,
+                "by": person(row.actor_user_id),
+                "reason": (row.details or {}).get("reason"),
+            }
+        )
+    # The final result, event by event: the first choice (also the first
+    # after a withdrawal), each replacement, each change that was undone. A
+    # result confirmed again (its warnings acknowledged) is no change.
+    current: str | None = None
+    for row in finals:
+        event = row.payload
+        if event.get("withdrawn"):
+            current = None
+            changes.append(
+                {
+                    "kind": "final_withdrawn",
+                    "at": row.created_at,
+                    "from_person": person(event["actor_id"]),
+                    "reason": event["reason"],
+                }
+            )
+            continue
+        chosen = str(event["submission_id"])
+        if chosen == current:
+            continue
+        restored = bool(event.get("restored"))
+        changes.append(
+            {
+                "kind": "final_restored"
+                if restored
+                else "final_chosen"
+                if current is None
+                else "final_changed",
+                "at": row.created_at,
+                "by": person(
+                    event.get("restored_by") if restored else event["actor_id"]
+                ),
+                "from_result": results.get(current) if current else None,
+                "to_result": results.get(chosen),
+            }
+        )
+        current = chosen
     return sorted(changes, key=lambda change: change["at"])
 
 
@@ -631,6 +801,9 @@ def build_submissions(
                 "finding_count": int(row.findings),
                 "author": people[row.annotator_id],
                 "guideline_version": row.guideline_version,
+                "guideline_label": facts[row.guideline_version].label
+                if row.guideline_version is not None
+                else None,
                 "guideline_withdrawn": row.guideline_version is not None
                 and facts[row.guideline_version].withdrawn,
                 "kept_automatically": kept.get(row.submission_id, 0),
@@ -676,7 +849,20 @@ def build_submissions(
         "submissions": submissions,
         "rounds": rounds,
         "changes": _row_changes(
-            conn, pid, documents, case_id, language, viewer_user_id
+            conn,
+            pid,
+            documents,
+            case_id,
+            language,
+            viewer_user_id,
+            ordinals=ordinals,
+            results={
+                item["submission_id"]: {
+                    "author": item["author"],
+                    "consolidation": item["kind"] == "consolidation",
+                }
+                for item in submissions
+            },
         ),
         "open_translation_reviews": reviews,
     }

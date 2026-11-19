@@ -244,13 +244,13 @@ A text's own plan can override this until work on it starts.
 What for: decide how many people annotate each text and who may consolidate.
 
 1. Open **Settings**, tab **Workflow**, card **Annotation and consolidation**.
-2. Set **Annotators per text** (1 to 5). It is an upper limit; fewer is fine.
+2. Set **Annotators per text** (1 to 20). It is an upper limit; fewer is fine. A single text can have its own number, also 1 to 20 ([Assign work to the selected texts](lead-documents.md#assign-work-to-the-selected-texts)). The agreement compares every two annotators of a text, so a text with 20 annotators adds 190 pairs to agreement.csv.
 3. Tick **Annotate only after the translation review is accepted** if translations must be reviewed before annotation. Nobody can then annotate a translation that is not accepted; you can still assign annotators while the review is underway ([Assign work to the selected texts](lead-documents.md#assign-work-to-the-selected-texts)).
 4. Tick **Consolidator must not be one of the text's annotators** if annotators may not consolidate their own texts.
 5. Tick **Hide annotator names during consolidation** if consolidators should decide without knowing who marked what. Off by default.
 6. Click **Save changes**.
 
-Lowering the number removes nobody; existing assignments stay.
+Lowering the number removes nobody; existing assignments stay. A text can have its own number instead, set in the assign dialog ([Assign work for one text](lead-documents.md#assign-work-for-one-text)); it keeps it when you change the project setting.
 
 With hidden names, a consolidator sees the annotators of a text as *Annotator A*, *Annotator B* and so on, in the order they submitted, instead of names or pseudonyms; the same letters are used in the consolidation, the full editor and the submitted work they read for it. A person keeps their letter in later consolidation rounds of the same task. The technical ids and checksums the consolidator's browser receives are scrambled too, so they cannot be used to work out who wrote a finding. Tool proposals keep their robot icon. You and other leads still see every name, and exports are unchanged. The change applies to every consolidation the next time it opens, also to one already started. The audit trail records the change as *Project settings changed*, with the setting named.
 
@@ -288,7 +288,9 @@ What for: give or take away a role.
 2. Tick a role checkbox to give the role. It saves at once.
 3. Untick a role checkbox to take it away, then confirm with **Remove role**. This logs the person out on all devices; they can log in again right away. Taking away the lead role also revokes the project API tokens the person created for this project, unless they are a system administrator. Their personal tokens keep working, but no longer with the role you took away.
 
-A project needs at least one lead: **Add another project lead before removing the last lead.**
+A project needs at least one lead: **Add another project lead before removing the last lead.** When you are the project's only lead and untick your own **Lead** box or click **Remove…** on your row, this message appears at once, without a confirmation.
+
+The exception is a system administrator, who may take away the last lead, their own lead role included, for example to hand a project over. The dialog then says *This project will have no lead. You can still manage it as system administrator.* On their own row it does not speak of lost access or revoked tokens, because an administrator keeps both. A project without a lead shows "–" under **Lead** on **Projects** and can only be managed by an administrator until one is added ([Add a member](#add-a-member)).
 
 ## Remove a member
 
@@ -308,11 +310,12 @@ What for: let a script import, export or read this project, for example a nightl
 1. Open **Settings**, tab **People**.
 2. Under **Project API tokens**, click **New token…**.
 3. Enter a **Token name**, tick the scopes it needs (**Read**, **Import**, **Export**, **Project administration**) and set **Valid for (days)**.
-4. Click **Create token**. Copy the token from the dialog with **Copy token** and store it; it is shown only once.
+4. Click **Create token**. The dialog, titled with the name of the token (*New token “Progress report script”*), shows the token; it is shown only once. Click **Copy token** and store it, for example in your password manager.
+5. Tick **I have stored the token**, then click **Close**. Until the box is ticked, the dialog cannot be closed, not with **Close** and not with the Escape key.
 
 A project token works in this project only and acts as you, the lead who created it. It is revoked when you leave the project or lose the lead role (unless you are a system administrator), when you change your password and when your account is deactivated. Every lead of the project sees its tokens and can stop one with **Revoke…** and **Revoke token**. Changes made with a token are in the audit trail with the token's name.
 
-A project token is also the safest kind for the Ontotator MCP server, which lets an AI assistant set up and run the project for you ([MCP server guide](../../mcp/README.md)).
+A project token is also the safest kind for the Ontotator MCP server, which lets an AI assistant set up and run the project for you ([MCP server guide](../../mcp/README.md)). The line *Also for the Ontotator MCP server (AI assistant): see the handbook.* under the tokens opens this section.
 
 ## Publish the first or a new guideline version
 
@@ -324,10 +327,13 @@ Before you start: published versions cannot be edited, only withdrawn. Check the
 2. Without guidelines, the form is already open (**No guidelines yet**). Otherwise, click **Publish a new version**.
 3. Choose a `.md` or `.txt` file (UTF-8, up to 256 KB) in **Guideline file (.md or .txt, up to 256 KB)**.
 4. Check the preview.
-5. Optional: describe the change in **What changed? (optional)**.
-6. Click the publish button, for example *Publish as v2*. Or click **Discard**.
+5. Optional: enter the version your document gives itself, for example *3.1*, in **Your version of the guideline (optional)** (one line, up to 40 characters).
+6. Optional: describe the change in **What changed? (optional)**.
+7. Click the publish button, for example *Publish as v2*. Or click **Discard**.
 
 Everyone sees a notice in their next task.
+
+The number after *v* counts the uploads of this project: the first file you publish is v1, the next one v2, also when you publish an earlier text again. It is not the version of your document. If your document has its own version, enter it in step 5: the app then shows it before the upload number everywhere, for example *Guidelines 3.1 (v2)*, *Guidelines updated to 3.1 (v2)* in the notice, and *Guidelines 3.1 (v2) (current: 3.2 (v3))* on a submitted result. Without it, everything reads *Guidelines v2*. Your version cannot be changed after publishing. To correct it, publish the text again with the right one.
 
 ## See who has read the guidelines
 
@@ -345,13 +351,13 @@ What for: go back to an earlier text.
 
 1. Open **Settings**, tab **Guidelines**.
 2. In the row of the old version, click **More…**, then the republish item, for example *Republish v1…*.
-3. The form opens with the old text. Click the publish button, for example *Publish as v3*.
+3. The form opens with the old text and, if the old version had one, its own version in **Your version of the guideline (optional)**. Click the publish button, for example *Publish as v3*.
 
 ## Withdraw a guideline version
 
 What for: remove a version that must no longer be read, for example because it contains a mistake.
 
-Warning: the text of the withdrawn version is deleted for good. The version number stays, and results made under it show it as withdrawn. No guideline is in force until you publish or republish one.
+Warning: the text of the withdrawn version is deleted for good. The version number and your own version of it stay, and results made under it show it as withdrawn, for example *Guidelines 3.1 (v2) (withdrawn)*. No guideline is in force until you publish or republish one.
 
 1. Open **Settings**, tab **Guidelines**.
 2. In the version's row, click **More…**, then the withdraw item, for example *Withdraw v2…*.

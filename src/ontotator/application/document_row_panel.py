@@ -78,10 +78,13 @@ if TYPE_CHECKING:  # document_rows imports this module
 __all__ = [
     "NOT_ELIGIBLE",
     "Candidate",
+    "agreeing_choices",
+    "agreeing_rows",
     "fill_agreement",
     "final_panel",
     "finding_of",
     "findings_of",
+    "newest_choices",
     "project_profile",
     "project_roles",
     "unresolved_notes",
@@ -579,6 +582,134 @@ def fill_agreement(
             _full_agreement(item.comparable, recorded_at, payloads, profile, defaults)
             is not None
         )
+
+
+def agreeing_choices(
+    conn: Connection,
+    pid: int,
+    ctx: _Context,
+    keys: Sequence[tuple[str, str]],
+) -> dict[tuple[str, str], tuple[str | None, dict[str, Any] | None]]:
+    """For each row of ``keys``: the submission to accept when its compared
+    submissions agree in full, else why not (issue 354).
+
+    The rule of the final panel's ``all_match``: at least two eligible
+    submissions on the compared version, none of the row's eligible
+    submissions a consolidation, every consolidation group ``match``, and
+    the earliest of them that the viewer may accept (not their own work
+    when the project forbids it). Reads the submissions of all rows in a
+    fixed number of statements, as ``fill_agreement`` does for a page.
+    """
+    facts = ctx.facts
+    comparisons = {key: row_comparison(ctx, *key) for key in keys}
+    result: dict[tuple[str, str], tuple[str | None, dict[str, Any] | None]] = {}
+    compared: list[tuple[str, str]] = []
+    for key, item in comparisons.items():
+        if any(c.consolidation_round is not None for c in item.eligible):
+            result[key] = ("consolidation", None)
+        elif len(item.comparable) < 2:
+            result[key] = ("fewer_than_two", None)
+        else:
+            compared.append(key)
+    if not compared:
+        return result
+    wanted = [c.submission_id for key in compared for c in comparisons[key].comparable]
+    recorded_at = _recorded_at(conn, pid, wanted)
+    payloads = _payloads(conn, pid, wanted, strict=False)
+    profile, defaults = project_profile(conn, pid)
+    roles = project_roles(conn, pid, profile)
+    for key in compared:
+        comparable = comparisons[key].comparable
+        order = _full_agreement(
+            comparable, recorded_at, payloads, profile, defaults, roles
+        )
+        chosen = next(
+            (
+                sid
+                for sid in order or ()
+                if not (
+                    facts.adjudicator_not_annotator
+                    and payloads[sid].origin_key.annotator_id == facts.viewer_pseudonym
+                )
+            ),
+            None,
+        )
+        if chosen is None:
+            result[key] = ("differ", None)
+            continue
+        document_id = next(
+            c.document_id for c in comparable if c.submission_id == chosen
+        )
+        result[key] = (
+            None,
+            {
+                "document_id": document_id,
+                "submission_id": chosen,
+                "findings": len(findings_of(payloads[chosen], profile)),
+            },
+        )
+    return result
+
+
+def agreeing_rows(
+    conn: Connection,
+    pid: int,
+    ctx: _Context,
+    keys: Sequence[tuple[str, str]],
+) -> set[tuple[str, str]]:
+    """The rows of ``keys`` whose eligible submissions agree in full: all of
+    them are on the compared version, none is a consolidation, and every
+    consolidation group is ``match`` (the final panel's ``all_match`` and
+    ``agreeing_choices``, without asking who may accept). Bulk Change final…
+    (issue 336) asks this before an annotation replaces a final result. The
+    submissions of all rows are read in a fixed number of statements."""
+    comparisons = {key: row_comparison(ctx, *key) for key in keys}
+    compared = [
+        key
+        for key, item in comparisons.items()
+        if len(item.comparable) >= 2 and len(item.comparable) == len(item.eligible)
+    ]
+    if not compared:
+        return set()
+    wanted = [c.submission_id for key in compared for c in comparisons[key].comparable]
+    recorded_at = _recorded_at(conn, pid, wanted)
+    payloads = _payloads(conn, pid, wanted, strict=False)
+    profile, defaults = project_profile(conn, pid)
+    roles = project_roles(conn, pid, profile)
+    return {
+        key
+        for key in compared
+        if _full_agreement(
+            comparisons[key].comparable, recorded_at, payloads, profile, defaults, roles
+        )
+        is not None
+    }
+
+
+def newest_choices(
+    conn: Connection,
+    pid: int,
+    ctx: _Context,
+    keys: Sequence[tuple[str, str]],
+) -> dict[tuple[str, str], tuple[Candidate, int, datetime] | None]:
+    """For each row of ``keys``: its newest eligible submission (VD16, by the
+    time it was recorded), how many eligible submissions the row has and
+    when the newest was recorded; None for a row without one (bulk Change
+    final…, issue 336). One statement for all rows."""
+    eligible = {key: row_comparison(ctx, *key).eligible for key in keys}
+    recorded_at = _recorded_at(
+        conn, pid, (c.submission_id for found in eligible.values() for c in found)
+    )
+    result: dict[tuple[str, str], tuple[Candidate, int, datetime] | None] = {}
+    for key, found in eligible.items():
+        if not found:
+            result[key] = None
+            continue
+        newest = max(
+            found, key=lambda c: (recorded_at[c.submission_id], c.submission_id)
+        )
+        result[key] = (newest, len(found), recorded_at[newest.submission_id])
+    return result
 
 
 def _changed_passages(

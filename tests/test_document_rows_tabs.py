@@ -207,3 +207,51 @@ def test_assignee_reaches_the_selection(work):
     found = rows_service(work).case_ids("proj", RowQuery(assignee=anno))
     assert sorted(found["case_ids"]) == ["c1", "c2"]
     assert DocumentRowFilters(assignee=anno).query().assignee == anno
+
+
+def test_an_open_task_below_the_limit_is_in_progress_and_waits_on_its_person(env):
+    """Lead review F3: with "Annotators per text" 2 and one person at work,
+    the row shows the open task and waits on that person; assigning the
+    second annotator stays the lead's step of the row."""
+    from sqlalchemy import update
+
+    from ontotator.storage.tables import ProjectRow
+
+    with env.db.transaction() as conn:
+        conn.execute(
+            update(ProjectRow)
+            .where(ProjectRow.project_key == "proj")
+            .values(annotations_per_text=2)
+        )
+    result = page(env)
+    row = rows_of(result)[("c2", "en")]  # anno has an open task
+    step = row["next_step"]
+    assert (step["code"], step["kind"]) == ("annotation_in_progress", "in_progress")
+    assert step["owner"]["person"]["pseudonym"] == pseudonym(env, "anno")
+    assert [item["code"] for item in row["steps"]] == [
+        "annotation_in_progress",
+        "assign_annotation",
+    ]
+    second = row["steps"][1]
+    assert (second["action"], second["owner"]["kind"]) == ("assign_annotation", "you")
+    assert (second["assigned"], second["target"]) == (1, 2)
+    cell = row["stages"]["annotation"]
+    assert (cell["state"], cell["tone"]) == ("in_progress", "running")
+    assert (cell["detail"]["submitted"], cell["detail"]["total"]) == (0, 1)
+    assert (cell["detail"]["assigned"], cell["detail"]["target"]) == (1, 2)
+    # Tabs and filters agree: In progress, not To assign; found by its
+    # person, by the annotation state and by the step "Assign annotation".
+    assert ("c2", "en") in listed(page(env, segment="progress"))
+    assert ("c2", "en") not in listed(page(env, segment="assign"))
+    assert ("c1", "en") in listed(page(env, segment="assign"))  # nobody assigned
+    for query in (
+        {"waiting_on": (pseudonym(env, "anno"),)},
+        {"annotation_state": ("in_progress",)},
+        {"step": ("assign_annotation",)},
+    ):
+        assert ("c2", "en") in listed(page(env, **query)), query
+    assert ("c2", "en") not in listed(page(env, waiting_on=("me",)))
+    assert ("c2", "en") not in listed(page(env, annotation_state=("partly_assigned",)))
+    # The tab counts still equal the rows' step kinds.
+    test_tab_counts_equal_row_step_kinds(env)
+    test_shown_equals_rows_listed_for_each_tab(env)

@@ -61,10 +61,12 @@ class AssignmentGuidelineView(BaseModel):
     version: int
     kind: Literal["markdown", "text"]
     created_at: datetime
+    label: str | None = None
 
 
 class GuidelineNoticeChangeView(BaseModel):
     version: int
+    label: str | None = None
     change_note: str | None
     created_at: datetime
     withdrawn: bool
@@ -75,6 +77,7 @@ class GuidelineNoticeView(BaseModel):
 
     from_version: int | None
     to_version: int
+    to_label: str | None = None
     changes: list[GuidelineNoticeChangeView]
     more: int
 
@@ -83,9 +86,11 @@ class GuidelineNoticeView(BaseModel):
         return cls(
             from_version=notice.from_version,
             to_version=notice.to_version,
+            to_label=notice.to_label,
             changes=[
                 GuidelineNoticeChangeView(
                     version=change.version,
+                    label=change.label,
                     change_note=change.change_note,
                     created_at=change.created_at,
                     withdrawn=change.withdrawn,
@@ -114,8 +119,14 @@ class AssignmentView(BaseModel):
     external_id: str | None = None
     active_round_id: str | None = None
     workflow_revision: int = 0
+    # Paused: the task can be read, not saved. ``pause_causes`` names why:
+    # ``report`` (a problem report) and/or ``lead`` (the lead paused the
+    # text, issue 464); the task opens when none remains. ``hold_reason`` is
+    # the report's reason, else the lead's; ``lead_pause_reason`` the lead's.
     held: bool = False
     hold_reason: str | None = None
+    pause_causes: list[Literal["report", "lead"]] = Field(default_factory=list)
+    lead_pause_reason: str | None = None
     active_holds: list[ActiveHoldView] = Field(default_factory=list)
     # FD1: the lead's own translation review of a rejected or queried version.
     lead_correction: bool = False
@@ -223,6 +234,9 @@ class AssignRequest(BaseModel):
 
 class RefusedAssignment(AssignmentRowRequest):
     code: str
+    # The refusal's ``details.reason`` when it has one, e.g. ``accepted_by_review``
+    # for ``NOT_A_TRANSLATION`` (issue 409: use the translation correction).
+    reason: str | None = None
 
 
 class AssignResponse(BaseModel):
@@ -416,7 +430,16 @@ def assign(
                 )
             )
         except DomainError as exc:
-            refused.append(RefusedAssignment(**row.model_dump(), code=exc.code))
+            reason = (
+                exc.details.get("reason") if isinstance(exc.details, dict) else None
+            )
+            refused.append(
+                RefusedAssignment(
+                    **row.model_dump(),
+                    code=exc.code,
+                    reason=reason if isinstance(reason, str) else None,
+                )
+            )
     return AssignResponse(created=_views(request, created), refused=refused)
 
 

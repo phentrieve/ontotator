@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, type TaskSummary } from "../src/api/client";
 import type { RouteLeaveGuard } from "../src/app/router";
 import { TranslationReviewScreen } from "../src/translation/TranslationReviewScreen";
-import { reviewRecord, reviewWorkspace } from "./translationFixtures";
+import { firstVersionWorkspace, reviewRecord, reviewWorkspace } from "./translationFixtures";
 import { decisionConsequences, decisionLabels, decisionOutcomes, issueMessages } from "../src/translation/labels";
 import { ShortcutHelpHost, openShortcutHelp } from "../src/ui/ShortcutHelp";
 import type { ReviewDecisionCode } from "../src/translation/reviewRules";
@@ -67,10 +67,12 @@ it("opens the exact source, inherited run and correction baseline with no defaul
   expect(screen.getByText(/Example MT/)).toBeDefined();
   expect(screen.getByRole("heading", { name: "Automatic translation checks" })).toBeDefined();
   const band = screen.getByRole("region", { name: "Automatic translation checks" });
-  expect(band.textContent).toContain("1 automatic check failed: Units added in translation");
+  // The reviewed version is a correction (v3): the run's failed check is named as one of v1 and asks for nothing.
+  expect(band.textContent).toContain("The automatic checks ran on v1, not on this version (v3). 1 automatic check failed on v1: Units added in translation.");
   expect(screen.queryByText(/A unit changed/)).toBeNull();
   fireEvent.click(within(band).getByRole("button", { name: "Details" }));
-  expect(screen.getAllByText(/A unit changed/)).toHaveLength(2);
+  expect(band.textContent).toContain("Checks of v1: 0 passed, 1 failed");
+  expect(screen.getAllByText(/A unit changed/)).toHaveLength(1);
   expect(screen.getAllByRole("radio").every(n => !(n as HTMLInputElement).checked)).toBe(true);
   expect(submitButton().getAttribute("aria-disabled")).toBe("true");
   expect(screen.getByText("Choose a decision to submit.")).toBeDefined();
@@ -109,6 +111,20 @@ it("autosaves exact raw data once in StrictMode and submits with the actual conf
   expect(submit).toHaveBeenCalledWith(17, 41);
   expect(screen.getByText("Review submitted")).toBeDefined();
   expect(screen.getByText("A corrected version v7 was created.")).toBeDefined();
+});
+it("Retry corrected version metadata: a retry that passes names the version and removes the error of the failed attempt", async () => {
+  setup();
+  vi.mocked(api.getVariantMetadata).mockRejectedValueOnce(new Error("The project is busy right now."));
+  await edited(); await clock();
+  await act(async () => { fireEvent.click(submitButton()); });
+  await act(async () => { fireEvent.click(within(screen.getByRole("dialog", { name: "Submit this review?" })).getByRole("button", { name: "Submit review" })); });
+  expect(screen.getByText("Review submitted")).toBeDefined();
+  expect(screen.queryByText("A corrected version v7 was created.")).toBeNull();
+  expect(screen.getByRole("alert").textContent).toContain("The project is busy right now.");
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Retry corrected version metadata" })); });
+  expect(screen.getByText("A corrected version v7 was created.")).toBeDefined();
+  expect(screen.queryByRole("button", { name: "Retry corrected version metadata" })).toBeNull();
+  expect(screen.queryByRole("alert")).toBeNull();
 });
 it("hides the guidelines notice once the review is submitted here and lists the guideline stamp", async () => {
   const { submit } = setup(undefined, false, undefined, undefined, <p>Guidelines updated to v2</p>);
@@ -724,7 +740,7 @@ it("preserves raw input on stale-predecessor refusal and never rebases or create
   expect(api.getVariantMetadata).not.toHaveBeenCalled();
 });
 it("always lists Ctrl+Enter in help; it explains a blocked submit and otherwise only opens the confirmation", async () => {
-  const { submit } = setup();
+  const { submit } = setup(firstVersionWorkspace());
   render(<ShortcutHelpHost />);
   await screen.findByRole("textbox", { name: "Translation (de)" });
   act(openShortcutHelp);
@@ -771,6 +787,38 @@ it("summarises decision, categories and a rationale excerpt before submitting, t
   const summary = within(screen.getByRole("region", { name: "Submitted review" }));
   expect(summary.getByText("Reviewed")).toBeDefined();
   expect(screen.queryByText("reviewed")).toBeNull();
+});
+it("names the typography hints of the saved text in the submit confirmation; they block nothing (issue 484)", async () => {
+  const text = "Über  setzt..";
+  const { submit } = setup(reviewWorkspace({ draft: { revision: 6, text, form: { decision: "accepted_corrected", clinical_change: false } } }));
+  const hints = vi.spyOn(api, "getDraftTypographyHints").mockResolvedValue({ revision: 6, total: 2, truncated: false,
+    counts: { DOUBLE_SPACE: 1, DOUBLE_FULL_STOP: 1 }, hints: [{ rule: "DOUBLE_SPACE", start: 4, end: 6 }, { rule: "DOUBLE_FULL_STOP", start: 11, end: 13 }] });
+  await screen.findByRole("textbox", { name: "Translation (de)" });
+  expect(hints).not.toHaveBeenCalled();
+  fireEvent.click(submitButton());
+  const dialog = within(screen.getByRole("dialog", { name: "Submit this review?" }));
+  expect(await dialog.findByText("2 typography hints in your text: double space, doubled full stop.")).toBeDefined();
+  expect(hints).toHaveBeenCalledWith(17);
+  fireEvent.click(dialog.getByRole("button", { name: "Show them" }));
+  expect(within(dialog.getByRole("list", { name: "Typography hints" })).getAllByRole("listitem").map(item => item.querySelector("mark")!.textContent)).toEqual(["  ", ".."]);
+  await act(async () => { fireEvent.click(dialog.getByRole("button", { name: "Submit review" })); });
+  expect(submit).toHaveBeenCalledWith(17, 6);
+});
+it("shows no hint line for a clean text, for an answer of another draft revision, or when the hints cannot be read", async () => {
+  setup(reviewWorkspace({ draft: { revision: 6, text: "Übersetzt.", form: { decision: "accepted_unchanged", clinical_change: false } } }));
+  const hints = vi.spyOn(api, "getDraftTypographyHints").mockResolvedValueOnce({ revision: 6, total: 0, truncated: false, counts: {}, hints: [] })
+    .mockResolvedValueOnce({ revision: 5, total: 1, truncated: false, counts: { TAB: 1 }, hints: [{ rule: "TAB", start: 0, end: 1 }] })
+    .mockRejectedValueOnce(new Error("offline"));
+  await screen.findByRole("textbox", { name: "Translation (de)" });
+  for (let round = 1; round <= 3; round++) {
+    await act(async () => { fireEvent.click(submitButton()); });
+    const dialog = screen.getByRole("dialog", { name: "Submit this review?" });
+    await waitFor(() => expect(hints).toHaveBeenCalledTimes(round));
+    await act(async () => { await Promise.resolve(); });
+    expect(dialog.textContent).not.toContain("typography");
+    expect(within(dialog).getByRole("button", { name: "Submit review" })).toBeDefined();
+    await act(async () => { fireEvent.click(within(dialog).getByRole("button", { name: "Keep editing" })); });
+  }
 });
 it("explains a blocked submit right at the button with the rules' own issues", async () => {
   setup();
@@ -1006,6 +1054,41 @@ it("keeps the rail footer with Submit at 1440 px and renders no pinned bar", asy
   expect(submitButton().closest(".translation-decision-footer")).not.toBeNull();
   expect(document.querySelector(".translation-pinned-bar")).toBeNull();
   expect(screen.queryByRole("region", { name: "Decision and submit" })).toBeNull();
+});
+it("collapses and resizes Your review from 1100 px and remembers both (#410)", async () => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
+  const first = setup();
+  await screen.findByRole("textbox", { name: "Translation (de)" });
+  const sep = screen.getByRole("separator", { name: "Resize review panel" });
+  expect(sep.getAttribute("aria-valuenow")).toBe("360");
+  fireEvent.keyDown(sep, { key: "ArrowLeft", shiftKey: true });
+  expect(sep.getAttribute("aria-valuenow")).toBe("424");
+  expect((document.querySelector(".translation-workspace") as HTMLElement).style.getPropertyValue("--review-panel-width")).toBe("424px");
+  fireEvent.click(screen.getByRole("button", { name: "Collapse review panel" }));
+  const expand = screen.getByRole("button", { name: "Expand review panel" });
+  expect(expand.getAttribute("aria-expanded")).toBe("false");
+  await waitFor(() => expect(document.activeElement).toBe(expand));
+  expect((document.getElementById("translation-decision-body") as HTMLElement).hidden).toBe(true);
+  expect(screen.queryByRole("separator", { name: "Resize review panel" })).toBeNull();
+  // Collapsed, the pinned bar keeps the decision and the one Submit reachable.
+  expect(screen.getAllByRole("button", { name: "Submit review…" })).toHaveLength(1);
+  expect(submitButton().closest(".translation-pinned-bar")).not.toBeNull();
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 350)); });
+  first.unmount();
+  // A new visit starts collapsed; Skip to decision opens the rail at the remembered width.
+  setup();
+  await screen.findByRole("textbox", { name: "Translation (de)" });
+  expect(screen.getByRole("button", { name: "Expand review panel" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Skip to decision" }));
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Your review" })));
+  expect(screen.getByRole("separator", { name: "Resize review panel" }).getAttribute("aria-valuenow")).toBe("424");
+  expect(submitButton().closest(".translation-decision-footer")).not.toBeNull();
+});
+it("offers no resize or collapse below 1100 px", async () => {
+  setup(undefined, false, { width: 800, listeners: new Set() });
+  await screen.findByRole("textbox", { name: "Translation (de)" });
+  expect(screen.queryByRole("separator", { name: "Resize review panel" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Collapse review panel" })).toBeNull();
 });
 it("keeps Skip to decision", async () => {
   setup(undefined, false, { width: 800, listeners: new Set() });
@@ -1258,6 +1341,25 @@ it("lead correction shows only Accepted with corrections, preselected, with the 
   await clock();
   expect(save).toHaveBeenLastCalledWith(17, { expected_revision: 6, text: "Lead fix", form: { decision: "accepted_corrected", clinical_change: false } });
   expect(submitButton().getAttribute("aria-disabled")).toBeNull();
+});
+it("issue 341 b: a lead correction of an accepted version says the new version is reviewed again", async () => {
+  const workspace = leadWorkspace();
+  setup({ ...workspace, reviewed_again: true, variant: { ...workspace.variant, translation_status: "accepted" } });
+  await screen.findByRole("textbox", { name: "Translation (de)" });
+  expect(screen.getByText("You are correcting this accepted translation as project lead. The corrected text becomes a new version that is reviewed again.")).toBeDefined();
+  expect(screen.getByText("Your corrected version is reviewed again.")).toBeDefined();
+  vi.useFakeTimers();
+  fireEvent.change(screen.getByRole("textbox", { name: "Translation (de)" }), { target: { value: "Lead fix" } });
+  await clock();
+  await act(async () => { fireEvent.click(submitButton()); });
+  const dialog = screen.getByRole("dialog", { name: "Submit this review?" });
+  expect(within(dialog).getByText(/starts as a correction with review On\. This version stays accepted/)).toBeDefined();
+});
+it("issue 341 b: a further lead correction after a rejection is reviewed again too", async () => {
+  setup({ ...leadWorkspace(), reviewed_again: true });
+  await screen.findByRole("textbox", { name: "Translation (de)" });
+  expect(screen.getByText("You are correcting this translation as project lead. The corrected text becomes a new version that is reviewed again.")).toBeDefined();
+  expect(screen.getByText("Your corrected version is reviewed again.")).toBeDefined();
 });
 it("lead correction turns a stored other decision into Accepted with corrections", async () => {
   const workspace = leadWorkspace();

@@ -121,7 +121,11 @@ def latest_review_decisions(
             TranslationReviewRow.id.desc(),
         )
     ).all()
-    return {row.document_id: row.decision for row in rows}
+    # A version made by an editorial correction of a rejected or queried
+    # version counts as that one (issue 453).
+    return work_plan_store.inherited_review_decisions(
+        conn, pid, {row.document_id: row.decision for row in rows}
+    )
 
 
 def corrects_selected_text(status: str | None, decision: str | None) -> bool:
@@ -131,7 +135,8 @@ def corrects_selected_text(status: str | None, decision: str | None) -> bool:
     Open question 1: an accepted_corrected parent (status reviewed) is skipped
     because its accepted child raises the cause.
     """
-    if decision in NOT_NEWER_DECISIONS:
+    # A queried version a lead accepted as it is (issue 483) counts again.
+    if decision in NOT_NEWER_DECISIONS and status != "accepted":
         return False
     return not (status == "reviewed" and decision == "accepted_corrected")
 

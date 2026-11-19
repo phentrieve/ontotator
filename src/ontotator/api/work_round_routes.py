@@ -1,6 +1,7 @@
 """Round navigation and exact-input transitions."""
 
 from datetime import datetime
+from typing import Literal
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, ConfigDict, Field
@@ -20,10 +21,12 @@ from ontotator.application.round_reads import (
     enrich_inputs,
     enrich_rounds,
     enrich_sources,
+    round_source_text,
 )
 from ontotator.application.work_rounds import (
     RoundInputResolutionService,
     WorkRoundService,
+    consolidation_open,
 )
 from ontotator.assignments.service import AssignmentService
 from ontotator.auth.audit import Actor
@@ -32,6 +35,7 @@ from ontotator.domain.errors import DomainError
 from ontotator.domain.work_rounds import (
     CreatableRoundKind,
     RoundInputView,
+    RoundSourceText,
     WorkRoundView,
 )
 from ontotator.domain.workspace import Draft, MutationEnvelope
@@ -165,6 +169,18 @@ def round_inputs(
     return [blinding.input_view(i) for i in items] if blinding else items
 
 
+@router.get("/rounds/{round_id}/source-text")
+def round_source(
+    round_id: str, request: Request, principal: PrincipalDep
+) -> RoundSourceText | None:
+    """The earlier text version a carried round's work came from, for "Show
+    changes since vN" (issue 421); null when the round was not carried from
+    another version. Everyone who may see the round may read it."""
+    repo = get_repo(request)
+    item = _visible_round(repo, round_id)
+    return round_source_text(repo, item.project_key, item)
+
+
 @router.post("/workspaces/{workspace_id}/round-input-resolutions")
 def resolve_input(
     workspace_id: str,
@@ -198,6 +214,10 @@ class RoundSourceView(BaseModel):
     round_ordinal: int | None = None
     recorded_at: datetime | None = None
     finding_count: int = 0
+    # The refusal a carry-forward from this submission would get right now,
+    # so the task owner is told before trying. Only the fact: never who
+    # consolidates (blinding).
+    refused_by: Literal["CONSOLIDATION_OPEN"] | None = None
 
 
 @router.get("/assignments/{assignment_id}/round-sources")
@@ -281,8 +301,17 @@ def round_sources(
         facts = enrich_sources(
             repo, assignment.project_key, [r.submission_id for r in result]
         )
+        # The rule of WorkRoundService.create for carry_forward.
+        refused_by = (
+            "CONSOLIDATION_OPEN"
+            if result
+            and assignment.status == "submitted"
+            and consolidation_open(conn, pid, assignment.document_id)
+            else None
+        )
     result = [
-        item.model_copy(update=fact) for item, fact in zip(result, facts, strict=True)
+        item.model_copy(update={**fact, "refused_by": refused_by})
+        for item, fact in zip(result, facts, strict=True)
     ]
     return sorted(
         result, key=lambda item: (item.version, item.submission_id), reverse=True

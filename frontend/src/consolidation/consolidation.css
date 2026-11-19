@@ -217,6 +217,8 @@
 
 .cons-legend-swatch {
   display: inline-block;
+  /* A long line (many people on line 4, issue 447) wraps; the swatch keeps its width. */
+  flex: none;
   width: 24px;
   height: 16px;
   background-repeat: no-repeat;
@@ -381,8 +383,17 @@
   vertical-align: middle;
 }
 
+/* Many people (issue 447): the table scrolls sideways inside its box; the row labels stay in view. */
+.cons-compare tbody th,
+.cons-compare thead td:first-child {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background: var(--surface-raised);
+}
+
 .cons-row--conflict td,
-.cons-row--conflict th {
+.cons-compare .cons-row--conflict th {
   background: var(--warning-light);
 }
 
@@ -581,14 +592,36 @@
   border-bottom-color: transparent;
 }
 
+/* The sticky row label paints its own border: above a hint line it takes the conflict row's colour. */
+.cons-compare .cons-row--conflict:has(+ .cons-row-hint) > th {
+  border-bottom-color: var(--warning-light);
+}
+
 .cons-row-hint td {
   padding-top: 0;
   color: var(--text-muted);
 }
 
 /* The hint is not a row to decide (no choices), but it keeps the colour of the conflict row it explains. */
-.cons-row--conflict + .cons-row-hint td {
+.cons-row--conflict + .cons-row-hint td,
+.cons-row--conflict + .cons-row-split + .cons-row-hint td {
   background: var(--warning-light);
+}
+
+/* Many people (issue 470): the line under a row (who holds which value, the parent term) and an agreed value shown
+   once across the columns stay in view while the table scrolls sideways, like the row labels. The box is never wider
+   than the visible part of the table (the scroll box is the query container), so a long line wraps there. */
+.cons-pin {
+  display: inline-block;
+  position: sticky;
+  inset-inline-start: var(--space-2);
+  max-width: calc(100cqi - 2 * var(--space-2));
+}
+
+/* After the sticky label column, whose width the table measures. */
+.cons-pin-value {
+  inset-inline-start: calc(var(--cons-label-width, 0px) + var(--space-2));
+  max-width: calc(100cqi - var(--cons-label-width, 0px) - 2 * var(--space-2));
 }
 
 /* A tag in the group heading as a small bordered chip (the app's .badge), apart from "2 fields to decide". */
@@ -599,3 +632,15 @@
 
 /* Submit summary: the server's warnings as a list inside the warning box. */
 .cons-warning-list { margin: var(--space-1) 0 0; padding-inline-start: var(--space-5); }
+
+/* Issue 470: the findings a warning is about, each with "Go to group". */
+.cons-warning-findings { margin: var(--space-1) 0 0; padding-inline-start: var(--space-5); }
+.cons-warning-findings li + li { margin-top: var(--space-1); }
+
+/* #472: the row's "Decision saved · Undo" never shows beside a dialog opened after it, as the app's toast (issue 439). */
+body:has([role="dialog"][aria-modal="true"]) .cons-undo { visibility: hidden; }
+
+/* Phone and tablet layouts (up to 1024 px), used by touch: the ✓ of a value is at least 44 × 44 px (issue 472). */
+@media (max-width: 1024px) {
+  .cons-take { width: 44px; height: 44px; }
+}

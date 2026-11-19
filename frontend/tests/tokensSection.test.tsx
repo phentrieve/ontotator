@@ -36,11 +36,20 @@ describe("API tokens", () => {
     fireEvent.click(screen.getByLabelText(/^Import/));
     fireEvent.change(screen.getByLabelText("Valid for (days) (required)"), { target: { value: "30" } });
     fireEvent.click(screen.getByRole("button", { name: "Create token" }));
-    const dialog = await screen.findByRole("dialog", { name: "New token importer" });
+    const dialog = await screen.findByRole("dialog", { name: "New token “importer”" });
     expect(within(dialog).getByText("ott_secret-value")).toBeDefined();
     expect(within(dialog).getByText(/shown only once/)).toBeDefined();
     expect(create).toHaveBeenCalledWith({ name: "importer", scopes: ["read", "import"], expires_in_days: 30 });
-    fireEvent.click(within(dialog).getAllByRole("button", { name: "Close" }).at(-1)!);
+    // Review finding C: like the setup-code dialog, it cannot be left (Escape, Close) before the box is ticked.
+    const close = within(dialog).getByRole("button", { name: "Close" }) as HTMLButtonElement;
+    expect(close.disabled).toBe(true);
+    expect(close.className).not.toContain("btn-primary");
+    expect(within(dialog).getByRole("button", { name: "Copy token" }).className).toContain("btn-primary");
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    fireEvent.click(close);
+    expect(within(dialog).getByText("ott_secret-value")).toBeDefined();
+    fireEvent.click(within(dialog).getByLabelText("I have stored the token"));
+    fireEvent.click(close);
     await waitFor(() => expect(screen.queryByText("ott_secret-value")).toBeNull());
     expect(screen.getByText("importer")).toBeDefined();
   });
@@ -78,6 +87,9 @@ describe("API tokens", () => {
     expect(await screen.findByText("No API tokens yet.")).toBeDefined();
     expect(api.listProjectTokens).toHaveBeenCalledWith("p/key");
     expect(screen.getByRole("heading", { name: "Project API tokens" })).toBeDefined();
+    const mcp = screen.getByText(/^Also for the Ontotator MCP server \(AI assistant\):/);
+    expect(mcp.textContent).toBe("Also for the Ontotator MCP server (AI assistant): see the handbook.");
+    expect(within(mcp).getByRole("link", { name: "see the handbook" }).getAttribute("href")).toBe("#/help/lead-settings?section=give-a-script-access-to-the-project");
     fireEvent.click(screen.getByRole("button", { name: "New token…" }));
     fireEvent.change(screen.getByLabelText("Token name (required)"), { target: { value: "sync" } });
     fireEvent.click(screen.getByRole("button", { name: "Create token" }));

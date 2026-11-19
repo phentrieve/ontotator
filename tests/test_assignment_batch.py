@@ -264,6 +264,7 @@ def test_preview_targets_newest_version_per_root_and_skips_with_reasons(env, tmp
         "document_id": de(CASES[6]),
         "version": 1,
         "remaining": 1,
+        "per_text": 1,
         "usernames": [],
         "unreviewed_translation": False,
         "waiting_for_translation_review": False,
@@ -366,6 +367,7 @@ def test_commit_is_all_or_nothing_on_refusal(env):
             "document_id": de(CASES[4]),
             "username": "ben",
             "code": "ADJUDICATOR_IS_ANNOTATOR",
+            "reason": None,
         }
     ]
     assert assignment_count(env) == before
@@ -597,6 +599,49 @@ def test_review_accepted_translation_targets_externally_accepted_rows_only(env):
     assert flags[RowKey(CASES[0], "de")] == BOTH
 
 
+def test_batch_refusal_carries_the_reason(env, monkeypatch):
+    """A refusal between preview and commit names its reason like the single
+    assignment (issue 409)."""
+    from ontotator.application import work_plans
+    from ontotator.domain.errors import DomainError
+
+    lead = env.app.state.accounts.get_by_username("leader")
+    set_status(env, "accepted", CASES[0])
+    plan(env, ANNOTATE, CASES[0])
+    with env.db.transaction() as conn:
+        store.add_acceptance(
+            conn,
+            env.pid,
+            de(CASES[0]),
+            source="lead",
+            reason="checked externally",
+            accepted_by=lead.id,
+        )
+
+    def refuse(*_: Any) -> bool:
+        raise DomainError("NOT_A_TRANSLATION", {"reason": "accepted_by_review"})
+
+    monkeypatch.setattr(work_plans, "enable_review_for_accepted", refuse)
+    response = commit(
+        env,
+        "translation_review",
+        case_ids=CASES[:1],
+        review_accepted_translation=True,
+        usernames=["ana"],
+    )
+    assert response.status_code == 409, response.text
+    assert response.json()["details"]["refused"] == [
+        {
+            "case_id": CASES[0],
+            "language": "de",
+            "document_id": de(CASES[0]),
+            "username": "ana",
+            "code": "NOT_A_TRANSLATION",
+            "reason": "accepted_by_review",
+        }
+    ]
+
+
 def test_review_accepted_translation_skips_versions_with_a_correction(env, tmp_path):
     """D25 as ``enable_review_for_accepted``: a version with a correction
     derived from it (here a rejected one, so v1 stays newest) is no target."""
@@ -729,3 +774,106 @@ def test_decision_with_final_or_segment_is_422(env):
             json=body("translation_review", filters=filters),
         )
         assert response.status_code == 422, response.text
+
+
+# --- order of assignment (issue 488) ------------------------------------------ #
+
+
+def _stored(env: Any) -> list[tuple[str, str]]:
+    """(document, username) of every assignment in the stored order."""
+    with env.db.transaction() as conn:
+        return [
+            (document_id, username)
+            for document_id, username in conn.execute(
+                select(AssignmentRow.document_id, UserRow.username)
+                .join(UserRow, UserRow.id == AssignmentRow.user_id)
+                .where(AssignmentRow.project_id == env.pid)
+                .order_by(AssignmentRow.id)
+            ).tuples()
+        ]
+
+
+def _my_tasks(env: Any, username: str) -> list[str]:
+    from auth_harness import logged_in
+
+    response = logged_in(env.app, username, assignments=[]).get("/api/v1/me/tasks")
+    assert response.status_code == 200, response.text
+    return [task["document_id"] for task in response.json()]
+
+
+def test_sort_given_assigns_in_the_order_of_case_ids(env):
+    """``sort: given`` (MCP ``distribute_texts`` with ``case_ids``): the tasks
+    are created in the caller's order, and the person's translation reviews
+    are listed in it."""
+    wanted = [CASES[7], CASES[2], CASES[11], CASES[0]]
+    shown = preview(
+        env, "translation_review", case_ids=wanted, usernames=["ana"], sort="given"
+    )
+    assert [target["case_id"] for target in shown["targets"]] == wanted
+    response = commit(
+        env, "translation_review", case_ids=wanted, usernames=["ana"], sort="given"
+    )
+    assert response.status_code == 200, response.text
+    assert [c["document_id"] for c in response.json()["created"]] == [
+        de(case) for case in wanted
+    ]
+    assert _stored(env) == [(de(case), "ana") for case in wanted]
+    assert _my_tasks(env, "ana") == [de(case) for case in wanted]
+
+
+def test_sort_given_keeps_the_first_of_a_repeated_case_and_unknown_cases(env):
+    wanted = [CASES[3], "case-9999", CASES[1], CASES[3]]
+    shown = preview(
+        env, "translation_review", case_ids=wanted, usernames=["ana"], sort="given"
+    )
+    assert [target["case_id"] for target in shown["targets"]] == [CASES[3], CASES[1]]
+
+
+def test_without_sort_given_the_batch_assigns_in_documents_order(env):
+    wanted = [CASES[7], CASES[2], CASES[11]]
+    response = commit(env, "translation_review", case_ids=wanted, usernames=["ana"])
+    assert response.status_code == 200, response.text
+    assert _stored(env) == [(de(case), "ana") for case in sorted(wanted)]
+    assert _my_tasks(env, "ana") == [de(case) for case in sorted(wanted)]
+
+
+def test_split_gives_each_person_a_block_in_the_given_order(env):
+    wanted = [CASES[9], CASES[4], CASES[6], CASES[1], CASES[8]]
+    response = commit(
+        env,
+        "translation_review",
+        case_ids=wanted,
+        mode="split",
+        usernames=["ana", "ben"],
+        sort="given",
+    )
+    assert response.status_code == 200, response.text
+    assert _stored(env) == [
+        (de(wanted[0]), "ana"),
+        (de(wanted[1]), "ana"),
+        (de(wanted[2]), "ana"),
+        (de(wanted[3]), "ben"),
+        (de(wanted[4]), "ben"),
+    ]
+    assert _my_tasks(env, "ana") == [de(case) for case in wanted[:3]]
+    assert _my_tasks(env, "ben") == [de(case) for case in wanted[3:]]
+
+
+def test_each_assigns_every_person_in_the_given_order(env):
+    set_status(env, "accepted", *CASES)
+    set_project(env, annotations_per_text=2)
+    wanted = [CASES[5], CASES[0], CASES[3]]
+    response = commit(
+        env,
+        "annotate",
+        case_ids=wanted,
+        mode="each",
+        usernames=["ana", "ben"],
+        sort="given",
+    )
+    assert response.status_code == 200, response.text
+    assert _stored(env) == [
+        (de(case), name) for case in wanted for name in ("ana", "ben")
+    ]
+    for name in ("ana", "ben"):
+        assert _my_tasks(env, name) == [de(case) for case in wanted]

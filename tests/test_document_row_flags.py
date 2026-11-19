@@ -107,7 +107,12 @@ def test_flagged_findings_group_id_facet_and_kept_automatically(cons):
     # The round the group belongs to (``#/consolidations/{round_id}?group=``).
     assert row["flagged_round_id"] == cons.round.round_id
     facets = rows(env)["bar"]["facets"]
-    assert facets["flags"] == {"guidelines_unclear": 1}
+    # The fixture's two annotators are above the limit of one (issue 339 b).
+    assert facets["flags"] == {
+        "guidelines_unclear": 1,
+        "over_limit": 1,
+        "can_take_annotator": 1,
+    }
     filtered = rows(env, [("flags", "guidelines_unclear")])
     assert [
         (r["case_id"], r["language"]) for g in filtered["groups"] for r in g["rows"]
@@ -162,7 +167,10 @@ def test_no_flags_before_and_without_marks(cons):
         row["flagged_group_id"],
         row["flagged_round_id"],
     ) == (0, None, None)
-    assert rows(env)["bar"]["facets"]["flags"] == {}
+    assert rows(env)["bar"]["facets"]["flags"] == {
+        "over_limit": 1,
+        "can_take_annotator": 1,
+    }
     decide_and_submit(cons, [("confirmed", None)] * 3)
     row = row_of(rows(env), "c1", "en")
     assert (
@@ -171,7 +179,11 @@ def test_no_flags_before_and_without_marks(cons):
         row["flagged_round_id"],
     ) == (0, None, None)
     facets = rows(env, [("flags", "guidelines_unclear")])["bar"]["facets"]
-    assert facets["flags"] == {"guidelines_unclear": 0}
+    assert facets["flags"] == {
+        "guidelines_unclear": 0,
+        "over_limit": 1,
+        "can_take_annotator": 1,
+    }
     assert rows(env, [("flags", "guidelines_unclear")])["groups"] == []
     assert all(item["kept_automatically"] == 0 for item in submissions(env))
 
@@ -201,7 +213,11 @@ def test_exact_flags_only_for_shown_rows(cons, monkeypatch):
     # Page 2 of the one flagged row: counted in the facet, not shown.
     hidden = rows(env, [("flags", "guidelines_unclear"), ("page", "2")])
     assert hidden["groups"] == []
-    assert hidden["bar"]["facets"]["flags"] == {"guidelines_unclear": 1}
+    assert hidden["bar"]["facets"]["flags"] == {
+        "guidelines_unclear": 1,
+        "over_limit": 1,
+        "can_take_annotator": 1,
+    }
     ids = env.lead.get(
         f"{BASE}/document-rows/case-ids", params=[("flags", "guidelines_unclear")]
     )
@@ -214,3 +230,51 @@ def test_exact_flags_only_for_shown_rows(cons, monkeypatch):
         cons.round.round_id,
     )
     assert calls == [cons.round.round_id]
+
+
+def test_can_take_annotator_lists_a_text_whose_first_annotator_is_at_work(tmp_path):
+    """Review 2, F4: with a limit of two, a text whose first annotator is at
+    work is in progress, yet can take another annotator. The flag lists it
+    (and the texts nobody has yet) until the limit is reached."""
+    from sqlalchemy import update
+    from work_plan_support import assign, doc, plan_env
+
+    from ontotator.storage.tables import ProjectRow
+
+    env = plan_env(tmp_path)
+    with env.db.transaction() as conn:
+        conn.execute(update(ProjectRow).values(annotations_per_text=2))
+
+    def listed(**params: str) -> list[tuple[str, str]]:
+        page = env.lead.get(
+            f"{BASE}/document-rows",
+            params={"flags": "can_take_annotator", "language": "en", **params},
+        )
+        assert page.status_code == 200, page.text
+        return [
+            (row["case_id"], row["language"])
+            for group in page.json()["groups"]
+            for row in group["rows"]
+        ]
+
+    assert listed() == [("c1", "en"), ("c2", "en")]
+    assert listed(segment="progress") == []
+    assign(env, doc("c1", "en"), "anno", "annotate")
+    # In progress, not "to assign", and still listed: a place is free.
+    assert listed(segment="progress") == [("c1", "en")]
+    assert listed(segment="assign") == [("c2", "en")]
+    page = env.lead.get(f"{BASE}/document-rows", params={"segment": "progress"}).json()
+    assert page["bar"]["facets"]["flags"]["can_take_annotator"] == 1
+    row = row_of(page, "c1", "en")
+    assert [step["code"] for step in row["steps"]] == [
+        "annotation_in_progress",
+        "assign_annotation",
+    ]
+    cell = row["stages"]["annotation"]
+    assert (cell["state"], cell["detail"]["assigned"], cell["detail"]["target"]) == (
+        "in_progress",
+        1,
+        2,
+    )
+    assign(env, doc("c1", "en"), "anno2", "annotate")
+    assert listed() == [("c2", "en")]

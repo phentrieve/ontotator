@@ -122,7 +122,8 @@ test("S0 synthetic-accepted: the final is on old text after v2 corrected it; en 
     expect(Math.max(...heights), `${width} px row height`).toBeLessThanOrEqual(41);
   }
   await expect(rowCell(de, "finalization")).toContainText("Final is on old text");
-  await expect(rowCell(de, "annotation")).toContainText(new RegExp(`\\d+ of \\d+ submitted, not started · open: ${ann}`));
+  // One annotation per text: the v1 submission carried to v2 does not count on v2 (issue 420, never "1 of 2 submitted").
+  await expect(rowCell(de, "annotation")).toContainText(new RegExp(`^\\s*assigned, not started · open: ${ann}`));
   await expect(rowCell(de, "waiting")).toHaveText("You");
   await expect(rowCell(de, "next").getByRole("button").first()).toHaveAccessibleName(textNamePattern("Review changes…, ", caseId, "de"));
 
@@ -138,7 +139,7 @@ test("S0 synthetic-accepted: the final is on old text after v2 corrected it; en 
   await closeCard(card);
 
   const history = await openCardHistory(page, caseId, "de");
-  await expect(activityLines(history).filter({ hasText: /^Finalization: chosen/ })).toHaveCount(1);
+  await expect(activityLines(history).filter({ hasText: /^Finalization: .*chosen by/ })).toHaveCount(1);
   await history.getByRole("button", { name: "Back", exact: true }).click();
   await expect(await textVersionItems(history, 2)).toHaveText([/^v2\s*Correction of v1\s*Ready for review/, /^v1\s*Machine translation/]);
   await closeCard(history);
@@ -210,7 +211,7 @@ test("S1 case-0042: two submissions and a final result, nothing to do", async ({
   // History: both submissions and the final choice (the Submissions table is in the decision block, V6).
   const card = await openCardHistory(page, caseId, "en");
   await expect(activityLines(card).filter({ hasText: /^Annotation: .*Round 1/ })).toHaveCount(2);
-  await expect(activityLines(card).filter({ hasText: /^Finalization: chosen/ })).toHaveCount(1);
+  await expect(activityLines(card).filter({ hasText: /^Finalization: .*chosen by/ })).toHaveCount(1);
   await closeCard(card);
 
   // "Final result: none" (FD11 link parameter, a chip): nothing matches.
@@ -312,8 +313,8 @@ test("S5 case-0377: the lead's consolidation is the final result, without a roun
 
   // No round in a consolidation's history line.
   const card = await openCardHistory(page, caseId, "en");
-  await expect(activityLines(card).filter({ hasText: /^Annotation Consolidation: / })).toHaveCount(1);
-  await expect(activityLines(card).filter({ hasText: /^Annotation Consolidation: .*Round/ })).toHaveCount(0);
+  await expect(activityLines(card).filter({ hasText: /^Finalization Consolidation: / })).toHaveCount(1);
+  await expect(activityLines(card).filter({ hasText: /^Finalization Consolidation: .*Round/ })).toHaveCount(0);
   await expect(activityLines(card).filter({ hasText: /^Annotation: .*Round 1/ })).toHaveCount(3);
 });
 
@@ -458,7 +459,7 @@ test("S13 case-0713 en: consolidation and carry-forward kinds, the final is the 
 
   // History: the two annotations, the consolidation and the carry-forward on v2.
   await card.getByRole("button", { name: /^History \(\d+\)$/ }).click();
-  await expect(activityLines(card).filter({ hasText: /^Annotation Consolidation: / })).toHaveCount(1);
+  await expect(activityLines(card).filter({ hasText: /^Finalization Consolidation: / })).toHaveCount(1);
   await expect(activityLines(card).filter({ hasText: /^Annotation: .*v2/ })).toHaveCount(1);
   await expect(activityLines(card).filter({ hasText: /^Annotation: .*v1/ })).toHaveCount(2);
   await card.getByRole("button", { name: "Back", exact: true }).click();

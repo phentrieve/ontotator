@@ -117,6 +117,67 @@ describe("ConsolidationScreen", () => {
     expect(undo.mock.calls[0][1]).toMatchObject({ payload: { command: "consolidation_undo_reopen_all" } });
   });
 
+  // Issue 470: the server restores the reopened decisions only while nothing was decided since.
+  it("a new decision takes the Undo of Reopen all decisions… away: one Undo at most is on offer", async () => {
+    const after = withGroup(exampleView(), "g-hypo", { state: "choose", annotation_ids: ["cons-1"] });
+    load(decidedView(), exampleView(), after);
+    vi.spyOn(api, "reopenAllConsolidationGroups").mockResolvedValue(draft(4));
+    const undo = vi.spyOn(api, "undoReopenAllConsolidationGroups").mockResolvedValue(draft(6));
+    vi.spyOn(api, "resolveConsolidationGroup").mockResolvedValue(draft(5));
+    await renderScreen();
+    fireEvent.click(screen.getByRole("button", { name: "More task actions" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Reopen all decisions…" }));
+    fireEvent.click(within(await screen.findByRole("dialog", { name: "Reopen 4 decided groups?" })).getByRole("button", { name: "Reopen all" }));
+    await waitFor(() => expect(document.querySelector(".ui-toast-region .ui-toast")?.textContent).toContain("Reopened 4 decided groups."));
+    await waitFor(() => expect(expandedTitle()).toBe("muscular hypotonia"));
+    await takeAbsentAndKeep();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Undo, muscular hypotonia" })).toBeTruthy());
+    expect(document.querySelector(".ui-toast-region .ui-toast")).toBeNull();
+    expect(screen.getAllByRole("button", { name: /Undo/ })).toHaveLength(1);
+    // Ctrl+Z now undoes the decision, not the reopen.
+    const reopen = vi.spyOn(api, "reopenConsolidationGroup").mockResolvedValue(draft(6));
+    fireEvent.keyDown(window, { key: "z", ctrlKey: true });
+    await waitFor(() => expect(reopen).toHaveBeenCalledTimes(1));
+    expect(undo).not.toHaveBeenCalled();
+  });
+
+  it("a toast that followed the reopen is not taken away by the next decision", async () => {
+    load(decidedView(), exampleView(), decidedView(), withGroup(exampleView(), "g-hypo", { state: "choose", annotation_ids: ["cons-1"] }));
+    vi.spyOn(api, "reopenAllConsolidationGroups").mockResolvedValue(draft(4));
+    vi.spyOn(api, "undoReopenAllConsolidationGroups").mockResolvedValue(draft(5));
+    vi.spyOn(api, "reopenConsolidationGroup").mockResolvedValue(draft(6));
+    await renderScreen();
+    fireEvent.click(screen.getByRole("button", { name: "More task actions" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Reopen all decisions…" }));
+    fireEvent.click(within(await screen.findByRole("dialog", { name: "Reopen 4 decided groups?" })).getByRole("button", { name: "Reopen all" }));
+    await waitFor(() => expect(document.querySelector(".ui-toast-region .ui-toast")?.textContent).toContain("Reopened 4 decided groups."));
+    fireEvent.click(within(document.querySelector(".ui-toast-region .ui-toast") as HTMLElement).getByRole("button", { name: /Undo/ }));
+    await waitFor(() => expect(document.querySelector(".ui-toast-region .ui-toast")?.textContent).toContain("Decisions restored."));
+    await waitFor(() => expect(screen.getByRole("button", { name: /^muscular hypotonia decided/ })).toBeTruthy());
+    if (expandedTitle() !== "muscular hypotonia") fireEvent.click(screen.getByRole("button", { name: /^muscular hypotonia decided/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Reopen" }));
+    await waitFor(() => expect(api.reopenConsolidationGroup).toHaveBeenCalledTimes(1));
+    expect(document.querySelector(".ui-toast-region .ui-toast")?.textContent).toContain("Decisions restored.");
+  });
+
+  it("Reopen all whose view read failed opens the first open group once the next view arrives (issue 375)", async () => {
+    // Before: only "Unsteady gait" is open. The read after the reopen fails; Reload brings the reopened view.
+    const before = withGroup(decidedView(), "g-gait", { state: "open" });
+    vi.spyOn(api, "getConsolidation").mockResolvedValueOnce(before).mockRejectedValueOnce(new Error("offline")).mockResolvedValue(exampleView());
+    vi.spyOn(api, "openWorkRound").mockResolvedValue({ workspace_id: "ws-c", view: workspaceView(), read_only: false });
+    vi.spyOn(api, "reopenAllConsolidationGroups").mockResolvedValue(draft(4));
+    await renderScreen();
+    await waitFor(() => expect(expandedTitle()).toBe("Unsteady gait"));
+    fireEvent.click(screen.getByRole("button", { name: "More task actions" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Reopen all decisions…" }));
+    fireEvent.click(within(await screen.findByRole("dialog", { name: "Reopen 3 decided groups?" })).getByRole("button", { name: "Reopen all" }));
+    await waitFor(() => expect(document.querySelector(".ui-toast-region .ui-toast")?.textContent).toContain("Reopened 3 decided groups."));
+    // The stale view is not used for a selection.
+    expect(expandedTitle()).toBe("Unsteady gait");
+    fireEvent.click(await screen.findByRole("button", { name: "Reload" }));
+    await waitFor(() => expect(expandedTitle()).toBe("muscular hypotonia"));
+  });
+
   it("a failed Undo keeps the inline Undo available (M-7g)", async () => {
     const after = withGroup(exampleView(), "g-hypo", { state: "choose", annotation_ids: ["cons-1"] });
     load(exampleView(), after);
@@ -218,6 +279,95 @@ describe("ConsolidationScreen", () => {
     expect(within(lead).getByRole("heading", { name: "Added by Ana Weber" })).toBeTruthy();
     expect(lead.textContent).toContain("Seizure (HP:0001250)");
     expect(within(lead).queryByRole("button")).toBeNull();
+  });
+
+  // Issue 470.
+  it("Remove takes an added finding out again after a confirmation next to it", async () => {
+    mockViewport(1280);
+    const [start, end] = span("last week");
+    const added = [{ input_id: "ann-new", person_id: "ann-0005", annotation_id: "ann-new", term_id: "HP:0001250", term_label: "Seizure",
+      layer_id: "phenotype", type_id: "default", axes: {}, spans: [[start, end] as [number, number]], cues: [], note: null, from_tool_proposal: false, modifiers: [] }];
+    load({ ...exampleView(), added }, { ...exampleView(), added: [] });
+    const save = vi.spyOn(api, "applyCommand").mockResolvedValue(draft(4));
+    await renderScreen({ assignmentId: 42, workspaceView: workspaceView() });
+    const list = screen.getByRole("region", { name: "Added findings" });
+    expect(within(list).getByRole("button", { name: "Edit values, Seizure (HP:0001250)" })).toBeTruthy();
+    fireEvent.click(within(list).getByRole("button", { name: "Remove, Seizure (HP:0001250)" }));
+    const confirm = within(list).getByRole("group", { name: "Remove this finding?" });
+    expect(confirm.textContent).toContain("Seizure (HP:0001250), “last week”. You added it; it is in no group.");
+    // Cancel changes nothing and gives the two actions back.
+    fireEvent.click(within(confirm).getByRole("button", { name: "Cancel" }));
+    expect(save).not.toHaveBeenCalled();
+    expect(within(list).getByRole("button", { name: "Edit values, Seizure (HP:0001250)" })).toBeTruthy();
+    fireEvent.click(within(list).getByRole("button", { name: "Remove, Seizure (HP:0001250)" }));
+    fireEvent.click(within(within(list).getByRole("group", { name: "Remove this finding?" })).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    expect(save.mock.calls[0][0]).toBe("ws-c");
+    expect(save.mock.calls[0][1].payload).toEqual({ command: "delete_draft_annotation", annotation_id: "ann-new" });
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Added findings" })).toBeNull());
+    expect(document.querySelector(".ui-toast-region .ui-toast")?.textContent).toContain("Finding removed: Seizure (HP:0001250).");
+    expect(document.querySelector(".cons-added")).toBeNull();
+  });
+
+  it("a failed Remove keeps the finding and says that nothing changed", async () => {
+    mockViewport(1280);
+    const added = [{ input_id: "ann-new", person_id: "ann-0005", annotation_id: "ann-new", term_id: "HP:0001250", term_label: "Seizure",
+      layer_id: "phenotype", type_id: "default", axes: {}, spans: [span("last week")], cues: [], note: null, from_tool_proposal: false, modifiers: [] }];
+    load({ ...exampleView(), added });
+    vi.spyOn(api, "applyCommand").mockRejectedValue(new Error("offline"));
+    await renderScreen({ assignmentId: 42, workspaceView: workspaceView() });
+    const list = screen.getByRole("region", { name: "Added findings" });
+    fireEvent.click(within(list).getByRole("button", { name: "Remove, Seizure (HP:0001250)" }));
+    fireEvent.click(within(within(list).getByRole("group", { name: "Remove this finding?" })).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(document.querySelector(".ui-toast-region .ui-toast")?.textContent).toContain("Could not remove the finding. Nothing changed."));
+    expect(within(list).getByRole("button", { name: "Remove, Seizure (HP:0001250)" })).toBeTruthy();
+    expect(list.textContent).toContain("Seizure (HP:0001250), “last week”");
+  });
+
+  it("the lead's read-only view offers no Remove", async () => {
+    const added = [{ input_id: "ann-new", person_id: "ann-0005", annotation_id: "ann-new", term_id: "HP:0001250", term_label: "Seizure",
+      layer_id: "phenotype", type_id: "default", axes: {}, spans: [span("last week")], cues: [], note: null, from_tool_proposal: false, modifiers: [] }];
+    load({ ...decidedView(), read_only: true, read_only_reason: "submitted", workspace_id: null, added, added_by: "Ana Weber (ann-0005)" });
+    await renderScreen({ readOnly: true });
+    expect(within(screen.getByRole("region", { name: "Added findings" })).queryByRole("button")).toBeNull();
+  });
+
+  // Issue 470: a phone-sized screen has no text pane; "Add finding" stays, by a typed passage.
+  it("offers Add finding by a typed passage without the text pane (390 px, and with the text hidden)", async () => {
+    mockViewport(390);
+    load(exampleView());
+    vi.spyOn(api, "searchOntology").mockResolvedValue({ route: "auto", query: "fever", shuffled: false, search_id: "search-1",
+      candidates: [{ term_id: "HP:0001945", label: "Fever", definition: "", matched_term: "Fever", rank: 1 }] } as never);
+    const save = vi.spyOn(api, "applyCommand").mockResolvedValue(draft(4));
+    await renderScreen({ workspaceView: workspaceView() });
+    expect(screen.queryByRole("region", { name: "Clinical text" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Show text" })).toBeNull();
+    const add = screen.getByRole("button", { name: "Add finding" });
+    expect(document.getElementById(add.getAttribute("aria-describedby")!)?.textContent).toBe("Type the passage to add a finding everyone missed.");
+    fireEvent.click(add);
+    const form = await screen.findByRole("dialog", { name: "Add finding" });
+    expect(form.textContent).toContain("Type it exactly as written in the text.");
+    expect(form.textContent).not.toContain("select the passage");
+    fireEvent.change(within(form).getByLabelText("Passage from the text"), { target: { value: "fever" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Continue" }));
+    fireEvent.click(await within(await screen.findByRole("dialog", { name: "Add finding" })).findByRole("option", { name: /Fever/ }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    const [start, end] = span("fever");
+    expect(save.mock.calls[0][1].payload).toMatchObject({ command: "create_annotation", term_id: "HP:0001945", segments: [{ start, end }] });
+    cleanup();
+    // Between 700 and 1100 px with the text hidden: next to Show text.
+    mockViewport(900);
+    await renderScreen({ workspaceView: workspaceView() });
+    expect(screen.getAllByRole("button", { name: "Add finding" })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Hide text" }));
+    expect(screen.getByRole("button", { name: "Show text" })).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Add finding" })).toHaveLength(1);
+    cleanup();
+    // Read-only on a phone: nothing to add.
+    mockViewport(390);
+    load({ ...decidedView(), read_only: true, read_only_reason: "submitted", workspace_id: null });
+    await renderScreen({ readOnly: true });
+    expect(screen.queryByRole("button", { name: "Add finding" })).toBeNull();
   });
 
   it("offers Back to documents in the lead's read-only view", async () => {
@@ -563,6 +713,56 @@ describe("ConsolidationScreen", () => {
   });
 });
 
+describe("ConsolidationScreen, modifier term kept as a finding (issue 470)", () => {
+  const people = [{ ...ANA, lane: 1 }, BEN];
+  const sev = member("sev-a", ANA, "HP:0012828", "Severe", [modSpan("schwere")]);
+  const view = () => exampleView({ text: MOD_TEXT, people, groups: [
+    group("g-sev", ["partial", "modifier_as_finding"], [sev], { state: "keep", annotation_ids: ["cons-sev"],
+      result: { term_id: "HP:0012828", term_label: "Severe", layer_id: "phenotype", axes: {}, spans: [modSpan("schwere")], modifiers: [] } }),
+    group("g-seiz", ["partial"], [member("seiz-b", BEN, "HP:0001250", "Seizure", [modSpan("Krampfanfälle")])], { state: "keep", annotation_ids: ["cons-seiz"] }),
+  ] });
+
+  it("the submit dialog names the finding before the first Submit, and Go to group opens its group", async () => {
+    load(view());
+    const submit = vi.spyOn(api, "submitWorkspace");
+    await renderScreen({ assignmentId: 42 });
+    fireEvent.click(screen.getByRole("button", { name: "Submit consolidation" }));
+    const dialog = screen.getByRole("dialog", { name: "Submit consolidation?" });
+    expect(within(dialog).getByText(/^1 finding uses a modifier term \(such as Severe\) as the finding itself:/)).toBeTruthy();
+    expect(within(dialog).getByRole("listitem").textContent).toContain("Severe “schwere”");
+    // Not yet the server's warnings: the button still reads Submit.
+    expect(within(dialog).queryByText("Check before you submit")).toBeNull();
+    expect(within(dialog).getByRole("button", { name: "Submit" })).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Go to group, Severe “schwere”" }));
+    expect(screen.queryByRole("dialog", { name: "Submit consolidation?" })).toBeNull();
+    expect(submit).not.toHaveBeenCalled();
+    await waitFor(() => expect(expandedTitle()).toBe("schwere"));
+    expect(document.activeElement).toBe(toggle(/^schwere /));
+  });
+
+  it("after the server's warning the finding is named once, in Check before you submit", async () => {
+    load(view());
+    vi.spyOn(api, "submitWorkspace").mockRejectedValueOnce(new ApiError(409, "Check values", "AXIS_CONFIRMATION_WARNING", {
+      acknowledgement: { draft_revision: 3, policy_revision: 1, warning_digest: "abc" },
+      warnings: [{ annotation_id: "cons-sev", rule: "modifier_as_finding", detail: { term_id: "HP:0012828" } }] }));
+    await renderScreen({ assignmentId: 42 });
+    fireEvent.click(screen.getByRole("button", { name: "Submit consolidation" }));
+    const dialog = screen.getByRole("dialog", { name: "Submit consolidation?" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Submit" }));
+    await within(dialog).findByText("Check before you submit");
+    expect(within(dialog).getAllByText(/as the finding itself/)).toHaveLength(1);
+    expect(within(dialog).getAllByRole("button", { name: "Go to group, Severe “schwere”" })).toHaveLength(1);
+    expect(within(dialog).getByRole("button", { name: "Submit with 1 warning" })).toBeTruthy();
+  });
+
+  it("a consolidation without such a finding shows no warning before Submit", async () => {
+    load(decidedView());
+    await renderScreen({ assignmentId: 42 });
+    fireEvent.click(screen.getByRole("button", { name: "Submit consolidation" }));
+    expect(within(screen.getByRole("dialog", { name: "Submit consolidation?" })).queryByText(/as the finding itself/)).toBeNull();
+  });
+});
+
 describe("ConsolidationScreen, modifiers", () => {
   const people = [{ ...ANA, lane: 1 }, BEN];
   const [ss, se] = modSpan("schwere");
@@ -672,7 +872,10 @@ describe("ConsolidationScreen, modifiers", () => {
     fireEvent.click(screen.getByRole("button", { name: "Submit consolidation" }));
     const dialog = screen.getByRole("dialog", { name: "Submit consolidation?" });
     fireEvent.click(within(dialog).getByRole("button", { name: "Submit" }));
-    expect(await within(dialog).findByText("1 finding uses a modifier term (such as Severe) as the finding itself.")).toBeTruthy();
+    // cons-3 is the group "below the 3rd percentile" (issue 470: the warning names the finding and leads to its group).
+    const item = (await within(dialog).findByText(/^1 finding uses a modifier term \(such as Severe\) as the finding itself:/)).closest("li")!;
+    expect(item.textContent).toContain("Microcephaly “below the 3rd percentile”");
+    expect(within(item).getByRole("button", { name: "Go to group, Microcephaly “below the 3rd percentile”" })).toBeTruthy();
     expect(within(dialog).getByText("2 findings have a modifier warning: a cohort term, or two of one kind.")).toBeTruthy();
     expect(within(dialog).queryByText(/filled in by default/)).toBeNull();
     fireEvent.click(within(dialog).getByRole("button", { name: "Submit with 2 warnings" }));

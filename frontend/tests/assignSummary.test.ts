@@ -1,11 +1,18 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { memberReason, onePersonSummary, partlyAssignedLines, resultMessage, skippedLines, stepLabel } from "../src/admin/assignSummary";
+import { holdersLine, MAX_ANNOTATORS_PER_TEXT, memberReason, onePersonSummary, partlyAssignedLines, resultMessage, skippedLines, stepLabel } from "../src/admin/assignSummary";
 
 const ana = { pseudonym: "ann-0004", display_name: "Ana Weber" };
 const ben = { pseudonym: "ann-0007", display_name: "Ben Roth" };
 
 describe("assign summary", () => {
+  it("names up to five holders, then the first five and how many more (issue 447)", () => {
+    const names = Array.from({ length: MAX_ANNOTATORS_PER_TEXT }, (_, index) => `Person ${index + 1}`);
+    expect(holdersLine(names.slice(0, 5))).toBe("Person 1; Person 2; Person 3; Person 4; Person 5");
+    expect(holdersLine(names.slice(0, 6))).toBe("Person 1; Person 2; Person 3; Person 4; Person 5; and 1 more (marked “Already assigned” below)");
+    expect(holdersLine(names)).toBe("Person 1; Person 2; Person 3; Person 4; Person 5; and 15 more (marked “Already assigned” below)");
+  });
+
   it("summarises one person", () => {
     expect(onePersonSummary({ person: ana, gets: 20, task: "translation_review", language: "de", openBefore: 3, openAfter: 23 }))
       .toBe("Ana Weber gets 20 translation reviews (de). Open tasks: 3 → 23.");
@@ -36,6 +43,8 @@ describe("assign summary", () => {
     expect(memberReason({ unavailable: null, already_assigned: 3, reads: ["de"] }, "annotate", "de")).toBe("Already annotating 3 of these cases");
     expect(memberReason({ unavailable: null, already_assigned: 0, reads: ["de"] }, "annotate", "de")).toBeNull();
     expect(partlyAssignedLines([{ case_id: "case-0101", language: "de", remaining: 1 }, { case_id: "case-0102", language: "de", remaining: 2 }], 2)).toEqual(["case-0101 de: 1 assigned (limit 2)"]);
+    // Issue 422: a text's own limit replaces the project value.
+    expect(partlyAssignedLines([{ case_id: "case-0101", language: "de", remaining: 3, per_text: 4 }, { case_id: "case-0102", language: "de", remaining: 1, per_text: 1 }], 1)).toEqual(["case-0101 de: 1 assigned (limit 4)"]);
     expect(resultMessage("translation_review", 20, [{ person: ana, count: 20 }])).toBe("20 translation reviews assigned to Ana Weber");
     expect(resultMessage("annotate", 2, [{ person: ana, count: 1 }, { person: ben, count: 1 }])).toBe("2 annotations assigned to Ana Weber and Ben Roth");
   });

@@ -544,6 +544,7 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
                     "HISTORY_NOT_AVAILABLE": 422,
                     "ROUND_ACTIVE": 409,
                     "CONSOLIDATION_ACTIVE": 409,
+                    "CONSOLIDATION_OPEN": 409,
                     "ROUND_ALREADY_EXISTS": 409,
                     "TASK_HELD": 409,
                     "TASK_WAITING_FOR_TRANSLATION_REVIEW": 409,
@@ -552,6 +553,10 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
                     "TRANSLATION_NOT_ACCEPTED": 409,
                     "TRANSLATION_NOT_REVIEWED": 409,
                     "LEAD_CORRECTION_NOT_AVAILABLE": 409,
+                    "VERSION_NOT_ACCEPTABLE": 409,
+                    "VERSION_UPLOAD_NOT_AVAILABLE": 409,
+                    "EDITORIAL_CORRECTION_NOT_AVAILABLE": 409,
+                    "QUERY_DECISION_NOT_AVAILABLE": 409,
                     "LANGUAGE_CONFIRMATION_REQUIRED": 409,
                     "REASSIGN_CONFIRMATION_REQUIRED": 409,
                     "ADJUDICATOR_IS_ANNOTATOR": 409,
@@ -575,6 +580,8 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
                     "MEMBER_HAS_ASSIGNMENTS": 409,
                     "WORK_PLAN_CONFIRMATION_REQUIRED": 409,
                     "WORK_PLAN_CHANGED": 409,
+                    "PREVIEW_STALE": 409,
+                    "BULK_UNDO_STALE": 409,
                     "WORK_PLAN_INVALID": 422,
                     "NOT_IN_WORK_PLAN": 409,
                     "CASE_IDS_TOO_MANY": 422,
@@ -610,6 +617,7 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
         return response
 
     from ontotator.api.assignment_routes import router as assignment_router
+    from ontotator.api.typography_routes import router as typography_router
     from ontotator.api.variant_routes import router as variant_router
 
     app.include_router(assignment_router)
@@ -655,6 +663,7 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
     app.include_router(work_time_router)
     app.include_router(submission_history_router)
     app.include_router(variant_router)
+    app.include_router(typography_router)
     app.include_router(admin_router)
     app.include_router(ontology_router)
     app.include_router(archive_router)
@@ -663,11 +672,19 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
     from ontotator.api.work_plan_routes import router as work_plan_router
 
     app.include_router(work_plan_router)
+    from ontotator.api.bulk_task_action_routes import (
+        router as bulk_task_action_router,
+    )
+
+    app.include_router(bulk_task_action_router)
     from ontotator.api.annotation_mode_change_routes import (
         router as annotation_mode_change_router,
     )
 
     app.include_router(annotation_mode_change_router)
+    from ontotator.api.text_pause_routes import router as text_pause_router
+
+    app.include_router(text_pause_router)
     app.include_router(translation_workflow_router)
     from ontotator.api.guideline_routes import router as guideline_router
 

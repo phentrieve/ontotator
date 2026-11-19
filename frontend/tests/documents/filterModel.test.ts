@@ -32,6 +32,7 @@ describe("filter model", () => {
     ["Final facet", { final_state: "none,after_annotation,after_review,choose" }, { final_state: ["none", "after_annotation", "after_review", "choose"] }, ["Final: No final yet"]],
     ["Waiting on facet", { waiting_on: "me,ann-0001" }, { waiting_on: ["me", "ann-0001"] }, ["Waiting on: You", "Waiting on: ann-0001"]],
     ["Flags facet (X5)", { flags: "guidelines_unclear,nope" }, { flags: "guidelines_unclear" }, ["Flagged: guidelines unclear"]],
+    ["Over-limit filter (issue 339 b)", { flags: "over_limit" }, { flags: "over_limit" }, ["More annotators than the limit"]],
     ["Plan not in plan reads Not planned", { plan: "not_in_plan" }, { plan: "not_in_plan" }, ["Plan: Not planned"]],
     ["Review and annotation not planned keep the short chip", { review_state: "not_planned", annotation_state: "not_planned" }, { review_state: "not_planned", annotation_state: "not_planned" }, ["Translation review: Not planned", "Annotation: Not planned"]],
     ["Exact case (deep link)", { case: "case-104" }, { case: "case-104" }, ["Case ID: case-104"]],
@@ -100,6 +101,40 @@ describe("filter model", () => {
     expect(optionOf("Annotation not planned")).toMatchObject({ param: "annotation_state", values: ["not_planned"] });
     expect(clearAllPatch({ flags: "guidelines_unclear" })).toMatchObject({ flags: undefined });
     expect(filtersActive({ flags: "guidelines_unclear" })).toBe(true);
+  });
+
+  it("offers More annotators than the limit in Flags (issue 339 b, decision 336-D)", () => {
+    const over = optionOf("More annotators than the limit");
+    expect(over).toMatchObject({ param: "flags", values: ["over_limit"] });
+    expect(optionCount({ flags: { over_limit: 3 } }, over)).toBe(3);
+    expect(toggleOption({ flags: "guidelines_unclear" }, over, true)).toEqual({ flags: "guidelines_unclear,over_limit" });
+    expect(FACET_GROUPS.find(group => group.id === "flags")!.options.map(option => option.label)).toEqual(["Flagged: guidelines unclear", "More annotators than the limit", "Paused by lead", "Typography hints"]);
+  });
+
+  it("offers Can take another annotator with the Annotation options (review 2, F4)", () => {
+    const room = optionOf("Can take another annotator");
+    expect(room).toMatchObject({ param: "flags", values: ["can_take_annotator"] });
+    expect(FACET_GROUPS.find(group => group.id === "annotation")!.options.map(option => option.label).slice(0, 2)).toEqual(["Unassigned", "Can take another annotator"]);
+    expect(optionCount({ flags: { can_take_annotator: 2 } }, room)).toBe(2);
+    expect(toggleOption({ annotation_state: "in_progress" }, room, true)).toEqual({ flags: "can_take_annotator" });
+    expect(rowsRequest({ segment: "progress", flags: "can_take_annotator" })).toEqual({ segment: "progress", flags: "can_take_annotator" });
+    expect(labels({ flags: "can_take_annotator" })).toEqual(["Can take another annotator"]);
+  });
+
+  it("offers Paused by lead in Flags (issue 464)", () => {
+    const paused = optionOf("Paused by lead");
+    expect(paused).toMatchObject({ param: "flags", values: ["lead_paused"] });
+    expect(optionCount({ flags: { lead_paused: 4 } }, paused)).toBe(4);
+    expect(toggleOption({}, paused, true)).toEqual({ flags: "lead_paused" });
+  });
+
+  it("offers Typography hints in Flags, with a chip and the server request (issue 484)", () => {
+    const hints = optionOf("Typography hints");
+    expect(hints).toMatchObject({ param: "flags", values: ["typography_hints"] });
+    expect(optionCount({ flags: { typography_hints: 2 } }, hints)).toBe(2);
+    expect(toggleOption({ flags: "lead_paused" }, hints, true)).toEqual({ flags: "lead_paused,typography_hints" });
+    expect(chipsOf({ flags: "typography_hints" }).map(chip => chip.label)).toEqual(["Typography hints"]);
+    expect(rowsRequest({ flags: "typography_hints" })).toEqual({ flags: "typography_hints" });
   });
 
   it("toggles grouped options and counts their values", () => {

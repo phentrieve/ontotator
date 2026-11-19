@@ -22,6 +22,8 @@ import { VersionSelect } from './VersionSelect';
 import { ShowSelect } from './ShowSelect';
 import { LayerFindings, layerTerms } from './LayerFindings';
 import { layerKey, legacyLayerKey, refForLayer, useTextLayers } from './useTextLayers';
+import type { TextChanges } from '../translation/textDiff';
+import { useChangesSince } from '../editor/ChangesSince';
 import './textView.css';
 import { onSpaceActivate } from '../ui/spaceActivates';
 
@@ -79,20 +81,25 @@ export function VariantDetails({ detail, documentId }: { detail: CaseDetail; doc
   </details>;
 }
 
-/** Read-only check states of a submitted carry-forward submission (lead view); nothing without round inputs. */
-function SubmissionCarriedChecks({ projectKey, documentId, submissionId }: { projectKey: string; documentId: string; submissionId: string }): JSX.Element | null {
-  const key = JSON.stringify([projectKey, documentId, submissionId]);
+/** The history detail of the shown submission (carried check states, the version it was carried from); null otherwise. */
+function useSubmissionDetail(projectKey: string, documentId: string | undefined, submissionId: string | null): { detail: SubmissionHistoryDetail | null; failed: boolean } {
+  const key = documentId && submissionId ? JSON.stringify([projectKey, documentId, submissionId]) : null;
   const [state, setState] = useState<{ key: string; value: SubmissionHistoryDetail | null; failed: boolean } | null>(null);
   useEffect(() => {
+    if (!key || !documentId || !submissionId) return;
     let active = true;
     api.getSubmissionHistory(projectKey, documentId, submissionId).then(value => { if (active) setState({ key, value, failed: false }); }, () => { if (active) setState({ key, value: null, failed: true }); });
     return () => { active = false; };
   }, [key]);
-  const detail = state?.key === key ? state.value : null;
+  return state?.key === key ? { detail: state.value, failed: state.failed } : { detail: null, failed: false };
+}
+
+/** Read-only check states of a submitted carry-forward submission (lead view); nothing without round inputs. */
+function SubmissionCarriedChecks({ projectKey, detail, failed }: { projectKey: string; detail: SubmissionHistoryDetail | null; failed: boolean }): JSX.Element | null {
   const inputs = detail?.round_inputs ?? [];
   const termOf = (input: Pick<CarriedInputLike, 'source_snapshot' | 'target_snapshot'>) => (input.target_snapshot ?? input.source_snapshot).annotation;
   const labelFor = useTermLabels(projectKey, inputs.map(input => ({ layer_id: termOf(input).layer_id, term_id: termOf(input).term_id })));
-  if (state?.key === key && state.failed) return <InlineMessage tone="warning">Carried check states are unavailable.</InlineMessage>;
+  if (failed) return <InlineMessage tone="warning">Carried check states are unavailable.</InlineMessage>;
   if (!detail || !inputs.length) return null;
   const items = carriedCheckItems(inputs, detail.round_input_resolutions ?? [], detail.annotations,
     ({ annotation }) => <TermName termId={annotation.term_id} label={labelFor(annotation.layer_id, annotation.term_id)} />);
@@ -106,6 +113,8 @@ export function CaseViewer({ projectKey, caseId, variant, show, annotations, com
   const [compareIdentity, setCompareIdentity] = useState<object | null>(null);
   const compareOpen = access.allowed && (compareIdentity === identity || compare !== undefined);
   const [leftElement, setLeftElement] = useState<HTMLDivElement | null>(null);
+  // Change marks of the current text while the comparison shows changes (issue 411).
+  const [leftChanges, setLeftChanges] = useState<TextChanges | null>(null);
   const [comparisonToolbar, setComparisonToolbar] = useState<HTMLDivElement | null>(null);
   const compareButton = useRef<HTMLButtonElement | null>(null);
   const wasComparing = useRef(false);
@@ -148,6 +157,12 @@ export function CaseViewer({ projectKey, caseId, variant, show, annotations, com
   const [payloadError, setPayloadError] = useState<{ identity: object; error: unknown } | null>(null);
   const snapshot = ref && payload?.identity === payloadIdentity ? payload.value : null;
   const labelFor = useTermLabels(projectKey, layerTerms(snapshot?.annotations ?? []));
+  const submission = useSubmissionDetail(projectKey, current?.document_id, ref?.kind === 'submission' ? ref.id : null);
+  // Issue 421: an annotation carried from an earlier version offers "Show changes since vN" (not while comparing,
+  // where Show changes compares the two chosen texts).
+  const shownText = textState?.identity === contentIdentity ? textState.value.text : '';
+  const carriedFrom = submission.detail?.summary.document_id === current?.document_id ? submission.detail?.carried_from : null;
+  const changesSince = useChangesSince(compareOpen || !shownText ? null : carriedFrom, shownText, leftElement);
   useEffect(() => {
     let active = true;
     setCaseError(null); setTaskError(null); setTasks(null);
@@ -185,11 +200,15 @@ export function CaseViewer({ projectKey, caseId, variant, show, annotations, com
   const supported = tasks?.identity === identity ? tasks.value.filter(row => row.project_key === projectKey && row.document_id === current.document_id) : [];
   const payloadFailed = payloadError?.identity === payloadIdentity;
   const layerLabel = layers.entries?.find(entry => entry.ref && layerKey(entry.ref) === selection)?.label ?? ref?.label ?? '';
+  // Small visible labels (#47 X-15); the selects keep their aria-label as the name. While comparing they move above
+  // the current text, mirroring the comparison text's selects, so both texts start at the same height (issue 412).
+  const identitySelects = <>
+    <label className="text-view-field"><span>Language and version</span><VersionSelect caseDetail={detail} value={current.document_id} onChange={id => move(id)} /></label>
+    <label className="text-view-field"><span>Show</span><ShowSelect entries={layers.entries ?? []} value={selection} otherLabel={ref?.label} onChange={key => move(current.document_id, key)} /></label>
+  </>;
   return <section className={`case-viewer${compareOpen ? " case-comparing" : ""}`} aria-label="Case viewer">
-    <TextViewToolbar projectKey={projectKey} caseId={detail.case_id} language={current.language} documents={documents} onNavigate={onNavigate}>
-      {/* Small visible labels (#47 X-15); the selects keep their aria-label as the name. */}
-      <label className="text-view-field"><span>Language and version</span><VersionSelect caseDetail={detail} value={current.document_id} onChange={id => move(id)} /></label>
-      <label className="text-view-field"><span>Show</span><ShowSelect entries={layers.entries ?? []} value={selection} otherLabel={ref?.label} onChange={key => move(current.document_id, key)} /></label>
+    <TextViewToolbar projectKey={projectKey} caseId={detail.case_id} language={current.language} documents={documents} onNavigate={onNavigate} canManage={access.canManage}>
+      {!compareOpen && identitySelects}
       {access.allowed && <Button ref={compareButton} size="sm" aria-expanded={compareOpen} onClick={() => compareOpen ? closeComparison() : setCompareIdentity(identity)}>Compare</Button>}
       <SubmissionHistory projectKey={projectKey} caseId={caseId} documentId={current.document_id} language={current.language} version={current.version}
         username={username} canManage={access.canManage} onNavigate={onNavigate} documents={documents} />
@@ -206,16 +225,21 @@ export function CaseViewer({ projectKey, caseId, variant, show, annotations, com
     {!!layers.error && <><ErrorNotice error={layers.error} />{retryButton}</>}
     {layers.refs && selection !== 'text' && !ref && <InlineMessage tone="info">This annotation version is not available to you.</InlineMessage>}
     {payloadFailed && <><ErrorNotice error={payloadError.error} />{retryButton}</>}
-    {ref?.kind === 'submission' && <SubmissionCarriedChecks projectKey={projectKey} documentId={current.document_id} submissionId={ref.id} />}
+    {ref?.kind === 'submission' && <SubmissionCarriedChecks projectKey={projectKey} {...submission} />}
     <div className="comparison-reading">
     {compareOpen && <div className="comparison-toolbar-slot" ref={setComparisonToolbar} />}
+    {compareOpen && <div role="group" aria-label="Current text identity" className="comparison-pane-identity comparison-current-identity">
+      <h2 className="comparison-pane-title">Current text</h2>
+      <div className="text-view-selects">{identitySelects}</div>
+    </div>}
     {textError?.identity === contentIdentity ? <><ErrorNotice error={textError.error} />{retryButton}</> : text ? <>
       {ref && !snapshot && !payloadFailed && <InlineMessage tone="info">Loading annotation version...</InlineMessage>}
-      <ReadOnlyAnnotationView onTextElement={setLeftElement} key={JSON.stringify([username, projectKey, caseId, selectedId, selection, retry])} text={text.text} annotations={snapshot?.annotations ?? []} evidence={snapshot?.evidence ?? []} labelFor={labelFor} proposalContext={ref?.kind === "proposals" && snapshot ? {projectKey,documentId:current.document_id,scope:JSON.stringify([username,projectKey,caseId,selectedId,selection,retry]),setId:ref.id} : undefined} />
+      <ReadOnlyAnnotationView onTextElement={setLeftElement} key={JSON.stringify([username, projectKey, caseId, selectedId, selection, retry])} text={text.text} changes={compareOpen ? leftChanges : changesSince?.changes ?? null}
+        header={changesSince?.bar} passages={changesSince?.passages} passagesSince={changesSince?.since} currentPassage={changesSince?.current} annotations={snapshot?.annotations ?? []} evidence={snapshot?.evidence ?? []} labelFor={labelFor} proposalContext={ref?.kind === "proposals" && snapshot ? {projectKey,documentId:current.document_id,scope:JSON.stringify([username,projectKey,caseId,selectedId,selection,retry]),setId:ref.id} : undefined} />
     </> : <InlineMessage tone="info">Loading text...</InlineMessage>}
     {snapshot && <LayerFindings key={selection} label={layerLabel} annotations={snapshot.annotations} labelFor={labelFor} text={text?.text ?? ''} />}
       {compareOpen && <ComparePane layers projectKey={projectKey} username={username} caseDetail={detail} leftDocumentId={current.document_id}
-        leftText={text?.text ?? ""} leftElement={text ? leftElement : null} suspended={!text || !detailFresh} leftContext={JSON.stringify([selectedId, selection, retry])} onClose={closeComparison} toolbarHost={comparisonToolbar}
+        leftText={text?.text ?? ""} leftElement={text ? leftElement : null} suspended={!text || !detailFresh} leftContext={JSON.stringify([selectedId, selection, retry])} onClose={closeComparison} toolbarHost={comparisonToolbar} onLeftChanges={setLeftChanges}
         initialRight={compare !== undefined ? { documentId: compare, refKey: compareShow ?? 'text' } : undefined} />}
       </div>
   </section>;

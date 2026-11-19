@@ -7,7 +7,7 @@ import { formatTime } from "../app/submissionLabels";
 import { Button, StatusBadge, type StatusTone } from "../ui";
 import { TranslationCorrectionAction } from "../variants/TranslationCorrectionAction";
 import { originLabels } from "../admin/variantMetadata";
-import { statusBadgeText, versionName } from "./labels";
+import { pausedWord, statusBadgeText, versionName } from "./labels";
 import { RouteLink, rowName } from "./RowCells";
 import type { CardWorkItem } from "./textCard/cardModel";
 import { PersonList, PersonRow, useFocusAfterRemoval } from "./textCard/PersonRow";
@@ -25,8 +25,97 @@ export interface TextVersionsTools {
   onAssignmentsChanged: () => void;
   /** Opens the translation review history of a version. */
   onShowTranslationReviews?: (documentId: string) => void;
-  /** Opens the page's "Request translation correction" dialog for an accepted version (else the inline form). */
+  /** Opens the page's "Ask a reviewer to correct" dialog for an accepted version (else the inline form). */
   onRequestCorrection?: (row: DocumentRowView, variant: VariantSummary) => void;
+  /** The lead: "Correct it myself…" on the newest accepted version (issue 341 b). */
+  onCorrectTranslation?: (row: DocumentRowView, version: DocumentVersionView) => void;
+  /** The lead: "Accept this version…" on the newest version that is not reviewed or accepted (issue 341 d). */
+  onAcceptVersion?: (row: DocumentRowView, version: DocumentVersionView) => void;
+  /** The lead: "Upload a corrected text…" on the newest version of a translation (issue 341 a). */
+  onUploadVersion?: (row: DocumentRowView, version: DocumentVersionView) => void;
+  /** The lead: "Fix typos…" (an editorial correction) on the newest version of a translation (issue 453). */
+  onEditorialCorrection?: (row: DocumentRowView, version: DocumentVersionView) => void;
+}
+
+/** Issue 341 d: a newest translation version that is neither reviewed nor accepted, not discarded. */
+export function acceptableVersion(row: Pick<DocumentRowView, "plan_row">, version: DocumentVersionView): boolean {
+  return version.is_newest_in_chain && version.translation_status != null && !["accepted", "reviewed"].includes(version.translation_status)
+    && !isDiscarded(row, version);
+}
+
+/** Issue 341 b: the newest accepted translation version the lead may correct, not discarded. */
+export function correctableVersion(row: Pick<DocumentRowView, "plan_row">, version: DocumentVersionView): boolean {
+  return version.is_newest_in_chain && version.translation_status === "accepted" && !isDiscarded(row, version);
+}
+
+/** Issues 341 a and 453: the newest version of a translation the lead may upload a new version after or correct editorially, not discarded. */
+export function uploadableVersion(row: Pick<DocumentRowView, "plan_row">, version: DocumentVersionView): boolean {
+  return version.is_newest_in_chain && version.translation_status != null && !isDiscarded(row, version);
+}
+
+/** What tells "Fix typos…" apart from "Correct it myself…" and "Upload a corrected text…" (the button's tooltip). */
+export const FIX_TYPOS_HINT = "Spacing, typos, grammar. Keeps the status; no review.";
+
+/**
+ * The lead's actions that change the text of a version, named by who does the work, and what tells them apart in a
+ * few words: the hint line under the buttons of a version row (visible, not a tooltip: it must work on a phone).
+ */
+export const VERSION_ACTIONS = {
+  ask: { label: "Ask a reviewer to correct…", hint: ["Ask a reviewer", "a reviewer corrects it in a new review."] },
+  correct: { label: "Correct it myself…", hint: ["Correct it myself", "you edit it here; it is reviewed again."] },
+  typos: { label: "Fix typos…", hint: ["Fix typos", "spacing, typos, grammar; the status stays, no review."] },
+  upload: { label: "Upload a corrected text…", hint: ["Upload", "a text made elsewhere becomes the next version."] },
+} as const;
+export type VersionAction = keyof typeof VERSION_ACTIONS;
+
+/** "Ask a reviewer: … Correct it myself: …" for the actions a version offers; nothing for fewer than two. */
+export function VersionActionsHint({ actions }: { actions: readonly VersionAction[] }): JSX.Element | null {
+  if (actions.length < 2) return null;
+  return <p className="text-version-hint">
+    {actions.map((action, index) => <span key={action}>{index > 0 && " "}<span className="text-version-hint-name">{VERSION_ACTIONS[action].hint[0]}:</span> {VERSION_ACTIONS[action].hint[1]}</span>)}
+  </p>;
+}
+
+const uploadMethodLabels: Readonly<Record<NonNullable<DocumentVersionView["upload"]>["method"], string>> = {
+  machine_translation: "Machine translation", human_translation: "Human translation", manual_correction: "Corrected by hand",
+};
+
+/** How an uploaded version was made: "Machine translation, DeepL, deepl-2026-10"; "Human translation"; "Corrected by hand". */
+export function uploadMethodLabel(upload: NonNullable<DocumentVersionView["upload"]>): string {
+  return [uploadMethodLabels[upload.method], upload.provider?.trim(), upload.model?.trim()].filter(Boolean).join(", ");
+}
+
+/** "12 Nov 2026" from a calendar date ("2026-11-12"), without a time zone shift. */
+function calendarDate(value: string): string {
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return value;
+  return `${day} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][month - 1] ?? month} ${year}`;
+}
+
+/** "Uploaded by Project lead (ann-0002), 16 Nov, 10:12 · Made on 12 Nov 2026 by Dr. Roe · Checked against the source". */
+export function uploadLabel(upload: NonNullable<DocumentVersionView["upload"]>, now?: Date): string {
+  const who = ["Uploaded", upload.uploaded_by ? `by ${identityLabel(upload.uploaded_by)}` : null].filter(Boolean).join(" ");
+  const made = [upload.made_on ? `on ${calendarDate(upload.made_on)}` : null, upload.made_by?.trim() ? `by ${upload.made_by.trim()}` : null].filter(Boolean).join(" ");
+  return [[who, upload.uploaded_at ? formatTime(upload.uploaded_at, { now }) : null].filter(Boolean).join(", "), made ? `Made ${made}` : null, upload.note?.trim()].filter(Boolean).join(" · ");
+}
+
+/** "Typo fix by Project lead (ann-0002), 17 Nov, 10:12 · Spacing; Typo" (issue 453: the record of an editorial correction). */
+export function editorialCorrectionLabel(record: NonNullable<DocumentVersionView["editorial_correction"]>, now?: Date): string {
+  const who = ["Typo fix", record.corrected_by ? `by ${identityLabel(record.corrected_by)}` : null].filter(Boolean).join(" ");
+  return [[who, record.corrected_at ? formatTime(record.corrected_at, { now }) : null].filter(Boolean).join(", "), record.reason.trim()].filter(Boolean).join(" · ");
+}
+
+/**
+ * Issue 483: the lead's decision on a query that accepted this version, e.g.
+ * "Accepted: decision on the query of Ana Weber (ann-0003), the reviewer’s text taken, Project lead (ann-0002), 18 Nov, 10:12 · Answer: Yes, as proposed."
+ * ("the version kept as it is"; "the reviewer’s text taken with changes" when the lead changed it).
+ */
+export function queryDecisionLabel(record: NonNullable<DocumentVersionView["query_decision"]>, row: Pick<DocumentRowView, "work" | "moved_work">, now?: Date): string {
+  const reviewer = [...row.work, ...(row.moved_work ?? [])].find(item => item.assignment_id === record.reviewer_assignment_id)?.person;
+  const what = record.kind === "unchanged" ? "the version kept as it is" : record.edited ? "the reviewer’s text taken with changes" : "the reviewer’s text taken";
+  const head = [`Accepted: decision on the query${reviewer ? ` of ${identityLabel(reviewer)}` : ""}`, what, record.decided_by ? identityLabel(record.decided_by) : null,
+    record.decided_at ? formatTime(record.decided_at, { now }) : null].filter(Boolean).join(", ");
+  return [head, record.answer?.trim() ? `Answer: ${record.answer.trim()}` : null].filter(Boolean).join(" · ");
 }
 
 /** Acceptance record of a translation version (spec "Annotate without review: acceptance record"). */
@@ -156,35 +245,60 @@ export const TextVersions = forwardRef<HTMLUListElement, TextVersionsProps>(func
       const fullName = `${name} of ${rowName(row)}`;
       const discarded = isDiscarded(row, version);
       const acceptance = acceptanceOf(version);
+      // A lead fixed typos in this version: a review of it is not reopened, the fix is reviewed.
+      const typosFixed = row.versions.some(entry => entry.editorial_correction?.previous_document_id === version.document_id);
       let actions: ReactNode = null;
+      // The actions that change this version's text, in button order (the hint line under the buttons names them).
+      const offered: VersionAction[] = [];
       if (tools) {
+        // The server refuses a correction request for a version a correction was made of: only the newest is asked.
+        const ask = !!variant && variant.translation_status === "accepted" && version.is_newest_in_chain;
+        const correct = !!tools.onCorrectTranslation && correctableVersion(row, version);
+        const typos = !!tools.onEditorialCorrection && uploadableVersion(row, version);
+        const upload = !!tools.onUploadVersion && uploadableVersion(row, version);
+        if (ask) offered.push("ask");
+        if (correct) offered.push("correct");
+        if (typos) offered.push("typos");
+        if (upload) offered.push("upload");
         actions = <>
           {variant && (tools.onRequestCorrection
-            ? variant.translation_status === "accepted" && <Button size="sm" onClick={() => tools.onRequestCorrection?.(row, variant)}>Request correction…</Button>
+            ? ask && <Button size="sm" aria-label={`Ask a reviewer to correct ${fullName}…`} onClick={() => tools.onRequestCorrection?.(row, variant)}>{VERSION_ACTIONS.ask.label}</Button>
             : <TranslationCorrectionAction projectKey={projectKey} variant={variant} username={tools.username} requiredLanguages={tools.requiredLanguages(version.document_id)} />)}
+          {correct && <Button size="sm" aria-label={`Correct ${fullName} myself…`}
+            onClick={() => tools.onCorrectTranslation?.(row, version)}>{VERSION_ACTIONS.correct.label}</Button>}
+          {tools.onAcceptVersion && acceptableVersion(row, version) && <Button size="sm" aria-label={`Accept ${fullName}…`}
+            onClick={() => tools.onAcceptVersion?.(row, version)}>Accept this version…</Button>}
+          {typos && <Button size="sm" aria-label={`Fix typos in ${fullName}…`} title={FIX_TYPOS_HINT}
+            onClick={() => tools.onEditorialCorrection?.(row, version)}>{VERSION_ACTIONS.typos.label}</Button>}
+          {upload && <Button size="sm" aria-label={`Upload a corrected text for ${fullName}…`}
+            onClick={() => tools.onUploadVersion?.(row, version)}>{VERSION_ACTIONS.upload.label}</Button>}
           {version.translation_status != null && tools.onShowTranslationReviews && <Button size="sm" aria-label={`Translation reviews for ${name}`} onClick={() => tools.onShowTranslationReviews?.(version.document_id)}>Translation reviews</Button>}
         </>;
       }
       return <li key={version.document_id} className="text-version">
         <div className="text-version-head">
           <span className="text-version-name">{name}</span>
-          <span className="text-version-origin">{originText(version, row)}</span>
+          <span className="text-version-origin">{originText(version, row)}{version.upload && ` · ${uploadMethodLabel(version.upload)}`}</span>
           {badge && <StatusBadge tone={badgeTone(version)}>{badge}</StatusBadge>}
           {discarded && <StatusBadge tone="neutral">Discarded</StatusBadge>}
           {/* With several chains the name already carries the chain. */}
           {!row.parallel_roots && <span className="text-version-chain">{version.chain_name}</span>}
           {!version.matches_filter && <span className="cell-secondary">Does not match the filters</span>}
         </div>
+        {version.upload && <p className="text-version-record">{uploadLabel(version.upload, now)}</p>}
+        {version.editorial_correction && <p className="text-version-record">{editorialCorrectionLabel(version.editorial_correction, now)}</p>}
+        {version.query_decision && <p className="text-version-record">{queryDecisionLabel(version.query_decision, row, now)}</p>}
         {acceptance && <p className="text-version-record">{acceptanceLabel(acceptance, now)}</p>}
         {discarded && discardLabel(version, now) !== "Discarded" && <p className="text-version-record">{discardLabel(version, now)}</p>}
         {work.length > 0 && <PersonList label={`Assignments on ${name}`}>
           {work.map(item => {
-            const details = <>{labelFor(taskLabels, item.task)}{item.held && " · Paused"}</>;
+            const details = <>{labelFor(taskLabels, item.task)}{item.held && ` · ${pausedWord(item)}`}</>;
             // Moved work is history; annotations carry their actions in the Annotation part (text card).
             const plain = item.moved_to_version != null || (hideOpenWork && item.task === "annotate");
             return plain
               ? <PersonRow key={`${item.assignment_id}-${item.moved_to_version ?? ""}`} name={workerName(item)} pseudonym={item.person?.pseudonym ?? item.author_label} details={details} status={versionWorkStatus(item)} />
               : <WorkPersonRow key={item.assignment_id} item={item} caseId={row.case_id} textName={fullName} details={details} canManage={canManage} tools={tools}
+                noReopen={item.task === "translation_review" && typosFixed}
                 onChanged={() => tools?.onAssignmentsChanged()} onRemoved={focusAfterRemoval} />;
           })}
         </PersonList>}
@@ -192,6 +306,7 @@ export const TextVersions = forwardRef<HTMLUListElement, TextVersionsProps>(func
           <RouteLink route={view} onNavigate={onNavigate} className="btn btn-secondary btn-sm" aria-label={`View text ${fullName}`}>View text</RouteLink>
           {actions}
         </div>
+        <VersionActionsHint actions={offered} />
       </li>;
   };
   const groups = row.parallel_roots ? chainGroups(older) : [{ chain: "", versions: older }];

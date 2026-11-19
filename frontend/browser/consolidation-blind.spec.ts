@@ -35,6 +35,14 @@ function bareHashes(value: unknown, key?: string): string[] {
   return value.match(HEX) ?? [];
 }
 
+/**
+ * Whether a text names a secret. An annotation id is "ann-" plus twelve hex characters and can begin with the digits of
+ * a pseudonym ("ann-0147…"), so a secret directly followed by a hex character is part of such an id, not a name.
+ */
+function names(text: string, secret: string): boolean {
+  return new RegExp(`${secret.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![0-9a-f])`).test(text);
+}
+
 async function pageText(page: Page): Promise<string> {
   return await page.evaluate(() => {
     const parts: string[] = [document.body.innerText];
@@ -64,7 +72,7 @@ test("a blinded consolidator reads no annotator identity and no recomputable has
     if (!new URL(answer.url()).pathname.startsWith("/api/")) return;
     let body: string;
     try { body = await answer.text(); } catch { return; }
-    for (const secret of secrets) if (body.includes(secret)) leaks.push(`${answer.url()}: ${secret}`);
+    for (const secret of secrets) if (names(body, secret)) leaks.push(`${answer.url()}: ${secret}`);
     if (!(answer.headers()["content-type"] ?? "").startsWith("application/json")) return;
     for (const hash of bareHashes(JSON.parse(body))) leaks.push(`${answer.url()}: hash ${hash}`);
   });
@@ -74,13 +82,13 @@ test("a blinded consolidator reads no annotator identity and no recomputable has
   await expect(page.locator(".cons-hidden-names")).toBeVisible();
   await expect(expanded(page).locator("thead th")).toHaveText(["Annotator A", "Annotator B"]);
   let text = await pageText(page);
-  expect(secrets.filter(secret => text.includes(secret))).toEqual([]);
+  expect(secrets.filter(secret => names(text, secret))).toEqual([]);
 
   // The full editor opens on the opaque ids and names the authors by letter.
   await page.getByRole("button", { name: "Open in full editor", exact: true }).click();
   await expect(page.getByText(/^Selected submitted findings \([1-9]\d*\)$/)).toBeVisible({ timeout: 30_000 });
   text = await pageText(page);
-  expect(secrets.filter(secret => text.includes(secret))).toEqual([]);
+  expect(secrets.filter(secret => names(text, secret))).toEqual([]);
   await page.locator("[data-consolidation-back]").click();
   await expect(expandedGroup(page)).toHaveText("muscular hypotonia", { timeout: 30_000 });
 
@@ -101,6 +109,6 @@ test("a blinded consolidator reads no annotator identity and no recomputable has
   await dialog.getByRole("button", { name: "Submit", exact: true }).click();
   await expect(page.getByText("Consolidation submitted. The lead then accepts the result.", { exact: true })).toBeVisible();
   text = await pageText(page);
-  expect(secrets.filter(secret => text.includes(secret))).toEqual([]);
+  expect(secrets.filter(secret => names(text, secret))).toEqual([]);
   expect(leaks).toEqual([]);
 });

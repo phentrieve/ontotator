@@ -1,13 +1,15 @@
 /**
  * One finding group of the consolidation view (spec §3, mockup variant B). Collapsed: one line with the conflict mark,
- * the group name (the text excerpt) and its state ("2 fields to decide", "agreed", "decided"). Expanded: the
+ * the group name (the text excerpt) and its state ("2 fields to decide", counted down with each choice; "agreed",
+ * "decided"). Expanded: the
  * comparison table (columns = people, rows = term, axes, text, note; a check button takes a value in a
  * conflicting row), the result line that always spells out the one finding, "+ note", "Guidelines unclear here" and
  * the actions. A choice only stages (the result line updates, "Not saved yet."); one "Keep" saves once every
  * conflicting row has a choice (M2 M-7d, as DN-11 for modifiers). Actions: Keep, "Not in result" and "More…" (Edit
  * values…, Other term…; M-7c); "Open in full editor" is in the screen header (M-7a). A resolved row has no button of
  * its own: the row expands, "Change" is inside (M-7b); the last decision offers "Undo" in its row (M-7g). A person's
- * modifier marked as a finding (S18) resolves only with "Attach to a finding…" or "Not in result" (DN-8).
+ * modifier marked as a finding (S18) resolves only with "Attach to a finding…" or "Not in result" (DN-8); while no
+ * finding of its sentence is decided, "Attach to a finding…" is shown inactive with the reason (issue 470).
  */
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ConsolidationAnnotatePayload, ConsolidationGroupView, ConsolidationMemberView, ConsolidationPersonView, ConsolidationResolvePayload } from "../api/client";
@@ -19,8 +21,8 @@ import { useTermLabels } from "../editor/useTermLabels";
 import { Button, Checkbox, InlineConfirm, MenuButton, Select, Textarea } from "../ui";
 import { IconUndo, IconWarning } from "../ui/icons";
 import { ComparisonTable } from "./ComparisonTable";
-import { axisLabel, duplicateTermHint, groupStatus, labelWithQuote, keepLabel, namesOf, NOT_IN_RESULT, partialText, REOPEN_EDITED_WARNING, standaloneWarning } from "./consolidationText";
-import { absentPeople, attachCandidates, choicesComplete, choose, comparisonRows, groupName, hasKind, isStandalone, memberSets, needsTerm, presentPeople, relatedTerms, resolvePayload, resultLine, sameTermGroups, showsUnresolved, standaloneText, storedResult, unresolvedNotes, type Choices, type OtherTerm } from "./groupModel";
+import { ATTACH_DECIDE_FIRST, ATTACH_NO_FINDING, axisLabel, CHOSEN_NOT_SAVED, duplicateTermHint, groupStatus, labelWithQuote, keepLabel, namesOf, NOT_IN_RESULT, partialText, REOPEN_EDITED_WARNING, standaloneWarning } from "./consolidationText";
+import { absentPeople, attachCandidates, attachPending, choicesComplete, choose, comparisonRows, groupName, hasKind, isStandalone, memberSets, needsTerm, presentPeople, relatedTerms, resolvePayload, resultLine, sameTermGroups, showsUnresolved, standaloneText, storedResult, unresolvedNotes, type Choices, type OtherTerm } from "./groupModel";
 import { crossLinks, setText, type ModifierView } from "./modifierSets";
 import { ResultLine } from "./ResultLine";
 import { TermPicker, useTermSearch } from "./TermPicker";
@@ -193,7 +195,9 @@ export function GroupCard(props: GroupCardProps): JSX.Element {
   const inputIds = group.members.map(member => member.input_id);
   const sameTerm = line.termId ? sameTermGroups(group, allGroups, line.termId, choices) : [];
   const termName = group.members.find(member => member.term_id === line.termId)?.term_label || otherTerm?.label || line.termId;
-  const status = groupStatus(group, conflicts);
+  // Issue 472: the state counts the rows still without a choice; with every choice made it says that nothing is saved yet.
+  const undecided = rows.filter(row => row.conflict && choices[row.id] === undefined).length;
+  const status = open && conflicts > 0 && undecided === 0 ? CHOSEN_NOT_SAVED : groupStatus(group, undecided);
   const stored = useMemo(() => (open ? null : storedResult(group, text)), [open, group, text]);
   const decidedText = props.summary ?? stored?.line.finding;
   const extras = () => ({ ...(note.trim() ? { note: note.trim() } : {}), ...(flag ? { guidelines_unclear: true } : {}) });
@@ -230,6 +234,7 @@ export function GroupCard(props: GroupCardProps): JSX.Element {
   const outcomeBlock = outcome?.kind === "conflict"
     ? <InlineConfirm title="Decision not saved" message="" confirmLabel="Save" onConfirm={() => undefined} onCancel={props.onDismissOutcome} outcome={outcome}
       conflictMessage="This consolidation changed elsewhere (another tab, a reopened submission, a new text version or a new assignment). Nothing was saved. Review the current state." />
+    : outcome?.kind === "paused" ? <div className="cons-failure" role="alert"><p>Decision not saved. {outcome.message}</p></div>
     : outcome?.kind === "error" ? <div className="cons-failure" role="alert">
       <p>Could not save. Nothing changed.</p>
       <Button onClick={outcome.onRetry} loading={busy}>Retry</Button>
@@ -259,6 +264,8 @@ export function GroupCard(props: GroupCardProps): JSX.Element {
   </p>);
 
   const attachTargets = standalone ? attachCandidates(group, allGroups, text) : [];
+  // Issue 470: the warning names "attach it to a finding", so the action is always there; without a target it says why.
+  const attachBlocked = !standalone || attachTargets.length ? null : attachPending(group, allGroups, text) ? ATTACH_DECIDE_FIRST : ATTACH_NO_FINDING;
   const modifier = standalone ? standaloneText(group, text) : "";
   // Modifiers attached to this group's finding from a standalone card (S18).
   const attached = allGroups.filter(value => value.attached_to && group.annotation_ids.includes(value.attached_to));
@@ -283,11 +290,13 @@ export function GroupCard(props: GroupCardProps): JSX.Element {
           {attachTargets.length > 0 && <MenuButton label="Attach to a finding…" buttonLabel="Attach to a finding…" size="md" items={attachTargets.map(target => ({
             id: target.annotationId, label: target.label,
             onSelect: () => { if (!busy) resolve({ action: "leave_out", attach_to: target.annotationId }, `${modifier} to ${target.label}`); } }))} />}
+          {attachBlocked && <Button aria-disabled aria-describedby={`${noteId}-attach`} onClick={() => undefined}>Attach to a finding…</Button>}
           {workspace && (!conflicts || needsTerm(group)) && <span ref={moreRef} className="cons-more"><MenuButton label={`More actions, ${name}`} buttonLabel="More…" size="md" items={[
             ...(!conflicts ? [{ id: "edit-values", label: "Edit values…", onSelect: () => setEditing(true) }] : []),
             { id: "other-term", label: "Other term…", onSelect: () => setPicking(true) },
           ]} /></span>}
           {!complete && <span id={`${noteId}-keep`} className="cons-muted">Choose a value in each highlighted row first.</span>}
+          {attachBlocked && <span id={`${noteId}-attach`} className="cons-muted">{attachBlocked}</span>}
         </div>}
       {workspace && <TermPicker open={picking} anchorRef={moreRef} label="Other term" workspace={workspace} layerId={group.members[0].layer_id}
         onClose={() => { setPicking(false); moreRef.current?.querySelector<HTMLButtonElement>("button")?.focus(); }} onPick={candidate => {

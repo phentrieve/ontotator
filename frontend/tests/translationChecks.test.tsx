@@ -82,3 +82,51 @@ it("offers Details whenever the band reports a failure, with a failed count that
   rerender(<ChecksSummary failed={[{ code: "units_added", passed: false }]} all={[{ code: "numbers_changed", passed: true }]} />);
   expect(screen.getByText("All checks: 1 passed, 1 failed")).toBeTruthy();
 });
+it("names the checks of a later version as checks of the first version and asks for nothing", () => {
+  render(<ChecksSummary failed={[]} earlier={{ checked: 1, version: 2 }} all={[
+    { code: "units_added", passed: false, detail: "mg added" }, { code: "numbers_changed", passed: true }]} />);
+  const band = screen.getByRole("region", { name: "Automatic translation checks" });
+  expect(band.textContent).toContain("The automatic checks ran on v1, not on this version (v2). 1 automatic check failed on v1: Units added in translation.");
+  expect(band.className).not.toContain("translation-checks--failed");
+  fireEvent.click(within(band).getByRole("button", { name: "Details" }));
+  expect(band.textContent).toContain("Checks of v1: 1 passed, 1 failed");
+  // No failure block with the "say why in the rationale" guidance: the check is not one of this version.
+  expect(screen.queryByRole("heading", { level: 3 })).toBeNull();
+});
+it("says only where the checks ran when the first version passed them all", () => {
+  render(<ChecksSummary failed={[]} earlier={{ checked: 1, version: 3 }} all={[{ code: "units_added", passed: true }]} />);
+  expect(screen.getByRole("region", { name: "Automatic translation checks" }).textContent).toContain("The automatic checks ran on v1, not on this version (v3).Details");
+});
+
+const added = { source_count: 1, translation_count: 3, truncated: false, passages: [{ start: 10, end: 19, text: "(Ikterus)" }, { start: 30, end: 38, text: "(Pyrexie)" }] };
+it("shows more passages in brackets than in the source in the band, with the passages under Details (issue 484)", () => {
+  render(<ChecksSummary failed={[]} all={[{ code: "numbers_changed", passed: true }]} brackets={added} />);
+  const band = screen.getByRole("region", { name: "Automatic translation checks" });
+  expect(band.className).toContain("translation-checks--failed");
+  // The run's checks keep their line; the check of Ontotator has its own.
+  expect(band.querySelector(".translation-checks-line")!.textContent).toBe("1 automatic check passed.");
+  expect(band.querySelector(".translation-checks-brackets")!.textContent).toBe("More passages in brackets than in the source: 3 in the translation, 1 in the source");
+  expect(screen.queryByRole("heading", { level: 3 })).toBeNull();
+  fireEvent.click(within(band).getByRole("button", { name: "Details" }));
+  const block = within(band).getByRole("heading", { level: 3, name: "Passages in brackets added in translation" }).closest("section")!;
+  expect(within(block).getAllByRole("listitem").map(item => item.textContent)).toEqual(["“(Ikterus)”", "“(Pyrexie)”"]);
+  expect(block.textContent).toContain("Remove it and choose Accepted with corrections. If you are not sure, choose Query with the category Addition.");
+  expect(block.textContent).toContain("This check asks for no rationale.");
+  // It is not counted with the checks of the translation run.
+  expect(band.textContent).toContain("All checks: 1 passed, 0 failed");
+});
+it("shows the passages also without any check of the run, and says when the list is cut", () => {
+  render(<ChecksSummary failed={[]} all={[]} brackets={{ ...added, truncated: true }} />);
+  const band = screen.getByRole("region", { name: "Automatic translation checks" });
+  expect(band.textContent).toContain("No automatic checks were recorded for this translation.");
+  fireEvent.click(within(band).getByRole("button", { name: "Details" }));
+  expect(band.textContent).toContain("There are more; only the first ones are listed.");
+  expect(band.textContent).not.toContain("All checks:");
+});
+it("says nothing about brackets when the translation has no more passages than the source", () => {
+  render(<ChecksSummary failed={[]} all={[]} brackets={{ source_count: 2, translation_count: 2, truncated: false, passages: [] }} />);
+  const band = screen.getByRole("region", { name: "Automatic translation checks" });
+  expect(band.className).not.toContain("translation-checks--failed");
+  expect(band.querySelector(".translation-checks-brackets")).toBeNull();
+  expect(within(band).queryByRole("button", { name: "Details" })).toBeNull();
+});

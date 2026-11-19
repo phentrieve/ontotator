@@ -1,6 +1,6 @@
 import { taskText } from "../app/identity";
 import { useEffect, useRef, useState, type ComponentProps, type MutableRefObject } from "react";
-import { api, ApiError, type AssignmentOpenRequest, type AssignmentView, type AssignmentWorkspace, type CurrentUser, type RoundInputView, type TaskSummary, type WorkRoundView } from "../api/client";
+import { api, ApiError, type AssignmentOpenRequest, type AssignmentView, type AssignmentWorkspace, type CurrentUser, type RoundInputView, type RoundSourceText, type TaskSummary, type WorkRoundView } from "../api/client";
 import { ErrorNotice } from "../admin/ErrorNotice";
 import { Button, Dialog, InlineMessage, Select, type ToastMessage } from "../ui";
 import { CaseScreen } from "../app/CaseScreen";
@@ -15,6 +15,9 @@ import { WorkRoundsDialog } from "./WorkRoundsDialog";
 import { TaskProblemActions } from "./TaskProblemActions";
 import { TaskGuidelines } from "./TaskGuidelines";
 import { notifyTasksChanged } from "./tasksEvents";
+import { LeadReason } from "./LeadReason";
+import { pauseNotice } from "./pauseLabels";
+import { PausedNotice } from "../editor/PausedNotice";
 import { ReportAnswerNotice } from "../problems/ReportAnswerNotice";
 import { roundBadge as roundBadgeOf, roundIdentity } from "../editor/rounds/roundLabels";
 import { ConsolidationScreen } from "../consolidation/ConsolidationScreen";
@@ -73,7 +76,8 @@ export function TaskEditor(props: TaskEditorProps): JSX.Element {
     return <TaskGuidelines assignment={assignment} place="header" readOnly={assignment.status === "submitted" || assignment.held}
       onRefresh={assignment.lead_correction ? value => setState({ identity, assignment: value }) : undefined}>{guidelines => <>
       <TimedTranslationReview key={identity} editable={assignment.status !== "submitted" && !assignment.held} assignmentId={props.assignmentId} username={props.user.username}
-        held={assignment.held} holdReason={assignment.hold_reason} saveBeforeReportRef={saveBeforeReportRef}
+        held={assignment.held} holdReason={pauseNotice(assignment).reason} holdTitle={pauseNotice(assignment).title} holdKept={pauseNotice(assignment).kept} saveBeforeReportRef={saveBeforeReportRef}
+        onTaskHeld={() => { void api.getAssignmentMetadata(props.assignmentId).then(value => setState(current => current?.identity === identity ? { identity, assignment: value } : current), () => undefined); }}
         guidelineActions={<>{guidelines.button}<HelpLink screen="translationReview" /></>} guidelineNotice={guidelines.notice}
         reportActions={<TaskProblemActions assignment={assignment} onSaveBeforeReport={async () => { await saveBeforeReportRef.current?.(); }} onRefresh={value => setState({ identity, assignment: value })} />}
         onNavigate={props.onNavigate} routeLeaveRef={props.routeLeaveRef} leaveGuardRef={props.leaveGuardRef} onSubmitted={afterSubmit(props)} />
@@ -107,6 +111,7 @@ function AnnotationTaskEditor({ assignmentId, user, onNavigate, routeLeaveRef, l
   const [roundDialogOpen, setRoundDialogOpen] = useState(false);
   const [roundInputs, setRoundInputs] = useState<RoundInputView[]>([]);
   const [roundInfo, setRoundInfo] = useState<WorkRoundView | null>(null);
+  const [changesSource, setChangesSource] = useState<RoundSourceText | null>(null);
   const [taskError, setTaskError] = useState<unknown>(null);
   const saveBeforeReportRef = useRef<(() => Promise<void>) | null>(null);
   // Issue 298: an editable annotation task in the editor records working time (not the consolidation view).
@@ -139,8 +144,12 @@ function AnnotationTaskEditor({ assignmentId, user, onNavigate, routeLeaveRef, l
       selectedRound.current = requestedRound;
       selectedWorkRound.current = requestedWorkRound;
       const info = rounds.find(value => value.round_id === roundId) ?? null;
+      // Issue 421: the version carried work came from ("Show changes since vN"); the task opens without it on failure.
+      const source = roundId && info && (info.kind === "carry_forward" || info.kind === "text_change" || info.kind === "handover")
+        ? await api.getRoundSourceText(roundId).catch(() => null) : null;
+      if (!active.current || request !== generation.current) return;
       const editableState = info ? info.active && info.state === "editable" : opened.assignment.status !== "submitted";
-      setRoundInputs(inputs); setRoundInfo(info);
+      setRoundInputs(inputs); setRoundInfo(info); setChangesSource(source);
       setWorkspace({ ...opened, read_only: opened.read_only && (!opened.assignment.held || !editableState) }); setRevision(value => value + 1);
     } catch (failure) {
       if (active.current && request === generation.current) setError(failure);
@@ -153,6 +162,8 @@ function AnnotationTaskEditor({ assignmentId, user, onNavigate, routeLeaveRef, l
     return () => { active.current = false; generation.current++; taskGeneration.current++; };
   }, [assignmentId]);
   const back = () => onNavigate(MY_TASKS);
+  /** A save was refused because the task is paused: read the task again, so the banner names the cause; the screen keeps its input. */
+  const refreshAssignment = () => { void api.getAssignmentMetadata(assignmentId).then(value => { if (active.current) { setWorkspace(current => current ? { ...current, assignment: value } : current); void loadTasks(); } }, () => undefined); };
   const backLink = <a href={routeHref(MY_TASKS)} className="btn btn-secondary" onKeyDown={onSpaceActivate} onClick={event => {
     if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
     event.preventDefault(); back();
@@ -186,7 +197,10 @@ function AnnotationTaskEditor({ assignmentId, user, onNavigate, routeLeaveRef, l
     // The task's guidelines and "Report a text problem" stay at hand: the consolidator decides guideline questions.
     return <TaskGuidelines assignment={assignment} place="header" readOnly={workspace.read_only || assignment.held}>{guidelines => <>
       <ConsolidationScreen projectKey={assignment.project_key} roundId={roundInfo.round_id} assignmentId={assignmentId} practice={!!listed?.practice}
-        onNavigate={onNavigate} workspaceView={workspace.read_only ? null : workspace.view} notice={guidelines.notice}
+        onNavigate={onNavigate} workspaceView={workspace.read_only ? null : workspace.view} readOnly={assignment.held} onTaskHeld={refreshAssignment}
+        notice={<>{assignment.held && <PausedNotice title={pauseNotice(assignment).title} reason={pauseNotice(assignment).reason}
+          kept={`Your decisions so far are kept and can be read. ${pauseNotice(assignment).kept ?? ""}`} />}
+          {!workspace.read_only && listed && <LeadReason task={listed} className="lead-reason lead-reason--band" />}{guidelines.notice}</>}
         headerActions={<>{guidelines.button}<HelpLink screen="consolidation" />
           {/* Group commands save at once: nothing to save before a report. */}
           <TaskProblemActions assignment={assignment} textName={listed ? taskText(listed) : undefined} readOnly={workspace.read_only} onSaveBeforeReport={async () => undefined} onRefresh={value => {
@@ -204,7 +218,7 @@ function AnnotationTaskEditor({ assignmentId, user, onNavigate, routeLeaveRef, l
     assignment_id: assignment.id, project_key: assignment.project_key, project_name: assignment.project_key,
     document_id: assignment.document_id, task: assignment.task, status: assignment.status,
     language: workspace.view.document.language, updated_at: assignment.updated_at,
-    workflow_revision: assignment.workflow_revision, held: assignment.held, hold_reason: assignment.hold_reason, report_answered: false, waiting_for_translation_review: false, waiting_for_lead: false, translation_finished: false,
+    workflow_revision: assignment.workflow_revision, held: assignment.held, hold_reason: assignment.hold_reason, pause_causes: assignment.pause_causes ?? [], report_answered: false, waiting_for_translation_review: false, waiting_for_lead: false, translation_finished: false,
   };
   // Toolbar identity (spec section 7): short badge, full identity line as its title.
   const roundBadge = roundBadgeOf(roundInfo);
@@ -228,8 +242,9 @@ function AnnotationTaskEditor({ assignmentId, user, onNavigate, routeLeaveRef, l
         ...(guidelines.item ? [guidelines.item] : []),
         { id: "help", label: "Help for this screen", onSelect: () => window.open(helpHref(helpScreen), "_blank", "noopener,noreferrer") }]}
       roundInputs={roundInputs} roundKind={roundInfo?.kind} roundActive={roundInfo?.active} roundBadge={roundBadge} roundTitle={roundTitle}
-      roundOrdinal={roundInfo?.round_ordinal} documentVersion={roundInfo?.document_version}
-      held={assignment.held} holdReason={assignment.hold_reason} saveBeforeReportRef={saveBeforeReportRef}
+      roundOrdinal={roundInfo?.round_ordinal} documentVersion={roundInfo?.document_version} changesSource={changesSource}
+      held={assignment.held} holdReason={pauseNotice(assignment).reason} holdTitle={pauseNotice(assignment).title} holdKept={pauseNotice(assignment).kept} saveBeforeReportRef={saveBeforeReportRef}
+      onTaskHeld={refreshAssignment}
       headerTimer={<WorkTimerControl timer={workTimer} />} onEdit={workTimer.edit}
       guidelines={guidelines.panel}
       guidelineNotice={<><WorkTimeNotice timer={workTimer} />{/* Reloads when a lead acts on the task (revision) or a new answer arrives (My tasks list). */}

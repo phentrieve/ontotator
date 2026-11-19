@@ -14,7 +14,12 @@ export const HELP_SECTIONS = {
   consolidation: { chapter: "consolidator", section: "read-the-text-and-walk-the-groups" },
   consolidationReadOnly: { chapter: "lead-results", section: "read-a-submitted-consolidation" },
   documents: { chapter: "lead-documents", section: "the-documents-page" },
+  // Issue 337 (337-B): "Newer set available" in the text card.
+  newerProposals: { chapter: "lead-change-course", section: "work-from-new-tool-proposals" },
   taskProfiles: { chapter: "lead-settings", section: "task-profiles" },
+  // Under the tokens cards: both sections name the Ontotator MCP server.
+  projectTokens: { chapter: "lead-settings", section: "give-a-script-access-to-the-project" },
+  personalTokens: { chapter: "getting-started", section: "create-an-api-token" },
 } as const satisfies Record<string, { chapter: string; section: string }>;
 
 export type HelpScreen = keyof typeof HELP_SECTIONS;

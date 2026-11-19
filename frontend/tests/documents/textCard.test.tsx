@@ -8,7 +8,7 @@ import { formatTime } from "../../src/app/submissionLabels";
 import { TextCard, type TextCardProps } from "../../src/documents/textCard/TextCard";
 import type { SegmentId } from "../../src/documents/textCard/cardModel";
 import { annotateItem, cardRow } from "./cardFixtures";
-import { final, stepOf, submission, submissions, version, work } from "./fixtures";
+import { final, round, stepOf, submission, submissions, version, work } from "./fixtures";
 import { ana, cell, luc, tom } from "./tableFixtures";
 import type { TextVersionsTools } from "../../src/documents/TextVersions";
 
@@ -185,6 +185,73 @@ describe("annotation part", () => {
     expect(within(part()).queryByText(/tool proposals?$/)).toBeNull();
   });
 
+  it("names the proposal set, a newer set with its help link, and a person on another set (issue 337)", () => {
+    const set = (set_id: number, imported_at: string, newest: boolean, proposal_count = 17) =>
+      ({ set_id, imported_at, tool: "phentrieve", tool_version: "1.4", proposal_count, newest });
+    const part = () => within(card()).getByRole("region", { name: "Annotation" });
+    const older = set(1, "2026-10-02T09:00:00", false);
+    const newer = set(2, "2026-11-10T09:00:00", true, 24);
+    renderCard({ row: assignRow({
+      proposal_set: older, newer_proposal_set: newer,
+      work: [
+        annotateItem({ assignment_id: 1, person: tom, author_label: "ann-0004", assigned_at: "2026-10-20T16:44:00", proposal_set: older }),
+        annotateItem({ assignment_id: 2, person: luc, author_label: "ann-0005", assigned_at: "2026-10-20T16:44:00", proposal_set: newer }),
+        annotateItem({ assignment_id: 3, person: ana, author_label: "ann-0003", assigned_at: "2026-10-20T16:44:00", proposal_set: older }),
+      ],
+    }) });
+    const line = within(part()).getByText("Proposals").closest("p")!;
+    expect(line.textContent).toBe("Proposals set 2026-10-02 (phentrieve 1.4), 17 proposals Newer set available: 2026-11-10 How to use it");
+    expect(within(part()).queryByText("17 tool proposals")).toBeNull();
+    expect(within(line).getByRole("link", { name: "How to use it" }).getAttribute("href")).toContain("work-from-new-tool-proposals");
+    const people = within(part()).getByRole("list", { name: "Annotators" });
+    expect(within(people).getByText("Luc Martin").closest("li")!.textContent).toContain("newest set");
+    expect(within(people).getByText("Tom Reis").closest("li")!.textContent).not.toContain("set");
+    cleanup();
+    // On the newest set: no pill; from scratch: no pill either.
+    renderCard({ row: assignRow({ proposal_set: newer, newer_proposal_set: null }) });
+    expect(within(part()).getByText("Proposals").closest("p")!.textContent).toBe("Proposals set 2026-11-10 (phentrieve 1.4), 24 proposals");
+    cleanup();
+    renderCard({ row: assignRow({ proposal_set: older, newer_proposal_set: newer, annotation_mode: { mode: "scratch", source: "project", locked: false, override: null, proposal_count: 17 } }) });
+    expect(within(part()).queryByText(/Newer set available/)).toBeNull();
+  });
+
+  it("names the older set while any task is on it, and says when a set was not recorded (issue 337)", () => {
+    const set = (set_id: number, imported_at: string, newest: boolean) => ({ set_id, imported_at, tool: "phentrieve", tool_version: "1.4", proposal_count: 24, newest });
+    const part = () => within(card()).getByRole("region", { name: "Annotation" });
+    const older = set(1, "2026-10-02T09:00:00", false), newer = set(2, "2026-11-10T09:00:00", true);
+    // The mockup: Tom submitted on the old set, Luc is assigned and will start on the newest.
+    renderCard({ row: assignRow({ proposal_set: older, newer_proposal_set: newer, work: [
+      annotateItem({ assignment_id: 1, person: tom, author_label: "ann-0004", assigned_at: "2026-10-20T16:44:00", status: "submitted", proposal_set: older }),
+      annotateItem({ assignment_id: 2, person: luc, author_label: "ann-0005", assigned_at: "2026-10-20T16:44:00", proposal_set: newer }),
+    ] }) });
+    expect(within(part()).getByText("Proposals").closest("p")!.textContent).toBe("Proposals set 2026-10-02 (phentrieve 1.4), 24 proposals Newer set available: 2026-11-10 How to use it");
+    expect(within(part()).getByText("Luc Martin").closest("li")!.textContent).toContain("newest set");
+    cleanup();
+    // Every task began before sets were recorded: no set is claimed, no pill.
+    renderCard({ row: assignRow({ proposal_set: null, newer_proposal_set: null, proposal_set_unrecorded: true, work: [
+      annotateItem({ assignment_id: 1, person: tom, author_label: "ann-0004", assigned_at: "2026-10-20T16:44:00", proposal_set_unrecorded: true }),
+    ] }) });
+    expect(within(part()).getByText("Proposals").closest("p")!.textContent).toBe("Proposals set not recorded (the tasks started before sets were recorded)");
+    expect(within(part()).queryByText(/Newer set available/)).toBeNull();
+    expect(within(part()).getByText("Tom Reis").closest("li")!.textContent).not.toContain("set not recorded");
+    cleanup();
+    // One person without a recorded set beside a known one: said in their row.
+    renderCard({ row: assignRow({ proposal_set: older, newer_proposal_set: newer, work: [
+      annotateItem({ assignment_id: 1, person: tom, author_label: "ann-0004", assigned_at: "2026-10-20T16:44:00", proposal_set: older }),
+      annotateItem({ assignment_id: 2, person: luc, author_label: "ann-0005", assigned_at: "2026-10-20T16:44:00", proposal_set_unrecorded: true }),
+    ] }) });
+    expect(within(part()).getByText("Luc Martin").closest("li")!.textContent).toContain("set not recorded");
+  });
+
+  it("names a text's own annotator limit beside the project's (issue 422)", () => {
+    const part = () => within(card()).getByRole("region", { name: "Annotation" });
+    renderCard({ row: assignRow({ annotations_per_text: { effective: 4, project: 1, override: 4 } }) });
+    expect(within(part()).getByText("Annotators: 4 for this text (project: 1)")).toBeTruthy();
+    cleanup();
+    renderCard({ row: assignRow({ annotations_per_text: { effective: 1, project: 1, override: null } }) });
+    expect(within(part()).queryByText(/for this text/)).toBeNull();
+  });
+
   it("shows Translation not reviewed yet only for a flagged row", () => {
     const part = () => within(card()).getByRole("region", { name: "Annotation" });
     renderCard({ row: assignRow({ unreviewed_translation: true }) });
@@ -271,6 +338,41 @@ describe("annotation part", () => {
     expect(plain.textContent).toBe("Ana Weber ann-0003Assignment removed · submitted 18 Oct, kept in the historyRemovedOpen annotation");
   });
 
+  it("names the version of each person's task when the text has several versions (issue 445)", async () => {
+    // v1 carries Ana's submission and Luc's removed one, Tom is assigned on the correction v2.
+    vi.mocked(api.getRowSubmissions).mockImplementation(async (_key, caseId, language) => submissions(caseId, language, {
+      submissions: [
+        submission({ submission_id: "s-ana", document_id: "case-200-de", author_label: "ann-0003", author: ana }),
+        submission({ submission_id: "s-luc", document_id: "case-200-de", author_label: "ann-0005", author: luc, recorded_at: "2026-10-17T10:00:00Z" }),
+      ],
+    }));
+    const versions = [
+      version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", chain_name: "Translation", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "Translation" }),
+    ];
+    const people = [
+      annotateItem({ assignment_id: 2, person: ana, author_label: "ann-0003", status: "submitted", assigned_at: "2026-10-12T09:00:00" }),
+      annotateItem({ assignment_id: 1, person: tom, author_label: "ann-0004", document_id: "case-200-de-v2", version: 2, assigned_at: "2026-10-14T09:00:00" }),
+    ];
+    renderCard({ row: assignRow({ versions, work: people }) });
+    const list = within(card()).getByRole("list", { name: "Annotators" });
+    await within(list).findByRole("link", { name: "Open annotation of Ana Weber" });
+    const rows = within(list).getAllByRole("listitem").map(item => item.querySelector(".person-row-details")?.textContent);
+    expect(rows).toEqual(["Assigned 14 Oct, from proposals · v2", "Submitted 18 Oct, 3 findings · assigned 12 Oct · v1", "Assignment removed · submitted 17 Oct, kept in the history · v1"]);
+    cleanup();
+    // Parallel roots: the chain name, as in the submissions table.
+    renderCard({ row: assignRow({ versions, work: people, parallel_roots: true }) });
+    const parallel = within(card()).getByRole("list", { name: "Annotators" });
+    await within(parallel).findByRole("link", { name: "Open annotation of Ana Weber" });
+    expect(within(parallel).getAllByRole("listitem")[0].textContent).toContain("Assigned 14 Oct, from proposals · Translation v2");
+    cleanup();
+    // One version: no version in the rows.
+    renderCard({ row: assignRow({ work: [people[0]] }) });
+    const single = within(card()).getByRole("list", { name: "Annotators" });
+    await within(single).findByRole("link", { name: "Open annotation of Ana Weber" });
+    expect(within(single).getAllByRole("listitem")[0].querySelector(".person-row-details")?.textContent).toBe("Submitted 18 Oct, 3 findings · assigned 12 Oct");
+  });
+
   it("after removing a person, focus moves to the next person's first button, else to Assign annotators…", async () => {
     vi.spyOn(api, "removeAssignment").mockResolvedValue({} as Awaited<ReturnType<typeof api.removeAssignment>>);
     renderCard({ initialSegment: "annotation" });
@@ -355,7 +457,7 @@ describe("translation part", () => {
     expect(onNavigate).toHaveBeenCalledWith({ name: "projectCase", key: "p", caseId: "case-200", variant: "case-200-de", compare: "case-200-en", documents: query });
   });
 
-  it("after a review: the newest version per chain, older ones collapsed, one Request correction…, submitted reviews under their version", () => {
+  it("after a review: the newest version per chain, older ones collapsed, one Ask a reviewer to correct…, submitted reviews under their version", () => {
     const versions = [
       version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "reviewed", chain_name: "m1", is_newest_in_chain: false }),
       version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "m1", translation_status: "accepted" }),
@@ -383,10 +485,125 @@ describe("translation part", () => {
     const older = within(part).getByText("Older versions (1)").closest("details")!;
     expect(older.open).toBe(false);
     expect(within(older).getByText("m1 v1")).toBeTruthy();
-    expect(within(part).getAllByRole("button", { name: "Request correction…" })).toHaveLength(1);
-    fireEvent.click(within(part).getByRole("button", { name: "Request correction…" }));
+    expect(within(part).getAllByRole("button", { name: "Ask a reviewer to correct m1 v2 of case-200 de…" })).toHaveLength(1);
+    fireEvent.click(within(part).getByRole("button", { name: "Ask a reviewer to correct m1 v2 of case-200 de…" }));
     expect(onRequestCorrection).toHaveBeenCalledWith(row, variant);
-    expect(within(part).queryByRole("button", { name: "Request translation correction" })).toBeNull();
+    expect(within(part).queryByRole("button", { name: "Ask a reviewer to correct…" })).toBeNull();
+  });
+
+  it("issue 341: Correct it myself… on the accepted newest version, Accept this version… on the one not reviewed", () => {
+    const versions = [
+      version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "reviewed", chain_name: "m1", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "m1", translation_status: "accepted" }),
+      version({ document_id: "case-200-mt", origin: "machine_translation", derived_from: "case-200-en", chain_name: "mt", translation_status: "ready_for_review" }),
+    ];
+    const onCorrectTranslation = vi.fn(), onAcceptVersion = vi.fn();
+    const textVersionTools = { username: "lead", members: [], assignments: [], variants: new Map(), requiredLanguages: () => ["de"],
+      onAssignmentsChanged: vi.fn(), onRequestCorrection: vi.fn(), onCorrectTranslation, onAcceptVersion };
+    const row = assignRow({ versions, parallel_roots: true, work: [] });
+    renderCard({ row, initialSegment: "translation", textVersionTools });
+    const part = within(card()).getByRole("heading", { name: "Translation" }).closest("section")!;
+    const correct = within(part).getAllByText("Correct it myself…");
+    expect(correct).toHaveLength(1);
+    expect(correct[0].getAttribute("aria-label")).toBe("Correct m1 v2 of case-200 de myself…");
+    // One action that changes the text: nothing to tell apart, no hint line.
+    expect(part.querySelector(".text-version-hint")).toBeNull();
+    fireEvent.click(correct[0]);
+    expect(onCorrectTranslation).toHaveBeenCalledWith(row, versions[1]);
+    const accept = within(part).getAllByText("Accept this version…");
+    expect(accept).toHaveLength(1);
+    expect(accept[0].getAttribute("aria-label")).toBe("Accept mt v1 of case-200 de…");
+    fireEvent.click(accept[0]);
+    expect(onAcceptVersion).toHaveBeenCalledWith(row, versions[2]);
+  });
+
+  it("issue 483: a version accepted by the lead's decision on a query names the decision and the answer", () => {
+    const lead = { pseudonym: "ann-0002", display_name: "Project lead", is_me: false };
+    const decision = { decided_document_id: "case-200-de", reviewed_document_id: "case-200-de", reviewer_assignment_id: 31, decided_at: "2026-11-18T10:12:00", decided_by: lead };
+    const versions = [
+      version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "reviewed", latest_review_decision: "query", chain_name: "m1", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "m1", translation_status: "accepted",
+        query_decision: { ...decision, kind: "reviewer_text", answer: "Yes, as proposed.", edited: false } }),
+    ];
+    const review = work({ assignment_id: 31, document_id: "case-200-de", task: "translation_review", status: "submitted", author_label: "ann-0003", person: { pseudonym: "ann-0003", display_name: "Ana Weber", is_me: false } });
+    renderCard({ row: assignRow({ versions, work: [review] }), initialSegment: "translation", now: new Date("2026-11-20T12:00:00") });
+    const part = within(card()).getByRole("heading", { name: "Translation" }).closest("section")!;
+    expect(within(part).getByText("Accepted: decision on the query of Ana Weber (ann-0003), the reviewer’s text taken, Project lead (ann-0002), 18 Nov, 10:12 · Answer: Yes, as proposed.")).toBeTruthy();
+  });
+
+  it("issue 453: a version made by an editorial correction names who corrected it and why", () => {
+    const versions = [
+      version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "accepted", chain_name: "m1", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "m1", translation_status: "accepted",
+        editorial_correction: { reason: "Space before the full stop", previous_document_id: "case-200-de", inserted_characters: 0, deleted_characters: 1,
+          corrected_at: "2026-11-17T10:12:00", corrected_by: { pseudonym: "ann-0002", display_name: "Project lead", is_me: false } } }),
+    ];
+    const row = assignRow({ versions, work: [] });
+    renderCard({ row, initialSegment: "translation", now: new Date("2026-11-20T12:00:00") });
+    const part = within(card()).getByRole("heading", { name: "Translation" }).closest("section")!;
+    expect(within(part).getByText("Typo fix by Project lead (ann-0002), 17 Nov, 10:12 · Space before the full stop")).toBeTruthy();
+  });
+
+  it("issue 453: Fix typos… on the newest version of each translation, a rejected one included", () => {
+    const versions = [
+      version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "accepted", chain_name: "m1", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "m1", translation_status: "accepted" }),
+      version({ document_id: "case-200-mt", origin: "machine_translation", derived_from: "case-200-en", chain_name: "mt", translation_status: "reviewed", latest_review_decision: "rejected" }),
+    ];
+    const onEditorialCorrection = vi.fn();
+    const textVersionTools = { username: "lead", members: [], assignments: [], variants: new Map(), requiredLanguages: () => ["de"],
+      onAssignmentsChanged: vi.fn(), onRequestCorrection: vi.fn(), onUploadVersion: vi.fn(), onEditorialCorrection };
+    const row = assignRow({ versions, parallel_roots: true, work: [] });
+    renderCard({ row, initialSegment: "translation", textVersionTools });
+    const part = within(card()).getByRole("heading", { name: "Translation" }).closest("section")!;
+    // Not on the older version; a rejected newest version can be corrected too.
+    const buttons = within(part).getAllByText("Fix typos…");
+    expect(buttons.map(button => button.getAttribute("aria-label"))).toEqual(["Fix typos in m1 v2 of case-200 de…", "Fix typos in mt v1 of case-200 de…"]);
+    // The tooltip tells it apart from "Correct it myself…" and "Upload a corrected text…".
+    expect(buttons[0].getAttribute("title")).toBe("Spacing, typos, grammar. Keeps the status; no review.");
+    // Next to the other version actions, before the upload.
+    expect(buttons[0].nextElementSibling?.textContent).toBe("Upload a corrected text…");
+    // Lead review F8: one visible hint line under the buttons says what tells the offered actions apart.
+    const hints = [...part.querySelectorAll(".text-version-hint")].map(hint => hint.textContent);
+    expect(hints).toEqual([
+      "Fix typos: spacing, typos, grammar; the status stays, no review. Upload: a text made elsewhere becomes the next version.",
+      "Fix typos: spacing, typos, grammar; the status stays, no review. Upload: a text made elsewhere becomes the next version.",
+    ]);
+    fireEvent.click(buttons[0]);
+    expect(onEditorialCorrection).toHaveBeenCalledWith(row, versions[1]);
+  });
+
+  it("issue 341: Upload a corrected text… on the newest version of each translation, with how an uploaded version was made", () => {
+    const versions = [
+      version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "accepted", chain_name: "m1", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "m1", translation_status: "ready_for_review",
+        upload: { method: "machine_translation", provider: "DeepL", model: "deepl-2026-10", made_on: "2026-11-12", made_by: "Dr. Roe", note: "Checked against the source",
+          uploaded_at: "2026-11-16T10:12:00", uploaded_by: { pseudonym: "ann-0002", display_name: "Project lead", is_me: false } } }),
+      version({ document_id: "case-200-mt", origin: "machine_translation", derived_from: "case-200-en", chain_name: "mt", translation_status: "accepted" }),
+    ];
+    const onUploadVersion = vi.fn();
+    const textVersionTools = { username: "lead", members: [], assignments: [], variants: new Map(), requiredLanguages: () => ["de"],
+      onAssignmentsChanged: vi.fn(), onRequestCorrection: vi.fn(), onUploadVersion };
+    const row = assignRow({ versions, parallel_roots: true, work: [] });
+    renderCard({ row, initialSegment: "translation", textVersionTools, now: new Date("2026-11-20T12:00:00") });
+    const part = within(card()).getByRole("heading", { name: "Translation" }).closest("section")!;
+    // The older version sits under "Older versions" and offers no upload.
+    const upload = within(part).getAllByText("Upload a corrected text…");
+    expect(upload.map(button => button.getAttribute("aria-label"))).toEqual(["Upload a corrected text for m1 v2 of case-200 de…", "Upload a corrected text for mt v1 of case-200 de…"]);
+    fireEvent.click(upload[0]);
+    expect(onUploadVersion).toHaveBeenCalledWith(row, versions[1]);
+    expect(within(part).getByText("Correction of m1 v1 · Machine translation, DeepL, deepl-2026-10")).toBeTruthy();
+    expect(within(part).getByText("Uploaded by Project lead (ann-0002), 16 Nov, 10:12 · Made on 12 Nov 2026 by Dr. Roe · Checked against the source")).toBeTruthy();
+  });
+
+  it("issue 341: no Upload a corrected text… on a source text or a discarded translation", () => {
+    const tools = { username: "lead", members: [], assignments: [], variants: new Map(), requiredLanguages: () => ["de"], onAssignmentsChanged: vi.fn(), onUploadVersion: vi.fn() };
+    renderCard({ row: assignRow({ is_source: true, versions: [version({ document_id: "case-200-de" })] }), initialSegment: "translation", textVersionTools: tools });
+    expect(within(card()).queryByText("Upload a corrected text…")).toBeNull();
+    cleanup();
+    const discarded = { ...version({ document_id: "case-200-de", origin: "machine_translation", translation_status: "ready_for_review" }), discarded: { reason: "Wrong text" } };
+    renderCard({ row: assignRow({ versions: [discarded] }), initialSegment: "translation", textVersionTools: tools });
+    expect(within(card()).queryByText("Upload a corrected text…")).toBeNull();
   });
 
   it("calls a native text the source text and a failed check failed", () => {
@@ -430,6 +647,23 @@ describe("footer", () => {
     expect(within(card()).getByRole("heading", { level: 3, name: "Details" })).toBeTruthy();
     fireEvent.click(within(card()).getByRole("button", { name: "Back" }));
     expect(within(card()).getByRole("navigation", { name: "Text path" })).toBeTruthy();
+  });
+
+  it("the technical details name the version of each submission and open round (issue 445)", async () => {
+    vi.mocked(api.getRowSubmissions).mockImplementation(async (_key, caseId, language) => submissions(caseId, language, {
+      submissions: [submission({ submission_id: "s-ana", document_id: "case-200-de", author_label: "ann-0003", author: ana, round_id: "r-ana" })],
+      rounds: [
+        round({ round_id: "r-ana", assignment_id: 2, document_id: "case-200-de", author_label: "ann-0003" }),
+        round({ round_id: "r-tom", assignment_id: 1, document_id: "case-200-de-v2", version: 2, chain_name: "Translation", author_label: "ann-0004", state: "open", submitted: false }),
+      ],
+    }));
+    renderCard({ initialView: "details" });
+    await within(card()).findByText("Submission ID, ann-0003, v1");
+    const terms = Array.from(card().querySelectorAll(".technical-details dt")).map(term => `${term.textContent}: ${term.nextElementSibling?.textContent}`);
+    expect(terms).toContain("Submission ID, ann-0003, v1: s-ana, round r-ana, Annotate from scratch");
+    expect(terms).toContain("Round ID, ann-0004, v2: r-tom, Annotate from scratch");
+    // The submitted round is not listed again.
+    expect(terms.filter(term => term.startsWith("Round ID"))).toHaveLength(1);
   });
 
   it("no Change plan… in the footer; a text outside the plan offers Add to plan… (the dialog)", () => {
@@ -525,6 +759,25 @@ describe("one layout for the parts (issues 329, 331, 332)", () => {
     expect([...groupA.querySelectorAll(".text-version-name")].map(name => name.textContent)).toEqual(["Provider A v1", "Provider A v2"]);
     // The chain is in the name: no repeated chain column.
     expect(part.querySelector(".text-version-chain")).toBeNull();
+  });
+
+  it("review 2, F1: a review of a version a lead fixed typos in is not reopened, and only the newest version is asked to be corrected", () => {
+    const fixed = [
+      version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "accepted", latest_review_decision: "accepted_unchanged", chain_name: "m1", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "m1", translation_status: "accepted",
+        editorial_correction: { reason: "Typo", previous_document_id: "case-200-de", inserted_characters: 1, deleted_characters: 1, corrected_at: "2026-11-17T10:12:00", corrected_by: null } }),
+    ];
+    const review = work({ assignment_id: 5, document_id: "case-200-de", task: "translation_review", status: "submitted", author_label: "ann-0003", person: ana });
+    const variant = (document_id: string) => [document_id, { document_id, translation_status: "accepted", text_sha256: "x" }] as const;
+    const tools = { ...textTools([toolAssignment(5, "submitted", { task: "translation_review", pseudonym: "ann-0003" })]),
+      variants: new Map([variant("case-200-de"), variant("case-200-de-v2")]) as unknown as TextVersionsTools["variants"], onRequestCorrection: vi.fn() };
+    renderCard({ row: assignRow({ versions: fixed, work: [review] }), initialSegment: "translation", textVersionTools: tools });
+    const part = within(card()).getByRole("heading", { name: "Translation" }).closest("section")!;
+    within(part).getByText("Older versions (1)").closest("details")!.open = true;
+    const row = within(within(part).getByRole("list", { name: "Assignments on v1" })).getByRole("listitem");
+    // The server refuses the reopening (VARIANT_REVIEW_STALE): the fix is reviewed, so no button offers it.
+    expect(within(row).getAllByRole("button").map(button => button.getAttribute("aria-label"))).toEqual(["Remove Ana Weber’s review assignment"]);
+    expect(within(part).getAllByText("Ask a reviewer to correct…").map(button => button.getAttribute("aria-label"))).toEqual(["Ask a reviewer to correct v2 of case-200 de…"]);
   });
 
   it("moved work is a plain person row saying where it went", () => {

@@ -9,18 +9,24 @@ export function reviewRecord(changes: Partial<TranslationReviewRecord> = {}): Tr
     status_before: "reviewed", status_after: "accepted", created_variant_id: "created-v7",
     review_policy: "translation-review/v1", created_at: at, guideline_withdrawn: false, ...changes };
 }
+/** A review of v3, a correction: the failed check of the run is one of v1, so `failed_checks` of this version is empty. */
 export function reviewWorkspace(changes: Partial<ReviewWorkspace> = {}): ReviewWorkspace {
   const variant = { document_id: "target", case_id: "case", external_id: "EN 1/7", language: "de", version: 3,
     origin: "correction" as const, derived_from: "previous", translation: null,
     translation_status: "reviewed" as const, status_reason: null, text_sha256: "sha" };
   const ancestor = { ...variant, document_id: "translation-v1", version: 1, origin: "machine_translation" as const,
-    derived_from: "source", translation: { provider: "Example MT", model: "Model 1", run_id: "run-1" } };
+    derived_from: "source", translation: { provider: "Example MT", model: "Model 1", run_id: "run-1", checks: [{ code: "units_added", passed: false, detail: "A unit changed" }] } };
   return { assignment: { id: 17, workflow_revision: 0, held: false, lead_correction: false, project_key: "proj", document_id: "target", user_id: 1, username: "alice",
     pseudonym: "R", task: "translation_review", status: "in_progress", created_at: at, updated_at: at,
     revoked_at: null, last_submission_id: null, external_id: "EN 1/7" },
     variant, translation_ancestor: ancestor, text: "Übersetzt.",
     source: { variant: { ...variant, document_id: "source", external_id: "source", language: "en", origin: "native", version: 1 }, text: "Source 😀\n\nSecond paragraph." },
-    comparisons: [], failed_checks: [{ code: "units_added", passed: false, detail: "A unit changed" }],
+    comparisons: [], failed_checks: [],
     draft: { text: "Übersetzt.", form: {}, revision: 6 }, qualification: "Reviewer",
-    previous_reviews: [], read_only: false, submitted_record: null, lead_correction: false, ...changes };
+    previous_reviews: [], read_only: false, submitted_record: null, lead_correction: false, reviewed_again: false, ...changes };
+}
+/** A review of the first version, a machine translation whose run failed a check. */
+export function firstVersionWorkspace(changes: Partial<ReviewWorkspace> = {}): ReviewWorkspace {
+  const base = reviewWorkspace();
+  return reviewWorkspace({ variant: base.translation_ancestor, failed_checks: [{ code: "units_added", passed: false, detail: "A unit changed" }], ...changes });
 }

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import contextlib
 import csv
+import hashlib
 import io
 import os
 import re
@@ -22,10 +23,10 @@ from mcp.server.mcpserver import MCPServer
 from pydantic import Field
 
 from ontotator_mcp.client import OntotatorClient, project_path, seg
-from ontotator_mcp.errors import OntotatorError
-from ontotator_mcp.models import NewUser
-from ontotator_mcp.tooling import register
-from ontotator_mcp.tools_setup import OPEN_STATES, _cut
+from ontotator_mcp.errors import OntotatorError, check_preview_token, stale_note
+from ontotator_mcp.models import NewUser, TextRef
+from ontotator_mcp.tooling import register, tool_message
+from ontotator_mcp.tools_setup import OPEN_STATES, _cut, unknown_texts
 
 Project = Annotated[str, Field(description="Project key, e.g. 'ward-7'.")]
 CodesPath = Annotated[
@@ -41,6 +42,129 @@ CodesPath = Annotated[
 CODE_COLUMNS = ("username", "display_name", "email", "code", "expires_at")
 # Tasks a lead can hand to someone else (a consolidation opens through its round).
 HANDOVER_TASKS = ("annotate", "translation_review")
+# Bulk actions on the tasks of many texts (issue 336): their entries listed in full.
+MAX_BULK_LISTED = 50
+TaskKind = Literal["annotate", "translation_review", "review"]
+Texts = Annotated[
+    list[TextRef],
+    Field(
+        min_length=1,
+        max_length=10000,
+        description=(
+            "The texts, each {'case_id': ..., 'language': ...}: at most 10000"
+            " per call, of at most 2000 cases (the server's selection cap)."
+        ),
+    ),
+]
+Tasks = Annotated[
+    list[TaskKind] | None,
+    Field(
+        description=(
+            "Which tasks of the texts: annotate (default), translation_review,"
+            " review (consolidation)."
+        )
+    ),
+]
+PreviewToken = Annotated[
+    str | None,
+    Field(
+        max_length=80,
+        description=(
+            "With confirm: the preview_token of the dry run, so exactly the"
+            " tasks it listed change. It also stands for the reason: confirm"
+            " with the same reason as the dry run."
+        ),
+    ),
+]
+
+
+def _reason_mark(reason: Any) -> str:
+    """Eight hex digits that stand for ``reason`` in a preview_token."""
+    text = reason.strip() if isinstance(reason, str) else ""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:8]
+
+
+def bulk_summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
+    """A bulk action's preview or result, lists cut to MAX_BULK_LISTED, with
+    the selected texts the project does not have (``unknown_texts``). An
+    applied reopen or withdrawal keeps the server's ``undo`` (id and
+    expires_at), which undo_reopen_or_withdraw takes."""
+
+    def brief(item: dict[str, Any]) -> dict[str, Any]:
+        person = item.get("person") or {}
+        entry = {
+            key: item.get(key)
+            for key in ("case_id", "language", "assignment_id", "task", "status")
+        }
+        entry["person"] = person.get("display_name") or person.get("pseudonym")
+        if "message" in item:
+            entry["why"] = tool_message(item)
+        return entry
+
+    changes = [brief(item) for item in found.get("changes", [])]
+    kept = [brief(item) for item in found.get("kept", [])]
+    skipped = [
+        {key: item.get(key) for key in ("case_id", "language")}
+        | {"message": tool_message(item)}
+        for item in found.get("skipped", [])
+    ]
+    return (
+        {
+            "applied": applied,
+            "changed" if applied else "would_change": _cut(changes, MAX_BULK_LISTED),
+            "change_count": found.get("change_count", len(changes)),
+            "kept": _cut(kept, MAX_BULK_LISTED),
+            "kept_count": found.get("kept_count", len(kept)),
+            "skipped_texts": _cut(skipped, MAX_BULK_LISTED),
+        }
+        | unknown_texts(found, MAX_BULK_LISTED)
+        | {"preview_token": found.get("preview_token")}
+        | ({"undo": found["undo"]} if applied and found.get("undo") else {})
+    )
+
+
+def pause_summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
+    """The preview or result of pausing or releasing texts, lists cut to
+    MAX_BULK_LISTED: per text its tasks in progress and their people."""
+
+    def person(item: dict[str, Any]) -> Any:
+        ref = item.get("person") or {}
+        return ref.get("display_name") or ref.get("pseudonym")
+
+    def text(item: dict[str, Any]) -> dict[str, Any]:
+        tasks = item.get("tasks", [])
+        entry: dict[str, Any] = {
+            "case_id": item.get("case_id"),
+            "language": item.get("language"),
+            "tasks_in_progress": len(tasks),
+            "people": sorted({name for name in map(person, tasks) if name}),
+        }
+        if item.get("pause"):
+            entry["paused_because"] = item["pause"].get("reason")
+        still = sum(1 for task in tasks if task.get("paused_by_report"))
+        if still and found.get("action") == "release":
+            entry["still_paused_by_report"] = still
+        return entry
+
+    changes = [text(item) for item in found.get("changes", [])]
+    skipped = [
+        {key: item.get(key) for key in ("case_id", "language")}
+        | {"message": tool_message(item)}
+        for item in found.get("skipped", [])
+    ]
+    return {
+        "applied": applied,
+        "changed" if applied else "would_change": _cut(changes, MAX_BULK_LISTED),
+        "change_count": found.get("change_count", len(changes)),
+        "tasks_in_progress": found.get("task_count", 0),
+        "still_paused_by_report": found.get("still_paused_count", 0),
+        "skipped_texts": _cut(skipped, MAX_BULK_LISTED),
+        "skipped_count": found.get("skipped_count", len(skipped)),
+        **unknown_texts(found, MAX_BULK_LISTED),
+        "preview_token": found.get("preview_token"),
+    }
+
+
 # A copy of ontotator.exchange.spreadsheet (#386): this package is installed on
 # its own and does not depend on the server. Keep the two in step.
 ESCAPED_START = ("=", "+", "-", "@", "\t", "\r", "'")
@@ -208,7 +332,8 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         Usernames the server already has are skipped and reported in
         ``existing``, so the call can be repeated safely; a failure of one
         person is reported in ``refused`` and the others go on. Each person
-        sets a password with the setup code (valid 24 hours) on the login
+        sets a password with the setup code (valid 7 days unless the
+        server sets another time; expires_at says until when) on the login
         page; issue_setup_codes renews lapsed ones. With codes_path the
         codes are WRITTEN TO A LOCAL CSV FILE (readable by the user only)
         inside the folders of ONTOTATOR_MCP_FILES_DIR instead of being
@@ -519,11 +644,383 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
     async def reopen_task(
         assignment_id: int, reason: str | None = None
     ) -> dict[str, Any]:
-        """Reopen a submitted task so its person can change the submission."""
+        """Reopen a submitted task so its person can change the submission.
+
+        A translation review of a version in which a lead fixed typos since
+        (editorial_correction) is refused with
+        VARIANT_REVIEW_STALE/typos_fixed; the details name the fixed
+        version. Assign a review of the text again instead: it is a review
+        of that newest version.
+        """
         reopened: dict[str, Any] = await api.post(
             f"/api/v1/assignments/{seg(assignment_id)}/reopen", {"reason": reason}
         )
         return assignment_summary(reopened)
+
+    async def _bulk(
+        project: str,
+        action: str,
+        body: dict[str, Any],
+        confirm: bool,
+        preview_token: str | None,
+    ) -> dict[str, Any]:
+        """Dry run, or apply with the dry run's token; a stale token answers
+        with the fresh dry run (``stale``).
+
+        The server's token covers the tasks, not the reason. The token this
+        tool hands out therefore ends with a mark of the reason, and a
+        confirm with another reason is refused here (#471).
+        """
+        path = project_path(project, "bulk-task-actions", action)
+        body = body | {"rows": [text.model_dump() for text in body["rows"]]}
+        mark = _reason_mark(body.get("reason"))
+
+        def summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
+            result = bulk_summary(found, applied)
+            if result.get("preview_token"):
+                result["preview_token"] = f"{result['preview_token']}.{mark}"
+            return result
+
+        if not confirm:
+            preview: dict[str, Any] = await api.post(path, body | {"preview": True})
+            return summary(preview, False)
+        token, _, given = (preview_token or "").partition(".")
+        check_preview_token(token if preview_token is not None else None)
+        if given != mark:
+            raise OntotatorError(
+                "The reason is not the one of the dry run this preview_token"
+                " belongs to; nothing was changed. Run the dry run again with"
+                " this reason and confirm with its preview_token."
+            )
+        try:
+            applied: dict[str, Any] = await api.post(
+                path, body | {"preview_token": token}
+            )
+        except OntotatorError as exc:
+            fresh = (
+                exc.details.get("preview") if isinstance(exc.details, dict) else None
+            )
+            if exc.code != "PREVIEW_STALE" or not isinstance(fresh, dict):
+                raise
+            return summary(fresh, False) | {
+                "stale": True,
+                "note": stale_note("Tasks", "changed"),
+            }
+        return summary(applied, True)
+
+    @register(server, scopes="project-admin", effect="changes")
+    async def reopen_texts(
+        project: Project,
+        texts: Texts,
+        reason: Annotated[
+            str,
+            Field(
+                min_length=1,
+                max_length=2000,
+                description="Why, e.g. 'Guideline 2.3 changed'; the people see it.",
+            ),
+        ],
+        tasks: Tasks = None,
+        confirm: Annotated[
+            bool, Field(description="False: dry run. True: reopen the listed tasks.")
+        ] = False,
+        preview_token: PreviewToken = None,
+    ) -> dict[str, Any]:
+        """Reopen the submitted tasks of many texts, after a dry run.
+
+        Like reopen_task for each task: its person gets it back in My tasks
+        with the reason. Texts with a final result are skipped (withdraw it
+        first, withdraw_final_result); unsubmitted tasks are kept. The dry run lists both, the
+        texts the project does not have (unknown_texts: another spelling,
+        letter case or language; nothing happens to them) and a
+        preview_token; confirm with it: every listed task is reopened, or
+        none when anything changed since (then the answer is a fresh dry run,
+        ``stale``). The confirmed answer carries ``undo`` (id and
+        expires_at): undo_reopen_or_withdraw takes that id and submits the
+        tasks again, for 60 minutes and while nothing else changed on the
+        texts. There is no ``undo`` when a translation review was reopened
+        (its draft restarted from the current text) or nothing changed.
+        """
+        body = {"rows": texts, "reason": reason} | ({"tasks": tasks} if tasks else {})
+        return await _bulk(project, "reopen", body, confirm, preview_token)
+
+    @register(server, scopes="project-admin", effect="destructive")
+    async def withdraw_open_tasks(
+        project: Project,
+        texts: Texts,
+        tasks: Tasks = None,
+        include_started: Annotated[
+            bool,
+            Field(description="Also tasks in progress or reopened (drafts stay)."),
+        ] = False,
+        over_limit_only: Annotated[
+            bool,
+            Field(
+                description=(
+                    "Only annotations above annotators per text (a text's own value,"
+                    " else the project's):"
+                    " submitted, then started, then the earliest stay."
+                )
+            ),
+        ] = False,
+        reason: Annotated[str | None, Field(max_length=2000)] = None,
+        confirm: Annotated[
+            bool, Field(description="False: dry run. True: withdraw the listed tasks.")
+        ] = False,
+        preview_token: PreviewToken = None,
+    ) -> dict[str, Any]:
+        """Withdraw the open tasks of many texts, after a dry run.
+
+        Like withdraw_task for each task: it leaves the person's list; drafts
+        and submitted work stay. By default only tasks not yet started;
+        paused tasks and lead corrections are kept; texts the project does
+        not have are named (unknown_texts). Confirm with the dry
+        run's preview_token: all listed tasks are withdrawn, or none when
+        anything changed since (a fresh dry run, ``stale``). The confirmed
+        answer carries ``undo`` (id and expires_at): undo_reopen_or_withdraw
+        takes that id and brings the tasks back with their drafts, for 60
+        minutes and while nothing else changed on the texts.
+        """
+        body: dict[str, Any] = {
+            "rows": texts,
+            "include_started": include_started,
+            "over_limit_only": over_limit_only,
+        }
+        if tasks:
+            body["tasks"] = tasks
+        if reason:
+            body["reason"] = reason
+        return await _bulk(project, "withdraw", body, confirm, preview_token)
+
+    @register(server, scopes="project-admin", effect="changes")
+    async def undo_reopen_or_withdraw(
+        project: Project,
+        undo_id: Annotated[
+            int,
+            Field(
+                ge=1,
+                description=(
+                    "``undo.id`` of the confirmed reopen_texts or"
+                    " withdraw_open_tasks answer."
+                ),
+            ),
+        ],
+        confirm: Annotated[
+            bool,
+            Field(description="False: dry run. True: bring the tasks back."),
+        ] = False,
+    ) -> dict[str, Any]:
+        """Undo a reopen_texts or withdraw_open_tasks, after a dry run.
+
+        The server kept which tasks the action changed; this names only that
+        record. It works once, with the token of the lead who applied the
+        action, within 60 minutes. The dry run lists the tasks that would
+        come back (would_restore): reopened tasks are submitted again,
+        withdrawn tasks return to their people with their drafts. It also
+        says what is in the way (blocked, with the reason): something
+        changed on the texts since (a task, draft, round, final result, plan
+        row or version), a text no longer plans the task, or a person left
+        the project. blocked_texts names each text in the way and what
+        changed on it (texts: how many texts the action changed). With confirm every task comes back, or none: a blocked
+        undo changes nothing (the answer is then the dry run, ``refused``).
+        An undo that is unknown, expired or already used is refused with
+        BULK_UNDO_STALE. start_rounds and a reopened translation review
+        have no undo.
+        """
+        path = project_path(project, "bulk-task-actions", "undo")
+
+        def summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
+            tasks = [
+                {
+                    key: item.get(key)
+                    for key in ("case_id", "language", "assignment_id", "task")
+                }
+                | {
+                    "status": item.get("status"),
+                    "person": (item.get("person") or {}).get("display_name")
+                    or (item.get("person") or {}).get("pseudonym"),
+                }
+                for item in found.get("tasks", [])
+            ]
+            return {
+                "applied": applied,
+                "undo_id": found.get("undo_id"),
+                "action": found.get("action"),
+                "expires_at": found.get("expires_at"),
+                "restored" if applied else "would_restore": _cut(
+                    tasks, MAX_BULK_LISTED
+                ),
+                "task_count": found.get("task_count", len(tasks)),
+                "blocked": found.get("blocked"),
+                "texts": found.get("texts", 0),
+                "blocked_texts": _cut(found.get("blocked_texts", []), MAX_BULK_LISTED),
+            }
+
+        preview: dict[str, Any] = await api.post(
+            path, {"undo_id": undo_id, "preview": True}
+        )
+        if not confirm:
+            return summary(preview, False)
+        if preview.get("blocked"):
+            named = preview.get("blocked_texts") or []
+            # As the web message: how many texts are in the way, and the first.
+            what = (
+                f"{len(named)} of {preview.get('texts', len(named))} texts changed"
+                f" since the action ({named[0]['case_id']} {named[0]['language']}:"
+                f" {named[0]['message']}"
+                + (f" And {len(named) - 1} more, see blocked_texts." * (len(named) > 1))
+                + ")"
+                if named
+                else "The texts changed since the action (blocked)"
+            )
+            return summary(preview, False) | {
+                "refused": True,
+                "note": f"Undo is not possible: {what}; nothing was restored."
+                " reopen_task, withdraw_task and assign_texts change one task.",
+            }
+        applied: dict[str, Any] = await api.post(path, {"undo_id": undo_id})
+        return summary(applied, True)
+
+    @register(server, scopes="project-admin", effect="destructive")
+    async def start_rounds(
+        project: Project,
+        texts: Texts,
+        kind: Annotated[
+            Literal["carry_forward", "clean_restart"],
+            Field(
+                description=(
+                    "carry_forward: the new round starts with what the person"
+                    " submitted. clean_restart: it has none of the earlier findings;"
+                    " a task from tool proposals starts on the newest proposals."
+                )
+            ),
+        ],
+        reason: Annotated[
+            str | None,
+            Field(max_length=2000, description="Required for clean_restart."),
+        ] = None,
+        confirm: Annotated[
+            bool, Field(description="False: dry run. True: start the listed rounds.")
+        ] = False,
+        preview_token: PreviewToken = None,
+    ) -> dict[str, Any]:
+        """Start a new work round for the submitted annotations of many texts,
+        after a dry run. THERE IS NO UNDO.
+
+        Each person gets the task back and must submit again; the earlier
+        submission no longer counts. Only submitted annotations on a text's
+        current version take a round; texts with a final result or an open
+        consolidation are skipped, other tasks are kept (the dry run says
+        why); texts the project does not have are named (unknown_texts).
+        Confirm with the dry run's preview_token: every listed task
+        gets its round, or none when anything changed since (a fresh dry
+        run, ``stale``). No tool takes a round back: the answer has no
+        ``undo``, and undo_reopen_or_withdraw does not apply.
+        """
+        if kind == "clean_restart" and not (reason or "").strip():
+            raise OntotatorError(
+                "A clean_restart needs a reason; nothing was checked or changed."
+                " Pass reason, in the dry run too."
+            )
+        body: dict[str, Any] = {"rows": texts, "kind": kind}
+        if reason:
+            body["reason"] = reason
+        return await _bulk(project, "start-round", body, confirm, preview_token)
+
+    async def _pause(
+        project: str,
+        action: str,
+        body: dict[str, Any],
+        confirm: bool,
+        preview_token: str | None,
+    ) -> dict[str, Any]:
+        """Dry run, or apply with the dry run's token; a stale token answers
+        with the fresh dry run (``stale``)."""
+        path = project_path(project, "text-pauses", action)
+        body = body | {"rows": [text.model_dump() for text in body["rows"]]}
+        if not confirm:
+            preview: dict[str, Any] = await api.post(path, body | {"preview": True})
+            return pause_summary(preview, False)
+        check_preview_token(preview_token)
+        try:
+            applied: dict[str, Any] = await api.post(
+                path, body | {"preview_token": preview_token}
+            )
+        except OntotatorError as exc:
+            fresh = (
+                exc.details.get("preview") if isinstance(exc.details, dict) else None
+            )
+            if exc.code != "PREVIEW_STALE" or not isinstance(fresh, dict):
+                raise
+            return pause_summary(fresh, False) | {
+                "stale": True,
+                "note": stale_note("The texts", "changed"),
+            }
+        return pause_summary(applied, True)
+
+    @register(server, scopes="project-admin", effect="changes")
+    async def pause_texts(
+        project: Project,
+        texts: Texts,
+        reason: Annotated[
+            str,
+            Field(
+                min_length=1,
+                max_length=2000,
+                description=(
+                    "Why, e.g. 'Source text is being clarified'; the people see"
+                    " it in My tasks and in the task."
+                ),
+            ),
+        ],
+        confirm: Annotated[
+            bool, Field(description="False: dry run. True: pause the listed texts.")
+        ] = False,
+        preview_token: PreviewToken = None,
+    ) -> dict[str, Any]:
+        """Pause the work on many texts, after a dry run.
+
+        A paused text keeps its tasks: the people still see them in My
+        tasks, marked "Paused by lead" with the reason, and can read them,
+        but no task in progress can be saved (annotation, translation review,
+        consolidation). A task assigned, reopened or given a round later is
+        paused from the start. Submitted work and final results are untouched
+        and exported as before. A pause from a problem report is a separate
+        cause and stays as it is. The dry run lists the texts with their
+        tasks in progress, the texts already paused, the texts the project
+        does not have (unknown_texts) and a preview_token;
+        confirm with it: every listed text is paused, or none when anything
+        changed since (a fresh dry run, ``stale``). release_texts is the way
+        back.
+        """
+        return await _pause(
+            project, "pause", {"rows": texts, "reason": reason}, confirm, preview_token
+        )
+
+    @register(server, scopes="project-admin", effect="changes")
+    async def release_texts(
+        project: Project,
+        texts: Texts,
+        reason: Annotated[str | None, Field(max_length=2000)] = None,
+        confirm: Annotated[
+            bool, Field(description="False: dry run. True: release the listed texts.")
+        ] = False,
+        preview_token: PreviewToken = None,
+    ) -> dict[str, Any]:
+        """Release texts a lead paused (pause_texts), after a dry run.
+
+        Their tasks in progress can be saved again. A task that a problem
+        report pauses as well stays paused until that report is decided
+        (``still_paused_by_report``); deciding a report never releases a
+        lead pause. Texts that are not paused are skipped; texts the
+        project does not have are named (unknown_texts). Confirm with the
+        dry run's preview_token: every listed text is released, or none when
+        anything changed since (a fresh dry run, ``stale``).
+        """
+        body: dict[str, Any] = {"rows": texts}
+        if reason:
+            body["reason"] = reason
+        return await _pause(project, "release", body, confirm, preview_token)
 
     @register(server, scopes=("read", "project-admin"), effect="destructive")
     async def hand_over_open_tasks(
@@ -549,6 +1046,7 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
             ),
         ] = False,
         confirm_language: bool = False,
+        confirm_unreviewed_translation: bool = False,
         confirm: Annotated[
             bool, Field(description="False: dry run. True: reassign as planned.")
         ] = False,
@@ -560,7 +1058,10 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
         include_started) with the reason. With confirm each planned task is
         reassigned; a refusal of one task (for example the successor
         already has that text) is reported and the others go on. Submitted
-        work stays with its author.
+        work stays with its author. An annotation task on a translation
+        whose review is not accepted is refused with
+        TRANSLATION_NOT_REVIEWED unless confirm_unreviewed_translation; the
+        dry run does not mark such tasks.
         """
         # The server keeps usernames trimmed and in lower case.
         leaving = from_username.strip().lower()
@@ -592,7 +1093,7 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
                         "username": move["to"],
                         "confirm_started": include_started,
                         "confirm_language": confirm_language,
-                        "confirm_unreviewed_translation": False,
+                        "confirm_unreviewed_translation": confirm_unreviewed_translation,
                     },
                 )
             except OntotatorError as exc:

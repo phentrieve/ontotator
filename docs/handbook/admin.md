@@ -66,7 +66,7 @@ What for: let a person set their own password. Codes are shown only once.
 
 ![Setup code dialog with the hand-over text open and the confirmation box](images/admin-setup-code.png)
 
-You cannot close the dialog or leave the page until the box is ticked. Setup codes last 24 hours, reset codes 2 hours. The person then uses **I have a setup or reset code** on the login page, see [Getting started](getting-started.md#set-your-password-with-a-setup-or-reset-code).
+You cannot close the dialog or leave the page until the box is ticked. The dialog and the hand-over text say when the code expires: a setup code lasts 7 days by default (whoever runs the server can change this, see `ONTOTATOR_SETUP_CODE_HOURS` in docs/operations.md), a reset code always 2 hours. The person then uses **I have a setup or reset code** on the login page, see [Getting started](getting-started.md#set-your-password-with-a-setup-or-reset-code).
 
 ## Issue a new setup or reset code
 
@@ -74,7 +74,11 @@ What for: a code expired, got lost, or someone forgot their password.
 
 1. On **Users**, click **More…** in the person's row.
 2. Choose **New setup code** (setup still pending) or **Reset code** (password already set).
-3. Confirm with **New setup code** or **Reset code**. Any earlier unused code stops working. With a reset code, the current password keeps working until the new code is used.
+3. Confirm with **New setup code** or **Reset code**. The dialog says what follows:
+   - Any earlier unused code stops working.
+   - A reset code logs the person out on all devices at once, not only when the code is used. Someone in the middle of a task sees *Your session has ended. Please log in again.* at their next click, so issue a reset code only when the person asked for one or the account may be in the wrong hands.
+   - All API tokens of the person are revoked, with a reset code and with a new setup code alike.
+   - With a reset code, the current password keeps working until the new code is used: the person can log in again right away.
 4. [Hand over the code](#hand-over-a-setup-or-reset-code).
 
 Deactivated accounts get no new code. Activate the account first.
@@ -106,8 +110,8 @@ You cannot deactivate your own account. In project member lists the person shows
 What for: check what was changed on an account and by whom.
 
 1. On **Users**, click **More…** in the row and choose **History**. For anonymised accounts, click the **History** button in the row.
-2. Read the table: **When**, **By**, **What**, **Whom**, **Project**, **Details**. **What** names the change in plain words, for example *Project settings changed*, *Final export created* or *Phenopackets created*. Research exports are listed too, for example *Edit log exported* or *Working time exported*.
-3. Changes made with an API token name it under **Details** (*Via API token*); the single requests a token made are left out here. The dialog shows the newest 200 entries. For the whole trail, use the command `ontotator admin audit`, see [Server operations](../operations.md#users-ontologies-and-projects).
+2. Read the table: **When**, **By**, **What**, **Whom**, **Project**, **Details**. **What** names the change in plain words, for example *Project settings changed*, *Final result withdrawn*, *Final export created* or *Phenopackets created*. Research exports are listed too, for example *Edit log exported* or *Working time exported*. A text given its own number of annotators reads *Annotators per text changed for one text*, with the text, the old and new value and the project value under **Details**. *Languages changed* says which languages were added and removed (*Added: fr. Removed: es.*). *Project settings changed* names each setting as the settings page does, with the old and the new value (*Hide annotator names during consolidation: off → on*); the description, the prefilled values and the values annotators can choose are named without values. Entries from before these values were recorded show the names only. On a phone, scroll the table sideways to read **Details**.
+3. Changes made with an API token name it under **Details** (*Via API token*); the single requests a token made are left out here. The dialog shows the newest 200 entries. For the whole trail, use the command `ontotator admin audit`, see [Server operations](../operations.md#users-ontologies-and-projects). An editorial correction of a translation is recorded as *Typo fix in a translation*; its details carry the reason and the changed passages. A lead's decision on a queried translation review is recorded as *Query on a translation decided*, with the kind of decision and the answer to the reviewer.
 
 ## Anonymise a deactivated account
 
@@ -131,7 +135,7 @@ What for: read what users report about error messages, pages that do not load, c
 3. Read a report. It shows its reference (for example *TR-12*), the user's text, who sent it and when. Below are the details Ontotator added: app version, the task if it was sent from one (its kind, for example *Annotation, from proposals*, the project and the text; for a practice task only *A practice task*, as practice projects are private), screen, browser, window size, the last error the app received and, from the crash message, the error.
 4. Click **Mark as done** when the report is handled. Click **Reopen** to open it again.
 
-Users send reports with **Technical problem…** in the sidebar or **Report a technical problem…** in the editor; see [Report a technical problem](getting-started.md#report-a-technical-problem). Their task is not paused, and project leads do not see these reports. A user can send at most 20 reports per hour.
+Users send reports with **Technical problem…** in the sidebar or **Report a technical problem…** in the editor; see [Report a technical problem](getting-started.md#report-a-technical-problem). Their task is not paused, and project leads do not see these reports. Each user sees their own reports and their status (*Open* or *Done*) under **Profile** › **My technical reports**, but not your name or the added details. A user can send at most 20 reports per hour.
 
 Reports stay inside Ontotator. Nothing goes out by e-mail or to GitHub. To open an issue, click **Copy report** and paste the text by hand. Remove clinical content and patient details first.
 
@@ -274,7 +278,7 @@ What for: see every API token of the server, stop one, or create a system token 
 1. Click **Server settings** under **Administration**.
 2. Go to **API tokens**. The table shows each token's **Kind** (*Personal*, *Project* or *System*), **Owner**, **Project**, **Scopes**, expiry, last use and **Status**.
 3. To stop a token, click **Revoke…** in its row, then **Revoke token**. A token the server revoked by itself says why next to **Revoked**, for example *project role removed* or *password changed*.
-4. To create a system token, click **New system token…**, enter a **Token name**, tick its scopes and click **Create token**. Copy the token from the dialog; it is shown only once.
+4. To create a system token, click **New system token…**, enter a **Token name**, tick its scopes and click **Create token**. Copy the token from the dialog with **Copy token**; it is shown only once. Tick **I have stored the token**, then click **Close**; the dialog cannot be closed before.
 
 Only a system token may hold the **System administration** scope, for ontology and translation uploads and user accounts. It acts as you and is revoked when you are no longer a system administrator, when you change your password and when your account is deactivated. Token creation, revocation and every change made with a token are in the audit trail.
 

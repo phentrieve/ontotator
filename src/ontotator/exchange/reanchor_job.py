@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
@@ -11,7 +11,6 @@ import ontospan
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from sqlalchemy import Connection, and_, func, select, update
 
-from ontotator import __version__
 from ontotator.auth.audit import Actor, record_audit
 from ontotator.auth.authority import lock_user_authority
 from ontotator.authz.policy import Action
@@ -42,11 +41,13 @@ from ontotator.exchange.t1 import (
     Pin,
     _axes,
     _mentions,
+    _method,
     document_to_t1,
     layers_for,
 )
 from ontotator.jobs.queue import Job, JobContext, JobQueue, handler_payload
 from ontotator.storage.database import Database
+from ontotator.storage.reanchor_credit import credited_actors, is_legacy_reanchor_actor
 from ontotator.storage.repository import Repository, _lock_id
 from ontotator.storage.tables import (
     AnnotationSnapshotRow,
@@ -67,6 +68,18 @@ class ReanchorSource:
     payload: dict[str, Any]
     annotations: tuple[AnnotationSnapshot, ...]
     notes: dict[str, list[str]]
+    # The actors the source set is credited to (#417): the stored payload
+    # actors, or for a legacy re-anchored source the tool of its own source.
+    actors: tuple[dict[str, Any], ...] | None = None
+    actor_alias: Mapping[str, str] = field(default_factory=dict)
+
+    def credited_actors(self) -> list[ontospan.Actor]:
+        stored = (
+            self.actors
+            if self.actors is not None
+            else tuple(self.payload.get("actors", []))
+        )
+        return [ontospan.Actor.model_validate(actor) for actor in stored]
 
 
 def pending_payload(item: NeedsReview) -> dict[str, Any]:
@@ -129,12 +142,16 @@ def rebuild_source(
     if not source.annotations:
         return None, None
     set_id = f"{project}:reanchor:{target.document_id}:{source.row_id}"
-    actor = ontospan.Actor(
-        actor_id="ontotator-reanchor",
-        kind="tool",
-        name="ontotator-reanchor",
-        version=__version__,
-    )
+    # The copy keeps the producer of the source set (#417): the re-anchoring
+    # is recorded by the set's origin and each proposal's source_refs.
+    set_actors = source.credited_actors()
+    if not set_actors:  # a source without stored actors: its proposals' own
+        for item in source.annotations:
+            ref = item.annotation.provenance.actor
+            actor_id = source.actor_alias.get(ref.actor_id, ref.actor_id)
+            if all(actor.actor_id != actor_id for actor in set_actors):
+                set_actors.append(ontospan.Actor(actor_id=actor_id, kind=ref.kind))
+    by_id = {actor.actor_id: actor for actor in set_actors}
     mapped = text_map(old.text, target.text)
     annotations: list[AnnotationSnapshot] = []
     evidence: list[EvidenceSnapshot] = []
@@ -162,6 +179,16 @@ def rebuild_source(
             )
             own_evidence.append(EvidenceSnapshot.create(value, target))
         origin = original_urn(source, original.annotation.annotation_id)
+        produced = original.annotation.provenance
+        actor_id = source.actor_alias.get(
+            produced.actor.actor_id, produced.actor.actor_id
+        )
+        actor = by_id.get(actor_id)
+        if actor is None:
+            actor = ontospan.Actor(actor_id=actor_id, kind=produced.actor.kind)
+            by_id[actor_id] = actor
+            set_actors.append(actor)
+        method = produced.method
         annotation = Annotation(
             annotation_id=annotation_id,
             document_id=target.document_id,
@@ -176,8 +203,8 @@ def rebuild_source(
             ],
             modifiers=result.target_modifiers,
             provenance=Provenance(
-                actor=ActorRef(actor_id=actor.actor_id, kind="tool"),
-                method="tool",
+                actor=ActorRef(actor_id=actor.actor_id, kind=actor.kind),
+                method=method,
                 source_refs=[origin],
             ),
         )
@@ -212,7 +239,7 @@ def rebuild_source(
                 ),
                 provenance=ontospan.Provenance(
                     actor=actor,
-                    method="tool",
+                    method=_method(rebuilt.annotation.provenance),
                     source_refs=(origin,),
                     notes=tuple(own_notes),
                 ),
@@ -221,7 +248,7 @@ def rebuild_source(
     aset = ontospan.AnnotationSet(
         annotation_set_id=set_id,
         set_kind="tool_output",
-        actors=(actor,),
+        actors=tuple(set_actors),
         created_at=created_at,
         layers=tuple(layers_for(profile, pins)),
         annotations=tuple(delivered),
@@ -238,7 +265,7 @@ def rebuild_source(
         None,
         set_id,
         "tool_output",
-        [actor.model_dump(mode="json", exclude_none=True)],
+        [actor.model_dump(mode="json", exclude_none=True) for actor in set_actors],
         aset.model_dump(mode="json"),
         ImportedProposals(annotations, evidence, notes, defaulted_axes),
         "reanchor",
@@ -261,6 +288,30 @@ class ReviewProducer(BaseModel):
     review_id: StrictInt = Field(gt=0)
 
 
+class UploadProducer(BaseModel):
+    """A version uploaded from the text card (issue 341 a)."""
+
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["version_upload"] = "version_upload"
+    upload_id: StrictInt = Field(gt=0)
+
+
+class EditorialProducer(BaseModel):
+    """An editorial correction of a version by a lead (issue 453)."""
+
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["editorial_correction"] = "editorial_correction"
+    correction_id: StrictInt = Field(gt=0)
+
+
+class QueryDecisionProducer(BaseModel):
+    """A lead took the reviewer's text of a queried review (issue 483)."""
+
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["query_decision"] = "query_decision"
+    decision_id: StrictInt = Field(gt=0)
+
+
 class CorrectionPair(BaseModel):
     model_config = ConfigDict(extra="forbid")
     old_document_id: str = Field(min_length=1)
@@ -269,7 +320,14 @@ class CorrectionPair(BaseModel):
 
 class ReanchorPayload(CorrectionPair):
     project: str = Field(min_length=1)
-    producer: Annotated[ImportProducer | ReviewProducer, Field(discriminator="kind")]
+    producer: Annotated[
+        ImportProducer
+        | ReviewProducer
+        | UploadProducer
+        | EditorialProducer
+        | QueryDecisionProducer,
+        Field(discriminator="kind"),
+    ]
 
 
 def enqueue_import_pairs(
@@ -355,6 +413,81 @@ def enqueue_review_pair(
     )
 
 
+def enqueue_upload_pair(
+    jobs: JobQueue,
+    project: str,
+    project_id: int,
+    old: str,
+    new: str,
+    upload_id: int,
+    actor: Actor,
+) -> int:
+    payload = ReanchorPayload(
+        project=project,
+        old_document_id=old,
+        new_document_id=new,
+        producer=UploadProducer(upload_id=upload_id),
+    )
+    # Part of the saved upload: never refused for the queue limit.
+    return jobs.enqueue(
+        "reanchor",
+        payload.model_dump(mode="json"),
+        project_id=project_id,
+        actor=actor,
+        queue_limit=False,
+    )
+
+
+def enqueue_editorial_pair(
+    jobs: JobQueue,
+    project: str,
+    project_id: int,
+    old: str,
+    new: str,
+    correction_id: int,
+    actor: Actor,
+) -> int:
+    payload = ReanchorPayload(
+        project=project,
+        old_document_id=old,
+        new_document_id=new,
+        producer=EditorialProducer(correction_id=correction_id),
+    )
+    # Part of the saved correction: never refused for the queue limit.
+    return jobs.enqueue(
+        "reanchor",
+        payload.model_dump(mode="json"),
+        project_id=project_id,
+        actor=actor,
+        queue_limit=False,
+    )
+
+
+def enqueue_query_decision_pair(
+    jobs: JobQueue,
+    project: str,
+    project_id: int,
+    old: str,
+    new: str,
+    decision_id: int,
+    actor: Actor,
+) -> int:
+    payload = ReanchorPayload(
+        project=project,
+        old_document_id=old,
+        new_document_id=new,
+        producer=QueryDecisionProducer(decision_id=decision_id),
+    )
+    # Part of the saved decision: never refused for the queue limit.
+    return jobs.enqueue(
+        "reanchor",
+        payload.model_dump(mode="json"),
+        project_id=project_id,
+        actor=actor,
+        queue_limit=False,
+    )
+
+
 @dataclass(frozen=True)
 class PairJob:
     job_id: int
@@ -423,6 +556,88 @@ def _authority(conn: Connection, pair: PairJob, project_id: int) -> None:
             raise DomainError("REANCHOR_PRODUCER_INVALID")
         if actor.user_id is None and not actor.label.startswith("cli:"):
             raise DomainError("NOT_ALLOWED")
+        require_project_management(
+            conn, actor, payload.project, project_id, Action.IMPORT_DOCUMENTS
+        )
+    elif isinstance(payload.producer, UploadProducer):
+        from ontotator.storage.plan_tables import TranslationVersionUploadRow
+
+        upload = conn.execute(
+            select(
+                TranslationVersionUploadRow.project_id,
+                TranslationVersionUploadRow.previous_document_id,
+                TranslationVersionUploadRow.document_id,
+                TranslationVersionUploadRow.uploaded_by,
+            ).where(TranslationVersionUploadRow.id == payload.producer.upload_id)
+        ).one_or_none()
+        if (
+            upload is None
+            or actor.user_id is None
+            or tuple(upload)
+            != (
+                project_id,
+                payload.old_document_id,
+                payload.new_document_id,
+                actor.user_id,
+            )
+        ):
+            raise DomainError("REANCHOR_PRODUCER_INVALID")
+        require_project_management(
+            conn, actor, payload.project, project_id, Action.IMPORT_DOCUMENTS
+        )
+    elif isinstance(payload.producer, EditorialProducer):
+        from ontotator.storage.plan_tables import EditorialCorrectionRow
+
+        correction = conn.execute(
+            select(
+                EditorialCorrectionRow.project_id,
+                EditorialCorrectionRow.previous_document_id,
+                EditorialCorrectionRow.document_id,
+                EditorialCorrectionRow.corrected_by,
+            ).where(EditorialCorrectionRow.id == payload.producer.correction_id)
+        ).one_or_none()
+        if (
+            correction is None
+            or actor.user_id is None
+            or tuple(correction)
+            != (
+                project_id,
+                payload.old_document_id,
+                payload.new_document_id,
+                actor.user_id,
+            )
+        ):
+            raise DomainError("REANCHOR_PRODUCER_INVALID")
+        # The correction added a text to the project, as an upload does.
+        require_project_management(
+            conn, actor, payload.project, project_id, Action.IMPORT_DOCUMENTS
+        )
+    elif isinstance(payload.producer, QueryDecisionProducer):
+        from ontotator.storage.plan_tables import QueryDecisionRow
+
+        decision = conn.execute(
+            select(
+                QueryDecisionRow.project_id,
+                QueryDecisionRow.document_id,
+                QueryDecisionRow.accepted_document_id,
+                QueryDecisionRow.decided_by,
+                QueryDecisionRow.kind,
+            ).where(QueryDecisionRow.id == payload.producer.decision_id)
+        ).one_or_none()
+        if (
+            decision is None
+            or actor.user_id is None
+            or tuple(decision)
+            != (
+                project_id,
+                payload.old_document_id,
+                payload.new_document_id,
+                actor.user_id,
+                "reviewer_text",
+            )
+        ):
+            raise DomainError("REANCHOR_PRODUCER_INVALID")
+        # The decision added a text to the project, as an upload does.
         require_project_management(
             conn, actor, payload.project, project_id, Action.IMPORT_DOCUMENTS
         )
@@ -509,8 +724,10 @@ def reanchor_sources(
             AnnotationSnapshotRow.document_id == document_id,
         )
     ).all()
+    credits = credited_actors(conn, project_id, sets)
     result = []
     for row in sets:
+        credit = credits[row["id"]]
         members = [
             (decode_snapshot(payload), notes)
             for set_id, notes, payload in rows
@@ -539,9 +756,31 @@ def reanchor_sources(
                 row["payload"],
                 tuple(snap for snap, _ in members),
                 {snap.annotation.annotation_id: list(notes) for snap, notes in members},
+                # A legacy re-anchored source is read as its credited tool.
+                tuple(credit.actors) if credit.alias else None,
+                dict(credit.alias),
             )
         )
     return result
+
+
+def _legacy_form(built: ImportedSet, actors: list[Any]) -> dict[str, Any]:
+    """The payload a set re-anchored before #417 holds for this rebuild: the
+    job as the one actor and method ``tool`` of every proposal."""
+    payload = dict(built.payload)
+    payload["actors"] = list(actors)
+    payload["annotations"] = [
+        {
+            **item,
+            "provenance": {
+                **item["provenance"],
+                "actor": actors[0],
+                "method": "tool",
+            },
+        }
+        for item in payload.get("annotations", [])
+    ]
+    return payload
 
 
 def _process_pair(
@@ -592,12 +831,23 @@ def _process_pair(
             .one_or_none()
         )
         if known is not None:
-            expected = dict(built.payload)
+            # A set stored before #417 names the job (of its release) as its
+            # producer; it is the same set when it matches in every other way.
+            legacy = len(known["actors"]) == 1 and is_legacy_reanchor_actor(
+                known["actors"][0]
+            )
+            expected = (
+                _legacy_form(
+                    built, known["payload"].get("actors") or list(known["actors"])
+                )
+                if legacy
+                else dict(built.payload)
+            )
             actual = dict(known["payload"])
             expected.pop("created_at", None)
             actual.pop("created_at", None)
             if (
-                known["actors"] != built.actors
+                (not legacy and known["actors"] != built.actors)
                 or known["set_kind"] != "tool_output"
                 or known["source_sha256"] is not None
                 or known["manifest_sha256"] is not None

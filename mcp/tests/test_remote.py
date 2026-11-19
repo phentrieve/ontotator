@@ -235,7 +235,7 @@ def test_file_tools_are_off_remotely(client: TestClient, tmp_path: Any) -> None:
         client,
         TOKEN_A,
         "download_export",
-        {"project": "p", "job_id": 1, "path": str(tmp_path / "x.zip")},
+        {"job_id": 1, "path": str(tmp_path / "x.zip")},
     )
     assert result["result"]["isError"] is True
     assert "remote MCP server" in json.dumps(result)

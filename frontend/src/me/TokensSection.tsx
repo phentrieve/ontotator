@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { api, type ApiToken, type ApiTokenScope, type CreateApiToken, type CreatedApiToken } from "../api/client";
 import { ErrorNotice } from "../admin/ErrorNotice";
 import { formatDateTime } from "../app/labels";
+import { helpHref } from "../help/sections";
 import { Button, Checkbox, ConfirmDialog, DataTable, Dialog, EmptyState, EmptyValue, InlineMessage, StatusBadge, TextInput, type Column, type StatusTone } from "../ui";
 
 /** Whose tokens the section shows (issue 305): the user's own, one project's (leads) or all (admins). */
@@ -149,6 +150,7 @@ export function TokensSection({ mode }: { mode: TokensSectionMode }): JSX.Elemen
           </div>
         </fieldset>
       </form>}
+    {mode.kind !== "admin" && <p className="field-hint">Also for the Ontotator MCP server (AI assistant): <a href={helpHref(mode.kind === "project" ? "projectTokens" : "personalTokens")} target="_blank" rel="noopener noreferrer">see the handbook</a>.</p>}
     {created && <NewTokenDialog created={created} onClose={() => setCreated(null)} />}
     <ConfirmDialog open={revoking !== null} tone="danger" busy={busy} title={revoking ? `Revoke the token ${revoking.name}?` : ""} confirmLabel="Revoke token"
       message={<><p>Every script that uses this token stops working at once. This cannot be undone.</p>{error !== undefined && <ErrorNotice error={error} />}</>}
@@ -158,6 +160,8 @@ export function TokensSection({ mode }: { mode: TokensSectionMode }): JSX.Elemen
 }
 
 function NewTokenDialog({ created, onClose }: { created: CreatedApiToken; onClose: () => void }): JSX.Element {
+  const checkboxId = useId();
+  const [stored, setStored] = useState(false);
   const [copy, setCopy] = useState<"copied" | "failed" | null>(null);
   const copyToken = async () => {
     try {
@@ -166,12 +170,15 @@ function NewTokenDialog({ created, onClose }: { created: CreatedApiToken; onClos
       setCopy("copied");
     } catch { setCopy("failed"); }
   };
-  return <Dialog open title={`New token ${created.token.name}`} size="sm" onClose={onClose}
-    footer={<Button variant="primary" onClick={onClose}>Close</Button>}>
+  // As in the setup-code dialog: neither Escape nor Close leaves before the box is ticked, since the token cannot be shown again.
+  return <Dialog open title={`New token “${created.token.name}”`} size="sm" onClose={stored ? onClose : undefined}
+    footer={<Button disabled={!stored} onClick={onClose}>Close</Button>}>
     <p>This token is shown only once. Store it now, for example in your password manager.</p>
     <p className="code-once-value code-once-value--token"><code>{created.secret}</code></p>
     <p>Send it as <code>Authorization: Bearer</code> followed by the token.</p>
-    <Button onClick={() => { void copyToken(); }}>{copy === "copied" ? "Copied" : "Copy token"}</Button>
+    <Button variant="primary" onClick={() => { void copyToken(); }}>{copy === "copied" ? "Copied" : "Copy token"}</Button>
+    {copy === "copied" && <InlineMessage tone="success">Copied to clipboard.</InlineMessage>}
     {copy === "failed" && <InlineMessage tone="error">Could not copy to the clipboard. Select and copy the token manually.</InlineMessage>}
+    <Checkbox id={checkboxId} label="I have stored the token" checked={stored} onChange={event => setStored(event.target.checked)} />
   </Dialog>;
 }

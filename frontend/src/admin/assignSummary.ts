@@ -86,12 +86,31 @@ export function memberReason(member: Pick<BatchPersonView, "unavailable" | "alre
 export const memberUnavailable = (member: Pick<BatchPersonView, "unavailable">): boolean => member.unavailable === "role_missing" || member.unavailable === "inactive";
 
 /** Targets that already hold some of their assignments: "case-0101, de: 1 of 2 assigned". */
-export function partlyAssignedLines(targets: readonly { case_id: string; language: string; remaining: number }[], perText: number): string[] {
-  const partial = targets.filter(target => target.remaining > 0 && target.remaining < perText);
-  if (partial.length <= 3) return partial.map(target => `${textLabel(target)}: ${perText - target.remaining} assigned (limit ${perText})`);
-  const groups = new Map<number, number>();
-  for (const target of partial) groups.set(perText - target.remaining, (groups.get(perText - target.remaining) ?? 0) + 1);
-  return [...groups].sort(([a], [b]) => a - b).map(([assigned, n]) => `${n} versions: ${assigned} assigned (limit ${perText})`);
+/** The most annotators a text can get: the upper bound of the project setting and of a text's own value (issue 447; the server
+ *  and the database check the same bound). */
+export const MAX_ANNOTATORS_PER_TEXT = 20;
+
+/** Holders named in the assign dialog's status line before "and n more". */
+export const HOLDERS_SHOWN = 5;
+
+/** Who holds the task, as one line. Up to five holders: all of them. More (issue 447): the first five and "and n more";
+ *  the people list below marks every holder "Already assigned", so nobody is lost. */
+export function holdersLine(holders: readonly string[]): string {
+  if (holders.length <= HOLDERS_SHOWN) return holders.join("; ");
+  return `${holders.slice(0, HOLDERS_SHOWN).join("; ")}; and ${holders.length - HOLDERS_SHOWN} more (marked “Already assigned” below)`;
+}
+
+/** Texts that already have some annotators; a text's own limit (issue 422) wins over `perText`. */
+export function partlyAssignedLines(targets: readonly { case_id: string; language: string; remaining: number; per_text?: number }[], perText: number): string[] {
+  const limitOf = (target: { per_text?: number }) => target.per_text ?? perText;
+  const partial = targets.filter(target => target.remaining > 0 && target.remaining < limitOf(target));
+  if (partial.length <= 3) return partial.map(target => `${textLabel(target)}: ${limitOf(target) - target.remaining} assigned (limit ${limitOf(target)})`);
+  const groups = new Map<string, { assigned: number; limit: number; n: number }>();
+  for (const target of partial) {
+    const limit = limitOf(target), assigned = limit - target.remaining, key = `${assigned}/${limit}`;
+    groups.set(key, { assigned, limit, n: (groups.get(key)?.n ?? 0) + 1 });
+  }
+  return [...groups.values()].sort((a, b) => a.assigned - b.assigned || a.limit - b.limit).map(({ assigned, limit, n }) => `${n} versions: ${assigned} assigned (limit ${limit})`);
 }
 
 const joinNames = (names: readonly string[]): string => names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;

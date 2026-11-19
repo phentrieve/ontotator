@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { expect, test, type Browser, type Page } from '@playwright/test';
+import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import type { components } from '../src/api/generated';
 import { authenticatedRequest, importPackage, loginExisting, mentionWithOffsets, moreAction, openCase, selectText, submitCase } from './helpers';
 import { problemReportScenario } from './problemReportHelpers';
@@ -174,6 +174,38 @@ test('Q1 (B2): the problem dialog keeps New report and Close in a fixed footer',
   }
 });
 
+/**
+ * The tabs the browser opens from now on, as the browser itself reports them (page targets).
+ * A Ctrl-click opens a background tab that can load its address before Playwright has attached to it;
+ * Playwright then never announces it (no "page" event on the context, seen on a busy machine), although
+ * the tab is there. So the tab is looked for where it cannot be missed, and its address is checked too.
+ */
+async function newTabs(context: BrowserContext) {
+  const session = await context.browser()!.newBrowserCDPSession();
+  const urls = new Map<string, string>();
+  const known = new Set<string>();
+  let armed = false;
+  const seen = (info: { targetId: string; type: string; url: string }) => {
+    if (info.type !== 'page') return;
+    if (!armed) known.add(info.targetId);
+    else if (!known.has(info.targetId)) urls.set(info.targetId, info.url);
+  };
+  session.on('Target.targetCreated', event => seen(event.targetInfo));
+  session.on('Target.targetInfoChanged', event => seen(event.targetInfo));
+  // Reports the tabs that exist already, then every new one.
+  await session.send('Target.setDiscoverTargets', { discover: true });
+  armed = true;
+  return {
+    /** Waits for a new tab at ``url`` and closes it. */
+    async closeWhenOpened(url: string) {
+      await expect.poll(() => [...urls.values()], { message: `a new tab at ${url}` }).toContain(url);
+      const [targetId] = [...urls].find(([, address]) => address === url)!;
+      await session.send('Target.closeTarget', { targetId });
+      await session.detach();
+    },
+  };
+}
+
 test('Q3: project switcher closes on select, Escape, outside click and Tab-out; arrows and ctrl-click do not navigate', async ({ page, context }) => {
   const s = await scenario(page);
   await loginExisting(page, s.users.lead);
@@ -207,9 +239,9 @@ test('Q3: project switcher closes on select, Escape, outside click and Tab-out; 
   await expect(field).toHaveAttribute('aria-activedescendant', /.+/);
   expect(page.url()).toBe(url);
   // Ctrl-click opens a new tab and leaves this page and the popover as they were.
-  const popup = context.waitForEvent('page');
+  const tabs = await newTabs(context);
   await option.click({ modifiers: ['Control'] });
-  await (await popup).close();
+  await tabs.closeWhenOpened(await option.evaluate(link => (link as HTMLAnchorElement).href));
   expect(page.url()).toBe(url);
   await expect(dialog).toBeVisible();
   // Plain click navigates and closes.

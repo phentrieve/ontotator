@@ -3,7 +3,8 @@ import type { DocumentRowView, NextStepView } from "../../api/client";
 import type { ProjectDocumentsQuery, Route } from "../../app/router";
 import type { PathSegment, PathTone } from "../../ui/StagePath";
 import { earlyFinal } from "../finalPanelText";
-import { annotatorCount, shortName, stageText, startedOf, startedPart, submittedOf } from "../stageLabels";
+import { submissionVersion } from "../SubmissionsTable";
+import { annotatorCount, consolidationPause, shortName, stageText, startedOf, startedPart, submittedOf } from "../stageLabels";
 
 export type SegmentId = "translation" | "annotation" | "finalization";
 export type CardView = "path" | "history" | "details";
@@ -47,12 +48,36 @@ export function translationState(row: DocumentRowView): State {
   return { state: cellLabel(row, "review"), tone: "now" };
 }
 
-export function annotationState(row: DocumentRowView): State {
+const NOT_NEWER = new Set(["rejected", "query"]);
+
+/**
+ * The versions the Annotation cell counts, as the server's stage cells do: the newest version of each chain, a
+ * correction whose review was rejected or queried skipped (it is not newer). Work on an older version (a submission
+ * carried to the new version, or one the lead left behind with "Start v2 fresh") never counts (issue 420).
+ */
+function targetDocumentIds(row: DocumentRowView): Set<string> {
+  const newest = new Map<string, DocumentRowView["versions"][number]>();
+  for (const version of row.versions ?? []) {
+    const notNewer = version.origin === "correction" && version.translation_status === "reviewed" && NOT_NEWER.has(version.latest_review_decision ?? "");
+    const best = newest.get(version.chain_id);
+    if (!notNewer && (!best || version.version > best.version)) newest.set(version.chain_id, version);
+  }
+  return new Set([...newest.values()].map(version => version.document_id));
+}
+
+/** `compact`: the table cell's short form; the row's "Paused by lead" badge names the pause there. */
+export function annotationState(row: DocumentRowView, compact = false): State {
   const cell = row.stages?.annotation;
   const detail = cell?.detail ?? {};
   const target = detail.target ?? detail.total ?? 0;
-  // The server may send no counts: count the row's annotate work items; without any, no count.
-  const work = (row.work ?? []).filter(item => item.task === "annotate" && item.moved_to_version == null);
+  // The server may send no counts: count the row's annotate work items on the newest version; without any, no count.
+  // A submitted cell that names an older version (a final result on v1, nothing on v2 yet) counts that version.
+  const targets = targetDocumentIds(row);
+  const annotate = (row.work ?? []).filter(item => item.task === "annotate" && item.moved_to_version == null);
+  const onTargets = annotate.filter(item => targets.size === 0 || targets.has(item.document_id));
+  const work = cell?.state === "submitted" && onTargets.length === 0 && detail.version != null
+    ? annotate.filter(item => item.version === detail.version)
+    : onTargets;
   const total = detail.total ?? detail.target ?? work.length;
   const done = detail.submitted ?? work.filter(item => item.status === "submitted").length;
   const working = cell?.state === "in_progress" || cell?.state === "paused";
@@ -76,14 +101,28 @@ export function annotationState(row: DocumentRowView): State {
       const assigned = detail.assigned ?? 0;
       return { state: target > 1 ? annotatorCount(assigned, target) : assigned === 0 ? "Unassigned" : `${assigned} assigned`, tone: "now" };
     }
-    case "in_progress": return { state: running, tone: "now" };
-    case "paused": return { state: submitted, tone: "now" };
+    // Below "annotators per text" the open work comes first; the limit follows as an upper bound ("· max 2").
+    case "in_progress": return { state: detail.target != null && (detail.assigned ?? 0) < detail.target ? `${running} · max ${detail.target}` : running, tone: "now" };
+    // Issue 464: the lead paused the text; the count stays ("paused by lead, 1 of 2 submitted").
+    case "paused": return detail.note !== "lead_pause" ? { state: submitted, tone: "now" }
+      : { state: compact ? submitted : total > 0 ? `paused by lead, ${submitted}` : "paused by lead", tone: "later" };
     case "submitted":
     case "consolidating": return { state: submitted, tone: "done" };
     case undefined:
     case "none": return { state: "—", tone: "later" };
     default: return { state: cellLabel(row, "annotation"), tone: "now" };
   }
+}
+
+/**
+ * The version a person's task or submission sits on, for their row of the card (issue 445): "v2", or "{chain name} v1"
+ * with parallel roots (as `submissionVersion`). Null while the text has one version, as in the history lines.
+ */
+export function personVersion(row: Pick<DocumentRowView, "versions" | "parallel_roots">, item: { document_id: string; version: number }): string | null {
+  const versions = row.versions ?? [];
+  if (versions.length <= 1) return null;
+  const chainName = versions.find(entry => entry.document_id === item.document_id)?.chain_name ?? null;
+  return submissionVersion(item.version, chainName, row.parallel_roots);
 }
 
 /** "18 Oct" of an ISO time; null when there is none. */
@@ -97,7 +136,10 @@ export function finalizationState(row: DocumentRowView, _now: Date): State {
   const cell = row.stages?.final;
   if (row.stages?.annotation.state === "consolidating") {
     const progress = row.consolidation_progress;
-    return { state: progress ? `consolidating (${progress.open} of ${progress.total} groups open)` : "consolidating", tone: "now" };
+    // Paused by the lead or by a problem report: the consolidation stays named, it is nobody's turn under a lead pause.
+    const pause = consolidationPause(row);
+    const word = pause ? "consolidating · paused" : "consolidating";
+    return { state: progress ? `${word} (${progress.open} of ${progress.total} groups open)` : word, tone: pause === "lead" ? "later" : "now" };
   }
   switch (cell?.state) {
     case undefined:
@@ -109,7 +151,9 @@ export function finalizationState(row: DocumentRowView, _now: Date): State {
     // A preselected result (a submitted consolidation, the accept rule) or full agreement waits for acceptance, not a comparison.
     case "choose": return (cell.detail.submitted ?? 0) < 2 ? { state: cellLabel(row, "final"), tone: "now" }
       : { state: cell.detail.label_rule === "accept" || (cell.detail.all_match && !earlyFinal(row)) ? "ready to accept" : "ready to compare", tone: "now" };
-    case "confirm": return { state: "ready to accept", tone: "now" };
+    // A final result that something changed under (issue 469): the phone card's words, "Check changes, newer result".
+    // "ready to accept" is a text without a final result.
+    case "confirm": { const text = stageText("final", cell, row); return { state: [text.word, text.detail].filter(Boolean).join(", "), tone: "now" }; }
     case "final": {
       const day = dayMonth(row.final?.selected_at ?? cell.detail.at);
       return { state: day ? `accepted ${day}` : "accepted", tone: "done" };

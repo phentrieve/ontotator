@@ -31,7 +31,12 @@ it('shows old and updated sources before deliberately saving/submitting the exac
   const dialog = await screen.findByRole('dialog', { name: 'Review source update' });
   expect(document.activeElement?.textContent).toContain('Compare the original and updated source');
   expect(within(dialog).getByText(cause.old_source_text)).toBeTruthy();
-  expect(within(dialog).getByText(cause.new_source_text)).toBeTruthy();
+  // The updated source marks the differences with the review's word diff.
+  const updated = within(dialog).getByRole('region', { name: 'Updated source' });
+  expect([...updated.querySelectorAll('del')].map(node => node.textContent).join('|')).toBe('Original|no ');
+  expect([...updated.querySelectorAll('ins')].map(node => node.textContent).join('|')).toBe('Updated');
+  expect(updated.textContent!.replace('Original', '').replace('no ', '')).toBe(cause.new_source_text);
+  expect(within(dialog).getByText('In the updated source, added text is underlined and removed text is struck through.')).toBeTruthy();
   expect(within(dialog).getByText('Übersetzt.')).toBeTruthy();
   fireEvent.click(within(dialog).getByRole('button', { name: 'Submit review and resolve source update' }));
   await waitFor(() => expect(api.resolveSourceObligation).toHaveBeenCalledWith(17, 'exact-cause', {
@@ -51,7 +56,7 @@ it('retains the same unresolved cause and current draft after a refused exact re
   fireEvent.click(within(dialog).getByRole('button', { name: 'Submit review and resolve source update' }));
   await within(dialog).findByRole('alert');
   expect(api.resolveSourceObligation).toHaveBeenCalledTimes(1);
-  expect(within(dialog).getByText(cause.new_source_text)).toBeTruthy();
+  expect(within(dialog).getByRole('region', { name: 'Updated source' }).querySelector('ins')!.textContent).toBe('Updated');
   expect(screen.getByRole('textbox', { name: 'Translation (de)' })).toHaveProperty('value', 'Übersetzt.');
 });
 
@@ -68,4 +73,34 @@ it('resolves a corrected draft using the immutable cause translation pin and its
   fireEvent.click(within(dialog).getByRole('button', { name: 'Submit review and resolve source update' }));
   await screen.findByText('Review submitted');
   expect(api.resolveSourceObligation).toHaveBeenCalledWith(17, 'exact-cause', { expected_revision: 18, translation_text_sha256: 'sha', old_source_text_sha256: 'old-hash', new_source_text_sha256: 'new-hash' });
+});
+
+it('names the open source update in the submit confirmation and leads to it instead of submitting past it', async () => {
+  vi.mocked(api.openTranslationReview).mockResolvedValue(reviewWorkspace({ draft: { text: 'Übersetzt.', form: { decision: 'accepted_unchanged', clinical_change: false, rationale: 'Units checked' }, revision: 6 } }));
+  const ordinarySubmit = vi.spyOn(api, 'submitTranslationReview').mockResolvedValue(reviewRecord({ decision: 'accepted_unchanged', created_variant_id: null }));
+  render(<TranslationReviewScreen assignmentId={17} username="alice" onNavigate={vi.fn()} routeLeaveRef={{ current: null }} leaveGuardRef={{ current: null }} />);
+  await screen.findByRole('button', { name: 'Review source update to original-v2' });
+  fireEvent.click(screen.getByRole('button', { name: 'Submit review…' }));
+  const confirm = await screen.findByRole('dialog', { name: 'Submit this review?' });
+  const warning = within(confirm).getByRole('alert');
+  expect(warning.textContent).toContain('1 source update is not reviewed.');
+  expect(warning.textContent).toContain('leaves the update open');
+  // The confirm button says what it does and is not the focused default.
+  const submitAnyway = within(confirm).getByRole('button', { name: 'Submit without the source update' });
+  expect(within(confirm).queryByRole('button', { name: 'Submit review' })).toBeNull();
+  expect(document.activeElement).not.toBe(submitAnyway);
+  fireEvent.click(within(warning).getByRole('button', { name: 'Review source update' }));
+  expect(screen.queryByRole('dialog', { name: 'Submit this review?' })).toBeNull();
+  expect(await screen.findByRole('dialog', { name: 'Review source update' })).toBeTruthy();
+  expect(ordinarySubmit).not.toHaveBeenCalled();
+});
+
+it('does not warn about the source update when the decision does not accept the translation', async () => {
+  vi.mocked(api.openTranslationReview).mockResolvedValue(reviewWorkspace({ draft: { text: 'Übersetzt.', form: { decision: 'rejected', clinical_change: true, categories: ['value'], rationale: 'Wrong dose' }, revision: 6 } }));
+  render(<TranslationReviewScreen assignmentId={17} username="alice" onNavigate={vi.fn()} routeLeaveRef={{ current: null }} leaveGuardRef={{ current: null }} />);
+  await screen.findByRole('button', { name: 'Review source update to original-v2' });
+  fireEvent.click(screen.getByRole('button', { name: 'Submit review…' }));
+  const confirm = await screen.findByRole('dialog', { name: 'Submit this review?' });
+  expect(within(confirm).queryByRole('alert')).toBeNull();
+  expect(within(confirm).getByRole('button', { name: 'Submit review' })).toBeTruthy();
 });

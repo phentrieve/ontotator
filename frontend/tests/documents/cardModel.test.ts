@@ -1,9 +1,10 @@
 // @vitest-environment node
 /** The text card's path states (U3, state table). */
 import { describe, expect, it } from "vitest";
-import { annotationState, cardSegments, defaultSegment, finalizationState, translationState } from "../../src/documents/textCard/cardModel";
+import { roundLine } from "../../src/documents/textCard/AnnotationPart";
+import { annotationState, cardSegments, defaultSegment, finalizationState, personVersion, translationState } from "../../src/documents/textCard/cardModel";
 import { annotateItem, cardRow } from "./cardFixtures";
-import { final, work } from "./fixtures";
+import { final, version, work } from "./fixtures";
 import { ana, cell, tom } from "./tableFixtures";
 
 const now = new Date("2026-10-22T12:00:00Z");
@@ -53,6 +54,15 @@ describe("Annotation", () => {
   it("in progress counts the submissions", () => {
     expect(annotationState(cardRow({ annotation: cell("in_progress", "running", { submitted: 1, total: 2 }) }))).toEqual({ state: "1 of 2 submitted", tone: "now" });
   });
+  it("an open task below the limit comes first, the limit follows as max (lead review F3)", () => {
+    const one = [annotateItem({ assignment_id: 1, status: "open" })];
+    expect(annotationState(cardRow({ annotation: cell("in_progress", "running", { people: [ana], submitted: 0, total: 1, assigned: 1, target: 2, started: 0, open_tasks: 1 }) }, { work: one })))
+      .toEqual({ state: "assigned, not started · max 2", tone: "now" });
+    expect(annotationState(cardRow({ annotation: cell("in_progress", "running", { people: [ana], submitted: 1, total: 2, assigned: 2, target: 3, started: 1, open_tasks: 1 }) })))
+      .toEqual({ state: "1 of 2 submitted · max 3", tone: "now" });
+    // At the limit there is no room to name.
+    expect(annotationState(cardRow({ annotation: cell("in_progress", "running", { submitted: 1, total: 2, assigned: 2, target: 2 }) })).state).toBe("1 of 2 submitted");
+  });
   it("in progress before the first save reads not started (issue 258)", () => {
     const one = [annotateItem({ assignment_id: 1, status: "open" })];
     expect(annotationState(cardRow({ annotation: cell("in_progress", "running", { people: [ana], started: 0, open_tasks: 1 }) }, { work: one })))
@@ -77,6 +87,25 @@ describe("Annotation", () => {
     expect(annotationState(cardRow({ annotation: cell("consolidating", "running") }, { work }))).toEqual({ state: "2 of 2 submitted", tone: "done" });
     expect(annotationState(cardRow({ annotation: cell("consolidating", "running") }, { work: [] }))).toEqual({ state: "submitted", tone: "done" });
     expect(annotationState(cardRow({ annotation: cell("in_progress", "running") }, { work: [] }))).toEqual({ state: "in progress", tone: "now" });
+  });
+  it("without server counts counts only work on the newest version (issue 420)", () => {
+    const versions = [
+      version({ document_id: "case-200-de", chain_id: "de", origin: "machine_translation", translation_status: "accepted", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", chain_id: "de", version: 2, origin: "correction", derived_from: "case-200-de", translation_status: "accepted" }),
+    ];
+    const v1 = annotateItem({ assignment_id: 1, status: "submitted" });
+    const carried = annotateItem({ assignment_id: 2, document_id: "case-200-de-v2", version: 2, status: "in_progress" });
+    // Carried to v2 (author or someone else): "0 of 1", never "1 of 2" (v1 submission + v2 task).
+    expect(annotationState(cardRow({ annotation: cell("in_progress", "running", { people: [ana], started: 1, open_tasks: 1 }) }, { versions, work: [v1, carried] })))
+      .toEqual({ state: "0 of 1 submitted", tone: "now" });
+    // Submitted on v2: "1 of 1", never "2 of 2".
+    const done = { ...carried, status: "submitted" as const };
+    expect(annotationState(cardRow({ annotation: cell("submitted", "done") }, { versions, work: [v1, done] }))).toEqual({ state: "1 of 1 submitted", tone: "done" });
+    // A correction that was rejected in review is not newer: v1 stays counted.
+    const rejected = [versions[0]!, { ...versions[1]!, translation_status: "reviewed" as const, latest_review_decision: "rejected" }];
+    expect(annotationState(cardRow({ annotation: cell("submitted", "done") }, { versions: rejected, work: [v1] }))).toEqual({ state: "1 of 1 submitted", tone: "done" });
+    // A submitted cell naming v1 (the final result is on v1, nothing on v2 yet) counts v1.
+    expect(annotationState(cardRow({ annotation: cell("submitted", "done", { version: 1 }) }, { versions, work: [v1] }))).toEqual({ state: "1 of 1 submitted", tone: "done" });
   });
   it("submitted and consolidating are done", () => {
     expect(annotationState(cardRow({ annotation: cell("submitted", "done", { submitted: 2, total: 2 }) }))).toEqual({ state: "2 of 2 submitted", tone: "done" });
@@ -115,8 +144,19 @@ describe("Finalization", () => {
     expect(finalizationState(cardRow(stages, { consolidation_progress: { round_id: "r1", open: 2, total: 3 } }), now)).toEqual({ state: "consolidating (2 of 3 groups open)", tone: "now" });
     expect(finalizationState(cardRow(stages), now)).toEqual({ state: "consolidating", tone: "now" });
   });
-  it("confirm reads ready to accept", () => {
-    expect(finalizationState(cardRow({ final: cell("confirm", "decision") }), now)).toEqual({ state: "ready to accept", tone: "now" });
+  it("a paused consolidation stays named: nobody's turn under a lead pause, the lead's under a report (review 2, F2)", () => {
+    const progress = { consolidation_progress: { round_id: "r1", open: 2, total: 2 } };
+    const byLead = { annotation: cell("consolidating", "waiting", { note: "lead_pause", submitted: 2, total: 2 }), final: cell("after_review", "waiting") };
+    expect(finalizationState(cardRow(byLead, progress), now)).toEqual({ state: "consolidating · paused (2 of 2 groups open)", tone: "later" });
+    expect(annotationState(cardRow(byLead))).toEqual({ state: "2 of 2 submitted", tone: "done" });
+    const byReport = { annotation: cell("consolidating", "decision", { note: "report_pause" }), final: cell("after_review", "waiting") };
+    expect(finalizationState(cardRow(byReport), now)).toEqual({ state: "consolidating · paused", tone: "now" });
+  });
+  it("confirm reads as the phone card: Check changes and what changed (issue 469)", () => {
+    expect(finalizationState(cardRow({ final: cell("confirm", "decision", { causes: ["SELECTED_NEWER_RESULT"] }) }), now)).toEqual({ state: "Check changes, newer result", tone: "now" });
+    expect(finalizationState(cardRow({ final: cell("confirm", "decision", { causes: ["SELECTED_TEXT_CORRECTED", "SELECTED_NEWER_RESULT"] }) }), now).state).toBe("Check changes, text corrected, newer result");
+    // Without a cause the words stand alone; never "ready to accept", which is a text without a final result.
+    expect(finalizationState(cardRow({ final: cell("confirm", "decision") }), now)).toEqual({ state: "Check changes", tone: "now" });
   });
   it("accepted shows the date", () => {
     const chosen = final({ case_id: "case-200", language: "de", document_id: "case-200-de", submission_id: "s-1", selected_at: "2026-10-18T10:05:00Z" });
@@ -150,5 +190,36 @@ describe("segments", () => {
 describe("a text outside the plan", () => {
   it("opens on Annotation, not on a Finalization that cannot start", () => {
     expect(defaultSegment([{ id: "translation", title: "Translation", state: "source text", tone: "done" }, { id: "annotation", title: "Annotation", state: "not planned", tone: "optional" }, { id: "finalization", title: "Finalization", state: "—", tone: "optional" }])).toBe("annotation");
+  });
+});
+
+describe("the version of a person's task (issue 445)", () => {
+  const v1 = version({ document_id: "d1", chain_name: "DeepL", is_newest_in_chain: false });
+  const v2 = version({ document_id: "d2", version: 2, origin: "correction", derived_from: "d1", chain_id: "d1", chain_name: "DeepL" });
+  it("is not named while the text has one version", () => {
+    expect(personVersion({ versions: [v1], parallel_roots: false }, { document_id: "d1", version: 1 })).toBeNull();
+  });
+  it("is v{n} with several versions, with the chain name for parallel roots", () => {
+    expect(personVersion({ versions: [v1, v2], parallel_roots: false }, { document_id: "d1", version: 1 })).toBe("v1");
+    expect(personVersion({ versions: [v1, v2], parallel_roots: false }, { document_id: "d2", version: 2 })).toBe("v2");
+    expect(personVersion({ versions: [v1, v2], parallel_roots: true }, { document_id: "d2", version: 2 })).toBe("DeepL v2");
+    // A version the row does not list (never expected) still reads "v3".
+    expect(personVersion({ versions: [v1, v2], parallel_roots: true }, { document_id: "gone", version: 3 })).toBe("v3");
+  });
+});
+
+describe("roundLine: a person's open task in a new round (lead review F3)", () => {
+  const lead = { pseudonym: "lead-1", display_name: "Carla Diaz", is_me: true };
+  const tom = { pseudonym: "ann-4", display_name: "Tom Reis", is_me: false };
+  const started = { kind: "round_started" as const, at: "2026-11-17T13:39:00", task: "annotate", assignment_id: 7, round_ordinal: 2, by: lead, to_person: tom };
+  it("names the round, who started it and the day", () => {
+    expect(roundLine({ assignment_id: 7, round_ordinal: 2 }, [started])).toBe("Round 2, started by you 17 Nov");
+    expect(roundLine({ assignment_id: 7, round_ordinal: 2 }, [{ ...started, by: tom }])).toBe("Round 2, started by Tom Reis 17 Nov");
+  });
+  it("is the round alone without the change, and nothing in the first round", () => {
+    expect(roundLine({ assignment_id: 7, round_ordinal: 2 }, null)).toBe("Round 2");
+    expect(roundLine({ assignment_id: 8, round_ordinal: 2 }, [started])).toBe("Round 2");
+    expect(roundLine({ assignment_id: 7, round_ordinal: 1 }, [started])).toBeNull();
+    expect(roundLine({ assignment_id: 7, round_ordinal: null }, [started])).toBeNull();
   });
 });

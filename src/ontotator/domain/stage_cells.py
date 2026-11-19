@@ -91,6 +91,8 @@ CellNote = Literal[
     "translation_not_accepted",
     "unchanged",
     "with_corrections",
+    # Accepted like the version a lead fixed typos in ("Fix typos…").
+    "typos_fixed",
     "in_package",
     "outside",
     "review_off",
@@ -98,6 +100,11 @@ CellNote = Literal[
     "may_change",
     "not_exported",
     "carried_on_submit",
+    # Review / Annotation paused: the lead paused the text (issue 464). Also
+    # on Annotation ``consolidating``: the open consolidation is paused.
+    "lead_pause",
+    # Annotation ``consolidating``: a problem report pauses the consolidation.
+    "report_pause",
     "v2_not_annotated",
     "no_target_proposals",  # old_text_submitted: the target has no proposals yet
     # Review re_review: why the translation is reviewed again.
@@ -118,6 +125,7 @@ PAUSED_EXCERPT_LENGTH = 60
 _ACCEPTED_NOTES: Mapping[str, CellNote] = {
     "unchanged": "unchanged",
     "corrected": "with_corrections",
+    "typos_fixed": "typos_fixed",
     "package": "in_package",
     "external": "outside",
 }
@@ -153,8 +161,11 @@ class StageFacts:
     review_reason_text: str | None = None  # free text, e.g. "Dosis prüfen"
     review_decided_by: int | None = None  # latest decision on the newest version
     review_decided_at: datetime | None = None
-    accepted_how: Literal["unchanged", "corrected", "package", "external"] | None = None
+    accepted_how: (
+        Literal["unchanged", "corrected", "typos_fixed", "package", "external"] | None
+    ) = None
     accepted_from_version: int | None = None  # "v1 → v2" when corrected
+    typos_fixed_by: int | None = None  # the lead of ``typos_fixed``
     newest_version: int = 1
     newest_origin: str | None = None  # VariantOrigin of the target
     annotators_open: tuple[int, ...] = ()  # on the target(s), not held
@@ -170,7 +181,14 @@ class StageFacts:
     consolidators: tuple[int, ...] = ()
     paused_by: int | None = None  # reporter of the open report
     paused_excerpt: str | None = None  # ≤ 60 characters
-    paused_task: Literal["annotate", "translation_review"] | None = None
+    # ``consolidation``: the held task is a consolidation (task ``review``).
+    paused_task: Literal["annotate", "translation_review", "consolidation"] | None = (
+        None
+    )
+    # Issue 464: the lead paused the text; the lead and the reason.
+    lead_paused: bool = False
+    lead_pause_by: int | None = None
+    lead_pause_reason: str | None = None
     # Old-version work items (rules 3a, 3b, finishing) are ``step.old_open``,
     # ``step.old_submitted`` and ``step.finishing``: one source for the steps
     # and the cells.
@@ -202,7 +220,10 @@ class CellDetail:
     versions, of ``total`` roots); in Annotation and Final the counts are the
     minimum over the row's target versions ("1 of 2 assigned", "1 of 2
     submitted"). The Annotation ``total`` of ``submitted`` is "annotators per
-    text", or the people holding that target when more do (issue 283). ``reason`` is free text only (Review re_review: "Dosis
+    text", or the people holding that target when more do (issue 283). An
+    Annotation cell ``in_progress`` below the limit counts ``submitted`` out
+    of the people holding the target and carries ``assigned`` / ``target``
+    ("not started · max 2"). ``reason`` is free text only (Review re_review: "Dosis
     prüfen"); codes go to ``note``, Final ``confirm`` cause codes to
     ``causes``. ``started`` of ``open_tasks``: how many of the open
     assignments the cell names have started (``StageFacts``, issue 258);
@@ -277,7 +298,7 @@ def _held_cell(facts: StageFacts) -> CellName:
     """Cell of the task held by an open report or a pause."""
     if facts.paused_task == "translation_review":
         return "review"
-    if facts.paused_task == "annotate" or facts.step.annotate:
+    if facts.paused_task in ("annotate", "consolidation") or facts.step.annotate:
         return "annotation"
     return "review"
 
@@ -399,14 +420,17 @@ def _review(facts: StageFacts, codes: frozenset[str]) -> StageCell:
     if _accepted(step):
         accepted = sum(1 for s in step.translation_statuses if s == "accepted")
         how = facts.accepted_how
-        corrected = how == "corrected"
+        # "v1 → v2" and who: the reviewer who corrected, the lead who fixed
+        # typos (never the reviewer of the fixed version).
+        changed = how in ("corrected", "typos_fixed")
+        fixed_by = () if facts.typos_fixed_by is None else (facts.typos_fixed_by,)
         return _cell(
             "accepted",
             "done",
             note=_ACCEPTED_NOTES.get(how) if how is not None else None,
-            people=decided_by if corrected else (),
-            from_version=facts.accepted_from_version if corrected else None,
-            version=facts.newest_version if corrected else None,
+            people=(decided_by if how == "corrected" else fixed_by) if changed else (),
+            from_version=facts.accepted_from_version if changed else None,
+            version=facts.newest_version if changed else None,
             **_roots(facts, accepted),
         )
     if not step.review:
@@ -424,6 +448,16 @@ def _annotation(facts: StageFacts, codes: frozenset[str]) -> StageCell:
     if not step.annotate:
         return _cell("not_planned", "none", note="review_only" if step.review else None)
     if _held(facts) and _held_cell(facts) == "annotation":
+        if facts.paused_task == "consolidation" and facts.consolidators:
+            # The paused task is the consolidation: the annotations are in
+            # and the cell keeps naming the consolidation, so the row and the
+            # card still show it (and never offer a second one).
+            return _consolidating(
+                facts,
+                "decision",
+                note="report_pause",
+                excerpt=_excerpt(facts.paused_excerpt),
+            )
         return _paused(facts)
     waiting_note: dict[str, Any] = (
         {"note": "text_change_waiting"} if facts.correction_waiting else {}
@@ -488,7 +522,11 @@ def _annotation(facts: StageFacts, codes: frozenset[str]) -> StageCell:
             )
     per_text = step.per_text
     counted = per_text > 1
-    if "assign_annotation" in codes:
+    open_work = bool(step.open_annotations or facts.annotators_open)
+    # Room for another annotator. With an open task the cell shows that task
+    # (below); the room is then a remark of the in-progress cell.
+    room = "assign_annotation" in codes
+    if room and not open_work and not step.finishing:
         assigned = step.annotation_assignments
         return _cell(
             "partly_assigned" if assigned else "unassigned",
@@ -513,28 +551,26 @@ def _annotation(facts: StageFacts, codes: frozenset[str]) -> StageCell:
     # target when more do (issue 283; never "2 of 1 submitted").
     total = max(per_text, submitted, facts.annotators_holding)
     if facts.consolidators:
-        # Counts of the newest version, as "submitted"; without them the client
-        # would count annotate work of every version (v1 + v2 read "3 of 3").
-        return _cell(
-            "consolidating",
-            "running",
-            people=facts.consolidators,
-            submitted=submitted if counted else None,
-            total=per_text if counted else None,
-        )
-    if step.open_annotations or facts.annotators_open:
+        return _consolidating(facts, "running")
+    if open_work:
         note: dict[str, Any] = (
             {"note": "may_change", "version": newest}
             if step.open_translation_reviews or facts.review_people
             else waiting_note
         )
         many = counted or submitted > 0
+        if room:
+            # Below the limit: out of the people who hold the text, and the
+            # limit as "max" (``assigned`` / ``target``, as partly_assigned).
+            total = max(submitted, facts.annotators_holding, 1)
         return _cell(
             "in_progress",
             "running",
             people=facts.annotators_open,
             submitted=submitted if many else None,
             total=total if many else None,
+            assigned=step.annotation_assignments if room and counted else None,
+            target=per_text if room and counted else None,
             round_ordinal=facts.round_ordinal,
             **note,
             **started,
@@ -555,6 +591,22 @@ def _annotation(facts: StageFacts, codes: frozenset[str]) -> StageCell:
     # Enough assignments, nothing open and nothing submitted: no step names
     # this cell (an application invariant broke), so it is no lead task.
     return _cell("submitted", "done", version=newest, **waiting_note)
+
+
+def _consolidating(facts: StageFacts, tone: Tone, **detail: Any) -> StageCell:
+    """The Annotation cell while a consolidation is open: its consolidators
+    and the counts of the newest version, as "submitted" (without them the
+    client would count annotate work of every version: v1 + v2 read
+    "3 of 3")."""
+    counted = facts.step.per_text > 1
+    return _cell(
+        "consolidating",
+        tone,
+        people=facts.consolidators,
+        submitted=facts.submissions if counted else None,
+        total=facts.step.per_text if counted else None,
+        **detail,
+    )
 
 
 def _people(items: Sequence[OldItem]) -> tuple[int, ...]:
@@ -612,7 +664,36 @@ def stage_cells(facts: StageFacts, steps: Sequence[Step]) -> StageCells:
     """Review, Annotation and Final cell of one row (spec "Stage cells")."""
     codes = frozenset(step.code for step in steps)
     return StageCells(
-        review=_review(facts, codes),
-        annotation=_annotation(facts, codes),
+        review=_lead_pause(facts, _review(facts, codes)),
+        annotation=_lead_pause(facts, _annotation(facts, codes)),
         final=_final(facts, codes),
+    )
+
+
+def _lead_pause(facts: StageFacts, cell: StageCell) -> StageCell:
+    """A cell with running work on a text the lead paused reads "Paused by
+    lead" with the lead and the reason: the work is nobody's turn until the
+    text is released (issue 464). Every other cell stays: submitted work,
+    waiting work and the lead's own decisions are not paused.
+
+    An open consolidation stays ``consolidating`` with its consolidators and
+    counts, marked ``lead_pause``: the annotations are submitted (they are
+    not paused), and the client reads the open consolidation from this state
+    (the Finalization cell, the consolidator's row of the card, no second
+    "Consolidate…")."""
+    if not facts.lead_paused or cell.tone != "running":
+        return cell
+    if cell.state == "consolidating":
+        return _consolidating(
+            facts,
+            "waiting",
+            note="lead_pause",
+            excerpt=_excerpt(facts.lead_pause_reason),
+        )
+    return _cell(
+        "paused",
+        "waiting",
+        people=() if facts.lead_pause_by is None else (facts.lead_pause_by,),
+        excerpt=_excerpt(facts.lead_pause_reason),
+        note="lead_pause",
     )

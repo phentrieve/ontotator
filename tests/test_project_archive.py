@@ -904,3 +904,346 @@ def test_working_time_keeps_its_times_and_orphaned_tasks(
         ).scalar_one()
     assert [i.assignment_id for i in intervals] == [-999_999, copied_task]
     assert {(i.started_at, i.ended_at) for i in intervals} == {(started, ended)}
+
+
+def _text_overrides(db: Any, key: str) -> list[tuple[Any, ...]]:
+    """(case, language, value, reason, pseudonym of who set it) per text."""
+    from ontotator.storage.plan_tables import TextSettingRow
+    from ontotator.storage.tables import UserRow
+
+    with db.snapshot() as conn:
+        return [
+            tuple(row)
+            for row in conn.execute(
+                select(
+                    TextSettingRow.case_id,
+                    TextSettingRow.language,
+                    TextSettingRow.annotations_per_text,
+                    TextSettingRow.reason,
+                    UserRow.pseudonym,
+                )
+                .join(ProjectRow, ProjectRow.id == TextSettingRow.project_id)
+                .join(UserRow, UserRow.id == TextSettingRow.updated_by)
+                .where(ProjectRow.project_key == key)
+            )
+        ]
+
+
+def test_an_editorial_correction_round_trips(
+    servers: tuple[TestClient, TestClient], tmp_path: Path
+) -> None:
+    """Issue 453: the corrected version and its record (the reason, and the
+    lead mapped to their account) travel with the archive."""
+    from ontotator.application.editorial_corrections import (
+        EditorialCorrectionService,
+        editorial_corrections,
+    )
+    from ontotator.storage.tables import JobRow, UserRow
+
+    source, target = servers
+    built = _consolidation_project(source.app)  # type: ignore[arg-type]
+    scenario: Scenario = built["scenario"]
+    app: Any = source.app
+    lead = app.state.accounts.get_by_username(scenario.users["lead"])
+    previous = app.state.repo.get_variant(scenario.key, built["translation_id"])
+    saved = EditorialCorrectionService(_db(source), app.state.jobs).correct(
+        Actor.user(lead.id, lead.username),
+        scenario.key,
+        previous.document_id,
+        text=GERMAN + ".",
+        expected_text_sha256=previous.text_sha256,
+        reason="Full stop was missing",
+    )
+    # The correction queued the re-anchoring of proposals; an archive waits.
+    with _db(source).snapshot() as conn:
+        (job_id,) = conn.execute(
+            select(JobRow.id).where(JobRow.kind == "reanchor")
+        ).scalars()
+    jobs = app.state.jobs
+    assert jobs.run(jobs.claim(job_id, "archive-test"), "archive-test").status == (
+        "succeeded"
+    )
+    data = _export(source, scenario.key, tmp_path)
+
+    result = project_archive.import_archive(_db(target), OPERATOR, data)
+
+    assert result["verification"]["ok"], result["verification"]
+    assert _counts(_db(target), scenario.key) == _counts(_db(source), scenario.key)
+
+    def record(client: TestClient) -> tuple[Any, ...]:
+        with _db(client).snapshot() as conn:
+            pid = conn.execute(
+                select(ProjectRow.id).where(ProjectRow.project_key == scenario.key)
+            ).scalar_one()
+            row = editorial_corrections(conn, pid)[saved["document_id"]]
+            lead_pseudonym = conn.execute(
+                select(UserRow.pseudonym).where(UserRow.id == row["corrected_by"])
+            ).scalar_one()
+        return (
+            row["reason"],
+            row["previous_document_id"],
+            row["inserted_characters"],
+            row["corrected_at"],
+            lead_pseudonym,
+        )
+
+    assert record(target) == record(source)
+    assert record(target)[:3] == ("Full stop was missing", previous.document_id, 1)
+
+
+def test_a_query_decision_round_trips(
+    servers: tuple[TestClient, TestClient], tmp_path: Path
+) -> None:
+    """Issue 483: the lead's decision on a queried review travels with the
+    archive: the accepted version, the answer, the review it decides and the
+    lead mapped to their account."""
+    from browser_documents_scenarios_rows import review_translation
+
+    from ontotator.application.query_decisions import (
+        QueryDecisionService,
+        query_decisions,
+    )
+    from ontotator.storage.tables import JobRow, TranslationReviewRow, UserRow
+
+    source, target = servers
+    app: Any = source.app
+    scenario = new_project(app, "arch")
+    english = native_unit(CASE, "en", TEXT, case_id=CASE)
+    german = translation_unit(CASE, "de", GERMAN, source=english)
+    translated = import_texts(scenario, [english, german])[(CASE, "de", 1)]
+    add_user(scenario, "lead", ["lead"])
+    add_user(scenario, "reviewer", ["annotator"], qualification="Physician")
+    lead = app.state.accounts.get_by_username(scenario.users["lead"])
+    queried = review_translation(scenario, translated, "reviewer", "query")
+    previous = app.state.repo.get_variant(scenario.key, translated)
+    saved = QueryDecisionService(_db(source), app.state.jobs).decide(
+        Actor.user(lead.id, lead.username),
+        scenario.key,
+        previous.document_id,
+        kind="reviewer_text",
+        expected_text_sha256=previous.text_sha256,
+        expected_review_id=queried.id,
+        text=GERMAN + " Geprüft.",
+        answer="Taken with one addition.",
+    )
+    # The decision queued the re-anchoring of proposals; an archive waits.
+    with _db(source).snapshot() as conn:
+        (job_id,) = conn.execute(
+            select(JobRow.id).where(JobRow.kind == "reanchor")
+        ).scalars()
+    jobs = app.state.jobs
+    assert jobs.run(jobs.claim(job_id, "archive-test"), "archive-test").status == (
+        "succeeded"
+    )
+    data = _export(source, scenario.key, tmp_path)
+
+    result = project_archive.import_archive(_db(target), OPERATOR, data)
+
+    assert result["verification"]["ok"], result["verification"]
+    assert _counts(_db(target), scenario.key) == _counts(_db(source), scenario.key)
+
+    def record(client: TestClient) -> tuple[Any, ...]:
+        with _db(client).snapshot() as conn:
+            pid = conn.execute(
+                select(ProjectRow.id).where(ProjectRow.project_key == scenario.key)
+            ).scalar_one()
+            row = query_decisions(conn, pid)[saved["document_id"]]
+            lead_pseudonym = conn.execute(
+                select(UserRow.pseudonym).where(UserRow.id == row["decided_by"])
+            ).scalar_one()
+            # The review the decision names is the project's own review.
+            review = conn.execute(
+                select(
+                    TranslationReviewRow.project_id, TranslationReviewRow.decision
+                ).where(TranslationReviewRow.id == row["review_id"])
+            ).one()
+        return (
+            row["kind"],
+            row["answer"],
+            row["edited"],
+            row["document_id"],
+            row["reviewed_document_id"],
+            row["decided_at"],
+            lead_pseudonym,
+            review.project_id == pid,
+            review.decision,
+        )
+
+    assert record(target) == record(source)
+    assert record(target)[:5] == (
+        "reviewer_text",
+        "Taken with one addition.",
+        True,
+        previous.document_id,
+        previous.document_id,
+    )
+    assert record(target)[7:] == (True, "query")
+
+
+def test_an_uploaded_translation_version_round_trips(
+    servers: tuple[TestClient, TestClient], tmp_path: Path
+) -> None:
+    """Issue 341 a: the uploaded version and its upload record (how the text
+    was made, and the uploader mapped to their account) travel with the
+    archive."""
+    from ontotator.application.version_uploads import VersionUploadService, uploads
+    from ontotator.storage.tables import JobRow, UserRow
+
+    source, target = servers
+    built = _consolidation_project(source.app)  # type: ignore[arg-type]
+    scenario: Scenario = built["scenario"]
+    app: Any = source.app
+    lead = app.state.accounts.get_by_username(scenario.users["lead"])
+    previous = app.state.repo.get_variant(scenario.key, built["translation_id"])
+    # The test runs the re-anchoring job itself. The server's own worker polls
+    # the queue too and would otherwise claim the job first now and then.
+    app.state.job_worker.stop()
+    saved = VersionUploadService(_db(source), app.state.jobs).upload(
+        Actor.user(lead.id, lead.username),
+        scenario.key,
+        previous.document_id,
+        text=GERMAN + " Neu übersetzt.",
+        expected_text_sha256=previous.text_sha256,
+        method="machine_translation",
+        provider="DeepL",
+        model="deepl-2026-10",
+        note="Checked against the source",
+    )
+    # The upload queued the re-anchoring of proposals; an archive waits for it.
+    with _db(source).snapshot() as conn:
+        (job_id,) = conn.execute(
+            select(JobRow.id).where(JobRow.kind == "reanchor")
+        ).scalars()
+    jobs = app.state.jobs
+    claimed = jobs.claim(job_id, "archive-test")
+    assert claimed is not None
+    assert jobs.run(claimed, "archive-test").status == "succeeded"
+    data = _export(source, scenario.key, tmp_path)
+
+    result = project_archive.import_archive(_db(target), OPERATOR, data)
+
+    assert result["verification"]["ok"], result["verification"]
+    assert _counts(_db(target), scenario.key) == _counts(_db(source), scenario.key)
+
+    def record(client: TestClient) -> tuple[Any, ...]:
+        with _db(client).snapshot() as conn:
+            pid = conn.execute(
+                select(ProjectRow.id).where(ProjectRow.project_key == scenario.key)
+            ).scalar_one()
+            row = uploads(conn, pid)[saved["document_id"]]
+            uploader = conn.execute(
+                select(UserRow.pseudonym).where(UserRow.id == row["uploaded_by"])
+            ).scalar_one()
+        return (
+            row["method"],
+            row["provider"],
+            row["model"],
+            row["note"],
+            row["uploaded_at"],
+            uploader,
+        )
+
+    assert record(target) == record(source)
+    assert record(target)[:4] == (
+        "machine_translation",
+        "DeepL",
+        "deepl-2026-10",
+        "Checked against the source",
+    )
+
+
+def _set_override(db: Any, key: str) -> None:
+    """The project's annotator gives the text its own value (a real person,
+    so the import has to map ``updated_by``)."""
+    from ontotator.storage.tables import AssignmentRow
+    from ontotator.storage.text_settings import write_per_text
+
+    with db.transaction() as conn:
+        pid, user = conn.execute(
+            select(AssignmentRow.project_id, AssignmentRow.user_id)
+            .join(ProjectRow, ProjectRow.id == AssignmentRow.project_id)
+            .where(ProjectRow.project_key == key)
+        ).one()
+        write_per_text(
+            conn, pid, CASE, "en", 3, reason="method comparison", actor_id=user
+        )
+
+
+def test_a_text_keeps_its_own_annotations_per_text(
+    servers: tuple[TestClient, TestClient], tmp_path: Path
+) -> None:
+    """Issue 422: the per-text override travels with the archive, with the
+    person who set it mapped to their account on the target."""
+    from ontotator.storage.plan_tables import TextSettingRow
+    from ontotator.storage.tables import AssignmentRow
+
+    source, target = servers
+    scenario = _simple_project(source.app)  # type: ignore[arg-type]
+    _set_override(_db(source), scenario.key)
+    before = _text_overrides(_db(source), scenario.key)
+    data = _export(source, scenario.key, tmp_path)
+
+    result = project_archive.import_archive(_db(target), OPERATOR, data)
+
+    assert result["verification"]["ok"]
+    after = _text_overrides(_db(target), scenario.key)
+    assert [row[:4] for row in after] == [(CASE, "en", 3, "method comparison")]
+    assert after == before
+    # ``updated_by`` is the imported annotator, not the source server's id.
+    with _db(target).snapshot() as conn:
+        setter, annotator = conn.execute(
+            select(TextSettingRow.updated_by, AssignmentRow.user_id)
+            .join(AssignmentRow, AssignmentRow.project_id == TextSettingRow.project_id)
+            .join(ProjectRow, ProjectRow.id == TextSettingRow.project_id)
+            .where(ProjectRow.project_key == scenario.key)
+        ).one()
+    assert setter == annotator
+
+
+def test_a_lead_pause_travels_with_the_archive(
+    servers: tuple[TestClient, TestClient], tmp_path: Path
+) -> None:
+    """Issue 464: a paused text is paused on the target as well, with the
+    reason, the time and the person who paused it mapped to their account;
+    its task in progress stays paused there."""
+    from datetime import UTC, datetime
+
+    from sqlalchemy import update
+
+    from ontotator.storage.plan_tables import TextSettingRow
+    from ontotator.storage.tables import AssignmentRow
+    from ontotator.storage.text_pause import paused_texts, task_held, write_pause
+
+    source, target = servers
+    scenario = _simple_project(source.app)  # type: ignore[arg-type]
+    at = datetime(2026, 11, 17, 9, 30, tzinfo=UTC)
+    with _db(source).transaction() as conn:
+        pid, user = conn.execute(
+            select(AssignmentRow.project_id, AssignmentRow.user_id)
+            .join(ProjectRow, ProjectRow.id == AssignmentRow.project_id)
+            .where(ProjectRow.project_key == scenario.key)
+        ).one()
+        write_pause(
+            conn, pid, CASE, "en", reason="Clinic is checking", actor_id=user, at=at
+        )
+        conn.execute(update(AssignmentRow).values(status="in_progress"))
+    data = _export(source, scenario.key, tmp_path)
+
+    result = project_archive.import_archive(_db(target), OPERATOR, data)
+
+    assert result["verification"]["ok"]
+    with _db(target).snapshot() as conn:
+        pid = conn.execute(
+            select(ProjectRow.id).where(ProjectRow.project_key == scenario.key)
+        ).scalar_one()
+        pauses = paused_texts(conn, pid)
+        pause = pauses[(CASE, "en")]
+        assert list(pauses) == [(CASE, "en")]
+        assert (pause.reason, pause.paused_at) == ("Clinic is checking", at)
+        annotator, held = conn.execute(
+            select(AssignmentRow.user_id, task_held()).where(
+                AssignmentRow.project_id == pid
+            )
+        ).one()
+        assert pause.paused_by == annotator and held is True
+        assert conn.execute(select(TextSettingRow.paused)).scalars().all() == [True]

@@ -6,6 +6,7 @@ import {
   type CaseSummary,
   type CurrentUser,
   type DocumentRowView,
+  type DocumentVersionView,
   type DocumentRowsPage,
   type DocumentRowsQuery,
   type DocumentRowsRequest,
@@ -29,10 +30,12 @@ import { FilterPopover } from "../documents/FilterPopover";
 import { DocumentCards } from "../documents/DocumentCards";
 import { DocumentsTable, tableRows, type ColumnSort, type HeaderSort, type TableSelection } from "../documents/DocumentsTable";
 import { consolidationStartedToast, panelStep } from "../documents/finalPanelText";
+import { finalChangedText, finalUndoAction } from "../documents/finalUndo";
 import { leadSteps, rowActionLabel, stepBlockedReason } from "../documents/nextStepLabels";
 import { TranslationCorrectionAction } from "../variants/TranslationCorrectionAction";
 import { DecisionBlock } from "../documents/FinalPanel";
 import { StageActions, type StageActionsProps } from "../documents/StageActions";
+import { WithdrawFinalDialog } from "../documents/WithdrawFinalDialog";
 import { TextCard, type CardStep } from "../documents/textCard/TextCard";
 import type { CardView, SegmentId } from "../documents/textCard/cardModel";
 import { CardPlanSelect, TextPlanDialog } from "../documents/PlanSteps";
@@ -46,6 +49,9 @@ import { SelectByIdsDialog } from "../documents/SelectByIdsDialog";
 import { SelectionBar } from "../documents/SelectionBar";
 import { documentsGroupId, documentsRowId, isPlainClick, type DocumentsRowPart, type OpenTextCard, RouteLink, rowKeyOf, rowName } from "../documents/RowCells";
 import type { TextVersionsTools } from "../documents/TextVersions";
+import { AcceptVersionDialog, CorrectVersionDialog } from "../documents/VersionDialogs";
+import { EditorialCorrectionDialog } from "../documents/EditorialCorrectionDialog";
+import { UploadVersionDialog } from "../documents/UploadVersionDialog";
 import { workText } from "../documents/labels";
 import { isActiveRow } from "../documents/stageLabels";
 import { caseOfTextKey, languageOfTextKey, MAX_SELECTION_CASES as MAX_SELECTION, rowRefOf, textKeyOf, useTextSelection } from "../documents/useTextSelection";
@@ -369,6 +375,8 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
       me: assignMe,
       consolidatorRule: page?.adjudicator_not_annotator ?? false,
       onClose: () => setAssignDialog(null),
+      // Issue 422: a changed limit shows in the row and the text card at once.
+      onLimitChanged: () => { void refreshAll(); },
       // The toast region announces the message; a second live region would say it twice (#47 A-25).
       // Issue 248: the toast follows the refreshed rows, so it never announces work the row does not show yet.
       onAssigned: message => { setAssignDialog(null); void refreshAll().then(() => showToast({ message })); },
@@ -379,6 +387,12 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
   const [reviewDocument, setReviewDocument] = useState<string | null>(null);
 
   const [correctionFor, setCorrectionFor] = useState<{ row: DocumentRowView; variant: VariantSummary } | null>(null);
+  /** "Withdraw final…" (issue 343): the row whose final result the dialog takes back. */
+  const [withdrawFor, setWithdrawFor] = useState<DocumentRowView | null>(null);
+  /** The row as the page shows it now (after a refused withdrawal the reload brings the new revision). */
+  const withdrawRow = withdrawFor ? pageRows.find(entry => rowKeyOf(entry) === rowKeyOf(withdrawFor)) ?? withdrawFor : null;
+  // Issues 341 and 453: the lead's actions on one version row (Correct it myself…, Accept this version…, Fix typos…, Upload a corrected text…).
+  const [versionAction, setVersionAction] = useState<{ kind: "correct" | "accept" | "upload" | "editorial"; row: DocumentRowView; version: DocumentVersionView } | null>(null);
   const textVersionTools = useMemo<TextVersionsTools | undefined>(() => {
     if (!inventory) return undefined;
     const variants = new Map<string, VariantSummary>(inventory.cases.flatMap(item => item.variants).map(variant => [variant.document_id, variant]));
@@ -391,9 +405,15 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
       onAssignmentsChanged: refreshAll,
       onShowTranslationReviews: setReviewDocument,
       onRequestCorrection: (row, variant) => setCorrectionFor({ row, variant }),
+      ...(canOverrideTranslationStatus ? {
+        onCorrectTranslation: (row: DocumentRowView, version: DocumentVersionView) => setVersionAction({ kind: "correct", row, version }),
+        onAcceptVersion: (row: DocumentRowView, version: DocumentVersionView) => setVersionAction({ kind: "accept", row, version }),
+        onUploadVersion: (row: DocumentRowView, version: DocumentVersionView) => setVersionAction({ kind: "upload", row, version }),
+        onEditorialCorrection: (row: DocumentRowView, version: DocumentVersionView) => setVersionAction({ kind: "editorial", row, version }),
+      } : {}),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refreshAll only uses rows.reload and state setters
-  }, [inventory, currentUser?.username, rows.reload]);
+  }, [inventory, currentUser?.username, rows.reload, canOverrideTranslationStatus]);
 
   // Deep link: focus the named row header (or the group header) once its data is shown.
   const focusedDeepLink = useRef<string | null>(null);
@@ -553,8 +573,9 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
     const caseIds = [...selection.cases];
     if (!caseIds.length) return;
     setAssignDialog({
-      mode: "cases", projectKey, caseIds, sort: batchSort(request.sort), filters, me: assignMe,
+      mode: "cases", projectKey, caseIds, rows: selectedRows, sort: batchSort(request.sort), filters, me: assignMe,
       onClose: () => setAssignDialog(null),
+      onLimitChanged: () => { void refreshAll(); },
       onAssigned: (message, skipped) => {
         // The planned work is done for this selection; the skipped cases stay one click away.
         setAssignDialog(null);
@@ -705,7 +726,18 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
   const decision = panelKey && releasedKey !== panelKey && (decisionKey.current === panelKey || decisionOptional) ? <DecisionBlock optional={decisionOptional} projectKey={projectKey} rowKey={panelKey} page={page} query={query} refreshError={rows.error}
     username={currentUser?.username ?? ""} changeFinal={changeFinalKey === panelKey}
     onClose={closeCardFromBlock}
-    onDecided={key => { notifyFinalSelectionChanged(projectKey); recordDecision(projectKey, key); reloadAfterAction(); }}
+    onDecided={(key, undo) => {
+      notifyFinalSelectionChanged(projectKey);
+      recordDecision(projectKey, key);
+      // Another result replaced the final one: the same message with Undo as after the bulk "Change final…".
+      if (undo) {
+        const name = `${caseOfTextKey(key)} ${languageOfTextKey(key)}`;
+        const message = finalChangedText(name);
+        announce(message);
+        showToast({ message, actionLabel: "Undo", undo: true, onAction: finalUndoAction(projectKey, undo.id, { onAnnounce: announce, showToast, onChanged: () => { notifyFinalSelectionChanged(projectKey); reloadAfterAction(); } }, name) });
+      }
+      reloadAfterAction();
+    }}
     onAdvance={key => showPanel({ key, stage: panelStage, tab: panelTab }, {})}
     onReload={() => rows.reload()}
     onNavigate={route => onNavigate(route)}
@@ -732,6 +764,7 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
     canRequestCorrection: row => correctionVariant(row) != null,
     onChangeFinal: row => openCard({ key: rowKeyOf(row), stage: panelStage, tab: panelTab }, { changeFinal: true, focus: true }),
     canChangeFinal: row => row.final != null && !panelStep(row) && decisionKey.current !== rowKeyOf(row),
+    onWithdrawFinal: row => setWithdrawFor(row),
   };
   // Escape inside the options closes them; a discard confirmation inside handles its own Escape first (registered later).
   useShortcut("Escape", event => {
@@ -740,14 +773,16 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
     closePanel(resolveOptions.rowKey);
   }, { allowInInputs: true, enabled: resolveOptions != null });
 
-  // "Request correction…" of an accepted version (the card's versions, the cards' stage popover).
+  // "Ask a reviewer to correct…" of an accepted version (the card's versions, the cards' stage popover).
   /** The accepted newest translation a correction can be requested for (Text versions offers the same). */
   const correctionVariant = (row: DocumentRowView): VariantSummary | null => {
     if (row.is_source || !textVersionTools) return null;
     const newest = row.versions.find(version => version.is_newest_in_chain && version.translation_status === "accepted" && !version.discarded);
     return newest ? textVersionTools.variants.get(newest.document_id) ?? null : null;
   };
-  const closeCorrection = () => { setCorrectionFor(null); reloadAfterAction(); };
+  /** The reviewer was asked: the dialog's one button then reads "Close" ("Cancel" before, as in the neighbour dialogs). */
+  const [correctionDone, setCorrectionDone] = useState(false);
+  const closeCorrection = () => { setCorrectionFor(null); setCorrectionDone(false); reloadAfterAction(); };
 
   const [planFor, setPlanFor] = useState<DocumentRowView | null>(null);
   // A status-column sort of the loaded page (the server sorts by Text and Last activity only).
@@ -785,6 +820,7 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
     onStep={stepCard} onClose={closeCard} onNavigate={route => onNavigate(route)}
     onAssign={(row, task) => { void onAssign(row, task); }}
     onChangePlan={row => setPlanFor(row)} onOpenText={entry => openCard({ key: rowKeyOf(entry), tab: panelTab })} onChanged={reloadAfterAction}
+    onMessage={message => { announce(message); showToast({ message }); }}
     decision={decision} textVersionTools={textVersionTools} canManage me={currentUser ?? null}
     reportRoute={reportId => ({ name: "projectProblemReport", key: projectKey, reportId, documents: query })}
     plan={<><PlanChips row={panelRow} groupRevision={groupOf(panelRow.case_id)?.plan_revision ?? 1} saves={planSaves} size={narrow ? "card" : "table"} /><PlanRowNotice row={panelRow} saves={planSaves} /></>}
@@ -942,12 +978,31 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
     {assignDialog && <AssignWorkDialog {...assignDialog} />}
     {textChangeDialog}
     {planDialog}
-    {correctionFor && textVersionTools && <Dialog open title={`Request translation correction: ${rowName(correctionFor.row)}`} size="md"
-      onClose={closeCorrection} footer={<Button onClick={closeCorrection}>Close</Button>}
+    {correctionFor && textVersionTools && <Dialog open title={`Ask a reviewer to correct, ${rowName(correctionFor.row)}`} size="md"
+      onClose={closeCorrection} footer={<Button onClick={closeCorrection}>{correctionDone ? "Close" : "Cancel"}</Button>}
       returnFocus={() => rowElement(rowKeyOf(correctionFor.row), "action") ?? rowElement(rowKeyOf(correctionFor.row), "header")}>
       <TranslationCorrectionAction projectKey={projectKey} variant={correctionFor.variant} username={textVersionTools.username}
-        requiredLanguages={textVersionTools.requiredLanguages(correctionFor.variant.document_id)} defaultOpen inDialog />
+        requiredLanguages={textVersionTools.requiredLanguages(correctionFor.variant.document_id)} defaultOpen inDialog onAssigned={() => setCorrectionDone(true)} />
     </Dialog>}
+    {withdrawFor && withdrawRow && <WithdrawFinalDialog projectKey={projectKey} row={withdrawRow} onCancel={() => setWithdrawFor(null)}
+      onStale={reloadAfterAction}
+      onWithdrawn={() => {
+        setWithdrawFor(null);
+        notifyFinalSelectionChanged(projectKey);
+        showToast({ message: `Final result of ${rowName(withdrawFor)} withdrawn.` });
+        reloadAfterAction();
+      }} />}
+    {versionAction?.kind === "correct" && <CorrectVersionDialog row={versionAction.row} version={versionAction.version} projectKey={projectKey}
+      onNavigate={route => onNavigate(route)} onClose={() => setVersionAction(null)} />}
+    {versionAction?.kind === "accept" && <AcceptVersionDialog row={versionAction.row} version={versionAction.version} projectKey={projectKey}
+      onClose={() => setVersionAction(null)}
+      onAccepted={message => { setVersionAction(null); void refreshAll().then(() => showToast({ message })); }} />}
+    {versionAction?.kind === "upload" && <UploadVersionDialog row={versionAction.row} version={versionAction.version} projectKey={projectKey}
+      onClose={() => setVersionAction(null)}
+      onUploaded={message => { setVersionAction(null); void refreshAll().then(() => showToast({ message })); }} />}
+    {versionAction?.kind === "editorial" && <EditorialCorrectionDialog row={versionAction.row} version={versionAction.version} projectKey={projectKey}
+      onClose={() => setVersionAction(null)}
+      onCorrected={message => { setVersionAction(null); void refreshAll().then(() => showToast({ message })); }} />}
     {idsDialogOpen && <SelectByIdsDialog projectKey={projectKey} current={selection.cases} filters={filters} sort={request.sort ?? "case"} activeOnly={!notInPlanShown} onClose={() => setIdsDialogOpen(false)} onSelect={selectByIds} />}
   </section>;
 }
@@ -978,7 +1033,7 @@ function ReviewHistory({ projectKey, documentId, onClose }: { projectKey: string
     {records?.length === 0 && <p>No one has reviewed this translation yet.</p>}
     {records && <ol className="review-history">{records.map(record => <li key={record.id}>
       <p><strong>{labelFor(decisionLabels, record.decision)}</strong> by {record.reviewer_pseudonym}, <time dateTime={record.created_at}>{formatDateTime(record.created_at)}</time></p>
-      <p className="cell-secondary review-guideline">{submissionGuidelineLabel(record.guideline_version, record.guideline_withdrawn, null)}</p>
+      <p className="cell-secondary review-guideline">{submissionGuidelineLabel(record.guideline_version, record.guideline_withdrawn, null, record.guideline_label)}</p>
       <p className="cell-secondary">{[record.reviewer_qualification, record.reviewer_languages.length ? `reads ${record.reviewer_languages.join(", ")}` : ""].filter(Boolean).join(", ")}</p>
       <p>{record.status_before === record.status_after ? `Translation status stayed ${labelFor(translationStatusLabels, record.status_after)}.` : `Translation status changed from ${labelFor(translationStatusLabels, record.status_before)} to ${labelFor(translationStatusLabels, record.status_after)}.`}</p>
       <p>{record.clinical_change ? "Clinical change" : "No clinical change"}{record.categories.length ? `: ${record.categories.map(category => labelFor(categoryLabels, category)).join(", ")}` : ""}</p>

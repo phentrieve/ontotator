@@ -48,6 +48,7 @@ from ontotator.authz.memberships import grant_lead_self_role
 from ontotator.authz.policy import Access, Action, Role, Task
 from ontotator.authz.project_authority import require_project_management
 from ontotator.authz.visibility import current_access, require_document
+from ontotator.domain.annotation_limits import MAX_CONSOLIDATION_SOURCES
 from ontotator.domain.canonical import canonical_hash
 from ontotator.domain.errors import AccessDenied, DomainError
 from ontotator.domain.work_rounds import WorkRoundView
@@ -70,7 +71,9 @@ class StartConsolidation(BaseModel):
     document_id: str = Field(min_length=1)
     # Username of the consolidator; the acting lead may name themself.
     reviewer: str = Field(min_length=1)
-    source_submission_ids: list[str] = Field(min_length=2, max_length=20)
+    source_submission_ids: list[str] = Field(
+        min_length=2, max_length=MAX_CONSOLIDATION_SOURCES
+    )
     reason: str | None = Field(default=None, max_length=2000)
     confirm_language: bool = False
     request_id: str = Field(min_length=1, max_length=128)

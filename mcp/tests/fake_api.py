@@ -7,6 +7,7 @@ schema) or a function. Each call is recorded with its contract template.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -16,6 +17,17 @@ import httpx
 from contract import check, match, named, response_schema, synth
 
 TOKEN = "ott_test-token-never-shown"
+# Two preview tokens as the server makes them (``sha256:`` and 64 hex digits).
+PT_A = "sha256:" + "a" * 64
+PT_B = "sha256:" + "b" * 64
+
+
+def marked(token: str, reason: str = "") -> str:
+    """``token`` as reopen_texts, withdraw_open_tasks and start_rounds hand
+    it out: the server's token and a mark of the dry run's reason."""
+    return f"{token}.{hashlib.sha256(reason.encode()).hexdigest()[:8]}"
+
+
 Handler = Callable[[httpx.Request], Any]
 
 
@@ -55,6 +67,9 @@ class FakeApi:
     calls: list[Call] = field(default_factory=list)
     # The bearer tokens a request may carry (remote mode has several callers).
     accepted: frozenset[str] = frozenset({TOKEN})
+    # Builds the body of a route no test answered; ``contract.synth`` (the
+    # smallest instance) unless a test wants more.
+    synth: Callable[[dict[str, Any]], Any] = synth
 
     def __post_init__(self) -> None:
         # Jobs finish at once unless a test says otherwise.
@@ -94,7 +109,7 @@ class FakeApi:
         answer = self.routes.get((request.method, template), _SYNTH)
         if answer is _SYNTH:
             schema = response_schema(request.method, template)
-            body = None if schema is None else synth(schema)
+            body = None if schema is None else self.synth(schema)
         elif callable(answer):
             body = answer(request)
         else:

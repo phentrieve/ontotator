@@ -1,9 +1,9 @@
-import { useId, useState } from "react";
-import type { TranslationReviewRecord } from "../api/client";
+import { useId, useState, type ReactNode } from "react";
+import type { BracketCheck, TranslationReviewRecord } from "../api/client";
 import { personLabel } from "../app/identity";
 import { submissionGuidelineLabel } from "../guidelines/submissionLabel";
 import { Button, IconCheck, IconChevronRight, IconWarning, StatusBadge, EmptyValue } from "../ui";
-import { allChecksLine, calmCheckText, categoryLabels, checkBandText, checkDeviationGuidance, checkExplanation, checkLabel, checkNoLocation, decisionConsequences, decisionLabels, formatReviewDate, translationStatusLabel } from "./labels";
+import { addedBrackets, allChecksLine, calmCheckText, earlierChecksText, sourceUpdatesOpenText, sourceUpdatesOpenTitle, categoryLabels, checkBandText, checkDeviationGuidance, checkExplanation, checkLabel, checkNoLocation, decisionConsequences, decisionLabels, formatReviewDate, translationStatusLabel } from "./labels";
 import type { ClinicalCategory, ReviewDecisionCode } from "./reviewRules";
 
 type CheckRow = { code: string; passed: boolean; detail: string | null };
@@ -20,26 +20,36 @@ function checkRows(raw: readonly unknown[]): CheckRow[] {
  * Check records carry no position in the text, so failures are described, not linked.
  * The disclosure starts collapsed on every mount and is never stored.
  */
-export function ChecksSummary({ failed, all }: { failed: readonly unknown[]; all: readonly unknown[] | null }): JSX.Element {
+export function ChecksSummary({ failed, all, earlier, brackets }: {
+  failed: readonly unknown[]; all: readonly unknown[] | null;
+  /** A version after the first: the checks in `all` ran on version `checked`, not on the reviewed `version`. They are shown as that version's checks and ask for nothing. */
+  earlier?: { checked: number; version: number };
+  /** Ontotator's own check of the reviewed version (issue 484): shown when the translation has more bracketed passages than the source. It asks for nothing. */
+  brackets?: BracketCheck | null;
+}): JSX.Element {
   const id = useId();
   const [open, setOpen] = useState(false);
   const failures = checkRows(failed), every = checkRows(all ?? failed);
   const passed = every.filter(check => check.passed).length;
   // The band and Details agree: whenever the band names a failure, Details exists and counts it.
-  const hasDetails = failures.length > 0 || every.length > 0;
+  const added = brackets && brackets.translation_count > brackets.source_count ? brackets : null;
+  const hasDetails = failures.length > 0 || every.length > 0 || added !== null;
   const failedCount = Math.max(failures.length, every.length - passed);
   const bandText = failures.length > 0 ? checkBandText(failures.map(check => check.code)) : "";
   const split = bandText.indexOf(": ");
-  return <section className={`translation-checks${failures.length > 0 ? " translation-checks--failed" : ""}`} aria-labelledby={`${id}-heading`}>
+  return <section className={`translation-checks${failures.length > 0 || added ? " translation-checks--failed" : ""}`} aria-labelledby={`${id}-heading`}>
     <h2 id={`${id}-heading`} className="review-sr-only">Automatic translation checks</h2>
     <div className="translation-checks-band">
-      {failures.length > 0
+      {earlier && every.length > 0
+        ? <p className="translation-checks-line translation-checks-calm"><span>{earlierChecksText(earlier.checked, earlier.version, every.filter(check => !check.passed).map(check => check.code))}</span></p>
+        : failures.length > 0
         ? <p className="translation-checks-line"><IconWarning /><span><strong>{bandText.slice(0, split + 1)}</strong>{bandText.slice(split + 1)}</span></p>
         : every.length > 0
           ? <p className="translation-checks-line translation-checks-calm"><IconCheck /><span>{calmCheckText(every.length)}</span></p>
           : <p className="translation-checks-line translation-checks-calm">No automatic checks were recorded for this translation.</p>}
       {hasDetails && <Button variant="quiet" size="sm" className="translation-checks-toggle" aria-expanded={open} aria-controls={`${id}-details`}
         icon={<IconChevronRight className="translation-checks-chevron" />} onClick={() => setOpen(value => !value)}>{open ? "Hide details" : "Details"}</Button>}
+      {added && <p className="translation-checks-brackets"><IconWarning /><span><strong>{addedBrackets.band}</strong> {addedBrackets.counts(added.translation_count, added.source_count)}</span></p>}
     </div>
     {hasDetails && <div id={`${id}-details`} className="translation-check-details" hidden={!open}>
       {open && <>
@@ -53,8 +63,20 @@ export function ChecksSummary({ failed, all }: { failed: readonly unknown[]; all
           {check.code && <details className="translation-check-technical"><summary>Technical details</summary>
             <p>Technical code: <code className="translation-check-code">{check.code}</code></p></details>}
         </section>)}
-        <div className="translation-checks-all-line">
-          <span>{allChecksLine(passed, failedCount)}</span>
+        {added && <section className="translation-check" aria-labelledby={`${id}-brackets`}>
+          <h3 id={`${id}-brackets`}>{addedBrackets.title}</h3>
+          <p>{addedBrackets.explanation} {addedBrackets.counts(added.translation_count, added.source_count)}.</p>
+          <dl className="translation-check-facts">
+            <div><dt>{addedBrackets.passagesTerm}</dt><dd>
+              <ul className="translation-check-passages">{added.passages.map((passage, index) => <li key={index}><span className="translation-check-detail">“{passage.text}”</span></li>)}</ul>
+              {added.truncated && <p>{addedBrackets.truncated}</p>}
+            </dd></div>
+            <div><dt>{addedBrackets.addedTerm}</dt><dd>{addedBrackets.addedAdvice}</dd></div>
+            <div><dt>{addedBrackets.rightTerm}</dt><dd>{addedBrackets.rightAdvice}</dd></div>
+          </dl>
+        </section>}
+        {(failures.length > 0 || every.length > 0) && <div className="translation-checks-all-line">
+          <span>{allChecksLine(passed, failedCount, earlier?.checked)}</span>
           {every.length > 0 && <><details className="translation-checks-all">
             <summary>Show all checks</summary>
             <ul className="translation-check-list">{every.map((check, index) => <li key={index}>
@@ -63,7 +85,7 @@ export function ChecksSummary({ failed, all }: { failed: readonly unknown[]; all
               {check.code && <dl className="translation-check-code-line"><dt>Technical code</dt><dd><code className="translation-check-code">{check.code}</code></dd></dl>}
             </li>)}</ul>
           </details></>}
-        </div>
+        </div>}
       </>}
     </div>}
   </section>;
@@ -81,7 +103,7 @@ export function ReviewSummary({ record, heading }: { record: TranslationReviewRe
       <div><dt>Rationale</dt><dd className="review-summary-rationale">{record.rationale?.trim() ? record.rationale : <EmptyValue />}</dd></div>
       <div><dt>Status of the reviewed version</dt><dd>{translationStatusLabel(record.status_after)}</dd></div>
       <div><dt>Reviewer</dt><dd>{personLabel({ pseudonym: record.reviewer_pseudonym })}{record.reviewer_qualification ? `, ${record.reviewer_qualification}` : ""}</dd></div>
-      <div><dt>Guidelines</dt><dd>{submissionGuidelineLabel(record.guideline_version, record.guideline_withdrawn, null).replace(/^Guidelines:? /, "")}</dd></div>
+      <div><dt>Guidelines</dt><dd>{submissionGuidelineLabel(record.guideline_version, record.guideline_withdrawn, null, record.guideline_label).replace(/^Guidelines:? /, "")}</dd></div>
       <div><dt>Submitted</dt><dd><time dateTime={record.created_at}>{formatReviewDate(record.created_at)}</time></dd></div>
     </dl>
   </section>;
@@ -93,19 +115,30 @@ const excerpt = (text: string, limit = 160) => {
 };
 
 /** Body of the submit confirmation: what is decided and what follows. */
-export function SubmitSummary({ decision, clinical, categories, rationale, failedChecks = [] }: {
+export function SubmitSummary({ decision, clinical, categories, rationale, failedChecks = [], consequence, sourceUpdates, typography }: {
   decision: ReviewDecisionCode; clinical: boolean; categories: readonly ClinicalCategory[]; rationale: string | null | undefined;
   /** Failed automatic checks of an accepted translation (R-12). */
   failedChecks?: readonly string[];
+  /** Replaces `decisionConsequences` (a lead correction of an accepted version, issue 341 b). */
+  consequence?: string;
+  /** Source updates this submit would leave unreviewed, with the way to the source update dialog. */
+  sourceUpdates?: { count: number; onReview: () => void };
+  /** Typography hints of the text to be saved (`TypographyHintsNote`); they block nothing. */
+  typography?: ReactNode;
 }): JSX.Element {
   return <div className="review-confirm">
+    {sourceUpdates && <div className="review-confirm-source-update" role="alert">
+      <p><strong>{sourceUpdatesOpenTitle(sourceUpdates.count)}</strong> {sourceUpdatesOpenText}</p>
+      <Button size="sm" onClick={sourceUpdates.onReview}>Review source update</Button>
+    </div>}
     {failedChecks.length > 0 && <p><strong>{checkBandText(failedChecks)}.</strong></p>}
+    {typography}
     <dl className="review-summary-list">
       <div><dt>Decision</dt><dd>{decisionLabels[decision]}</dd></div>
       <div><dt>Clinically relevant change</dt><dd>{clinical ? `Yes: ${categoryList(categories)}` : "No"}</dd></div>
       {rationale?.trim() ? <div><dt>Rationale</dt><dd className="review-summary-rationale">{excerpt(rationale)}</dd></div> : null}
     </dl>
-    <p>{decisionConsequences[decision]}</p>
+    <p>{consequence ?? decisionConsequences[decision]}</p>
     <p className="review-confirm-final">A submitted review cannot be changed later.</p>
   </div>;
 }

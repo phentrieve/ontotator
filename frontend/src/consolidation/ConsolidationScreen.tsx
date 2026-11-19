@@ -5,7 +5,7 @@
  * after submission); a withdrawn input or a lost assignment makes it read-only with the reason.
  */
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
-import { api, ApiError, type ConsolidationAnnotatePayload, type ConsolidationGroupView, type ConsolidationResolvePayload, type SearchCandidate, type TaskSummary } from "../api/client";
+import { api, ApiError, type ConsolidationAnnotatePayload, type ConsolidationGroupView, type ConsolidationResolvePayload, type SearchCandidate, type TaskSummary, type ConsolidationView } from "../api/client";
 import { ErrorNotice } from "../admin/ErrorNotice";
 import type { WorkspaceView } from "../app/CaseScreen";
 import { nextOpenTask } from "../app/caseOrder";
@@ -19,7 +19,7 @@ import { useShortcut } from "../ui/shortcuts";
 import { StagePath } from "../ui/StagePath";
 import { AddedFindings } from "./AddedFindings";
 import { addedHeading, duplicatesText, finalizationState, headerTitle, readOnlyText, submittedText, summaryText } from "./consolidationText";
-import { duplicateTerms, groupName, termLabel } from "./groupModel";
+import { duplicateTerms, groupName, modifierFindings, termLabel } from "./groupModel";
 import { GroupList, textOrder } from "./GroupList";
 import { SubmitBar } from "./SubmitBar";
 import { SummaryDialog } from "./SummaryDialog";
@@ -46,6 +46,8 @@ export interface ConsolidationScreenProps {
   workspaceView?: WorkspaceView | null;
   /** Task actions next to the title (the task's guidelines and "Report a text problem"). */
   headerActions?: ReactNode;
+  /** A save was refused because the task is paused (it was paused while this screen was open): the caller reloads the task's state. */
+  onTaskHeld?: () => void;
   /** The task's one-time guidelines notice, shown under the header (inside the screen's padding, as in CaseScreen). */
   notice?: ReactNode;
   /** "Back to documents" target of the lead's read-only view (the Documents page with its row panel). */
@@ -72,7 +74,9 @@ export function passagesOf(text: string, query: string): TextRange[] {
 }
 
 /** "Add finding" without a mouse selection: type the passage, choose its occurrence. */
-function PassageForm({ text, anchorRef, onPick, onClose }: { text: string; anchorRef: RefObject<HTMLElement>; onPick: (range: TextRange) => void; onClose: () => void }): JSX.Element {
+function PassageForm({ text, anchorRef, selectable, onPick, onClose }: { text: string; anchorRef: RefObject<HTMLElement>;
+  /** The text pane is in view: the passage can also be selected there. */
+  selectable: boolean; onPick: (range: TextRange) => void; onClose: () => void }): JSX.Element {
   const [value, setValue] = useState("");
   const [index, setIndex] = useState(0);
   const id = useId();
@@ -84,7 +88,7 @@ function PassageForm({ text, anchorRef, onPick, onClose }: { text: string; ancho
   return <Popover open anchorRef={anchorRef} label="Add finding" onClose={onClose} width={420}>
     <form className="cons-passage-form" onSubmit={event => { event.preventDefault(); pick(); }}>
       <TextInput id={`${id}-passage`} label="Passage from the text" value={value} autoComplete="off"
-        hint={value.trim() && !matches.length ? "Not found in the text. Type it exactly as written." : "Or select the passage in the text."}
+        hint={value.trim() && !matches.length ? "Not found in the text. Type it exactly as written." : selectable ? "Or select the passage in the text." : "Type it exactly as written in the text."}
         onChange={event => { setValue(event.target.value); setIndex(0); }} />
       {matches.length > 1 && <Select id={`${id}-occurrence`} label="Occurrence" value={String(index)} onChange={event => setIndex(Number(event.target.value))}>
         {matches.map((match, position) => <option key={match.start} value={position}>{`${position + 1}: ${context(match)}`}</option>)}
@@ -107,7 +111,7 @@ const nextOpenAfter = (groups: readonly ConsolidationGroupView[], groupId: strin
 };
 
 export function ConsolidationScreen(props: ConsolidationScreenProps): JSX.Element {
-  const data = useConsolidation(props.roundId, { workspaceView: props.workspaceView });
+  const data = useConsolidation(props.roundId, { workspaceView: props.workspaceView, onTaskHeld: props.onTaskHeld });
   const view = data.view;
   const wide = useMediaQuery("(min-width: 1100px)");
   const medium = useMediaQuery("(min-width: 700px)");
@@ -134,6 +138,20 @@ export function ConsolidationScreen(props: ConsolidationScreenProps): JSX.Elemen
   const [reopeningAll, setReopeningAll] = useState({ open: false, busy: false });
   const [focusRequest, setFocusRequest] = useState<{ groupId: string } | null>(null);
   const { toast, show, dismiss } = useToast();
+  const toastNow = useRef(toast);
+  toastNow.current = toast;
+  /** The Undo of the "Reopened n decided groups." toast while that toast is the one on screen. */
+  const reopenAllUndo = useRef<(() => void) | null>(null);
+  /**
+   * A new change. The last decision's Undo ends with it, and so does the Undo of "Reopen all decisions…" (issue 470):
+   * the server restores the reopened decisions only while nothing was decided since, so its toast goes, and one Undo
+   * at most is on offer.
+   */
+  const changed = () => {
+    setLastDecision(null);
+    if (reopenAllUndo.current && toastNow.current?.onAction === reopenAllUndo.current) dismiss();
+    reopenAllUndo.current = null;
+  };
   const toggles = useRef(new Map<string, HTMLButtonElement>());
   const submitRef = useRef<HTMLDivElement>(null);
   const addRef = useRef<HTMLButtonElement>(null);
@@ -173,6 +191,18 @@ export function ConsolidationScreen(props: ConsolidationScreenProps): JSX.Elemen
     setSelected(groupId);
     if (focus) setFocusRequest({ groupId });
   };
+  const selectFirstOpen = (fresh: ConsolidationView) => {
+    const first = textOrder(fresh.groups, fresh.text).find(group => group.state === "open");
+    if (first) select(first.group_id, true);
+  };
+  // Reopen all whose view read failed: waits for a view newer than `after`.
+  const awaitedView = useRef<{ after: ConsolidationView | null } | null>(null);
+  useEffect(() => {
+    if (!awaitedView.current || !view || view === awaitedView.current.after) return;
+    awaitedView.current = null;
+    selectFirstOpen(view);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new view selects
+  }, [view]);
   const announceTimer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(announceTimer.current), []);
   const announce = (text: string) => {
@@ -193,7 +223,7 @@ export function ConsolidationScreen(props: ConsolidationScreenProps): JSX.Elemen
 
   const reopen = async (group: ConsolidationGroupView, undone = false): Promise<boolean> => {
     const previous = lastDecision;
-    setLastDecision(null);
+    changed();
     const ok = await data.reopen(group.group_id, { input_ids: group.members.map(member => member.input_id) });
     // A failed reopen keeps Undo available.
     if (!ok) setLastDecision(previous);
@@ -206,7 +236,7 @@ export function ConsolidationScreen(props: ConsolidationScreenProps): JSX.Elemen
     return ok;
   };
   const resolve = async (group: ConsolidationGroupView, payload: ConsolidationResolvePayload, summary: string): Promise<boolean> => {
-    setLastDecision(null);
+    changed();
     const ok = await data.resolve(group.group_id, payload);
     if (!ok) return false;
     setSummaries(current => new Map(current).set(group.group_id, summary));
@@ -228,21 +258,28 @@ export function ConsolidationScreen(props: ConsolidationScreenProps): JSX.Elemen
   // Not in text fields (the shortcut scope "screen" leaves typing targets alone). Listed in "?" while the view is
   // editable (R-25); without a decision to undo the key passes through.
   useShortcut(["Ctrl+z", "Meta+z"], undoLast, { scope: "screen", description: "Undo the last decision", group: "Consolidation", enabled: !readOnly });
-  const annotate = (group: ConsolidationGroupView, payload: ConsolidationAnnotatePayload) => { setLastDecision(null); return data.annotate(group.group_id, payload); };
+  const annotate = (group: ConsolidationGroupView, payload: ConsolidationAnnotatePayload) => { changed(); return data.annotate(group.group_id, payload); };
   // R-10 "re-merge": every decided group open again without preselection, matches taken over again; one Undo.
   const decidedCount = groups.filter(group => group.state !== "open" && group.state !== "auto").length;
   const reopenAll = async () => {
     setReopeningAll(current => ({ ...current, busy: true }));
     setLastDecision(null); setRestoring(null);
+    const before = data.latestView();
     const ok = await data.reopenAll();
     setReopeningAll({ open: false, busy: false });
     if (!ok) { show({ message: "Could not reopen the decisions. Nothing changed." }); return; }
     setSummaries(new Map());
-    const first = textOrder(viewRef.current?.groups ?? [], viewRef.current?.text ?? "").find(group => group.state === "open");
-    if (first) select(first.group_id, true);
-    show({ message: `Reopened ${decidedCount} decided ${decidedCount === 1 ? "group" : "groups"}.`, undo: true, onAction: () => {
+    // The view read after the reopen: viewRef still holds the old one until it renders (issue 375). When that
+    // read failed, the first open group is selected once the next view arrives.
+    const fresh = data.latestView();
+    if (fresh && fresh !== before) selectFirstOpen(fresh);
+    else awaitedView.current = { after: before };
+    const undo = () => {
+      reopenAllUndo.current = null;
       void data.undoReopenAll().then(restored => show({ message: restored ? "Decisions restored." : "Could not restore the decisions." }));
-    } });
+    };
+    reopenAllUndo.current = undo;
+    show({ message: `Reopened ${decidedCount} decided ${decidedCount === 1 ? "group" : "groups"}.`, undo: true, onAction: undo });
   };
 
   // Findings added outside the groups, as the server lists them (live and after submission).
@@ -256,7 +293,7 @@ export function ConsolidationScreen(props: ConsolidationScreenProps): JSX.Elemen
   const pickPassage = (picked: TextRange) => { setRange(picked); setTyping(false); setAdding(true); };
   const addFinding = async (candidate: SearchCandidate, searchId?: string) => {
     if (!range || !addTarget) return;
-    setAdding(false); setLastDecision(null);
+    setAdding(false); changed();
     const ok = await data.addFinding({ ...addTarget, annotationId: newAnnotationId, termId: candidate.term_id, searchId, segments: [range], axes: addTarget.axes });
     // The new finding has the creation defaults; its values open for a check right away.
     if (ok) { setRange(null); setEditAdded(newAnnotationId); setNewAnnotationId(`ann-${randomId()}`); show({ message: `Finding added: ${candidate.label} (${candidate.term_id}). Check its values.` }); }
@@ -306,6 +343,7 @@ export function ConsolidationScreen(props: ConsolidationScreenProps): JSX.Elemen
   const lead = props.assignmentId === undefined || !!isLead;
   const reason = !view.read_only ? null : props.practice && view.read_only_reason === "submitted" ? "Submitted. Read-only." : readOnlyText(view, lead);
   const showText = !narrow && (wide || !textHidden);
+  const canAdd = !readOnly && !!addTarget;
   const textToolbar = <>
     {!readOnly && addTarget && <Button ref={addRef} size="sm" aria-expanded={adding || typing}
       aria-describedby={!range ? "cons-add-hint" : undefined}
@@ -359,7 +397,12 @@ export function ConsolidationScreen(props: ConsolidationScreenProps): JSX.Elemen
       {showText && <TextPane text={view.text} groups={groups} people={view.people} selectedGroupId={selected} reducedMotion={reducedMotion}
         onSelectGroup={groupId => select(groupId, true)} added={added} toolbar={textToolbar}
         onTextSelection={!readOnly && addTarget ? setRange : undefined} />}
-      {!narrow && !wide && textHidden && <div><Button size="sm" onClick={() => setTextHidden(false)}>Show text</Button></div>}
+      {/* Without the text pane (hidden, or a phone-sized screen): "Add finding" by a typed passage (issue 470). */}
+      {!showText && (!narrow || canAdd) && <div className="cons-text-toolbar cons-text-hidden">
+        {!narrow && <Button size="sm" onClick={() => setTextHidden(false)}>Show text</Button>}
+        {canAdd && <Button ref={addRef} size="sm" aria-expanded={adding || typing} aria-describedby="cons-add-hint" onClick={() => setTyping(true)}>Add finding</Button>}
+        {canAdd && <span id="cons-add-hint" className="cons-muted">Type the passage to add a finding everyone missed.</span>}
+      </div>}
       <div className="cons-side">
         <GroupList groups={groups} people={view.people} text={view.text} selected={selected} readOnly={readOnly} busy={data.busy}
           outcomes={data.outcomes} narrow={narrow} workspace={data.workspace} summaries={summaries}
@@ -370,17 +413,27 @@ export function ConsolidationScreen(props: ConsolidationScreenProps): JSX.Elemen
         {added.length > 0 && <AddedFindings heading={addedHeading(props.assignmentId !== undefined, view.added_by)} added={view.added ?? []} text={view.text}
           workspace={data.workspace} readOnly={readOnly} busy={data.busy === "add-finding"} editRequest={editAdded}
           onSetValues={async (annotationId, axes) => {
-            setLastDecision(null); setEditAdded(null);
+            changed(); setEditAdded(null);
             const ok = await data.setAddedValues(annotationId, axes);
             if (!ok) show({ message: "Could not save the values. Nothing changed." });
+            return ok;
+          }}
+          onRemove={async (annotationId, label) => {
+            changed(); setEditAdded(null);
+            const ok = await data.removeAdded(annotationId);
+            show({ message: ok ? `Finding removed: ${label}.` : "Could not remove the finding. Nothing changed." });
+            // Its row is gone: focus goes to where a finding is added.
+            if (ok) requestAnimationFrame(() => addRef.current?.focus());
             return ok;
           }} />}
       </div>
     </div>
-    {typing && <PassageForm text={view.text} anchorRef={addRef} onPick={pickPassage} onClose={() => setTyping(false)} />}
+    {typing && <PassageForm text={view.text} anchorRef={addRef} selectable={showText} onPick={pickPassage} onClose={() => setTyping(false)} />}
     {data.workspace && addTarget && <TermPicker open={adding} anchorRef={addRef} label="Add finding" workspace={data.workspace} layerId={addTarget.layerId} annotationId={newAnnotationId}
       initialQuery={range ? prefillQuery(view.text, [range]) : undefined} onClose={() => setAdding(false)} onPick={(candidate, searchId) => { void addFinding(candidate, searchId); }} />}
     <SummaryDialog open={dialog.open} lead={!!isLead} practice={props.practice} summary={summaryText(groups, added.length)} duplicates={duplicatesText(duplicateTerms(groups))} busy={dialog.busy} warning={dialog.warning} error={dialog.error}
+      modifierFindings={modifierFindings(groups, view.added ?? [], view.text, dialog.warning?.asFindingIds)}
+      onShowGroup={groupId => { setDialog({ open: false, busy: false, warning: null, error: null }); select(groupId, true); }}
       onSubmit={acknowledged => { void submit(acknowledged); }} onClose={() => setDialog({ open: false, busy: false, warning: null, error: null })} />
     <p className="visually-hidden" role="status" aria-live="polite">{announcement}</p>
     <ConfirmDialog open={reopeningAll.open} busy={reopeningAll.busy} title={`Reopen ${decidedCount} decided ${decidedCount === 1 ? "group" : "groups"}?`}

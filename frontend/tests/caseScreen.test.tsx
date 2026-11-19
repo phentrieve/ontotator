@@ -1387,7 +1387,8 @@ describe("CaseScreen integration", () => {
         await addHypotonia(rendered.container);
         await waitFor(() => expect((document.activeElement as HTMLElement).hasAttribute("data-confirm-defaults")).toBe(true));
         expect(document.activeElement!.textContent).toContain("Confirm defaults (3)");
-        expect(announcer()).toBe("Hypotonia added. Values from defaults: Present, Patient, Current. Confirm defaults or change a value.");
+        // The announcement is rendered after the focus moves (a state update of the same effect).
+        await waitFor(() => expect(announcer()).toBe("Hypotonia added. Values from defaults: Present, Patient, Current. Confirm defaults or change a value."));
       });
 
       it("after adding a term focuses the first required empty value instead", async () => {
@@ -1398,7 +1399,8 @@ describe("CaseScreen integration", () => {
         await addHypotonia(rendered.container);
         await waitFor(() => expect((document.activeElement as HTMLElement).closest('[data-axis-field="assertion"]')).not.toBeNull());
         expect((document.activeElement as HTMLInputElement).type).toBe("radio");
-        expect(announcer()).toBe("Hypotonia added. Values from defaults: Patient, Current. Confirm defaults or change a value.");
+        // The announcement is rendered after the focus moves (a state update of the same effect).
+        await waitFor(() => expect(announcer()).toBe("Hypotonia added. Values from defaults: Patient, Current. Confirm defaults or change a value."));
       });
 
       it("D confirms all defaults in one set_axes and returns focus to the text after the mark", async () => {
@@ -2990,6 +2992,80 @@ describe("CaseScreen: finding modifiers (attach mode, Modifiers section, marks)"
       expect(history.mock.calls[0][1]).toMatchObject({ expected_revision: 2, payload: { command: "undo_step", step: 2 } });
       expect(read).toHaveBeenCalled();
       expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    it("Undo and Redo work while the history of the new revision is still being read", async () => {
+      const view = modView(SEVERE_ON_SEIZURE);
+      // The server's history: one step done at revision 1; an undo leaves it to redo, a redo puts it back.
+      let server = { revision: view.draft.revision, done: true };
+      let hold: Promise<void> | null = null;
+      const read = vi.spyOn(api, "getHistory").mockImplementation(async () => {
+        const at = { ...server };
+        await hold;
+        return historyAt(at.revision, at.done ? { undo: step(0, 1, "add_modifier"), undo_count: 1, changed: true }
+          : { redo: step(0, 1, "add_modifier"), redo_count: 1 }) as never;
+      });
+      const history = vi.spyOn(api, "applyHistory").mockImplementation(async (_ws, envelope) => {
+        server = { revision: envelope.expected_revision + 1, done: envelope.payload.command === "redo_step" };
+        return { ...structuredClone(view.draft), revision: server.revision } as never;
+      });
+      await setup(view);
+      const undo = screen.getByRole("button", { name: "Undo last change" }) as HTMLButtonElement;
+      const redo = screen.getByRole("button", { name: "Redo last change" }) as HTMLButtonElement;
+      await waitFor(() => expect(undo.disabled).toBe(false));
+      expect(redo.disabled).toBe(true);
+
+      // The reads from now on wait: the editor knows the new revision, but not its history.
+      let release!: () => void;
+      hold = new Promise<void>(resolve => { release = resolve; });
+      const reads = read.mock.calls.length;
+      fireEvent.keyDown(window, { key: "z", ctrlKey: true });
+      await waitFor(() => expect(history).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(read.mock.calls.length).toBeGreaterThan(reads));
+      // Right after the undo: Redo is offered (without a step name), Undo is not (it was the only step).
+      await waitFor(() => expect(redo.disabled).toBe(false));
+      expect(redo.getAttribute("title")).toBe("Redo the last undone change");
+      expect(undo.disabled).toBe(true);
+      fireEvent.keyDown(window, { key: "Z", ctrlKey: true, shiftKey: true });
+      release();
+      await waitFor(() => expect(history).toHaveBeenCalledTimes(2));
+      expect(history.mock.calls[1][1]).toMatchObject({ expected_revision: 2, payload: { command: "redo_step", step: 1 } });
+
+      // And the other way: Undo right after that redo, again before its history is read.
+      hold = new Promise<void>(resolve => { release = resolve; });
+      await waitFor(() => expect(undo.disabled).toBe(false));
+      expect(redo.disabled).toBe(true);
+      fireEvent.keyDown(window, { key: "z", ctrlKey: true });
+      release();
+      await waitFor(() => expect(history).toHaveBeenCalledTimes(3));
+      expect(history.mock.calls[2][1]).toMatchObject({ expected_revision: 3, payload: { command: "undo_step", step: 1 } });
+      hold = null;
+      await waitFor(() => expect(redo.getAttribute("title")).toBe("Redo: add a modifier to Seizure"));
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    it("a new change ends the redo at once, and a failed history read is said when a control is pressed", async () => {
+      const view = modView(SEVERE_ON_SEIZURE);
+      let fail = false;
+      vi.spyOn(api, "getHistory").mockImplementation(async () => {
+        if (fail) throw new Error("History could not be read");
+        return historyAt(view.draft.revision, { undo: step(0, 1, "add_modifier"), redo: step(1, 2, "set_axes"), undo_count: 1, redo_count: 1, changed: true }) as never;
+      });
+      const history = restoring(view);
+      const { container } = await setup(view);
+      const undo = screen.getByRole("button", { name: "Undo last change" }) as HTMLButtonElement;
+      const redo = screen.getByRole("button", { name: "Redo last change" }) as HTMLButtonElement;
+      await waitFor(() => expect(redo.disabled).toBe(false));
+      fail = true;
+      fireEvent.click(container.querySelector('[data-list-key="annotation:seizure"]')!);
+      fireEvent.click(within(await screen.findByRole("group", { name: /^Assertion/ })).getByRole("radio", { name: /^Absent/ }));
+      // The history of the new revision never arrives: Redo is not offered, Undo is.
+      await waitFor(() => expect(redo.disabled).toBe(true));
+      expect(redo.getAttribute("title")).toBe("Nothing to redo");
+      expect(undo.disabled).toBe(false);
+      fireEvent.click(undo);
+      expect(await screen.findByText("History could not be read")).toBeDefined();
+      expect(history).not.toHaveBeenCalled();
     });
 
     it("a refused step reads as its message, not as the status code (F2)", async () => {

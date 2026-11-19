@@ -99,6 +99,14 @@ export function App({ user: givenUser, onLogout }: AppProps): JSX.Element {
   useEffect(() => {
     alive.current = true;
     clearLegacyStorage();
+    // The address can change between the first render and this effect, before the listeners below
+    // exist (a link followed in that moment, a script): follow it instead of writing the rendered
+    // address back over it (issue 380).
+    const current = window.location.hash || "#/";
+    if (current !== acceptedHash.current) {
+      acceptedHash.current = current;
+      setRoute(parseRoute(window.location.hash));
+    }
     // Mark entries created by this controller so a cancelled Back/Forward can
     // restore the history cursor as well as the visible URL.
     window.history.replaceState({ ...window.history.state, ontotatorRouteIndex: acceptedIndex.current }, "", acceptedHash.current);
@@ -368,7 +376,7 @@ export function App({ user: givenUser, onLogout }: AppProps): JSX.Element {
     case "projectConsolidation": content = <ConsolidationScreen key={JSON.stringify([user.username, route.key, route.roundId])} projectKey={route.key}
       roundId={route.roundId} group={route.group} onNavigate={go} readOnly headerActions={<HelpLink screen="consolidationReadOnly" />}
       back={{ name: "projectDocuments", key: route.key, ...(route.documents ?? {}) }} />; break;
-    case "me": content = <ProfilePage backToTask={route.task} backToDocuments={route.documents} onSaved={setSavedIdentity} routeLeaveRef={routeLeaveRef} leaveGuardRef={logoutGuardRef} onNavigate={go} />; break;
+    case "me": content = <ProfilePage backToTask={route.task} backToDocuments={route.documents} section={route.section} onSaved={setSavedIdentity} routeLeaveRef={routeLeaveRef} leaveGuardRef={logoutGuardRef} onNavigate={go} />; break;
     case "adminSettings": content = user.is_system_admin ? <SettingsPage />
       : notice("Server settings", "Only system administrators can change server settings."); break;
     case "help": content = <Suspense fallback={<InlineMessage tone="info">Loading the handbook…</InlineMessage>}>

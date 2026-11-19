@@ -151,6 +151,13 @@ describe("CarryDialog", () => {
     expect(carry).toHaveBeenCalledWith("demo", "sub-ana-1", expect.objectContaining({ mode: "dismiss" }));
   });
 
+  it("a preview refused because the work was already carried says so (issue 461)", async () => {
+    vi.mocked(api.previewTextChange).mockRejectedValue(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "already_resolved", resolution: "carried", assignment_id: 12, decided_at: "2026-11-17T10:00:00+00:00" }));
+    setup();
+    expect((await within(dialog()).findByRole("alert")).textContent).toBe("This work was already carried to this version. Its task is still there or was submitted. Reload the row.");
+    expect(within(dialog()).queryByRole("button", { name: "Retry" })).toBeNull();
+  });
+
   it("Assign refused for missing proposals shows the reason once with Retry", async () => {
     vi.spyOn(api, "carrySubmission").mockRejectedValue(new ApiError(422, "raw", "TEXT_CHANGE_NOT_APPLICABLE", { reason: "no_target_proposals" }));
     setup("proposals");
@@ -168,6 +175,25 @@ describe("CarryDialog", () => {
     fireEvent.click(await within(dialog()).findByRole("button", { name: "Retry" }));
     await waitFor(() => expect(props.onDone).toHaveBeenCalled());
     expect(carry).toHaveBeenCalledTimes(2);
+  });
+
+  it("the footer Retry keeps focus in the dialog while Assign runs again and after it fails again (issue 419)", async () => {
+    let fail: (error: unknown) => void = () => undefined;
+    vi.spyOn(api, "carrySubmission").mockRejectedValueOnce(new ApiError(503, "Service unavailable"))
+      .mockImplementationOnce(() => new Promise((_resolve, reject) => { fail = reject; }));
+    setup();
+    await within(dialog()).findByText("Ana Weber submitted on v1 (Round 1, 3 findings).");
+    fireEvent.click(assign());
+    const retry = await within(dialog()).findByRole("button", { name: "Retry" });
+    retry.focus();
+    fireEvent.click(retry);
+    // The Retry button leaves while the request runs: focus waits on the busy Assign.
+    await waitFor(() => expect(assign().getAttribute("aria-busy")).toBe("true"));
+    expect(within(dialog()).queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(document.activeElement).toBe(assign());
+    fail(new ApiError(503, "Service unavailable"));
+    const again = await within(dialog()).findByRole("button", { name: "Retry" });
+    await waitFor(() => expect(document.activeElement).toBe(again));
   });
 
   it("a lost connection offers Retry and keeps the carry options", async () => {

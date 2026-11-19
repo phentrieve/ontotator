@@ -17,6 +17,12 @@
 
 .case-viewer:not(.case-comparing) > .comparison-reading { display: flex; flex: 1 1 auto; min-height: 0; }
 .case-viewer:not(.case-comparing) > .comparison-reading > .readonly-annotation-view { flex: 1 1 auto; min-width: 0; }
+/* Phone width (issue 438): the text keeps the full width; the layer's findings go below it, as when comparing,
+   on at most 40 % of the reading area, where they scroll on their own. */
+@media (max-width: 700px) {
+  .case-viewer:not(.case-comparing) > .comparison-reading { flex-direction: column; }
+  .case-viewer:not(.case-comparing) > .comparison-reading > .layer-findings { flex: 0 0 auto; max-height: 40%; border-left: 0; border-top: 1px solid var(--border); }
+}
 
 /* Comparing: each column's findings go below its text. */
 .case-viewer.case-comparing .layer-findings { border-left: 0; border-top: 1px solid var(--border); max-height: 300px; }
@@ -30,3 +36,10 @@
   .case-viewer.case-comparing .comparison-reading > .layer-findings { grid-column: 1; grid-row: 4; }
   .case-viewer.case-comparing .compare-pane { grid-row: 5; }
 }
+
+/* Comparing: each text has the same identity group (title, "Language and version", "Show") directly above it, in
+   one shared row, so the two texts start at the same height (#412). */
+.case-viewer.case-comparing .compare-pane { background: none; }
+.case-viewer .comparison-pane-identity .text-view-selects { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: var(--space-2); }
+.case-viewer .comparison-pane-identity .text-view-field { display: flex; }
+.case-viewer.case-comparing .comparison-reading > .comparison-current-identity { grid-column: 1; grid-row: 2; }

@@ -737,6 +737,61 @@ def test_optional_spanless_reason_setting_is_authorized_persisted_and_audited(ap
     ]
 
 
+def test_a_settings_change_records_the_values_before_and_after(app):
+    """The history shows "old → new" for plain settings (#472)."""
+    admin = logged_in(app, "root", system_admin=True)
+    create_project(app, admin)
+    endpoint = "/api/v1/projects/phenotypes/settings"
+    languages = admin.get(endpoint).json()["languages"]
+
+    def last_update() -> dict:
+        with app.state.repo.db.transaction() as conn:
+            return conn.execute(
+                select(AuditEventRow.details)
+                .where(AuditEventRow.action == "project.update")
+                .order_by(AuditEventRow.id.desc())
+                .limit(1)
+            ).scalar_one()
+
+    changed = admin.patch(
+        endpoint,
+        json={
+            "blind_consolidation": True,
+            "annotations_per_text": 3,
+            "languages": [*languages, "fr"],
+            "description": "Invented description",
+            # Unchanged: not recorded.
+            "record_working_time": False,
+        },
+    )
+    assert changed.status_code == 200, changed.text
+    details = last_update()
+    assert details["fields"] == [
+        "annotations_per_text",
+        "blind_consolidation",
+        "description",
+        "languages",
+    ]
+    # Free text is named only.
+    assert details["changes"] == {
+        "annotations_per_text": {"before": 1, "after": 3},
+        "blind_consolidation": {"before": False, "after": True},
+        "languages": {"before": languages, "after": sorted([*languages, "fr"])},
+    }
+
+    # One choice on the page, two fields: both are recorded, so the history can
+    # name the choice before and after.
+    assert (
+        admin.patch(endpoint, json={"require_spanless_note": False}).status_code == 200
+    )
+    details = last_update()
+    assert details["fields"] == ["require_spanless_note"]
+    assert details["changes"] == {
+        "allow_spanless_findings": {"before": True, "after": True},
+        "require_spanless_note": {"before": True, "after": False},
+    }
+
+
 def test_only_removing_a_role_ends_the_members_sessions(app):
     admin = logged_in(app, "root", system_admin=True)
     create_project(app, admin)

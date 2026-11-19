@@ -90,23 +90,38 @@ export function submittedOf(submitted: number, total: number): string {
  * have one.
  */
 const NARROW_STATES: readonly (readonly [RegExp, string])[] = [
-  [/^assigned, not started$/, "not started"],
+  // "· max 2" (an open task below the limit) stays in the title; the narrow cell names the work.
+  [/^assigned, not started(?: · max \d+)?$/, "not started"],
   [/^(?:after translation review|waiting for review \(.*\))$/, "after review"],
   [/^in review, .+$/, "in review"],
-  [/^(\d+) of (\d+) submitted(?:, .+)?$/, "$1/$2 submitted"],
+  [/^(\d+) of (\d+) submitted(?:, .+)?(?: · max \d+)?$/, "$1/$2 submitted"],
   [/^(\d+) annotators? · max (\d+)$/, "$1 · max $2"],
   [/^not reviewed, optional$/, "not reviewed"],
   [/^(?:Final is|In progress|Submitted|Finishing) on old text$/, "on old text"],
   [/^Submitted on (v\d+)$/, "$1 submitted"],
   [/^Finishing on (v\d+)$/, "finishing $1"],
   [/^ready to compare$/, "to compare"],
+  // What changed ("newer result", "text corrected") stays in the title.
+  [/^Check changes, .+$/, "Check changes"],
   [/^consolidating \(.+\)$/, "consolidating"],
+  // The ⏸ glyph (and the row's "Paused by lead" badge) says the pause where "· paused" would be cut.
+  [/^consolidating · paused(?: \(.+\))?$/, "consolidating"],
 ];
 
 /** The narrow table's short state (`NARROW_STATES`); null when the state fits as it is. */
 export function narrowStageState(state: string): string | null {
   for (const [pattern, short] of NARROW_STATES) if (pattern.test(state)) return state.replace(pattern, short);
   return null;
+}
+
+/**
+ * Why the row's open consolidation is paused: the lead paused the text (issue 464) or a problem report pauses the
+ * consolidator's task; null while it runs or none is open. The server keeps the Annotation cell "consolidating" then.
+ */
+export function consolidationPause(row: { stages?: { annotation: StageCellView } | null }): "lead" | "report" | null {
+  const cell = row.stages?.annotation;
+  if (cell?.state !== "consolidating") return null;
+  return cell.detail.note === "lead_pause" ? "lead" : cell.detail.note === "report_pause" ? "report" : null;
 }
 
 /** The short form of a person in a cell: the display name, else the pseudonym. */
@@ -162,8 +177,11 @@ function reviewText(cell: StageCellView, context: StageContext): StageText {
     case "source_changed":
       return { symbol: "⚠", word: "Source changed", detail: `translation from ${[context.sourceLanguage || "source", version(detail.from_version)].filter(Boolean).join(" ")}` };
     case "accepted": {
-      const how = detail.note === "with_corrections"
-        ? join("with corrections", detail.from_version != null && detail.version != null ? `v${detail.from_version} → v${detail.version}` : null, people)
+      const versions = detail.from_version != null && detail.version != null ? `v${detail.from_version} → v${detail.version}` : null;
+      // "Fix typos…": the person named is the lead who fixed them, never the reviewer of the fixed version.
+      const fixedBy = (detail.people ?? []).map(person => (person.is_me ? "you" : shortName(person))).join(", ");
+      const how = detail.note === "with_corrections" ? join("with corrections", versions, people)
+        : detail.note === "typos_fixed" ? join(fixedBy ? `typos fixed by ${fixedBy}` : "typos fixed", versions)
         : detail.note ? ACCEPTED_TEXT[detail.note] ?? "" : "";
       return { symbol: "✓", word: "Accepted", detail: how };
     }
@@ -174,6 +192,8 @@ function reviewText(cell: StageCellView, context: StageContext): StageText {
 function pausedText(cell: StageCellView): StageText {
   const person = names(cell.detail.people);
   const excerpt = quoted(cell.detail.excerpt);
+  // Issue 464: the lead paused the text; the person named is that lead, the excerpt the reason.
+  if (cell.detail.note === "lead_pause") return { symbol: "⏸", word: "Paused by lead", detail: person && excerpt ? `${person}: ${excerpt}` : person || excerpt || "" };
   return { symbol: "⏸", word: "Paused", detail: person && excerpt ? `${person}: ${excerpt}` : person || excerpt || "" };
 }
 
@@ -206,8 +226,10 @@ function annotationText(cell: StageCellView): StageText {
       return { symbol: "○", word: counted("Unassigned"), detail: join(working, waiting) };
     }
     case "in_progress": {
+      // Below the limit (the server sends `target` then): "max 2" after the open work.
+      const max = detail.target != null && (detail.assigned ?? 0) < detail.target ? `max ${detail.target}` : null;
       if (detail.total != null && detail.submitted != null) {
-        return { symbol: "◐", word: submittedOf(detail.submitted, detail.total), detail: join(people && `waiting: ${people}`, startedPart(detail), waiting) };
+        return { symbol: "◐", word: submittedOf(detail.submitted, detail.total), detail: join(people && `waiting: ${people}`, startedPart(detail), max, waiting) };
       }
       const change = detail.note === "may_change" ? join(version(detail.version), "may change") : null;
       const started = startedOf(detail);
@@ -215,7 +237,10 @@ function annotationText(cell: StageCellView): StageText {
       return { symbol: started === "none" ? "○" : "◐", word, detail: join(people, detail.round_ordinal != null ? `Round ${detail.round_ordinal}` : null, change, waiting) };
     }
     case "paused": return pausedText(cell);
-    case "consolidating": return { symbol: "◐", word: "Consolidating", detail: people };
+    case "consolidating":
+      if (detail.note === "lead_pause") return { symbol: "⏸", word: "Consolidation paused by lead", detail: join(people, quoted(detail.excerpt)) };
+      if (detail.note === "report_pause") return { symbol: "⏸", word: "Consolidation paused", detail: join(people, quoted(detail.excerpt)) };
+      return { symbol: "◐", word: "Consolidating", detail: people };
     case "old_text_open":
       return { symbol: "⚠", word: "In progress on old text", detail: people ? `${people} ${several ? "work" : "works"} on ${version(detail.from_version) ?? "the old text"}` : "" };
     case "old_text_submitted":

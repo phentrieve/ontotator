@@ -1,12 +1,13 @@
 import { SearchPreferencesSection } from "./SearchPreferencesSection";
 import { TokensSection } from "./TokensSection";
 import { ConnectionsSection } from "./ConnectionsSection";
+import { TechnicalReportsSection } from "./TechnicalReportsSection";
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { api, type OwnProfilePatch, type Profile } from "../api/client";
 import { ErrorNotice } from "../admin/ErrorNotice";
 import { LanguagesField } from "../admin/LanguagesField";
 import { Button, Checkbox, Dialog, InlineMessage, TextInput } from "../ui";
-import type { Route, RouteLeaveGuard } from "../app/router";
+import type { ProfileSection, Route, RouteLeaveGuard } from "../app/router";
 import { PracticeSection } from "../practice/PracticeSection";
 import { RouteLink } from "../documents/RowCells";
 
@@ -21,6 +22,8 @@ export interface ProfilePageProps {
   backToTask?: number;
   /** The project whose Documents page the user came from: shows "Back to Documents". */
   backToDocuments?: string;
+  /** Open at this section: `technical-reports` from the report dialog (issue 269). */
+  section?: ProfileSection;
 }
 
 function profileChanges(baseline: Profile, draft: Profile): OwnProfilePatch {
@@ -52,7 +55,7 @@ function passwordProblem(username: string, next: string, repeat: string): string
   if (folded === stripForComparison(username.normalize("NFC")).toLowerCase()) return "The password must differ from the username.";
 }
 
-export function ProfilePage({ backToTask, backToDocuments, onSaved, routeLeaveRef, leaveGuardRef, onNavigate }: ProfilePageProps): JSX.Element {
+export function ProfilePage({ backToTask, backToDocuments, section, onSaved, routeLeaveRef, leaveGuardRef, onNavigate }: ProfilePageProps): JSX.Element {
   const [searchDirty, setSearchDirty] = useState(false);
   const [model, setModel] = useState<{ baseline: Profile; draft: Profile } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -200,6 +203,7 @@ export function ProfilePage({ backToTask, backToDocuments, onSaved, routeLeaveRe
     <PracticeSection onNavigate={onNavigate} />
     <TokensSection key={tokensEpoch} mode={{ kind: "personal" }} />
     <ConnectionsSection key={`connections-${tokensEpoch}`} />
+    <TechnicalReportsSection focus={section === "technical-reports"} />
     <section className="detail-section">
       <h2>Change password</h2>
       <p>This logs out your other sessions and revokes all your API tokens, the project tokens you created included, and disconnects your connected apps.</p>

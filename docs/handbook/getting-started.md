@@ -12,7 +12,7 @@ This chapter is for everyone. It shows how to log in, find your tasks and keep y
 
 What for: your first login, or a new password after an administrator reset it.
 
-Before you start: you need a setup or reset code from your administrator. A code works once. Setup codes expire after 24 hours, reset codes after 2 hours.
+Before you start: you need a setup or reset code from your administrator. A code works once. Setup codes expire after 7 days by default (your administrator can change this; the message with your code says when it expires), reset codes after 2 hours.
 
 1. Open the address of your Ontotator server in your browser. You see the login screen.
 2. Click **I have a setup or reset code**. The form **Set your password** opens.
@@ -60,7 +60,7 @@ The header is the same on every page:
 - **Ontotator** on the left takes you to the start page.
 - The breadcrumb shows where you are, for example **My tasks** or **Documents**.
 - On the right are your display name, your pseudonym, your roles and **Log out**.
-- **Handbook** in the header opens this handbook inside the app. On the Documents, consolidation and translation review screens, **Help** opens the handbook section about that screen; in the editor it is **More** > **Help for this screen**. On the project forms, a link next to the task profile opens the section that explains it. Click a screenshot in the handbook to open it at full size in a new tab.
+- **Handbook** in the header opens this handbook inside the app. On the Documents, consolidation and translation review screens, **Help** opens the handbook section about that screen; in the editor it is **More** > **Help for this screen**. On the project forms, a link next to the task profile opens the section that explains it. In the text card, **How to use it** next to *Newer set available* opens the section on new tool proposals. Click a screenshot in the handbook to open it at full size in a new tab.
 - Below the chapter list, the handbook shows the app's version and commit, for example `Ontotator 0.3.0 · commit cc65cea`. Quote it when you report a problem.
 
 The sidebar lists **My tasks**, **Projects**, **Profile** and **Technical problem…** (see [Report a technical problem](#report-a-technical-problem)). The number after **My tasks** counts your open tasks, the same tasks as the **To do** tab; it updates as soon as you submit a text. Clicking **My tasks** or **Projects** loads your projects and the count again, so a project you were just added to shows up without reloading the page. Leads also see their project's pages (**Documents**, **Progress**, **Settings**, **Export**). System administrators also see **Administration** with **Users**, **Ontologies**, **Technical reports**, **New project** and **Server settings** (see [Administration](admin.md)). In the editor, the sidebar folds into **Sections**; click it to open it.
@@ -72,13 +72,24 @@ What for: tell the system administrators about an error message, a page that doe
 1. Click **Technical problem…** in the sidebar. In the editor, open **More** and choose **Report a technical problem…**. If a text cannot be displayed, the message *Something went wrong while displaying this text.* offers **Report a technical problem…** too, and so does *Something went wrong while displaying this page.* when another screen, such as My tasks or Documents, cannot be displayed.
 2. Under **What happened?**, write what you did and what you saw.
 3. Click **Send report**.
-4. The dialog shows a reference, for example *TR-12*. Quote it if you ask an administrator about your report.
+4. The dialog shows *Sent as TR-12.* (your reference). Quote it if you ask an administrator about your report. Click **See my reports** to open the list of your reports.
 
 The report goes to the system administrators, not to your project lead. Your task is not paused.
 
 Ontotator adds what the administrators need to find the cause: the app version, the task if you send it from one (its kind, the project and the text), the screen, your browser, the window size and the last error the app received. From the crash message it also adds the error. Open **Added automatically** to see it before you send.
 
 The report stays inside Ontotator; nothing is sent by e-mail or elsewhere. Do not write patient details beyond what is needed to describe the problem.
+
+### See your technical reports
+
+What for: look up a report you sent and whether it was handled.
+
+1. Click **Profile** in the sidebar and scroll to **My technical reports**. From the report dialog, click **My reports** (before sending) or **See my reports** (after sending).
+2. The table shows each report you sent, newest first: **Ref.** (for example *TR-12*), **Sent**, **What happened** (your text; open a long text to read all of it) and **Status**. If you sent 100 reports or more, the newest 100 are shown; click **Show older reports** below the table for the rest.
+
+**Open** means the administrators have not handled the report yet; **Done** means an administrator marked it as handled. Only you and the system administrators see your reports. Administrators do not answer in Ontotator; if you need an answer, contact an administrator and quote the reference.
+
+If you have typed text in the dialog, **My reports** does not close it: send or cancel the report first. The crash screens do not show these links.
 
 ## Switch project
 
@@ -100,15 +111,22 @@ What for: find the texts you have to work on.
 
 ![My tasks with the status tabs and a table of tasks, each with its Text, Task, Status and an action button](images/getting-started-my-tasks.png)
 
+The list is ordered by status: **Reopened** first, then **In progress**, **Open** and **Submitted**. Within a status the tasks are in the order in which the lead assigned them; texts the lead moved to the front come first. Work from the top unless the lead says otherwise. You cannot sort the list yourself.
+
 Each row is one task. The **Task** column says what to do, for example **Annotation, from scratch**, **Annotation, from proposals**, **Consolidation** or **Translation review**. The **Status** column shows **Open**, **In progress**, **Submitted** or **Reopened**.
 
-- **Reopened**: the lead reopened your submission. Click the badge to read why.
+- **Reopened**: the lead reopened your submission. The lead's reason stands under the task, for example *Reopened by the lead on 17 Nov 2026, 14:30: The onset in sentence 2 is missing.* (on a narrow screen under the badge). Without a reason, click the badge to read when it was reopened.
+- A **Translation review** the lead asked for a second time shows the lead's reason under the task, for example *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.* The translation review and the consolidation show the lead's reason again when you open the task.
+- *Answer from the lead* at a submitted **Translation review**: you submitted it as a **Query** and the lead decided. Open the task to read the decision and the answer ([Review a translation](annotator.md#review-a-translation)).
 - A **Consolidation** task shows the lead's reason under the task, for example *Reason from the lead: Term and assertion differ*, if the lead gave one.
 - **Paused**: the task waits for a decision on a problem report. A long reason is cut off here; the task shows all of it. **Answer to your report** means the lead has replied.
+- **Paused by lead**: the lead paused the work on this text and gives the reason below the mark. You can open and read the task (**View paused task**), but not save it, until the lead releases the text ([A task paused by the lead](annotator.md#a-task-paused-by-the-lead)).
 - **Waiting for translation review**: the lead assigned the annotation ahead, and the translation is still being reviewed. You cannot start yet; the **Action** column says **Opens once a translation is accepted**. Once it is accepted, the task shows **Start** by itself. A rejected review keeps the task waiting. If the review leads to a corrected version, the task opens on that version.
 - **Waiting for the project lead**: the text of this task was corrected and the task cannot follow by itself. You cannot start it; the lead decides how it continues, and it may leave your list.
 
-If the project has guidelines, a link such as *Project guidelines v2* appears above the table. Read them before you start: they say what to mark and how.
+On a phone, each row has two parts: under **Task** the text, what to do and the status below each other, and beside it the **Action**. The reason of a **Paused** or **Reopened** task is written out in full under its badge, so there is no badge to tap. The project is shown under the text when the list mixes several projects; the dates **Assigned** and **Last change** are left out. Nothing needs to be swiped sideways.
+
+If the project has guidelines, a link such as *Project guidelines v2* (or *Project guidelines 3.1 (v2)*) appears above the table. Read them before you start: they say what to mark and how.
 
 If you see **No texts are assigned to you yet.**, wait until your lead assigns texts to you.
 
@@ -161,7 +179,7 @@ If you see **Task not found or not yours**, the task was withdrawn or is assigne
 What for: check the annotation rules of the project.
 
 1. Open a task.
-2. Open **More** in the toolbar and choose the guidelines, for example *Guidelines v2*. *(new)* after it means the guidelines changed since you last read them. In a translation review or consolidation, the guidelines are a button in the header instead, with a **New** badge.
+2. Open **More** in the toolbar and choose the guidelines, for example *Guidelines v2*, or *Guidelines 3.1 (v2)* when your lead gave the version its own number: *3.1* is the version of the guideline document, *v2* counts the uploads in the app. *(new)* after it means the guidelines changed since you last read them. In a translation review or consolidation, the guidelines are a button in the header instead, with a **New** badge.
 3. The guidelines open beside the text; in the editor they take the right column as a tab next to **Details** (see [The guidelines in the editor](annotator.md#the-guidelines-in-the-editor)). Click **All versions** to see older versions, or **Close** to hide them.
 
 The first time you open a task in a project with guidelines, a notice asks you to read them. Click the read button in the notice, for example *Read guidelines v2*. The notice also says where you find them later: under **More** › *Guidelines* in the editor, or the guidelines button in the header of a translation review or consolidation.
@@ -233,11 +251,12 @@ What for: let a script or another program read or export your projects without y
 3. Enter a **Token name** that says what uses it.
 4. Tick the scopes the program needs: **Read**, **Import**, **Export** or **Project administration**.
 5. Set **Valid for (days)**: 1 to 365, 90 by default.
-6. Click **Create token**. The dialog shows the token once. Click **Copy token** and store it, for example in your password manager, then click **Close**.
+6. Click **Create token**. The dialog, titled with the name of the token (*New token “Laptop script”*), shows the token once. Click **Copy token** and store it, for example in your password manager.
+7. Tick **I have stored the token**, then click **Close**. Until the box is ticked, the dialog cannot be closed, not with **Close** and not with the Escape key.
 
 The program sends the token in the header `Authorization: Bearer <token>`. It acts as you: it can do only what its scopes allow and what you may do yourself. Annotation, review and translation review work always needs the browser, and a token cannot create other tokens. Every change made with a token is in the audit trail with the token's name.
 
-An AI assistant that speaks MCP, such as Claude Desktop, can use a token too: the Ontotator MCP server lets it set up a project, follow progress and download exports for you. Installing and configuring it is described in the [MCP server guide](../../mcp/README.md). Prefer a project token with a short lifetime for it.
+An AI assistant that speaks MCP, such as Claude Desktop, can use a token too: the Ontotator MCP server lets it set up a project, follow progress and download exports for you. Installing and configuring it is described in the [MCP server guide](../../mcp/README.md). Prefer a project token with a short lifetime for it. The line *Also for the Ontotator MCP server (AI assistant): see the handbook.* under your tokens opens this section.
 
 To stop a token, click **Revoke…** in its row, then **Revoke token**. Every program that uses it stops working at once. All your tokens are also revoked when you change your password, when an administrator issues you a reset code and when your account is deactivated. Losing a project role does not revoke a personal token, but the token at once loses what the role allowed: it can only ever do what you may do yourself right now.
 

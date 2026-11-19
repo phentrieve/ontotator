@@ -27,6 +27,7 @@ from ontotator.domain.work_plans import (
 from ontotator.storage.final_tables import FinalSelectionRow
 from ontotator.storage.plan_tables import (
     DiscardedVariantRow,
+    EditorialCorrectionRow,
     TranslationAcceptanceRow,
     WorkPlanFlagsRow,
     WorkPlanRow,
@@ -50,11 +51,13 @@ __all__ = [
     "add_acceptance",
     "bump_revisions",
     "clear_restored",
+    "counted_typo_fixes",
     "decided_rows",
     "discarded",
     "effective_plan",
     "ensure_rows",
     "final_keys",
+    "inherited_review_decisions",
     "language_versions",
     "open_reports",
     "open_tasks",
@@ -79,7 +82,88 @@ def _in_keys(case_col: Any, language_col: Any, keys: Iterable[RowKey]) -> Any:
     return tuple_(case_col, language_col).in_([(k.case_id, k.language) for k in keys])
 
 
+def inherited_review_decisions(
+    conn: Connection, pid: int, decisions: Mapping[str, str]
+) -> dict[str, str]:
+    """``decisions`` (document id -> decision of its latest translation
+    review) plus the versions made by an editorial correction (issue 453) of
+    a rejected or queried version: such a version has no review of its own
+    and the status of the version it corrects, so it counts as rejected or
+    queried like that one."""
+    previous: dict[str, str] = {
+        row.document_id: row.previous_document_id
+        for row in conn.execute(
+            select(
+                EditorialCorrectionRow.document_id,
+                EditorialCorrectionRow.previous_document_id,
+            ).where(EditorialCorrectionRow.project_id == pid)
+        )
+    }
+    result = dict(decisions)
+    if not previous:
+        return result
+    known = result | _review_decisions(
+        conn, pid, sorted(set(previous) | set(previous.values()))
+    )
+    for document_id in previous:
+        current = document_id
+        while current not in known and current in previous:
+            current = previous[current]
+        decision = known.get(current)
+        if current != document_id and decision in ("rejected", "query"):
+            result[document_id] = decision
+    return result
+
+
+def counted_typo_fixes(conn: Connection, pid: int) -> frozenset[str]:
+    """The versions made by an editorial correction (issue 453) that count
+    whatever their review decision is (``Version.typo_fix_counts``).
+
+    A typo fix is the text it fixes: it counts when that version does. Only
+    the fix of a correction takes that correction's rejected or queried
+    decision as "not newer" (the version before the correction is the target
+    again, as before the fix). The fix of a first version counts, and so does
+    a fix that was reviewed itself: a review of it never falls back to the
+    same text with the typos.
+    """
+    rows = conn.execute(
+        select(
+            EditorialCorrectionRow.document_id,
+            EditorialCorrectionRow.previous_document_id,
+            DocumentRow.origin,
+        )
+        .join(
+            DocumentRow,
+            and_(
+                DocumentRow.project_id == EditorialCorrectionRow.project_id,
+                DocumentRow.document_id == EditorialCorrectionRow.previous_document_id,
+            ),
+        )
+        .where(EditorialCorrectionRow.project_id == pid)
+    ).all()
+    if not rows:
+        return frozenset()
+    fixed = {row.document_id: (row.previous_document_id, row.origin) for row in rows}
+    reviewed = set(_review_decisions(conn, pid, sorted(fixed)))
+    counted: set[str] = set()
+    for document_id in fixed:
+        current, origin = document_id, None
+        while current in fixed and current not in reviewed:
+            current, origin = fixed[current]
+        if current in fixed or origin != "correction":
+            counted.add(document_id)
+    return frozenset(counted)
+
+
 def _latest_decisions(
+    conn: Connection, pid: int, document_ids: Sequence[str] | None = None
+) -> dict[str, str]:
+    return inherited_review_decisions(
+        conn, pid, _review_decisions(conn, pid, document_ids)
+    )
+
+
+def _review_decisions(
     conn: Connection, pid: int, document_ids: Sequence[str] | None = None
 ) -> dict[str, str]:
     query = select(
@@ -136,6 +220,7 @@ def language_versions(
         return query if doc_ids is None else query.where(column.in_(doc_ids))
 
     decisions = _latest_decisions(conn, project_id, doc_ids)
+    typo_fixes = counted_typo_fixes(conn, project_id)
     packaged = set(
         conn.execute(
             scoped(
@@ -185,6 +270,7 @@ def language_versions(
                 translation_status=row.translation_status,
                 position=row.position,
                 latest_decision=decisions.get(row.document_id),
+                typo_fix_counts=row.document_id in typo_fixes,
             )
         )
     result: dict[RowKey, LanguageVersion] = {}
@@ -374,6 +460,21 @@ def clear_restored(conn: Connection, project_id: int, key: RowKey) -> None:
             WorkPlanFlagsRow.restored_revision.is_not(None),
         )
         .values(restored_revision=None)
+    )
+
+
+def set_restored(conn: Connection, project_id: int, key: RowKey, revision: int) -> None:
+    """Put the row's PLAN_RESTORED marker back; the plan revision stays as it
+    is. For the Undo of a bulk change of final results: the final result the
+    warning was about is the text's final result again."""
+    conn.execute(
+        update(WorkPlanFlagsRow)
+        .where(
+            WorkPlanFlagsRow.project_id == project_id,
+            WorkPlanFlagsRow.case_id == key.case_id,
+            WorkPlanFlagsRow.language == key.language,
+        )
+        .values(restored_revision=revision)
     )
 
 

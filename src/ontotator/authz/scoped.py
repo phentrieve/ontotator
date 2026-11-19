@@ -352,12 +352,17 @@ class ScopedRepository(Repository):
     ) -> None:
         assignment = self.require_workable(conn, key, mutation=True)
         values: dict[str, Any] = {"updated_at": at}
+        # Issue 268: the first save since the task was given or reopened.
+        started = {"started_at": func.coalesce(AssignmentRow.started_at, at)}
         if isinstance(result, Submission):
-            values.update(status="submitted", last_submission_id=result.submission_id)
+            values.update(
+                started, status="submitted", last_submission_id=result.submission_id
+            )
         elif assignment.status == "open":
-            values["status"] = "in_progress"
+            values.update(started, status="in_progress")
         else:
-            return
+            # A task in progress or reopened keeps status and ``updated_at``.
+            values = started
         conn.execute(
             update(AssignmentRow)
             .where(AssignmentRow.id == assignment.id)

@@ -900,7 +900,7 @@ def test_finishing_on_old_text_is_running() -> None:
     assert c.annotation.detail.people == (TOM,)
 
 
-def test_partly_assigned_lists_the_working_people() -> None:
+def test_an_open_task_below_the_limit_is_in_progress_with_the_room() -> None:
     c = cells(
         facts(
             per_text=2,
@@ -909,9 +909,39 @@ def test_partly_assigned_lists_the_working_people() -> None:
             annotators_open=(TOM,),
         )
     )
-    assert (c.annotation.state, c.annotation.tone) == ("partly_assigned", "todo")
+    # An open task below the limit: the cell shows the work and waits on the
+    # person; the room for another annotator is "max 2" (lead review, F3).
+    assert (c.annotation.state, c.annotation.tone) == ("in_progress", "running")
     assert (c.annotation.detail.assigned, c.annotation.detail.target) == (1, 2)
+    assert (c.annotation.detail.submitted, c.annotation.detail.total) == (0, 1)
     assert c.annotation.detail.people == (TOM,)
+    # At the limit the cell carries no room.
+    full = cells(
+        facts(
+            per_text=2,
+            annotation_assignments=2,
+            open_annotations=1,
+            annotators_open=(TOM,),
+            annotators_holding=2,
+        )
+    ).annotation
+    assert (full.state, full.detail.target, full.detail.total) == (
+        "in_progress",
+        None,
+        2,
+    )
+    # Nobody at work (one submitted, room for one more): still partly assigned.
+    idle = cells(
+        facts(
+            per_text=2,
+            annotation_assignments=1,
+            missing_final=True,
+            submissions=1,
+            annotators_submitted=(TOM,),
+        )
+    ).annotation
+    assert (idle.state, idle.tone) == ("partly_assigned", "todo")
+    assert (idle.detail.assigned, idle.detail.target) == (1, 2)
 
 
 # One root per target status / newest decision class (keeps the product small).
@@ -1072,6 +1102,13 @@ def test_every_lead_step_has_exactly_one_actionable_cell() -> None:
                 and status != "accepted"
             ):
                 continue
+            # Lead review F3: with an annotation open the row waits on its
+            # person (rule 9 first); assigning another annotator stays on
+            # offer while the cell shows the running work.
+            if s.code == "assign_annotation" and (
+                step.open_annotations or step.finishing
+            ):
+                continue
             # "rejected" carries the edge of a decision row ("rejected + edge"),
             # only for the row's resolve_rejected (an assign step of the same
             # rejected translation lands there too).
@@ -1168,6 +1205,51 @@ def test_consolidation_shows_consolidating() -> None:
     assert (c.annotation.state, c.annotation.tone) == ("consolidating", "running")
     assert c.annotation.detail.people == (LUC,)
     assert (c.final.state, c.final.tone) == ("after_review", "waiting")
+
+
+def test_a_paused_consolidation_stays_consolidating() -> None:
+    """Review 2, F2: a pause never hides the open consolidation. The cell
+    keeps the consolidators and the counts, so the row and the card still
+    name it and never offer a second consolidation."""
+    base: dict[str, Any] = dict(
+        per_text=2,
+        annotation_assignments=2,
+        annotators_submitted=(ANA, TOM),
+        consolidators=(LUC,),
+        submissions=2,
+    )
+    by_lead = cells(
+        facts(
+            **base,
+            lead_paused=True,
+            lead_pause_by=ANA,
+            lead_pause_reason="Source text is being checked",
+        )
+    ).annotation
+    assert (by_lead.state, by_lead.tone) == ("consolidating", "waiting")
+    assert (by_lead.detail.people, by_lead.detail.note) == ((LUC,), "lead_pause")
+    assert (by_lead.detail.submitted, by_lead.detail.total) == (2, 2)
+    assert by_lead.detail.excerpt == "Source text is being checked"
+
+    f = facts(
+        **base,
+        open_report_id="r1",
+        paused_by=LUC,
+        paused_excerpt="Which rule applies?",
+        paused_task="consolidation",
+    )
+    steps = derive_steps(f.step)
+    assert steps[0].code == "decide_report"
+    by_report = stage_cells(f, steps).annotation
+    assert (by_report.state, by_report.tone) == ("consolidating", "decision")
+    assert (by_report.detail.people, by_report.detail.note) == ((LUC,), "report_pause")
+    assert by_report.detail.excerpt == "Which rule applies?"
+    # The report wins over a lead pause on the same text: it is the lead's turn.
+    both = stage_cells(dataclasses.replace(f, lead_paused=True), steps).annotation
+    assert (both.tone, both.detail.note) == ("decision", "report_pause")
+    # A paused annotation task is still the paused cell.
+    annotator = stage_cells(dataclasses.replace(f, paused_task="annotate"), steps)
+    assert annotator.annotation.state == "paused"
 
 
 def test_final_choose_counts_consolidation_submissions() -> None:
@@ -1270,11 +1352,11 @@ def test_annotation_counts_started_annotations() -> None:
     assert (cell.detail.started, cell.detail.open_tasks) == (0, 1)
     cell = cells(facts(**base, annotate_tasks=1, annotate_started=1)).annotation
     assert (cell.detail.started, cell.detail.open_tasks) == (1, 1)
-    # Partly assigned: the working people carry the count too.
+    # Below the limit: the open task carries the count too.
     cell = cells(
         facts(**base, per_text=2, annotate_tasks=1, annotate_started=0)
     ).annotation
-    assert cell.state == "partly_assigned"
+    assert (cell.state, cell.detail.target) == ("in_progress", 2)
     assert (cell.detail.started, cell.detail.open_tasks) == (0, 1)
     # Nobody at work: nothing to count.
     cell = cells(facts(annotate_tasks=0)).annotation

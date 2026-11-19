@@ -116,6 +116,65 @@ def synth(schema: dict[str, Any], depth: int = 0) -> Any:
     return {}
 
 
+# Response fields that carry clinical text or what a person wrote about it:
+# the text of a version, of a passage or of a change, a reviewer's corrected
+# text and rationale, annotators' notes.
+CONTENT_FIELDS = frozenset(
+    {
+        "text",
+        "proposed_text",
+        "rationale",
+        "excerpt",
+        "context",
+        "old_context",
+        "new_context",
+        "old_text",
+        "new_text",
+        "previous_text",
+        "old_source_text",
+        "new_source_text",
+        "translation_text",
+        "note",
+        "unresolved_note",
+    }
+)
+MAX_FULL_DEPTH = 8
+
+
+def synth_full(
+    schema: dict[str, Any], content: str, name: str = "", depth: int = 0
+) -> Any:
+    """The largest instance of ``schema``: every property, one item in every
+    array, and ``content`` in each string field of ``CONTENT_FIELDS``. A tool
+    that passes such a field on shows ``content`` in its answer."""
+    schema = resolve(schema)
+    if depth > MAX_FULL_DEPTH:
+        return synth(schema, depth)
+    if "const" in schema:
+        return schema["const"]
+    if "enum" in schema:
+        return schema["enum"][0]
+    for key in ("anyOf", "oneOf"):
+        if key in schema:
+            options = [o for o in schema[key] if resolve(o).get("type") != "null"]
+            return synth_full((options or schema[key])[0], content, name, depth + 1)
+    kind = schema.get("type")
+    if kind == "object" or "properties" in schema:
+        return {
+            prop: synth_full(sub, content, prop, depth + 1)
+            for prop, sub in schema.get("properties", {}).items()
+        }
+    if kind == "array":
+        items = schema.get("items")
+        if not isinstance(items, dict) or schema.get("maxItems") == 0:
+            return []
+        return [synth_full(items, content, name, depth + 1)]
+    if kind == "string" and name in CONTENT_FIELDS:
+        limit = schema.get("maxLength")
+        return content if limit is None else content[:limit]
+    return synth(schema, depth)
+
+
 def check(instance: Any, schema: dict[str, Any]) -> None:
     """Raise if ``instance`` does not fit ``schema`` (a contract schema)."""
     document = {"components": spec()["components"], **schema}

@@ -177,3 +177,77 @@ it("the undo toast keeps its buttons on the row and wraps a long message (R-6)",
     expect(message.getAttribute("title")).toBe("fr of case-0101: Review off");
   } finally { style.remove(); }
 });
+// Issue 439: a toast of the previous action never covers a dialog opened after it.
+function DialogHost({ onUndo }: { onUndo: () => void }) {
+  const { toast, show, dismiss } = useToast();
+  const [open, setOpen] = useState(false);
+  return <>
+    {open && <div role="dialog" aria-modal="true" aria-label="Withdraw open tasks"><button onClick={() => show({ message: "Withdrew 1 assignment" })}>act</button></div>}
+    <button onClick={() => show({ message: "Reopened 8 assignments", onAction: onUndo, undo: true })}>show</button>
+    <button onClick={() => setOpen(value => !value)}>toggle dialog</button>
+    <Toast toast={toast} onDismiss={dismiss} />
+  </>;
+}
+/** The DOM change is observed in a microtask. */
+const observed = () => act(async () => { await Promise.resolve(); });
+it("waits behind a dialog opened after it, without losing its time or its Undo, and is back when the dialog closes", async () => {
+  const onUndo = vi.fn();
+  render(<DialogHost onUndo={onUndo} />);
+  fireEvent.click(screen.getByText("show"));
+  const region = screen.getByRole("status");
+  expect(region.hasAttribute("data-behind-dialog")).toBe(false);
+  act(() => { vi.advanceTimersByTime(6_000); });
+
+  fireEvent.click(screen.getByText("toggle dialog"));
+  await observed();
+  expect(region.hasAttribute("data-behind-dialog")).toBe(true);
+  // Still in the polite live region, so nothing is taken from what a screen reader was told.
+  expect(region.getAttribute("aria-live")).toBe("polite");
+  expect(region.textContent).toContain("Reopened 8 assignments");
+  // Its time does not run, and Ctrl+Z does not reach an action nobody can see.
+  act(() => { vi.advanceTimersByTime(60_000); });
+  expect(region.textContent).toContain("Reopened 8 assignments");
+  fireEvent.keyDown(document.body, { key: "z", ctrlKey: true });
+  expect(onUndo).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByText("toggle dialog"));
+  await observed();
+  expect(region.hasAttribute("data-behind-dialog")).toBe(false);
+  // The full time again, and the Undo works.
+  act(() => { vi.advanceTimersByTime(9_000); });
+  fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+  expect(onUndo).toHaveBeenCalledTimes(1);
+});
+it("closes 10 s after the dialog that hid it has closed", async () => {
+  render(<DialogHost onUndo={() => undefined} />);
+  fireEvent.click(screen.getByText("show"));
+  fireEvent.click(screen.getByText("toggle dialog"));
+  await observed();
+  fireEvent.click(screen.getByText("toggle dialog"));
+  await observed();
+  act(() => { vi.advanceTimersByTime(10_000); });
+  expect(screen.getByRole("status").textContent).toBe("");
+});
+it("a toast shown while a dialog is open reports that dialog's action and stays visible", async () => {
+  render(<DialogHost onUndo={() => undefined} />);
+  fireEvent.click(screen.getByText("toggle dialog"));
+  fireEvent.click(screen.getByText("show"));
+  await observed();
+  const region = screen.getByRole("status");
+  expect(region.hasAttribute("data-behind-dialog")).toBe(false);
+  // A toast of the dialog's own action replaces a waiting one and is visible.
+  fireEvent.click(screen.getByText("toggle dialog"));
+  await observed();
+  fireEvent.click(screen.getByText("show"));
+  fireEvent.click(screen.getByText("toggle dialog"));
+  await observed();
+  expect(region.hasAttribute("data-behind-dialog")).toBe(true);
+  fireEvent.click(screen.getByText("act"));
+  await observed();
+  expect(region.textContent).toContain("Withdrew 1 assignment");
+  expect(region.hasAttribute("data-behind-dialog")).toBe(false);
+});
+it("the waiting toast is hidden by a style rule, not removed", () => {
+  const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../../src/styles/components.css"), "utf8");
+  expect(css).toMatch(/\.ui-toast-region\[data-behind-dialog\] > \.ui-toast \{ visibility: hidden; \}/);
+});

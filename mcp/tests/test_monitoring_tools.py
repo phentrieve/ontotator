@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
+import httpx
 import pytest
 from conftest import call
 from fake_api import FakeApi
 from mcp import Client
 from shapes import build
+
+from ontotator_mcp.config import Settings
+from ontotator_mcp.server import build_server
 
 P = "/api/v1/projects/{key}"
 DOC = "case/1-en-v1"
@@ -32,7 +38,9 @@ async def test_list_guidelines_gives_versions_and_read_status(
     fake: FakeApi, mcp_client: Client
 ) -> None:
     reach = build("GuidelineReachView", notified=3, opened=2, members=4)
-    version = build("GuidelineSummary", version=2, reach=reach, not_seen=[])
+    version = build(
+        "GuidelineSummary", version=2, label="3.1", reach=reach, not_seen=[]
+    )
     fake.on(
         "GET",
         f"{P}/guidelines",
@@ -41,6 +49,8 @@ async def test_list_guidelines_gives_versions_and_read_status(
         ),
     )
     listing = await call(mcp_client, "list_guidelines", {"project": "p"})
+    # The upload number and the project's own label of the version (#487).
+    assert (listing["current"]["version"], listing["current"]["label"]) == (2, "3.1")
     assert listing["versions"][0]["reach"] == {
         "notified": 3,
         "opened": 2,
@@ -112,3 +122,66 @@ async def test_list_translation_reviews_of_the_project_or_one_text(
         ("GET", f"{P}/translation-reviews"),
         ("GET", f"{P}/documents/{{doc}}/translation-reviews"),
     ]
+
+
+def _review_with_text() -> dict[str, object]:
+    return build(
+        "TranslationReviewRecord",
+        id=5,
+        decision="accepted_corrected",
+        rationale="The dose was missing: 5 mg.",
+        proposed_text="Die Patientin erhielt 5 mg.",
+        proposed_text_sha256="a" * 64,
+    )
+
+
+async def test_list_translation_reviews_returns_the_reviewers_text_only_on_request(
+    fake: FakeApi, settings: Settings
+) -> None:
+    fake.on("GET", f"{P}/translation-reviews", [_review_with_text()])
+    server = build_server(
+        replace(settings, read_content=True), transport=httpx.MockTransport(fake)
+    )
+    async with Client(server) as content_client:
+        [plain] = await call(
+            content_client, "list_translation_reviews", {"project": "p"}
+        )
+        assert "proposed_text" not in plain and "rationale" not in plain
+        # The decision and the hashes stay: what changed is still identifiable.
+        assert plain["decision"] == "accepted_corrected"
+        assert plain["proposed_text_sha256"] == "a" * 64
+        [full] = await call(
+            content_client,
+            "list_translation_reviews",
+            {"project": "p", "include_text": True},
+        )
+    assert full["proposed_text"] == "Die Patientin erhielt 5 mg."
+    assert full["rationale"] == "The dose was missing: 5 mg."
+    assert full == _review_with_text()
+
+
+async def test_list_translation_reviews_has_no_include_text_without_the_opt_in(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    """Without ONTOTATOR_MCP_READ_CONTENT=1 the argument does not exist, so
+    no call returns the reviewer's text (review finding F2)."""
+    tools = {tool.name: tool for tool in (await mcp_client.list_tools()).tools}
+    listed = tools["list_translation_reviews"]
+    assert set(listed.input_schema["properties"]) == {"project", "document_id"}
+    assert "ONTOTATOR_MCP_READ_CONTENT=1" in (listed.description or "")
+    fake.on("GET", f"{P}/translation-reviews", [_review_with_text()])
+    [plain] = await call(mcp_client, "list_translation_reviews", {"project": "p"})
+    assert "proposed_text" not in plain and "rationale" not in plain
+    assert plain["proposed_text_sha256"] == "a" * 64
+
+
+async def test_get_text_detail_leaves_the_reviewers_text_out(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    fake.on("GET", f"{P}/documents/{{doc}}/translation-reviews", [_review_with_text()])
+    detail = await call(
+        mcp_client, "get_text_detail", {"project": "p", "document_id": DOC}
+    )
+    [review] = detail["translation_reviews"]
+    assert (review["id"], review["decision"]) == (5, "accepted_corrected")
+    assert "proposed_text" not in review and "rationale" not in review

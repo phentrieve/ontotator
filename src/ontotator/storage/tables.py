@@ -58,6 +58,9 @@ APPEND_ONLY_TABLES = (
     "review_obligation_resolutions",
     "translation_acceptances",
     "discarded_variants",
+    "translation_version_uploads",
+    "translation_editorial_corrections",
+    "translation_query_decisions",
     "text_change_resolutions",
     "draft_snapshots",
     "guideline_versions",
@@ -91,7 +94,7 @@ class ProjectRow(Base):
     __tablename__ = "projects"
     __table_args__ = (
         CheckConstraint(
-            "annotations_per_text BETWEEN 1 AND 5", name="annotations_per_text"
+            "annotations_per_text BETWEEN 1 AND 20", name="annotations_per_text"
         ),
         CheckConstraint(
             "import_plan IN ('nothing', 'review_and_annotate_translations')",
@@ -1116,6 +1119,9 @@ class AssignmentRow(Base):
     # FD1: the lead's own translation review of a rejected or queried version.
     lead_correction: Mapped[bool] = mapped_column(server_default=text("false"))
     annotation_mode: Mapped[str | None]
+    # Issue 268: the first saved change since the assignment was given or
+    # last reopened; None until then (a reopen or a new round clears it).
+    started_at: Mapped[datetime | None]
 
 
 class TranslationReviewRow(Base):

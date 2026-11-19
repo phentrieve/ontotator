@@ -19,6 +19,7 @@ import { Kbd } from "../ui/Kbd";
 import { useCoalescedAxisChange } from "./useCoalescedAxisChange";
 import { useValuesLayout } from "./valuesLayout";
 import { quoteOf } from "./modifiers";
+import { CopyTextButton } from "./CopyTextButton";
 
 export type AxesValues = Record<string, string | null>;
 export type Axes = AxesValues;
@@ -49,6 +50,8 @@ export interface AnnotationPanelProps {
   /** Open the ontology tree at this annotation's term. */
   onShowInTree?: () => void;
   onSelectEvidence: (evidenceId: string) => void;
+  /** Tells screen readers that "Copy text" of a mention copied (or failed). */
+  onCopyAnnounce?: (message: string) => void;
   noteValue?: string;
   noteRequired?: boolean;
   noteHint?: string;
@@ -111,6 +114,7 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
   onDeselect,
   onShowInTree,
   onSelectEvidence,
+  onCopyAnnounce,
   noteValue, noteRequired, noteHint, onChangeNote, onSaveNote, detachLastBlockedReason,
   onUpdateTerm,
   onUpdateAxes,
@@ -488,6 +492,7 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
                     </div>
                   ) : (
                   <div className="mention-card__actions">
+                    {snippet && <CopyTextButton text={quoteOf(documentText, segments, " ")} onAnnounce={onCopyAnnounce} />}
                     {onMoveMention && linkedEvidence.length > 1 && <Button
                       type="button"
                       variant="secondary" size="sm"

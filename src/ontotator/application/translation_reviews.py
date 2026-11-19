@@ -2,8 +2,8 @@
 
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field, replace
-from datetime import UTC, datetime
-from typing import Any
+from datetime import UTC, date, datetime
+from typing import Any, Literal
 
 from ontospan import TranslationCheck, canonical_text
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, ValidationError
@@ -12,7 +12,9 @@ from sqlalchemy import Connection, RowMapping, func, insert, select, update
 from ontotator.assignments.service import (
     Assignment,
     AssignmentService,
+    latest_reopen,
     move_waiting_tasks,
+    second_review_requests,
 )
 from ontotator.auth.audit import Actor, record_audit
 from ontotator.auth.authority import lock_user_authority
@@ -24,6 +26,7 @@ from ontotator.authz.visibility import (
     require_document,
     visible_documents,
 )
+from ontotator.domain.bracketed_passages import BracketCheck, check_added_brackets
 from ontotator.domain.errors import DomainError, RevisionConflict, project_not_found
 from ontotator.domain.translation_review import (
     LEAD_CORRECTION_DECISION,
@@ -34,8 +37,15 @@ from ontotator.domain.translation_review import (
     check_review,
     next_status,
 )
+from ontotator.domain.typography import (
+    TypographyHint,
+    count_by_rule,
+    typography_hints,
+)
 from ontotator.domain.variants import (
+    TranslationStatus,
     VariantInfo,
+    descends_from_accepted,
     resolve_translation_lineage,
     translation_review_comparisons,
     variant_document_id,
@@ -43,6 +53,10 @@ from ontotator.domain.variants import (
 from ontotator.jobs.queue import JobQueue
 from ontotator.storage.database import Database
 from ontotator.storage.guidelines import current_guideline_version, guideline_facts
+from ontotator.storage.plan_tables import (
+    EditorialCorrectionRow,
+    TranslationVersionUploadRow,
+)
 from ontotator.storage.repository import Repository, _lock_id
 from ontotator.storage.tables import (
     AssignmentRow,
@@ -152,12 +166,15 @@ class TranslationReviewRecord(BaseModel):
     # The guideline version in force at submit (G15); NULL when none was.
     guideline_version: int | None = None
     guideline_withdrawn: bool = False
+    # The project's own name of that version ("3.1"); set with the flag above.
+    guideline_label: str | None = None
 
 
 def with_guideline_withdrawn(
     conn: Connection, project_id: int, records: list[TranslationReviewRecord]
 ) -> list[TranslationReviewRecord]:
-    """``records`` with ``guideline_withdrawn`` set from the stamped versions."""
+    """``records`` with ``guideline_withdrawn`` and ``guideline_label`` set
+    from the stamped versions."""
     if not any(r.guideline_version is not None for r in records):
         return records
     facts = guideline_facts(conn, project_id)
@@ -166,7 +183,10 @@ def with_guideline_withdrawn(
         r
         if r.guideline_version is None
         else r.model_copy(
-            update={"guideline_withdrawn": facts[r.guideline_version].withdrawn}
+            update={
+                "guideline_withdrawn": facts[r.guideline_version].withdrawn,
+                "guideline_label": facts[r.guideline_version].label,
+            }
         )
         for r in records
     ]
@@ -187,10 +207,72 @@ def failed_translation_checks(
     ]
 
 
+def version_failed_checks(
+    variant: VariantInfo, ancestor: VariantInfo
+) -> list[TranslationCheck]:
+    """Failed automatic checks of the reviewed version itself.
+
+    The checks ran on the text of the translation run (the first version). A
+    later version is another text that was never checked, so it carries no
+    failed check: none is counted in My tasks and "Accepted unchanged" needs
+    no rationale for one. The run's checks stay readable on the ancestor.
+    """
+    if variant.document_id != ancestor.document_id:
+        return []
+    return failed_translation_checks(ancestor.translation)
+
+
 @dataclass(frozen=True)
 class ReviewText:
     variant: VariantInfo
     text: str
+
+
+@dataclass(frozen=True)
+class VersionOrigin:
+    """How a version after the first was made, for its reviewer.
+
+    ``upload``: a lead uploaded the text ("Upload new version…", with the
+    upload record's fields); ``review_correction``: a translation reviewer
+    corrected the previous version; ``lead_correction``: a lead did
+    ("Correct the translation…"); ``editorial_correction``: a lead fixed
+    spacing, typos or grammar without a review ("Fix typos…", ``note`` is
+    the recorded reason); ``correction``: no record (an import).
+    """
+
+    kind: Literal[
+        "upload",
+        "review_correction",
+        "lead_correction",
+        "editorial_correction",
+        "correction",
+    ]
+    previous_version: int
+    at: datetime | None = None
+    method: str | None = None
+    provider: str | None = None
+    model: str | None = None
+    made_on: date | None = None
+    made_by: str | None = None
+    note: str | None = None
+
+
+@dataclass(frozen=True)
+class QueryAnswer:
+    """The lead's decision on the reviewer's query (issue 483), as the
+    reviewer reads it at the submitted task.
+
+    ``reviewer_text``: the proposed text became version
+    ``accepted_version`` (``edited``: the lead changed it before saving);
+    ``unchanged``: the reviewed version (or its typo fix) was accepted as it
+    is. ``answer`` is what the lead wrote.
+    """
+
+    kind: Literal["reviewer_text", "unchanged"]
+    accepted_version: int
+    decided_at: datetime
+    answer: str | None = None
+    edited: bool = False
 
 
 @dataclass(frozen=True)
@@ -216,8 +298,49 @@ class ReviewWorkspace:
     submitted_record: TranslationReviewRecord | None
     # FD1: the lead reviews this version themselves (accepted_corrected only).
     lead_correction: bool = False
+    # Issue 341 b: the lead correction's new version is reviewed again (this
+    # version or one it was corrected from is accepted).
+    reviewed_again: bool = False
     # The reviewer's own checked-sentence marks (issue 256); empty once submitted.
     checked_sentences: CheckedSentences = field(default_factory=CheckedSentences)
+    # A version after the first: how it was made and the version before it,
+    # so the reviewer sees what changed. None for the first version.
+    version_origin: VersionOrigin | None = None
+    previous_version: ReviewText | None = None
+    # What the lead said when asking for this review (as in My tasks): the
+    # reason of "Request correction…" for the task's current round, and of the
+    # latest "Reopen…" while the task is reopened.
+    second_review_at: datetime | None = None
+    second_review_reason: str | None = None
+    reopened_at: datetime | None = None
+    reopen_reason: str | None = None
+    # The lead's decision on this submitted query, with the answer; None
+    # while the lead has not decided it and for other decisions.
+    query_answer: QueryAnswer | None = None
+    # Issue 484: bracketed passages of the reviewed version against those of
+    # its source, computed when the review is opened. More in the translation
+    # is shown in the checks band; it asks for nothing and is not counted in
+    # ``failed_checks``.
+    added_brackets: BracketCheck | None = None
+
+
+# Hints listed for a draft; the counts stay exact.
+DRAFT_HINTS_MAX = 200
+
+
+@dataclass(frozen=True)
+class DraftTypographyHints:
+    """Typography hints of the stored draft text (issue 484), never stored.
+
+    ``revision`` is the draft revision the hints were computed for. Positions
+    count Unicode code points, as everywhere.
+    """
+
+    revision: int
+    total: int
+    counts: dict[str, int]
+    hints: list[TypographyHint]
+    truncated: bool
 
 
 class TranslationReviewService:
@@ -312,7 +435,12 @@ class TranslationReviewService:
         if assignment.held:
             raise DomainError(
                 "TASK_HELD",
-                {"reason": assignment.hold_reason, "assignment_id": assignment.id},
+                {
+                    "reason": assignment.hold_reason,
+                    "causes": list(assignment.pause_causes),
+                    "lead_reason": assignment.lead_pause_reason,
+                    "assignment_id": assignment.id,
+                },
             )
         if assignment.status == "submitted":
             raise DomainError("ASSIGNMENT_SUBMITTED")
@@ -504,6 +632,20 @@ class TranslationReviewService:
             comparisons = translation_review_comparisons(
                 variant, ancestor, variants.values()
             )
+            second = second_review_requests(
+                conn, {assignment.id: assignment.active_round_id}
+            ).get(assignment.id)
+            reopen = (
+                latest_reopen(conn, assignment.id)
+                if assignment.status == "reopened"
+                else None
+            )
+            # A later version: the version it was corrected from.
+            previous = (
+                variants.get(variant.derived_from)
+                if variant.origin == "correction" and variant.derived_from
+                else None
+            )
             texts = conn.execute(
                 select(DocumentRow.document_id, DocumentRow.text).where(
                     DocumentRow.project_id == pid,
@@ -511,14 +653,16 @@ class TranslationReviewService:
                 )
             ).all()
             by_id = {document_id: text for document_id, text in texts}
+            version_text = self._text(conn, pid, variant)
+            source_text = self._text(conn, pid, source)
             return ReviewWorkspace(
                 assignment,
                 variant,
                 ancestor,
-                self._text(conn, pid, variant),
-                ReviewText(source, self._text(conn, pid, source)),
+                version_text,
+                ReviewText(source, source_text),
                 [ReviewText(v, by_id[v.document_id]) for v in comparisons],
-                failed_translation_checks(ancestor.translation),
+                version_failed_checks(variant, ancestor),
                 draft,
                 user["qualification"],
                 self._records(
@@ -527,8 +671,124 @@ class TranslationReviewService:
                 assignment.status == "submitted" or assignment.held,
                 submitted,
                 assignment.lead_correction,
+                assignment.lead_correction
+                and descends_from_accepted(variant, variants.get),
                 marks,
+                version_origin=self._version_origin(conn, pid, variant, previous),
+                previous_version=None
+                if previous is None
+                else ReviewText(previous, self._text(conn, pid, previous)),
+                second_review_at=second[0] if second else None,
+                second_review_reason=second[1] if second else None,
+                reopened_at=reopen[0] if reopen else None,
+                reopen_reason=reopen[1] if reopen else None,
+                query_answer=self._query_answer(conn, submitted),
+                added_brackets=check_added_brackets(source_text, version_text),
             )
+
+    def draft_typography_hints(
+        self, access: Access, assignment_id: int
+    ) -> DraftTypographyHints:
+        """Hints of the text the review would save: the stored draft, or the
+        reviewed version while nothing was saved. Whoever may open the review
+        may read them; nothing is written."""
+        with self.db.transaction() as conn:
+            assignment, pid, _ = self._authority(conn, access, assignment_id)
+            variant, _, _, _ = self._context(assignment)
+            row = conn.execute(
+                select(
+                    TranslationReviewDraftRow.text, TranslationReviewDraftRow.revision
+                ).where(TranslationReviewDraftRow.assignment_id == assignment.id)
+            ).one_or_none()
+            if row is None:
+                text, revision = self._text(conn, pid, variant), 0
+            else:
+                text, revision = row.text, row.revision
+        hints = typography_hints(text)
+        return DraftTypographyHints(
+            revision,
+            len(hints),
+            count_by_rule(hints),
+            hints[:DRAFT_HINTS_MAX],
+            len(hints) > DRAFT_HINTS_MAX,
+        )
+
+    @staticmethod
+    def _query_answer(
+        conn: Connection, submitted: TranslationReviewRecord | None
+    ) -> QueryAnswer | None:
+        if submitted is None or submitted.decision != "query":
+            return None
+        from ontotator.application.query_decisions import decisions_of_reviews
+
+        found = decisions_of_reviews(conn, [submitted.id]).get(submitted.id)
+        return None if found is None else QueryAnswer(**found)
+
+    @staticmethod
+    def _version_origin(
+        conn: Connection,
+        project_id: int,
+        variant: VariantInfo,
+        previous: VariantInfo | None,
+    ) -> VersionOrigin | None:
+        if previous is None:
+            return None
+        upload = (
+            conn.execute(
+                select(TranslationVersionUploadRow).where(
+                    TranslationVersionUploadRow.project_id == project_id,
+                    TranslationVersionUploadRow.document_id == variant.document_id,
+                )
+            )
+            .mappings()
+            .first()
+        )
+        if upload is not None:
+            return VersionOrigin(
+                "upload",
+                previous.version,
+                upload["uploaded_at"],
+                upload["method"],
+                upload["provider"],
+                upload["model"],
+                upload["made_on"],
+                upload["made_by"],
+                upload["note"],
+            )
+        editorial = (
+            conn.execute(
+                select(EditorialCorrectionRow).where(
+                    EditorialCorrectionRow.project_id == project_id,
+                    EditorialCorrectionRow.document_id == variant.document_id,
+                )
+            )
+            .mappings()
+            .first()
+        )
+        if editorial is not None:
+            return VersionOrigin(
+                "editorial_correction",
+                previous.version,
+                editorial["corrected_at"],
+                note=editorial["reason"],
+            )
+        review = conn.execute(
+            select(TranslationReviewRow.created_at, AssignmentRow.lead_correction)
+            .join(AssignmentRow, AssignmentRow.id == TranslationReviewRow.assignment_id)
+            .where(
+                TranslationReviewRow.project_id == project_id,
+                TranslationReviewRow.created_variant_id == variant.document_id,
+            )
+            .order_by(TranslationReviewRow.id)
+            .limit(1)
+        ).first()
+        if review is None:
+            return VersionOrigin("correction", previous.version)
+        return VersionOrigin(
+            "lead_correction" if review.lead_correction else "review_correction",
+            previous.version,
+            review.created_at,
+        )
 
     def save_draft(
         self,
@@ -571,6 +831,8 @@ class TranslationReviewService:
                     status="in_progress"
                     if assignment.status == "open"
                     else assignment.status,
+                    # Issue 268: the first save since given or reopened.
+                    started_at=func.coalesce(AssignmentRow.started_at, now),
                     updated_at=now,
                 )
             )
@@ -650,13 +912,25 @@ class TranslationReviewService:
                 form,
                 machine_text=machine,
                 proposed_text=draft.text,
-                failed_checks=bool(failed_translation_checks(ancestor.translation)),
+                failed_checks=bool(version_failed_checks(variant, ancestor)),
             )
             if issues:
                 raise DomainError("REVIEW_INVALID", {"issues": issues})
             before = variant.translation_status
             assert before is not None
             after, child_status = next_status(form.decision)
+            corrected_status: TranslationStatus | None = child_status
+            if assignment.lead_correction and descends_from_accepted(
+                variant, variants.get
+            ):
+                # Issue 341 b: the lead's correction of an accepted version is
+                # a new text that is reviewed again; the accepted version and
+                # the annotation work on it stay (text-change steps follow).
+                # So is a further lead correction after that new text was
+                # rejected or queried: it never counts as accepted unreviewed.
+                corrected_status = "ready_for_review"
+                if before == "accepted":
+                    after = "accepted"
             child = None
             if child_status:
                 latest = max(
@@ -676,7 +950,7 @@ class TranslationReviewService:
                     origin="correction",
                     derived_from=variant.document_id,
                     translation=None,
-                    translation_status=child_status,
+                    translation_status=corrected_status,
                 )
             proposed = canonical_text(draft.text)
             sha = hashlib.sha256(proposed.encode("utf-8")).hexdigest()
@@ -758,6 +1032,7 @@ class TranslationReviewService:
                 .values(
                     status="submitted",
                     last_submission_id=f"tr-{record_id}",
+                    started_at=func.coalesce(AssignmentRow.started_at, now),
                     updated_at=now,
                 )
             )

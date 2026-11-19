@@ -96,6 +96,7 @@ from ontotator.packages.models import (
 from ontotator.storage.database import Database, advisory_lock_id
 from ontotator.storage.guidelines import current_guideline_version, guideline_facts
 from ontotator.storage.live_submissions import discarded_draft_keys, live_submission
+from ontotator.storage.reanchor_credit import credited_actors
 from ontotator.storage.tables import (
     AnnotationSnapshotRow,
     DocumentRow,
@@ -2268,7 +2269,20 @@ class Repository:
         )
 
     @staticmethod
-    def _proposal_set_metadata(row: Mapping[str, Any]) -> dict[str, Any]:
+    def _proposal_set_metadata(
+        conn: Connection, project_id: int, rows: Sequence[Mapping[str, Any]]
+    ) -> list[dict[str, Any]]:
+        # A set re-anchored before #417 is shown as its source's tool.
+        credits = credited_actors(conn, project_id, rows)
+        return [
+            Repository._one_proposal_set_metadata(
+                {**row, "actors": credits[row["id"]].actors}
+            )
+            for row in rows
+        ]
+
+    @staticmethod
+    def _one_proposal_set_metadata(row: Mapping[str, Any]) -> dict[str, Any]:
         result = dict(row)
         if row["origin"] != "reanchor":
             result.update(source_document_id=None, source_version=None)
@@ -2291,7 +2305,7 @@ class Repository:
             )
             if row is None or self.get_document(project_key, row.document_id) is None:
                 raise DomainError("PROPOSAL_SET_NOT_FOUND", "Proposal set not found.")
-            return self._proposal_set_metadata(dict(row))
+            return self._proposal_set_metadata(conn, project_id, [dict(row)])[0]
 
     def workspace_proposal_sets(
         self, key: WorkspaceKey, offered: Sequence[tuple[str, str, int]]
@@ -2341,7 +2355,9 @@ class Repository:
                 )
                 .order_by(ProposalSetRow.id)
             ).mappings()
-            return [self._proposal_set_metadata(dict(row)) for row in rows]
+            return self._proposal_set_metadata(
+                conn, project_id, [dict(row) for row in rows]
+            )
 
     def get_variant_text(self, project_key: str, document_id: str) -> Document | None:
         """Immutable text, separately scoped from annotation/workspace reads."""
@@ -3080,9 +3096,18 @@ class Repository:
             ).values(
                 status="submitted",
                 last_submission_id=result.submission_id,
+                started_at=func.coalesce(AssignmentRow.started_at, at),
                 updated_at=at,
             )
         else:
+            # Issue 268: the first save since the task was given or reopened.
+            # A reopened task keeps its status and ``updated_at``.
+            conn.execute(
+                statement.where(
+                    AssignmentRow.status.in_(["open", "in_progress", "reopened"]),
+                    AssignmentRow.started_at.is_(None),
+                ).values(started_at=at)
+            )
             statement = statement.where(AssignmentRow.status == "open").values(
                 status="in_progress", updated_at=at
             )

@@ -15,6 +15,7 @@ from ontotator.domain.guidelines import (
     decode_body,
     guideline_ref,
     kind_for_filename,
+    validate_label,
     validate_note,
 )
 
@@ -97,6 +98,33 @@ def test_note_rules() -> None:
             validate_note(value, field=field)  # type: ignore[arg-type]
         assert _code(error) == "GUIDELINE_NOTE_INVALID"
         assert error.value.details == {"field": field}
+
+
+def test_label_rules() -> None:
+    """A project's own version label: optional, one short line (#487)."""
+    assert validate_label(None) is None
+    assert validate_label("") is None
+    assert validate_label("   ") is None
+    assert validate_label("  3.1  ") == "3.1"
+    assert validate_label("2026-11 draft B") == "2026-11 draft B"
+    assert validate_label("x" * 40) == "x" * 40
+    for value in ("x" * 41, "3.1\nfinal", "3.1\u202e", "3\x00", "3\t1"):
+        with pytest.raises(DomainError) as error:
+            validate_label(value)
+        assert _code(error) == "GUIDELINE_NOTE_INVALID"
+        assert error.value.details == {"field": "label"}
+
+
+def test_notice_carries_the_labels() -> None:
+    facts = [
+        VersionFact(1, datetime(2026, 10, 1, tzinfo=UTC), None, False, "3.0"),
+        VersionFact(2, datetime(2026, 10, 2, tzinfo=UTC), None, False),
+        VersionFact(3, datetime(2026, 10, 3, tzinfo=UTC), "Clearer", False, "3.1"),
+    ]
+    notice = compute_notice(facts, 1)
+    assert notice is not None
+    assert (notice.to_version, notice.to_label) == (3, "3.1")
+    assert [(c.version, c.label) for c in notice.changes] == [(3, "3.1"), (2, None)]
 
 
 def test_guideline_ref_format() -> None:

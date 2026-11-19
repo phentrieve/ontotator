@@ -62,6 +62,7 @@ from ontotator.auth.tokens import (
     token_digest,
 )
 from ontotator.domain.errors import DomainError
+from ontotator.settings import setup_code_hours
 from ontotator.storage.database import Database, advisory_lock_id
 from ontotator.storage.report_tables import TechnicalReportRow
 from ontotator.storage.tables import (
@@ -84,11 +85,25 @@ from ontotator.storage.tables import (
 CodePurpose = Literal["setup", "reset"]
 BootstrapResult = Literal["created", "already_done", "not_configured"]
 
-CODE_LIFETIME: dict[str, timedelta] = {
-    "setup": timedelta(hours=24),
-    # Long enough to reach the person out of band; still single use.
-    "reset": timedelta(hours=2),
-}
+# Long enough to reach the person out of band; still single use. Fixed: a
+# reset code opens an existing account with its work.
+RESET_CODE_LIFETIME = timedelta(hours=2)
+
+
+def code_lifetime(purpose: CodePurpose) -> timedelta:
+    """How long a code issued now is valid.
+
+    A setup code lasts ``ONTOTATOR_SETUP_CODE_HOURS`` (7 days by default), a
+    reset code two hours.
+
+    Raises:
+        SettingsError: for a setup code when the setting is not valid.
+    """
+    if purpose == "reset":
+        return RESET_CODE_LIFETIME
+    return timedelta(hours=setup_code_hours())
+
+
 # Crockford base32 (no I, L, O, U): a code read aloud has no look-alikes.
 CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 # 26 symbols of 5 bits: 130 bits, far beyond guessing a single-use code that
@@ -296,6 +311,15 @@ def _rewrite_username(
             )
         )
     )
+    # The erased languages leave the trail too (#467); the events stay.
+    conn.execute(
+        update(AuditEventRow)
+        .where(
+            AuditEventRow.target_user_id == user_id,
+            AuditEventRow.action == "user.languages",
+        )
+        .values(details=AuditEventRow.details.op("-")("before").op("-")("after"))
+    )
     # Only the erasure itself may rewrite history: close the window again.
     conn.execute(text("SET LOCAL ontotator.erasure = off"))
     conn.execute(
@@ -383,6 +407,13 @@ class AccountService:
             user = self._lock_user(conn, username)
             if normalized and _user(user).anonymised:
                 raise _anonymised(user.username)
+            before = sorted(
+                conn.execute(
+                    select(UserLanguageRow.language).where(
+                        UserLanguageRow.user_id == user.id
+                    )
+                ).scalars()
+            )
             conn.execute(
                 delete(UserLanguageRow).where(UserLanguageRow.user_id == user.id)
             )
@@ -400,6 +431,8 @@ class AccountService:
                 "user.languages",
                 target_type="user",
                 target_id=user.username,
+                # The history says what was added and removed (#467).
+                details={"before": before, "after": sorted(normalized)},
                 at=self._now(),
             )
 
@@ -691,7 +724,8 @@ class AccountService:
     def issue_reset_code(self, actor: Actor, username: str) -> IssuedCode:
         """A new code for an active user; replaces unused codes, ends sessions.
 
-        A user who never set a password gets a fresh setup code (24 hours)
+        A user who never set a password gets a fresh setup code (7 days by
+        default, see ``code_lifetime``)
         instead of a reset code (2 hours).
 
         Raises:
@@ -746,7 +780,7 @@ class AccountService:
             )
         )
         code = new_code()
-        expires_at = now + CODE_LIFETIME[purpose]
+        expires_at = now + code_lifetime(purpose)
         conn.execute(
             pg_insert(OneTimeCodeRow).values(
                 user_id=user.id,

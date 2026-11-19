@@ -28,6 +28,9 @@ environment:
                            in, separated by the path separator; required for
                            any local file access (unset, the file tools refuse
                            and the others still work)
+  ONTOTATOR_MCP_READ_CONTENT
+                           1 adds the tools that return texts and submitted
+                           annotations (off by default)
 
 with --http (ONTOTATOR_TOKEN and ONTOTATOR_MCP_FILES_DIR must be unset):
   ONTOTATOR_MCP_URL        the public address clients use, e.g.

@@ -9,9 +9,10 @@ from mcp.server.mcpserver import MCPServer
 from pydantic import Field
 
 from ontotator_mcp.client import OntotatorClient, project_path, seg
-from ontotator_mcp.errors import OntotatorError
-from ontotator_mcp.tooling import register
-from ontotator_mcp.tools_status import rows
+from ontotator_mcp.errors import OntotatorError, check_preview_token, stale_note
+from ontotator_mcp.models import TextRef
+from ontotator_mcp.tooling import register, tool_message
+from ontotator_mcp.tools_setup import unknown_texts
 
 Project = Annotated[str, Field(description="Project key, e.g. 'ward-7'.")]
 ExportKind = Literal[
@@ -46,42 +47,6 @@ def _panel_path(project: str, case_id: str, language: str) -> str:
     )
 
 
-def _annotations_open(row: dict[str, Any]) -> bool:
-    """Other annotations of the text are still open (no one-click acceptance then)."""
-    work = [item for item in row.get("work", []) if item.get("task") == "annotate"]
-    return any(item.get("status") != "submitted" for item in work)
-
-
-def agreeing_submission(
-    row: dict[str, Any], panel: dict[str, Any]
-) -> tuple[dict[str, Any] | None, str]:
-    """The submission to accept for a fully agreeing text, or None and why not."""
-    if row.get("final") is not None:
-        return None, "has a final result"
-    listed = _listed(panel.get("submissions", []))
-    if len(listed) < 2:
-        return None, "fewer than two submissions"
-    if any(item.get("kind") == "consolidation" for item in listed):
-        return None, "has a consolidation; accept it in the web interface"
-    if _annotations_open(row):
-        return None, "other annotations are still open"
-    if not panel.get("all_match"):
-        return None, "submissions differ; consolidate or choose in the web interface"
-    chosen = next(
-        (
-            item
-            for item in listed
-            if item.get("submission_id") == panel.get("all_match_submission_id")
-        ),
-        None,
-    )
-    if chosen is None:
-        return None, "no submission to accept"
-    if not chosen.get("eligible", True):
-        return None, "the token's owner may not accept this result (own work)"
-    return chosen, "all findings match"
-
-
 def export_target(job: dict[str, Any]) -> str:
     kind = DOWNLOADABLE.get(str(job.get("kind")))
     if kind is None:
@@ -108,7 +73,13 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
         ],
         source_submission_ids: Annotated[
             list[str] | None,
-            Field(description="Submissions to merge; None: every eligible one."),
+            Field(
+                description=(
+                    "Submissions to merge (2 to 40, the API's bound); None:"
+                    " every eligible one."
+                ),
+                max_length=40,
+            ),
         ] = None,
         reason: str | None = None,
         confirm_language: bool = False,
@@ -116,8 +87,11 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
         """Start a consolidation of a text's submissions by a consolidator.
 
         Creates the consolidator's task; the consolidation itself is done in
-        the web interface. A consolidator lacking the role gets it
-        (``role_granted``).
+        the web interface. The consolidator needs the 'adjudicator' role
+        (set_member_roles); only the token's owner, as a lead naming
+        themselves, gets it on the way (``role_granted``). There is no dry
+        run. Refused while this person already has an open consolidation
+        task on the text (WORKFLOW_REVISION_CONFLICT).
         """
         panel = await api.get(_panel_path(project, case_id, language))
         eligible = [s for s in _listed(panel.get("submissions", [])) if s["eligible"]]
@@ -136,21 +110,40 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
                 "Not every source submission is an eligible submission of this"
                 " text: " + ", ".join(s["submission_id"] for s in eligible)
             )
-        started: dict[str, Any] = await api.post(
-            project_path(project, "consolidations"),
-            {
-                "document_id": chosen[0]["document_id"],
-                "reviewer": reviewer,
-                "source_submission_ids": source_submission_ids,
-                "reason": reason,
-                "confirm_language": confirm_language,
-                "request_id": str(uuid.uuid4()),
-            },
-        )
+        try:
+            started: dict[str, Any] = await api.post(
+                project_path(project, "consolidations"),
+                {
+                    "document_id": chosen[0]["document_id"],
+                    "reviewer": reviewer,
+                    "source_submission_ids": source_submission_ids,
+                    "reason": reason,
+                    "confirm_language": confirm_language,
+                    "request_id": str(uuid.uuid4()),
+                },
+            )
+        except OntotatorError as exc:
+            if exc.code == "WORKFLOW_REVISION_CONFLICT":
+                # This tool names no task revision, so the conflict is an
+                # open consolidation task of this person; repeating never helps.
+                raise exc.with_advice(
+                    f"{reviewer} already has an open consolidation task on"
+                    f" {case_id} {language}; nothing was started. Have it"
+                    " submitted, or withdraw it (list_assignments,"
+                    " withdraw_task), then repeat the call. Or name another"
+                    " consolidator."
+                ) from None
+            if exc.code == "ASSIGNEE_ROLE_MISSING":
+                raise exc.with_advice(
+                    f"{reviewer} lacks the consolidator role; nothing was"
+                    " started. Add 'adjudicator' to the person's roles with"
+                    " set_member_roles (list_people shows them), then repeat"
+                    " the call."
+                ) from None
+            raise
         return started
 
-    # A final result cannot be withdrawn (#343): the same PUT as set_final_result.
-    @register(server, scopes=("read", "project-admin"), effect="destructive")
+    @register(server, scopes="project-admin", effect="destructive")
     async def accept_agreeing_texts(
         project: Project,
         case_ids: Annotated[
@@ -159,55 +152,270 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
         confirm: Annotated[
             bool, Field(description="False: dry run. True: accept the listed texts.")
         ] = False,
+        preview_token: Annotated[
+            str | None,
+            Field(
+                max_length=80,
+                description=(
+                    "With confirm: the preview_token of the dry run, so exactly"
+                    " the texts it listed are accepted."
+                ),
+            ),
+        ] = None,
     ) -> dict[str, Any]:
         """Accept the result of every text whose annotations agree in full.
 
-        A text qualifies when it has no final result, all its annotations
-        are submitted, there is no consolidation, and all findings match
-        (also notes and modifier text spans; unresolved findings never
-        count as agreed). The dry run lists what would be accepted and why
-        the others are not; with confirm the agreeing submission becomes
-        the final result of each. A final result can be changed later with
-        set_final_result, but not withdrawn.
+        The server decides (one request): a text qualifies when it has no
+        final result, no open task, at least two submissions, no
+        consolidation, and all findings match (also notes and modifier text
+        spans; unresolved findings never count as agreed). The dry run lists
+        what would be accepted, why each other text is not (skipped, with
+        the counts per reason in skipped_by_reason), how many texts already
+        have a final result (they are not changed; set_final_result changes
+        one, change_final_results many), the case_ids the project does not have (unknown_case_ids) and
+        a preview_token. Confirm with that token: all listed
+        texts become final, or none when anything changed since the dry run;
+        then the answer is a fresh dry run with a new token
+        (``stale``). A final result can be changed later with
+        set_final_result or withdrawn with withdraw_final_result.
         """
-        found, _ = await rows(api, project, stage=["final"])
-        if case_ids is not None:
-            wanted = set(case_ids)
-            found = [row for row in found if row.get("case_id") in wanted]
-        accepted: list[dict[str, Any]] = []
-        skipped: list[dict[str, Any]] = []
-        for row in found:
-            ref = {"case_id": row["case_id"], "language": row["language"]}
-            panel = await api.get(_panel_path(project, row["case_id"], row["language"]))
-            chosen, why = agreeing_submission(row, panel)
-            if chosen is None:
-                skipped.append(ref | {"reason": why})
-                continue
-            entry = ref | {
-                "document_id": chosen["document_id"],
-                "submission_id": chosen["submission_id"],
-                "findings": chosen.get("finding_count"),
+        path = project_path(project, "final-selections", "accept-agreeing")
+        scope = {} if case_ids is None else {"case_ids": case_ids}
+
+        def summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
+            skipped = [
+                {key: item[key] for key in ("case_id", "language", "reason")}
+                | {"message": tool_message(item)}
+                for item in found.get("skipped", [])
+            ]
+            # Texts with Annotate off are counted, and listed last.
+            skipped.sort(key=lambda item: item["reason"] == "not_in_plan")
+            by_reason: dict[str, int] = {}
+            for item in skipped:
+                by_reason[item["reason"]] = by_reason.get(item["reason"], 0) + 1
+            return {
+                "applied": applied,
+                "accepted" if applied else "would_accept": found.get("texts", []),
+                "skipped": skipped[:MAX_LISTED],
+                "skipped_count": len(skipped),
+                "skipped_by_reason": by_reason,
+                "already_final": found.get("already_final", 0),
+                "unknown_case_ids": found.get("unknown_case_ids", []),
+                "preview_token": found.get("preview_token"),
             }
-            if confirm:
-                try:
-                    await api.put(
-                        project_path(project, "final-selections"),
-                        {
-                            "document_id": chosen["document_id"],
-                            "submission_id": chosen["submission_id"],
-                            "expected_revision": 0,
-                        },
-                    )
-                except OntotatorError as exc:
-                    skipped.append(ref | {"reason": str(exc)})
-                    continue
-            accepted.append(entry)
-        return {
-            "applied": confirm,
-            "accepted" if confirm else "would_accept": accepted,
-            "skipped": skipped[:MAX_LISTED],
-            "skipped_count": len(skipped),
-        }
+
+        if not confirm:
+            preview: dict[str, Any] = await api.post(path, {"preview": True, **scope})
+            return summary(preview, False)
+        check_preview_token(preview_token)
+        try:
+            applied: dict[str, Any] = await api.post(
+                path, {"preview_token": preview_token, **scope}
+            )
+        except OntotatorError as exc:
+            fresh = (
+                exc.details.get("preview") if isinstance(exc.details, dict) else None
+            )
+            if exc.code != "PREVIEW_STALE" or not isinstance(fresh, dict):
+                raise
+            return summary(fresh, False) | {
+                "stale": True,
+                "note": stale_note("Texts", "accepted"),
+            }
+        return summary(applied, True)
+
+    @register(server, scopes="project-admin", effect="destructive")
+    async def change_final_results(
+        project: Project,
+        texts: Annotated[
+            list[TextRef],
+            Field(
+                min_length=1,
+                max_length=10000,
+                description=(
+                    "The texts, each {'case_id': ..., 'language': ...}: at most"
+                    " 10000 per call, of at most 2000 cases."
+                ),
+            ),
+        ],
+        rule: Annotated[
+            Literal["newest_submission"],
+            Field(description="How each text's new final result is picked."),
+        ] = "newest_submission",
+        confirm: Annotated[
+            bool, Field(description="False: dry run. True: change the listed texts.")
+        ] = False,
+        preview_token: Annotated[
+            str | None,
+            Field(
+                max_length=80,
+                description=(
+                    "With confirm: the preview_token of the dry run, so exactly"
+                    " the changes it listed are made."
+                ),
+            ),
+        ] = None,
+    ) -> dict[str, Any]:
+        """Change the final result of many texts to their newest submission.
+
+        For texts that already have a final result (accept_agreeing_texts
+        covers texts without one). Rule newest_submission: of the submissions
+        a lead can choose on the text's current version (the last one of
+        each submitted annotation and of each submitted consolidation), the
+        newest becomes the final result when it was submitted after the
+        final result was chosen and is a consolidation, the text's only
+        submission, or an annotation that agrees in full with the text's
+        other submissions (the rule of accept_agreeing_texts). Texts are
+        skipped, with the reason,
+        when they have no final result, other work on them is open, nothing
+        is submitted on the current version, the final result already is the
+        newest submission, nothing was submitted since the final result was
+        chosen, the newest is your own and the project forbids choosing
+        your own result, or the submissions differ and were not
+        consolidated (reason 'differ': compare them with set_final_result
+        or start_consolidation). The dry run lists changes and skips, the
+        texts the project does not have (unknown_texts: another spelling,
+        letter case or language) and a preview_token. Confirm with that token: every listed text changes,
+        or none when anything changed since (then the answer is a fresh dry
+        run, ``stale``). The confirmed answer carries ``undo`` (id and
+        expires_at): undo_change_final_results takes that id and brings the
+        earlier final results back for 60 minutes, while nothing else
+        changed on the texts.
+        """
+        path = project_path(project, "final-selections", "bulk-change")
+        body = {"rows": [text.model_dump() for text in texts], "rule": rule}
+
+        def summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
+            changes = found.get("changes", [])
+            skipped = [
+                {key: item[key] for key in ("case_id", "language", "reason")}
+                | {"message": tool_message(item)}
+                for item in found.get("skipped", [])
+            ]
+            return {
+                "applied": applied,
+                "rule": found.get("rule"),
+                "texts": found.get("texts", 0),
+                "changed" if applied else "would_change": changes[:MAX_LISTED],
+                "change_count": found.get("change_count", len(changes)),
+                "skipped": skipped[:MAX_LISTED],
+                "skipped_count": found.get("skipped_count", len(skipped)),
+                "skipped_by_reason": found.get("skipped_by_reason", {}),
+                **unknown_texts(found),
+                "preview_token": found.get("preview_token"),
+            } | ({"undo": found["undo"]} if applied and found.get("undo") else {})
+
+        if not confirm:
+            preview: dict[str, Any] = await api.post(path, body | {"preview": True})
+            return summary(preview, False)
+        check_preview_token(preview_token)
+        try:
+            applied: dict[str, Any] = await api.post(
+                path, body | {"preview_token": preview_token}
+            )
+        except OntotatorError as exc:
+            fresh = (
+                exc.details.get("preview") if isinstance(exc.details, dict) else None
+            )
+            if exc.code != "PREVIEW_STALE" or not isinstance(fresh, dict):
+                raise
+            return summary(fresh, False) | {
+                "stale": True,
+                "note": stale_note("Texts", "changed"),
+            }
+        return summary(applied, True)
+
+    @register(server, scopes="project-admin", effect="changes")
+    async def undo_change_final_results(
+        project: Project,
+        undo_id: Annotated[
+            int,
+            Field(
+                ge=1,
+                description=(
+                    "``undo.id`` of the confirmed change_final_results or"
+                    " set_final_result answer."
+                ),
+            ),
+        ],
+        confirm: Annotated[
+            bool,
+            Field(
+                description=("False: dry run. True: restore the earlier final results.")
+            ),
+        ] = False,
+    ) -> dict[str, Any]:
+        """Undo a change_final_results, after a dry run.
+
+        The server kept the final result each text had; this names only that
+        record. It works once, with the token of the lead who made the
+        change, within 60 minutes. The dry run lists the final result each
+        text would get back (would_restore) and the texts in the way
+        (blocked, with the reason): a text blocks when its final result was
+        changed, confirmed or withdrawn since, or its versions, its plan
+        row, one of its tasks or its submissions changed. With confirm every
+        text gets its earlier final result back, with the lead who had
+        chosen it and the warnings that lead had confirmed, or none: one
+        blocked text refuses the whole undo (the answer is then the dry run,
+        ``refused``). Final exports made since the change do not block; they
+        stay as they are, with the changed results (exports_since).
+        """
+        path = project_path(project, "final-selections", "bulk-change", "undo")
+
+        def summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
+            restores = [
+                {
+                    "case_id": item.get("case_id"),
+                    "language": item.get("language"),
+                    "submission_id": item.get("submission_id"),
+                    "version": item.get("version"),
+                    "replaces_submission_id": item.get("from_submission_id"),
+                    "chosen_by": (item.get("selected_by") or {}).get("display_name")
+                    or (item.get("selected_by") or {}).get("pseudonym"),
+                    "chosen_at": item.get("selected_at"),
+                }
+                for item in found.get("restores", [])
+            ]
+            blocked = [
+                {
+                    key: item.get(key)
+                    for key in ("case_id", "language", "reason", "message")
+                }
+                for item in found.get("blocked", [])
+            ]
+            return {
+                "applied": applied,
+                "undo_id": found.get("undo_id"),
+                "expires_at": found.get("expires_at"),
+                "texts": found.get("texts", 0),
+                "restored" if applied else "would_restore": restores[:MAX_LISTED],
+                "restore_count": found.get("restore_count", len(restores)),
+                "blocked": blocked[:MAX_LISTED],
+                "blocked_count": found.get("blocked_count", len(blocked)),
+                "exports_since": found.get("exports_since", 0),
+            }
+
+        if not confirm:
+            preview: dict[str, Any] = await api.post(
+                path, {"undo_id": undo_id, "preview": True}
+            )
+            return summary(preview, False)
+        try:
+            applied: dict[str, Any] = await api.post(path, {"undo_id": undo_id})
+        except OntotatorError as exc:
+            fresh = (
+                exc.details.get("preview") if isinstance(exc.details, dict) else None
+            )
+            # The client appends the refusal's reason to its code.
+            if exc.code != "BULK_UNDO_STALE/changed" or not isinstance(fresh, dict):
+                raise
+            return summary(fresh, False) | {
+                "refused": True,
+                "note": "Texts changed since the final results were changed"
+                " (blocked); nothing was restored. set_final_result changes"
+                " one text back.",
+            }
+        return summary(applied, True)
 
     @register(server, scopes="read", effect="read")
     async def final_export_check(project: Project) -> dict[str, Any]:

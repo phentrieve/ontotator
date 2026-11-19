@@ -154,7 +154,11 @@ it('opens independent comparison alongside the actual viewer without replacing l
   expect(toolbar.closest('.comparison-reading')).toBe(mounted.container.querySelector('.comparison-reading'));
   expect(toolbar.closest('.compare-pane')).toBeNull();
   expect(within(toolbar).getByRole('checkbox', { name: 'Couple scrolling' })).toBeTruthy();
-  expect(within(screen.getByRole('group', { name: 'Text view' })).getAllByRole('combobox')).toHaveLength(2);
+  // Symmetric panes (#412): the current text's selects leave the toolbar for a group above the current text.
+  expect(within(screen.getByRole('group', { name: 'Text view' })).queryAllByRole('combobox')).toHaveLength(0);
+  const leftIdentity = screen.getByRole('group', { name: 'Current text identity' });
+  expect(within(leftIdentity).getByRole('heading', { name: 'Current text' })).toBeTruthy();
+  expect(within(leftIdentity).getAllByRole('combobox')).toHaveLength(2);
   expect(within(rightIdentity).getAllByRole('combobox')).toHaveLength(2);
   expect(mounted.container.querySelector('.variant-selectors')).toBeNull();
   expect(mounted.container.querySelector('.text-container')).toBe(left);
@@ -163,6 +167,7 @@ it('opens independent comparison alongside the actual viewer without replacing l
   fireEvent.click(screen.getByRole('button', { name: 'Close comparison' }));
   expect(mounted.container.querySelector('.text-container')).toBe(left);
   expect(document.activeElement).toBe(compare);
+  expect(within(screen.getByRole('group', { name: 'Text view' })).getAllByRole('combobox')).toHaveLength(2);
   vi.unstubAllGlobals();
 });
 
@@ -224,8 +229,8 @@ it('restricts ordinary annotators to text without generic browsing or forbidden 
 it('lets an annotator open an old own submission from the history as an own ref, never as a submission ref', async () => {
   const { CaseViewer } = await import('../src/variants/CaseViewer');
   vi.mocked(api.listProjects).mockResolvedValue([{ project_key: 'pkg', roles: ['annotator'], can_manage: false } as any]);
-  vi.spyOn(api, 'listSubmissionHistory').mockResolvedValue([{ submission_id: ownRef.id, document_id: 'target', author_label: 'Reader A', created_at: '2026-10-16T00:00:00Z', mode: 'independent', round_id: null, guideline_withdrawn: false }]);
-  vi.spyOn(api, 'getSubmissionHistory').mockResolvedValue({ summary: { submission_id: ownRef.id, document_id: 'target', author_label: 'Reader A', created_at: '2026-10-16T00:00:00Z', mode: 'independent', round_id: null, guideline_withdrawn: false },
+  vi.spyOn(api, 'listSubmissionHistory').mockResolvedValue([{ submission_id: ownRef.id, document_id: 'target', author_label: 'Reader A', is_me: true, created_at: '2026-10-16T00:00:00Z', mode: 'independent', round_id: null, guideline_withdrawn: false }]);
+  vi.spyOn(api, 'getSubmissionHistory').mockResolvedValue({ summary: { submission_id: ownRef.id, document_id: 'target', author_label: 'Reader A', is_me: true, created_at: '2026-10-16T00:00:00Z', mode: 'independent', round_id: null, guideline_withdrawn: false },
     annotations: historical.annotations, evidence: [], decisions: [], checked_layer_ids: [], document_checked: false, reanchor_inputs: [], reanchor_resolutions: [], round_inputs: [], round_input_resolutions: [] });
   const rows = vi.spyOn(api, 'getRowSubmissions');
   const onNavigate = vi.fn();
@@ -281,7 +286,7 @@ it('shows a lead the read-only check states of a submitted carry-forward submiss
   vi.mocked(api.listAnnotationVersions).mockResolvedValue([ownRef, carriedRef, plainRef]);
   const snapshot = historical.annotations[0];
   const other = { ...snapshot, annotation: { ...snapshot.annotation, annotation_id: 'gone', term_id: 'HP:gone' } };
-  const summary = (id: string) => ({ submission_id: id, document_id: 'target', author_label: 'Reader A', created_at: '2026-10-16T00:00:00Z', mode: 'independent', round_id: 'round-2' });
+  const summary = (id: string) => ({ submission_id: id, document_id: 'target', author_label: 'Reader A', is_me: true, created_at: '2026-10-16T00:00:00Z', mode: 'independent', round_id: 'round-2' });
   const input = (id: string, source: typeof snapshot, target: typeof snapshot | null) => ({ input_id: id, source_submission_id: 'sub-1',
     source_ref: { annotation_id: source.annotation.annotation_id, version: source.version }, source_snapshot: source, target_snapshot: target,
     mapping_status: 'carried' as const, source_round_ordinal: 1 });

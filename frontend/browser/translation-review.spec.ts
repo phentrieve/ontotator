@@ -416,6 +416,8 @@ for (const width of [1280, 1024, 600]) test(`review source, the one editable tra
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { name: 'Your review', exact: true })).toBeFocused();
   await page.keyboard.press('Tab');
+  // From 1100 px the rail's collapse button sits next to its heading (#410).
+  if (width >= 1100) { await expect(page.getByRole('button', { name: 'Collapse review panel', exact: true })).toBeFocused(); await page.keyboard.press('Tab'); }
   // Editing the translation auto-selected Accepted with corrections; Tab enters the decisions at the selected one.
   const selectedDecision = page.getByRole('radio', { name: 'Accepted with corrections', exact: true });
   await expect(selectedDecision).toBeChecked(); await expect(selectedDecision).toBeFocused();
@@ -576,6 +578,47 @@ test('390x844: checkbox hidden, action works', async ({ page }) => {
   await expect(target(page)).toHaveValue(value); await expect(target(page)).toBeFocused();
   expect((await caretState(page)).selection).toEqual([caret, caret]);
   await evidence(page, '21-narrow-action');
+});
+
+test('Your review can be resized and collapsed, both kept on reload, and the page never scrolls sideways (#410)', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 }); const s = await scenario(page, 'target'); await openReview(page, s);
+  const rail = page.locator('.translation-decision');
+  const separator = page.getByRole('separator', { name: 'Resize review panel', exact: true });
+  const before = (await rail.boundingBox())!.width;
+  // Dragging the divider on the rail's left edge to the left widens it.
+  const grip = (await separator.boundingBox())!;
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + 200); await page.mouse.down();
+  await page.mouse.move(grip.x + grip.width / 2 - 120, grip.y + 200, { steps: 6 }); await page.mouse.up();
+  await expect.poll(async () => (await rail.boundingBox())!.width).toBeGreaterThan(before + 100);
+  const resized = (await rail.boundingBox())!.width;
+  // Keyboard: Shift+Arrow right narrows by 64 px.
+  await separator.focus(); await page.keyboard.press('Shift+ArrowRight');
+  await expect.poll(async () => Math.round((await rail.boundingBox())!.width)).toBe(Math.round(resized - 64));
+  const kept = (await rail.boundingBox())!.width;
+  await page.waitForTimeout(400);
+  await page.reload(); await expect(target(page)).toBeVisible();
+  await expect.poll(async () => Math.round((await rail.boundingBox())!.width)).toBe(Math.round(kept));
+  // Collapse: the texts take the room, the pinned bar keeps the decision and Submit.
+  const textWidth = (await page.locator('.translation-texts').boundingBox())!.width;
+  await page.getByRole('button', { name: 'Collapse review panel', exact: true }).click();
+  const expand = page.getByRole('button', { name: 'Expand review panel', exact: true });
+  await expect(expand).toBeFocused(); await expect(expand).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByRole('heading', { name: 'Your review', exact: true })).toBeHidden();
+  expect((await page.locator('.translation-texts').boundingBox())!.width).toBeGreaterThan(textWidth + 200);
+  await expect(page.getByRole('region', { name: 'Decision and submit', exact: true }).getByRole('button', { name: 'Submit review…', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.scrollingElement!.scrollWidth - document.scrollingElement!.clientWidth)).toBeLessThanOrEqual(0);
+  await page.reload(); await expect(target(page)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Expand review panel', exact: true })).toBeVisible();
+  // "Change ↓" in the pinned bar opens the rail again at the kept width.
+  await page.getByRole('button', { name: 'Change ↓', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Your review', exact: true })).toBeVisible();
+  await expect.poll(async () => Math.round((await rail.boundingBox())!.width)).toBe(Math.round(kept));
+  await expect(page.getByRole('region', { name: 'Decision and submit', exact: true })).toHaveCount(0);
+  for (const width of [1100, 1024, 390]) {
+    await page.setViewportSize({ width, height: 800 });
+    expect(await page.evaluate(() => document.scrollingElement!.scrollWidth - document.scrollingElement!.clientWidth), `${width} px`).toBeLessThanOrEqual(0);
+  }
+  await expect(page.getByRole('button', { name: 'Collapse review panel', exact: true })).toHaveCount(0);
 });
 
 test('axe has no violations in the column head with coupling on', async ({ page }) => {

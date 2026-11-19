@@ -6,12 +6,15 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, type ConsolidationAnnotatePayload, type ConsolidationReopenPayload, type ConsolidationResolvePayload, type ConsolidationView, type Draft, type MutationEnvelope, type Submission } from "../api/client";
+import { errorMessage } from "../admin/errors";
 import type { WorkspaceView } from "../app/CaseScreen";
 import { randomId } from "../editor/ids";
 import { notifyTasksChanged } from "../tasks/tasksEvents";
 
 export type GroupOutcome =
   | { kind: "conflict"; onReview: () => void }
+  /** Refused because the task is paused (a problem report, or the lead paused the text): the words for the person. */
+  | { kind: "paused"; message: string }
   | { kind: "error"; onRetry: () => void };
 
 export type AxisWarning = {
@@ -22,6 +25,8 @@ export type AxisWarning = {
   modifiers: number;
   /** Findings whose term is a modifier term (`modifier_as_finding`, #57). */
   asFinding: number;
+  /** The annotation ids of those findings, so the dialog can name them (issue 470). */
+  asFindingIds: string[];
 };
 
 const MODIFIER_RULES = new Set(["modifier_as_finding", "cohort_modifier", "exclusive_modifier_class"]);
@@ -46,14 +51,17 @@ export function axisWarningOf(error: unknown): AxisWarning | null {
     || typeof acknowledgement.warning_digest !== "string" || !acknowledgement.warning_digest) return null;
   const warnings = (Array.isArray(error.details.warnings) ? error.details.warnings : []) as { annotation_id?: string; rule?: string }[];
   const modifiers = warnings.filter(warning => MODIFIER_RULES.has(warning?.rule ?? ""));
-  const findings = (rule: (name: string) => boolean) => new Set(modifiers.filter(warning => rule(warning.rule ?? "")).map(warning => warning.annotation_id)).size;
-  return { acknowledgement, count: warnings.length - modifiers.length, modifiers: findings(rule => rule !== "modifier_as_finding"),
-    asFinding: findings(rule => rule === "modifier_as_finding") };
+  const findings = (rule: (name: string) => boolean) => new Set(modifiers.filter(warning => rule(warning.rule ?? "")).map(warning => warning.annotation_id));
+  const asFinding = findings(rule => rule === "modifier_as_finding");
+  return { acknowledgement, count: warnings.length - modifiers.length, modifiers: findings(rule => rule !== "modifier_as_finding").size,
+    asFinding: asFinding.size, asFindingIds: [...asFinding].filter((id): id is string => typeof id === "string") };
 }
 
 const isConflict = (error: unknown) => error instanceof ApiError && error.status === 409;
+const isPaused = (error: unknown) => error instanceof ApiError && error.code === "TASK_HELD";
 
-export function useConsolidation(roundId: string, options: { workspaceView?: WorkspaceView | null } = {}) {
+export function useConsolidation(roundId: string, options: { workspaceView?: WorkspaceView | null; /** A save was refused because the task is paused: the caller reloads the task's state. */ onTaskHeld?: () => void } = {}) {
+  const taskHeld = useRef(options.onTaskHeld); taskHeld.current = options.onTaskHeld;
   const [view, setView] = useState<ConsolidationView | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [refreshError, setRefreshError] = useState<unknown>(null);
@@ -67,7 +75,11 @@ export function useConsolidation(roundId: string, options: { workspaceView?: Wor
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
-  const apply = (value: ConsolidationView) => { revision.current = value.draft_revision; setView(value); };
+  // The last view read from the server, before React renders it: a command's caller picks from the refreshed view (issue 375).
+  const latest = useRef<ConsolidationView | null>(null);
+  const apply = (value: ConsolidationView) => { revision.current = value.draft_revision; latest.current = value; setView(value); };
+  /** The view after the last read, also while its render is still pending. */
+  const latestView = useCallback(() => latest.current, []);
 
   useEffect(() => {
     let active = true;
@@ -114,7 +126,10 @@ export function useConsolidation(roundId: string, options: { workspaceView?: Wor
           return true;
         } catch (failure) {
           if (!alive.current) return false;
-          const outcome: GroupOutcome = isConflict(failure)
+          // A pause is not a change elsewhere: the message names it, and the screen turns read-only with its banner.
+          if (isPaused(failure)) taskHeld.current?.();
+          const outcome: GroupOutcome = isPaused(failure) ? { kind: "paused", message: errorMessage(failure) }
+            : isConflict(failure)
             ? { kind: "conflict", onReview: () => { setOutcomes({}); reload(); } }
             : { kind: "error", onRetry: () => { void attempt(); } };
           setOutcomes(current => ({ ...current, [groupId]: outcome }));
@@ -162,6 +177,10 @@ export function useConsolidation(roundId: string, options: { workspaceView?: Wor
       chosen_axis_ids: Object.keys(axes).filter(axis => !!axes[axis]),
     }), [command]);
 
+  /** "Remove" on an added finding (issue 470): the editor's `delete_draft_annotation`. */
+  const removeAdded = useCallback((annotationId: string): Promise<boolean> =>
+    command("add-finding", (id, envelope) => api.applyCommand(id, envelope), { command: "delete_draft_annotation", annotation_id: annotationId }), [command]);
+
   const submit = useCallback(async (acknowledgement?: AxisWarning["acknowledgement"]): Promise<SubmitResult> => {
     const workspaceId = view?.workspace_id;
     if (!workspaceId) throw new Error("This consolidation is read-only.");
@@ -180,6 +199,7 @@ export function useConsolidation(roundId: string, options: { workspaceView?: Wor
       } catch (failure) {
         const warning = axisWarningOf(failure);
         if (warning) return { kind: "warning", warning };
+        if (isPaused(failure)) taskHeld.current?.();
         throw failure;
       }
     });
@@ -189,7 +209,7 @@ export function useConsolidation(roundId: string, options: { workspaceView?: Wor
 
   const dismissOutcome = useCallback((groupId: string) => setOutcomes(current => { const next = { ...current }; delete next[groupId]; return next; }), []);
 
-  return { view, error, refreshError, workspace, draft, busy, outcomes, reload, refresh, resolve, annotate, reopen, reopenAll, undoReopenAll, addFinding, setAddedValues, submit, dismissOutcome };
+  return { view, latestView, error, refreshError, workspace, draft, busy, outcomes, reload, refresh, resolve, annotate, reopen, reopenAll, undoReopenAll, addFinding, setAddedValues, removeAdded, submit, dismissOutcome };
 }
 
 export type ConsolidationData = ReturnType<typeof useConsolidation>;

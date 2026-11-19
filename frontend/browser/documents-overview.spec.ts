@@ -1,5 +1,5 @@
 /**
- * Documents overview scenarios 1-16 (plan O10c Step 2, "Shared contracts › Scenario table"):
+ * Documents overview scenarios 1-16 and 18 (plan O10c Step 2, "Shared contracts › Scenario table"):
  * one isolated project per scenario (tests/browser_overview_scenarios.py), opened as the
  * lead at 1280 px; every row's three one-line stage cells (the text card's short state and who,
  * spec 2026-10-23 §2b), Waiting on, Next step and decision edge as the table, with a screenshot
@@ -104,8 +104,13 @@ const SCENARIOS: Record<Exclude<OverviewScenarioName, "WALKTHROUGH">, (RowExpect
     // Source changed: decision colour, but step kind assign (no edge, To assign, VD14).
     { case_id: "case-115", language: "de", translation: { state: "Source changed", who: "" }, annotation: SUBMITTED, finalization: { state: "may be outdated", who: "" }, waiting: "You", action: "Assign review…", edge: false },
   ],
+  // Issue 268: the correction request reopened Ana's submitted review; she saved nothing since.
   S16: [
-    { case_id: "case-116", language: "de", translation: { state: `in review (${ANA})`, who: "" }, annotation: { state: "assigned, not started", who: TOM }, finalization: WAITING, waiting: [ANA, TOM], action: null, edge: false },
+    { case_id: "case-116", language: "de", translation: { state: `assigned, not started (${ANA})`, who: "" }, annotation: { state: "assigned, not started", who: TOM }, finalization: WAITING, waiting: [ANA, TOM], action: null, edge: false },
+  ],
+  // Issue 420: Ana's v1 submission carried to her on v2 counts nothing on v2 (never "1 of 2 submitted").
+  S18: [
+    { case_id: "case-118", language: "de", translation: ACCEPTED, annotation: { state: "assigned, not started", who: ANA }, finalization: WAITING, waiting: [ANA], action: null, edge: false, marker: "v2 corrected" },
   ],
 };
 

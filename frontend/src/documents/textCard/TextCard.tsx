@@ -4,7 +4,7 @@
  * actions. History and Text details open inside the card with Back. ‹ › (J / K) step through the table
  * order; Esc and ✕ close it without changing the selection. Below 700 px it is a full-width sheet.
  */
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { DocumentRowView, NextStepView } from "../../api/client";
 import { plural } from "../../app/labels";
 import type { PanelStage, ProjectDocumentsQuery, Route } from "../../app/router";
@@ -16,7 +16,10 @@ import { LanguageTag } from "../../ui/LanguageTag";
 import { useShortcut } from "../../ui/shortcuts";
 import { StagePath } from "../../ui/StagePath";
 import { useMediaQuery } from "../../ui/useMediaQuery";
+import { BulkPauseDialog } from "../BulkPauseDialog";
+import { pauseAppliedText } from "../bulkPauseModel";
 import { historyLines } from "../historyLines";
+import { leadPauseLine } from "../labels";
 import { leadSteps, stepLabel } from "../nextStepLabels";
 import { isActiveRow } from "../stageLabels";
 import { RouteLink, rowKeyOf } from "../RowCells";
@@ -60,6 +63,8 @@ export interface TextCardProps {
   onOpenText?: (row: DocumentRowView) => void;
   /** Reload rows after remove. */
   onChanged: () => void;
+  /** A short message after an action of the card (the page shows it as a toast and announces it). */
+  onMessage?: (message: string) => void;
   /** The existing DecisionBlock (Compare/Consolidate/Accept result). */
   decision?: ReactNode;
   textVersionTools?: TextVersionsTools;
@@ -115,14 +120,26 @@ function OtherLanguages({ row, rows, canManage, onOpenText, onChangePlan }: Pick
 }
 
 /** Banners above the path: open problem reports (with "Decide on report…") and findings flagged "guidelines unclear" (X5). Each is a notice with its title and a button row. */
-function Banners({ row, projectKey, query, reportRoute, onNavigate, steps }: Pick<TextCardProps, "row" | "projectKey" | "query" | "reportRoute" | "onNavigate"> & { steps: readonly CardStep[] }): JSX.Element | null {
+function Banners({ row, projectKey, query, reportRoute, onNavigate, steps, canManage, onChanged, onMessage }: Pick<TextCardProps, "row" | "projectKey" | "query" | "reportRoute" | "onNavigate" | "canManage" | "onChanged" | "onMessage"> & { steps: readonly CardStep[] }): JSX.Element | null {
   const id = useId();
+  const [releasing, setReleasing] = useState(false);
   const open = (row.problem_reports ?? []).filter(report => report.state === "open");
   const flagged = row.flagged_unclear ?? 0;
-  if (!open.length && flagged <= 0) return null;
+  const pause = row.lead_pause;
+  if (!open.length && flagged <= 0 && !pause) return null;
   const name = `${row.case_id} ${row.language}`;
   const roundId = row.flagged_round_id;
   return <div className="text-card-banners">
+    {/* Issue 464: who paused the text, when and why; "Release…" opens the bulk dialog for this text. */}
+    {pause && <div className="text-card-banner" role="group" aria-labelledby={`${id}-pause`}>
+      <p id={`${id}-pause`} className="text-card-banner-title">Paused by lead</p>
+      <p className="text-card-banner-text">{leadPauseLine(pause)}</p>
+      <p className="text-card-banner-text text-card-muted">Open tasks cannot be saved, also tasks assigned now. Submitted work and the final result are untouched.</p>
+      {canManage && <div className="text-card-actions"><Button size="sm" aria-label={`Release…, ${name}`} onClick={() => setReleasing(true)}>Release…</Button></div>}
+      {releasing && <BulkPauseDialog projectKey={projectKey} action="release" rows={[{ case_id: row.case_id, language: row.language }]}
+        onClose={() => setReleasing(false)} // The same message as the bulk action ("Released 1 text."), so the lead sees that it worked (review 2, F7 a).
+        onApplied={result => { setReleasing(false); onMessage?.(pauseAppliedText(result)); onChanged(); }} />}
+    </div>}
     {open.length > 0 && <div className="text-card-banner" role="group" aria-labelledby={`${id}-report`}>
       <p id={`${id}-report`} className="text-card-banner-title">{plural(open.length, "open problem report")}{open.length === 1 && `: ${open[0].title}`}</p>
       <div className="text-card-actions">
@@ -163,8 +180,9 @@ export function TextCard(props: TextCardProps): JSX.Element {
   const submissions = useRowSubmissions(projectKey, row.case_id, row.language, true);
   const list = submissions.data?.submissions ?? null;
 
-  // A refreshed rows page with new activity on the row reloads its submissions.
-  const activity = row.last_activity_at ?? "";
+  // A refreshed rows page with new activity on the row reloads its submissions. A pause or its release is no work on
+  // the text and leaves the activity time alone, but adds a History line: it reloads them too.
+  const activity = `${row.last_activity_at ?? ""}|${row.lead_pause?.paused_at ?? ""}`;
   const seenActivity = useRef(activity);
   const { reload } = submissions;
   useEffect(() => {
@@ -227,7 +245,7 @@ export function TextCard(props: TextCardProps): JSX.Element {
       {segment === "translation" && <TranslationPart key={rowKeyOf(row)} row={row} projectKey={projectKey} query={query} canManage={canManage}
         onAssign={props.onAssign} onNavigate={onNavigate} onChanged={props.onChanged} textVersionTools={props.textVersionTools} now={now}
         planControl={plannable ? props.planControl?.("review") : undefined} {...partProps("translation", "review")} />}
-      {segment === "annotation" && <AnnotationPart key={rowKeyOf(row)} row={row} projectKey={projectKey} query={query} submissions={list} canManage={canManage}
+      {segment === "annotation" && <AnnotationPart key={rowKeyOf(row)} row={row} projectKey={projectKey} query={query} submissions={list} changes={submissions.data?.changes} canManage={canManage}
         onAssign={props.onAssign} onNavigate={onNavigate} onChanged={props.onChanged} tools={props.textVersionTools} now={now}
         planControl={plannable ? props.planControl?.("annotation") : undefined} {...partProps("annotation", "annotation")} />}
       {segment === "finalization" && <FinalizationPart row={row} projectKey={projectKey} query={query} decision={props.decision} onNavigate={onNavigate} now={now}

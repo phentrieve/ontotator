@@ -16,7 +16,7 @@ Check the spelling of your username. After 5 wrong passwords within 15 minutes, 
 
 ### My setup or reset code does not work
 
-Codes work once and expire: setup codes after 24 hours, reset codes after 2 hours. A newer code also cancels an older one. Ask an administrator for a new code. Capital letters, spaces and hyphens in the code do not matter.
+Codes work once and expire: setup codes after 7 days by default (the administrator can change this), reset codes after 2 hours. A newer code also cancels an older one. Ask an administrator for a new code. Capital letters, spaces and hyphens in the code do not matter.
 
 ### A login window appears while I am working
 
@@ -63,6 +63,8 @@ The task was removed or given to someone else, or you followed a link meant for 
 ### My task is paused
 
 A problem report pauses the task, yours or the lead's. A one-line banner *Task paused: …* above the text gives the reason; click **Show more** to read all of it. You can read your saved work but not change or submit it. If you reported the problem yourself, you can resume with a reason. If the lead paused it, only the lead can release it. See [Resume a paused task or withdraw a report](annotator.md#resume-a-paused-task-or-withdraw-a-report).
+
+A task marked **Paused by lead** is paused because the lead paused the work on its text; the mark and the banner *Paused by lead: …* give the lead's reason. You can read the task and wait: it opens again when the lead releases the text. A save that is refused meanwhile says *The project lead paused the work on this text: …*; your saved work is kept. See [A task paused by the lead](annotator.md#a-task-paused-by-the-lead).
 
 ### My submitted task is read-only
 
@@ -120,6 +122,10 @@ Add your qualification (for example "physician, native German speaker") in your 
 
 The translation tool checked its own output and found a possible problem, for example numbers or units that differ from the source. Click **Details** to read the check, what the tool reported and what to do if the translation is right anyway. Open **Technical details** for the technical code of the check. If Ontotator has no description for a check, ask the project lead what it checks. See [Review a translation](annotator.md#review-a-translation).
 
+A line *More passages in brackets than in the source* in the same band is a check of Ontotator itself on the version you review. It asks for no rationale ([Review a translation](annotator.md#review-a-translation)).
+
+The checks of the translation tool run once, on the first version of a translation. In the review of a later version the band reads *The automatic checks ran on v1, not on this version (v2).* and names a check that failed on v1; it asks for nothing there ([Review a later version](annotator.md#review-a-later-version)).
+
 ## Consolidating
 
 ### Why is "Submit consolidation" disabled?
@@ -140,9 +146,17 @@ The result has findings with values filled in by default, modifier terms used as
 
 ## Leading a project
 
+### The app says "Guidelines v2", but our guideline is version 3.1
+
+The number after *v* counts the guideline files published in this project; it is not the version of your document. When you publish, enter your document's version in **Your version of the guideline (optional)**. The app then shows it first, for example *Guidelines 3.1 (v2)*. A version that is already published keeps its name: publish the text again with your version to change it. See [Publish the first or a new guideline version](lead-settings.md#publish-the-first-or-a-new-guideline-version).
+
 ### I cannot accept a result
 
 In projects where the consolidator of a text may not be one of its annotators, you cannot choose a result you made yourself. Another lead must choose it. See [Accept a result or compare results](lead-results.md#accept-a-result-or-compare-results).
+
+### Undo after Reopen… or Withdraw open tasks… says "Undo is no longer possible: the texts changed since."
+
+Undo of these bulk actions works once, for the lead who made the change, within an hour, and only while nothing changed on the texts since, for example nobody saved a draft and nobody was assigned. Reopen or withdraw the remaining tasks again, or assign the work anew. If the dialog itself says *The texts changed since the preview. Check the new preview.*, nothing was changed yet: read the new preview and confirm again. See [Reopen or withdraw the tasks of several texts](lead-documents.md#reopen-or-withdraw-the-tasks-of-several-texts).
 
 ### My uploaded texts do not show up
 
@@ -172,6 +186,26 @@ The text is not in the work plan. Plan it first. See [Add a text to the plan](le
 
 You assigned a translation review to someone who already reviewed this version, for example after they rejected it. A second assignment is not possible; reopen their review instead: **Resolve…**, then the reopen item, for example *Reopen Ana Weber's review…*. See [Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation).
 
+### "This version can no longer be accepted here."
+
+**Accept this version…** was refused: the version was accepted or reviewed meanwhile, a newer version exists, it was discarded, or a translation review of it is open. The dialog names the reason. Close it and look at the version list again. See [Accept one translation version](lead-results.md#accept-one-translation-version).
+
+### "A new version cannot be uploaded here any more."
+
+**Upload a corrected text…** was refused when you saved: a newer version of the translation arrived meanwhile, the translation was discarded, or a translation review of the version was assigned. The dialog names the reason. Close it and look at the version list again; your text is not saved, so keep it. See [Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation).
+
+### "Fix typos…" did not save
+
+**Fix typos…** did not save: a newer version arrived, a translation review of the version is open, it was discarded, or the text is the same as before. The dialog names the reason; your text stays in the dialog until you close it. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
+
+### "This query can no longer be decided here."
+
+**Accept the reviewer’s text…** or **Answer and accept the version as it is…** was refused: the query was already decided, a newer version of the translation arrived, the translation was discarded, or a translation review of the version is open (withdraw it with **Remove…** first). The dialog names the reason. Reload the row to see its current state. See [Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation).
+
+### A review of a version cannot be reopened or assigned after "Fix typos…"
+
+*A lead fixed typos in this version: v2 is the text to review. Assign a review of the newest version.* A translation review always reviews the corrected text. In the row, use **Assign review…** or **Resolve…** › **Assign a new review…**; the person who reviewed the earlier version can be chosen again. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
+
 ### A task is still paused after I closed the report
 
 Closing a report does not always release the pause. The row shows **Resume task…**; click it and release the pause. See [Decide on a problem report](lead-results.md#decide-on-a-problem-report).
@@ -183,6 +217,14 @@ While your consolidation runs, **Open consolidation** in the text card opens you
 ### The consolidator list does not show a person
 
 Only you and the members with the **Consolidator** role are listed; the hint under the list says so and links **Settings → People**. Give the role first. See [Change a member's roles](lead-settings.md#change-a-members-roles).
+
+### "A final result was chosen for this text, so its annotation mode stays."
+
+**Change mode…** is refused while the text has a final result. Withdraw it first: **Withdraw final…** in the text card's **Finalization**, then change the mode. See [Withdraw a final result](lead-results.md#withdraw-a-final-result).
+
+### A new round is refused: a consolidation is open
+
+*A consolidation is open on this text: finish or withdraw it first.* A submitted annotation gets no new round while a consolidation of its text is not submitted: the consolidation works on that submission. As an annotator, ask your lead. As a lead, wait for the consolidation, or withdraw its task in the text card and start the round then. **More actions** › **Start a round…** skips such texts for the same reason. See [Start a new round for several texts](lead-documents.md#start-a-new-round-for-several-texts).
 
 ### The export asks me to tick a box
 

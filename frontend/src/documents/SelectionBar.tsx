@@ -7,17 +7,37 @@
  * translation plan presets live in the plan dialog's quick choice). Every plan save keeps the selection and shows an
  * Undo toast (D22); a save that changes nothing says why instead. The summary sends the selected texts (`rows`); the
  * plan dialog edits whole cases. "Move to front" (issue 339) puts the selected texts first in the project's order,
- * so their tasks come first in My tasks, after an inline confirmation.
+ * so their tasks already assigned come first in My tasks (issue 488), after an inline confirmation. "More actions ▾" (issue 336, decision 336-C)
+ * holds the bulk actions on the texts' tasks, "Reopen…" and "Withdraw open tasks…", and on their final results,
+ * "Accept agreeing results…" (texts without a final result; issues 354, 339) and "Change final…" (the newest
+ * submission replaces the final result; issue 336 step 2); an entry that does nothing for the selection stays in the
+ * menu, unavailable, with its reason. The task actions open `BulkTaskDialog`; after one applies, the toast offers Undo
+ * while the texts stay unchanged. The final actions open `BulkFinalDialog`; after "Change final…" the toast offers Undo
+ * too (the server restores every text's earlier final result, or none and says which text is in the way). "Start a round…"
+ * (issue 336 step 3) gives the submitted annotations a new work round in `BulkTaskDialog`, also without Undo.
+ * "Change mode…" (step 4) changes the annotation mode of the texts in `BulkModeDialog`; each text is restored in its card.
+ * "Pause texts…" and "Release texts…" (issue 464) pause and release the work on the texts in `BulkPauseDialog`; each
+ * is the other's way back, so neither has an Undo.
  * The bar floats at the bottom of the viewport over the content (`useFloatingBar`): its arrival never moves the
  * table; the page reserves its height as bottom padding. Its place in the DOM keeps the focus order.
  */
 import { useEffect, useId, useRef, useState } from "react";
-import { api, type BulkResult, type ConsequencesView, type DocumentRowFilters, type RowRefView, type SelectionSummary, type UndoView } from "../api/client";
+import { api, type BulkModeChangeView, type BulkResult, type BulkTaskActionView, type ConsequencesView, type DocumentRowFilters, type RowRefView, type SelectionSummary, type TextPauseActionView, type UndoView } from "../api/client";
 import { ErrorNotice } from "../admin/ErrorNotice";
+import { errorMessage } from "../admin/errors";
 import { plural } from "../app/labels";
-import { Button, Checkbox, InlineConfirm, InlineMessage, type ToastMessage } from "../ui";
+import { Button, Checkbox, IconSortDown, InlineConfirm, InlineMessage, MenuButton, type ToastMessage } from "../ui";
+import { ACTION_LABELS, appliedText, unavailableReason, type BulkAction } from "./bulkActionModel";
+import { BulkFinalDialog } from "./BulkFinalDialog";
+import { finalAppliedText, finalUnavailableReason, FINAL_ACTION_LABELS, taskUndoRefusal, type FinalAction, type FinalPreview } from "./bulkFinalModel";
+import { BulkModeDialog } from "./BulkModeDialog";
+import { modeAppliedText, modeUnavailableReason, MODE_ACTION_LABEL } from "./bulkModeModel";
+import { BulkPauseDialog } from "./BulkPauseDialog";
+import { pauseAppliedText, pauseUnavailableReason, PAUSE_ACTION_LABELS, type PauseAction } from "./bulkPauseModel";
+import { BulkTaskDialog } from "./BulkTaskDialog";
 import { PLAN_CHANGED_MESSAGE, UNDO_WITHDRAWN_NOTE, undoneToast, WITHDRAW_CHECKBOX, withdrawnSummary } from "./PlanChips";
 import { PlanDialog } from "./PlanDialog";
+import { finalUndoAction } from "./finalUndo";
 import { runPlanUndo } from "./planUndo";
 import { useFloatingBar } from "./useFloatingBar";
 import { caseOfTextKey, rowRefOf } from "./useTextSelection";
@@ -109,6 +129,9 @@ export function nothingChangedText(result: BulkResult, selected: number): string
   return "Nothing changed: the selected texts already have this plan.";
 }
 
+/** Every task kind, started tasks included, counts only: what the menu asks to know whether an entry can act at all. */
+const BROAD = { tasks: ["annotate", "translation_review", "review"] as ("annotate" | "translation_review" | "review")[], preview: true, summary_only: true };
+
 type Undo = { kind: "conflict"; undo: UndoView; consequences: ConsequencesView; withdrawn: readonly RowRefView[] } | { kind: "changed" };
 
 export function SelectionBar({
@@ -139,6 +162,40 @@ export function SelectionBar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectKey, idsKey, filtersKey, refresh]);
   const current = summary?.key === idsKey + filtersKey ? summary.value : null;
+
+  /** Per bulk action, its broadest preview for the selection: an entry without changes is unavailable (336-C). */
+  const [reach, setReach] = useState<{ key: string; reopen: BulkTaskActionView | null; withdraw: BulkTaskActionView | null; start_round: BulkTaskActionView | null; scratch: BulkModeChangeView | null; proposals: BulkModeChangeView | null; accept: FinalPreview | null; change: FinalPreview | null; pause: TextPauseActionView | null; release: TextPauseActionView | null } | null>(null);
+  const [bulk, setBulk] = useState<BulkAction | null>(null);
+  const [finalAction, setFinalAction] = useState<FinalAction | null>(null);
+  const [modeChange, setModeChange] = useState(false);
+  const [pauseAction, setPauseAction] = useState<PauseAction | null>(null);
+  useEffect(() => {
+    if (rows.length < MIN_TEXTS) return;
+    let active = true;
+    const key = idsKey;
+    // A newer selection aborts the requests of the older one.
+    const abort = new AbortController();
+    const timer = window.setTimeout(() => {
+      const quiet = <T,>(request: Promise<T>) => request.catch(() => null);
+      void Promise.all([
+        quiet(api.bulkReopen(projectKey, { rows, ...BROAD }, abort.signal)),
+        quiet(api.bulkWithdraw(projectKey, { rows, ...BROAD, include_started: true }, abort.signal)),
+        quiet(api.acceptAgreeing(projectKey, { rows, preview: true }, abort.signal).then((data): FinalPreview => ({ action: "accept", data }))),
+        quiet(api.bulkChangeFinal(projectKey, { rows, preview: true, summary_only: true }, abort.signal).then((data): FinalPreview => ({ action: "change", data }))),
+        // Continuing reaches every task a restart reaches.
+        quiet(api.bulkStartRound(projectKey, { rows, kind: "carry_forward", preview: true, summary_only: true }, abort.signal)),
+        // One preview per mode: the entry acts when either changes a text.
+        quiet(api.bulkChangeMode(projectKey, { rows, mode: "scratch", preview: true, summary_only: true }, abort.signal)),
+        quiet(api.bulkChangeMode(projectKey, { rows, mode: "proposals", preview: true, summary_only: true }, abort.signal)),
+        quiet(api.pauseTexts(projectKey, "pause", { rows, preview: true, summary_only: true }, abort.signal)),
+        quiet(api.pauseTexts(projectKey, "release", { rows, preview: true, summary_only: true }, abort.signal)),
+      ]).then(([reopen, withdraw, accept, change, start_round, scratch, proposals, pause, release]) => { if (active) setReach({ key, reopen, withdraw, start_round, scratch, proposals, accept, change, pause, release }); });
+    }, SUMMARY_DELAY_MS);
+    return () => { active = false; window.clearTimeout(timer); abort.abort(); };
+    // The key stands for the selection.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectKey, idsKey, refresh]);
+  const reachable = reach?.key === idsKey ? reach : null;
 
   const [error, setError] = useState<unknown>();
   const [plan, setPlan] = useState<string[] | null>(null);
@@ -201,6 +258,75 @@ export function SelectionBar({
     latest.current.onChanged();
   };
 
+  /** After a bulk action: the toast with Undo (while the texts stay unchanged), refetch, the selection stays. */
+  const bulkApplied = (result: BulkTaskActionView) => {
+    setBulk(null);
+    const message = appliedText(result);
+    latest.current.onAnnounce(message);
+    const undoToken = result.undo;
+    latest.current.showToast({
+      message,
+      ...(undoToken ? {
+        actionLabel: "Undo",
+        undo: true,
+        onAction: () => {
+          latest.current.onAnnounce("Saving…");
+          api.bulkUndo(projectKey, undoToken.id).then(() => {
+            const done = result.action !== "withdraw" ? "The reopened tasks are submitted again." : "The withdrawn tasks are back.";
+            latest.current.onAnnounce(done);
+            latest.current.showToast({ message: done });
+            latest.current.onChanged();
+          }, (failure: unknown) => {
+            // All or nothing: the refusal names the first text that changed since (issue 469).
+            const text = taskUndoRefusal(failure) ?? errorMessage(failure);
+            latest.current.onAnnounce(text);
+            latest.current.showToast({ message: text, persist: true });
+          });
+        },
+      } : {}),
+    });
+    latest.current.onChanged();
+  };
+
+  /** After a bulk action on final results: the message (with Undo after "Change final…"), refetch, the selection stays. */
+  const finalApplied = (result: FinalPreview) => {
+    setFinalAction(null);
+    const message = finalAppliedText(result);
+    latest.current.onAnnounce(message);
+    const undoToken = result.action === "change" ? result.data.undo : null;
+    latest.current.showToast({
+      message,
+      ...(undoToken ? {
+        actionLabel: "Undo",
+        undo: true,
+        onAction: finalUndoAction(projectKey, undoToken.id, {
+          onAnnounce: message => latest.current.onAnnounce(message),
+          showToast: next => latest.current.showToast(next),
+          onChanged: () => latest.current.onChanged(),
+        }),
+      } : {}),
+    });
+    latest.current.onChanged();
+  };
+
+  /** After a bulk mode change: the message (no Undo; each text is restored in its card), refetch, the selection stays. */
+  const modeApplied = (result: BulkModeChangeView) => {
+    setModeChange(false);
+    const message = modeAppliedText(result);
+    latest.current.onAnnounce(message);
+    latest.current.showToast({ message });
+    latest.current.onChanged();
+  };
+
+  /** After a pause or release: the message (no Undo; the other action is the way back), refetch, the selection stays. */
+  const pauseApplied = (result: TextPauseActionView) => {
+    setPauseAction(null);
+    const message = pauseAppliedText(result);
+    latest.current.onAnnounce(message);
+    latest.current.showToast({ message });
+    latest.current.onChanged();
+  };
+
   const moveToFront = () => {
     setFrontBusy(true); setError(undefined);
     api.moveToFront(projectKey, rows).then(result => {
@@ -216,7 +342,8 @@ export function SelectionBar({
 
   const visible = keys.size >= MIN_TEXTS || undoState !== null;
   useFloatingBar(section, visible);
-  if (!visible && !plan) return null;
+  if (!visible && !plan && !bulk && !finalAction && !modeChange && !pauseAction) return null;
+  const modeReason = modeUnavailableReason([reachable?.scratch, reachable?.proposals]);
   const withdrawing = undoState?.kind === "conflict" && undoState.consequences.withdrawn.length > 0;
 
   return <>
@@ -230,6 +357,26 @@ export function SelectionBar({
         <div className="selection-bar-actions">
           <Button variant="primary" onClick={onAssign}>{assignButtonText(current)}</Button>
           <Button onClick={() => setPlan(caseIds)}>Plan…</Button>
+          <MenuButton size="md" label="More actions" buttonLabel="More actions" content={<>More actions<IconSortDown aria-hidden="true" /></>}
+            items={[
+              ...(["reopen", "withdraw"] as const).map(action => {
+                const reason = unavailableReason(action, reachable?.[action]);
+                return { id: action, label: ACTION_LABELS[action], disabled: reason !== null, ...(reason ? { description: reason } : {}), onSelect: () => setBulk(action) };
+              }),
+              ...(["accept", "change"] as const).map(action => {
+                const reason = finalUnavailableReason(reachable?.[action]);
+                return { id: action, label: FINAL_ACTION_LABELS[action], disabled: reason !== null, ...(reason ? { description: reason } : {}), onSelect: () => setFinalAction(action) };
+              }),
+              ...(["start_round"] as const).map(action => {
+                const reason = unavailableReason(action, reachable?.[action]);
+                return { id: action, label: ACTION_LABELS[action], disabled: reason !== null, ...(reason ? { description: reason } : {}), onSelect: () => setBulk(action) };
+              }),
+              { id: "change_mode", label: MODE_ACTION_LABEL, disabled: modeReason !== null, ...(modeReason ? { description: modeReason } : {}), onSelect: () => setModeChange(true) },
+              ...(["pause", "release"] as const).map(action => {
+                const reason = pauseUnavailableReason(action, reachable?.[action]);
+                return { id: `${action}_texts`, label: PAUSE_ACTION_LABELS[action], disabled: reason !== null, ...(reason ? { description: reason } : {}), onSelect: () => setPauseAction(action) };
+              }),
+            ]} />
           <Button ref={frontButton} aria-expanded={front} onClick={() => setFront(value => !value)}>{MOVE_TO_FRONT}</Button>
           <Button aria-pressed={showSelected} onClick={onToggleShowSelected}>Show selected</Button>
           <Button onClick={onClear}>Clear selection</Button>
@@ -238,7 +385,7 @@ export function SelectionBar({
       {limitNote && keys.size >= MIN_TEXTS && <p className="selection-bar-limit">{limitNote}</p>}
       {front && keys.size >= MIN_TEXTS && <div className="selection-bar-undo">
         <InlineConfirm title="Move to the front of the queue" busy={frontBusy} confirmLabel={moveTextsText(keys.size)}
-          message={<p>{`Open tasks on the ${plural(keys.size, "selected text")} come first in My tasks, before the tasks on texts imported earlier. The other texts keep their order.`}</p>}
+          message={<p>{`Tasks already assigned on the ${plural(keys.size, "selected text")} come first in My tasks. Tasks you assign later follow the order of assignment. The texts' order under Import order changes with it.`}</p>}
           onCancel={() => { setFront(false); frontButton.current?.focus(); }} onConfirm={moveToFront} />
       </div>}
       {error !== undefined && <div className="selection-bar-error"><ErrorNotice error={error} /></div>}
@@ -253,6 +400,11 @@ export function SelectionBar({
         </InlineConfirm>
       </div>}
     </section>}
+    {finalAction && <BulkFinalDialog projectKey={projectKey} action={finalAction} rows={rows} onClose={() => setFinalAction(null)} onApplied={finalApplied} />}
+    {modeChange && <BulkModeDialog projectKey={projectKey} rows={rows} onClose={() => setModeChange(false)} onApplied={modeApplied}
+      reach={reachable?.scratch && reachable.proposals ? { scratch: reachable.scratch.change_count, proposals: reachable.proposals.change_count } : undefined} />}
+    {pauseAction && <BulkPauseDialog projectKey={projectKey} action={pauseAction} rows={rows} onClose={() => setPauseAction(null)} onApplied={pauseApplied} />}
+    {bulk && <BulkTaskDialog projectKey={projectKey} action={bulk} rows={rows} onClose={() => setBulk(null)} onApplied={bulkApplied} />}
     {plan && <PlanDialog projectKey={projectKey} caseIds={plan} rows={rows} onClose={() => setPlan(null)}
       onSaved={(result, message) => { setPlan(null); saved(result, message); }} />}
   </>;

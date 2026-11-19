@@ -428,6 +428,10 @@ test("PUBLISHED: Publish and Discard stay above a long preview and stick while i
   await fileInput(page).setInputFiles({ name: "long.md", mimeType: "text/markdown", buffer: Buffer.from(`# Long guideline\n\n${paragraphs.join("\n\n")}\n`) });
   const preview = page.getByRole("region", { name: "Preview of long.md", exact: true });
   await expect(preview).toBeVisible();
+  // The Markdown renderer is its own chunk: until it has loaded, the preview holds only "Loading guidelines…"
+  // and is too short to scroll under the bar. Measure once the whole text is laid out.
+  await expect(preview.getByText("Paragraph 120:", { exact: false })).toBeAttached();
+  await expect.poll(() => preview.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
   const publishButton = page.getByRole("button", { name: "Publish as v2", exact: true });
   // The consequences come before Publish (#47 A-24); the actions come before the preview.
   const facts = page.getByText(PUBLISH_HINT, { exact: true });
@@ -484,4 +488,118 @@ test("PUBLISHED: My tasks link and the guidelines page", async ({ page }) => {
   await expect.poll(async () => (await value<Listing>(page, `${root(s)}/guidelines`)).my_latest_seen).toBe(1);
   await openTask(page, s, "annotate-1");
   await expectGuidelinesItem(page, "Guidelines v1");
+});
+
+test("PUBLISHED: a version with the project's own label reads 3.1 (v2) for the lead and in a task (#487)", async ({ page, browser }) => {
+  const s = await guidelineScenario(page, "PUBLISHED");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await loginGuidelineUser(page, s, "lead");
+  await visit(page, settingsUrl(s));
+  await expectInForce(page, 1, "v1.md");
+  await openPublish(page);
+  await fileInput(page).setInputFiles(s.files["v2.md"]);
+  const own = page.getByLabel("Your version of the guideline (optional)", { exact: true });
+  await expect(page.getByText("The version your document gives itself, for example 3.1. It is shown before the upload number: Guidelines 3.1 (v2).", { exact: true })).toBeVisible();
+  await own.fill("3.1");
+  await page.getByLabel("What changed? (optional)").fill(V2_NOTE);
+  await evidence(page, "label-publish-form");
+  // The upload number stays the identifier: the button still names it.
+  await page.getByRole("button", { name: "Publish as v2", exact: true }).click();
+  await expect(page.locator(".guidelines-success")).toContainText("Published 3.1 (v2). Annotators and reviewers see the update notice when they next open a task.");
+  await expect(page.getByRole("heading", { name: "In force Guidelines 3.1 (v2)", level: 2, exact: true })).toBeVisible();
+  const table = page.getByRole("table", { name: "Guideline versions" });
+  await expect(table.getByRole("rowheader").nth(0)).toHaveText(/^3\.1 \(v2\)/);
+  // The version published without a label reads as before.
+  await expect(table.getByRole("rowheader").nth(1)).toHaveText(/^v1/);
+  await expect(table.getByRole("button", { name: "Read 3.1 (v2)", exact: true })).toBeVisible();
+  await expect(table.getByRole("button", { name: "More actions, v1", exact: true })).toBeVisible();
+  await evidence(page, "label-settings");
+  const listing = await value<Listing>(page, `${root(s)}/guidelines`);
+  expect(listing.versions.map(item => [item.version, item.label ?? null])).toEqual([[2, "3.1"], [1, null]]);
+
+  // The withdraw dialog names it the same way and says what stays.
+  await page.getByRole("region", { name: /^In force/ }).getByRole("button", { name: "More actions, 3.1 (v2)", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Withdraw 3.1 (v2)…", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Withdraw 3.1 (v2)?" });
+  await expect(dialog).toContainText("results made under 3.1 (v2) keep showing “Guidelines 3.1 (v2) (withdrawn)”");
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+
+  const ana = await actor(browser, s, "ana");
+  try {
+    await ana.page.setViewportSize({ width: 1440, height: 900 });
+    await ana.page.goto("/#/");
+    await expect(ana.page.getByRole("link", { name: /^Project guidelines 3\.1 \(v2\)(, .+)?$/ })).toBeVisible();
+    await openTask(ana.page, s, "annotate-1");
+    await expect(ana.page.getByText(/^(Guidelines updated to 3\.1 \(v2\)|This project has guidelines \(3\.1 \(v2\)\))$/)).toBeVisible();
+    await evidence(ana.page, "label-task-notice");
+    await ana.page.getByRole("button", { name: "Read guidelines 3.1 (v2)", exact: true }).click();
+    const tab = ana.page.locator(".inspector-pane").getByRole("tabpanel", { name: "Guidelines 3.1 (v2)", exact: true });
+    await expect(tab.getByRole("heading", { name: "Guidelines 3.1 (v2)", level: 2 })).toBeVisible();
+    await expect(tab.getByText(V2_TEXT)).toBeVisible();
+    await evidence(ana.page, "label-task-tab");
+
+    // The guidelines page, also at phone width: the names fit without sideways scrolling.
+    await ana.page.setViewportSize({ width: 390, height: 844 });
+    await ana.page.goto(`/#/projects/${encodeURIComponent(s.project)}/guidelines`);
+    await expect(ana.page.getByRole("heading", { name: "Guidelines 3.1 (v2)", level: 2 })).toBeVisible();
+    const versions = ana.page.getByRole("list", { name: "Versions" });
+    await expect(versions.getByRole("link", { name: "3.1 (v2)", exact: true })).toHaveAttribute("href", `#/projects/${encodeURIComponent(s.project)}/guidelines/v2`);
+    await expect(versions.getByRole("link", { name: "v1", exact: true })).toBeVisible();
+    expect(await ana.page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    await ana.page.goto(`/#/projects/${encodeURIComponent(s.project)}/guidelines/v1`);
+    await expect(ana.page.getByText("This is v1. The current version is 3.1 (v2).", { exact: true })).toBeVisible();
+    await evidence(ana.page, "label-page-390");
+  } finally { await ana.close(); }
+});
+
+test("PUBLISHED: long links, wide tables and code wrap or scroll in their own box, never the panel or the page (#410)", async ({ page, browser }) => {
+  const s = await guidelineScenario(page, "PUBLISHED");
+  await loginGuidelineUser(page, s, "lead");
+  const long = "https://example.org/" + "very-long-path-segment-without-breaks-".repeat(8) + "end";
+  const cells = (make: (index: number) => string) => `| ${Array.from({ length: 12 }, (_, index) => make(index)).join(" | ")} |`;
+  const md = ["# Wide guideline", "", `See ${long} for details.`, "", cells(index => `Column header number ${index}`), cells(() => "---"),
+    cells(index => `cell-${index}-${"x".repeat(30)}`), "", "```", "code_line_without_any_breaks_".repeat(12), "```", "",
+    `Inline \`${"inline_code_token_".repeat(10)}\` and ${"Supercalifragilistic".repeat(8)}.`, ""].join("\n");
+  const { csrf_token } = (await (await page.request.get("/api/v1/auth/me")).json()) as { csrf_token: string };
+  const response = await page.request.post(`${root(s)}/guidelines`, {
+    headers: { Origin: new URL(page.url()).origin, "X-CSRF-Token": csrf_token },
+    multipart: { file: { name: "wide.md", mimeType: "text/markdown", buffer: Buffer.from(md) }, change_note: "Wide", expected_latest_version: "1" },
+  });
+  expect(response.ok(), await response.text()).toBeTruthy();
+  /** The guideline text fits its reader; the reader's scroll box and the page do not scroll sideways. */
+  const fits = async (target: Page) => {
+    const geometry = await target.evaluate(() => {
+      const documentBox = document.querySelector(".guideline-document")!, reader = document.querySelector(".guideline-reader")!;
+      let box: Element | null = reader;
+      while (box && getComputedStyle(box).overflowX === "visible") box = box.parentElement;
+      const page = document.scrollingElement!;
+      return { document: documentBox.getBoundingClientRect().width, reader: reader.clientWidth, readerScroll: reader.scrollWidth,
+        box: box ? box.scrollWidth - box.clientWidth : 0, page: page.scrollWidth - page.clientWidth, right: documentBox.getBoundingClientRect().right, viewport: innerWidth };
+    });
+    expect(geometry.document).toBeLessThanOrEqual(geometry.reader + 1);
+    expect(geometry.readerScroll).toBeLessThanOrEqual(geometry.reader + 1);
+    expect(geometry.box).toBeLessThanOrEqual(1);
+    expect(geometry.page).toBeLessThanOrEqual(0);
+    expect(geometry.right).toBeLessThanOrEqual(geometry.viewport);
+  };
+  for (const width of [1024, 390]) {
+    await page.setViewportSize({ width, height: 800 });
+    await visit(page, `/#/projects/${encodeURIComponent(s.project)}/guidelines`);
+    await expect(page.getByRole("heading", { name: "Wide guideline" })).toBeVisible();
+    await fits(page);
+  }
+  // Ben's translation review: the guidelines drawer beside the review.
+  const ben = await actor(browser, s, "ben");
+  for (const width of [1280, 390]) {
+    await ben.page.setViewportSize({ width, height: 800 });
+    await visit(ben.page, `/#/tasks/${s.assignments["review-de"]}`);
+    await expect(ben.page.getByRole("textbox", { name: "Translation (de)", exact: true })).toBeVisible();
+    await guidelinesButton(ben.page, 2).click();
+    await expect(ben.page.getByRole("heading", { name: "Wide guideline" })).toBeVisible();
+    await fits(ben.page);
+    // The long link wraps; the wide table scrolls in its own box.
+    const scroller = ben.page.locator(".guideline-table-scroll");
+    expect(await scroller.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
+  }
+  await ben.close();
 });

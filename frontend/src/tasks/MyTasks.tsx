@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { currentGuidelineRef, guidelineVersionName, type GuidelineRef } from "../guidelines/versionName";
+import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { api, onSessionRestored, type ProjectSummary, type TaskSummary } from "../api/client";
 import { routeHref, type NavigateOptions, type Route, type TaskStatusTab } from "../app/router";
 import { ErrorNotice } from "../admin/ErrorNotice";
@@ -6,7 +7,7 @@ import { assignmentStatusLabels, consolidationReasonText, formatDateTime, reopen
 import { taskText } from "../app/identity";
 import { failedChecksTitle } from "../translation/labels";
 import { IconInfo, IconWarning } from "../ui/icons";
-import { Button, DataTable, EmptyState, InlineMessage, Popover, Select, StatusBadge, tabId, Tabs, type Column } from "../ui";
+import { Button, DataTable, EmptyState, InlineMessage, Popover, Select, StatusBadge, tabId, Tabs, useMediaQuery, type Column } from "../ui";
 import { LanguageText } from "../ui/LanguageTag";
 import { AssignedDate } from "../ui/AssignedDate";
 import { onSpaceActivate } from "../ui/spaceActivates";
@@ -14,6 +15,8 @@ import { annotationTaskName } from "../editor/modes";
 import { PracticeCard, PracticeGroup } from "../practice/PracticeOnMyTasks";
 import { usePractice } from "../practice/usePractice";
 import { notifyTasksChanged } from "./tasksEvents";
+import { reopenedText, secondReviewText } from "./LeadReason";
+import { pauseMarks } from "./pauseLabels";
 
 export interface MyTasksProps {
   project?: string;
@@ -68,11 +71,19 @@ export function memberHint(members: Pick<ProjectSummary, "name" | "roles">[]): s
 
 const answerRoute = (task: TaskSummary, reportId: string): Route => ({ name: "projectProblemReport", key: task.project_key, reportId });
 
-/** The "Reopened" badge itself opens a popover with when and why (#34): the row stays one badge high. */
-function ReopenedInfo({ notice }: { notice: string }): JSX.Element {
+/** Why a task reads "Reopened": the lead's reopen, or for a review reopened by "Ask a reviewer to correct…" that request. */
+const reopenedNotice = (task: TaskSummary): string | null =>
+  task.status === "reopened" && !reopenedText(task) ? secondReviewText(task) ?? reopenNotice(task) : reopenNotice(task);
+
+/**
+ * The "Reopened" badge itself opens a popover with when and why (#34): the row stays one badge high.
+ * `inline` (narrow screens, where the status sits under the task) writes the notice out below the badge instead.
+ */
+function ReopenedInfo({ notice, inline = false }: { notice: string; inline?: boolean }): JSX.Element {
   const [open, setOpen] = useState(false);
   const anchor = useRef<HTMLButtonElement>(null);
   const id = useId();
+  if (inline) return <><StatusBadge status="reopened">{assignmentStatusLabels.reopened}</StatusBadge><p className="task-reopen-reason">{notice}</p></>;
   return <>
     <button ref={anchor} type="button" className="task-reopen-info" aria-label="Reopened, why" aria-expanded={open} aria-controls={open ? id : undefined}
       onClick={() => setOpen(value => !value)}><StatusBadge status="reopened">{assignmentStatusLabels.reopened} <IconInfo /></StatusBadge></button>
@@ -83,6 +94,7 @@ function ReopenedInfo({ notice }: { notice: string }): JSX.Element {
 }
 
 export function MyTasks({ project, status, projects, onNavigate, username }: MyTasksProps): JSX.Element {
+  const narrow = useMediaQuery("(max-width: 700px)");
   // A visit without a project filter reopens the last chosen project ("" = All my tasks), once per visit,
   // as soon as the project list is known (a project the user left is not restored).
   const restored = useRef(false);
@@ -127,15 +139,15 @@ export function MyTasks({ project, status, projects, onNavigate, username }: MyT
   // One quiet "Project guidelines v3" link per listed project with a version in force (spec: My tasks).
   const taskProjects = state.kind === "ready" ? [...new Set(state.tasks.map(task => task.project_key))].sort() : [];
   const projectIdentity = JSON.stringify(taskProjects);
-  const [guidelines, setGuidelines] = useState<{ identity: string; versions: ReadonlyMap<string, number> } | null>(null);
+  const [guidelines, setGuidelines] = useState<{ identity: string; versions: ReadonlyMap<string, GuidelineRef> } | null>(null);
   useEffect(() => {
     const keys = JSON.parse(projectIdentity) as string[];
     if (keys.length === 0) return;
     let active = true;
     // A failed read only hides that project's link; the task list stays usable.
-    void Promise.all(keys.map(key => api.listGuidelines(key).then(listing => listing.current?.version ?? null, () => null))).then(versions => {
+    void Promise.all(keys.map(key => api.listGuidelines(key).then(listing => currentGuidelineRef(listing), () => null))).then(versions => {
       if (!active) return;
-      const inForce = new Map<string, number>();
+      const inForce = new Map<string, GuidelineRef>();
       keys.forEach((key, index) => { const version = versions[index]; if (version !== null) inForce.set(key, version); });
       setGuidelines({ identity: projectIdentity, versions: inForce });
     });
@@ -177,17 +189,18 @@ export function MyTasks({ project, status, projects, onNavigate, username }: MyT
   const navigateProject = (value: string) => onNavigate(value === allProjectsValue ? { name: "tasks", status: status ?? "all" }
     : { name: "tasks", project: value, ...(status === undefined ? {} : { status }) });
   const managed = projects.filter(item => item.can_manage && (project === undefined || item.project_key === project));
-  const guidelineVersions = guidelines?.identity === projectIdentity ? guidelines.versions : new Map<string, number>();
+  const guidelineVersions = guidelines?.identity === projectIdentity ? guidelines.versions : new Map<string, GuidelineRef>();
   const listedProjects = new Set(filtered.map(task => task.project_key));
   const guidelineLinks = [...options.keys()].filter(key => listedProjects.has(key) && guidelineVersions.has(key));
   const guidelineLink = (key: string) => {
+    const inForce = guidelineVersions.get(key);
     const route: Route = { name: "projectGuidelines", key };
     // Without a project filter the list may mix projects: the link names its project.
     const name = tasks.find(task => task.project_key === key)?.project_name ?? key;
     return <a href={routeHref(route)} onClick={event => {
       if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
       event.preventDefault(); onNavigate(route);
-    }}>{`Project guidelines v${guidelineVersions.get(key)}${project === undefined ? `, ${name}` : ""}`}</a>;
+    }}>{`Project guidelines ${inForce ? guidelineVersionName(inForce.version, inForce.label) : ""}${project === undefined ? `, ${name}` : ""}`}</a>;
   };
   const columns: Column<TaskSummary>[] = [
     { id: "text", header: "Text", cell: task => <LanguageText text={taskText(task)} code={task.language} /> },
@@ -196,15 +209,21 @@ export function MyTasks({ project, status, projects, onNavigate, username }: MyT
       {taskDescription(task)}
       {failedChecks(task) > 0 && <span className="task-check-flag"><IconWarning /> {failedChecksTitle(failedChecks(task))}</span>}
       {task.consolidation_reason && <p className="cell-secondary task-consolidation-reason">{consolidationReasonText(task.consolidation_reason)}</p>}
+      {secondReviewText(task) && <p className="cell-secondary task-lead-reason">{secondReviewText(task)}</p>}
+      {/* The lead's reason for reopening is written out like the one for a second review (review 2, F7 c); on a narrow
+          screen the notice under the "Reopened" badge already says it. */}
+      {!narrow && task.reopen_reason?.trim() && reopenedText(task) && <p className="cell-secondary task-lead-reason">{reopenedText(task)}</p>}
     </> },
     { id: "status", header: "Status", cell: task => <>
       {task.waiting_for_translation_review || task.waiting_for_lead ? <StatusBadge tone="neutral">{task.waiting_for_lead ? WAITING_FOR_LEAD : WAITING_FOR_REVIEW}</StatusBadge>
-        : reopenNotice(task) ? <ReopenedInfo notice={reopenNotice(task)!} /> : <StatusBadge status={task.status}>{assignmentStatusLabels[task.status]}</StatusBadge>}
+        // Narrow: the notice is written out below the badge; a second-review reason already stands under the task name.
+        : reopenedNotice(task) && !(narrow && reopenedNotice(task) === secondReviewText(task)) ? <ReopenedInfo notice={reopenedNotice(task)!} inline={narrow} /> : <StatusBadge status={task.status}>{assignmentStatusLabels[task.status]}</StatusBadge>}
       {task.report_answered && (task.answered_report_id ? <a className="task-answer-link" href={routeHref(answerRoute(task, task.answered_report_id))} onClick={event => {
         if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
         event.preventDefault(); onNavigate(answerRoute(task, task.answered_report_id!));
       }}><StatusBadge tone="info">Answer to your report</StatusBadge></a> : <StatusBadge tone="info">Answer to your report</StatusBadge>)}
-      {task.held && <><StatusBadge tone="warning">Paused</StatusBadge><p className="task-hold-reason" title={task.hold_reason ?? undefined}>{task.hold_reason ?? "A project problem needs attention."}</p></>}
+      {task.query_answered_at && <StatusBadge tone="info">Answer from the lead</StatusBadge>}
+      {task.held && pauseMarks(task).map(mark => <Fragment key={mark.cause}><StatusBadge tone="warning">{mark.badge}</StatusBadge><p className="task-hold-reason" title={mark.reason}>{mark.reason}</p></Fragment>)}
     </> },
     { id: "assigned", header: "Assigned", cell: task => <AssignedDate at={task.assigned_at} /> },
     { id: "changed", header: "Last change", cell: task => <time dateTime={task.updated_at}>{formatDateTime(task.updated_at)}</time> },
@@ -212,6 +231,20 @@ export function MyTasks({ project, status, projects, onNavigate, username }: MyT
       if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
       event.preventDefault(); onNavigate({ name: "task", assignmentId: task.assignment_id });
     }}>{task.held ? "View paused task" : taskActionLabels[task.status]}</a> },
+  ];
+  // Narrow screens (a phone): the seven columns do not fit and the pinned Action column covered Status. The text,
+  // the task and the status with its reason share one stacked cell beside the action; nothing scrolls sideways.
+  // Each part is the cell of its wide column, so a line added to a column appears here as well.
+  const column = (id: string) => columns.find(item => item.id === id)!;
+  const mixedProjects = project === undefined && new Set(shown.map(task => task.project_key)).size > 1;
+  const shownColumns: Column<TaskSummary>[] = !narrow ? columns : [
+    { id: "task", header: "Task", cell: task => <div className="task-stack">
+      <strong className="task-stack__text">{column("text").cell(task)}</strong>
+      {mixedProjects && <span className="cell-secondary">{column("project").cell(task)}</span>}
+      <div className="task-stack__task">{column("task").cell(task)}</div>
+      <div className="task-stack__status">{column("status").cell(task)}</div>
+    </div> },
+    column("open"),
   ];
   // One entry: the project's Documents, or with several managed projects (or none, as a member) the Projects page.
   const members = projects.filter(item => project === undefined || item.project_key === project);
@@ -228,7 +261,7 @@ export function MyTasks({ project, status, projects, onNavigate, username }: MyT
     if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
     event.preventDefault(); onNavigate(allRoute);
   }}>Show all tasks</a>} />;
-  const table = <DataTable label="My tasks" className="data-table--pin-end" rows={shown} columns={columns} rowKey={task => String(task.assignment_id)} rowProps={task => ({ "data-testid": "task-row", "aria-label": `${projectLabel(task.project_name, task.project_key)}: ${taskText(task)}${failedChecks(task) > 0 ? `, ${failedChecksTitle(failedChecks(task))}` : ""}${task.waiting_for_translation_review ? `, ${WAITING_FOR_REVIEW}` : task.waiting_for_lead ? `, ${WAITING_FOR_LEAD}` : ""}` })} />;
+  const table = <DataTable label="My tasks" className={narrow ? "my-tasks-table--narrow" : "data-table--pin-end"} rows={shown} columns={shownColumns} rowKey={task => String(task.assignment_id)} rowProps={task => ({ "data-testid": "task-row", "aria-label": `${projectLabel(task.project_name, task.project_key)}: ${taskText(task)}${failedChecks(task) > 0 ? `, ${failedChecksTitle(failedChecks(task))}` : ""}${task.waiting_for_translation_review ? `, ${WAITING_FOR_REVIEW}` : task.waiting_for_lead ? `, ${WAITING_FOR_LEAD}` : ""}` })} />;
   return <section aria-label="My tasks">
     <h1>My tasks</h1>
     {practiceState && <PracticeCard state={practiceState} onChange={practiceChanged} onNavigate={onNavigate} />}

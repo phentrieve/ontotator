@@ -202,3 +202,127 @@ def test_s12_orphan_pause_and_extended_hold_note(client):
     en = rows[("case-0512", "en")]
     assert "OPEN_PROBLEM_REPORT" in codes(en["issues"])
     assert page["bar"]["report_or_pause"] == 2
+
+
+def test_s464_work_in_progress_a_report_pause_and_nothing_paused_by_a_lead(client):
+    """Issue 464: the lead pause spec starts from texts no lead has paused."""
+    body = scenario(client, "S464")
+    assert len(body["rows"]) == 7 and set(body["users"]) == {
+        "lead",
+        "kim",
+        "tom",
+        "roe",
+        "ana",
+    }
+    (page,) = lead_pages(client, body)
+    rows = {key[0]: row for key, row in rows_of(page).items()}
+    assert all(row["lead_pause"] is None for row in rows.values())
+    causes = {
+        case: sorted(cause for item in row["work"] for cause in item["pause_causes"])
+        for case, row in rows.items()
+    }
+    assert causes["EN100026"] == ["report"]
+    assert not any(found for case, found in causes.items() if case != "EN100026")
+    assert rows["EN100024"]["final"] is not None
+    assert rows["EN100027"]["work"] == []
+    review = [w for w in rows["EN100028"]["work"] if w["task"] == "review"]
+    assert [w["assignment_id"] for w in review] == [
+        body["assignments"]["consolidation"]
+    ]
+    assert rows["EN100028"]["stages"]["annotation"]["state"] == "consolidating"
+
+
+def _as(client: TestClient, username: str) -> dict[str, str]:
+    """Log ``username`` in; the headers of a write."""
+    origin = str(client.base_url).rstrip("/")
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"username": username, "password": TEST_PASSWORD},
+        headers={"Origin": origin},
+    )
+    assert login.status_code == 200, login.text
+    return {"Origin": origin, "X-CSRF-Token": login.json()["csrf_token"]}
+
+
+def _en100028(client: TestClient, body: dict[str, Any]) -> dict[str, Any]:
+    (page,) = lead_pages(client, body)
+    return {key[0]: row for key, row in rows_of(page).items()}["EN100028"]
+
+
+def test_s464_a_paused_consolidation_stays_in_the_row(client):
+    """Review 2, F2: the lead pauses a text whose consolidation is open, or
+    the consolidator reports a problem. The row keeps the consolidation: the
+    submitted annotations are not paused, the consolidator's task says why
+    it is, and nothing offers a second consolidation."""
+    body = scenario(client, "S464")
+    base = f"/api/v1/projects/{body['project']}"
+    ref = [{"case_id": "EN100028", "language": "en"}]
+    headers = _as(client, body["users"]["lead"])
+    token = client.post(
+        f"{base}/text-pauses/pause",
+        json={"rows": ref, "preview": True},
+        headers=headers,
+    ).json()["preview_token"]
+    paused = client.post(
+        f"{base}/text-pauses/pause",
+        json={"rows": ref, "reason": "Source is checked", "preview_token": token},
+        headers=headers,
+    )
+    assert paused.status_code == 200, paused.text
+    client.post("/api/v1/auth/logout", headers=headers)
+
+    row = _en100028(client, body)
+    cell = row["stages"]["annotation"]
+    assert (cell["state"], cell["tone"]) == ("consolidating", "waiting")
+    assert cell["detail"]["note"] == "lead_pause"
+    assert [p["display_name"] for p in cell["detail"]["people"]] == ["Kim Lang"]
+    assert (cell["detail"]["submitted"], cell["detail"]["total"]) == (2, 2)
+    review = [w for w in row["work"] if w["task"] == "review"]
+    assert [(w["held"], w["pause_causes"]) for w in review] == [(True, ["lead"])]
+    assert row["consolidation_progress"]["open"] == 2
+    assert row["next_step"]["code"] == "consolidation_in_progress"
+    # Nobody's turn while the lead pause stands.
+    assert row["next_step"]["owner"]["kind"] == "none"
+
+    # Released, then paused by the consolidator's problem report.
+    headers = _as(client, body["users"]["lead"])
+    token = client.post(
+        f"{base}/text-pauses/release",
+        json={"rows": ref, "preview": True},
+        headers=headers,
+    ).json()["preview_token"]
+    client.post(
+        f"{base}/text-pauses/release",
+        json={"rows": ref, "preview_token": token},
+        headers=headers,
+    )
+    client.post("/api/v1/auth/logout", headers=headers)
+    headers = _as(client, body["users"]["kim"])
+    assignment_id = body["assignments"]["consolidation"]
+    task = next(
+        t
+        for t in client.get("/api/v1/me/tasks").json()
+        if t["assignment_id"] == assignment_id
+    )
+    reported = client.post(
+        f"/api/v1/assignments/{assignment_id}/problem-reports",
+        json={
+            "request_id": "f2-report",
+            "expected_workflow_revision": task["workflow_revision"],
+            "round_id": task["active_round_id"],
+            "reason": "Which rule applies?",
+        },
+        headers=headers,
+    )
+    assert reported.status_code == 200, reported.text
+    client.post("/api/v1/auth/logout", headers=headers)
+
+    row = _en100028(client, body)
+    cell = row["stages"]["annotation"]
+    assert (cell["state"], cell["tone"]) == ("consolidating", "decision")
+    assert (cell["detail"]["note"], cell["detail"]["excerpt"]) == (
+        "report_pause",
+        "Which rule applies?",
+    )
+    assert [p["display_name"] for p in cell["detail"]["people"]] == ["Kim Lang"]
+    assert row["next_step"]["code"] == "decide_report"

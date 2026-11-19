@@ -6,6 +6,7 @@ the row and page dictionaries of the Documents read API.
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
@@ -16,6 +17,7 @@ from ontotator.application import document_row_stages as stages
 from ontotator.domain import document_rows as rules
 from ontotator.domain import next_steps as steps_rules
 from ontotator.domain import stage_cells as cells_rules
+from ontotator.domain.annotation_limits import effective_annotation_limit
 from ontotator.domain.annotation_modes import AnnotationMode, text_mode
 from ontotator.domain.document_rows import PAGE_SIZE
 from ontotator.domain.work_plans import PlanFlags
@@ -110,7 +112,9 @@ class _Context:
                 self.resolution_of[resolution.assignment_id] = resolution.resolution
                 if resolution.resolution == "moved":
                     self.moved_to[resolution.assignment_id] = resolution.to_document_id
-            if resolution.submission_id is not None:
+            if resolution.submission_id is not None and not resolution.lapsed:
+                # A lapsed carry (issue 461) settles nothing: rule 3b offers
+                # the carry again.
                 self.submission_resolutions.setdefault(
                     resolution.submission_id, set()
                 ).add(resolution.resolution)
@@ -128,6 +132,8 @@ class _Context:
         # Per row, filled by _build_row: effective (review, annotate) flags,
         # bar segment of the next step and pseudonyms owning the next step.
         self.flags: dict[RowKey, tuple[bool, bool]] = {}
+        # Per row, filled by _row_steps: more annotators than the limit.
+        self.over_limit: dict[RowKey, bool] = {}
         # A final on a discarded root is not the row's final (export, steps).
         self.has_final: dict[RowKey, bool] = {}
         # Annotation tasks closed until the translation review is accepted.
@@ -200,6 +206,58 @@ def _discard(facts: RowFacts, document_id: str) -> dict[str, Any] | None:
         "reason": record["reason"],
         "discarded_at": record["discarded_at"],
         "discarded_by": facts.people.get(record["discarded_by"]),
+    }
+
+
+def _upload(facts: RowFacts, document_id: str) -> dict[str, Any] | None:
+    """The upload record of a version uploaded from the text card (341 a)."""
+    record = facts.uploads.get(document_id)
+    if record is None:
+        return None
+    uploaded_by = record["uploaded_by"]
+    return {
+        "method": record["method"],
+        "provider": record["provider"],
+        "model": record["model"],
+        "made_on": record["made_on"],
+        "made_by": record["made_by"],
+        "note": record["note"],
+        "uploaded_at": record["uploaded_at"],
+        "uploaded_by": facts.people.get(uploaded_by) if uploaded_by else None,
+    }
+
+
+def _editorial_correction(facts: RowFacts, document_id: str) -> dict[str, Any] | None:
+    """The editorial correction that made a version (issue 453)."""
+    record = facts.editorial_corrections.get(document_id)
+    if record is None:
+        return None
+    corrected_by = record["corrected_by"]
+    return {
+        "reason": record["reason"],
+        "previous_document_id": record["previous_document_id"],
+        "inserted_characters": record["inserted_characters"],
+        "deleted_characters": record["deleted_characters"],
+        "corrected_at": record["corrected_at"],
+        "corrected_by": facts.people.get(corrected_by) if corrected_by else None,
+    }
+
+
+def _query_decision(facts: RowFacts, document_id: str) -> dict[str, Any] | None:
+    """The lead's decision on a query that accepted a version (issue 483)."""
+    record = facts.query_decisions.get(document_id)
+    if record is None:
+        return None
+    decided_by = record["decided_by"]
+    return {
+        "kind": record["kind"],
+        "decided_document_id": record["document_id"],
+        "reviewed_document_id": record["reviewed_document_id"],
+        "reviewer_assignment_id": record["assignment_id"],
+        "answer": record["answer"],
+        "edited": record["edited"],
+        "decided_at": record["decided_at"],
+        "decided_by": facts.people.get(decided_by) if decided_by else None,
     }
 
 
@@ -503,7 +561,11 @@ def _build_row(ctx: _Context, case_id: str, language: str) -> dict[str, Any]:
     row_cells = ctx.cells[key]
     others_at = facts.others_activity.get(key)
     flagged_round = _consolidation_flags(facts, live)
-    proposal_count = facts.proposal_counts.get(_target(live or chains).document_id, 0)
+    target_document = _target(live or chains).document_id
+    proposal_count = facts.proposal_counts.get(target_document, 0)
+    proposal_set, newer_set, set_unrecorded = _row_proposal_sets(
+        ctx, target_document, [item for item in active if item.task == "annotate"]
+    )
     return {
         "case_id": case_id,
         "language": language,
@@ -529,6 +591,9 @@ def _build_row(ctx: _Context, case_id: str, language: str) -> dict[str, Any]:
                 "last_activity_at": version_activity[v.document_id],
                 "acceptance": _acceptance(facts, v.document_id),
                 "discarded": _discard(facts, v.document_id),
+                "upload": _upload(facts, v.document_id),
+                "editorial_correction": _editorial_correction(facts, v.document_id),
+                "query_decision": _query_decision(facts, v.document_id),
             }
             for chain in chains
             for v in chain.versions
@@ -593,11 +658,24 @@ def _build_row(ctx: _Context, case_id: str, language: str) -> dict[str, Any]:
         "others_activity_at": others_at,
         # Pre-check only (facet, filter); exact after paging.
         "flagged_unclear": 1 if flagged_round is not None else 0,
+        "over_limit": ctx.over_limit.get(key, False),
         "flagged_group_id": None,
         "flagged_round_id": flagged_round,
         "proposal_count": proposal_count,
         "annotation_mode": _annotation_mode(
             facts, key, versions, row_assignments, proposal_count, planned=annotate
+        ),
+        "proposal_set": proposal_set,
+        "newer_proposal_set": newer_set,
+        "proposal_set_unrecorded": set_unrecorded,
+        "annotations_per_text": {
+            "effective": facts.per_text(key),
+            "project": facts.annotations_per_text,
+            "override": facts.per_text_overrides.get(key),
+        },
+        "lead_pause": _lead_pause(ctx, key),
+        "typography_hints": sum(
+            facts.typography_hints.get(chain.newest.document_id, 0) for chain in live
         ),
         "consolidation_progress": None,
         "unreviewed_translation": steps_rules.unreviewed_translation(
@@ -660,6 +738,102 @@ def _annotation_mode(
     }
 
 
+def _set_view(facts: RowFacts, set_id: int | None) -> dict[str, Any] | None:
+    """``ProposalSetView`` fields of an imported proposal set (issue 337)."""
+    found = facts.proposal_sets.get(set_id) if set_id is not None else None
+    if found is None:
+        return None
+    return {
+        "set_id": found.set_id,
+        "imported_at": found.imported_at,
+        "tool": found.tool,
+        "tool_version": found.tool_version,
+        "proposal_count": found.proposal_count,
+        "newest": facts.newest_sets.get(found.document_id) == found.set_id,
+    }
+
+
+def _item_round(ctx: _Context, item: rules.AssignmentFact) -> Any:
+    return ctx.rounds.get(item.active_round_id or "")
+
+
+def _from_proposals(ctx: _Context, item: rules.AssignmentFact) -> bool:
+    """An annotation task that works (or will work) on tool proposals."""
+    if item.task != "annotate":
+        return False
+    round_fact = _item_round(ctx, item)
+    if round_fact is not None:
+        return bool(round_fact.mode == "proposal_check")
+    return item.annotation_mode == "proposals"
+
+
+def _item_set(ctx: _Context, item: rules.AssignmentFact) -> int | None:
+    """The proposal set an annotation task works on (issue 337).
+
+    The set its active round started from; a task from proposals without a
+    round yet starts on the newest set of its version. None: not recorded (a
+    round from before 0037), from scratch, or seed proposals.
+    """
+    if not _from_proposals(ctx, item):
+        return None
+    round_fact = _item_round(ctx, item)
+    if round_fact is not None:
+        found: int | None = round_fact.proposal_set_id
+        return found
+    return ctx.facts.newest_sets.get(item.document_id)
+
+
+def _set_unrecorded(ctx: _Context, item: rules.AssignmentFact) -> bool:
+    """A started task from proposals whose round did not record its set (it
+    began before migration 0037) on a text that has imported sets."""
+    round_fact = _item_round(ctx, item)
+    return (
+        round_fact is not None
+        and _from_proposals(ctx, item)
+        and round_fact.proposal_set_id is None
+        and item.document_id in ctx.facts.newest_sets
+    )
+
+
+def _row_proposal_sets(
+    ctx: _Context, target_document: str, work: Sequence[rules.AssignmentFact]
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None, bool]:
+    """``(proposal_set, newer_proposal_set, unrecorded)`` (issue 337, 337-A).
+
+    While any task of the text works on an older set than the newest of the
+    current version, the line names that older set and ``newer`` the newest
+    one: "Newer set available" stays until every task is on the newest set.
+    Among several older sets: the one with the most started or submitted
+    tasks, then the most tasks, then the older set. With every task on the
+    newest set, or without tasks, the newest set is named (a new task starts
+    from it). ``unrecorded``: no task has a known set and at least one
+    started before sets were recorded; then no set is claimed for the text.
+    """
+    facts = ctx.facts
+    started: Counter[int] = Counter()
+    total: Counter[int] = Counter()
+    unrecorded = False
+    for item in work:
+        set_id = _item_set(ctx, item)
+        if set_id is None or set_id not in facts.proposal_sets:
+            unrecorded = unrecorded or _set_unrecorded(ctx, item)
+            continue
+        total[set_id] += 1
+        if _item_round(ctx, item) is not None:
+            started[set_id] += 1
+    newest = facts.newest_sets.get(target_document)
+    if not total:
+        if unrecorded:
+            return None, None, True
+        return _set_view(facts, newest), None, False
+    older = [set_id for set_id in total if newest is not None and set_id < newest]
+    if not older:
+        shown = newest if newest in total else max(total)
+        return _set_view(facts, shown), None, False
+    shown = max(older, key=lambda set_id: (started[set_id], total[set_id], -set_id))
+    return _set_view(facts, shown), _set_view(facts, newest), False
+
+
 def _consolidation_flags(facts: RowFacts, live: Sequence[rules.Chain]) -> str | None:
     """The submitted consolidation round of the row's current version (the
     target of each live chain, as the final panel compares; the first chain
@@ -672,6 +846,28 @@ def _consolidation_flags(facts: RowFacts, live: Sequence[rules.Chain]) -> str | 
         if flagged is not None:
             return flagged.round_id
     return None
+
+
+def _pause_causes(item: rules.AssignmentFact) -> list[str]:
+    """Why the task is paused (``held``): ``report`` and/or ``lead``."""
+    report = item.held and (item.report_held or not item.lead_paused)
+    return [
+        *(("report",) if report else ()),
+        *(("lead",) if item.lead_paused else ()),
+    ]
+
+
+def _lead_pause(ctx: _Context, key: RowKey) -> dict[str, Any] | None:
+    """The lead pause of the text (issue 464): why, who and when."""
+    pause = ctx.facts.lead_pauses.get(key)
+    if pause is None:
+        return None
+    return {
+        "reason": pause.reason,
+        # None: paused through an API token, or by an account since erased.
+        "paused_by": ctx.facts.people.get(pause.paused_by or 0),
+        "paused_at": pause.paused_at,
+    }
 
 
 def _work_item(
@@ -692,6 +888,7 @@ def _work_item(
         "task": item.task,
         "status": item.status,
         "held": item.held,
+        "pause_causes": _pause_causes(item),
         "lead_correction": item.lead_correction,
         "round_ordinal": (
             ctx.ordinals.get(item.active_round_id)
@@ -711,6 +908,8 @@ def _work_item(
             ctx.person_of(item.created_by) if item.created_by is not None else None
         ),
         "annotation_mode": item.annotation_mode,
+        "proposal_set": _set_view(ctx.facts, _item_set(ctx, item)),
+        "proposal_set_unrecorded": _set_unrecorded(ctx, item),
         "unreviewed_translation": item.unreviewed_translation,
         "waiting_for_translation_review": item.assignment_id in ctx.waiting
         and item.assignment_id not in ctx.waiting_for_lead,
@@ -981,6 +1180,15 @@ def _row_steps(
         sum(1 for item in annotations if item.document_id == target.document_id)
         for target in targets
     ]
+    # Filter "More annotators than the limit" (issue 339 b), as the limit
+    # notice counts: unrevoked annotate tasks on a current version.
+    ctx.over_limit[key] = any(
+        n
+        > effective_annotation_limit(
+            facts.annotations_per_text, facts.per_text_overrides, *key
+        )
+        for n in per_target
+    )
     old_work = _old_work(ctx, live, targets, annotations)
     # Rule 8 compares annotation_assignments + pending_old_people with
     # "Annotations per text": the pair adds up to the minimum over the
@@ -1023,7 +1231,7 @@ def _row_steps(
         annotate=annotate,
         is_source=is_source,
         rule_on=facts.rule_on,
-        per_text=facts.annotations_per_text,
+        per_text=facts.per_text(key),
         open_report_id=report_id,
         orphan_pause_assignment_id=paused_id,
         unacknowledged_final_cause=any(
@@ -1086,7 +1294,7 @@ def _row_steps(
     submitted = sum(
         1 for item in on_targets if item.status == "submitted" and not item.held
     )
-    total = max(facts.annotations_per_text * len(targets), len(on_targets))
+    total = max(facts.per_text(key) * len(targets), len(on_targets))
     # Waiting on of an in-progress step: the people of every in-progress
     # step of the row (VD8, scenario 16).
     in_progress_work = [
@@ -1195,8 +1403,15 @@ def _row_steps(
                 if ordinal is not None
                 else _detail("annotations_submitted", submitted=submitted, total=total)
             )
+        # A task the lead paused is nobody's turn (issue 464).
         owner = _owner(
-            ctx, step.kind, in_progress_work if step.kind == "in_progress" else work
+            ctx,
+            step.kind,
+            [
+                item
+                for item in (in_progress_work if step.kind == "in_progress" else work)
+                if not item.lead_paused
+            ],
         )
         if not views:
             ctx.owners[key] = frozenset(
@@ -1288,8 +1503,13 @@ _PAUSABLE = frozenset({"annotate", "review"})
 
 
 def is_paused(row: Mapping[str, Any]) -> bool:
-    """The row has a held annotate or review task (filter ``paused``)."""
-    return any(item["held"] and item["task"] in _PAUSABLE for item in row["work"])
+    """The row has an annotate or review task held by a problem report
+    (filter ``paused``). A lead pause is the row's own state (``lead_pause``,
+    flag ``lead_paused``)."""
+    return any(
+        "report" in item["pause_causes"] and item["task"] in _PAUSABLE
+        for item in row["work"]
+    )
 
 
 def _row_level_matches(ctx: _Context, row: Mapping[str, Any], query: RowQuery) -> bool:
@@ -1306,7 +1526,7 @@ def _row_level_matches(ctx: _Context, row: Mapping[str, Any], query: RowQuery) -
         selected = getattr(query, f"{name}_state")
         if selected and row["stages"][name]["state"] not in selected:
             return False
-    if query.flags and not row["flagged_unclear"]:
+    if query.flags and set(query.flags).isdisjoint(facets.flag_values(row)):
         return False
     if query.proposals and facets.proposal_value(row) not in query.proposals:
         return False
@@ -1631,9 +1851,13 @@ def case_ids(facts: RowFacts, query: RowQuery) -> tuple[list[str], int, bool]:
 
 
 def sorted_case_ids(facts: RowFacts, case_ids: Sequence[str], sort: str) -> list[str]:
-    """``case_ids`` (deduplicated) in Documents order; unknown IDs last, as given."""
+    """``case_ids`` (deduplicated) in Documents order; unknown IDs last, as given.
+
+    ``sort`` "given" keeps the order of ``case_ids`` (issue 488)."""
     known = {version.case_id for version in facts.versions}
     unique = list(dict.fromkeys(case_ids))
+    if sort == "given":
+        return unique
     ordered = _sort_cases(
         facts, (case_id for case_id in unique if case_id in known), sort
     )

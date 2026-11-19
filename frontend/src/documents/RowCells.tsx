@@ -15,6 +15,8 @@ import { onSpaceActivate } from "../ui/spaceActivates";
 import { StatusBadge } from "../ui/StatusBadge";
 import {
   middleEllipsis,
+  leadPauseLine,
+  typographyHintsTitle,
   personLabel,
   submissionLabel,
   versionName,
@@ -191,6 +193,19 @@ export function VersionMarker({ row }: { row: DocumentRowView }): JSX.Element | 
   return <span className="documents-version-marker" title={title || undefined}>{text}</span>;
 }
 
+/** "Paused by lead" on a text a lead paused (issue 464); the title says who, when and why. */
+export function LeadPausedBadge({ row }: { row: Pick<DocumentRowView, "lead_pause"> }): JSX.Element | null {
+  if (!row.lead_pause) return null;
+  return <span className="documents-lead-paused" title={leadPauseLine(row.lead_pause)}><StatusBadge tone="warning">Paused by lead</StatusBadge></span>;
+}
+
+/** "Typography hints" on a text whose newest version has spacing errors or invisible characters (issue 484); the title says how many. */
+export function TypographyHintsBadge({ row }: { row: Pick<DocumentRowView, "typography_hints"> }): JSX.Element | null {
+  const count = row.typography_hints ?? 0;
+  if (count === 0) return null;
+  return <span className="documents-typography-hints" title={typographyHintsTitle(count)}><StatusBadge tone="neutral">Typography hints</StatusBadge></span>;
+}
+
 /** Small info badge "NEW"; accessible text "New since your last visit". */
 export function NewBadge(): JSX.Element {
   return <StatusBadge tone="info"><span aria-hidden="true">NEW</span><span className="visually-hidden">New since your last visit</span></StatusBadge>;
@@ -243,6 +258,8 @@ export function RowHeaderCell({ row, badge, onOpenCard, showCaseId = false, more
           <span className="visually-hidden">{`${more} more ${more === 1 ? "text" : "texts"} of this case not in plan`}</span></span>)}
       {sibling && <span className="visually-hidden">Same case as the open text</span>}
       <VersionMarker row={row} />
+      <LeadPausedBadge row={row} />
+      <TypographyHintsBadge row={row} />
       {active && rowIsNew(row) && <NewBadge />}
       {badge != null && badge !== false && <span className="documents-row-badge">{badge}</span>}
     </span>
@@ -271,7 +288,7 @@ export function ProposalsIcon({ row }: { row: DocumentRowView }): JSX.Element | 
 /** The short state of a stage as the text card's path names it (`cardModel`). */
 const STATE_OF: Readonly<Record<StageName, (row: DocumentRowView) => { state: string }>> = {
   review: translationState,
-  annotation: annotationState,
+  annotation: row => annotationState(row, true),
   final: row => finalizationState(row, new Date()),
 };
 
@@ -279,7 +296,8 @@ const STATE_OF: Readonly<Record<StageName, (row: DocumentRowView) => { state: st
 function stagePeople(row: DocumentRowView, stage: StageName): string {
   const cell = row.stages?.[stage];
   const working = stage === "review" ? ["in_progress", "re_review"] : stage === "annotation" ? ["in_progress", "paused"] : [];
-  return cell && working.includes(cell.state) ? (cell.detail.people ?? []).map(shortName).join(", ") : "";
+  // A cell paused by the lead names that lead, not people at work (issue 464): nobody is named as open.
+  return cell && working.includes(cell.state) && cell.detail.note !== "lead_pause" ? (cell.detail.people ?? []).map(shortName).join(", ") : "";
 }
 
 /** The state a stage cell shows (also its sort value); texts outside the plan: "not in plan" and no finalization (D10). */
@@ -299,11 +317,24 @@ function rowStageGlyph(row: DocumentRowView, stage: StageName, state: string): {
   const annotation = row.stages?.annotation;
   if (annotation?.state === "consolidating") {
     const { submitted, total } = annotation.detail;
-    if (stage === "final") return { symbol: "◐", tone: "running" };
+    // A paused consolidation: "⏸ consolidating · paused", waiting under a lead pause, the lead's decision under a report.
+    if (stage === "final") return annotation.detail.note === "lead_pause" || annotation.detail.note === "report_pause" ? { symbol: "⏸", tone: annotation.tone } : { symbol: "◐", tone: "running" };
     if (stage === "annotation" && (submitted == null || total == null || submitted >= total)) return { symbol: "✓", tone: "done" };
   }
   if (stage === "final" && state === "waiting") return { symbol: "○", tone: "waiting" };
   return { symbol: stageText(stage, cell, row).symbol, tone: cell.tone };
+}
+
+/**
+ * Below 1600 px, an Annotation cell with an open task and a free place keeps the limit in view: "0/1 · max 2"
+ * (0 of 1 submitted, up to 2 annotators) where "not started" or "0/1 submitted" read like a fully staffed text
+ * (review 2, F4). The server sends `target` on an in-progress cell only while the text can take another annotator.
+ */
+function roomNarrowState(row: DocumentRowView, stage: StageName): string | null {
+  const cell = stage === "annotation" && isActiveRow(row) ? row.stages?.annotation : undefined;
+  const detail = cell?.detail;
+  if (cell?.state !== "in_progress" || detail?.target == null || (detail.assigned ?? 0) >= detail.target) return null;
+  return `${detail.submitted ?? 0}/${detail.total ?? Math.max(detail.assigned ?? 1, 1)} · max ${detail.target}`;
 }
 
 /**
@@ -321,7 +352,7 @@ export function RowStageCell({ row, stage }: { row: DocumentRowView; stage: Stag
   const suffix = !who ? "" : stage === "annotation" ? ` · open: ${who}` : ` (${who})`;
   const full = state + suffix;
   // Below 1600 px (issues 248, 279) a shorter state where the full one would be cut.
-  const narrow = narrowStageState(state);
+  const narrow = roomNarrowState(row, stage) ?? narrowStageState(state);
   const className = ["documents-status", "stage-cell", `stage-cell--${tone}`, !isActiveRow(row) && "stage-cell--muted"].filter(Boolean).join(" ");
   return <span className="documents-status-cell">
     <span className={className} title={full}>

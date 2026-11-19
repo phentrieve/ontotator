@@ -1,5 +1,5 @@
 /** Documents-only label rules. Shared submission and time helpers are re-exported for convenience. */
-import { labelFor } from "../app/labels";
+import { formatDateTime, labelFor } from "../app/labels";
 import { personLabel } from "../app/submissionLabels";
 import { originLabels, translationStatusLabels } from "../admin/variantMetadata";
 
@@ -94,4 +94,23 @@ export function workText(work: readonly WorkItemLike[]): string {
   if (work.length === 0) return "Unassigned";
   if (work.length > 2) return `${work.filter(item => item.status === "submitted").length} of ${work.length} submitted`;
   return work.map(workItemText).join("; ");
+}
+
+/** "Paused" for a task a problem report pauses, "Paused by lead" when the lead paused the text (issue 464); both when both hold. */
+export function pausedWord(item: { held?: boolean; pause_causes?: readonly ("report" | "lead")[] }): string | null {
+  if (!item.held) return null;
+  const causes = item.pause_causes ?? [];
+  if (!causes.includes("lead")) return "Paused";
+  return causes.includes("report") ? "Paused by a problem report and by lead" : "Paused by lead";
+}
+
+/** The lead pause of a text (issue 464): "Carla Diaz, 17 Nov 2026, 14:02: Source text is being clarified"; "you, …" for the viewer. */
+export function leadPauseLine(pause: { reason: string; paused_by?: { pseudonym: string; display_name?: string | null; is_me?: boolean } | null; paused_at: string }): string {
+  const who = !pause.paused_by ? null : pause.paused_by.is_me ? "you" : pause.paused_by.display_name?.trim() || pause.paused_by.pseudonym;
+  return `${[who, formatDateTime(pause.paused_at)].filter(Boolean).join(", ")}: ${pause.reason}`;
+}
+
+/** Title of the "Typography hints" flag of a row (issue 484). */
+export function typographyHintsTitle(count: number): string {
+  return `${count} typography ${count === 1 ? "hint" : "hints"} in the newest version: spacing errors or invisible characters`;
 }

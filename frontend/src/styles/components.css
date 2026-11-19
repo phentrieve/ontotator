@@ -520,7 +520,7 @@ textarea.form-control {
 .empty-state { padding: var(--space-5) 0; }
 .empty-state-title { margin: 0; font-size: var(--size-xl); line-height: var(--leading-xl); font-weight: var(--weight-strong); }
 .empty-state-body { margin-top: var(--space-2); color: var(--text-muted); }
-.empty-state-action { margin-top: var(--space-4); }
+.empty-state-action { margin-top: var(--space-4); display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 /* Filters sit on one even grid so five controls read as one calm group. */
@@ -666,7 +666,9 @@ a.shell-product { color: inherit; text-decoration: none; }
 .users-page td li + li { margin-top: var(--space-1); }
 .ui-dialog.audit-history-dialog { width: calc(100vw - 2 * var(--space-4)); max-width: 1200px; }
 .audit-history-dialog .audit-when { white-space: nowrap; }
-.audit-history-dialog .audit-details { overflow-wrap: anywhere; }
+/* On a phone the six columns left Details about 80 px, which broke inside words (#472): it keeps a readable width and
+   the table scrolls sideways. */
+.audit-history-dialog .audit-details { display: inline-block; min-width: 14rem; overflow-wrap: anywhere; }
 .shell-page .detail-section:first-child { padding-top: 0; }
 .shell-page .detail-section:last-child { border-bottom: 0; }
 .shell-page :not(td) > .toolbar { margin-block: var(--space-3); }
@@ -771,11 +773,28 @@ ul.task-counts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space
 /* My tasks: failed automatic checks of a translation review, on a second line of the Task cell; icon plus words, not colour alone. */
 .task-hold-reason { display: -webkit-box; margin: var(--space-1) 0 0; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; max-width: 28rem; white-space: normal; }
 .task-check-flag { display: flex; align-items: center; gap: var(--space-1); color: var(--warning); font-size: var(--size-sm); }
+/* The lead's reason for a task (second review, reopen): in My tasks a line under the task name, in the task a quiet note. */
+.task-lead-reason { margin: var(--space-1) 0 0; max-width: 28rem; white-space: normal; overflow-wrap: anywhere; }
+.lead-reason { margin: 0 0 var(--space-3); padding: var(--space-2) var(--space-3); border: 1px solid var(--notice-info-border); border-radius: var(--radius); background: var(--notice-info-fill); color: var(--notice-info-text); font-size: var(--size-md); line-height: var(--leading-md); overflow-wrap: anywhere; }
+.lead-reason p { margin: 0; }
+.lead-reason p + p { margin-top: var(--space-1); }
+.lead-reason--band { margin: var(--space-2) 0 var(--space-3); }
 .task-reopen-info { all: unset; cursor: pointer; border-radius: var(--radius-sm); }
 .task-reopen-info:focus-visible { outline: var(--focus-width) solid var(--focus-ring); outline-offset: 2px; }
 .task-reopen-info .icon { width: 12px; height: 12px; margin-inline-start: 2px; vertical-align: -1px; }
 .task-answer-link { text-decoration: none; }
 .task-answer-link .status-pill { text-decoration: underline; text-underline-offset: 2px; }
+/* My tasks on a narrow screen: text, task and status (with its reason) stacked in one cell beside the action. */
+.task-stack { display: grid; gap: var(--space-1); min-width: 0; overflow-wrap: anywhere; }
+.task-stack__status { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
+.task-stack__status > p { flex: 1 0 100%; margin: 0; }
+/* No hover on a phone: the whole reason is written out, not clamped behind a title. */
+.task-stack .task-hold-reason { display: block; max-width: none; }
+.task-reopen-reason { margin: var(--space-1) 0 0; white-space: normal; }
+/* Fixed layout: the table is exactly as wide as its box, whatever the names; the action keeps a column of its own. */
+.my-tasks-table--narrow { table-layout: fixed; }
+.my-tasks-table--narrow th:last-child { width: 8.5rem; }
+.my-tasks-table--narrow td:last-child { overflow-wrap: anywhere; }
 
 /* Keeps a row's action column in view while the rest of a wide table scrolls. */
 .data-table--pin-end :is(th, td:not([colspan])):last-child { position: sticky; right: 0; background: var(--surface); box-shadow: inset 1px 0 var(--border); }
@@ -930,6 +949,8 @@ ul.task-counts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space
   pointer-events: auto;
   animation: toast-in 150ms ease;
 }
+/* A dialog opened after the toast: the toast waits, unseen and out of reach, until the dialog closes (issue 439). */
+.ui-toast-region[data-behind-dialog] > .ui-toast { visibility: hidden; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 /* The buttons stay on the row; a long message wraps instead of being cut (R-6). */
 .ui-toast > * { flex: none; }

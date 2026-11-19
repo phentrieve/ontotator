@@ -1,9 +1,9 @@
 import { expect, type Page } from "@playwright/test";
-import { openTasksHome, TEST_PASSWORD } from "./helpers";
+import { loginThroughForm } from "./helpers";
 import type { LeadPerson, LeadScenario } from "./leadWorkflowHelpers";
 
 /** Scenarios of ``POST /__test_review_flow__`` (tests/browser_review_flow_scenarios.py). */
-export type ReviewFlowScenarioName = "REVIEW_FLOW" | "ANNOTATION_LOOP";
+export type ReviewFlowScenarioName = "REVIEW_FLOW" | "ANNOTATION_LOOP" | "TRANSLATION_CHECKS";
 
 /** REVIEW_FLOW: the two cases whose de translation reviews Ana owns, in task order. */
 export type ReviewFlowCase = "failed-translation" | "second-translation";
@@ -41,10 +41,5 @@ export async function reviewFlowScenario(page: Page, name: ReviewFlowScenarioNam
  * ``loginExisting`` (which expects the username in the shell).
  */
 export async function loginScenarioUser(page: Page, scenario: ReviewFlowScenario, name: LeadPerson): Promise<void> {
-  await openTasksHome(page);
-  const form = page.getByRole("form", { name: "Log in to Ontotator" });
-  await form.getByLabel("Username", { exact: true }).fill(scenario.users[name]);
-  await form.getByLabel("Password", { exact: true }).fill(TEST_PASSWORD);
-  await form.getByRole("button", { name: "Log in", exact: true }).click();
-  await expect(page.getByTestId("current-user")).toContainText(scenario.display_names[name]);
+  await loginThroughForm(page, scenario.users[name], scenario.display_names[name]);
 }

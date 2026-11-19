@@ -48,6 +48,11 @@ describe("Review cell", () => {
   it("accepted", () => {
     expect(text("review", cell("accepted", "done", { note: "unchanged" }))).toEqual(["✓ Accepted", "unchanged"]);
     expect(text("review", cell("accepted", "done", { note: "with_corrections", people: [ana], from_version: 1, version: 2 }))).toEqual(["✓ Accepted", "with corrections, v1 → v2, Ana Weber"]);
+    // Review 2, F5: a lead's typo fix is credited to the lead, never to the reviewer of the fixed version.
+    expect(text("review", cell("accepted", "done", { note: "typos_fixed", people: [{ pseudonym: "ann-0001", display_name: "Project Lead", is_me: true }], from_version: 1, version: 2 })))
+      .toEqual(["✓ Accepted", "typos fixed by you, v1 → v2"]);
+    expect(text("review", cell("accepted", "done", { note: "typos_fixed", people: [luc], from_version: 2, version: 3 }))).toEqual(["✓ Accepted", "typos fixed by Luc Martin, v2 → v3"]);
+    expect(text("review", cell("accepted", "done", { note: "typos_fixed", from_version: 1, version: 2 }))).toEqual(["✓ Accepted", "typos fixed, v1 → v2"]);
     expect(text("review", cell("accepted", "done", { note: "in_package" }))).toEqual(["✓ Accepted", "in package"]);
     expect(text("review", cell("accepted", "done", { note: "outside" }))).toEqual(["✓ Accepted", "outside Ontotator"]);
   });
@@ -91,6 +96,10 @@ describe("Annotation cell", () => {
   });
   it("paused", () => expect(text("annotation", cell("paused", "decision", { people: [tom], excerpt: "Satz 3 unvollständig…" }))).toEqual(["⏸ Paused", "Tom Reis: “Satz 3 unvollständig…”"]));
   it("consolidating", () => expect(text("annotation", cell("consolidating", "running", { people: [luc] }))).toEqual(["◐ Consolidating", "Luc Martin"]));
+  it("a paused consolidation names the consolidator and the reason (review 2, F2)", () => {
+    expect(text("annotation", cell("consolidating", "waiting", { people: [luc], note: "lead_pause", excerpt: "Source is checked" }))).toEqual(["⏸ Consolidation paused by lead", "Luc Martin, “Source is checked”"]);
+    expect(text("annotation", cell("consolidating", "decision", { people: [luc], note: "report_pause", excerpt: "Which rule?" }))).toEqual(["⏸ Consolidation paused", "Luc Martin, “Which rule?”"]);
+  });
   it("old_text_open", () => expect(text("annotation", cell("old_text_open", "decision", { people: [tom], from_version: 1, version: 2 }))).toEqual(["⚠ In progress on old text", "Tom Reis works on v1"]));
   it("old_text_submitted", () => expect(text("annotation", cell("old_text_submitted", "decision", { people: [ana], from_version: 1, version: 2, note: "v2_not_annotated" })))
     .toEqual(["⚠ Submitted on v1", "Ana Weber, v2 not annotated"]));
@@ -126,6 +135,9 @@ describe("narrow table states (issue 248)", () => {
     "0 of 2 submitted, 1 of 2 started": "0/2 submitted",
     "1 annotator · max 2": "1 · max 2",
     "2 annotators · max 5": "2 · max 5",
+    "assigned, not started · max 2": "not started",
+    "1 of 2 submitted · max 3": "1/2 submitted",
+    "1 of 2 submitted, not started · max 3": "1/2 submitted",
     "2 · full": null,
     "not reviewed, optional": "not reviewed",
     "Final is on old text": "on old text",
@@ -135,6 +147,9 @@ describe("narrow table states (issue 248)", () => {
     "Finishing on v2": "finishing v2",
     "ready to compare": "to compare",
     "ready to accept": null,
+    "Check changes, newer result": "Check changes",
+    "Check changes, text corrected, newer result": "Check changes",
+    "Check changes": null,
     "consolidating (3 of 5 groups open)": "consolidating",
     "consolidating": null,
     "can be accepted": null,
@@ -147,6 +162,10 @@ describe("narrow table states (issue 248)", () => {
     "Source changed": null,
     "Your choice": null,
     "waiting": null,
+    "consolidating (2 of 3 groups open)": "consolidating",
+    // The pause is the cell's ⏸ glyph where "· paused" would be cut.
+    "consolidating · paused (2 of 3 groups open)": "consolidating",
+    "consolidating · paused": "consolidating",
   };
   it.each(Object.entries(states))("%s", (state, short) => expect(narrowStageState(state)).toBe(short));
   it("a state stays only when it fits the narrow cell (15 characters); short forms have at most 13", () => {

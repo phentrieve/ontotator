@@ -42,7 +42,7 @@ const workspace: Schemas["ReviewWorkspace"] = {
   assignment: { ...assignment }, variant, translation_ancestor: variant, text: text.text,
   source: { variant: { ...variant, document_id: "source", language: "en" }, text: "Original" },
   comparisons: [], failed_checks: [], draft: { text: text.text, form: {}, revision: 3 },
-  qualification: "Reviewer", previous_reviews: [record], read_only: true, submitted_record: record, lead_correction: false,
+  qualification: "Reviewer", previous_reviews: [record], read_only: true, submitted_record: record, lead_correction: false, reviewed_again: false,
 };
 const pending: Schemas["ReanchorItem"] = {
   proposal_set_id: 8, source_ref: { annotation_id: "urn:source", version: "v1" },

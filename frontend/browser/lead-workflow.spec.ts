@@ -13,7 +13,7 @@ import {
   documentsReady, documentsTab, moreMarker, notInPlanSwitch, openDecisionBlock, rowBox, openFilters, openTextCard, rowAction, rowCell, textCard, textName, textNamePattern,
   textRow, textVersionItems,
 } from "./documentsHelpers";
-import { authenticatedRequest, openTasksHome, TEST_PASSWORD } from "./helpers";
+import { authenticatedRequest, loginThroughForm } from "./helpers";
 import { leadScenario, pasteCaseIds, type LeadPerson, type LeadScenario } from "./leadWorkflowHelpers";
 
 test.setTimeout(240_000);
@@ -54,14 +54,7 @@ const person = (s: LeadScenario, name: LeadPerson) => `${s.display_names[name]} 
  * the landing (F8) opens that project.
  */
 async function login(page: Page, s: LeadScenario, name: LeadPerson, remember?: string) {
-  if (remember === undefined) await openTasksHome(page);
-  else await page.goto("/");
-  if (remember !== undefined) await page.evaluate(([key, value]) => window.localStorage.setItem(key, value), [`ontotator.lastProject.v1:${s.users[name]}`, remember]);
-  const form = page.getByRole("form", { name: "Log in to Ontotator" });
-  await form.getByLabel("Username", { exact: true }).fill(s.users[name]);
-  await form.getByLabel("Password", { exact: true }).fill(TEST_PASSWORD);
-  await form.getByRole("button", { name: "Log in", exact: true }).click();
-  await expect(page.getByTestId("current-user")).toContainText(s.display_names[name]);
+  await loginThroughForm(page, s.users[name], s.display_names[name], { lastProject: remember });
 }
 
 /** Log in as the lead, who used the project last: the landing opens its Documents (F8). */
@@ -509,13 +502,13 @@ test("ROWS: row actions within three clicks", async ({ page }) => {
   await page.getByRole("link", { name: "Back to Documents" }).first().click();
   await documentsReady(page);
 
-  // Review changes… (PLAN_RESTORED): the card with "Keep final on v1": 2 (the checkbox confirmation is gone).
+  // Review changes… (PLAN_RESTORED): the card with "Keep the current final result" (one version, issue 469): 2 (the checkbox confirmation is gone).
   clicks = counter(page);
   await clicks.click(rowAction(page, "Review changes…", cases.review_changes, "de"));
   const review = await openDecisionBlock(page, cases.review_changes, "de");
-  await expect(review.getByRole("button", { name: "Keep final on v1", exact: true })).toBeVisible();
+  await expect(review.getByRole("button", { name: "Keep the current final result", exact: true })).toBeVisible();
   await evidence(page, "row-review-changes", review);
-  await clicks.click(review.getByRole("button", { name: "Keep final on v1", exact: true }));
+  await clicks.click(review.getByRole("button", { name: "Keep the current final result", exact: true }));
   expect(clicks.total).toBe(2);
   await expect(review.locator(".final-panel-success")).toContainText(new RegExp(`Final result saved for ${esc(cases.review_changes)}${SEP}de\\.`));
   await textCard(page, cases.review_changes, "de").getByRole("button", { name: "Close", exact: true }).first().click();
@@ -556,13 +549,7 @@ async function twoProjectLead(page: Page) {
   expect(created.ok(), await created.text()).toBeTruthy();
   /** Log in at "#/" (the landing applies); `remember` seeds the last-used project first. */
   const loginDana = async (remember?: string) => {
-    await page.goto("/");
-    if (remember !== undefined) await page.evaluate(([key, value]) => window.localStorage.setItem(key, value), [`ontotator.lastProject.v1:${username}`, remember]);
-    const form = page.getByRole("form", { name: "Log in to Ontotator" });
-    await form.getByLabel("Username", { exact: true }).fill(username);
-    await form.getByLabel("Password", { exact: true }).fill(TEST_PASSWORD);
-    await form.getByRole("button", { name: "Log in", exact: true }).click();
-    await expect(page.getByTestId("current-user")).toContainText("Dana Lead");
+    await loginThroughForm(page, username, "Dana Lead", { landing: true, lastProject: remember });
   };
   return { a: a.project, b: b.project, username, loginDana };
 }
@@ -792,7 +779,7 @@ test("every Progress count opens Documents with the same number of rows", async 
     // Texts in view: the text names plus the not-planned sources folded into their case lines.
     const shown = page.getByRole("button", { name: /^Text case-\d{4} [a-z]{2}$|^source [a-z]{2} \(native\), \d+ translations?$/ });
     if (Number(count) === 0) {
-      await expect(page.getByText(/^(No texts match these filters\.|Nothing needs your decision|Nothing to assign|Nothing in progress|Nothing done yet|No texts yet)$/).first(), label).toBeVisible();
+      await expect(page.getByText(/^(No texts match these filters\.|Nothing needs your decision|No text waits for an assignment|Nothing in progress|Nothing done yet|No texts yet)$/).first(), label).toBeVisible();
     }
     await expect(shown, `${label} (${link.href})`).toHaveCount(Number(count));
     checked.push(`${label}: ${count}`);

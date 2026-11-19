@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from builtins import list as List
 from collections import Counter
-from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal, cast
 
@@ -63,7 +63,7 @@ from ontotator.domain.variants import VariantInfo
 from ontotator.domain.workspace import WorkspaceMode
 from ontotator.projects.assignments import revoke_assignments
 from ontotator.storage.database import Database
-from ontotator.storage.plan_tables import DiscardedVariantRow
+from ontotator.storage.plan_tables import DiscardedVariantRow, EditorialCorrectionRow
 from ontotator.storage.repository import _lock_id
 from ontotator.storage.tables import (
     AssignmentRow,
@@ -75,6 +75,8 @@ from ontotator.storage.tables import (
     UserLanguageRow,
     UserRow,
 )
+from ontotator.storage.text_pause import PauseCause, pause_causes, pause_columns
+from ontotator.storage.text_settings import effective_per_text
 
 TASK_FOR_MODE: dict[WorkspaceMode, Task] = {
     "independent": "annotate",
@@ -101,12 +103,90 @@ class Assignment:
     external_id: str | None = None
     active_round_id: str | None = None
     workflow_revision: int = 0
+    # Paused by any cause (``storage.text_pause``); ``pause_causes`` names
+    # them, ``hold_reason`` is the report's reason, else the lead's.
     held: bool = False
     hold_reason: str | None = None
+    pause_causes: tuple[PauseCause, ...] = field(default_factory=tuple)
+    lead_pause_reason: str | None = None
     # FD1: the lead's own translation review of a rejected or queried version.
     lead_correction: bool = False
     # Fixed at creation for task ``annotate`` (plan P3); None for other tasks.
     annotation_mode: AnnotationMode | None = None
+
+
+def second_review_requests(
+    conn: Connection, rounds: Mapping[int, str | None]
+) -> dict[int, tuple[datetime, str]]:
+    """When and why a lead asked for the review of each assignment with
+    "Request correction…": the ``translation.correction_requested`` audit
+    event of the assignment's current round (``rounds``: assignment id ->
+    active round id). A later round of the task (the lead reopened it, the
+    reviewer started a new one) is not that request any more.
+    """
+    wanted = {str(aid): rid for aid, rid in rounds.items() if rid}
+    if not wanted:
+        return {}
+    events = conn.execute(
+        select(AuditEventRow.target_id, AuditEventRow.at, AuditEventRow.details)
+        .where(
+            AuditEventRow.target_type == "assignment",
+            AuditEventRow.target_id.in_(sorted(wanted)),
+            AuditEventRow.action == "translation.correction_requested",
+        )
+        .order_by(AuditEventRow.id)
+    )
+    found: dict[int, tuple[datetime, str]] = {}
+    for event in events:
+        details = event.details or {}
+        if details.get("round_id") == wanted[event.target_id]:
+            found[int(event.target_id)] = (event.at, str(details.get("reason") or ""))
+    return found
+
+
+def query_answer_times(
+    conn: Connection, assignment_ids: Sequence[int]
+) -> dict[int, datetime]:
+    """When a lead decided the query of each submitted translation review
+    (issue 483): only the task's current submission counts."""
+    if not assignment_ids:
+        return {}
+    from ontotator.storage.plan_tables import QueryDecisionRow
+    from ontotator.storage.tables import TranslationReviewRow
+
+    rows = conn.execute(
+        select(AssignmentRow.id, QueryDecisionRow.decided_at)
+        .join(
+            TranslationReviewRow,
+            TranslationReviewRow.assignment_id == AssignmentRow.id,
+        )
+        .join(QueryDecisionRow, QueryDecisionRow.review_id == TranslationReviewRow.id)
+        .where(
+            AssignmentRow.id.in_(sorted(assignment_ids)),
+            AssignmentRow.last_submission_id
+            == func.concat("tr-", TranslationReviewRow.id),
+        )
+    )
+    return {row.id: row.decided_at for row in rows}
+
+
+def latest_reopen(
+    conn: Connection, assignment_id: int
+) -> tuple[datetime, str | None] | None:
+    """When and why a lead last reopened the task (``assignment.reopen``)."""
+    event = conn.execute(
+        select(AuditEventRow.at, AuditEventRow.details)
+        .where(
+            AuditEventRow.target_type == "assignment",
+            AuditEventRow.target_id == str(assignment_id),
+            AuditEventRow.action == "assignment.reopen",
+        )
+        .order_by(AuditEventRow.id.desc())
+        .limit(1)
+    ).first()
+    if event is None:
+        return None
+    return event.at, (event.details or {}).get("reason") or None
 
 
 @dataclass(frozen=True)
@@ -124,6 +204,8 @@ class TaskSummary:
     workflow_revision: int = 0
     held: bool = False
     hold_reason: str | None = None
+    pause_causes: tuple[PauseCause, ...] = field(default_factory=tuple)
+    lead_pause_reason: str | None = None
     source_language: str | None = None
     target_language: str | None = None
     # The text label's case ID (spec "Text label"), and the version and its
@@ -131,8 +213,9 @@ class TaskSummary:
     case_id: str | None = None
     version: int | None = None
     origin: str | None = None
-    # Spec A.7: failed automatic checks of the reviewed variant's translation run
-    # (the list ReviewWorkspace.failed_checks shows); None for other tasks.
+    # Spec A.7: failed automatic checks of the reviewed version (the list
+    # ReviewWorkspace.failed_checks shows; 0 for a version after the first, which
+    # was never checked); None for other tasks.
     failed_check_count: int | None = None
     # Spec 2026-10-23 §2: the assignment date and the annotation mode fixed
     # at assignment time (annotate only).
@@ -145,6 +228,14 @@ class TaskSummary:
     # An open consolidation: the lead's reason from the start command (#146);
     # None without one and for other tasks.
     consolidation_reason: str | None = None
+    # A translation review the lead asked for with "Request correction…": when
+    # and why (the ``translation.correction_requested`` audit event of the
+    # task's current round); None for other tasks.
+    second_review_at: datetime | None = None
+    second_review_reason: str | None = None
+    # A submitted translation review that asked a query: when the lead decided
+    # it (issue 483; the answer is in the review's workspace); None otherwise.
+    query_answered_at: datetime | None = None
     # R-26: a lead answered one of the owner's reports on this task since the
     # owner last opened it.
     report_answered: bool = False
@@ -184,8 +275,7 @@ def _assignments() -> Select[tuple[object, ...]]:
             AssignmentRow.last_submission_id,
             AssignmentRow.active_round_id,
             AssignmentRow.workflow_revision,
-            AssignmentRow.held,
-            AssignmentRow.hold_reason,
+            *pause_columns(),
             AssignmentRow.lead_correction,
             AssignmentRow.annotation_mode,
             DocumentRow.external_id,
@@ -200,8 +290,137 @@ def _assignments() -> Select[tuple[object, ...]]:
     )
 
 
+_STATUS_RANK = {"reopened": 0, "in_progress": 1, "open": 2, "submitted": 3}
+
+
+def _in_task_order(
+    conn: Connection, user_id: int, rows: List[RowMapping]
+) -> List[RowMapping]:
+    """A person's tasks in the order of My tasks (issue 488).
+
+    By status, then in the order of assignment (assignment id), with two
+    refinements:
+
+    - A task a lead moved to a new text version ("Handle text change") stands
+      at the place of the task it continues. The move revokes the old
+      assignment and creates the new one in the same transaction, so the new
+      one's ``created_at`` is the resolution's ``decided_at``. A task moved
+      twice keeps the place of the first one.
+    - Texts a lead moved to the front of the queue (issue 339) after their
+      task was assigned come first within their status, the latest move
+      first, each move in the order of assignment.
+    """
+    from ontotator.storage.overview_tables import TextChangeResolutionRow
+
+    Key = tuple[str, str, datetime]
+    earlier: dict[Key, tuple[int, Key]] = {
+        (row.project_key, row.to_document_id, row.decided_at): (
+            row.id,
+            (row.project_key, row.document_id, row.created_at),
+        )
+        for row in conn.execute(
+            select(
+                ProjectRow.project_key,
+                TextChangeResolutionRow.to_document_id,
+                TextChangeResolutionRow.decided_at,
+                AssignmentRow.id,
+                AssignmentRow.document_id,
+                AssignmentRow.created_at,
+            )
+            .join(
+                AssignmentRow,
+                AssignmentRow.id == TextChangeResolutionRow.assignment_id,
+            )
+            .join(ProjectRow, ProjectRow.id == AssignmentRow.project_id)
+            .where(
+                TextChangeResolutionRow.resolution == "moved",
+                AssignmentRow.user_id == user_id,
+            )
+        )
+    }
+    first: dict[int, int] = {}
+    for row in rows:
+        root = row["assignment_id"]
+        key = (row["project_key"], row["document_id"], row["assigned_at"])
+        # Ids only fall along the chain, so it ends.
+        while row["task"] == "annotate" and key in earlier and earlier[key][0] < root:
+            root, key = earlier[key]
+        first[row["assignment_id"]] = root
+    # Per text, the audit ids of the moves to the front, newest first.
+    moves: dict[tuple[str, str, str], List[int]] = {}
+    for event in conn.execute(
+        select(ProjectRow.project_key, AuditEventRow.id, AuditEventRow.details)
+        .join(ProjectRow, ProjectRow.id == AuditEventRow.project_id)
+        .where(
+            ProjectRow.project_key.in_({row["project_key"] for row in rows}),
+            AuditEventRow.action == "project.queue_order",
+        )
+        .order_by(AuditEventRow.id.desc())
+    ):
+        for text in event.details.get("moved_to_front") or []:
+            moves.setdefault(
+                (event.project_key, text["case_id"], text["language"]), []
+            ).append(event.id)
+    front: dict[int, int] = {}
+    if moves:
+        # A move counts for tasks assigned before it: audit ids give the order.
+        assigned: dict[str, int] = dict(
+            conn.execute(
+                select(AuditEventRow.target_id, func.min(AuditEventRow.id))
+                .where(
+                    AuditEventRow.project_id.in_(
+                        select(ProjectRow.id).where(
+                            ProjectRow.project_key.in_(
+                                {project for project, _, _ in moves}
+                            )
+                        )
+                    ),
+                    AuditEventRow.target_type == "assignment",
+                    AuditEventRow.target_id.in_(
+                        [str(root) for root in set(first.values())]
+                    ),
+                    AuditEventRow.action == "assignment.create",
+                )
+                .group_by(AuditEventRow.target_id)
+            )
+            .tuples()
+            .all()
+        )
+        for row in rows:
+            created = assigned.get(str(first[row["assignment_id"]]))
+            latest = moves.get((row["project_key"], row["case_id"], row["language"]))
+            if created is not None and latest and latest[0] > created:
+                front[row["assignment_id"]] = latest[0]
+    if not front and all(
+        first[row["assignment_id"]] == row["assignment_id"] for row in rows
+    ):
+        return rows
+
+    def place(row: RowMapping) -> tuple[int, int, int, int, int]:
+        assignment_id = row["assignment_id"]
+        moved = front.get(assignment_id)
+        return (
+            _STATUS_RANK[row["status"]],
+            moved is None,
+            -(moved or 0),
+            first[assignment_id],
+            assignment_id,
+        )
+
+    return sorted(rows, key=place)
+
+
+def _paused(row: RowMapping) -> dict[str, Any]:
+    """A row read with ``pause_columns`` as the fields of ``Assignment`` and
+    ``TaskSummary``."""
+    values = dict(row)
+    values["pause_causes"] = tuple(pause_causes(values))
+    del values["report_held"], values["lead_paused"]
+    return values
+
+
 def _assignment(row: RowMapping) -> Assignment:
-    return Assignment(**row)
+    return Assignment(**_paused(row))
 
 
 ReviewReason = Literal["source_changed"]
@@ -280,6 +499,21 @@ def source_obligation_documents(
     )
 
 
+def unopened_tasks(project_id: int, document_id: str) -> tuple[Any, ...]:
+    """The annotation tasks on a version that ``move_waiting_tasks`` moves:
+    nobody ever opened them, they are not paused and not from proposals."""
+    return (
+        AssignmentRow.project_id == project_id,
+        AssignmentRow.document_id == document_id,
+        AssignmentRow.task == "annotate",
+        AssignmentRow.revoked_at.is_(None),
+        AssignmentRow.status == "open",
+        AssignmentRow.held.is_(False),
+        AssignmentRow.active_round_id.is_(None),
+        AssignmentRow.annotation_mode != "proposals",
+    )
+
+
 def move_waiting_tasks(
     conn: Connection,
     actor: Actor,
@@ -287,9 +521,15 @@ def move_waiting_tasks(
     from_document_id: str,
     to_document_id: str,
     now: datetime,
+    *,
+    waiting_only: bool = True,
 ) -> None:
     """Waiting tasks follow a correction of their version, so that they open
     on the accepted text without a lead step (issue 213).
+
+    With ``waiting_only=False`` (an editorial correction, issue 453) every
+    task nobody opened follows, also on an accepted version: the new version
+    has the status of the one it corrects, so nothing waits for a review.
 
     Only tasks nobody ever opened: no draft or round exists to carry, so the
     assignment itself moves and keeps its id. Started work, paused tasks and
@@ -297,26 +537,20 @@ def move_waiting_tasks(
     R10) stay with the lead's "Handle text change". The caller holds the
     project lock and has written the status of ``from_document_id``.
     """
-    rule_on = conn.execute(
-        select(ProjectRow.annotate_accepted_translations_only).where(
-            ProjectRow.id == project_id
-        )
-    ).scalar_one()
-    variants = load_variants(conn, project_id, from_document_id)
-    if not rule_on or not annotation_waits(variants[from_document_id], variants.get):
-        return
+    if waiting_only:
+        rule_on = conn.execute(
+            select(ProjectRow.annotate_accepted_translations_only).where(
+                ProjectRow.id == project_id
+            )
+        ).scalar_one()
+        variants = load_variants(conn, project_id, from_document_id)
+        if not rule_on or not annotation_waits(
+            variants[from_document_id], variants.get
+        ):
+            return
     moved = conn.execute(
         update(AssignmentRow)
-        .where(
-            AssignmentRow.project_id == project_id,
-            AssignmentRow.document_id == from_document_id,
-            AssignmentRow.task == "annotate",
-            AssignmentRow.revoked_at.is_(None),
-            AssignmentRow.status == "open",
-            AssignmentRow.held.is_(False),
-            AssignmentRow.active_round_id.is_(None),
-            AssignmentRow.annotation_mode != "proposals",
-        )
+        .where(*unopened_tasks(project_id, from_document_id))
         .values(
             document_id=to_document_id,
             workflow_revision=AssignmentRow.workflow_revision + 1,
@@ -851,12 +1085,45 @@ class AssignmentService:
             raise DomainError("ASSIGNMENT_EXISTS", {"reason": "lead_correction_open"})
 
     @staticmethod
+    def _require_no_typo_fix(
+        conn: Connection, project_id: int, document_id: str
+    ) -> None:
+        """A version a lead fixed typos in takes no further review: the fix
+        is the text to review (``VARIANT_REVIEW_STALE`` names it). A review
+        of the old text would never reach the fix."""
+        fix = conn.execute(
+            select(DocumentRow.document_id, DocumentRow.version)
+            .join(
+                EditorialCorrectionRow,
+                (EditorialCorrectionRow.project_id == DocumentRow.project_id)
+                & (EditorialCorrectionRow.document_id == DocumentRow.document_id),
+            )
+            .where(
+                EditorialCorrectionRow.project_id == project_id,
+                EditorialCorrectionRow.previous_document_id == document_id,
+            )
+            .limit(1)
+        ).first()
+        if fix is not None:
+            raise DomainError(
+                "VARIANT_REVIEW_STALE",
+                {
+                    "reason": "typos_fixed",
+                    "document_id": fix.document_id,
+                    "version": fix.version,
+                },
+            )
+
+    @staticmethod
     def _require_annotation_slot(
         conn: Connection, project: RowMapping, document_id: str
     ) -> None:
         """A new annotate assignment needs a free "annotations per text" slot."""
-        # Per version on purpose (plan review R25).
-        limit = int(project["annotations_per_text"])
+        # Per version on purpose (plan review R25); the text's own limit
+        # when it has one (issue 422).
+        limit = effective_per_text(
+            conn, project["id"], document_id, int(project["annotations_per_text"])
+        )
         held = held_annotations(conn, project["id"], [document_id])[document_id]
         if held >= limit:
             raise DomainError(
@@ -907,6 +1174,7 @@ class AssignmentService:
             return existing
         if task == "translation_review":
             self._require_no_open_lead_correction(conn, project["id"], document_id)
+            self._require_no_typo_fix(conn, project["id"], document_id)
         if task == "annotate":
             self._require_annotation_slot(conn, project, document_id)
         eligibility = self.check_assignable(
@@ -1011,61 +1279,99 @@ class AssignmentService:
             ).scalar_one()
             project = self._prepare(conn, actor, key, target)
             old = self._locked(conn, assignment_id)
-            if old["status"] != "submitted":
-                raise DomainError("ASSIGNMENT_NOT_SUBMITTED")
-            # A discarded version takes no work, reopened work included.
-            if (
-                conn.execute(
-                    select(DiscardedVariantRow.document_id).where(
-                        DiscardedVariantRow.project_id == project["id"],
-                        DiscardedVariantRow.document_id == old["document_id"],
-                    )
-                ).first()
-                is not None
-            ):
-                raise DomainError("NOT_IN_WORK_PLAN")
-            if old["lead_correction"]:
-                # A submitted correction made a newer version (FD3, FD4).
-                raise DomainError(
-                    "LEAD_CORRECTION_NOT_AVAILABLE", {"reason": "not_newest"}
+            refusal = self.reopen_refusal(conn, project, old)
+            if refusal is not None:
+                raise refusal
+            self.reopen_locked(conn, actor, project, old, reason, self._now())
+            return self._get(conn, assignment_id)
+
+    @classmethod
+    def reopen_refusal(
+        cls, conn: Connection, project: RowMapping, old: RowMapping
+    ) -> DomainError | None:
+        """Why ``old`` (locked, not revoked) cannot be reopened, else None.
+
+        Shared with the bulk Reopen of Documents (issue 336), whose preview
+        lists the refused tasks instead of failing.
+        """
+        if old["status"] != "submitted":
+            return DomainError("ASSIGNMENT_NOT_SUBMITTED")
+        # A discarded version takes no work, reopened work included.
+        if (
+            conn.execute(
+                select(DiscardedVariantRow.document_id).where(
+                    DiscardedVariantRow.project_id == project["id"],
+                    DiscardedVariantRow.document_id == old["document_id"],
                 )
-            self._require_target(conn, project, target, cast(Task, old["task"]))
+            ).first()
+            is not None
+        ):
+            return DomainError("NOT_IN_WORK_PLAN")
+        if old["lead_correction"]:
+            # A submitted correction made a newer version (FD3, FD4).
+            return DomainError(
+                "LEAD_CORRECTION_NOT_AVAILABLE", {"reason": "not_newest"}
+            )
+        try:
+            cls._require_target(conn, project, old["user_id"], cast(Task, old["task"]))
             if old["task"] == "translation_review":
-                self._require_no_open_lead_correction(
+                cls._require_no_open_lead_correction(
                     conn, project["id"], old["document_id"]
                 )
-            now = self._now()
+                cls._require_no_typo_fix(conn, project["id"], old["document_id"])
+        except DomainError as refusal:
+            return refusal
+        return None
+
+    @classmethod
+    def reopen_locked(
+        cls,
+        conn: Connection,
+        actor: Actor,
+        project: RowMapping,
+        old: RowMapping,
+        reason: str | None,
+        now: datetime,
+        *,
+        via: str | None = None,
+    ) -> None:
+        """Reopen ``old`` after ``reopen_refusal`` passed, under the project
+        lock. ``via`` names a bulk action in the audit entry."""
+        assignment_id = old["id"]
+        conn.execute(
+            update(AssignmentRow)
+            .where(AssignmentRow.id == assignment_id)
+            # Issue 268: not started again until the first save from here.
+            .values(status="reopened", started_at=None, updated_at=now)
+        )
+        if old["task"] == "translation_review":
+            cls._restart_review_draft(conn, project["id"], old, now)
+        if old["active_round_id"] is not None:
+            from ontotator.storage.workflow_tables import WorkRoundStateRow
+
+            conn.execute(
+                update(WorkRoundStateRow)
+                .where(WorkRoundStateRow.round_id == old["active_round_id"])
+                .values(state="editable", revision=WorkRoundStateRow.revision + 1)
+            )
             conn.execute(
                 update(AssignmentRow)
                 .where(AssignmentRow.id == assignment_id)
-                .values(status="reopened", updated_at=now)
+                .values(workflow_revision=AssignmentRow.workflow_revision + 1)
             )
-            if old["task"] == "translation_review":
-                self._restart_review_draft(conn, project["id"], old, now)
-            if old["active_round_id"] is not None:
-                from ontotator.storage.workflow_tables import WorkRoundStateRow
-
-                conn.execute(
-                    update(WorkRoundStateRow)
-                    .where(WorkRoundStateRow.round_id == old["active_round_id"])
-                    .values(state="editable", revision=WorkRoundStateRow.revision + 1)
-                )
-                conn.execute(
-                    update(AssignmentRow)
-                    .where(AssignmentRow.id == assignment_id)
-                    .values(workflow_revision=AssignmentRow.workflow_revision + 1)
-                )
-            record_audit(
-                conn,
-                actor,
-                "assignment.reopen",
-                target_type="assignment",
-                target_id=assignment_id,
-                project_id=project["id"],
-                details={"reason": reason},
-                at=now,
-            )
-            return self._get(conn, assignment_id)
+        details: dict[str, Any] = {"reason": reason}
+        if via is not None:
+            details["via"] = via
+        record_audit(
+            conn,
+            actor,
+            "assignment.reopen",
+            target_type="assignment",
+            target_id=assignment_id,
+            project_id=project["id"],
+            details=details,
+            at=now,
+        )
 
     @staticmethod
     def _restart_review_draft(
@@ -1178,9 +1484,7 @@ class AssignmentService:
 
     def my_tasks(self, user_id: int) -> List[TaskSummary]:
         from ontotator.application.problem_report_views import answered
-        from ontotator.application.translation_reviews import (
-            failed_translation_checks,
-        )
+        from ontotator.application.translation_reviews import version_failed_checks
         from ontotator.authz.visibility import qualifying_assignment
         from ontotator.domain.variants import resolve_translation_lineage
         from ontotator.storage.workflow_tables import (
@@ -1194,8 +1498,7 @@ class AssignmentService:
                 AssignmentRow.id.label("assignment_id"),
                 AssignmentRow.active_round_id,
                 AssignmentRow.workflow_revision,
-                AssignmentRow.held,
-                AssignmentRow.hold_reason,
+                *pause_columns(),
                 ProjectRow.project_key,
                 ProjectRow.name.label("project_name"),
                 AssignmentRow.document_id,
@@ -1219,19 +1522,13 @@ class AssignmentService:
             )
             .join(UserRow, UserRow.id == AssignmentRow.user_id)
             .where(qualifying_assignment(user_id))
-            .order_by(
-                case(
-                    {"reopened": 0, "in_progress": 1, "open": 2, "submitted": 3},
-                    value=AssignmentRow.status,
-                ),
-                DocumentRow.position.asc().nulls_last(),
-                ProjectRow.project_key,
-                AssignmentRow.document_id,
-                AssignmentRow.id,
-            )
+            # Issue 488: within a status, the order of assignment (never the
+            # text's upload position); refined by ``_in_task_order``. The
+            # editor's "next task" follows this list (frontend ``nextOpenTask``).
+            .order_by(case(_STATUS_RANK, value=AssignmentRow.status), AssignmentRow.id)
         )
         with self.db.transaction() as conn:
-            rows = list(conn.execute(query).mappings())
+            rows = _in_task_order(conn, user_id, list(conn.execute(query).mappings()))
             # Issue 213: unsubmitted annotation tasks under the rule may wait.
             ruled: dict[str, int] = dict(
                 conn.execute(
@@ -1314,6 +1611,22 @@ class AssignmentService:
                     if r["task"] == "review"
                     and r["active_round_id"]
                     and r["status"] != "submitted"
+                ],
+            )
+            second_reviews = second_review_requests(
+                conn,
+                {
+                    r["assignment_id"]: r["active_round_id"]
+                    for r in rows
+                    if r["task"] == "translation_review"
+                },
+            )
+            query_answers = query_answer_times(
+                conn,
+                [
+                    r["assignment_id"]
+                    for r in rows
+                    if r["task"] == "translation_review" and r["status"] == "submitted"
                 ],
             )
             reports = {
@@ -1427,12 +1740,15 @@ class AssignmentService:
                 failed: int | None = None
                 if row["task"] == "translation_review":
                     project_variants = variants[row["project_key"]]
+                    reviewed = project_variants[row["document_id"]]
                     ancestor, original = resolve_translation_lineage(
-                        project_variants[row["document_id"]], project_variants.get
+                        reviewed, project_variants.get
                     )
                     source, target = original.language, row["language"]
                     try:
-                        failed = len(failed_translation_checks(ancestor.translation))
+                        # Only of the reviewed version itself: a later version
+                        # was never checked automatically.
+                        failed = len(version_failed_checks(reviewed, ancestor))
                     except ValidationError:
                         # A malformed stored run must not hide every task.
                         failed = None
@@ -1440,9 +1756,10 @@ class AssignmentService:
                     row["project_key"], {}
                 )
                 for_lead = (row["project_key"], row["document_id"]) in superseded
+                second = second_reviews.get(row["assignment_id"])
                 result.append(
                     TaskSummary(
-                        **row,
+                        **_paused(row),
                         waiting_for_translation_review=waiting and not for_lead,
                         waiting_for_lead=waiting and for_lead,
                         translation_finished=row["task"] == "annotate"
@@ -1464,6 +1781,9 @@ class AssignmentService:
                             if (reopen := reopens.get(str(row["assignment_id"])))
                             else {}
                         ),
+                        second_review_at=second[0] if second else None,
+                        second_review_reason=second[1] if second else None,
+                        query_answered_at=query_answers.get(row["assignment_id"]),
                     )
                 )
             return result

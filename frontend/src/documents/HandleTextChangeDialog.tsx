@@ -5,7 +5,7 @@ import { errorMessage } from "../admin/errors";
 import { personName } from "../admin/assignSummary";
 import { Button, ConfirmDialog, Dialog } from "../ui";
 import {
-  CHECKING, finishDescription, finishingMessage, finishLabel, handleTitle, heldLine, moveDescription, movedMessage, moveLabel, nextAfterWithdrawLine,
+  CHECKING, finishDescription, finishingMessage, finishLabel, handleTitle, heldLine, leadPausedLine, moveDescription, movedMessage, moveLabel, nextAfterWithdrawLine,
   CHOOSE_WITHDRAW, noTargetOptionLine, noTargetProposalsLine, notNewerLine, openWorkLine, RELOADED_MESSAGE, unplacedLine, WITHDRAW_LABEL, withdrawDescription, withdrawnMessage,
 } from "./textChangeText";
 
@@ -67,6 +67,8 @@ export function HandleTextChangeDialog(props: HandleTextChangeDialogProps): JSX.
   const from = `v${item?.version ?? 1}`;
   const to = `v${target?.version ?? (item?.version ?? 1) + 1}`;
   const held = item?.held ?? false;
+  // A report is decided first; a lead pause alone (issue 464) is ended by releasing the text.
+  const byReport = !(item?.pause_causes ?? []).includes("lead") || (item?.pause_causes ?? []).includes("report");
   const assignmentId = step.assignment_id ?? item?.assignment_id ?? null;
   const targetId = step.document_id ?? target?.document_id ?? "";
 
@@ -86,6 +88,7 @@ export function HandleTextChangeDialog(props: HandleTextChangeDialogProps): JSX.
   const [reload, setReload] = useState(0);
   const { body, retried } = useRetryFocus(preview, previewError);
   const retry = () => { retried(); setReload(value => value + 1); };
+  const [checking, setChecking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [unreviewed, setUnreviewed] = useState(false);
@@ -94,12 +97,18 @@ export function HandleTextChangeDialog(props: HandleTextChangeDialogProps): JSX.
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
   useEffect(() => {
-    if (held || notNewer || assignmentId === null || !targetId) return;
+    // No preview for this state (also when it changes during a request): nothing stays busy or kept.
+    if (held || notNewer || assignmentId === null || !targetId) { setChecking(false); setPreview(null); setPreviewError(null); return; }
     let active = true;
-    setPreview(null); setPreviewError(null);
+    // Missing proposals stay shown while Retry reloads: Move and Finish stay disabled and Move does not
+    // flash selected before the answer (issue 419). Retry shows busy and keeps focus.
+    setPreview(null); setPreviewError((current: unknown) => isNoTargetProposals(current) ? current : null);
+    setChecking(true);
     void api.previewTextChange(projectKey, { assignment_id: assignmentId, target_document_id: targetId }).then(
-      value => { if (active) setPreview(value); },
-      error => { if (active) setPreviewError(error); },
+      value => { if (active) { setPreview(value); setPreviewError(null); setChecking(false); } },
+      // A Retry that fails on the network or the server says nothing about the proposals: the reason, its Retry
+      // and the disabled Move and Finish stay.
+      error => { if (active) { setPreviewError((current: unknown) => isNoTargetProposals(current) && isTransientError(error) ? current : error); setChecking(false); } },
     );
     return () => { active = false; };
   }, [projectKey, assignmentId, targetId, held, notNewer, reload]);
@@ -153,14 +162,14 @@ export function HandleTextChangeDialog(props: HandleTextChangeDialogProps): JSX.
     <div className="text-change-dialog" ref={body}>
       <p>{openWorkLine(person, from, to)}</p>
       {noTarget && !held && <p className="text-change-error"><span role="alert">{noTargetProposalsLine(to)}</span>{" "}
-        <Button size="sm" data-retry onClick={retry}>Retry</Button></p>}
+        <Button size="sm" data-retry loading={checking} onClick={retry}>Retry</Button></p>}
       {withdrawOnly && !held && <>
         <p>{notNewer ? notNewerLine(from, to) : `${errorMessage(previewError)} That is why Withdraw is the only choice.`}</p>
         <p>{nextAfterWithdrawLine(to)}</p>
       </>}
       {held ? <p className="text-change-held">
-        {heldLine(person)}{" "}
-        {props.onDecideReport && <Button size="sm" onClick={props.onDecideReport}>Decide on report…</Button>}
+        {byReport ? heldLine(person) : leadPausedLine(person)}{" "}
+        {byReport && props.onDecideReport && <Button size="sm" onClick={props.onDecideReport}>Decide on report…</Button>}
       </p> : <fieldset className="text-change-options">
         <legend className="visually-hidden">How to continue</legend>
         {options.map(option => {

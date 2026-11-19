@@ -96,12 +96,18 @@ class Version:
     translation_status: str | None
     position: int | None
     latest_decision: str | None = None
+    # Made by an editorial correction (issue 453) of a version that counts,
+    # or reviewed itself (``work_plan_store.counted_typo_fixes``).
+    typo_fix_counts: bool = False
 
     @property
     def not_newer(self) -> bool:
-        """A correction whose latest review is rejected or queried is not newer."""
+        """A correction whose latest review is rejected or queried is not
+        newer. A typo fix counts like the version it fixes: the fix of a
+        rejected or queried first version is the newest text of its chain."""
         return (
-            self.origin == "correction"
+            not self.typo_fix_counts
+            and self.origin == "correction"
             and self.translation_status == "reviewed"
             and self.latest_decision in NOT_NEWER
         )
@@ -128,6 +134,8 @@ class AssignmentFact:
     document_id: str
     task: str
     status: str
+    # Paused by any cause: a problem report, or the lead paused the text
+    # while the task is not submitted (issue 464; ``lead_paused`` below).
     held: bool
     revoked: bool
     pseudonym: str
@@ -146,6 +154,13 @@ class AssignmentFact:
     # Assigned before the translation review was accepted, confirmed by the
     # lead (audit ``assignment.unreviewed_translation``, spec 2026-10-25 §2).
     unreviewed_translation: bool = False
+    # Issue 268: a change was saved since the assignment was given or last
+    # reopened (``assignments.started_at``).
+    saved_since_reopen: bool = False
+    # The lead paused the text and this task is not submitted (issue 464).
+    lead_paused: bool = False
+    # Held by a problem report (the other cause of ``held``).
+    report_held: bool = False
 
 
 def base_chain_name(root: Version) -> str:

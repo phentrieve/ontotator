@@ -195,6 +195,24 @@ def test_expected_latest_version_conflict(world) -> None:
         assert conn.execute(select(GuidelineVersionRow.version)).scalars().all() == [1]
 
 
+def test_a_missing_expected_version_is_told_apart_from_a_conflict(world) -> None:
+    """Issue 486: versions exist and the request names none. The code stays
+    (older clients), the details say the field was empty; a wrong number is
+    still a plain conflict."""
+    upload(world, "Alpha", expected=None)
+    with pytest.raises(DomainError) as missing:
+        upload(world, "Beta", expected=None)
+    assert missing.value.code == "GUIDELINE_VERSION_CONFLICT"
+    assert missing.value.details == {
+        "latest_version": 1,
+        "reason": "expected_version_missing",
+    }
+    with pytest.raises(DomainError) as stale:
+        upload(world, "Beta", expected=2)
+    assert stale.value.details == {"latest_version": 1}
+    assert upload(world, "Beta", expected=1).version == 2
+
+
 def test_concurrent_uploads_serialize(world) -> None:
     upload(world, "Base", expected=None)
     start = Barrier(2)

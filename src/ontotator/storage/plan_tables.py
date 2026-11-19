@@ -1,6 +1,6 @@
 """Work plans per language version, translation acceptances and discards."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import (
@@ -124,3 +124,174 @@ class DiscardedVariantRow(Base):
         BigInteger, ForeignKey(f"{SCHEMA}.users.id")
     )
     discarded_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class TranslationVersionUploadRow(Base):
+    """A translation version a lead uploaded from the text card (issue 341 a).
+
+    Append-only, one row per uploaded version: who uploaded it and how the
+    text was made (``method``, with provider and model for a machine
+    translation). The version itself is an ordinary ``correction`` of
+    ``previous_document_id``.
+    """
+
+    __tablename__ = "translation_version_uploads"
+    __table_args__ = (
+        ForeignKeyConstraint(*_DOCUMENT_FK),
+        ForeignKeyConstraint(
+            ["project_id", "previous_document_id"],
+            [f"{SCHEMA}.documents.project_id", f"{SCHEMA}.documents.document_id"],
+        ),
+        UniqueConstraint("project_id", "document_id"),
+        CheckConstraint(
+            "method IN ('machine_translation', 'human_translation',"
+            " 'manual_correction')",
+            name="method",
+        ),
+        CheckConstraint(
+            "method <> 'machine_translation' OR provider IS NOT NULL",
+            name="provider_required",
+        ),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.projects.id")
+    )
+    document_id: Mapped[str]
+    previous_document_id: Mapped[str]
+    method: Mapped[str]
+    provider: Mapped[str | None]
+    model: Mapped[str | None]
+    made_on: Mapped[date | None]
+    made_by: Mapped[str | None]
+    note: Mapped[str | None]
+    uploaded_by: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.users.id")
+    )
+    uploaded_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class EditorialCorrectionRow(Base):
+    """A translation version made by a lead's editorial correction (issue 453).
+
+    Append-only, one row per corrected version: who corrected it, when and
+    why, and how many characters were inserted and deleted. The version
+    itself is an ordinary ``correction`` of ``previous_document_id`` with
+    that version's translation status.
+    """
+
+    __tablename__ = "translation_editorial_corrections"
+    __table_args__ = (
+        ForeignKeyConstraint(*_DOCUMENT_FK),
+        ForeignKeyConstraint(
+            ["project_id", "previous_document_id"],
+            [f"{SCHEMA}.documents.project_id", f"{SCHEMA}.documents.document_id"],
+        ),
+        UniqueConstraint("project_id", "document_id"),
+        CheckConstraint("btrim(reason) <> ''", name="reason_required"),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.projects.id")
+    )
+    document_id: Mapped[str]
+    previous_document_id: Mapped[str]
+    reason: Mapped[str]
+    inserted_characters: Mapped[int]
+    deleted_characters: Mapped[int]
+    corrected_by: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.users.id")
+    )
+    corrected_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class QueryDecisionRow(Base):
+    """A lead's decision on a translation review submitted as a query (issue 483).
+
+    Append-only, one row per decided review. ``kind``: ``reviewer_text`` (the
+    reviewer's proposed text, as the lead confirmed it, became the next
+    version, accepted) or ``unchanged`` (the queried version was accepted as
+    it is). ``document_id`` is the version the lead decided on (the queried
+    one, or its typo fix), ``accepted_document_id`` the version the decision
+    accepted. ``answer`` is what the lead wrote to the reviewer; ``edited``
+    says that the lead changed the reviewer's text before saving it.
+    """
+
+    __tablename__ = "translation_query_decisions"
+    __table_args__ = (
+        ForeignKeyConstraint(*_DOCUMENT_FK),
+        ForeignKeyConstraint(
+            ["project_id", "accepted_document_id"],
+            [f"{SCHEMA}.documents.project_id", f"{SCHEMA}.documents.document_id"],
+        ),
+        UniqueConstraint("review_id"),
+        CheckConstraint("kind IN ('reviewer_text', 'unchanged')", name="kind"),
+        CheckConstraint(
+            "kind <> 'unchanged' OR btrim(coalesce(answer, '')) <> ''",
+            name="answer_required",
+        ),
+        Index(
+            "ix_translation_query_decisions_project_accepted",
+            "project_id",
+            "accepted_document_id",
+        ),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.projects.id")
+    )
+    # The decided review (``translation_reviews.id``). No foreign key, as for
+    # every reference to a review: the review history refuses TRUNCATE by its
+    # own trigger, which a referencing table would pre-empt.
+    review_id: Mapped[int] = mapped_column(BigInteger)
+    document_id: Mapped[str]
+    accepted_document_id: Mapped[str]
+    kind: Mapped[str]
+    answer: Mapped[str | None]
+    edited: Mapped[bool] = mapped_column(server_default=text("false"))
+    decided_by: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.users.id")
+    )
+    decided_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class TextSettingRow(Base):
+    """Per-text settings of a language version (issue 422).
+
+    ``annotations_per_text`` replaces the project value for this text, as
+    target and as limit; NULL follows the project value. Not tied to a text
+    version: a corrected version keeps it.
+    """
+
+    __tablename__ = "text_settings"
+    __table_args__ = (
+        UniqueConstraint("project_id", "case_id", "language"),
+        CheckConstraint(
+            "annotations_per_text BETWEEN 1 AND 20", name="annotations_per_text"
+        ),
+        CheckConstraint(
+            "NOT paused OR (pause_reason IS NOT NULL AND paused_at IS NOT NULL)",
+            name="pause",
+        ),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.projects.id")
+    )
+    case_id: Mapped[str]
+    language: Mapped[str]
+    annotations_per_text: Mapped[int | None]
+    reason: Mapped[str | None]
+    updated_by: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.users.id")
+    )
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    # Lead pause (issue 464): the work on the text is paused, for every
+    # version and every task, also one assigned later. After a release the
+    # reason, the lead and the time stay as the record of the last pause.
+    paused: Mapped[bool] = mapped_column(server_default=text("false"))
+    pause_reason: Mapped[str | None]
+    paused_by: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.users.id")
+    )
+    paused_at: Mapped[datetime | None]

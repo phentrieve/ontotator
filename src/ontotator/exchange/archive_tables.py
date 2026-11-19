@@ -118,8 +118,16 @@ ARCHIVED: tuple[ArchivedTable, ...] = (
     ArchivedTable("draft_snapshots"),
     ArchivedTable("work_plans"),
     ArchivedTable("work_plan_rows"),
+    # Per-text "Annotations per text" (issue 422).
+    ArchivedTable("text_settings"),
     ArchivedTable("translation_acceptances"),
     ArchivedTable("discarded_variants"),
+    # Uploaded translation versions and how their text was made (issue 341 a).
+    ArchivedTable("translation_version_uploads"),
+    # Editorial corrections of translation versions (issue 453).
+    ArchivedTable("translation_editorial_corrections"),
+    # A lead's decisions on queried translation reviews (issue 483).
+    ArchivedTable("translation_query_decisions"),
     ArchivedTable("final_selections"),
     ArchivedTable("final_selection_events"),
     ArchivedTable("export_selection_snapshots"),
@@ -175,6 +183,18 @@ EXTRA_REFERENCES: tuple[ExtraReference, ...] = (
         "payload",
         ("producer", "review_id"),
         "translation_reviews",
+        orphans=True,
+    ),
+    # A query decision names the review it decides (issue 483).
+    ExtraReference(
+        "translation_query_decisions", "review_id", (), "translation_reviews"
+    ),
+    # A re-anchoring job may also come from a lead's query decision.
+    ExtraReference(
+        "jobs",
+        "payload",
+        ("producer", "decision_id"),
+        "translation_query_decisions",
         orphans=True,
     ),
     # The audit trail records the rows it is about; a row the archive lacks

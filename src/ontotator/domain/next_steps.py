@@ -1,7 +1,8 @@
 """Next step of a Documents row (spec "Concepts: Next step"), pure.
 
 Rules 1-11 (with 4a, and 3a, 3b, 6a of the documents overview's text
-changes, V5) are checked in precedence order; ``derive_steps``
+changes, V5) are checked in precedence order (rule 9, open annotation
+work, before rule 8, room for another annotator); ``derive_steps``
 returns every matching rule, the first is the row's next step. "In plan"
 (Review or Annotate on) is its own fact: a row in the plan always has at
 least one step, a row outside it has none, except an undecided row (plan
@@ -355,7 +356,19 @@ def derive_steps(facts: StepFacts, *, row: object = None) -> list[Step]:
                 (),
             )
         )
+    # 9: annotation open (a finish_then_carry
+    # assignment on the old version included). Checked before rule 8: a row
+    # with an open task waits on its person, also below "Annotations per
+    # text" (an upper limit, not a quorum); rule 8 then follows as the
+    # lead's secondary step. ``open_annotations`` already
+    # counts that open assignment; ``finishing`` keeps the rule self-contained
+    # for facts built without it.
+    if facts.open_annotations or facts.finishing:
+        steps.append(
+            Step("annotation_in_progress", "in_progress", "annotation", None, ())
+        )
     # 8: annotation stage with fewer assignments than "Annotations per text";
+    # the row's next step only while nobody has an open annotation (rule 9);
     # people whose old-version work waits for the lead count too (VD22).
     if (
         facts.annotate
@@ -374,14 +387,6 @@ def derive_steps(facts: StepFacts, *, row: object = None) -> list[Step]:
                 assigned=facts.annotation_assignments if counted else None,
                 target=facts.per_text if counted else None,
             )
-        )
-    # 9: annotation open (a finish_then_carry
-    # assignment on the old version included). ``open_annotations`` already
-    # counts that open assignment; ``finishing`` keeps the rule self-contained
-    # for facts built without it.
-    if facts.open_annotations or facts.finishing:
-        steps.append(
-            Step("annotation_in_progress", "in_progress", "annotation", None, ())
         )
     # 9a: a consolidation open.
     if facts.open_consolidations:
@@ -419,5 +424,6 @@ def derive_steps(facts: StepFacts, *, row: object = None) -> list[Step]:
 
 def segment_of(step: Step) -> Segment | None:
     """Bar segment: decision (decide_plan, rules 1-5, 3a, 3b, 4a, fallback),
-    assign (6, 6a, 8), progress (7, 9, 10)."""
+    assign (6, 6a, 8), progress (7, 9, 10). A row below the limit with an
+    open annotation is in progress (rule 9 comes first)."""
     return _SEGMENTS[step.kind]

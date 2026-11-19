@@ -26,6 +26,8 @@ The editor has three columns:
 | Middle: the text | The text you annotate. Marked passages are highlighted. |
 | Right: details | The selected finding: **Values**, **Modifiers**, **Note**, its mentions and the term search. With nothing selected, the **New finding** panel opens here when you mark text. |
 
+The findings in the list follow the text: a finding stands where its first marked passage begins, so a finding you add in the middle of the text appears between its neighbours, not at the end. Findings without a text span come last. Carried findings stay at the top of the list, in the order of the earlier round.
+
 To make the findings list wider or narrower, drag the divider between the findings list and the text (**Resize findings column**), or focus it and press `←` or `→`. On a narrow screen, the tabs **Findings**, **Document** and **Details** switch between the columns; **Back to text** returns to the text.
 
 The toolbar shows the text name, its language and the mode:
@@ -45,7 +47,7 @@ The **More** menu holds **Work rounds**, **Report a text problem…**, **Report 
 
 Open the guidelines with **More** › *Guidelines v2* or, the first time, with the button in the notice, for example *Read guidelines v2*. On a wide screen they open in the right column, so the text keeps its place in the middle:
 
-- The right column gets two tabs, **Details** and *Guidelines v2*. Click a tab to switch, or focus a tab and press `←` or `→`.
+- The right column gets two tabs, **Details** and *Guidelines v2* (*Guidelines 3.1 (v2)* when the version has the lead's own number). Click a tab to switch, or focus a tab and press `←` or `→`.
 - Selecting a finding in the list or in the text keeps the guidelines in front. The decision keys `1`, `2` and `0` act on the selected proposal from there.
 - When you mark text, use the term search (`/`) or the values (`V`), or a decision needs a note (`4`, **Unresolved**), **Details** comes to the front by itself. The guidelines tab stays until you close it.
 - **All versions** opens the guidelines page in a new tab. **Close**, the ✕ next to the tabs or `Esc` closes the guidelines and returns to **Details**.
@@ -65,7 +67,7 @@ If the text was changed elsewhere, a **Revision conflict** notice appears; click
 | Diagonal hatching | A finding with the value **Absent**. |
 | Thicker underline | Overlapping findings. |
 | Frame | The finding you point at or selected. |
-| **AI** | Proposed by a tool. Point at the badge to see which tool. |
+| **AI** | Proposed by a tool. Point at the badge to see which tool. A proposal carried over to a corrected text version names the tool that proposed it. |
 | **Pending** | A proposal you have not decided yet. Decided proposals show **Confirmed**, **Rejected**, **Replaced** or **Unresolved**. |
 | **Being replaced** | A proposal with your copy from **Edit & Replace** that has no changes yet. |
 | **Defaults to confirm** | The finding still has prefilled values you have not confirmed. |
@@ -103,11 +105,14 @@ What for: record a term that the text mentions.
 
 1. Select the words in the text with the mouse. With the keyboard: click before the first word (or press Tab until the text has focus), hold Shift and move with the arrow keys.
 2. The panel **New finding** shows the marked text. To adjust it, drag the edge handles at its start and end, or focus a handle and press `←` or `→`.
+   - On a phone, the text stays where it is and a **New finding** bar appears at the bottom of the screen. Tap **Choose term** to go on to the term search, or **Discard**. On a phone held sideways there is no bar: the panel **New finding** with the term search stands beside the text.
 3. **Search term** is already filled with the marked words, and the hits are listed under **Terms**. Change the words, or type a code such as `HP:0001250`, if the right term is not among them.
 4. Press Enter to add the top hit, or click a hit. Enter adds nothing when the top hit is a **Weak match**: click a hit, or choose it with `↓` and press Enter.
 5. The finding is created with the project's prefilled values. [Confirm or change them](#set-values-and-confirm-defaults).
 
 To drop a mark without adding a finding, click **Discard** or press Esc.
+
+To look the marked words up elsewhere, for example in a web search, click **Copy text** or press `Ctrl+C` (`Cmd+C` on a Mac). Both copy the marked text of the new finding, or the selected (otherwise the first) mention of the selected finding or tool proposal; parts of a mention with words in between are joined by a space. Text you have selected in a field is copied as usual. **Copy text** is also at each mention under **Mentions**.
 
 ## Search a term
 
@@ -134,6 +139,12 @@ What for: pick a broader or narrower term than the one you have.
 2. Click a term in the tree. Its **Synonyms**, **Translated names** and other parents (**Also under**) are shown.
 3. Click **Use this term** to give the selected finding this term.
 4. Click **Close tree**.
+
+In a wide window the tree sits under the annotation panel. To give the tree more or less room, drag the divider between the two (**Resize ontology tree**) up or down, or focus it and press `↑` or `↓`. A double click or `Enter` restores the usual split. The height is kept in this browser.
+
+To give the tree more room, click **Hide details** next to the name of the term below the tree: only its name and code stay, on one line. **Show details** brings the definition, synonyms and other parents back. Your choice is kept in this browser.
+
+The tree follows your work: select another finding and it opens at that finding's term. After **Use this term** it stays open and marks the new term as the current one. While you search a term for a new finding it steps aside and comes back afterwards. Select a proposal or a reference, or clear the selection, and it closes.
 
 ## Set values and confirm defaults
 
@@ -238,8 +249,8 @@ What for: check a tool's proposals one by one and add what the tool missed. Your
 Tools make mistakes. Check every proposal as if you had marked it yourself: the marked text, the term and every value. Negations are a common error: a proposal for "Keine Krampfanfälle" (no seizures) with **Present** is wrong.
 
 1. The list **Review Proposals** shows every proposal. Your additions are under **Your own findings**.
-2. Select a proposal, or move with `j` and `k`. The text shows where it was found.
-3. Check the marked text, the term and each value.
+2. Select a proposal, or move with `j` and `k`. The text shows where it was found. On a phone, where the details replace the text, the details show the sentence around the quoted passage, with the passage marked.
+3. Check the marked text, the term and each value. To look the passage up elsewhere, click **Copy text** next to the quoted passage in the details, or press `Ctrl+C` (`Cmd+C` on a Mac): both copy the passage of the selected proposal, as for a finding ([Mark text and add a finding](#mark-text-and-add-a-finding)). A proposal with several mentions has **Copy text** at each.
 4. Decide:
    - **Confirm**: the passage, term and all values are right. Values tagged **Defaulted** were not set by the tool but prefilled; Confirm accepts them as shown, so check them too.
    - **Reject**: the proposal is wrong and nothing should replace it.
@@ -273,6 +284,16 @@ In a task from proposals, your decisions on the proposals are carried to the new
 
 A row **Not on this text** means the finding could not be placed in this text. Select it and choose one: **Mark in text**, **Link to an existing finding**, or **Dismiss with reason…**. A finding re-created with **Mark in text** keeps the original's term, values and note.
 
+### See what changed since the earlier version
+
+When the carried work comes from an earlier version of the text, for example after **Carry to v2…** or **Handle text change…**, the line above the text offers **Show changes since** v1 (with the number of that version). It is off by default.
+
+1. Tick **Show changes since** v1 (or press `Space` on it). Each changed passage gets a dashed frame, and added text is underlined. The line next to it counts the passages, for example *1 passage changed*.
+2. Click **Next ›** or **‹ Previous** to scroll to the next or previous passage; it gets a solid frame and the line reads, for example, *1 passage changed · 1 of 1*.
+3. Where text was removed, a small **−** marker stands in the text. Point at it or move to it with `Tab` to see the earlier wording, with the removed words struck through. `Esc` closes it. On a phone or tablet, tap the marker: the earlier wording stays until you tap the marker again or tap somewhere else.
+
+The marks are only shown over the text: the text stays exactly this version, so you can mark text, add or re-create findings and check carried findings as usual while they are on. A changed sentence the tool did not propose a finding for may need a new finding. The marks compare the two versions word by word, while **Check needed** is decided from the exact characters under each finding, so a finding inside a marked passage is not always marked **Check needed**, and the other way round. Untick the box to hide the marks.
+
 ![A carried finding with What to check and the Mark as checked button](images/annotator-carried-finding.png)
 
 ## Re-create findings after a text correction
@@ -286,6 +307,8 @@ What for: move your findings to the corrected text after the text got a new vers
 
 If the finding no longer fits, click **Dismiss with reason**, fill in **Reason for dismissal** and click **Save dismissal**.
 
+To see which passages the correction changed, tick **Show changes since** v1 above the text ([See what changed since the earlier version](#see-what-changed-since-the-earlier-version)).
+
 ## Submit the text
 
 What for: hand your finished work to the lead.
@@ -296,7 +319,7 @@ Before you start: submitting says you checked the whole text for further finding
 2. Click **Finish & submit text**. While items are open, the button shows how many. The full editor of a consolidation has no submit button; see [Work in the full editor](consolidator.md#work-in-the-full-editor).
 3. A dialog named after the text, for example *Submit CASE-1 en?*, first counts the findings and names those you left **Unresolved**, for example *34 findings, 1 unresolved, nothing open.* Then it lists what is still open: **Carried findings to check**, **Findings that need attention**, **Findings after text correction**, **Proposals not decided**. Click **Go to** to fix an item.
 4. When nothing blocks, click **Submit text**. If only warnings are left, the button reads **Submit with** and the number of warnings; see [Confirm values and acknowledge warnings](#confirm-values-and-acknowledge-warnings-in-the-submit-dialog) first.
-5. The next open task opens, preferably one of the same kind (another review after a review), or **My tasks** if none is left. Paused tasks are passed over. To see what you sent, click **View result** in the message.
+5. The next open task opens, preferably one of the same kind (another review after a review), or **My tasks** if none is left. It is the first such task in the order of **My tasks** ([See your tasks](getting-started.md#see-your-tasks)). Paused tasks are passed over. To see what you sent, click **View result** in the message.
 
 The task is now read-only. To change it later, [start a new work round](#start-a-new-work-round) yourself under **More** › **Work rounds**; you do not need the lead for that. The submit dialog says the same.
 
@@ -342,6 +365,8 @@ What happens to your earlier work:
 - The lead sees your task as not submitted, and a new consolidation cannot start from the replaced submission. The lead can still read it.
 - If the lead had already accepted your earlier submission as the final result, the lead is asked to review that choice.
 - You must [submit](#submit-the-text) the new round to hand in your work again.
+- While your submission is being consolidated, you cannot continue from it. The dialog then shows no choice and no button under **Start a new round**, only: *Your submission is being consolidated, so you cannot continue from it now. Ask your project lead.* The lead can finish the consolidation or withdraw it; after that the dialog offers your submission again.
+- In a task from tool proposals you cannot continue from a submission yourself. The dialog says: *In a task from tool proposals you cannot continue from a submission yourself. Ask your project lead to start a new round.*
 
 ## Report a text problem
 
@@ -359,7 +384,7 @@ The menu item reads **Text problems** when there is something to see, for exampl
 
 What for: continue work after a report, or take a report back.
 
-A paused task shows a one-line banner *Task paused: …* above the text with the reason. Click **Show more** to read all of it, **Show less** to fold it again.
+A paused task shows a one-line banner *Task paused: …* above the text with the reason. Click **Show more** to read all of it, **Show less** to fold it again. A term search in a task that was paused while you had it open is answered with the reason of the pause, not with terms.
 
 1. Open **More**, then **Text problems**. Your report card shows its state and your task's state.
 2. Choose one:
@@ -367,6 +392,15 @@ A paused task shows a one-line banner *Task paused: …* above the text with the
    - To take the report back: click **Withdraw report…**, fill in **Why are you withdrawing it?** and click **Withdraw report**. Your task is no longer paused by this report.
 
 When the lead answers, the task shows a banner with **Open the answer**, and **My tasks** shows **Answer to your report**. If a project lead paused the task, only a project lead can release the pause.
+
+### A task paused by the lead
+
+The lead can pause the work on a text, for example while the text is being clarified. Your task stays in **My tasks**, marked **Paused by lead** with the lead's reason. You can open and read it; a banner *Paused by lead: …* above the text gives the reason. You cannot save or submit until the lead releases the text. Then the mark goes away and you continue where you stopped. There is nothing for you to do meanwhile.
+
+- If the pause arrives while you have the task open, the next thing you do there (a term search, a saved change, a submit) is refused and the banner appears. In a narrow window or on a phone, where one pane shows at a time, the **New finding** panel repeats the reason (*Paused by lead: … Nothing can be saved now. What you marked is kept until you leave the task.*), because the banner is above the pane you work in. Nothing you saved is lost. What you had typed but not saved stays on the screen until you leave the task; when you leave, the editor asks before it discards it.
+- A task you are assigned on a paused text is paused from the start.
+- A task can be paused by the lead and by a problem report at the same time. **My tasks** then shows **Paused** with the report's reason and **Paused by lead** with the lead's. Each is released on its own, and the task opens when neither is left: after you resume your report, the task may still be **Paused by lead**.
+- Your submitted tasks are not paused.
 
 ## Review a translation
 
@@ -392,24 +426,63 @@ Then decide:
 | --- | --- | --- |
 | **Accepted unchanged** | The translation is right as it stands. | It becomes available for annotation. Annotation tasks already assigned open by themselves. |
 | **Accepted with corrections** | You corrected it and it is now right. Editing chooses this for you. | Your corrected text is saved as a new text version, which is accepted for annotation. |
-| **Query** | The meaning may differ clinically and you are not sure. | Not accepted. The lead reads your rationale and decides. Annotation tasks already assigned keep waiting. |
+| **Query** | The meaning may differ clinically and you are not sure. | Not accepted. The lead reads your rationale and decides: they take the text you proposed, or accept the translation as it is, and answer you. Annotation tasks already assigned keep waiting until then. |
 | **Rejected** | The translation changes the clinical meaning. | Not accepted. The lead decides: a new review, a correction or discarding it. Annotation tasks already assigned keep waiting. |
+
+A problem in the source that does not affect the translation is no reason for a **Query**. Examples: a dose that looks too low but is what the source says, a footnote digit stuck to a year, a word broken by a hyphen at a line end. If the translation gives the source correctly, accept it (**Accepted unchanged**, or **Accepted with corrections** if you corrected something else) and put your remark in the **Rationale**. It is kept with your review, and the lead reads it under **Translation reviews** in the text card. A **Query** holds the annotation of the text until the lead decides; keep it for a translation you are not sure about.
 
 Steps:
 
 1. Open the task. The **Source** is on the left, the **Translation** on the right.
 2. Read the automatic checks band at the top. Click **Details** to see which checks failed and why.
-3. Type your corrections directly in the translation column. Your edits are saved as you type, and the decision switches to **Accepted with corrections**. Use **Show changes** to see your edits and **Couple scrolling** to scroll both columns together. **Show matching paragraph** (`Alt+M`) jumps to the paired paragraph.
-4. Optional: to compare with another text, click **Compare** above the texts. With several texts to compare, it opens a menu.
+   - The band may also read *More passages in brackets than in the source: 2 in the translation, 1 in the source*. Ontotator found this itself, on the version you review. A translation sometimes adds a second name in brackets, for example a lay term followed by the Latin or English term; one finding is then named twice. **Details** lists the passages. If the translation added one, remove it; your decision is then **Accepted with corrections**. If you are not sure, choose **Query** with the category **Addition**. If the passages are right, decide as usual: this check asks for no rationale and is not counted in **My tasks**.
+3. Type your corrections directly in the translation column. Your edits are saved as you type, and the decision switches to **Accepted with corrections**. Use **Show changes** to see your edits, also a double space you typed, and **Couple scrolling** to scroll both columns together. **Show matching paragraph** (`Alt+M`) jumps to the paired paragraph.
+4. Optional: to compare with another text, click **Compare** above the texts. With several texts to compare, it opens a menu. In the review of a later version (v2, v3, …), the first entry is the previous version ([Review a later version](#review-a-later-version)).
 5. Under **Your review**, choose a **Decision** (or press `1` to `4`).
 6. Fill in what the decision needs:
    - **Query** and **Rejected** always count as a clinically relevant change: choose at least one category and write a **Rationale**. Put your question for the lead in the rationale.
    - **Accepted with corrections**: tick **Clinically relevant change** if your correction changes the clinical meaning; then a category and a **Rationale** are required.
    - **Accepted unchanged** after a failed automatic check: say in the **Rationale** why the flagged difference is correct.
 7. Click **Submit review…** (or press `Ctrl+Enter`), read what will happen, then click **Submit review**.
+   - If the text has spacing errors or invisible characters, the confirmation says so, for example *2 typography hints in your text: double space (2).* Click **Show them** to see each place with a little text around it; spaces are drawn as dots. To fix them, click **Keep editing**. The line blocks nothing: you can submit all the same. It names a double space, a space before or a missing space after punctuation, spaces at the end of a line or of the text, tabs, invisible characters and a doubled full stop. It does not find two words run together or a grammar slip; read your corrections once more.
 8. A message confirms the review, with **View result**. Your next open task opens on its own, another translation review first, or **My tasks** if none is left. If you also annotate this text and your review finished its translation, your annotation of the text opens instead and the message adds *Annotate this text now*. Finished means: the translation is accepted (with corrections, on the corrected version), every other translation of the text is accepted too, and no further review or decision of the lead is pending. After **Query** or **Rejected** it does not come first.
 
-If the source text was updated, **Source updates to review** appears. Open it, compare **Original source** and **Updated source**, and click **Submit review and resolve source update**.
+On a wide screen, **Your review** is a column on the right. To give the texts more room, drag its left edge (**Resize review panel**), or focus the edge and press `←` or `→`; `Enter` restores the default width. **Collapse review panel** folds it to a narrow strip: the bar at the bottom then shows the decision and **Submit review…**, and **Expand review panel** or **Change ↓** opens it again. Width and folding are remembered in this browser.
+
+After a **Query** the lead decides. **My tasks** then shows *Answer from the lead* at your submitted review (tab **Submitted**). Open the task: above **Submitted review** you read what was decided, for example *The lead decided your query on 18 Nov 2026, 10:12. Your text was accepted as v2.* (or *v1 was accepted as it is.*), and the lead's answer, for example *Answer from the lead: Yes, as proposed.*
+
+A project lead who corrects a translation themselves sees only **Accepted with corrections**. When the lead corrects a translation that was already accepted, the corrected version is reviewed again: it then appears as a new translation review task, usually for you ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
+
+#### Why the lead asked for this review
+
+When the lead asked for the review with **Ask a reviewer to correct…**, or reopened a review you had submitted, the lead's words stand above **Decision**:
+
+- *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.* The same line is under the task name in **My tasks**.
+- *Reopened by the lead on 18 Nov 2026, 10:00: The unit is mg in my copy.* In **My tasks** it stands under the task name, as the reason for a second review does; on a narrow screen it stands under the **Reopened** badge. Without a reason from the lead it ends with *No reason given.*
+
+A reopened review starts again from the text of its version; your earlier decision is listed under **Previous reviews**.
+
+#### Review a later version
+
+What for: review a translation that already has an earlier version, for example a text the lead uploaded with **Upload a corrected text…** or corrected, or a version another reviewer corrected. The text name in **My tasks** and in the task ends with the version, for example *case-0101 de v2 corrected*.
+
+The task shows the version you were given, not the first one:
+
+- **Translation details** says how this version was made: **This version** (for example *Human translation*, *Machine translation, DeepL, deepl-2026-10*, *Corrected by hand*, *Corrected by the project lead*, *Corrected in a translation review* or, after **Fix typos…**, *Typos fixed by the project lead on 17 November 2026 at 10:12* with **What was fixed**), when it was uploaded or corrected, the **Version before** and, for an uploaded text, what the lead recorded about who made it and when. The machine translation run of the first version is listed separately, for example *Translation run of v1*. On a phone the details open below the bar across the width of the screen.
+- The line under the translation reads *Same as the version you were given (v2).* Your own edits are underlined against that version, and **Show changes** shows them.
+- **Compare** shows what changed since the version before. Click **Compare** (with several texts to compare, choose *The previous version (v1)*): the third column, *Changes from v1 to v2*, shows this version with the removed passages struck through and the added ones underlined. **Close** hides it again.
+- The automatic checks ran on the first version only. The band says so, for example *The automatic checks ran on v1, not on this version (v2). 1 automatic check failed on v1: Units added in translation.* **Details** lists the checks of v1. A check that failed on v1 is not counted in **My tasks** for this task, and **Accepted unchanged** needs no rationale because of it. Check yourself whether the passage is right in this version. Only the check for passages in brackets is made on this version itself.
+
+#### Review a source update
+
+If the source text was updated after the translation was made, **Source updates to review** appears above **Decision**. The **Source** column of the task still shows the original source.
+
+1. Choose **Accepted unchanged** or, after correcting the translation, **Accepted with corrections**, and fill in what the decision needs.
+2. Under **Source updates to review**, click **Review source update**.
+3. Compare **Original source** and **Updated source** with **Current translation**. In the updated source, added text is underlined and removed text is struck through.
+4. Click **Submit review and resolve source update**. This submits your review and resolves the source update.
+
+**Submit review…** alone does not resolve a source update. If you use it with an accepting decision while one is open, the confirmation says so, for example *1 source update is not reviewed.*, and offers **Review source update**, which opens the comparison. **Submit without the source update** accepts the translation against the original source and leaves the update open: the submitted review can then no longer resolve it, and the lead has to assign another review.
 
 ![A translation review: the source on the left, the translation on the right, the failed automatic check above them. On the right, Query is chosen with the category Number or unit and a rationale, above Submit review…](images/annotator-translation-review.png)
 
@@ -425,11 +498,35 @@ What for: keep track of the sentences you have already checked in a long text.
 
 Checked sentences are green. If you edit a checked sentence later, it turns amber, and the head of the text counts it as *changed*. Read it again, then click it to mark it as checked.
 
+A mark belongs to its sentence, not to its wording. When a text repeats a sentence, for example *Unauffällig.*, and you edit the one you had checked, that sentence turns amber where it stands; the same sentence elsewhere in the text stays as it was, unchecked if you had not checked it. When you add or remove text before checked sentences, their marks move with them. A checked sentence you delete loses its mark; if you take an edit back, the sentence is green again.
+
 The marks are only for you. They are saved with your review, so they are kept when you reload, close the tab or the task is paused. With the review open in two tabs, both keep their marks; a tab shows the marks of the other one after your next mark there or after **Reload from server**. They do not change your decision, and the lead and the exports never see them.
 
 With the keyboard: Tab to a sentence, then press Enter or Space to mark it. Shift+Enter marks the range from the last sentence you marked.
 
 On a touch-only device such as a phone or tablet, **Mark checked sentences** is not offered, because a swipe on the text has to scroll. A review you can only read does not offer it either.
+
+### Show invisible characters
+
+What for: see spacing errors and characters you cannot see otherwise, such as a double space, a tab or a non-breaking space.
+
+1. Tick **Show invisible characters** above the texts. Your choice is remembered in this browser.
+2. Read the marks in all texts:
+
+   | Mark | Character |
+   | --- | --- |
+   | grey dot `·` | space; two dots are a double space |
+   | arrow `→` | tab |
+   | small circle `°` | non-breaking space |
+   | amber bar between two characters | zero-width character, for example a zero-width space |
+   | small `¬` above the line | soft hyphen |
+   | `¶` | end of a line; a dot before it is a space at the end of the line |
+
+3. Correct the translation as usual. Untick the box to hide the marks again.
+
+The marks only change what you see. They are not part of the text: selecting, copying and saving give the text without them, and the lines break where they broke before. The marks also show with **Show changes** and **Mark checked sentences**.
+
+Ontotator does not correct anything by itself, and a mark never blocks your review.
 
 ## Keyboard shortcuts
 

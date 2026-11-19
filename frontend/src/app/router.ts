@@ -121,7 +121,7 @@ export type Route =
   /** `view: "editor"` opens the editor of a consolidation task instead of the consolidation view (acceptance fixes WP-E). */
   | { name: "task"; assignmentId: number; view?: "editor" }
   /** `task`, or `documents` (a project key): the task or the Documents page the user came from, offered as a way back (issue 266). */
-  | { name: "me"; task?: number; documents?: string }
+  | { name: "me"; task?: number; documents?: string; section?: ProfileSection }
   | { name: "adminUsers" }
   | { name: "adminOntologies" }
   /** Server-wide settings (today: Practice projects). */
@@ -150,6 +150,9 @@ export type Route =
 /** Every "My tasks" link: an explicit All, so a reload or a new tab never runs the last-used landing. */
 export const MY_TASKS: Route = { name: "tasks", status: "all" };
 
+/** A Profile section an address can open at (issue 269). */
+export type ProfileSection = "technical-reports";
+
 export function parseRoute(hash: string): Route {
   const notFound: Route = { name: "notFound", hash };
   if (hash === "") return { name: "tasks" };
@@ -170,10 +173,12 @@ export function parseRoute(hash: string): Route {
     }
     switch (path) {
       case "#/me": {
+        // Profile › My technical reports (issue 269): the report dialog links here.
+        const section = params.get("section") === "technical-reports" ? { section: "technical-reports" as const } : {};
         const task = Number(params.get("task"));
-        if (Number.isInteger(task) && task > 0) return { name: "me", task };
+        if (Number.isInteger(task) && task > 0) return { name: "me", task, ...section };
         const documents = params.get("documents");
-        return documents ? { name: "me", documents } : { name: "me" };
+        return documents ? { name: "me", documents, ...section } : { name: "me", ...section };
       }
       case "#/admin/users": return { name: "adminUsers" };
       case "#/admin/ontologies": return { name: "adminOntologies" };
@@ -270,7 +275,7 @@ export function routeHref(route: Route): string {
         throw new RangeError("Assignment ID must be a positive safe integer");
       }
       return `#/tasks/${route.assignmentId}${querySuffix([["view", route.view]])}`;
-    case "me": return `#/me${querySuffix([["task", route.task === undefined ? undefined : String(route.task)], ["documents", route.documents]])}`;
+    case "me": return `#/me${querySuffix([["task", route.task === undefined ? undefined : String(route.task)], ["documents", route.documents], ["section", route.section]])}`;
     case "adminUsers": return "#/admin/users";
     case "adminOntologies": return "#/admin/ontologies";
     case "adminSettings": return "#/admin/settings";

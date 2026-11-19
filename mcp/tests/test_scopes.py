@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import io
 import zipfile
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -16,7 +17,7 @@ import httpx
 import pytest
 from conftest import call
 from contract import scope, spec
-from fake_api import FakeApi, token_view
+from fake_api import PT_A, FakeApi, marked, token_view
 from mcp import Client
 from shapes import build, page, panel, row, submission, work
 
@@ -29,6 +30,7 @@ from ontotator_mcp.resources import (
 )
 from ontotator_mcp.server import build_server
 from ontotator_mcp.tooling import TOOL_SCOPES, scope_text
+from ontotator_mcp.tools_content import CONTENT_TOOLS
 
 P = "/api/v1/projects/{key}"
 
@@ -72,6 +74,12 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
         "create_project": {"key": "p", "name": "P", "pins": [PIN], "template": "t"},
         "get_project_settings": {"project": "p"},
         "update_project_settings": {"project": "p", "changes": {"name": "Q"}},
+        "set_annotations_per_text": {
+            "project": "p",
+            "case_id": "c/1",
+            "language": "de",
+            "annotations_per_text": 4,
+        },
         "set_task_profile": {"project": "p", "profile_path": str(profile)},
         "set_ontology_pins": {"project": "p", "pins": [PIN], "confirm": True},
         "refresh_translations": {"project": "p"},
@@ -114,7 +122,18 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "language": "en",
             "reviewer": "r",
         },
-        "accept_agreeing_texts": {"project": "p", "confirm": True},
+        "accept_agreeing_texts": {
+            "project": "p",
+            "confirm": True,
+            "preview_token": PT_A,
+        },
+        "change_final_results": {
+            "project": "p",
+            "texts": [{"case_id": "c", "language": "en"}],
+            "confirm": True,
+            "preview_token": PT_A,
+        },
+        "undo_change_final_results": {"project": "p", "undo_id": 7, "confirm": True},
         "final_export_check": {"project": "p"},
         "start_export": {"project": "p", "kind": "final"},
         "get_job": {"job_id": 1, "wait": True},
@@ -138,6 +157,41 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
         "withdraw_task": {"assignment_id": 3},
         "remove_task": {"assignment_id": 3},
         "reopen_task": {"assignment_id": 3},
+        "reopen_texts": {
+            "project": "p",
+            "texts": [{"case_id": "c", "language": "en"}],
+            "reason": "Guideline 2.3",
+            "confirm": True,
+            "preview_token": marked(PT_A, "Guideline 2.3"),
+        },
+        "withdraw_open_tasks": {
+            "project": "p",
+            "texts": [{"case_id": "c", "language": "en"}],
+            "confirm": True,
+            "preview_token": marked(PT_A),
+        },
+        "undo_reopen_or_withdraw": {"project": "p", "undo_id": 7, "confirm": True},
+        "start_rounds": {
+            "project": "p",
+            "texts": [{"case_id": "c", "language": "en"}],
+            "kind": "clean_restart",
+            "reason": "New tool set",
+            "confirm": True,
+            "preview_token": marked(PT_A, "New tool set"),
+        },
+        "pause_texts": {
+            "project": "p",
+            "texts": [{"case_id": "c", "language": "en"}],
+            "reason": "Clinic is checking",
+            "confirm": True,
+            "preview_token": PT_A,
+        },
+        "release_texts": {
+            "project": "p",
+            "texts": [{"case_id": "c", "language": "en"}],
+            "confirm": True,
+            "preview_token": PT_A,
+        },
         "hand_over_open_tasks": {
             "project": "p",
             "from_username": "leaving",
@@ -150,6 +204,31 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
         "list_mode_changes": {"project": "p"},
         "get_text_detail": {"project": "p", "document_id": "c-en-v1"},
         "list_translation_reviews": {"project": "p"},
+        "list_typography_hints": {
+            "project": "p",
+            "document_id": "c-en-v1",
+            "include_text": True,
+        },
+        # The content tools (ONTOTATOR_MCP_READ_CONTENT=1), with every route.
+        "get_text_version": {
+            "project": "p",
+            "document_id": "c-en-v1",
+            "include_text": True,
+        },
+        "list_annotation_versions": {"project": "p", "document_id": "c-en-v1"},
+        "get_annotation_version": {
+            "project": "p",
+            "document_id": "c-en-v1",
+            "kind": "submission",
+            "version_id": "s1",
+            "include_text": True,
+        },
+        "get_submission": {
+            "project": "p",
+            "document_id": "c-en-v1",
+            "submission_id": "s1",
+            "include_text": True,
+        },
         "withdraw_guideline": {"project": "p", "version": 2},
         "start_new_round": {
             "project": "p",
@@ -165,6 +244,14 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "reason": "Proposals were wrong",
             "confirm": True,
         },
+        "change_annotation_modes": {
+            "project": "p",
+            "texts": [{"case_id": "c", "language": "en"}],
+            "mode": "scratch",
+            "reason": "Proposals were wrong",
+            "confirm": True,
+            "preview_token": PT_A,
+        },
         "restore_annotation_mode": {
             "project": "p",
             "case_id": "c",
@@ -179,6 +266,14 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "submission_id": "s1",
             "confirm": True,
         },
+        "withdraw_final_result": {
+            "project": "p",
+            "case_id": "w",
+            "language": "en",
+            "reason": "Re-annotation",
+            "confirm": True,
+            "expected_revision": 1,
+        },
         "request_translation_correction": {
             "project": "p",
             "document_id": "d",
@@ -186,6 +281,38 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "reason": "Dose missing",
         },
         "start_lead_correction": {"project": "p", "document_id": "d"},
+        "accept_translation_version": {
+            "project": "p",
+            "document_id": "d",
+            "reason": "Checked against the DeepL output",
+            "expected_text_sha256": "a" * 64,
+            "confirm": True,
+        },
+        "upload_translation_version": {
+            "project": "p",
+            "document_id": "d",
+            "text": "Bei Aufnahme: Puls regelmäßig.",
+            "method": "machine_translation",
+            "provider": "DeepL",
+            "expected_previous_sha256": "a" * 64,
+            "confirm": True,
+        },
+        "decide_translation_query": {
+            "project": "p",
+            "document_id": "d",
+            "decision": "unchanged",
+            "answer": "The short form is meant.",
+            "preview_token": "sha256:" + "a" * 64,
+            "confirm": True,
+        },
+        "editorial_correction": {
+            "project": "p",
+            "document_id": "d",
+            "replacements": [{"old": "Pat ient", "new": "Patient"}],
+            "reason": "Space inside a word",
+            "expected_text_sha256": "a" * 64,
+            "confirm": True,
+        },
         "discard_translation": {
             "project": "p",
             "document_id": "d",
@@ -249,7 +376,19 @@ def _flows(fake: FakeApi) -> None:
         {"case_ids": ["c"], "total": 1, "truncated": False},
     )
     both = [work("submitted", "a"), work("submitted", "b")]
-    fake.on("GET", f"{P}/document-rows", page([row("c", work=both)]))
+    final = build(
+        "FinalSelectionSummary",
+        case_id="w",
+        language="en",
+        document_id="w-en-v1",
+        submission_id="s9",
+        revision=1,
+    )
+    fake.on(
+        "GET",
+        f"{P}/document-rows",
+        page([row("c", work=both), row("w", final=final)]),
+    )
     fake.on(
         "GET",
         "/api/v1/projects/{key}/document-rows/{case_id}/{language}/final-panel",
@@ -312,7 +451,10 @@ async def test_every_tool_names_the_scopes_of_its_routes(
     fake: FakeApi, settings: Settings, tmp_path: Path
 ) -> None:
     _flows(fake)
-    server = build_server(settings, transport=httpx.MockTransport(fake))
+    # With the content tools: every tool the server can have.
+    server = build_server(
+        replace(settings, read_content=True), transport=httpx.MockTransport(fake)
+    )
     arguments = _arguments(tmp_path)
     async with Client(server) as client:
         listed = {tool.name: tool for tool in (await client.list_tools()).tools}
@@ -410,6 +552,9 @@ async def test_annotations_match_what_a_tool_does(mcp_client: Client) -> None:
 IRREVERSIBLE = (
     "set_final_result",
     "accept_agreeing_texts",
+    "change_final_results",
+    "start_rounds",
+    "change_annotation_modes",
     "carry_submission",
     "update_work_plan",
     "act_on_problem_report",
@@ -489,7 +634,8 @@ README_EFFECTS = {
 
 def test_the_readme_lists_every_tool_with_its_scopes_and_effect() -> None:
     readme = (Path(__file__).resolve().parents[1] / "README.md").read_text()
-    build_server(Settings(url="https://o.test", token="t"))
+    build_server(Settings(url="https://o.test", token="t", read_content=True))
+    assert set(CONTENT_TOOLS) <= set(TOOL_SCOPES)
     for info in TOOL_SCOPES.values():
         effect = README_EFFECTS[info.effect]
         assert f"| `{info.name}` | {info.label} | {effect} |" in readme, info.name

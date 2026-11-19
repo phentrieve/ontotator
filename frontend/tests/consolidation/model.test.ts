@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { duplicatesText, fieldsToDecide, finalizationState, groupStatus, headerTitle, partialText, readOnlyText, submittedText, summaryText } from "../../src/consolidation/consolidationText";
 import type { ConsolidationGroupView } from "../../src/api/client";
-import { attachCandidates, choicesComplete, choose, comparisonRows, duplicateTerms, groupName, relatedTermHint, resolvePayload, resultLine, sameTermGroups, standaloneText, storedResult, type Choices } from "../../src/consolidation/groupModel";
+import { attachCandidates, attachPending, choicesComplete, choose, comparisonRows, duplicateTerms, groupName, modifierFindings, relatedTermHint, resolvePayload, resultLine, sameTermGroups, shortName, splitLine, standaloneText, storedResult, type Choices } from "../../src/consolidation/groupModel";
 import { NO_MODIFIERS } from "../../src/consolidation/modifierSets";
 import { textOrder } from "../../src/consolidation/GroupList";
 import { ANA, BEN, CEM, decidedView, exampleGroups, exampleView, group, hypotoniaThree, LUC, member, mild, MOD_PEOPLE, MOD_TEXT, modSpan, recurrent, seizure, severe, span, TEXT, THREE, TOM } from "./fixtures";
@@ -92,9 +92,10 @@ describe("comparison model", () => {
     expect(relatedTermHint(hypotoniaThree({ term_lineage: ["HP:0001252", "HP:0008936"] }))).toBeNull();
   });
 
-  it("text is information unless spans conflict", () => {
+  it("text is information unless spans conflict; the same passage from everyone is agreed (#472)", () => {
     const text = rowOf(comparisonRows(hypotoniaThree(), THREE, TEXT, {}), "text");
-    expect(text).toMatchObject({ conflict: false, agreed: null, info: "(overlapping, comes with the chosen finding)" });
+    expect(text).toMatchObject({ conflict: false, agreed: "“muscular hypotonia” (all agree)" });
+    expect(text).not.toHaveProperty("info");
     const conflicting = rowOf(comparisonRows(hypotoniaThree({ span_conflict: true }, { ali: { spans: [span("hypotonia")] } }), THREE, TEXT, {}), "text");
     expect(conflicting.conflict).toBe(true);
     expect(conflicting.cells).toHaveLength(3);
@@ -102,9 +103,33 @@ describe("comparison model", () => {
 
   it("a one-person group reads the text without the overlap suffix, spanless too (R-9)", () => {
     const spanless = group("g-fatigue", ["partial"], [member("in-f", BEN, "HP:0012378", "Fatigue", [], { note: "Says tired." })]);
-    expect(rowOf(comparisonRows(spanless, [BEN], TEXT, {}), "text")).toMatchObject({ info: null, agreed: "No text span" });
+    expect(rowOf(comparisonRows(spanless, [BEN], TEXT, {}), "text")).toMatchObject({ agreed: "No text span" });
     const single = group("g-hypo1", ["partial"], [member("in-h", BEN, "HP:0001252", "Hypotonia", [span("hypotonia")])]);
-    expect(rowOf(comparisonRows(single, [BEN], TEXT, {}), "text")).toMatchObject({ info: null, agreed: "“hypotonia”" });
+    expect(rowOf(comparisonRows(single, [BEN], TEXT, {}), "text")).toMatchObject({ agreed: "“hypotonia”" });
+  });
+
+  // Issue 470.
+  it("the split line counts each value, the most frequent first, and names everyone outside the largest group", () => {
+    const cells = ["Hypotonia", "Hypotonia", "Abnormality of the nervous system", "Hypotonia", "Hypotonia", "Abnormality of the nervous system"].map(display => ({ display }));
+    expect(splitLine(cells, ["A", "B", "C", "D", "E", "F"])).toBe("Hypotonia 4 · Abnormality of the nervous system 2 (C, F)");
+    // Three values; a tie keeps the order of the columns.
+    expect(splitLine(["Present", "Absent", "Uncertain", "Absent"].map(display => ({ display })), ["Luc Martin", "Tom Reis", "Mia Berg", "Ali Kaya"]))
+      .toBe("Absent 2 · Present 1 (Luc Martin) · Uncertain 1 (Mia Berg)");
+    // A hidden name is its letter; a shown name is the display name without the pseudonym.
+    expect(shortName("Annotator C")).toBe("C");
+    expect(shortName("Annotator AB")).toBe("AB");
+    expect(shortName("Luc Martin (ann-0004)")).toBe("Luc Martin");
+    expect(shortName("ann-0004")).toBe("ann-0004");
+  });
+
+  it("rows to decide carry the split line from four people on; agreed rows and smaller groups never", () => {
+    const four = [...THREE, LUC];
+    const withLuc = { ...hypotoniaThree(), members: [...hypotoniaThree().members, member("in-luc", LUC, "HP:0001252", "Hypotonia", [span("muscular hypotonia")])] };
+    const rows = comparisonRows(withLuc, four, TEXT, {});
+    expect(rowOf(rows, "term").split).toBe("Hypotonia 3 · Axial hypotonia 1 (Ali Kaya)");
+    expect(rowOf(rows, "assertion").split).toBe("Present 3 · Absent 1 (Mia Berg)");
+    expect(rowOf(rows, "experiencer").split).toBeUndefined();
+    expect(comparisonRows(hypotoniaThree(), THREE, TEXT, {}).every(row => row.split === undefined)).toBe(true);
   });
 
   it("notes never block", () => {
@@ -221,7 +246,7 @@ describe("comparison model", () => {
 
   it("never offers keep both", () => {
     const rows = comparisonRows(hypotoniaThree(), THREE, TEXT, {});
-    const words = rows.flatMap(row => [row.label, row.agreed ?? "", row.info ?? "", ...row.cells.map(cell => cell.display)]);
+    const words = rows.flatMap(row => [row.label, row.agreed ?? "", row.split ?? "", row.hint ?? "", ...row.cells.map(cell => cell.display)]);
     expect(words.filter(word => /both/i.test(word))).toEqual([]);
   });
 });
@@ -414,6 +439,34 @@ describe("standalone modifier (S18)", () => {
     expect(textOrder(groups, MOD_TEXT).map(value => value.group_id)).toEqual(["g-rep", "g-seiz", "g-hypo", "g-sev", "g-fever"]);
     // Alone in its sentence, it keeps its text position.
     expect(textOrder([groups[0], standalone()], MOD_TEXT).map(value => value.group_id)).toEqual(["g-sev", "g-fever"]);
+  });
+
+  // Issue 470.
+  it("says whether a finding of the sentence is still to decide, for the inactive Attach to a finding…", () => {
+    const standalone = group("g-sev", ["partial", "modifier_as_finding"], [member("sev-a", ANA, "HP:0012828", "Severe", [modSpan("schwere")])]);
+    const seizureOpen = group("g-seiz", ["partial"], [member("seiz-b", BEN, "HP:0001250", "Seizure", [modSpan("Krampfanfälle")])]);
+    const fever = group("g-fever", ["partial"], [member("fev-b", BEN, "HP:0001945", "Fever", [modSpan("Fieber")])]);
+    expect(attachPending(standalone, [standalone, seizureOpen], MOD_TEXT)).toBe(true);
+    expect(attachPending(standalone, [standalone, { ...seizureOpen, state: "leave_out" }], MOD_TEXT)).toBe(true);
+    expect(attachPending(standalone, [standalone, { ...seizureOpen, state: "keep", annotation_ids: ["cons-1"] }], MOD_TEXT)).toBe(false);
+    // Another sentence, or another modifier term marked as a finding, is no finding to wait for.
+    expect(attachPending(standalone, [standalone, fever], MOD_TEXT)).toBe(false);
+    expect(attachPending(standalone, [standalone, { ...seizureOpen, kinds: ["partial", "modifier_as_finding"] }], MOD_TEXT)).toBe(false);
+  });
+
+  it("names the findings a modifier-term warning is about, with the group to jump to (issue 470)", () => {
+    const kept = { ...group("g-sev", ["partial", "modifier_as_finding"], [member("sev-a", ANA, "HP:0012828", "Severe", [modSpan("schwere")])]),
+      state: "keep" as const, annotation_ids: ["cons-sev"], result: { term_id: "HP:0012828", term_label: "Severe", layer_id: "phenotype", axes: {}, spans: [modSpan("schwere")], modifiers: [] } };
+    const open = group("g-mild", ["partial", "modifier_as_finding"], [member("mild-a", ANA, "HP:0012825", "Mild", [modSpan("wiederholt")])]);
+    const other = { ...kept, group_id: "g-other", annotation_ids: ["cons-other"], result: { ...kept.result, term_id: "HP:0001250", term_label: "Seizure" } };
+    const added = member("ann-added", BEN, "HP:0012828", "Severe", [modSpan("Kein")], { annotation_id: "ann-added" });
+    // Before the server answers: the groups whose kept term is a person's modifier term.
+    expect(modifierFindings([kept, open, other], [added], MOD_TEXT)).toEqual([{ label: "Severe “schwere”", groupId: "g-sev" }]);
+    // The server's ids: a group, a finding added outside the groups; an unknown id is left out.
+    expect(modifierFindings([kept, open], [added], MOD_TEXT, ["cons-sev", "ann-added", "gone"])).toEqual([
+      { label: "Severe “schwere”", groupId: "g-sev" },
+      { label: "Severe (HP:0012828), “Kein”, added by you", groupId: null },
+    ]);
   });
 
   it("an attached group reads attached", () => {

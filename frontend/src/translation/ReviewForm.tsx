@@ -22,6 +22,8 @@ export interface ReviewFormProps {
   readOnly?: boolean;
   /** Offered decisions; default all four with their number keys. A restricted set shows no number keys. */
   decisions?: readonly ReviewDecisionCode[];
+  /** Hints that replace `decisionDescriptions` (a lead correction of an accepted version, issue 341 b). */
+  descriptions?: Partial<Record<ReviewDecisionCode, string>>;
 }
 
 const allDecisions = Object.keys(decisionLabels) as ReviewDecisionCode[];
@@ -41,7 +43,7 @@ const categories = Object.keys(categoryLabels) as ClinicalCategory[];
  * (**) Required when automatic checks failed (R-12).
  * The rationale also stays visible whenever it holds text.
  */
-export function ReviewForm({ value, issues, onChange, onChooseDecision, failedCheckCount = 0, autoNote = null, readOnly = false, decisions = allDecisions }: ReviewFormProps) {
+export function ReviewForm({ value, issues, onChange, onChooseDecision, failedCheckCount = 0, autoNote = null, readOnly = false, decisions = allDecisions, descriptions }: ReviewFormProps) {
   const numberKeys = decisions === allDecisions;
   const id = useId();
   const decision = value.decision;
@@ -76,7 +78,7 @@ export function ReviewForm({ value, issues, onChange, onChooseDecision, failedCh
             />
             <span className="review-decision-text">
               <span className="review-decision-label" id={`${id}-${option}-label`}>{decisionLabels[option]}</span>
-              <span className="review-decision-hint" id={`${id}-${option}-hint`}>{decisionDescriptions[option]}</span>
+              <span className="review-decision-hint" id={`${id}-${option}-hint`}>{descriptions?.[option] ?? decisionDescriptions[option]}</span>
             </span>
             {numberKeys && <Kbd>{index + 1}</Kbd>}
           </label>,

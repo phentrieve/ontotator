@@ -40,6 +40,10 @@
 .translation-checks-line .icon { flex: none; }
 .translation-checks--failed .translation-checks-line .icon { color: var(--warning); }
 .translation-checks-calm { color: var(--text-muted); }
+/* Ontotator's check for added passages in brackets (issue 484): a line of its own under the run's checks. */
+.translation-checks-brackets { display: flex; align-items: center; gap: var(--space-2); flex-basis: 100%; margin: 0; padding-bottom: var(--space-1); color: var(--text); }
+.translation-checks-brackets .icon { flex: none; color: var(--warning); }
+.translation-check-passages { margin: 0; padding-left: var(--space-5); }
 .translation-checks-toggle .translation-checks-chevron { transition: transform 0.15s ease-out; }
 .translation-checks-toggle[aria-expanded="true"] .translation-checks-chevron { transform: rotate(90deg); }
 .translation-check-details { max-height: 40vh; overflow: auto; padding: var(--space-3) var(--space-5) var(--space-4); background: var(--surface-raised); }
@@ -88,7 +92,8 @@
 .translation-editor { height: min(60vh, 40rem); min-height: 16rem; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-raised); }
 .translation-text,
 .translation-review .translation-diff { padding: var(--space-4) var(--space-5); white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-serif); font-size: var(--size-reading); line-height: var(--leading-reading); color: var(--text); }
-.source-obligation-review .translation-column > .translation-text { flex: none; height: min(42vh, 24rem); min-height: 12rem; }
+.source-obligation-review .translation-column > .translation-text,
+.source-obligation-review .translation-column > .translation-diff { flex: none; height: min(42vh, 24rem); min-height: 12rem; }
 .source-obligation-current > .translation-text { height: min(32vh, 18rem); min-height: 10rem; }
 
 /* The one editable surface: a growing textarea over a mirror that marks changed text. */
@@ -169,6 +174,15 @@
 .review-history-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-serif); }
 .review-confirm p { margin: var(--space-4) 0 0; }
 .review-confirm-final { font-weight: var(--weight-strong); }
+/* Typography hints of the text to be saved (issue 484): a line and, behind "Show them", the place of each hint. */
+.review-confirm-hints { margin: var(--space-4) 0; }
+.review-confirm-hints p { margin: 0; }
+.review-confirm-hint-list { display: grid; gap: var(--space-2); margin: var(--space-2) 0 0; padding: 0; list-style: none; max-height: 14rem; overflow-y: auto; }
+.review-confirm-hint-list li { display: grid; gap: 2px; min-width: 0; }
+.review-confirm-hint-rule { color: var(--text-muted); font-size: var(--size-sm); }
+.review-confirm-hint-excerpt { font-family: var(--font-serif); white-space: pre-wrap; overflow-wrap: anywhere; }
+.review-confirm-hint-excerpt mark { padding: 1px 0; background: var(--warning-light); color: inherit; outline: 1px solid var(--warning); }
+.review-confirm-hints .review-confirm-hints-more { margin-top: var(--space-2); color: var(--text-muted); font-size: var(--size-sm); }
 
 @media (min-width: 700px) {
   /* Side by side, head, pane and note of every column share the rows of the columns grid (subgrid):
@@ -188,7 +202,20 @@
   .translation-texts .translation-column > .translation-editor { flex: 1; height: auto; min-height: 0; }
   .translation-review .translation-decision { min-height: 0; border-top: 0; border-left: 1px solid var(--border); }
   .translation-review .translation-decision-body { flex: 1; min-height: 0; overflow: auto; }
+  /* "Your review" (#410): its width follows the divider on its left edge (--review-panel-width, remembered per
+     user); collapsed it is a narrow strip and the pinned bar below keeps the decision and Submit. */
+  .translation-review .translation-workspace { grid-template-columns: minmax(0, 1fr) var(--review-panel-width, clamp(360px, 22vw, 440px)); }
+  .translation-review .translation-workspace--collapsed { grid-template-columns: minmax(0, 1fr) auto; }
+  .translation-review .translation-decision { position: relative; }
+  .translation-review .translation-decision > .sidebar-resizer { position: absolute; top: 0; bottom: 0; left: -8px; margin: 0; }
+  .translation-review .translation-decision-body[hidden] { display: none; }
 }
+.translation-decision-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: 28px; }
+.translation-decision--collapsed { width: 44px; align-items: stretch; }
+.translation-decision-expand { display: flex; flex: 1; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-3) 0; border: 0; background: none; color: var(--text); font: inherit; cursor: pointer; }
+.translation-decision-expand:hover { background: var(--surface-sunken); }
+.translation-decision-expand:focus-visible { outline: var(--focus-width) solid var(--focus-ring); outline-offset: calc(-1 * var(--focus-width)); }
+.translation-decision-strip-label { writing-mode: vertical-rl; font-size: var(--size-md); line-height: var(--leading-md); font-weight: var(--weight-strong); }
 @media (max-width: 1099px) {
   /* Keyboard focus scrolled into view is never hidden behind the pinned bar. */
   .translation-review { scroll-padding-bottom: calc(var(--review-bar, 60px) + var(--space-3)); }
@@ -209,6 +236,10 @@
   .translation-texts .translation-column > .translation-diff,
   .translation-texts .translation-column > .translation-editor { height: auto; min-height: 12rem; max-height: 50vh; max-height: 50dvh; }
   .translation-review-bar, .translation-checks-band, .translation-check-details { padding-inline: var(--space-4); }
+  /* Translation details: the panel spans the bar instead of running off the right edge. */
+  .translation-review-bar { position: relative; }
+  .translation-review-bar .translation-details { position: static; }
+  .translation-review-bar .translation-details[open] > dl { left: var(--space-4); right: var(--space-4); min-width: 0; }
   .translation-texts { padding-inline: var(--space-4); }
   .translation-decision-body, .translation-decision-footer, .translation-pinned-bar { padding-inline: var(--space-4); }
   .translation-text, .translation-review .translation-diff, .translation-editor-mirror, .translation-editor-input { padding-inline: var(--space-4); }
@@ -255,3 +286,24 @@
 .review-sentence.is-range-mark { background: var(--success-light); text-decoration-color: var(--success); text-decoration-style: dotted; }
 .review-sentence.is-range-unmark { background: transparent; text-decoration-color: var(--border-strong); text-decoration-style: dotted; }
 .review-sentence[aria-disabled="true"] { cursor: default; }
+
+/* Show invisible characters (issue 454). Each mark is generated content drawn over its character: it is never
+   selected or copied, and being absolutely positioned it adds no width, so the text wraps as without the marks. */
+.show-invisibles .invisible-char { position: relative; }
+.show-invisibles .invisible-char::before { position: absolute; top: 0; left: 0; color: var(--text-muted); font-style: normal; font-weight: var(--weight-regular); text-decoration: none; white-space: pre; pointer-events: none; user-select: none; -webkit-user-select: none; }
+/* Space: a middle dot centred on it. */
+.show-invisibles [data-invisible="space"]::before { content: "\00B7"; left: 50%; transform: translateX(-50%); }
+/* Non-breaking space: a degree sign, as word processors show it. */
+.show-invisibles [data-invisible="nbsp"]::before { content: "\00B0"; left: 50%; transform: translateX(-50%); color: var(--warning); }
+.show-invisibles [data-invisible="tab"]::before { content: "\2192"; color: var(--warning); }
+.show-invisibles [data-invisible="line-end"]::before { content: "\00B6"; padding-left: 1px; opacity: 0.7; }
+/* Zero-width characters have no box to draw on: a bar between the two neighbours. */
+.show-invisibles [data-invisible="zero-width"]::before { content: ""; top: 0.2em; bottom: 0.2em; left: -1px; border-left: 2px solid var(--warning); }
+/* Soft hyphen: a raised "not" sign between the two neighbours. */
+.show-invisibles [data-invisible="soft-hyphen"]::before { content: "\00AC"; top: -0.55em; left: 0; transform: translateX(-50%); font-size: 0.75em; color: var(--warning); }
+/* The mark of a line end hangs over the right edge of a full line; it must not make the box scroll sideways. */
+.translation-text.show-invisibles, .translation-review .translation-diff.show-invisibles, .translation-diff.show-invisibles, .translation-editor.show-invisibles { overflow-x: hidden; }
+
+/* Submit confirmation while a source update is open: a warning with the way to the source update dialog. */
+.review-confirm-source-update { display: grid; gap: var(--space-2); justify-items: start; margin: 0 0 var(--space-3); padding: var(--space-2) var(--space-3); border: 1px solid var(--notice-warning-border); border-radius: var(--radius); background: var(--notice-warning-fill); color: var(--notice-warning-text); }
+.review-confirm-source-update p { margin: 0; }

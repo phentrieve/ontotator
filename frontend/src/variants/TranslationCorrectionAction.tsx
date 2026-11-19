@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { personLabel } from '../app/identity';
-import { api, type AssignmentView, type Member, type VariantSummary } from '../api/client';
+import { api, ApiError, type AssignmentView, type Member, type VariantSummary } from '../api/client';
 import { eligibleMembers, unreadLanguages } from '../admin/assignmentUI';
 import { ErrorNotice } from '../admin/ErrorNotice';
 import { Button, Checkbox, InlineMessage, Select, Textarea } from '../ui';
@@ -13,13 +13,23 @@ interface Props {
   defaultOpen?: boolean;
   /** Inside a dialog whose title names the action: no heading of its own. */
   inDialog?: boolean;
+  /** The reviewer was asked (the dialog then offers "Close"). */
+  onAssigned?: () => void;
 }
+/** Issue 341 b: a lead correction of this version is open; a second review of it is refused. */
+export const LEAD_CORRECTING = 'A lead is correcting this version. Ask a reviewer after that correction is submitted, or withdraw it with Remove… in the lead’s row of the Translation part.';
+function leadCorrecting(error: unknown): boolean {
+  if (!(error instanceof ApiError) || error.code !== 'ASSIGNMENT_EXISTS') return false;
+  const details = error.details;
+  return typeof details === 'object' && details !== null && (details as { reason?: unknown }).reason === 'lead_correction_open';
+}
+
 export function TranslationCorrectionAction(props: Props): JSX.Element | null {
   if (props.variant.translation_status !== 'accepted') return null;
   return <CorrectionContent key={JSON.stringify([props.projectKey, props.variant.document_id, props.variant.text_sha256, props.username])} {...props} />;
 }
 
-function CorrectionContent({ projectKey, variant, username, requiredLanguages, defaultOpen = false, inDialog = false }: Props): JSX.Element {
+function CorrectionContent({ projectKey, variant, username, requiredLanguages, defaultOpen = false, inDialog = false, onAssigned }: Props): JSX.Element {
   const fieldId = useId(), active = useRef(false), writing = useRef(false);
   const [open, setOpen] = useState(defaultOpen), [attempt, setAttempt] = useState(0);
   const [members, setMembers] = useState<Member[] | null>(null), [error, setError] = useState<unknown>();
@@ -43,13 +53,13 @@ function CorrectionContent({ projectKey, variant, username, requiredLanguages, d
       const value = await api.assignTranslationCorrection(projectKey, variant.document_id, { username: reviewer, expected_text_sha256: variant.text_sha256,
         reason: reason.trim(), confirm_language: missingLanguages.length > 0 && confirmLanguage });
       notifyFinalSelectionChanged(projectKey);
-      if (active.current) setAssigned(value);
+      if (active.current) { setAssigned(value); onAssigned?.(); }
     } catch (failure) { if (active.current) setError(failure); }
     finally { writing.current = false; if (active.current) setBusy(false); }
   };
-  if (!open) return <Button size="sm" onClick={() => setOpen(true)}>Request translation correction</Button>;
-  return <section className={inDialog ? undefined : 'detail-section'} aria-label="Request translation correction">
-    {!inDialog && <h3>{assigned ? 'Translation correction requested' : 'Request translation correction'}</h3>}
+  if (!open) return <Button size="sm" onClick={() => setOpen(true)}>Ask a reviewer to correct…</Button>;
+  return <section className={inDialog ? undefined : 'detail-section'} aria-label="Ask a reviewer to correct">
+    {!inDialog && <h3>{assigned ? 'Reviewer asked to correct' : 'Ask a reviewer to correct'}</h3>}
     {!assigned && <p>Review this exact accepted text again. A submitted correction creates a separate text version and keeps the earlier review.</p>}
     {!requiredLanguages && <InlineMessage tone="warning">The exact source lineage is unavailable. Reload the text metadata before assigning another review.</InlineMessage>}
     {!members && error == null && <InlineMessage tone="info">Loading translation reviewers…</InlineMessage>}
@@ -61,10 +71,11 @@ function CorrectionContent({ projectKey, variant, username, requiredLanguages, d
       <Textarea id={`${fieldId}-reason`} label="Reason for another review" value={reason} disabled={busy} onChange={event => setReason(event.target.value)} />
       {missingLanguages.length > 0 && <Checkbox id={`${fieldId}-language`} label={`Assign despite missing ${missingLanguages.join(', ')} in this reviewer's profile`}
         checked={confirmLanguage} disabled={busy} onChange={event => setConfirmLanguage(event.target.checked)} />}
-      <Button disabled={!member || !requiredLanguages || !reason.trim() || (missingLanguages.length > 0 && !confirmLanguage) || busy} loading={busy} onClick={() => { void assign(); }}>Assign correction review</Button>
+      <Button disabled={!member || !requiredLanguages || !reason.trim() || (missingLanguages.length > 0 && !confirmLanguage) || busy} loading={busy} onClick={() => { void assign(); }}>Ask the reviewer</Button>
     </>}
-    {error != null && <><ErrorNotice error={error} />{!members && <Button onClick={() => setAttempt(value => value + 1)}>Reload translation reviewers</Button>}</>}
-    {assigned && <InlineMessage tone="success">Translation correction assigned to {personLabel(member, { fallback: 'the reviewer' })}.
+    {leadCorrecting(error) ? <InlineMessage tone="warning">{LEAD_CORRECTING}</InlineMessage> : error != null && <ErrorNotice error={error} />}
+    {error != null && <>{!members && <Button onClick={() => setAttempt(value => value + 1)}>Reload translation reviewers</Button>}</>}
+    {assigned && <InlineMessage tone="success">{personLabel(member, { fallback: 'The reviewer' })} was asked to correct the translation.
       {assigned.username === username && <> <a className="btn btn-secondary btn-sm" href={`#/tasks/${assigned.id}`} onKeyDown={onSpaceActivate}>Open my translation review</a></>}
     </InlineMessage>}
   </section>;

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
 import { documentsTab, openTextCard, rowAction, showSegment, textCard, textName, textNamePattern, textVersionItems } from "./documentsHelpers";
-import { openTasksHome, selectText, submitCase, TASKS_HOME, TEST_PASSWORD } from "./helpers";
+import { loginThroughForm, openTasksHome, routerReady, selectText, submitCase, TASKS_HOME, TEST_PASSWORD } from "./helpers";
 
 interface Actor { username: string; code: string }
 interface ProjectSetup { key: string; admin: string; lead: Actor; annotator: Actor }
@@ -18,6 +18,7 @@ async function redeemCode(page: Page, actor: Actor) {
   await form.getByLabel("Repeat the new password").fill(TEST_PASSWORD);
   await form.getByRole("button", { name: "Set password and log in" }).click();
   await expect(page.getByTestId("current-user")).toContainText(actor.username);
+  await routerReady(page);
   // Setting the password leaves "#/?status=all"; come back so every scenario continues from My tasks "All".
   await page.goto(TASKS_HOME);
 }
@@ -28,12 +29,7 @@ async function logout(page: Page) {
 }
 
 async function loginExisting(page: Page, actor: Actor) {
-  await openTasksHome(page);
-  const form = page.getByRole("form", { name: "Log in to Ontotator" });
-  await form.getByLabel("Username", { exact: true }).fill(actor.username);
-  await form.getByLabel("Password", { exact: true }).fill(TEST_PASSWORD);
-  await form.getByRole("button", { name: "Log in", exact: true }).click();
-  await expect(page.getByTestId("current-user")).toContainText(actor.username);
+  await loginThroughForm(page, actor.username, actor.username);
 }
 
 async function createUser(page: Page, username: string): Promise<Actor> {
@@ -48,6 +44,12 @@ async function createUser(page: Page, username: string): Promise<Actor> {
   await expect(dialog).toBeVisible();
   const code = await dialog.locator("code").innerText();
   expect(code.length).toBeGreaterThan(0);
+  // The expiry comes from the server: 7 days by default (ONTOTATOR_SETUP_CODE_HOURS), not a fixed 24 hours.
+  await expect(dialog.getByText(/^This code works once and expires in 7 days, on \d{1,2} \w{3} \d{4}, \d{2}:\d{2} \(local time\)\.$/)).toBeVisible();
+  const expires = Date.parse(await dialog.locator("time").getAttribute("datetime") ?? "");
+  expect(Math.abs(expires - Date.now() - 7 * 86_400_000)).toBeLessThan(120_000);
+  await dialog.locator("summary").click();
+  await expect(dialog.locator(".handover-text")).toContainText("valid for about 7 days, until");
   // The header close is hidden until acknowledgement; the footer Close is the acknowledgement-gated action.
   const close = dialog.locator(".modal-actions").getByRole("button", { name: "Close", exact: true });
   await expect(close).toBeDisabled();

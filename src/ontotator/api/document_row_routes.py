@@ -1,6 +1,6 @@
 """Lead-only Documents read API: grouped rows and per-row submissions."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Any, Literal, Self
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -88,6 +88,50 @@ class VersionDiscardView(_View):
     discarded_by: PersonRefView | None = None
 
 
+class VersionUploadView(_View):
+    """How a version uploaded from the text card was made (issue 341 a)."""
+
+    method: Literal["machine_translation", "human_translation", "manual_correction"]
+    provider: str | None = None
+    model: str | None = None
+    made_on: date | None = None
+    made_by: str | None = None
+    note: str | None = None
+    uploaded_at: datetime | None = None
+    uploaded_by: PersonRefView | None = None
+
+
+class VersionEditorialCorrectionView(_View):
+    """The editorial correction that made this version (issue 453)."""
+
+    reason: str
+    # The version that was corrected; this version has its status.
+    previous_document_id: str
+    inserted_characters: int
+    deleted_characters: int
+    corrected_at: datetime | None = None
+    corrected_by: PersonRefView | None = None
+
+
+class VersionQueryDecisionView(_View):
+    """The lead's decision on a query that accepted this version (issue 483)."""
+
+    # ``reviewer_text``: this version is the reviewer's proposed text;
+    # ``unchanged``: this version was accepted as it is.
+    kind: Literal["reviewer_text", "unchanged"]
+    # The version the lead decided on, the version the reviewer read and the
+    # reviewer's task.
+    decided_document_id: str
+    reviewed_document_id: str
+    reviewer_assignment_id: int
+    # What the lead wrote to the reviewer.
+    answer: str | None = None
+    # The lead changed the reviewer's text before saving it.
+    edited: bool = False
+    decided_at: datetime | None = None
+    decided_by: PersonRefView | None = None
+
+
 class DocumentVersionView(_View):
     document_id: str
     external_id: str
@@ -104,6 +148,32 @@ class DocumentVersionView(_View):
     last_activity_at: datetime | None
     acceptance: VersionAcceptanceView | None = None
     discarded: VersionDiscardView | None = None
+    upload: VersionUploadView | None = None
+    editorial_correction: VersionEditorialCorrectionView | None = None
+    query_decision: VersionQueryDecisionView | None = None
+
+
+class RowProposalSetView(_View):
+    """An imported tool proposal set on one text version (issue 337)."""
+
+    set_id: int
+    imported_at: datetime
+    # The set's first tool actor (name and version), when it names one.
+    tool: str | None = None
+    tool_version: str | None = None
+    proposal_count: int
+    # The newest set of its version (what a new task starts from).
+    newest: bool
+
+
+class AnnotationsPerTextView(_View):
+    """The text's "Annotations per text" (issue 422)."""
+
+    # What the text gets, target and limit: ``override`` if set, else
+    # ``project``.
+    effective: int
+    project: int
+    override: int | None = None
 
 
 class WorkItemView(_View):
@@ -114,7 +184,10 @@ class WorkItemView(_View):
     is_me: bool
     task: Task
     status: AssignmentStatus
+    # Paused by any cause; ``pause_causes`` names them: ``report`` (a problem
+    # report) and/or ``lead`` (the lead paused the text, issue 464).
     held: bool
+    pause_causes: list[Literal["report", "lead"]] = Field(default_factory=list)
     round_ordinal: int | None
     round_state: str | None
     # Lead workflow (D1): the assignee as a person reference.
@@ -128,6 +201,12 @@ class WorkItemView(_View):
     assigned_at: datetime | None = None
     assigned_by: PersonRefView | None = None
     annotation_mode: AnnotationMode | None = None
+    # Issue 337: the proposal set an annotation task works on (its round's,
+    # or the newest one for a task from proposals not started yet); None:
+    # not recorded, from scratch or seed proposals.
+    proposal_set: RowProposalSetView | None = None
+    # The task's round began before sets were recorded (migration 0037).
+    proposal_set_unrecorded: bool = Field(default_factory=lambda: False)
     # Spec 2026-10-25 §2: annotate work the lead confirmed before the
     # translation review was accepted (the History line).
     unreviewed_translation: bool = False
@@ -347,6 +426,17 @@ class ConsolidationProgressView(_View):
     total: int
 
 
+class LeadPauseView(_View):
+    """A lead paused the work on the text: its tasks in progress cannot be
+    saved, also tasks assigned later, until a lead releases the text.
+    Submitted work and final results are untouched."""
+
+    reason: str
+    # None: paused through an API token or by an account since erased.
+    paused_by: PersonRefView | None = None
+    paused_at: datetime
+
+
 class DocumentRowView(_View):
     case_id: str
     language: str
@@ -393,12 +483,32 @@ class DocumentRowView(_View):
     flagged_unclear: int = 0
     flagged_group_id: str | None = None
     flagged_round_id: str | None = None
+    # More unrevoked annotate tasks on a current version than "annotators per
+    # text" (filter flags=over_limit, issue 339 b).
+    over_limit: bool = Field(default_factory=lambda: False)
     # Spec 2026-10-23 §2, §2b: proposals of the newest proposal set of the
     # row's target document, the text's annotation mode (None: not planned
     # for annotation and no annotation work) and the progress of an active
     # consolidation round (shown rows only).
     proposal_count: int = 0
     annotation_mode: AnnotationModeView | None = None
+    # Issue 337: the proposal set the text's annotation tasks work on and,
+    # while any task is on an older set than the newest of the current
+    # version, that newest set (then ``proposal_set`` is the older one).
+    # Without tasks: the set a new task starts from. ``unrecorded``: the
+    # tasks began before sets were recorded, so no set is named.
+    proposal_set: RowProposalSetView | None = None
+    newer_proposal_set: RowProposalSetView | None = None
+    proposal_set_unrecorded: bool = Field(default_factory=lambda: False)
+    # Issue 422: the text's "Annotations per text" (None in older fixtures).
+    annotations_per_text: AnnotationsPerTextView | None = None
+    # Issue 464: the lead paused the work on the text (filter
+    # flags=lead_paused); None: not paused.
+    lead_pause: LeadPauseView | None = None
+    # Issue 484: typography hints (spacing errors, invisible characters) in
+    # the newest version of the text (filter flags=typography_hints);
+    # computed on request, never stored.
+    typography_hints: int = Field(default_factory=lambda: 0)
     consolidation_progress: ConsolidationProgressView | None = None
     # Spec 2026-10-25 §2: the rule is off and the translation is not accepted,
     # so annotating it needs an explicit acknowledgement.
@@ -513,6 +623,8 @@ class RowSubmissionView(_View):
     finding_count: int
     author: PersonRefView | None = None
     guideline_version: int | None = None
+    # The project's own name of that version ("3.1"), if it has one.
+    guideline_label: str | None = None
     guideline_withdrawn: bool = False
     # Consolidation submissions: findings kept automatically (all matched, U14).
     # A factory default keeps it optional in the generated types: the
@@ -547,16 +659,52 @@ class OpenTranslationReviewView(_View):
     reviewer: PersonRefView | None = None
 
 
-class RowChangeView(_View):
-    """A change of who works on a row, or how: its History line."""
+class RowResultRefView(_View):
+    """A submission named as a final result in a History line: its author,
+    and whether it is a consolidation."""
 
-    kind: Literal["reassigned", "mode_changed", "mode_restored"]
+    author: PersonRefView
+    consolidation: bool = False
+
+
+class RowChangeView(_View):
+    """A change of who works on a row, how, or of its final result: its
+    History line, with who did it, when and (where one was given) why.
+
+    ``by`` is the person who made the change; a withdrawn final result
+    (#343) names the lead in ``from_person`` instead. ``reopened``,
+    ``reopen_undone`` and ``round_started`` name the task and its person
+    (``assignment_id``, ``to_person``); the ``final_*`` kinds name the
+    results (``from_result`` the one replaced, ``to_result`` the one final
+    afterwards; null when the submission is no longer among the row's).
+    ``text_paused`` and ``text_released`` (issue 464) are a lead's pause and
+    release of the text, with ``by`` and the ``reason`` given."""
+
+    kind: Literal[
+        "reassigned",
+        "mode_changed",
+        "mode_restored",
+        "final_withdrawn",
+        "reopened",
+        "reopen_undone",
+        "round_started",
+        "final_chosen",
+        "final_changed",
+        "final_restored",
+        "text_paused",
+        "text_released",
+    ]
     at: datetime
     task: str | None = None
+    by: PersonRefView | None = None
+    assignment_id: int | None = None
+    round_ordinal: int | None = None
     from_person: PersonRefView | None = None
     to_person: PersonRefView | None = None
     from_mode: str | None = None
     to_mode: str | None = None
+    from_result: RowResultRefView | None = None
+    to_result: RowResultRefView | None = None
     reason: str | None = None
 
 

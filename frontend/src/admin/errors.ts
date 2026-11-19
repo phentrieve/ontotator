@@ -1,3 +1,4 @@
+import { guidelineVersionName, MAX_GUIDELINE_LABEL_CHARS } from "../guidelines/versionName";
 import { ApiError, NetworkError } from "../api/client";
 
 /** The server's guideline file refusals; the client-side file checks reuse them verbatim. */
@@ -59,6 +60,7 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   REPORT_SUBMISSION_INVALID: "Choose a submission from this exact task and round.",
   RESTART_AGREEMENT_REQUIRED: "Ask the project lead to agree to a clean restart through the problem report.",
   CONSOLIDATION_ACTIVE: "Someone else is already consolidating this text. Open their consolidation from the text card.",
+  CONSOLIDATION_OPEN: "A consolidation is open on this text: finish or withdraw it first.",
   ROUND_ACTIVE: "This task already has unfinished work. Complete it or agree on a clean restart first.",
   ROUND_ALREADY_EXISTS: "This task already has a work round. Open it from the round history.",
   ROUND_INPUTS_INCOMPLETE: "Check every carried finding before submitting. Complete it or dismiss it with a reason.",
@@ -254,7 +256,11 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   WORK_PLAN_CONFIRMATION_REQUIRED: "This change affects existing work. Confirm to continue.",
   WORK_PLAN_INVALID: "Annotation needs an accepted translation.",
   NOT_IN_WORK_PLAN: "This language version is not planned for this task.",
+  EDITORIAL_CORRECTION_NOT_AVAILABLE: "This typo fix cannot be saved. Reload the row to see its current state.",
+  QUERY_DECISION_NOT_AVAILABLE: "This query can no longer be decided here. Reload the row to see its current state.",
   LEAD_CORRECTION_NOT_AVAILABLE: "This translation can no longer be corrected here. Reload the row to see its current state.",
+  VERSION_NOT_ACCEPTABLE: "This version can no longer be accepted here. Reload the row to see its current state.",
+  VERSION_UPLOAD_NOT_AVAILABLE: "A new version cannot be uploaded here any more. Reload the row to see its current state.",
   CASE_IDS_TOO_MANY: "Paste at most 5000 case IDs.",
   VARIANT_ALREADY_DISCARDED: "This translation was already discarded.",
   ASSIGNMENT_BATCH_STALE: "The cases or people changed. Check the new preview.",
@@ -266,7 +272,12 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   NO_TOOL_PROPOSALS: "This text has no tool proposals, so it is annotated from scratch.",
   ANNOTATION_MODE_NOT_LOCKED: "No work fixes this text's mode yet. Choose the mode in the annotation plan.",
   ANNOTATION_MODE_UNCHANGED: "The text is already annotated this way.",
-  ANNOTATION_MODE_FINAL_SELECTED: "A final result was chosen for this text, so its annotation mode stays.",
+  ANNOTATION_MODE_FINAL_SELECTED: "A final result was chosen for this text, so its annotation mode stays. To change it, first use Withdraw final… under Finalization.",
+  WITHDRAW_REASON_REQUIRED: "Withdrawing a final result requires a reason.",
+  PREVIEW_STALE: "The texts changed since the preview. Check the new preview.",
+  BULK_UNDO_STALE: "Undo is no longer possible: the texts changed since.",
+  BULK_REASON_REQUIRED: "Reopening tasks requires a reason.",
+  PAUSE_REASON_REQUIRED: "Pausing texts requires a reason.",
   MODE_CHANGE_STALE: "The work on this text changed. Check the new list before you change the mode.",
   MODE_CHANGE_REASON_REQUIRED: "Changing the mode requires a reason.",
   MODE_CHANGE_NOT_FOUND: "This mode change no longer exists. Reload the text.",
@@ -277,6 +288,10 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
 export function errorMessage(error: unknown): string {
   // Never the raw browser text ("Failed to fetch").
   if (error instanceof NetworkError) return "Connection lost. Try again.";
+  if (error instanceof ApiError && error.code === "VARIANT_REVIEW_STALE" && typeof error.details === "object" && error.details !== null && error.details.reason === "typos_fixed") {
+    const version = error.details.version;
+    return `A lead fixed typos in this version${typeof version === "number" ? `: v${version} is the text to review` : ""}. Assign a review of the newest version.`;
+  }
   if (error instanceof ApiError && error.code === "REANCHOR_ITEMS_UNRESOLVED" && typeof error.details === "object" && error.details !== null) {
     const count = error.details.count;
     if (typeof count === "number" && Number.isSafeInteger(count) && count >= 0) return `${count} finding(s) after text correction still need review. Re-create them or dismiss them with a reason before submitting.`;
@@ -296,6 +311,17 @@ export function errorMessage(error: unknown): string {
   if (error instanceof ApiError && error.code === "TEXT_CHANGE_NOT_APPLICABLE" && typeof error.details === "object" && error.details !== null && error.details.reason === "no_target_proposals") {
     return "The new version has no proposals yet: their automatic transfer may still be running, or they must be imported. Wait for or import the proposals for the new version, then try again.";
   }
+  // Issue 461: the submission has a decision for this version already; the refusal names it.
+  if (error instanceof ApiError && error.code === "TEXT_CHANGE_NOT_APPLICABLE" && typeof error.details === "object" && error.details !== null && error.details.reason === "already_resolved") {
+    if (error.details.resolution === "dismissed") return "It was already decided to start this version fresh. That decision is final.";
+    if (error.details.resolution === "carried" || error.details.resolution === "handed_over") return "This work was already carried to this version. Its task is still there or was submitted. Reload the row.";
+  }
+  // Issue 464: the lead paused the text. The refusal names the cause and the lead's reason.
+  if (error instanceof ApiError && error.code === "TASK_HELD" && typeof error.details === "object" && error.details !== null
+    && Array.isArray(error.details.causes) && error.details.causes.includes("lead")) {
+    const reason = typeof error.details.lead_reason === "string" ? error.details.lead_reason.trim() : "";
+    return `The project lead paused the work on this text${reason ? `: ${reason}` : "."}${reason && !/[.!?]$/.test(reason) ? "." : ""} This change was not saved; your local input is kept. You can continue when the lead releases the text.`;
+  }
   // Practice (issue 266): the server says why it is not available.
   if (error instanceof ApiError && error.code === "PRACTICE_UNAVAILABLE" && typeof error.details === "object" && error.details !== null
     && typeof error.details.message === "string" && error.details.message.trim()) return error.details.message;
@@ -311,13 +337,15 @@ export function errorMessage(error: unknown): string {
     : "Something went wrong. Please try again.";
 }
 
-/** Guideline refusals that name a version (`v{n}`) or the refused field. */
+/** Guideline refusals that name a version (`v{n}`, or `3.1 (v{n})` with the project's own label) or the refused field. */
 function guidelineMessage(error: unknown): string | null {
   if (!(error instanceof ApiError) || typeof error.details !== "object" || error.details === null) return null;
   const version = error.details.version;
   const named = typeof version === "number" && Number.isSafeInteger(version) && version > 0;
-  if (error.code === "GUIDELINE_UNCHANGED" && named) return `This file is identical to v${version}. Nothing was published.`;
-  if (error.code === "GUIDELINE_ALREADY_WITHDRAWN" && named) return `v${version} is already withdrawn.`;
+  const name = named ? guidelineVersionName(version, typeof error.details.label === "string" ? error.details.label : null) : "";
+  if (error.code === "GUIDELINE_UNCHANGED" && named) return `This file is identical to ${name}. Nothing was published.`;
+  if (error.code === "GUIDELINE_ALREADY_WITHDRAWN" && named) return `${name} is already withdrawn.`;
+  if (error.code === "GUIDELINE_NOTE_INVALID" && error.details.field === "label") return `The version label must be one line of at most ${MAX_GUIDELINE_LABEL_CHARS} characters.`;
   if (error.code === "GUIDELINE_NOTE_INVALID" && error.details.field === "reason") return "The reason must be one line of at most 280 characters.";
   return null;
 }

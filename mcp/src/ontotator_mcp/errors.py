@@ -10,6 +10,7 @@ part of a message: should the server echo it back, it is replaced by ``***``.
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 import httpx
@@ -76,14 +77,175 @@ HINTS: dict[str, str] = {
         "The change withdraws tasks or final results (listed above); pass"
         " withdraw_tasks to apply it anyway."
     ),
+    "CONSOLIDATION_OPEN": (
+        "A consolidation is open on this text, and a new round would take away a"
+        " submission it rests on. Have the consolidation finished, or withdraw"
+        " its task (withdraw_task), then repeat the call."
+    ),
     "WORKFLOW_REVISION_CONFLICT": (
-        "The task or report changed in the meantime. Run the dry run again and repeat."
+        "The task or report changed in the meantime. Read the current state again"
+        " (the tool's dry run, where it has one) and repeat the call."
+    ),
+    "EDITORIAL_CORRECTION_NOT_AVAILABLE": (
+        "The reason says why (the dry run shows it too). A replacement that is"
+        " not found, ambiguous or overlapping names its index."
+    ),
+    "DOCUMENT_NOT_FOUND": (
+        "No such text version in this project, or the token's owner may not read"
+        " it. list_texts names the document_id of each text."
+    ),
+    "VERSION_NOT_FOUND": (
+        "No such submission or annotation version of this text, or the token's"
+        " owner may not read it. list_annotation_versions and get_text_detail"
+        " name the ones on offer; drafts cannot be read."
     ),
     "GUIDELINE_VERSION_CONFLICT": (
-        "Another guideline version was published meanwhile; check the guideline"
-        " and repeat."
+        "Another guideline version was published or withdrawn meanwhile; check"
+        " list_guidelines and repeat."
+    ),
+    # The request named no latest version (#486): repeating never helps.
+    "GUIDELINE_VERSION_CONFLICT/expected_version_missing": (
+        "The request did not say which guideline version it saw as the latest,"
+        " although the project has versions; nobody published meanwhile. An"
+        " ontotator-mcp older than the Ontotator server sends none: restart the"
+        " MCP server after an upgrade (whoami shows both versions). A script"
+        " sends expected_latest_version, the latest_version of GET .../guidelines."
+    ),
+    "GUIDELINE_NOTE_INVALID": (
+        "change_note (publish_guideline) and reason (withdraw_guideline) are one"
+        " line of at most 280 characters; annotators see it. Shorten it and"
+        " repeat the call."
+    ),
+    "ASSIGNEE_ROLE_MISSING": (
+        "The person lacks the project role this task needs ('annotator' for"
+        " annotations and translation reviews, 'adjudicator' for a"
+        " consolidation). list_people shows the roles; add the role with"
+        " set_member_roles, then repeat the call."
+    ),
+    "ASSIGNEE_INACTIVE": (
+        "The person's account is deactivated. Choose another person (list_people)."
+    ),
+    "NOT_A_MEMBER": (
+        "The person is not a member of the project. Add them with"
+        " set_member_roles, then repeat the call."
+    ),
+    "ANNOTATIONS_PER_TEXT_REACHED": (
+        "The text already has as many annotators as its annotations per text"
+        " allow. Raise the number (set_annotations_per_text for single texts,"
+        " update_project_settings for the project) or withdraw one of its tasks"
+        " (withdraw_task), then repeat the call."
+    ),
+    "VARIANT_REVIEW_STALE": (
+        "The text version or its review is not the one named: a newer version or"
+        " review arrived since the dry run, or the value passed is not the one"
+        " the dry run returned. Run the dry run again and confirm with its"
+        " text_sha256. decide_translation_query confirms with its preview_token"
+        " instead."
+    ),
+    "NOT_A_TRANSLATION": (
+        "This works on translations only. list_texts gives the document_id of"
+        " each translation (is_source false)."
+    ),
+    "NOT_A_TRANSLATION/not_a_translation": (
+        "document_id names a source text; this works on translations only."
+        " list_texts gives the document_id of each translation (is_source"
+        " false). A source text gets a new version by importing a package"
+        " (upload_texts)."
+    ),
+    "VERSION_UPLOAD_NOT_AVAILABLE": (
+        "No version can follow this one; the dry run (confirm false) names the reason."
+    ),
+    "VERSION_UPLOAD_NOT_AVAILABLE/not_newest": (
+        "document_id is not the newest version of its translation. list_texts"
+        " names the newest (document_id, version); repeat the call with it."
+    ),
+    "VERSION_UPLOAD_NOT_AVAILABLE/discarded": (
+        "This version was discarded; no version can follow it. list_texts names"
+        " the current version of the translation."
+    ),
+    "VERSION_UPLOAD_NOT_AVAILABLE/review_open": (
+        "A translation review or lead correction of this version is open. Let"
+        " it be submitted, or withdraw its task (list_assignments,"
+        " withdraw_task), then repeat the call."
+    ),
+    "VERSION_UPLOAD_NOT_AVAILABLE/unchanged": (
+        "The text equals the current version; there is nothing to upload."
+    ),
+    "BULK_UNDO_STALE": (
+        "This undo is no longer available; run the tool's dry run (confirm"
+        " false) to see why."
+    ),
+    "BULK_UNDO_STALE/not_found": (
+        "No undo with this undo_id for this token's owner in this project. Pass"
+        " the undo.id of the confirmed answer (change_final_results or"
+        " set_final_result for undo_change_final_results; reopen_texts or"
+        " withdraw_open_tasks for undo_reopen_or_withdraw), with a token of the"
+        " lead who made the change."
+    ),
+    "BULK_UNDO_STALE/expired": (
+        "The 60 minutes for this undo are over. Change single texts or tasks"
+        " back instead (set_final_result, reopen_task, withdraw_task,"
+        " assign_texts)."
+    ),
+    "BULK_UNDO_STALE/already_undone": (
+        "This change was undone already; an undo works once."
+    ),
+    "BULK_UNDO_STALE/not_undoable": (
+        "This action has no undo (a reopened translation review restarted its"
+        " draft). Change single tasks back with reopen_task, withdraw_task or"
+        " assign_texts."
+    ),
+    "BULK_UNDO_STALE/changed": (
+        "The texts changed since the action; nothing was restored. The dry run"
+        " (confirm false) names what is in the way."
+    ),
+    # The lead's decision on a queried translation review (#483, #485).
+    "QUERY_DECISION_NOT_AVAILABLE": (
+        "The query on this version cannot be decided; the dry run of"
+        " decide_translation_query (confirm false) names the reason."
+    ),
+    "QUERY_DECISION_NOT_AVAILABLE/already_decided": (
+        "A lead already decided this query; a query is decided once. list_texts"
+        " shows the accepted version of the translation."
+    ),
+    "QUERY_DECISION_NOT_AVAILABLE/not_a_query": (
+        "The latest translation review of this version was not submitted as a"
+        " query, or the version is not waiting for the lead (list_translation_reviews"
+        " shows the decisions). For a rejected translation use"
+        " start_lead_correction; for a text reviewed outside Ontotator,"
+        " upload_translation_version and accept_translation_version."
+    ),
+    "QUERY_DECISION_NOT_AVAILABLE/review_open": (
+        "A translation review or lead correction of this version is open. Let"
+        " it be submitted, or withdraw its task (list_assignments,"
+        " withdraw_task), then repeat the call."
+    ),
+    "QUERY_DECISION_NOT_AVAILABLE/not_newest": (
+        "document_id is not the newest version of its translation. list_texts"
+        " names the newest (document_id, version); repeat the call with it."
+    ),
+    "QUERY_DECISION_NOT_AVAILABLE/discarded": (
+        "This version was discarded; its query cannot be decided. list_texts"
+        " names the current version of the translation."
+    ),
+    "QUERY_DECISION_NOT_AVAILABLE/unchanged": (
+        "The text to save equals the text of the version, so there is no new"
+        " version to make. Accept the version as it is: decision 'unchanged'"
+        " with an answer."
+    ),
+    "QUERY_DECISION_NOT_AVAILABLE/answer_required": (
+        "Accepting the version as it is (decision 'unchanged') needs an answer"
+        " to the reviewer's question: pass answer."
     ),
 }
+
+
+def hint_for(code: str | None) -> str | None:
+    """What to do about ``code``: the sentence for the code with its reason
+    (``CODE/reason``) if there is one, else the one for the code alone."""
+    if not code:
+        return None
+    return HINTS.get(code) or HINTS.get(code.split("/")[0])
 
 
 class OntotatorError(ToolError):
@@ -96,12 +258,25 @@ class OntotatorError(ToolError):
         status: int | None = None,
         code: str | None = None,
         details: Any = None,
+        refusal: str | None = None,
     ) -> None:
         super().__init__(message)
         self.status = status
         self.code = code
         # The API's ``details``, for a tool that reports them as a dry run.
         self.details = details
+        # The message without the general advice, for a tool that knows
+        # better what to do next (``with_advice``).
+        self.refusal = refusal or message
+
+    def with_advice(self, advice: str) -> OntotatorError:
+        """The same refusal, with ``advice`` in place of the general hint."""
+        return OntotatorError(
+            sentences([self.refusal, advice]),
+            status=self.status,
+            code=self.code,
+            details=self.details,
+        )
 
 
 def _text(value: Any) -> str:
@@ -155,6 +330,9 @@ def api_error(response: httpx.Response) -> OntotatorError:
         if isinstance(body.get("code"), str):
             code = body["code"]
             details = body.get("details")
+            # A refusal without details repeats its code as the details.
+            if details == code:
+                details = None
         elif "detail" in body:
             detail = body["detail"]
             code = "VALIDATION_ERROR" if response.status_code == 422 else None
@@ -170,14 +348,53 @@ def api_error(response: httpx.Response) -> OntotatorError:
     parts = [head]
     if details not in (None, ""):
         parts.append(_text(details))
-    hint = HINTS.get((code or "").split("/")[0])
+    token = _bearer(request)
+    refusal = redact(sentences(parts), token)
+    hint = hint_for(code)
     if hint is None and response.status_code == 404:
         hint = "Not found, or not visible to the token's owner."
     if hint:
         parts.append(hint)
-    message = redact(sentences(parts), _bearer(request))
+    message = redact(sentences(parts), token)
     return OntotatorError(
-        message, status=response.status_code, code=code, details=details
+        message,
+        status=response.status_code,
+        code=code,
+        details=details,
+        refusal=refusal,
+    )
+
+
+PREVIEW_TOKEN = re.compile(r"sha256:[0-9a-f]{64}")
+
+
+def check_preview_token(token: str | None) -> str:
+    """The token a confirm call passed, if it can be one of a dry run.
+
+    A token that is missing, cut or mistyped is refused here, so that the
+    answer does not read as "something changed since the dry run".
+    """
+    if token is None:
+        raise OntotatorError(
+            "Run the dry run first and pass its preview_token with confirm."
+        )
+    if not PREVIEW_TOKEN.fullmatch(token):
+        raise OntotatorError(
+            "This preview_token is not one a dry run returned (it is cut or"
+            " mistyped); nothing was changed. Pass the preview_token of the"
+            " last dry run exactly as it was returned."
+        )
+    return token
+
+
+def stale_note(what: str, done: str = "changed") -> str:
+    """The note of a confirm the server refused as stale: the fresh dry run
+    follows. A well-formed token of another dry run looks the same to the
+    server as a change, so the note names both."""
+    return (
+        f"{what} changed since the dry run, or the preview_token is not the one"
+        f" of the last dry run with the same arguments; nothing was {done}."
+        " Check this new dry run and confirm with its preview_token."
     )
 
 

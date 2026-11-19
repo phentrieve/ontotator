@@ -27,17 +27,18 @@ export interface StageActionsProps {
   canRequestCorrection?: (row: DocumentRowView) => boolean;
   onChangeFinal?: (row: DocumentRowView) => void;
   canChangeFinal?: (row: DocumentRowView) => boolean;
+  /** "Withdraw final…" (issue 343), next to "Change final…" and under the same condition (`canChangeFinal`). */
+  onWithdrawFinal?: (row: DocumentRowView) => void;
   textVersionTools?: TextVersionsTools;
-  /** The text card: its person rows carry every person's Reassign… / Reopen… / Remove…, its versions Request correction. */
+  /** The text card: its person rows carry every person's Reassign… / Reopen… / Remove…, its versions "Ask a reviewer to correct…". */
   inCard?: boolean;
 }
 
 /**
  * Admin actions of the given stage, or of every stage: Annotation "Reassign…" (one direct button per open
- * task, S3) and "Reopen…" of a submitted annotation; Translation "Reopen…" of a submitted review, "Request
- * correction…", "Assign a new review…"; Finalization "Change final…" of a decided row.
+ * task, S3) and "Reopen…" of a submitted annotation; Translation "Reopen…" of a submitted review, "Ask a reviewer to correct…", "Assign a new review…"; Finalization "Change final…" and "Withdraw final…" of a decided row.
  */
-export function StageActions({ row, stage, onAssign, onRequestCorrection, canRequestCorrection, onChangeFinal, canChangeFinal, textVersionTools, inCard = false }: StageActionsProps): JSX.Element | null {
+export function StageActions({ row, stage, onAssign, onRequestCorrection, canRequestCorrection, onChangeFinal, canChangeFinal, onWithdrawFinal, textVersionTools, inCard = false }: StageActionsProps): JSX.Element | null {
   const show = (name: PanelStage) => !stage || stage === name;
   const documents = new Set(row.versions.map(version => version.document_id));
   // Open work of the stage (reviewers under Translation, annotators under Annotation): Reassign… and the assignment actions.
@@ -55,7 +56,9 @@ export function StageActions({ row, stage, onAssign, onRequestCorrection, canReq
   const correction = show("review") && !inCard && onRequestCorrection && canRequestCorrection?.(row);
   const newReview = show("review") && onAssign && canAssignNewReview(row);
   const changeFinal = show("final") && onChangeFinal && canChangeFinal?.(row);
-  if (!reassignable.length && !reopenable.length && !correction && !newReview && !changeFinal) return null;
+  // Like "Change final…": not while the row's final decision is open (the decision block then holds the final).
+  const withdrawFinal = show("final") && onWithdrawFinal && row.final != null && canChangeFinal?.(row);
+  if (!reassignable.length && !reopenable.length && !correction && !newReview && !changeFinal && !withdrawFinal) return null;
   const personOf = (pseudonym: string) => {
     const display = textVersionTools?.members.find(member => member.pseudonym === pseudonym)?.display_name?.trim();
     return display ? `${display} (${pseudonym})` : pseudonym;
@@ -71,8 +74,9 @@ export function StageActions({ row, stage, onAssign, onRequestCorrection, canReq
       {reopening === assignment.id && textVersionTools && <AssignmentActions assignment={assignment} textName={textLabel(row)} members={textVersionTools.members} open="reopen"
         onChanged={textVersionTools.onAssignmentsChanged} onClose={() => setReopening(null)} />}
     </div>)}
-    {correction && <Button size="sm" onClick={() => onRequestCorrection(row)}>Request correction…</Button>}
+    {correction && <Button size="sm" onClick={() => onRequestCorrection(row)}>Ask a reviewer to correct…</Button>}
     {newReview && <Button size="sm" onClick={() => onAssign(row, "translation_review", { newReviewOfAccepted: true })}>Assign a new review…</Button>}
     {changeFinal && <Button size="sm" onClick={() => onChangeFinal(row)}>Change final…</Button>}
+    {withdrawFinal && <Button size="sm" onClick={() => onWithdrawFinal(row)}>Withdraw final…</Button>}
   </>;
 }

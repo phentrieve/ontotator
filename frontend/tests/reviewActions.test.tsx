@@ -45,6 +45,41 @@ describe("ReviewActions", () => {
     is_obsolete: false,
   };
 
+  it("offers Copy text next to each quoted passage, several segments joined by a space (review F4)", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+    try {
+      const announce = vi.fn();
+      const mention = (id: string, segments: { start: number; end: number }[]) => ({ version: "v1", mention: { evidence_id: id, segments } });
+      render(<ReviewActions target={{ ...sampleTarget, evidence_count: 2 }} currentDecision={null} draftAnnotations={[]} onDecide={vi.fn()} onCopyAnnounce={announce}
+        documentText="Muscle tone in the arms is clearly reduced. No seizure."
+        evidence={[mention("e1", [{ start: 0, end: 11 }, { start: 35, end: 42 }]), mention("e2", [{ start: 47, end: 54 }])] as never} />);
+      const buttons = screen.getAllByRole("button", { name: "Copy text" });
+      expect(buttons).toHaveLength(2);
+      await act(async () => { fireEvent.click(buttons[0]); });
+      expect(writeText).toHaveBeenLastCalledWith("Muscle tone reduced");
+      expect(announce).toHaveBeenLastCalledWith("Copied the text.");
+      await act(async () => { fireEvent.click(buttons[1]); });
+      expect(writeText).toHaveBeenLastCalledWith("seizure");
+    } finally { vi.unstubAllGlobals(); }
+  });
+  it("shows the sentence around each quoted passage only when asked (issue 468)", () => {
+    const mention = (id: string, segments: { start: number; end: number }[]) => ({ version: "v1", mention: { evidence_id: id, segments } });
+    const props = { target: sampleTarget, currentDecision: null, draftAnnotations: [], onDecide: vi.fn(),
+      documentText: "Muscle tone is reduced. No seizure today.", evidence: [mention("e1", [{ start: 27, end: 34 }])] as never };
+    const { container, rerender } = render(<ReviewActions {...props} />);
+    expect(container.querySelector(".review-actions__sentence")).toBeNull();
+    rerender(<ReviewActions {...props} showSentence />);
+    const sentence = container.querySelector(".review-actions__sentence")!;
+    expect(sentence.textContent).toBe("In the text: No seizure today.");
+    expect(sentence.querySelector("mark")?.textContent).toBe("seizure");
+  });
+  it("offers no Copy text for a proposal without a text span", () => {
+    render(<ReviewActions target={{ ...sampleTarget, evidence_count: 0 }} currentDecision={null} draftAnnotations={[]} onDecide={vi.fn()} evidence={[]} />);
+    expect(screen.getByText("No text mention (spanless)")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Copy text" })).toBeNull();
+  });
+
   it("renders 4 origin-neutral action buttons identically for human and tool proposals", () => {
     const onDecide = vi.fn();
 

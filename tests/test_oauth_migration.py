@@ -1,4 +1,4 @@
-"""Migration 0039: OAuth tables and ``api_tokens.oauth_grant_id`` on live data."""
+"""Migration 0053: OAuth tables and ``api_tokens.oauth_grant_id`` on live data."""
 
 from collections.abc import Iterator
 
@@ -9,8 +9,8 @@ from sqlalchemy.exc import IntegrityError
 
 from ontotator.storage.schema import upgrade
 
-REVISION = "0039"
-PREVIOUS = "0038"
+REVISION = "0053"
+PREVIOUS = "0049"
 S = "ontotator"
 
 

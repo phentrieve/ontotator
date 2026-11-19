@@ -317,6 +317,8 @@ def test_batch_skips_a_locked_text_without_proposals_and_assigns_the_rest(env):
             "language": "en",
             "reason": "no_proposals_on_version",
             "document_id": None,
+            "assigned": None,
+            "per_text": None,
         }
     ]
     saved = env.lead.post(

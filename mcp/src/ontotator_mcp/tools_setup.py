@@ -9,8 +9,10 @@ from typing import Annotated, Any, Literal
 from mcp.server.mcpserver import MCPServer
 from pydantic import Field
 
+from ontotator_mcp import __version__
 from ontotator_mcp.client import OntotatorClient, project_path, seg
-from ontotator_mcp.errors import OntotatorError
+from ontotator_mcp.config import READ_CONTENT_VARIABLE
+from ontotator_mcp.errors import OntotatorError, hint_for
 from ontotator_mcp.models import (
     AssignmentRow,
     CasePlanChoice,
@@ -47,6 +49,18 @@ def _cut(items: Any, limit: int = MAX_LISTED) -> Any:
     if isinstance(items, list) and len(items) > limit:
         return [*items[:limit], f"... {len(items) - limit} more"]
     return items
+
+
+def unknown_texts(found: dict[str, Any], limit: int = 50) -> dict[str, Any]:
+    """``unknown_texts`` of a bulk answer: the selected texts the project does
+    not have (another spelling, letter case or language), as they were given.
+    Nothing happens to them. An older server does not report them
+    (``unknown_rows``); then the answer has no such entry instead of an empty
+    list."""
+    rows = found.get("unknown_rows")
+    if not isinstance(rows, list):
+        return {}
+    return {"unknown_texts": _cut(rows, limit), "unknown_text_count": len(rows)}
 
 
 def utc_now() -> datetime:
@@ -105,6 +119,18 @@ def upload_summary(view: dict[str, Any]) -> dict[str, Any]:
         "work_plan": plan.get("work_plan"),
     }
 
+
+# Issue 409: the path that works for a version without a lead or override
+# acceptance.
+ACCEPTED_BY_REVIEW_HINT = (
+    "This version has no acceptance by a lead or an import override (it was"
+    " accepted by a translation review or in its package). Ask for its new review"
+    " (a correction or a second opinion) with request_translation_correction"
+    " (in the web interface: Ask a reviewer to correct... at the accepted version)."
+)
+
+# One line a guideline's change note or withdrawal reason may have.
+NOTE_LENGTH = 280
 
 OPEN_STATES = ("open", "in_progress", "reopened")
 
@@ -175,11 +201,42 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
 
         Call this first to check that ONTOTATOR_URL and ONTOTATOR_TOKEN work.
         Any scope but admin alone reads the token itself; ``expires_in_days`` and a warning
-        tell when to replace it. With the read scope and a token that is not
-        a project token it also names the user and the server's version.
+        tell when to replace it. For every kind of token it names the
+        version of the Ontotator server (``server``) and of this MCP server
+        (``mcp_server``), with a ``warning`` when they differ, and whether
+        this MCP server has the content tools on (``content_tools``). With
+        the read scope and a token that is not a project token it also
+        names the user.
         """
         token = token_summary(await api.get("/api/v1/me/token"), now=utc_now())
-        result: dict[str, Any] = {"token": token, "url": api.settings.url}
+        result: dict[str, Any] = {
+            "token": token,
+            "url": api.settings.url,
+            "mcp_server": {
+                "version": __version__,
+                "content_tools": api.settings.read_content,
+                "content_tools_note": (
+                    f"On: this MCP server was started with {READ_CONTENT_VARIABLE}=1."
+                    if api.settings.read_content
+                    else "Off: the tools that return texts and submitted"
+                    " annotations do not exist. They are a setting of this MCP"
+                    " server, not of the Ontotator server: set"
+                    f" {READ_CONTENT_VARIABLE}=1 in the MCP client's"
+                    " configuration of ontotator-mcp (env) and restart it."
+                ),
+            },
+        }
+        # The version is open to every token, a project token included.
+        about: dict[str, Any] = await api.get("/api/v1/about")
+        result["server"] = about
+        if about.get("version") != __version__:
+            result["warning"] = (
+                f"This MCP server is ontotator-mcp {__version__}, the Ontotator"
+                f" server is {about.get('version')}. Tools may send requests the"
+                " server no longer accepts, or miss newer ones. Install the"
+                " ontotator-mcp of the server's release and restart the MCP"
+                " server (a running process keeps the code it started with)."
+            )
         if "read" not in token["scopes"] or token["project_key"] is not None:
             result["user"] = None
             result["note"] = (
@@ -189,9 +246,8 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
             )
             return result
         me = await api.get("/api/v1/auth/me")
-        about = await api.get("/api/v1/about")
         me.pop("csrf_token", None)
-        return result | {"user": me, "server": about}
+        return result | {"user": me}
 
     @register(server, scopes="read", effect="read")
     async def list_projects() -> list[dict[str, Any]]:
@@ -385,7 +441,7 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         )
         return settings
 
-    @register(server, scopes="project-admin", effect="additive")
+    @register(server, scopes=("read", "project-admin"), effect="additive")
     async def publish_guideline(
         project: Project,
         path: Annotated[
@@ -397,7 +453,26 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
                 )
             ),
         ],
-        change_note: str = "",
+        change_note: Annotated[
+            str,
+            Field(
+                max_length=NOTE_LENGTH,
+                description=(
+                    "What changed, in one line of at most 280 characters;"
+                    " annotators see it."
+                ),
+            ),
+        ] = "",
+        label: Annotated[
+            str,
+            Field(
+                description=(
+                    "The version the guideline document gives itself, e.g. '3.1';"
+                    " one line, at most 40 characters. Shown before the upload"
+                    " number: 'Guidelines 3.1 (v2)'. Empty: none."
+                )
+            ),
+        ] = "",
     ) -> dict[str, Any]:
         """Publish a new version of the project's annotation guideline.
 
@@ -406,14 +481,24 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         the absolute path read. Only files inside the folders of
         ONTOTATOR_MCP_FILES_DIR; without that variable it refuses. Earlier
         versions stay; annotators are asked
-        to read the new one.
+        to read the new one. Refused with GUIDELINE_VERSION_CONFLICT if
+        another version was published meanwhile. 'version' in the result
+        counts the project's uploads and is the identifier; 'label' is the
+        document's own version, if one was given.
         """
         files = api.local_files([path])
+        listing = await api.get(project_path(project, "guidelines"))
+        latest = listing.get("latest_version")
         summary: dict[str, Any] = await api.upload(
             project_path(project, "guidelines"),
             "file",
             files,
-            data={"change_note": change_note},
+            data={
+                "change_note": change_note,
+                # A form field: empty for a project without a guideline.
+                "expected_latest_version": "" if latest is None else str(latest),
+                "label": label,
+            },
         )
         return summary | {"local_files": [str(file) for file in files]}
 
@@ -421,7 +506,15 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
     async def withdraw_guideline(
         project: Project,
         version: Annotated[int, Field(ge=1, description="Guideline version.")],
-        reason: str | None = None,
+        reason: Annotated[
+            str | None,
+            Field(
+                max_length=NOTE_LENGTH,
+                description=(
+                    "Why, in one line of at most 280 characters; annotators see it."
+                ),
+            ),
+        ] = None,
     ) -> dict[str, Any]:
         """Withdraw a published guideline version, for example one published by mistake.
 
@@ -681,8 +774,11 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
             Field(
                 description=(
                     "'review_accepted_translation': a new translation review of"
-                    " a version already accepted (by a lead, or as reviewed"
-                    " outside with accept_external_review of commit_upload)."
+                    " a version already accepted by a lead or by an import"
+                    " override (accept_external_review of commit_upload). A"
+                    " version accepted only by a translation review is refused"
+                    " (reason accepted_by_review): ask for its new review"
+                    " with request_translation_correction."
                 )
             ),
         ] = "annotate",
@@ -691,7 +787,18 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         ] = False,
         confirm_unreviewed_translation: bool = False,
     ) -> dict[str, Any]:
-        """Assign text versions to people, one task per row."""
+        """Assign text versions to people, one task per row.
+
+        The tasks are created in the order of the rows. My tasks lists a
+        person's tasks by status, then in the order of assignment, and the
+        editor opens the next task in that order: put the rows in the order
+        the person should work in. New tasks come after the tasks the person
+        already has.
+
+        A row that cannot be assigned does not fail the call: it is listed
+        under ``refused`` with its code and a hint, and ``warning`` counts
+        such rows.
+        """
         body: dict[str, Any] = {
             "rows": [row.model_dump() for row in assignments],
             "task": task,
@@ -703,6 +810,23 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         result: dict[str, Any] = await api.post(
             project_path(project, "assignments"), body
         )
+        refused = result.get("refused", [])
+        for refusal in refused:
+            code = str(refusal.get("code") or "")
+            reason = refusal.get("reason")
+            if reason == "accepted_by_review":
+                refusal["hint"] = ACCEPTED_BY_REVIEW_HINT
+            elif hint := hint_for(f"{code}/{reason}" if reason else code):
+                refusal["hint"] = hint
+        if refused:
+            # A refused row is not an error of the call: say it at the top.
+            result = {
+                "warning": (
+                    f"{len(refused)} of {len(assignments)} rows were refused and"
+                    " got no task; 'refused' names each with its code and what"
+                    " to do (hint)."
+                )
+            } | result
         return result
 
     @register(server, scopes=("read", "project-admin"), effect="additive")
@@ -720,9 +844,16 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
             ),
         ],
         case_ids: Annotated[
-            list[str], Field(description="Cases; empty means every case.")
+            list[str],
+            Field(
+                description=(
+                    "Cases, in the order the people should work in; empty"
+                    " means every case, by case ID."
+                )
+            ),
         ] = [],  # noqa: B006
         task: Literal["annotate", "translation_review"] = "annotate",
+        confirm_unreviewed_translation: bool = False,
         confirm: Annotated[
             bool, Field(description="False: dry run. True: assign as previewed.")
         ] = False,
@@ -733,7 +864,17 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         the reason; with confirm the same selection is assigned, or refused
         if the project changed in between. Without case_ids it selects
         every case, at most 2000 (the API's selection limit); a larger
-        project is refused and needs case_ids.
+        project is refused and needs case_ids. Annotation of translations
+        whose review is not accepted (unreviewed_translation in the dry
+        run's targets) is refused with TRANSLATION_NOT_REVIEWED unless
+        confirm_unreviewed_translation.
+
+        The tasks are created in the order of case_ids (without case_ids: by
+        case ID). My tasks lists a person's tasks by status, then in the
+        order of assignment, and the editor opens the next task in that
+        order: give case_ids in the order the people should work in. With
+        'split' each person gets a block of consecutive cases. New tasks
+        come after the tasks a person already has.
         """
         body: dict[str, Any] = {
             "task": task,
@@ -741,6 +882,8 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
             "mode": mode,
             "usernames": usernames,
             "case_ids": case_ids or await all_case_ids(api, project),
+            # Issue 488: the caller's order is the order of assignment.
+            "sort": "given" if case_ids else "case",
         }
         preview: dict[str, Any] = await api.post(
             project_path(project, "assignments/batch/preview"), body
@@ -756,7 +899,11 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
             return {"assigned": False, "preview": summary}
         result = await api.post(
             project_path(project, "assignments/batch"),
-            body | {"expected_preview_digest": preview["digest"]},
+            body
+            | {
+                "expected_preview_digest": preview["digest"],
+                "confirm_unreviewed_translation": confirm_unreviewed_translation,
+            },
         )
         return {"assigned": True, "preview": summary, "result": result}
 
