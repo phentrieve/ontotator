@@ -73,8 +73,8 @@ list_texts (for a source text the two can be the same string).
 CONTENT_INSTRUCTIONS = """
 One exception to "no tool reads them": this MCP server was started with
 ONTOTATOR_MCP_READ_CONTENT=1, so get_text_version, list_annotation_versions,
-get_annotation_version and get_submission read texts and submitted
-annotations (never drafts, and nothing can be written). They return
+get_annotation_version, get_submission and get_consolidation_inputs read
+texts and submitted annotations (never drafts, and nothing can be written). They return
 clinical text only with include_text; ask for it only when the task needs
 the wording. The same holds for include_text of list_translation_reviews
 and list_typography_hints, which exists only on this server. The dry runs
