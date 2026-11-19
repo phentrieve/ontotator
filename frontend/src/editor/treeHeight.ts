@@ -20,6 +20,48 @@ export const INSPECTOR_MIN_HEIGHT = 160;
 const CHROME_HEIGHT = 108;
 
 /**
+ * What the tree needs to be useful: its header, the details of the selected term, "Use this term"
+ * (together about 160 px, measured at 1280 × 600) and ten rows of 26 px.
+ */
+export const TREE_USEFUL_HEIGHT = 420;
+/**
+ * A low window (issue 521): the layout is lower than the annotation panel's least (160 px) and the
+ * tree's useful height together. Then the open tree takes the whole right column and the panel
+ * shrinks to one line. Measured heights of the layout: 1440 × 900 about 790 px, 1440 × 700 about
+ * 590 px (not low), 1280 × 600 about 490 px (low).
+ */
+export const LOW_LAYOUT_BELOW = INSPECTOR_MIN_HEIGHT + TREE_USEFUL_HEIGHT;
+/**
+ * Once low, the layout stays low until it is this much higher: a window resized across the
+ * threshold, or a header that takes another line, does not switch the layout back and forth.
+ */
+export const LOW_LAYOUT_HYSTERESIS = 24;
+
+/** Whether a layout of this height is low, given whether it was low before. */
+export function isLowLayout(column: number, wasLow: boolean): boolean {
+  if (column <= 0) return wasLow;
+  return wasLow ? column < LOW_LAYOUT_BELOW + LOW_LAYOUT_HYSTERESIS : column < LOW_LAYOUT_BELOW;
+}
+
+/**
+ * Where the tree and the annotation panel can trade places. "column": three columns, the tree under
+ * the panel in the right column (editor.css: from 1025 px and an editor of at least 1060 px).
+ * "beside": two columns in a low window, a phone in landscape (701–1024 px wide, at most 560 px high),
+ * where the panel stands beside the text. null: every other layout, where nothing changes.
+ */
+export type SharedLayout = "column" | "beside" | null;
+export const BESIDE_MEDIA = "(min-width: 701px) and (max-width: 1024px) and (max-height: 560px)";
+
+function sharedLayout(): SharedLayout {
+  if (typeof document === "undefined" || typeof window === "undefined") return null;
+  const screen = document.querySelector(".case-screen");
+  if (!screen || screen.classList.contains("case-comparing")) return null;
+  if (window.matchMedia?.(BESIDE_MEDIA).matches) return "beside";
+  if (window.matchMedia?.("(min-width: 1025px)").matches && screen.getBoundingClientRect().width >= 1060) return "column";
+  return null;
+}
+
+/**
  * Limits for a column (the editor's layout) of this height: the tree takes at least 220 px and
  * leaves the annotation panel at least 160 px. `fallback` is the least the tree has while unset,
  * as the rows of `.tree-open` give it: max(50%, min(400px, 60%)).
@@ -34,6 +76,7 @@ interface Measured {
   column: number;
   /** Height of the tree on screen; 0 while it is not shown. */
   tree: number;
+  layout: SharedLayout;
 }
 
 function measured(): Measured {
@@ -42,6 +85,7 @@ function measured(): Measured {
   return {
     column: column > 0 ? column : Math.max(0, (typeof window === "undefined" ? 720 : window.innerHeight) - CHROME_HEIGHT),
     tree: host?.getBoundingClientRect().height ?? 0,
+    layout: sharedLayout(),
   };
 }
 
@@ -75,7 +119,7 @@ export function useTreeHeight(username: string | undefined, walk: string | numbe
   useLayoutEffect(() => {
     const update = () => setBox((previous) => {
       const next = measured();
-      return next.column === previous.column && next.tree === previous.tree ? previous : next;
+      return next.column === previous.column && next.tree === previous.tree && next.layout === previous.layout ? previous : next;
     });
     update();
     window.addEventListener("resize", update);
@@ -90,6 +134,15 @@ export function useTreeHeight(username: string | undefined, walk: string | numbe
       observer?.disconnect();
     };
   }, [walk]);
+
+  // Low or not, with hysteresis: kept across renders, decided anew only when the column is measured again.
+  const lowRef = useRef<{ column: number; low: boolean }>({ column: -1, low: false });
+  if (lowRef.current.column !== box.column) lowRef.current = { column: box.column, low: isLowLayout(box.column, lowRef.current.low) };
+  /**
+   * Where the open tree takes the panel's place in a low window: "column" (three columns, the panel
+   * shrinks to one line above the tree) or "beside" (a phone in landscape, the tree beside the text).
+   */
+  const low: SharedLayout = box.layout === "beside" ? "beside" : box.layout === "column" && lowRef.current.low ? "column" : null;
 
   const limits = treeHeightLimits(box.column);
   const limitsRef = useRef(limits);
@@ -130,5 +183,5 @@ export function useTreeHeight(username: string | undefined, walk: string | numbe
     const user = userRef.current;
     if (user && storedRef.current !== null) writeStoredWidth(user, clampSidebarWidth(storedRef.current, limitsRef.current), treeHeightKey);
   }, [apply, measure]);
-  return { height, value, limits, setHeight, reset, commit, measure };
+  return { height, value, limits, setHeight, reset, commit, measure, low };
 }

@@ -459,6 +459,10 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     focus: boolean;
   } | null>(null);
   const treeNonce = useRef(0);
+  // Issue 521: whether the open tree has taken the annotation panel's place (a low window), and whether
+  // the focus goes to "Show in tree" once the tree is closed and the panel is back.
+  const panelGivenToTreeRef = useRef(false);
+  const focusAfterTreeRef = useRef(false);
 
   // Issue 320: the undo and redo steps of the current round (their terms are named in the tooltips).
   const [history, setHistory] = useState<DraftHistoryView | null>(null);
@@ -2270,15 +2274,26 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
 
   // Closing changes nothing else: the tree is gone until "Show in tree" is used again. A
   // keyboard focus that was in the tree goes back to that button instead of getting lost.
+  const focusTreeButton = () => {
+    const button = inspectorRef.current?.querySelector<HTMLElement>(".annotation-tree-button");
+    // Closed because the selection was cleared (Escape on a tree button), the button is gone: the text takes the focus.
+    if (button) { tabs.showDetailsNow(); button.focus(); } else leftTextElement?.focus();
+  };
   const handleCloseTree = () => {
     const active = document.activeElement;
-    if (active instanceof HTMLElement && active.closest(".tree-host")) {
-      const button = inspectorRef.current?.querySelector<HTMLElement>(".annotation-tree-button");
-      // Closed because the selection was cleared (Escape on a tree button), the button is gone: the text takes the focus.
-      if (button) { tabs.showDetailsNow(); button.focus(); } else leftTextElement?.focus();
+    if (active instanceof HTMLElement && (active.closest(".tree-host") || active.closest(".finding-bar"))) {
+      // In a low window the panel is folded away while the tree is open: the button is back after the next render.
+      if (panelGivenToTreeRef.current) focusAfterTreeRef.current = true;
+      else focusTreeButton();
     }
     setTreeWalk(null);
   };
+  useLayoutEffect(() => {
+    if (treeWalk || !focusAfterTreeRef.current) return;
+    focusAfterTreeRef.current = false;
+    focusTreeButton();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the closing of the tree moves the focus
+  }, [treeWalk]);
 
   // An open tree follows the selection: another own annotation with a term starts a new
   // walk there. Anything else (a proposal, a reference, nothing) closes it: there it could
@@ -3475,6 +3490,33 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const sidebarWidth = useSidebarWidth(versionContext?.username, { inspectorWithGuidelines: tabs.hosted });
   // The ontology tree's height under the inspector, set by dragging the divider above it.
   const treeHeight = useTreeHeight(versionContext?.username, treeWalk && !treeCollapsed ? treeWalk.nonce : null);
+  // Issue 521, a low window: the open tree takes the whole right column and the annotation panel shrinks to one
+  // line (the marked words and the term), where "Show finding" brings it back until the tree is closed. On a phone in
+  // landscape the tree stands in place of the panel beside the text.
+  const [findingShown, setFindingShown] = useState(false);
+  if (!treeWalk && findingShown) setFindingShown(false);
+  const treeShown = !!treeWalk && !treeCollapsed;
+  const findingBarShown = treeShown && treeHeight.low === "column" && !!treeWalkAnnotation;
+  const panelGivenToTree: "column" | "beside" | null = !treeShown ? null
+    : treeHeight.low === "beside" ? "beside" : findingBarShown && !findingShown ? "column" : null;
+  panelGivenToTreeRef.current = panelGivenToTree !== null;
+  const findingToggleRef = useRef<HTMLButtonElement | null>(null);
+  const panelGivenBefore = useRef<typeof panelGivenToTree>(null);
+  useLayoutEffect(() => {
+    const before = panelGivenBefore.current;
+    panelGivenBefore.current = panelGivenToTree;
+    if (!panelGivenToTree || before === panelGivenToTree) return;
+    // A focus in the panel that is folded away now (most often "Show in tree") goes to what is left of it: the
+    // "Show finding" button, or the tree beside the text. The tree moves it to its row once it has loaded.
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && inspectorRef.current?.contains(active) && !active.closest(".finding-bar")) {
+      if (panelGivenToTree === "column") findingToggleRef.current?.focus();
+      else document.getElementById("ontology-tree")?.querySelector<HTMLElement>('[role="treeitem"][tabindex="0"], button')?.focus();
+    }
+    if (before === null) announceCarried(panelGivenToTree === "column"
+      ? "The ontology tree takes the column. The finding is shown in one line above it."
+      : "The ontology tree stands in place of the annotation panel. Close the tree to bring the panel back.");
+  }, [panelGivenToTree]);
   useLayoutEffect(() => {
     tabs.resetDetailsScroll();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new inspector subject resets its scroll
@@ -3985,8 +4027,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
         ))}
       </nav>
       {/* Main Workspace Layout */}
-      <div className={`app-layout mobile-pane-${mobilePane}${treeWalk && !treeCollapsed ? " tree-open" : ""}${treeHeight.height !== null ? " tree-sized" : ""}${tabs.hosted ? " inspector-with-guidelines" : ""}`}
-        style={{ "--sidebar-width": `${sidebarWidth.width}px`, ...(treeHeight.height !== null ? { "--tree-height": `${treeHeight.height}px` } : {}) } as CSSProperties}>
+      <div className={`app-layout mobile-pane-${mobilePane}${treeShown ? " tree-open" : ""}${treeHeight.height !== null && !panelGivenToTree ? " tree-sized" : ""}${panelGivenToTree ? ` panel-given-to-tree panel-given-to-tree--${panelGivenToTree}` : ""}${tabs.hosted ? " inspector-with-guidelines" : ""}`}
+        style={{ "--sidebar-width": `${sidebarWidth.width}px`, ...(treeHeight.height !== null && !panelGivenToTree ? { "--tree-height": `${treeHeight.height}px` } : {}) } as CSSProperties}>
         {/* Left: Sidebar (Annotations & Review Targets) */}
         <aside className="sidebar density-compact" id="findings-column">
           {/* Narrow layout: attach mode opens on Findings, where the text pane's banner and its Cancel are out of sight. */}
@@ -4247,6 +4289,17 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
 
         {/* Right: Annotation & Search Panel + Review Actions */}
         <div className="inspector-pane density-compact" ref={inspectorRef}>
+          {/* A low window with the tree open (issue 521): the finding in one line, and the way back to the whole panel. */}
+          {findingBarShown && treeWalkAnnotation && <div className="finding-bar" role="group" aria-label="Finding">
+            <p className="finding-bar__summary">
+              <span className="finding-bar__quote">{firstQuote(treeWalkAnnotation) ? `“${firstQuote(treeWalkAnnotation)}”` : "No text span"}</span>
+              <span className="finding-bar__term"><TermName termId={treeWalkAnnotation.annotation.term_id}
+                label={termLabel(treeWalkAnnotation.annotation.layer_id, treeWalkAnnotation.annotation.term_id)} /></span>
+            </p>
+            <Button ref={findingToggleRef} size="sm" aria-expanded={findingShown} onClick={() => setFindingShown(shown => !shown)}>
+              {findingShown ? "Hide finding" : "Show finding"}
+            </Button>
+          </div>}
           {/* With the guidelines open (from 1060 px): "Details | Guidelines vN" at the top; Details stays mounted while hidden. */}
           {tabs.hosted && guidelines && <InspectorTabList idBase={inspectorIdBase} tab={tabs.tab}
             version={guidelines.versionName} onSelect={tabs.select} onClose={guidelines.close} />}
@@ -4609,7 +4662,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
         )}
         {/* The divider drawn above the tree sets its height (three columns only, editor.css); after it in the
             focus order, as the findings column's divider follows that column. */}
-        {treeWalk && !treeCollapsed && (
+        {treeShown && !panelGivenToTree && (
           <SidebarResizer orientation="horizontal" side="start" width={treeHeight.value} limits={treeHeight.limits} controls="ontology-tree"
             onChange={treeHeight.setHeight} onReset={treeHeight.reset} onCommit={treeHeight.commit}
             label="Resize ontology tree" hint="Resize the ontology tree (focus the divider)" measure={treeHeight.measure} />
