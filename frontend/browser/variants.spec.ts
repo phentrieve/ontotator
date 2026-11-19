@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import type { components } from '../src/api/generated';
 import { authenticatedRequest, loginExisting, openCase, selectText, submitCase, viewSubmittedResult, TASKS_HOME } from './helpers';
+import { LOW_LAYOUT_BELOW } from '../src/editor/treeHeight';
 
 test.setTimeout(90_000);
 
@@ -296,7 +297,9 @@ test('wide editor keeps the real text and docked inspector/tree floors with visi
   await loginExisting(page, s.users.alice);
   await ownSubmission(page, s.assignments.alice);
   await reopen(browser, s, s.assignments.alice);
-  await page.setViewportSize({ width: 1280, height: 720 });
+  // 800 px high: the layout under the header, the case toolbar and the "reopened" banner has room for the
+  // annotation panel and a useful tree together (issue 521), so the two share the right column.
+  await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(`/#/tasks/${s.assignments.alice}`);
   await page.locator('.sidebar [data-list-key^="annotation:"]').first().click();
   await page.getByRole('button', { name: 'Show in tree', exact: true }).click();
@@ -305,16 +308,35 @@ test('wide editor keeps the real text and docked inspector/tree floors with visi
   const rect = async (selector: string) => {
     const box = await page.locator(selector).boundingBox(); expect(box).not.toBeNull(); return box!;
   };
-  const text = await rect('.app-layout > .center-pane'), sidebar = await rect('.app-layout > .sidebar');
-  const inspector = await rect('.inspector-pane'), tree = await rect('.tree-host');
-  expect(text.width).toBeGreaterThanOrEqual(500); expect(text.height).toBeGreaterThanOrEqual(500);
-  expect(inspector.width).toBeGreaterThanOrEqual(370); expect(inspector.height).toBeGreaterThanOrEqual(200);
-  expect(tree.height).toBeGreaterThanOrEqual(300); expect(tree.width).toBeGreaterThanOrEqual(300);
-  expect(sidebar.x + sidebar.width).toBeLessThanOrEqual(text.x + 1);
-  expect(text.x + text.width).toBeLessThanOrEqual(inspector.x + 1);
-  expect(Math.abs(tree.x - inspector.x)).toBeLessThanOrEqual(1);
-  expect(Math.abs(tree.y - inspector.y - inspector.height)).toBeLessThanOrEqual(1);
-  expect(tree.x + tree.width).toBeLessThanOrEqual(1281); expect(tree.y + tree.height).toBeLessThanOrEqual(721);
+  const floors = async (height: number) => {
+    const text = await rect('.app-layout > .center-pane'), sidebar = await rect('.app-layout > .sidebar');
+    const inspector = await rect('.inspector-pane'), tree = await rect('.tree-host');
+    expect(text.width).toBeGreaterThanOrEqual(500); expect(text.height).toBeGreaterThanOrEqual(500);
+    expect(inspector.width).toBeGreaterThanOrEqual(370); expect(inspector.height).toBeGreaterThanOrEqual(200);
+    expect(tree.height).toBeGreaterThanOrEqual(300); expect(tree.width).toBeGreaterThanOrEqual(300);
+    expect(sidebar.x + sidebar.width).toBeLessThanOrEqual(text.x + 1);
+    expect(text.x + text.width).toBeLessThanOrEqual(inspector.x + 1);
+    expect(Math.abs(tree.x - inspector.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(tree.y - inspector.y - inspector.height)).toBeLessThanOrEqual(1);
+    expect(tree.x + tree.width).toBeLessThanOrEqual(1281); expect(tree.y + tree.height).toBeLessThanOrEqual(height + 1);
+  };
+  const findingBar = page.getByRole('group', { name: 'Finding', exact: true });
+  expect((await rect('.app-layout')).height).toBeGreaterThanOrEqual(LOW_LAYOUT_BELOW);
+  await expect(findingBar).toHaveCount(0);
+  await floors(800);
+
+  // 720 px high: with the banner the layout is lower than the panel and a useful tree need (550 of 580 px).
+  // The tree takes the column and the finding is one line; "Show finding" gives the panel its floor back.
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await expect(findingBar).toBeVisible();
+  expect((await rect('.app-layout')).height).toBeLessThan(LOW_LAYOUT_BELOW);
+  await expect(findingBar).toContainText('Hypotonia');
+  const column = await rect('.app-layout'), tree = await rect('.tree-host');
+  expect(Math.abs(tree.y + tree.height - (column.y + column.height))).toBeLessThanOrEqual(1);
+  expect(tree.height).toBeGreaterThanOrEqual(column.height - 60);
+  await findingBar.getByRole('button', { name: 'Show finding', exact: true }).click();
+  await expect(findingBar.getByRole('button', { name: 'Hide finding', exact: true })).toHaveAttribute('aria-expanded', 'true');
+  await floors(720);
   await openVersions(page);
   await expect(page.getByLabel('Language', { exact: true })).toBeVisible();
   await openVersions(page);
