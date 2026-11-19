@@ -339,6 +339,7 @@ test.describe("ontology tree", () => {
     };
     const forward = await stopsInTree("Tab");
     expect(forward.filter((stop) => stop !== "details")).toEqual([
+      "BUTTON:Hide details",
       `A:View ${SENSORINEURAL} on hpo.jax.org`,
       "BUTTON:Use this term",
     ]);
@@ -349,6 +350,7 @@ test.describe("ontology tree", () => {
     expect(backward.filter((stop) => stop !== "details")).toEqual([
       "BUTTON:Use this term",
       `A:View ${SENSORINEURAL} on hpo.jax.org`,
+      "BUTTON:Hide details",
       `LI:${SENSORINEURAL}`,
       "BUTTON:Close tree",
     ]);
@@ -724,6 +726,72 @@ test.describe("ontology tree", () => {
     const names = stored.flatMap((change) => Object.keys(change as object));
     expect(names.filter((name) => name.includes("tree"))).toEqual([]);
   });
+
+  for (const size of [{ width: 1440, height: 900 }, { width: 1280, height: 600 }, { width: 800, height: 700 }, { width: 390, height: 844 }]) {
+    test(`'Hide details' at ${size.width}x${size.height} leaves name, id and 'Use this term', and the rows get the room`, async ({ page }) => {
+      // Marked in a wide window (the same steps at every size), then looked at in this one.
+      await openWithSeizure(page, `tree-details-${size.width}`);
+      await page.setViewportSize(size);
+      if (size.width <= 700) await page.getByRole("navigation", { name: "Select view" }).getByRole("button", { name: "Details" }).click();
+      await showInTree(page).click();
+      const panel = treePanel(page);
+      await expect(treeItem(page, SEIZURE)).toBeFocused();
+      const rows = panel.locator(".tree-browser__tree");
+      const detail = panel.locator(".tree-detail");
+      const use = panel.getByRole("button", { name: "Use this term" });
+      await expect(detail.locator(".tree-detail__definition")).toBeVisible();
+      const open = { tree: await box(page.locator(".tree-host")), rows: await box(rows), detail: await box(detail), use: await box(use) };
+
+      const hide = panel.getByRole("button", { name: "Hide details" });
+      await expect(hide).toHaveAttribute("aria-expanded", "true");
+      // By the name, not in the action row: "Use this term" and its hint are where they were.
+      expect((await box(hide)).y).toBeLessThan(open.use.y - 20);
+      await hide.focus();
+      await page.keyboard.press("Enter");
+      const show = panel.getByRole("button", { name: "Show details" });
+      await expect(show).toBeFocused();
+      await expect(show).toHaveAttribute("aria-expanded", "false");
+      await expect(detail.locator(".tree-detail__definition")).toHaveCount(0);
+      await expect(detail.locator(".tree-detail__name")).toHaveText("Seizure");
+      await expect(detail.locator(".tree-detail__id")).toHaveText(SEIZURE);
+      await expect(detail.getByRole("link", { name: `View ${SEIZURE} on hpo.jax.org` })).toBeVisible();
+      const closed = { tree: await box(page.locator(".tree-host")), rows: await box(rows), detail: await box(detail), use: await box(use) };
+      // The pane is the same; what the details gave up, the rows have.
+      expectSameBox(closed.tree, open.tree);
+      expect(closed.detail.height).toBeLessThanOrEqual(open.detail.height - 18);
+      expect(closed.rows.height).toBeGreaterThanOrEqual(open.rows.height + 18);
+      expect(Math.abs(closed.rows.height - open.rows.height - (open.detail.height - closed.detail.height))).toBeLessThanOrEqual(1);
+      expect(closed.use.height).toBe(open.use.height);
+      await expect(use).toBeInViewport({ ratio: 1 });
+      await expect(show).toBeInViewport({ ratio: 1 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
+
+      // Another term: its details stay hidden, name and id follow.
+      await treeItem(page, STATUS_EPILEPTICUS).click();
+      await expect(detail.locator(".tree-detail__id")).toHaveText(STATUS_EPILEPTICUS);
+      await expect(detail.locator(".tree-detail__definition")).toHaveCount(0);
+      await expect(use).toBeEnabled();
+
+      // Kept for this person in this browser: after a reload the next tree opens without details.
+      await page.goto("/#/?project=browser-fixture-tree");
+      await page.reload();
+      await expect(page.locator("#project-select")).toHaveValue("browser-fixture-tree");
+      await openCase(page, { task: "annotate" });
+      if (size.width <= 700) {
+        await page.getByRole("navigation", { name: "Select view" }).getByRole("button", { name: "Findings" }).click();
+        await ownAnnotations(page).first().click();
+        await page.getByRole("navigation", { name: "Select view" }).getByRole("button", { name: "Details" }).click();
+      } else await ownAnnotations(page).first().click();
+      await showInTree(page).click();
+      await expect(treeItem(page, SEIZURE)).toBeFocused();
+      await expect(show).toBeVisible();
+      await expect(detail.locator(".tree-detail__definition")).toHaveCount(0);
+      await show.click();
+      await expect(detail.locator(".tree-detail__definition")).toBeVisible();
+      await expect(panel.getByRole("button", { name: "Hide details" })).toHaveAttribute("aria-expanded", "true");
+      expect(Math.abs((await box(rows)).height - open.rows.height)).toBeLessThanOrEqual(1);
+    });
+  }
 
   for (const size of [
     // 1025-1059 px: the editor's own width (container query), not the viewport breakpoint, stacks it.

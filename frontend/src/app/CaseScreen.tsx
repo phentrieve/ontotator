@@ -4601,6 +4601,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
             onClose={handleCloseTree}
             onUseTerm={handleUseTreeTerm}
             languages={searchLanguagesFor(treeWalk.layerId)?.active}
+            username={versionContext?.username}
           />
         )}
       </div>
