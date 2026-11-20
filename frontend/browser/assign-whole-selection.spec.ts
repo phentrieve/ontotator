@@ -47,7 +47,7 @@ test("a de + en selection walks review, then annotation; Distribute moves on; cl
   await shot(lead, "1-dialog-start-overview");
 
   await members.getByRole("radio", { name: new RegExp(s.users.reviewer) }).click();
-  await dialog.getByRole("button", { name: "Assign 1", exact: true }).click();
+  await dialog.getByRole("button", { name: "Assign 1 task", exact: true }).click();
   await expect(dialog.getByRole("status").filter({ hasText: "1 translation review assigned to" })).toContainText("Next: annotation (");
   await expect(overview).toContainText("Step 2 of 3");
   await expect(steps.first()).toContainText("✓");

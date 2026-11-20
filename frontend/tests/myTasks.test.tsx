@@ -105,6 +105,23 @@ describe("My tasks component", () => {
     } finally { vi.useRealTimers(); }
   });
 
+  it("Last change follows the rule of assigned in the same row (issue 546)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 23, 15, 0));
+    const at = new Date(2026, 9, 23, 10, 40).toISOString();
+    vi.mocked(api.listMyTasks).mockResolvedValue([{ ...task(7, "open"), assigned_at: at, updated_at: new Date(2026, 9, 23, 11, 5).toISOString() },
+      { ...task(8, "open"), assigned_at: at, updated_at: new Date(2026, 9, 22, 9, 0).toISOString() }]);
+    try {
+      render(<MyTasks projects={[]} onNavigate={vi.fn()} />);
+      const rows = await screen.findAllByTestId("task-row");
+      expect(within(rows[0]).getByText("assigned today 10:40")).toBeDefined();
+      const changed = within(rows[0]).getByText("today 11:05");
+      expect(changed.tagName).toBe("TIME");
+      expect(changed.getAttribute("title")).toMatch(/2026/);
+      expect(within(rows[1]).getByText("yesterday")).toBeDefined();
+    } finally { vi.useRealTimers(); }
+  });
+
   it("shows loading while the request is pending", async () => {
     const pending = deferred<TaskSummary[]>();
     vi.mocked(api.listMyTasks).mockReturnValue(pending.promise);

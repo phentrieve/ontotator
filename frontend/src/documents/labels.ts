@@ -1,6 +1,6 @@
 /** Documents-only label rules. Shared submission and time helpers are re-exported for convenience. */
-import { formatDateTime, labelFor } from "../app/labels";
-import { personLabel } from "../app/submissionLabels";
+import { labelFor } from "../app/labels";
+import { personLabel, formatTime } from "../app/submissionLabels";
 import { originLabels, translationStatusLabels } from "../admin/variantMetadata";
 
 export { formatTime, fullTimestamp, kindLabels, personLabel, roundCell, submissionLabel } from "../app/submissionLabels";
@@ -107,7 +107,7 @@ export function pausedWord(item: { held?: boolean; pause_causes?: readonly ("rep
 /** The lead pause of a text (issue 464): "Carla Diaz, 17 Nov 2026, 14:02: Source text is being clarified"; "you, …" for the viewer. */
 export function leadPauseLine(pause: { reason: string; paused_by?: { pseudonym: string; display_name?: string | null; is_me?: boolean } | null; paused_at: string }): string {
   const who = !pause.paused_by ? null : pause.paused_by.is_me ? "you" : pause.paused_by.display_name?.trim() || pause.paused_by.pseudonym;
-  return `${[who, formatDateTime(pause.paused_at)].filter(Boolean).join(", ")}: ${pause.reason}`;
+  return `${[who, formatTime(pause.paused_at)].filter(Boolean).join(", ")}: ${pause.reason}`;
 }
 
 /** Title of the "Typography hints" flag of a row (issue 484). */

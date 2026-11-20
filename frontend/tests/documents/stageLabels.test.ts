@@ -163,9 +163,9 @@ describe("narrow table states (issue 248)", () => {
     "Your choice": null,
     "waiting": null,
     "consolidating (2 of 3 groups open)": "consolidating",
-    // The pause is the cell's ⏸ glyph where "· paused" would be cut.
-    "consolidating · paused (2 of 3 groups open)": "consolidating",
-    "consolidating · paused": "consolidating",
+    // The pause stays in words beside the pause icon (issue 549).
+    "consolidating · paused (2 of 3 groups open)": "paused",
+    "consolidating · paused": "paused",
   };
   it.each(Object.entries(states))("%s", (state, short) => expect(narrowStageState(state)).toBe(short));
   it("a state stays only when it fits the narrow cell (15 characters); short forms have at most 13", () => {

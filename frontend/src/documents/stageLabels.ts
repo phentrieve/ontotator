@@ -104,8 +104,8 @@ const NARROW_STATES: readonly (readonly [RegExp, string])[] = [
   // What changed ("newer result", "text corrected") stays in the title.
   [/^Check changes, .+$/, "Check changes"],
   [/^consolidating \(.+\)$/, "consolidating"],
-  // The ⏸ glyph (and the row's "Paused by lead" badge) says the pause where "· paused" would be cut.
-  [/^consolidating · paused(?: \(.+\))?$/, "consolidating"],
+  // The pause stays in words beside the pause icon (issue 549); "consolidating" and the progress go to the title.
+  [/^consolidating · paused(?: \(.+\))?$/, "paused"],
 ];
 
 /** The narrow table's short state (`NARROW_STATES`); null when the state fits as it is. */

@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CodeOnceDialog, handoverText, validityText, type CodeOnceDialogProps } from "../src/admin/CodeOnceDialog";
-import { formatDateTime } from "../src/app/labels";
+import { formatTime } from "../src/app/submissionLabels";
 
 const props = { open: true, kind: "setup" as const, code: "single-use-code-123", expires_at: "2026-10-16T12:30:00Z" };
 const acknowledgement = "I have handed over or stored the code";
@@ -30,7 +30,7 @@ describe("one-time code dialog", () => {
     expect(within(dialog).getByText(props.code)).toBeDefined();
     expect(within(dialog).getByText("This code is shown only once. Hand it over in person or by a secure channel.")).toBeDefined();
     expect(dialog.querySelector("time")?.dateTime).toBe(props.expires_at);
-    expect(dialog.querySelector("time")?.textContent).toBe(formatDateTime(props.expires_at));
+    expect(dialog.querySelector("time")?.textContent).toBe(formatTime(props.expires_at));
   });
 
   it("gates Close, Escape and the backdrop until acknowledged", async () => {
@@ -187,7 +187,7 @@ describe("one-time code dialog", () => {
     expect(text).toContain('Choose "I have a setup or reset code"');
     expect(text).toContain("username carol");
     expect(text).toContain(`Code: ${props.code}`);
-    expect(text).toContain(formatDateTime(props.expires_at));
+    expect(text).toContain(formatTime(props.expires_at));
     expect(screen.getByRole("button", { name: "Copy" })).toBeDefined();
   });
 
@@ -196,7 +196,7 @@ describe("one-time code dialog", () => {
     const expires = "2026-11-23T13:05:00Z";
     const view = render(<CodeOnceDialog {...props} expires_at={expires} onClose={vi.fn()} />);
     const line = screen.getByRole("dialog").querySelector("time")!.parentElement!;
-    expect(line.textContent).toBe(`This code works once and expires in 7 days, on ${formatDateTime(expires)} (local time).`);
+    expect(line.textContent).toBe(`This code works once and expires in 7 days, on ${formatTime(expires)} (local time).`);
     expect(screen.getByRole("dialog").textContent).not.toContain("24 hours");
     view.unmount();
     render(<CodeOnceDialog {...props} kind="reset" expires_at="2026-11-16T15:05:00Z" onClose={vi.fn()} />);

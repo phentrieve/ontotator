@@ -98,7 +98,7 @@ it("keeps the exact translation distribution context on Confirm; the language re
   vi.spyOn(api, "proposeDistribution").mockResolvedValue({ rows: [{ document_id: readyTarget.document_id, language: "de", username: "alice", display_name: "Alice", load_before: 4 }, { document_id: readyTarget.document_id, language: "de", username: "bob", display_name: "Bob", load_before: 2 }], unassignable: [], seed: 42, per_document: 2, context });
   vi.spyOn(api, "createAssignments").mockResolvedValueOnce({ created: [{ ...assignment, username: "bob" }], refused: [{ document_id: readyTarget.document_id, username: "alice", code: "LANGUAGE_CONFIRMATION_REQUIRED" }] }).mockResolvedValueOnce({ created: [{ ...assignment, username: "alice" }], refused: [] });
   render(<DistributionDialog projectKey="p" documents={[readyTarget]} cases={inventory} task="translation_review" onClose={vi.fn()} onChanged={vi.fn()} />);
-  fireEvent.change(screen.getByLabelText(/^People per document/), { target: { value: "2" } });
+  fireEvent.change(screen.getByLabelText(/^People per text/), { target: { value: "2" } });
   await waitFor(() => expect((screen.getByRole("button", { name: "Propose" }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole("button", { name: "Propose" }));
   await screen.findByRole("table", { name: "Proposed assignments" });
@@ -192,7 +192,7 @@ it("shows ordered readonly reviewer snapshots, rationale and created variant", a
   render(<DocumentsPage projectKey="p" canManage query={openTarget} onNavigate={vi.fn()} />);
   fireEvent.click(await screen.findByRole("button", { name: "Translation reviews for v1" }));
   const history = within(screen.getByRole("dialog", { name: `Translation reviews: ${target.document_id}` }));
-  expect((await history.findByText(/by Original pseudonym/)).textContent).toMatch(/^Accepted with corrections by Original pseudonym, \d{1,2} Oct 2026, \d{2}:\d{2}$/);
+  expect((await history.findByText(/by Original pseudonym/)).textContent).toMatch(/^Accepted with corrections by Original pseudonym, \d{1,2} Oct(?: 2026)?, \d{2}:\d{2}$/);
   expect(history.getByText("Original qualification, reads en, de")).toBeTruthy();
   expect(history.getByText("Translation status changed from Ready for review to Reviewed.")).toBeTruthy();
   expect(history.getByText("Clinical change: Number or unit")).toBeTruthy();

@@ -7,6 +7,7 @@ import { InlineMessage } from "../ui/InlineMessage";
 import { Textarea } from "../ui/Textarea";
 import "./reports.css";
 import { closeTechnicalReport, MAX_DESCRIPTION, MY_TECHNICAL_REPORTS_HREF, reportContext, SHOW_MY_TECHNICAL_REPORTS, subscribeTechnicalReport, TECHNICAL_REPORT_SENT, technicalReportOpen } from "./technicalReport";
+import { formatTime } from "../app/submissionLabels";
 
 function requestId(): string {
   try { if (typeof crypto?.randomUUID === "function") return crypto.randomUUID(); } catch { /* insecure context */ }
@@ -19,7 +20,7 @@ export function contextLines(context: TechnicalReportContext): string[] {
   if (context.route) lines.push(`Screen: ${context.route}`);
   if (context.viewport) lines.push(`Window size: ${context.viewport}`);
   const error = context.last_api_error;
-  if (error) lines.push(`Last error: ${error.code ?? `HTTP ${error.status}`} at ${new Date(error.at).toLocaleString()}`);
+  if (error) lines.push(`Last error: ${error.code ?? `HTTP ${error.status}`} at ${formatTime(error.at)}`);
   if (context.crash_message) lines.push(`Error message: ${context.crash_message}`);
   return lines;
 }

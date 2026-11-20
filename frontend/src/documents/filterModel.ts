@@ -64,7 +64,8 @@ export const FACET_GROUPS: readonly FacetGroup[] = [
   { id: "review", legend: "Translation review", options: [
     option("review_state", "Unassigned", "unassigned"),
     option("review_state", "Check failed", "check_failed"),
-    option("review_state", "In progress", "in_progress", "re_review"),
+    // The table's "in review" and Progress's "In review" (issue 546): one word for a review someone holds.
+    option("review_state", "In review", "in_progress", "re_review"),
     option("review_state", "Rejected / query", "rejected", "query"),
     option("review_state", "Not accepted", "not_accepted"),
     option("review_state", "Source changed", "source_changed"),

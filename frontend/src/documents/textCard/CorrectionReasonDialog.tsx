@@ -1,7 +1,7 @@
 import { useId, useRef, useState } from "react";
 import { api, type DocumentRowView } from "../../api/client";
 import { ErrorNotice } from "../../admin/ErrorNotice";
-import { formatDateTime } from "../../app/labels";
+import { formatTime } from "../../app/submissionLabels";
 import { Button, Dialog, Textarea } from "../../ui";
 import { shortName } from "../stageLabels";
 
@@ -12,7 +12,7 @@ type Addition = NonNullable<CorrectionRequest["additions"]>[number];
 /** "Added by you on 19 Nov 2026, 10:12: Paragraph 3 as well." (the lead's view of one addition). */
 export function additionLine(addition: Addition): string {
   const by = addition.added_by ? (addition.added_by.is_me ? "you" : shortName(addition.added_by)) : null;
-  return `Added${by ? ` by ${by}` : ""} on ${formatDateTime(addition.added_at)}: ${addition.note}`;
+  return `Added${by ? ` by ${by}` : ""} on ${formatTime(addition.added_at)}: ${addition.note}`;
 }
 
 /**
@@ -22,7 +22,7 @@ export function additionLine(addition: Addition): string {
 export function CorrectionRequestReason({ request }: { request: CorrectionRequest }): JSX.Element {
   // Spans: it also stands in the details line of the reviewer's row.
   return <span className="documents-review-reason correction-request-reason" role="note" aria-label="Reason of the correction request">
-    <span>{`Correction requested on ${formatDateTime(request.requested_at)}:`}</span>
+    <span>{`Correction requested on ${formatTime(request.requested_at)}:`}</span>
     <span className="correction-request-quote">{`“${request.reason}”`}</span>
     {(request.additions ?? []).map((addition, index) => <span key={index}>{additionLine(addition)}</span>)}
   </span>;

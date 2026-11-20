@@ -1,4 +1,4 @@
-import { Fragment, useState, type HTMLAttributes, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import { Fragment, useState, type HTMLAttributes, type KeyboardEvent, type MouseEvent, type ReactNode, type RefObject } from "react";
 
 export interface Column<T> {
   id: string;
@@ -75,6 +75,8 @@ export interface DataTableProps<T> {
    * with `more(total)`.
    */
   rowLimit?: { count: number; more: (total: number) => ReactNode; keep?: (row: T) => boolean };
+  /** The scroll box around the table, e.g. to fit the table to it. */
+  scrollRef?: RefObject<HTMLDivElement>;
 }
 const groupSelectionModeOf = (event: MouseEvent<HTMLInputElement>): GroupSelectMode =>
   event.shiftKey ? "range" : event.ctrlKey || event.metaKey ? "toggle-keep-anchor" : "toggle";
@@ -95,7 +97,7 @@ function moveSelection(event: KeyboardEvent<HTMLInputElement>, selector: string)
 const SELECT_BOXES = { label: "input.data-table-group-select, input.data-table-row-select", group: "input.data-table-group-select", row: "input.data-table-row-select" } as const;
 const indeterminateRef = (value: boolean) => (element: HTMLInputElement | null) => { if (element) element.indeterminate = value; };
 export function DataTable<T>({ label, columns, rows, rowKey, initialSort, empty, rowProps, className, groups, renderExpanded, busy, groupSelection,
-  rowSelection, groupLayout, selectionHeader, rowEdge, sort: serverSort, onSort, rowLimit }: DataTableProps<T>): JSX.Element {
+  rowSelection, groupLayout, selectionHeader, rowEdge, sort: serverSort, onSort, rowLimit, scrollRef }: DataTableProps<T>): JSX.Element {
   const [clientSort, setSort] = useState(initialSort);
   const sort = onSort ? serverSort : clientSort;
   const labelLayout = (groupLayout ?? (rowSelection ? "label" : "header")) === "label";
@@ -167,7 +169,7 @@ export function DataTable<T>({ label, columns, rows, rowKey, initialSort, empty,
   const sortBy = (column: Column<T>) => onSort
     ? onSort(column.id)
     : setSort({ column: column.id, direction: sort?.column === column.id && sort.direction === "asc" ? "desc" : "asc" });
-  return <div className="data-table-scroll"><table aria-busy={busy ? true : undefined} className={["data-table", "density-compact", className].filter(Boolean).join(" ")}>
+  return <div className="data-table-scroll" ref={scrollRef}><table aria-busy={busy ? true : undefined} className={["data-table", "density-compact", className].filter(Boolean).join(" ")}>
     <caption className="visually-hidden">{label}</caption>
     <thead><tr>{selectColumn && <th scope="col" className="data-table-select-cell">{selectionHeader ?? <span className="visually-hidden">Select</span>}</th>}
       {columns.map((column) => <th key={column.id} scope="col" style={{ width: column.width, textAlign: column.align ?? "start" }} aria-sort={sortable(column) ? sort?.column === column.id ? sort.direction === "asc" ? "ascending" : "descending" : "none" : undefined}>
