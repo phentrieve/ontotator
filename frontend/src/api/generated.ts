@@ -2400,6 +2400,12 @@ export interface paths {
          * Preview Editorial Correction
          * @description Issue 453, read only: whether this version can be corrected and, with
          *     a text or replacements, the changes, the guards and what follows.
+         *
+         *     Annotation tasks nobody opened follow the new version
+         *     (``tasks_following``); a task from tool proposals only when no proposal
+         *     needs a check. ``tasks_staying`` names each task that stays and why
+         *     (opened, paused, from proposals that need a check); move it with
+         *     "Handle text change" (issue 509).
          */
         post: operations["preview_editorial_correction_api_v1_projects__key__documents__doc__editorial_correction_preview_post"];
         delete?: never;
@@ -2420,7 +2426,9 @@ export interface paths {
         /**
          * Editorial Correction
          * @description Issue 453: save an editorial fix (spacing, typos, grammar) as the next
-         *     version of this translation, with this version's status.
+         *     version of this translation, with this version's status. Tasks nobody
+         *     opened follow; a task from tool proposals once its proposals are on the
+         *     new version, when none needs a check (issue 509).
          */
         post: operations["editorial_correction_api_v1_projects__key__documents__doc__editorial_correction_post"];
         delete?: never;
@@ -6908,6 +6916,8 @@ export interface components {
             final_result: boolean;
             /** Tasks Following */
             tasks_following: number;
+            /** Tasks Staying */
+            tasks_staying: components["schemas"]["EditorialStayingTask"][];
             /** Text */
             text: string | null;
             /** Previous Text */
@@ -6978,6 +6988,8 @@ export interface components {
             deleted_characters: number;
             /** Tasks Following */
             tasks_following: number;
+            /** Tasks Staying */
+            tasks_staying: components["schemas"]["EditorialStayingTask"][];
             /**
              * Annotations Carried
              * @default 0
@@ -7021,6 +7033,28 @@ export interface components {
             old: string;
             /** New */
             new: string;
+        };
+        /**
+         * EditorialStayingTask
+         * @description Issue 509: an annotation task on the corrected version, not
+         *     submitted, that stays there. ``reason``: ``paused``, ``opened``,
+         *     ``from_proposals_needs_check`` (a tool proposal marks words the fix
+         *     changes), ``from_proposals_none_carried`` (no proposal reaches the new
+         *     version) or, before the text is known, ``from_proposals``. Move it with
+         *     "Handle text change" (MCP ``move_task_to_version``).
+         */
+        EditorialStayingTask: {
+            /** Assignment Id */
+            assignment_id: number;
+            /** Username */
+            username: string;
+            /** Display Name */
+            display_name: string;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "paused" | "opened" | "from_proposals" | "from_proposals_needs_check" | "from_proposals_none_carried";
         };
         /**
          * EvidenceMention

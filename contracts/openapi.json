@@ -8073,7 +8073,7 @@
           "translation-workflow"
         ],
         "summary": "Preview Editorial Correction",
-        "description": "Issue 453, read only: whether this version can be corrected and, with\na text or replacements, the changes, the guards and what follows.",
+        "description": "Issue 453, read only: whether this version can be corrected and, with\na text or replacements, the changes, the guards and what follows.\n\nAnnotation tasks nobody opened follow the new version\n(``tasks_following``); a task from tool proposals only when no proposal\nneeds a check. ``tasks_staying`` names each task that stays and why\n(opened, paused, from proposals that need a check); move it with\n\"Handle text change\" (issue 509).",
         "operationId": "preview_editorial_correction_api_v1_projects__key__documents__doc__editorial_correction_preview_post",
         "parameters": [
           {
@@ -8137,7 +8137,7 @@
           "translation-workflow"
         ],
         "summary": "Editorial Correction",
-        "description": "Issue 453: save an editorial fix (spacing, typos, grammar) as the next\nversion of this translation, with this version's status.",
+        "description": "Issue 453: save an editorial fix (spacing, typos, grammar) as the next\nversion of this translation, with this version's status. Tasks nobody\nopened follow; a task from tool proposals once its proposals are on the\nnew version, when none needs a check (issue 509).",
         "operationId": "editorial_correction_api_v1_projects__key__documents__doc__editorial_correction_post",
         "parameters": [
           {
@@ -20649,6 +20649,13 @@
             "type": "integer",
             "title": "Tasks Following"
           },
+          "tasks_staying": {
+            "items": {
+              "$ref": "#/components/schemas/EditorialStayingTask"
+            },
+            "type": "array",
+            "title": "Tasks Staying"
+          },
           "text": {
             "anyOf": [
               {
@@ -20795,6 +20802,7 @@
           "open_consolidations",
           "final_result",
           "tasks_following",
+          "tasks_staying",
           "text",
           "previous_text",
           "new_text_sha256",
@@ -20951,6 +20959,13 @@
             "type": "integer",
             "title": "Tasks Following"
           },
+          "tasks_staying": {
+            "items": {
+              "$ref": "#/components/schemas/EditorialStayingTask"
+            },
+            "type": "array",
+            "title": "Tasks Staying"
+          },
           "annotations_carried": {
             "type": "integer",
             "title": "Annotations Carried",
@@ -20976,7 +20991,8 @@
           "text_sha256",
           "inserted_characters",
           "deleted_characters",
-          "tasks_following"
+          "tasks_following",
+          "tasks_staying"
         ],
         "title": "EditorialCorrectionResult"
       },
@@ -21076,6 +21092,42 @@
         ],
         "title": "EditorialReplacement",
         "description": "One passage of the text and what replaces it."
+      },
+      "EditorialStayingTask": {
+        "properties": {
+          "assignment_id": {
+            "type": "integer",
+            "title": "Assignment Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "paused",
+              "opened",
+              "from_proposals",
+              "from_proposals_needs_check",
+              "from_proposals_none_carried"
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "assignment_id",
+          "username",
+          "display_name",
+          "reason"
+        ],
+        "title": "EditorialStayingTask",
+        "description": "Issue 509: an annotation task on the corrected version, not\nsubmitted, that stays there. ``reason``: ``paused``, ``opened``,\n``from_proposals_needs_check`` (a tool proposal marks words the fix\nchanges), ``from_proposals_none_carried`` (no proposal reaches the new\nversion) or, before the text is known, ``from_proposals``. Move it with\n\"Handle text change\" (MCP ``move_task_to_version``)."
       },
       "EvidenceMention": {
         "properties": {
