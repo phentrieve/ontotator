@@ -72,8 +72,13 @@ async function attachSevere(page: Page) {
   await expect(page.getByText("New finding")).toBeVisible();
   await expect(page.locator("#search-input")).toBeFocused();
   await expect(page.locator("#search-input")).toHaveValue("schwere");
+  // The similar hits are shuffled per annotator and mark (unbiased display, as in modifiers.spec.ts): "schwere" is
+  // no exact name, so Severe ("Schwer") need not come first. Move the active hit to it with the keys.
   const hit = page.getByRole("listbox", { name: "Terms", exact: true }).locator('[role="option"][aria-selected="true"]');
+  await expect(hit).toBeVisible();
+  for (let step = 0; step < 10 && !(await hit.textContent())?.includes("Severe"); step += 1) await page.keyboard.press("ArrowDown");
   await expect(hit).toContainText("Severe");
+  await expect(hit).toContainText("Modifier");
   await page.keyboard.press("Enter");
   await expect(page.getByRole("button", { name: "Attach Severe to Seizure" })).toBeFocused();
   const added = commandResponse(page, "add_modifier");
