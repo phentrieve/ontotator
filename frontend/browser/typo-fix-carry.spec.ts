@@ -73,6 +73,17 @@ test("a typo fix moves one submitted annotation by itself; the other stays, and 
   await expect(activityLines(card).filter({ hasText: "moved to v2 by itself after the typo fix" }))
     .toHaveText([new RegExp(`^Annotation: annotation of ${esc(cy)} \\(${esc(s.pseudonyms.annotator)}\\) moved to v2 by itself after the typo fix, `)]);
   await noHorizontalScroll(page, "history");
+  // Issue 543: the header names only Ben's annotation as left on v1, and Cy's moved annotation is shown as submitted with
+  // Open annotation, "moved from v1" instead of an assignment of today.
+  await expect(card).toContainText("v2, 1 annotation still on an older version");
+  await card.getByRole("button", { name: "Back", exact: true }).click();
+  await card.getByRole("navigation", { name: "Text path", exact: true }).getByRole("button", { name: /^Annotation / }).click();
+  const people = card.getByRole("list", { name: "Annotators", exact: true });
+  const cyRow = people.getByRole("listitem").filter({ hasText: cy });
+  await expect(cyRow).toHaveCount(1);
+  await expect(cyRow).toContainText("moved from v1");
+  await expect(cyRow).not.toContainText("Assigned");
+  await expect(cyRow.getByRole("link", { name: `Open annotation of ${cy}`, exact: true })).toBeVisible();
   expect(errors).toEqual([]);
 
   // Cy: one task for the text, on v2, submitted; its view shows the corrected text with the finding.

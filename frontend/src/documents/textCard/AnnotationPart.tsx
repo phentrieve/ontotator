@@ -11,7 +11,7 @@ import { StatusBadge } from "../../ui/StatusBadge";
 import { RouteLink } from "../RowCells";
 import { shortName } from "../stageLabels";
 import type { TextVersionsTools } from "../TextVersions";
-import { dayMonth, personVersion, rowDay, textViewRoute, type CardWorkItem } from "./cardModel";
+import { currentAnnotateWork, dayMonth, personVersion, rowDay, textViewRoute, type CardWorkItem } from "./cardModel";
 import { PersonList, PersonRow, useFocusAfterRemoval } from "./PersonRow";
 import { assignedLine, workerName, WorkPersonRow } from "./WorkPersonRow";
 
@@ -80,8 +80,23 @@ function joined(parts: readonly ReactNode[]): ReactNode {
   return parts.filter(Boolean).map((part, index) => <span key={index}>{index > 0 && " · "}{part}</span>);
 }
 
-/** Submissions that are annotation layers (from scratch, or a check of the tool proposals). */
-const LAYER_KINDS: ReadonlySet<RowSubmissionView["kind"]> = new Set(["annotation", "proposal_check"]);
+/**
+ * Submissions that are annotation layers: from scratch, a check of the tool proposals, or a person's work carried to a
+ * newer text version (Carry to vN…, or moved by a typo fix, issue 530): the same person's annotation (issue 543).
+ */
+const LAYER_KINDS: ReadonlySet<RowSubmissionView["kind"]> = new Set(["annotation", "proposal_check", "carry_forward"]);
+
+/**
+ * "moved from v1" for a carried submission: the newest earlier version with the person's annotate work or submission on
+ * this text (a task moved by a typo fix is withdrawn, so its submission is what is left of it).
+ */
+function carriedFrom(row: Pick<DocumentRowView, "work" | "moved_work">, item: CardWorkItem, submissions: readonly RowSubmissionView[] | null): string {
+  const earlier = [
+    ...[...row.work, ...(row.moved_work ?? [])].filter(other => other.task === "annotate" && other.author_label === item.author_label).map(other => other.version),
+    ...(submissions ?? []).filter(other => LAYER_KINDS.has(other.kind) && other.author_label === item.author_label).map(other => other.version),
+  ].filter(version => version < item.version);
+  return earlier.length ? `moved from v${Math.max(...earlier)}` : "moved from an earlier version";
+}
 
 /** Order of the rows: unsubmitted first (needs the lead), then submitted; each by assignment date. */
 const byAssignment = (a: CardWorkItem, b: CardWorkItem) => (a.assigned_at ?? "").localeCompare(b.assigned_at ?? "") || a.assignment_id - b.assignment_id;
@@ -123,7 +138,7 @@ export function AnnotationPart({ row, projectKey, query, submissions, changes, c
   const assignButton = useRef<HTMLButtonElement>(null);
   const focusAfterRemoval = useFocusAfterRemoval(assignButton);
   const mode = row.annotation_mode ?? null;
-  const people = ordered(row.work.filter(item => item.task === "annotate" && item.moved_to_version == null));
+  const people = ordered(currentAnnotateWork(row));
   const documents = new Set(row.versions.map(version => version.document_id));
   // The newest annotation layer per person on this text.
   const layers = new Map<string, RowSubmissionView>();
@@ -182,7 +197,9 @@ export function AnnotationPart({ row, projectKey, query, submissions, changes, c
         // version only when the text has several, issue 445).
         // A new round of submitted work (issue: lead review F3): "Round 2, started by you 17 Nov" before the assignment.
         const roundText = item.status !== "submitted" ? roundLine(item, changes) : null;
-        const assignedText = assignedLine(item, now, !submittedText && !item.held && !roundText);
+        // A carried submission was not assigned by anyone at that moment: it says where it came from instead.
+        const assignedText = layer?.kind === "carry_forward" ? carriedFrom(row, item, submissions)
+          : assignedLine(item, now, !submittedText && !item.held && !roundText);
         const modeText = item.status !== "submitted" && item.annotation_mode ? MODE_TEXT[item.annotation_mode] : null;
         const details = joined([
           pausedWord(item),

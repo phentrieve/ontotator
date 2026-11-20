@@ -105,6 +105,32 @@ describe("header", () => {
     expect(within(card()).getByText("v2")).toBeTruthy();
   });
 
+  it("work moved or carried to the newest version counts as on it; only work left on v1 is named (issue 543)", () => {
+    const versions = [
+      version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de" }),
+    ];
+    const onV2 = { version: 2, document_id: "case-200-de-v2", status: "submitted" as const };
+    // A typo fix moved Tom's and Ana's work: their v1 tasks are marked moved, their v2 tasks hold the carried submissions.
+    const moved = [
+      annotateItem({ assignment_id: 1, person: tom, author_label: "ann-0004", version: 1, status: "submitted", moved_to_version: 2 }),
+      annotateItem({ assignment_id: 2, person: ana, author_label: "ann-0003", version: 1, status: "submitted", moved_to_version: 2 }),
+      annotateItem({ assignment_id: 11, person: tom, author_label: "ann-0004", ...onV2 }),
+      annotateItem({ assignment_id: 12, person: ana, author_label: "ann-0003", ...onV2 }),
+    ];
+    renderCard({ row: assignRow({ versions, work: moved }) });
+    expect(within(card()).getByText("v2")).toBeTruthy();
+    cleanup();
+    // Luc's work could not move: one annotation still waits on v1.
+    const luc1 = annotateItem({ assignment_id: 3, person: luc, author_label: "ann-0005", version: 1, status: "submitted" });
+    renderCard({ row: assignRow({ versions, work: [...moved, luc1] }) });
+    expect(within(card()).getByText("v2, 1 annotation still on an older version")).toBeTruthy();
+    cleanup();
+    // After Carry to v2… Luc's v1 task stays in the row's work, but his work is on v2 now.
+    renderCard({ row: assignRow({ versions, work: [...moved, luc1, annotateItem({ assignment_id: 13, person: luc, author_label: "ann-0005", ...onV2 })] }) });
+    expect(within(card()).getByText("v2")).toBeTruthy();
+  });
+
   it("‹ › step through the table order", () => {
     const { onStep } = renderCard();
     fireEvent.click(within(card()).getByRole("button", { name: "Next text" }));
@@ -357,6 +383,34 @@ describe("annotation part", () => {
     renderCard({ canManage: false });
     const plain = (await within(card()).findByRole("link", { name: "Open annotation of Ana Weber (assignment removed)" })).closest("li")!;
     expect(plain.textContent).toBe("Ana Weber ann-0003Assignment removed · submitted Sun, kept in the historyRemovedOpen annotation");
+  });
+
+  it("a carried or moved annotation shows its submission and Open annotation, once per person (issue 543)", async () => {
+    vi.mocked(api.getRowSubmissions).mockImplementation(async (_key, caseId, language) => submissions(caseId, language, {
+      submissions: [
+        submission({ submission_id: "s-ana-v1", document_id: "case-200-de", author_label: "ann-0003", author: ana }),
+        submission({ submission_id: "s-ana-v2", document_id: "case-200-de-v2", version: 2, author_label: "ann-0003", author: ana, kind: "carry_forward", recorded_at: "2026-10-20T10:00:00Z" }),
+      ],
+    }));
+    const versions = [
+      version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", chain_name: "Translation", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "Translation" }),
+    ];
+    const row = assignRow({
+      versions,
+      stages: { review: cell("not_planned", "none"), annotation: cell("submitted", "done", { assigned: 1, target: 1, submitted: 1, total: 1 }), final: cell("after_annotation", "waiting") },
+      work: [
+        annotateItem({ assignment_id: 2, person: ana, author_label: "ann-0003", version: 1, status: "submitted", assigned_at: "2026-10-12T09:00:00" }),
+        annotateItem({ assignment_id: 12, person: ana, author_label: "ann-0003", version: 2, document_id: "case-200-de-v2", status: "submitted", assigned_at: "2026-10-21T11:58:00" }),
+      ],
+    });
+    renderCard({ row, initialSegment: "annotation" });
+    const people = within(card()).getByRole("list", { name: "Annotators" });
+    await within(people).findByRole("link", { name: "Open annotation of Ana Weber" });
+    const rows = within(people).getAllByRole("listitem");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].textContent).toContain("Submitted yesterday, 3 findings · moved from v1");
+    expect(rows[0].textContent).not.toContain("Assigned");
   });
 
   it("names the version of each person's task when the text has several versions (issue 445)", async () => {

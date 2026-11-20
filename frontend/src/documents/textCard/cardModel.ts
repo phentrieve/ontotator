@@ -13,6 +13,18 @@ export type CardView = "path" | "history" | "details";
 /** A work item of a row (with its assignment date and annotation mode). */
 export type CardWorkItem = DocumentRowView["work"][number];
 
+/**
+ * The annotate work of the text card's rows: tasks moved to a newer version are left out, and so is a person's task on an
+ * older version once they have one on a newer version of the same text (a carried submission): one row per person, on the
+ * version their work is on now (issue 543).
+ */
+export function currentAnnotateWork(row: Pick<DocumentRowView, "work">): CardWorkItem[] {
+  const work = row.work.filter(item => item.task === "annotate" && item.moved_to_version == null);
+  const newestOf = new Map<string, number>();
+  for (const item of work) newestOf.set(item.author_label, Math.max(newestOf.get(item.author_label) ?? 0, item.version));
+  return work.filter(item => item.version >= (newestOf.get(item.author_label) ?? 0));
+}
+
 type State = { state: string; tone: PathTone };
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 

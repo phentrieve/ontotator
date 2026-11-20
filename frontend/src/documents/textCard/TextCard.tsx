@@ -28,7 +28,7 @@ import type { TextVersionsTools } from "../TextVersions";
 import { useRowSubmissions } from "../useRowSubmissions";
 import { AnnotationPart } from "./AnnotationPart";
 import { CardFooter, TextDetails } from "./CardFooter";
-import { cardSegments, defaultSegment, stepPlace, textViewRoute, type CardView, type SegmentId, type StepPlace } from "./cardModel";
+import { cardSegments, currentAnnotateWork, defaultSegment, stepPlace, textViewRoute, type CardView, type SegmentId, type StepPlace } from "./cardModel";
 import { FinalizationPart } from "./FinalizationPart";
 import { TranslationPart } from "./TranslationPart";
 import "./textCard.css";
@@ -93,12 +93,19 @@ export interface TextCardProps {
   planControl?: (step: "review" | "annotation") => ReactNode;
 }
 
-/** "v2", plus ", newer than the annotations" when annotate work sits on an older version; null with one version. */
-function versionWarning(row: DocumentRowView): string | null {
+/**
+ * "v2", plus ", newer than the annotations" when all annotate work sits on an older version, or ", 1 annotation still on
+ * an older version" when only some does; null with one version. Work moved or carried to the newest version (a typo fix,
+ * Carry to vN…) counts as on it (issue 543).
+ */
+export function versionWarning(row: Pick<DocumentRowView, "versions" | "work">): string | null {
   if (row.versions.length <= 1) return null;
   const newest = Math.max(...row.versions.map(version => version.version));
-  const older = row.work.some(item => item.task === "annotate" && item.version < newest);
-  return `v${newest}${older ? ", newer than the annotations" : ""}`;
+  const work = currentAnnotateWork(row);
+  const older = work.filter(item => item.version < newest).length;
+  if (!older) return `v${newest}`;
+  if (older === work.length) return `v${newest}, newer than the annotations`;
+  return `v${newest}, ${older} ${older === 1 ? "annotation" : "annotations"} still on an older version`;
 }
 
 /** The case's other texts on this page: each switches the card; texts outside the plan say so and offer "Add to plan…". */
