@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-6oni1mF8.js";import{n as a,t as o}from"./lib-DOgmthNw.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-CuCbapF3.js";import{n as a,t as o}from"./lib-ChlPpsAw.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -464,7 +464,7 @@ If the text was changed elsewhere, a **Revision conflict** notice appears; click
 | You see | Meaning |
 | --- | --- |
 | Fill colour of a mark | The term. The same term keeps one colour in the text; the colour says nothing about the state. Different terms that overlap or stand close together in a sentence always have different colours. |
-| Bands of colour | Text that belongs to several findings: one band per finding, in its colour. Up to three bands; with four or more findings the top band is striped. |
+| Bands of colour | Text that belongs to several findings: one band per finding, in its colour, stacked over the words with a thin gap between them. Up to three bands; with four or more findings the top band is striped. |
 | Solid underline | Your own finding. |
 | Dashed underline | A tool proposal under review. |
 | Dotted underline | A read-only reference finding. |
@@ -1057,7 +1057,7 @@ If the pause arrives while you have the consolidation open, the next decision is
 
 What for: see who marked what and work through the differences in order.
 
-1. The **Clinical text** shows one underline per person. The legend below says which line style belongs to whom. There are four line styles: with more than four people, the fourth (double) line stands for everyone from the fourth person on, and the legend lists them, for example *Line 4 (double): +5: …*. The table of a group still has every person. Kept findings are shaded; the selected group is framed.
+1. The **Clinical text** shows one underline per person. The legend below says which line style belongs to whom. There are four line styles: with more than four people, the fourth (double) line stands for everyone from the fourth person on, and the legend lists them, for example *Line 4 (double): +5: …*. The table of a group still has every person. Kept findings are shaded; the selected group is framed, with one frame per line around its whole passage, also where other findings overlap it.
 2. Beside it, the list **Groups** holds the groups in text order, each with its passage and [its state](#groups-and-their-states).
 3. One group is open at a time. Click a group, or a marked passage in the text, to open it.
 4. Press \`j\` for the next open group and \`k\` for the previous one, or click **Next open group** on the progress card.
