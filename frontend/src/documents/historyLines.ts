@@ -1,6 +1,6 @@
 /**
  * Activity lines of the row panel (acceptance fixes WP-A): one line per review, submission or open
- * task, then pauses and the final choice, oldest first, each with its stage, e.g.
+ * task, change, pause and the final choice, in time order, oldest first (issue 545), each with its stage, e.g.
  * "Review: Ana Weber (ann-0003), Accepted unchanged, 20 Oct, 22:09",
  * "Annotation: Tom Reis (ann-0004), Round 1, 1 finding, 21 Oct, 22:15"; a consolidation adds "4 kept automatically (all
  * matched)" (U14). A change by a lead or an annotator reads "what by whom, date time: reason": "Annotation: task of
@@ -30,6 +30,8 @@ export interface HistoryLine {
   /** Stage the line belongs to: translation review, annotation work or the final choice. */
   stage: HistoryStage;
   text: string;
+  /** When it happened (ISO); null for a line without a time, which sorts before every dated line. */
+  at: string | null;
   /** Problem report behind a paused task ("Open report"). */
   reportId?: string | null;
 }
@@ -71,6 +73,32 @@ const SUBMISSION_PREFIX: Readonly<Record<RowSubmissionView["kind"], string>> = {
 };
 const workPrefix = (item: WorkItem) => (item.task === "review" ? "Consolidation" : "Annotation");
 const who = (item: WorkItem) => personLabel(item.author_label, item.is_me, item.person);
+/**
+ * Who gave the work and when (issue 545): "assigned by you, 20 Oct, 16:13"; a consolidation is "started by …", the
+ * consolidation start assigns it. Nothing without a date.
+ */
+function assignedText(item: WorkItem, now: Date): string | null {
+  if (!item.assigned_at) return null;
+  const by = item.assigned_by ? ` by ${item.assigned_by.is_me ? "you" : named(item.assigned_by)}` : "";
+  return `${item.task === "review" ? "started" : "assigned"}${by}, ${timeText(item.assigned_at, now)}`;
+}
+
+/** Milliseconds of a line's time; NaN without one. */
+const timeOf = (line: HistoryLine) => (line.at ? Date.parse(line.at) : Number.NaN);
+
+/**
+ * Time order, oldest first (issue 545). Lines without a time come first (the oldest: package records), and lines
+ * of the same moment keep the order they were written in (a typo fix before the annotations it moved).
+ */
+export function inTimeOrder(lines: readonly HistoryLine[]): HistoryLine[] {
+  return lines.map((line, index) => ({ line, index, time: timeOf(line) }))
+    .sort((a, b) => {
+      const aNone = Number.isNaN(a.time), bNone = Number.isNaN(b.time);
+      if (aNone || bNone) return aNone === bNone ? a.index - b.index : aNone ? -1 : 1;
+      return a.time - b.time || a.index - b.index;
+    })
+    .map(entry => entry.line);
+}
 
 /** U14: "4 kept automatically (all matched)" on a consolidation that took matching findings over; else nothing. */
 function keptText(item: RowSubmissionView): string | null {
@@ -97,12 +125,17 @@ export function historyLines(row: DocumentRowView, submissions: readonly RowSubm
       const corrected = reviewed && decision === "accepted_corrected" ? row.versions.find(entry => entry.derived_from === reviewed.document_id) : undefined;
       outcome = join(decision ? labelFor(decisionLabels, decision) : "Submitted", corrected && reviewed ? `v${reviewed.version} → v${corrected.version}` : null);
     } else outcome = join(labelFor(assignmentStatusLabels, item.status), pausedWord(item));
-    const at = item === lastSubmitted ? row.stages?.review.detail.at : null;
-    lines.push({ key: `work-${item.assignment_id}`, stage: "review", text: `Review: ${join(who(item), outcome, at && timeText(at, now))}` });
+    const open = item.moved_to_version == null && item.status !== "submitted";
+    // A submitted review: when it was submitted (issue 545); an open one: who gave it and when.
+    const at = item.moved_to_version != null ? null
+      : item.status === "submitted" ? item.submitted_at ?? (item === lastSubmitted ? row.stages?.review.detail.at ?? null : null)
+      : item.assigned_at ?? null;
+    lines.push({ key: `work-${item.assignment_id}`, stage: "review", at,
+      text: `Review: ${join(who(item), outcome, open ? assignedText(item, now) : at && timeText(at, now))}` });
   }
   for (const entry of row.versions) {
     const acceptance = entry.is_newest_in_chain && !isDiscarded(row, entry) ? acceptanceOf(entry) : null;
-    if (acceptance) lines.push({ key: `acceptance-${entry.document_id}`, stage: "review", text: `Review: ${acceptanceLabel(acceptance, now)}` });
+    if (acceptance) lines.push({ key: `acceptance-${entry.document_id}`, stage: "review", at: acceptance.accepted_at ?? null, text: `Review: ${acceptanceLabel(acceptance, now)}` });
   }
 
   // "Fix typos…" (review 2, F6): one line per fix, like the other lead actions: what by whom, date time: reason.
@@ -110,7 +143,7 @@ export function historyLines(row: DocumentRowView, submissions: readonly RowSubm
     const fix = entry.editorial_correction;
     if (!fix) continue;
     const what = `typos fixed in v${entry.version}${byText(fix.corrected_by ?? null)}`;
-    lines.push({ key: `typos-${entry.document_id}`, stage: "review", text: `Review: ${fix.corrected_at ? changeText(what, timeText(fix.corrected_at, now), fix.reason) : `${what}: ${fix.reason.trim()}`}` });
+    lines.push({ key: `typos-${entry.document_id}`, stage: "review", at: fix.corrected_at ?? null, text: `Review: ${fix.corrected_at ? changeText(what, timeText(fix.corrected_at, now), fix.reason) : `${what}: ${fix.reason.trim()}`}` });
   }
 
   // The lead's decision on a query (issue 483): what by whom, date time: the answer to the reviewer.
@@ -121,18 +154,21 @@ export function historyLines(row: DocumentRowView, submissions: readonly RowSubm
     const what = decision.kind === "unchanged"
       ? `query decided${byText(decision.decided_by ?? null)}, v${entry.version} accepted as it is`
       : `query decided${byText(decision.decided_by ?? null)}, the reviewer’s text ${decision.edited ? "taken with changes" : "taken"}${decided ? `, v${decided.version} → v${entry.version}` : ` as v${entry.version}`}`;
-    lines.push({ key: `query-${entry.document_id}`, stage: "review", text: `Review: ${decision.decided_at ? changeText(what, timeText(decision.decided_at, now), decision.answer) : what}` });
+    lines.push({ key: `query-${entry.document_id}`, stage: "review", at: decision.decided_at ?? null, text: `Review: ${decision.decided_at ? changeText(what, timeText(decision.decided_at, now), decision.answer) : what}` });
   }
 
-  // Annotation: submissions in time order (once loaded), then the tasks not submitted yet.
+  // Annotation: submissions (once loaded), then the tasks not submitted yet. A typo fix's copy of a submission is
+  // no line of its own: the change line "moved to v2 by itself" names it (issue 545).
   const several = row.versions.length > 1;
   if (submissions) {
-    for (const item of [...submissions].sort((a, b) => a.recorded_at.localeCompare(b.recorded_at))) {
+    for (const item of submissions) {
+      if (item.moved_by_typo_fix) continue;
       const round = item.kind === "consolidation" ? null : item.round_ordinal == null ? "Initial submission" : `Round ${item.round_ordinal}`;
       lines.push({
         key: `submission-${item.submission_id}`,
         // A consolidation is Finalization work: its lines stand with the final result, not under Annotation.
         stage: item.kind === "consolidation" ? "final" : "annotation",
+        at: item.recorded_at,
         text: `${SUBMISSION_PREFIX[item.kind] ?? "Annotation"}: ${join(personLabel(item.author_label, item.is_me, item.author), round,
           plural(item.finding_count, "finding"), keptText(item), several && `v${item.version}`, timeText(item.recorded_at, now))}`,
       });
@@ -142,12 +178,14 @@ export function historyLines(row: DocumentRowView, submissions: readonly RowSubm
     if (item.task === "translation_review") continue;
     if (item.task === "annotate" && item.unreviewed_translation) {
       const by = item.assigned_by ? personLabel(item.assigned_by.pseudonym, !!item.assigned_by.is_me, item.assigned_by) : "the lead";
-      lines.push({ key: `unreviewed-${item.assignment_id}`, stage: "annotation", text: `Annotation assigned before the translation review was accepted (confirmed by ${by})` });
+      lines.push({ key: `unreviewed-${item.assignment_id}`, stage: "annotation", at: item.assigned_at ?? null, text: `Annotation assigned before the translation review was accepted (confirmed by ${by})` });
     }
     if (item.status === "submitted" && submissions && item.moved_to_version == null) continue;
     const status = item.moved_to_version != null ? `moved to v${item.moved_to_version}` : join(labelFor(assignmentStatusLabels, item.status), pausedWord(item));
     const round = item.moved_to_version == null && item.round_ordinal != null ? `Round ${item.round_ordinal}` : null;
-    lines.push({ key: `work-${item.assignment_id}`, stage: item.task === "review" ? "final" : "annotation", text: `${workPrefix(item)}: ${join(who(item), round, status)}` });
+    const moved = item.moved_to_version != null;
+    lines.push({ key: `work-${item.assignment_id}`, stage: item.task === "review" ? "final" : "annotation", at: moved ? null : item.assigned_at ?? null,
+      text: `${workPrefix(item)}: ${join(who(item), round, status, !moved && assignedText(item, now))}` });
   }
 
   (options.changes ?? []).forEach((change, index) => {
@@ -155,7 +193,7 @@ export function historyLines(row: DocumentRowView, submissions: readonly RowSubm
     const prefix = stage === "review" ? "Review" : change.task === "review" ? "Consolidation" : "Annotation";
     const when = timeText(change.at, now);
     const key = `change-${index}`;
-    const push = (lineStage: HistoryStage, text: string) => lines.push({ key, stage: lineStage, text });
+    const push = (lineStage: HistoryStage, text: string) => lines.push({ key, stage: lineStage, at: change.at, text });
     switch (change.kind) {
       case "reassigned":
         push(stage, `${prefix}: ${changeText(`reassigned from ${named(change.from_person)} to ${named(change.to_person)}`, when)}`);
@@ -212,12 +250,12 @@ export function historyLines(row: DocumentRowView, submissions: readonly RowSubm
   // A task on hold stays a history line (spec "Expansion": TASK_ON_HOLD).
   for (const entry of [...row.issues, ...row.notes]) {
     if (entry.code !== "TASK_ON_HOLD") continue;
-    lines.push({ key: `hold-${entry.cause_id}`, stage: "annotation", text: `Task paused${entry.author_label ? `: ${entry.author_label}` : ""}`, reportId: entry.report_id ?? null });
+    lines.push({ key: `hold-${entry.cause_id}`, stage: "annotation", at: entry.report?.created_at ?? null, text: `Task paused${entry.author_label ? `: ${entry.author_label}` : ""}`, reportId: entry.report_id ?? null });
   }
 
   // Issue 464: the lead pause in place, while its event line above is not loaded yet.
   if (row.lead_pause && !(options.changes ?? []).some(change => change.kind === "text_paused")) {
-    lines.push({ key: "lead-pause", stage: "text", text: `Text: ${changeText(`paused${byText(row.lead_pause.paused_by ?? null)}`, timeText(row.lead_pause.paused_at, now), row.lead_pause.reason)}` });
+    lines.push({ key: "lead-pause", stage: "text", at: row.lead_pause.paused_at, text: `Text: ${changeText(`paused${byText(row.lead_pause.paused_by ?? null)}`, timeText(row.lead_pause.paused_at, now), row.lead_pause.reason)}` });
   }
 
   // The final result: its event lines above say which result, who and when. Without them (the submissions are not
@@ -225,7 +263,7 @@ export function historyLines(row: DocumentRowView, submissions: readonly RowSubm
   const chosen = row.final;
   if (chosen && !(options.changes ?? []).some(change => FINAL_KINDS.has(change.kind))) {
     const by = chosen.selected_by ? (options.me && chosen.selected_by === options.me ? "you" : chosen.selected_by) : null;
-    lines.push({ key: "final", stage: "final", text: `Final: ${join(by ? `chosen by ${by}` : "chosen", chosen.selected_at && timeText(chosen.selected_at, now))}` });
+    lines.push({ key: "final", stage: "final", at: chosen.selected_at ?? null, text: `Final: ${join(by ? `chosen by ${by}` : "chosen", chosen.selected_at && timeText(chosen.selected_at, now))}` });
   }
-  return lines;
+  return inTimeOrder(lines);
 }

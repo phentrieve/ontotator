@@ -44,6 +44,7 @@ from ontotator.application.text_changes import (
     findings_in_changed_passages,
     unplaced_findings,
 )
+from ontotator.application.typo_fix_carry import submission_order_times
 from ontotator.domain import document_rows as rules
 from ontotator.domain.agreement import (
     Agreement,
@@ -252,18 +253,24 @@ def label_rule(
 def _recorded_at(
     conn: Connection, pid: int, submission_ids: Iterable[str]
 ) -> dict[str, datetime]:
+    """Submission order times (``submission_order_times``: a typo-fix copy
+    at the time of the person's own submission)."""
     wanted = sorted(set(submission_ids))
     if not wanted:
         return {}
-    return {
-        row.submission_id: row.recorded_at
-        for row in conn.execute(
-            select(SubmissionRow.submission_id, SubmissionRow.recorded_at).where(
-                SubmissionRow.project_id == pid,
-                SubmissionRow.submission_id.in_(wanted),
+    return submission_order_times(
+        conn,
+        pid,
+        {
+            row.submission_id: row.recorded_at
+            for row in conn.execute(
+                select(SubmissionRow.submission_id, SubmissionRow.recorded_at).where(
+                    SubmissionRow.project_id == pid,
+                    SubmissionRow.submission_id.in_(wanted),
+                )
             )
-        )
-    }
+        },
+    )
 
 
 def _payloads(
@@ -789,9 +796,11 @@ def final_panel(
     listing = build_submissions(conn, key, pid, case_id, language, facts.viewer_user_id)
     ctx = page_context(facts)
     comparison = row_comparison(ctx, case_id, language)
-    recorded_at = {
-        item["submission_id"]: item["recorded_at"] for item in listing["submissions"]
-    }
+    recorded_at = submission_order_times(
+        conn,
+        pid,
+        {item["submission_id"]: item["recorded_at"] for item in listing["submissions"]},
+    )
     inputs = _inputs(
         conn,
         pid,

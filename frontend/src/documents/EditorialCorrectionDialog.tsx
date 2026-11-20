@@ -64,6 +64,9 @@ export const PREVIEW_DELAY_MS = 400;
 export interface EditorialConsequences {
   /** Something stays on this version for the lead (started or submitted annotations, consolidations, a final result): the highlighted block. */
   attention: boolean;
+  /** What moves to the new version (annotations that move by themselves, waiting tasks, tool proposals): plain sentences. */
+  moving: string[];
+  /** What stays on this version: the highlighted block "Work stays on v1" when `attention`. */
   lines: string[];
 }
 
@@ -80,7 +83,9 @@ export function editorialConsequences(preview: EditorialCorrectionPreview): Edit
   const carry = preview.annotation_carry ?? [];
   const carried = carry.filter(item => item.carried);
   const kept = carry.filter(item => !item.carried && item.status === "submitted");
-  const started = Math.max(0, preview.annotations.open - moving), submitted = Math.max(0, preview.annotations.submitted - carried.length);
+  // Issue 543 (U4-04): before the text changes, nobody knows yet whose annotation moves by itself.
+  const unknown = preview.annotation_carry == null ? preview.annotations.submitted : 0;
+  const started = Math.max(0, preview.annotations.open - moving), submitted = Math.max(0, preview.annotations.submitted - carried.length - unknown);
   const staying = submitted + started;
   // The row's own next steps: started work is moved with "Handle text change…", submitted work with "Carry to v2…".
   const steps = [started ? "Handle text change…" : null, submitted ? `Carry to ${next}…` : null].filter(Boolean).join(" and ");
@@ -89,18 +94,24 @@ export function editorialConsequences(preview: EditorialCorrectionPreview): Edit
   // The text-change steps wait for the acceptance of a version that is not accepted yet (rule "annotate accepted translations only").
   const waits = preview.annotate_accepted_only && preview.translation_status !== "accepted";
   const others = [count ? plural(count, "open consolidation") : null, preview.final_result ? "the final result" : null].filter(Boolean).join(" and ");
-  const lines = [
+  const present = (line: string | null): line is string => line !== null;
+  // What moves stands apart from the block of what stays (issue 543, U4-04).
+  const moves = [
     carried.length ? `${carried.length === 1 ? "Moves" : "Move"} to ${next} by ${carried.length === 1 ? "itself" : "themselves"}, nobody submits again: the ${carried.length === 1 ? "annotation" : "annotations"} of ${names(carried)}.` : null,
-    ...keptLines(kept),
-    staying ? `${plural(staying, "annotation")} ${staying === 1 ? "stays" : "stay"} on ${old}. ${waits ? `Once ${next} is accepted` : "After saving"}, use ${steps} on this row to move ${staying === 1 ? "it" : "them"}.` : null,
-    others ? `${others.charAt(0).toUpperCase()}${others.slice(1)} ${count + (preview.final_result ? 1 : 0) === 1 ? "stays" : "stay"} on ${old}${staying ? " as well" : ""}.` : null,
-    findings?.needs_check ? `${findings.needs_check} of ${plural(findings.submitted, "finding")} ${findings.needs_check === 1 ? "marks" : "mark"} words you changed and will need a check when moved.` : null,
+    unknown ? `Once you change the text, this says ${unknown === 1 ? "whether the submitted annotation moves" : `which of the ${unknown} submitted annotations move`} to ${next} by ${unknown === 1 ? "itself" : "themselves"}.` : null,
     moving ? `${plural(moving, "waiting task")} ${moving === 1 ? "continues" : "continue"} on ${next}.` : null,
     proposals && proposals.carried + proposals.needs_check > 0
       ? `Tool proposals move to ${next}${proposals.needs_check ? `; ${proposals.needs_check} ${proposals.needs_check === 1 ? "marks" : "mark"} words you changed and ${proposals.needs_check === 1 ? "waits" : "wait"} for a check` : ""}.`
       : null,
-  ].filter((line): line is string => line !== null);
-  return { attention, lines: lines.length ? lines : [`Nobody has worked on ${old} yet.`] };
+  ].filter(present);
+  const stays = [
+    ...keptLines(kept),
+    staying ? `${plural(staying, "annotation")} ${staying === 1 ? "stays" : "stay"} on ${old}. ${waits ? `Once ${next} is accepted` : "After saving"}, use ${steps} on this row to move ${staying === 1 ? "it" : "them"}.` : null,
+    others ? `${others.charAt(0).toUpperCase()}${others.slice(1)} ${count + (preview.final_result ? 1 : 0) === 1 ? "stays" : "stay"} on ${old}${staying ? " as well" : ""}.` : null,
+    findings?.needs_check ? `${findings.needs_check} of ${plural(findings.submitted, "finding")} ${findings.needs_check === 1 ? "marks" : "mark"} words you changed and will need a check when moved.` : null,
+  ].filter(present);
+  if (!moves.length && !stays.length) return { attention: false, moving: [], lines: [`Nobody has worked on ${old} yet.`] };
+  return { attention, moving: moves, lines: stays };
 }
 
 type CarryPerson = NonNullable<EditorialCorrectionPreview["annotation_carry"]>[number];
@@ -254,10 +265,13 @@ export function EditorialCorrectionDialog({ row, version, projectKey, onCorrecte
             {tried && missingReason && <p id={`${id}-reason-error`} className="field-hint field-hint-error" role="alert">Choose what you fixed or write a note.</p>}
           </fieldset>
           {work !== null && (work.attention
-            ? <InlineMessage tone="warning" title={`Work stays on v${version.version}`}>
-              {work.lines.map(line => <span key={line} className="lead-correction-consequence">{line} </span>)}
-            </InlineMessage>
-            : <p className="editorial-correction-work">{work.lines.join(" ")}</p>)}
+            ? <>
+              {work.moving.length > 0 && <p className="editorial-correction-work">{work.moving.join(" ")}</p>}
+              <InlineMessage tone="warning" title={`Work stays on v${version.version}`}>
+                {work.lines.map(line => <span key={line} className="lead-correction-consequence">{line} </span>)}
+              </InlineMessage>
+            </>
+            : <p className="editorial-correction-work">{[...work.moving, ...work.lines].join(" ")}</p>)}
           <p className="field-hint">{`v${next} keeps the status of ${short}${status ? `: ${status}` : ""}. No translation review is started.`}</p>
         </>}
       {failure}

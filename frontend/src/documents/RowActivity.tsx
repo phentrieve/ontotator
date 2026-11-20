@@ -44,7 +44,7 @@ function lineParts(line: HistoryLine): { separator: string; body: string } {
 
 export function RowActivity({ row, projectKey, submissions, changes, reportRoute, onNavigate, actions, me, now }: RowActivityProps): JSX.Element {
   const reason = useReviewReason(projectKey, reasonDocumentId(row));
-  // Newest first: the lines come oldest first (review, annotation, final).
+  // Newest first: the lines come in time order, oldest first (issue 545).
   const lines = historyLines(row, submissions, { me, now, changes }).reverse();
   return <div className="row-activity">
     {lines.length > 0
