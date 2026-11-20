@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-20
+
 ### Added
 
 - Proposals: an open tool proposal's modifiers change in place (#525). In a task from proposals, the proposal's **Modifiers** have the controls of an own finding: **+ Add modifier…**, **Remove modifier**, **Remove text span** and **Link a text span…**, with the line *A change makes your copy of the proposal (Edit & Replace).* The first change runs Edit & Replace and makes the change on the copy, so the proposal is decided as **Replaced**; the copy's details open with *Your change made a copy; the proposal is decided as Replaced.* and **Undo**. The copy, the change and the decision are one step: **Undo** there or in the header takes them back together, and the proposal is open again. **Link a text span…** makes the copy only once the text is marked. The writes are those of Edit & Replace followed by the change on the copy (`create_annotation` with `source_annotation_id`, then `add_modifier`, `remove_modifier` or `set_modifier_segments`, then the `changed` decision with the copy as replacement), so provenance and export are the same. A decided proposal, or one with a copy, keeps read-only rows. No API change, no migration.
@@ -509,7 +511,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 First public release.
 
-[Unreleased]: https://github.com/phentrieve/ontotator/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/phentrieve/ontotator/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/phentrieve/ontotator/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/phentrieve/ontotator/compare/v0.10.2...v0.11.0
 [0.10.2]: https://github.com/phentrieve/ontotator/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/phentrieve/ontotator/compare/v0.10.0...v0.10.1
