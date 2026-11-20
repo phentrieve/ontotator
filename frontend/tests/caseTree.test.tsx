@@ -868,6 +868,93 @@ describe("copying the text of a finding", () => {
     expect(copyOn(note).setData).toHaveBeenCalledWith("text/plain", "alpha gamma");
   });
 
+  /** A line break inside the passage and more than PREFILL_MAX (80) codepoints. */
+  const LONG = "Mild weakness\r\nof both legs, worse in the evening and after long walks, with frequent falls since spring";
+  const longView = (annotations: any[] = []) => {
+    const view = baseView(annotations);
+    view.document.text = LONG;
+    return view;
+  };
+  const markAll = (container: HTMLElement) => {
+    const text = container.querySelector(".text-container")!;
+    const runs = text.querySelectorAll(".run");
+    const range = document.createRange();
+    range.setStart(runs[0].firstChild!, 0);
+    const last = runs[runs.length - 1].firstChild!;
+    range.setEnd(last, last.textContent!.length);
+    window.getSelection()!.removeAllRanges(); window.getSelection()!.addRange(range);
+    fireEvent.mouseUp(text);
+  };
+  const FLAT = LONG.replace(/\s+/gu, " ");
+
+  it("Ctrl+C copies a mention over a line break as one line", () => {
+    const a1 = snapshot("a1", "HP:A");
+    a1.evidence[0].mention.segments = [{ start: 0, end: 27 }];
+    const { container } = render(<CaseScreen view={longView([a1])} workspaceId="ws" onClose={vi.fn()} />);
+    fireEvent.click(entry(container, "a1"));
+    expect(copyOn(document.body).setData).toHaveBeenCalledWith("text/plain", "Mild weakness of both legs");
+  });
+
+  it("Ctrl+C right after marking copies the whole passage, not the selected, shortened prefill; a selection made in the field copies as usual", () => {
+    vi.spyOn(api, "searchOntology").mockResolvedValue({ search_id: "s", candidates: [] } as any);
+    const { container } = render(<CaseScreen view={longView()} workspaceId="ws" onClose={vi.fn()} />);
+    markAll(container);
+    const field = screen.getByRole<HTMLInputElement>("combobox", { name: "Search term" });
+    expect(document.activeElement).toBe(field);
+    // The prefill is shortened and selected by the panel.
+    expect(field.value.length).toBeLessThan(FLAT.length);
+    expect([field.selectionStart, field.selectionEnd]).toEqual([0, field.value.length]);
+    const copied = copyOn(field);
+    expect(copied.setData).toHaveBeenCalledWith("text/plain", FLAT);
+    expect(copied.notPrevented).toBe(false);
+    // Ctrl and C alone leave the prefill untouched: a second Ctrl+C copies the passage again.
+    fireEvent.keyDown(field, { key: "Control", ctrlKey: true });
+    fireEvent.keyDown(field, { key: "c", ctrlKey: true });
+    expect(copyOn(field).setData).toHaveBeenCalledWith("text/plain", FLAT);
+
+    // The user selects the whole field again by hand (a click, then Ctrl+A): the field's text is copied.
+    fireEvent.pointerDown(field);
+    fireEvent.keyDown(field, { key: "a", ctrlKey: true });
+    field.setSelectionRange(0, field.value.length);
+    const own = copyOn(field);
+    expect(own.setData).not.toHaveBeenCalled();
+    expect(own.notPrevented).toBe(true);
+    // A part of it, too.
+    field.setSelectionRange(0, 4);
+    expect(copyOn(field).notPrevented).toBe(true);
+    // No selection in the field: the passage.
+    field.setSelectionRange(4, 4);
+    expect(copyOn(field).setData).toHaveBeenCalledWith("text/plain", FLAT);
+  });
+
+  it("text selected in the text pane copies as the document's plain text, line breaks kept", () => {
+    const { container } = render(<CaseScreen view={longView()} workspaceId="ws" onClose={vi.fn()} />);
+    const runs = [...container.querySelectorAll<HTMLElement>(".text-container .run")];
+    const at = (offset: number): [Node, number] => {
+      const run = [...runs].reverse().find((candidate) => Number(candidate.dataset.start) <= offset)!;
+      return [run.firstChild!, offset - Number(run.dataset.start)];
+    };
+    const range = document.createRange(); range.setStart(...at(5)); range.setEnd(...at(27));
+    // Not committed as a mark (no mouseup): a selection the user is making, or one in a read-only text.
+    window.getSelection()!.removeAllRanges(); window.getSelection()!.addRange(range);
+    const copied = copyOn(document.body);
+    expect(copied.setData).toHaveBeenCalledTimes(1);
+    expect(copied.setData).toHaveBeenCalledWith("text/plain", "weakness\r\nof both legs");
+    expect(copied.notPrevented).toBe(false);
+    window.getSelection()!.removeAllRanges();
+  });
+
+  it("'Copy text' copies a passage over a line break as one line", async () => {
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    vi.spyOn(api, "searchOntology").mockResolvedValue({ search_id: "s", candidates: [] } as any);
+    const { container } = render(<CaseScreen view={longView()} workspaceId="ws" onClose={vi.fn()} />);
+    markAll(container);
+    fireEvent.click(within(container.querySelector<HTMLElement>(".inspector-pane")!).getByRole("button", { name: "Copy text" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(FLAT));
+    delete (navigator as any).clipboard;
+  });
+
   it("'Copy text' at a mention puts its text on the clipboard and says so", async () => {
     const writeText = vi.fn(async () => undefined);
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });

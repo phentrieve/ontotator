@@ -10,7 +10,7 @@ import type { SearchCandidate } from "../api/client";
 import { SearchLanguageButton } from "./SearchLanguageButton";
 import type { SearchLanguageControl } from "./searchLanguages";
 import { SearchManager, type SearchState, type WorkspaceKey } from "./searchState";
-import { firstUsableIndex, matchLine } from "./termSearch";
+import { PREFILL_SELECTED, firstUsableIndex, keepsPrefillSelected, matchLine } from "./termSearch";
 import { COHORT_TAG, MODIFIER_ROOTS } from "./modifiers";
 import "./modifiers.css";
 
@@ -146,6 +146,12 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
 
   // The prefill follows the marked text (late search languages, an adjusted mark) until the user types or clears:
   // the first one runs at once and is shown selected; later ones wait for the normal debounce.
+  // The panel selects the prefill and marks it as untouched; anything the user does in the field drops the mark.
+  const selectPrefillText = (input: HTMLInputElement) => {
+    input.select();
+    if (input.value.trim()) input.setAttribute(PREFILL_SELECTED, "");
+  };
+  const touchField = () => inputRef.current?.removeAttribute(PREFILL_SELECTED);
   const prefillSettled = useRef(!!initialQuery?.trim());
   const lastPrefill = useRef(initialQuery ?? "");
   const userTyped = useRef(false);
@@ -167,7 +173,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
     if (!selectPrefill.current) return;
     selectPrefill.current = false;
     const input = inputRef.current;
-    if (input && document.activeElement === input) input.select();
+    if (input && document.activeElement === input) selectPrefillText(input);
   }, [queryInput]);
 
   useLayoutEffect(() => {
@@ -175,7 +181,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
     const input = inputRef.current;
     if (!input) return;
     input.focus({ preventScroll: true });
-    input.select();
+    selectPrefillText(input);
     // Below the text (701–1024 px) the field may be out of view: bring only the inspector in, never the text pane.
     const rect = input.getBoundingClientRect();
     if (rect.top < 0 || rect.bottom > window.innerHeight) input.scrollIntoView?.({ block: "nearest" });
@@ -347,8 +353,10 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
             aria-controls={expanded ? listboxId : undefined}
             aria-activedescendant={shownActive >= 0 ? optionId(shownActive) : undefined}
             aria-describedby={hintId}
-            onChange={(e) => handleQueryChange(e.target.value)}
-            onKeyDown={handleKeyDown}
+            onChange={(e) => { touchField(); handleQueryChange(e.target.value); }}
+            onKeyDown={(e) => { if (!keepsPrefillSelected(e)) touchField(); handleKeyDown(e); }}
+            onPointerDown={touchField}
+            onBlur={touchField}
             autoComplete="off"
           />
           {queryInput && (

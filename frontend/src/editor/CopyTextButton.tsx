@@ -8,7 +8,8 @@ const TITLE = "Copy this text to the clipboard, for example to look it up";
 
 /**
  * "Copy text": puts a passage on the clipboard (to look it up elsewhere); the label says "Copied" for a moment,
- * `onAnnounce` tells screen readers. `compact` shows only an icon (a check once copied).
+ * `onAnnounce` tells screen readers. `compact` shows only an icon (a check once copied). Line breaks and runs of
+ * whitespace in `text` are copied as one space, as `passageText` does for Ctrl+C.
  */
 export function CopyTextButton({ text, onAnnounce, compact = false }: { text: string; onAnnounce?: (message: string) => void; compact?: boolean }): JSX.Element {
   const [state, setState] = useState<"copied" | "failed" | null>(null);
@@ -20,7 +21,7 @@ export function CopyTextButton({ text, onAnnounce, compact = false }: { text: st
     let next: "copied" | "failed" = "copied";
     try {
       if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(text.replace(/\s+/gu, " ").trim());
     } catch { next = "failed"; }
     setState(next);
     onAnnounce?.(next === "copied" ? "Copied the text." : "Could not copy the text.");
