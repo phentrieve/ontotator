@@ -72,6 +72,8 @@ describe("SearchPanel", () => {
       expect(input.value).toBe("seizure");
       expect(input.selectionStart).toBe(0);
       expect(input.selectionEnd).toBe(7);
+      // Selected by the panel, not by the user (Ctrl+C then copies the whole passage).
+      expect(input.hasAttribute("data-prefill-selected")).toBe(true);
       await act(async () => { await Promise.resolve(); });
       expect(options()).toHaveLength(3);
       expect(activeId(input)).toBe(options()[1].id);
@@ -531,6 +533,42 @@ describe("SearchPanel", () => {
     expect(screen.getByText("Matched synonym “Seizures”")).toBeDefined();
     const listbox = screen.getByRole("listbox", { name: "Terms" });
     expect(within(listbox).getAllByText(/^Matched /)).toHaveLength(2);
+  });
+});
+
+describe("SearchPanel: the prefill selected by the panel", () => {
+  afterEach(cleanup);
+  const MARK = "data-prefill-selected";
+  const fresh = () => renderPanel(vi.fn().mockResolvedValue(threeHits), { initialQuery: "seizure", autoFocus: true });
+
+  it("stays marked for Ctrl+C and the modifier keys", () => {
+    const input = fresh();
+    fireEvent.keyDown(input, { key: "Control", ctrlKey: true });
+    fireEvent.keyDown(input, { key: "c", ctrlKey: true });
+    fireEvent.keyDown(input, { key: "Meta", metaKey: true });
+    fireEvent.keyDown(input, { key: "c", metaKey: true });
+    expect(input.hasAttribute(MARK)).toBe(true);
+  });
+
+  it("loses the mark once the user clicks, presses another key, types or leaves the field", () => {
+    for (const touch of [
+      (input: HTMLInputElement) => fireEvent.pointerDown(input),
+      (input: HTMLInputElement) => fireEvent.keyDown(input, { key: "a", ctrlKey: true }),
+      (input: HTMLInputElement) => fireEvent.keyDown(input, { key: "ArrowLeft", shiftKey: true }),
+      (input: HTMLInputElement) => fireEvent.change(input, { target: { value: "seiz" } }),
+      (input: HTMLInputElement) => fireEvent.blur(input),
+    ]) {
+      const input = fresh();
+      expect(input.hasAttribute(MARK)).toBe(true);
+      touch(input);
+      expect(input.hasAttribute(MARK)).toBe(false);
+      cleanup();
+    }
+  });
+
+  it("is not set without a prefill", () => {
+    const input = renderPanel(vi.fn().mockResolvedValue(threeHits), { autoFocus: true });
+    expect(input.hasAttribute(MARK)).toBe(false);
   });
 });
 

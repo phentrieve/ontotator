@@ -104,29 +104,41 @@ function RemovedTip({ passage, index, since, anchor, onEnter, onLeave }: {
   </div>, document.body);
 }
 
+/** The text offset (UTF16, as the runs' data-start) of a DOM point in the text pane; markers and handles have no text. */
+function textOffsetOf(container: HTMLElement, node: Node, offset: number): number {
+  let end = 0;
+  for (const run of container.querySelectorAll<HTMLElement>('.run')) {
+    end = Number(run.dataset.start) + (run.textContent?.length ?? 0);
+    const range = container.ownerDocument.createRange();
+    range.selectNodeContents(run);
+    const side = range.comparePoint(node, offset);
+    if (side < 0) return Number(run.dataset.start);
+    if (side === 0) {
+      range.setEnd(node, offset);
+      return Number(run.dataset.start) + range.toString().length;
+    }
+  }
+  return end;
+}
+
+/** The page selection as text offsets, when it lies wholly in the text pane; else null. */
+function ownedSelection(container: HTMLElement): { anchor: number; focus: number } | null {
+  const selection = container.ownerDocument.defaultView?.getSelection();
+  if (!selection || selection.rangeCount !== 1 || !selection.anchorNode || !selection.focusNode
+    || !container.contains(selection.anchorNode) || !container.contains(selection.focusNode)) return null;
+  // Native DOM offsets are UTF16; never convert or normalize the selected text.
+  return {
+    anchor: textOffsetOf(container, selection.anchorNode, selection.anchorOffset),
+    focus: textOffsetOf(container, selection.focusNode, selection.focusOffset),
+  };
+}
+
 /** A display-only redraw must not finish or discard a native selection in progress. */
 function retainOwnedSelection(container: HTMLDivElement) {
   const selection = container.ownerDocument.defaultView?.getSelection();
-  if (!selection || selection.rangeCount !== 1 || !selection.anchorNode || !selection.focusNode
-    || !container.contains(selection.anchorNode) || !container.contains(selection.focusNode)) return;
-  const offsetOf = (node: Node, offset: number): number => {
-    let end = 0;
-    for (const run of container.querySelectorAll<HTMLElement>('.run')) {
-      end = Number(run.dataset.start) + (run.textContent?.length ?? 0);
-      const range = container.ownerDocument.createRange();
-      range.selectNodeContents(run);
-      const side = range.comparePoint(node, offset);
-      if (side < 0) return Number(run.dataset.start);
-      if (side === 0) {
-        range.setEnd(node, offset);
-        return Number(run.dataset.start) + range.toString().length;
-      }
-    }
-    return end;
-  };
-  // Native DOM offsets are UTF16; never convert or normalize the selected text.
-  const anchor = offsetOf(selection.anchorNode, selection.anchorOffset);
-  const focus = offsetOf(selection.focusNode, selection.focusOffset);
+  const owned = ownedSelection(container);
+  if (!selection || !owned) return;
+  const { anchor, focus } = owned;
   return () => {
     const pointAt = (offset: number): [Node, number] | null => {
       for (const run of container.querySelectorAll<HTMLElement>('.run')) {
@@ -245,6 +257,21 @@ export const TextPane: React.FC<TextPaneProps> = ({
     };
   }, [text]);
 
+  // Text selected in the pane (read-only, or before a keyboard selection is committed) copies as plain text: the
+  // document's own characters, line breaks included, without the marks' colours and fonts a rich paste would keep.
+  useEffect(() => {
+    const onCopy = (event: ClipboardEvent) => {
+      const container = containerRef.current;
+      const active = document.activeElement;
+      if (!container || !event.clipboardData || active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
+      const owned = ownedSelection(container);
+      if (!owned || owned.anchor === owned.focus) return;
+      event.clipboardData.setData("text/plain", text.slice(Math.min(owned.anchor, owned.focus), Math.max(owned.anchor, owned.focus)));
+      event.preventDefault();
+    };
+    document.addEventListener("copy", onCopy);
+    return () => document.removeEventListener("copy", onCopy);
+  }, [text]);
   // Sync mentions
   useEffect(() => {
     if (handleRef.current) {

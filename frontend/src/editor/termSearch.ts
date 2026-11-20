@@ -1,6 +1,7 @@
 /** Pure helpers of the term search: prefill, match copy and the active hit. */
 import type { SearchCandidate } from "../api/client";
 import { languageName } from "../translation/labels";
+import { quoteOf } from "./modifiers";
 
 export const PREFILL_MAX = 80;
 
@@ -21,6 +22,33 @@ export function prefillQuery(text: string, segments: readonly { start: number; e
   if (codepoints[PREFILL_MAX] === " ") return head.join("").trim();
   const lastSpace = head.lastIndexOf(" ");
   return (lastSpace > 0 ? head.slice(0, lastSpace) : head).join("").trim();
+}
+
+/** The passage to copy, to look it up elsewhere: the covered text of all segments (parts apart by words joined
+ * by a space, as `quoteOf`), whitespace and line breaks collapsed to one space, trimmed, never cut. */
+export function passageText(text: string, segments: readonly { start: number; end: number }[]): string {
+  return quoteOf(text, segments, " ").replace(/\s+/gu, " ").trim();
+}
+
+/**
+ * Set on the search field while the panel itself has selected its prefill and the user has not touched the
+ * field since (no click, no key but the copy shortcut, no typing, no blur). Ctrl+C then copies the whole
+ * passage rather than the prefill, which is cut at PREFILL_MAX; a selection the user made copies as usual.
+ */
+export const PREFILL_SELECTED = "data-prefill-selected";
+
+/** The field shows its prefill, selected by the panel and untouched since (see PREFILL_SELECTED). */
+export function isUntouchedPrefill(field: HTMLInputElement | HTMLTextAreaElement): boolean {
+  return field.hasAttribute(PREFILL_SELECTED) && field.value.trim() !== ""
+    && field.selectionStart === 0 && field.selectionEnd === field.value.length;
+}
+
+/** Keys that leave an untouched prefill untouched: the modifier keys alone and the copy shortcuts. */
+export function keepsPrefillSelected(event: Pick<KeyboardEvent, "key" | "ctrlKey" | "metaKey" | "altKey" | "shiftKey">): boolean {
+  if (["Control", "Meta", "Shift", "Alt"].includes(event.key)) return true;
+  const command = event.ctrlKey || event.metaKey;
+  if (!command || event.altKey || event.shiftKey) return false;
+  return event.key.toLowerCase() === "c" || (event.key === "Insert" && event.ctrlKey);
 }
 
 const baseLanguage = (code: string): string => code.split(/[-_]/)[0].toLowerCase();
