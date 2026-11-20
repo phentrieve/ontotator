@@ -25,7 +25,8 @@ import { autoNoteText, chooseDecision, reactToTextEdit, USER_ORIGIN, type Decisi
 import { acceptedCorrection, annotateThisTextLabel, categoryLabels, comparisonCountsDiffer, couplingEditingNote, couplingNote, decisionConsequence, decisionKeyHint, decisionLabels, decisionOutcomes, formatReviewDate, issueMessages, languageName, leadCorrectionKeyHint, leadCorrectionNote, matchingParagraphStatus, nextTaskLabel, paragraphCountChanged, paragraphCountsDiffer, remainingTasksText, reviewIssueMessage, showMatchingLabel, showMatchingShortcut, showMatchingTitle, translationNote, versionOriginRows } from "./labels";
 import { checkReview, type ClinicalCategory, type ReviewDecisionCode, type ReviewForm as FormValue } from "./reviewRules";
 import { LanguageTag } from "../ui/LanguageTag";
-import { SentenceCount, SentenceView } from "./SentenceMarks";
+import { SentenceCount, SentenceGutter } from "./SentenceMarks";
+import { FindBar, type FindBarHandle, type FindHit } from "./FindBar";
 import { InvisiblesKey } from "./invisibles";
 import { isChecked, rebaseMarks, resolveMarks, splitSentences, storedMarks, toggled, withRange, type MarkState, type Sentence, type Side, type StoredMarks } from "./sentences";
 
@@ -302,8 +303,8 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   const sideCount = (states: readonly MarkState[]) => ({ checked: states.filter(isChecked).length, total: states.length, stale: states.filter(state => state?.kind === "stale").length });
   const form = typedForm(rawForm), issues = form ? checkReview(form, workspace.text, text, workspace.failed_checks.length > 0) : [];
   const comparison = comparisonOpen ? comparisons.find(row => row.id === comparisonId) : undefined;
-  /** The editable translation is shown: it is the fixed leader and its pairing waits for a recompute (spec 2.2, 2.3). */
-  const editing = !readOnly && !showChanges && !marking;
+  /** The editable translation is shown: it is the fixed leader and its pairing waits for a recompute (spec 2.2, 2.3). Marking keeps it editable. */
+  const editing = !readOnly && !showChanges;
   const sourceStarts = useMemo(() => paragraphStarts(workspace.source.text), [workspace.source.text]);
   const comparisonStarts = useMemo(() => paragraphStarts(comparison?.text ?? ""), [comparison?.text]);
   /** Translation starts lag the text while editing: 300 ms after the last edit, at once on blur, never during composition. */
@@ -644,6 +645,27 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   useShortcut("3", () => chooseOption(decisionKeys[2]), { ...keyOptions, description: `Choose ${decisionLabels[decisionKeys[2]]}` });
   useShortcut("4", () => chooseOption(decisionKeys[3]), { ...keyOptions, description: `Choose ${decisionLabels[decisionKeys[3]]}` });
   useShortcut("Ctrl+Enter", requestSubmit, { scope: "screen", group: "Translation review", description: "Submit review (asks for confirmation)", enabled: !readOnly, allowInInputs: true });
+  /** Find in the texts (Ctrl+F, Cmd+F on a Mac); a second press inside the bar leaves it to the browser's own find. */
+  const [findOpen, setFindOpen] = useState(false);
+  const findBar = useRef<FindBarHandle | null>(null), beforeFind = useRef<HTMLElement | null>(null);
+  const openFind = () => {
+    if (findBar.current?.hasFocus()) return false;
+    const active = document.activeElement;
+    beforeFind.current = active instanceof HTMLElement && active !== document.body ? active : null;
+    // The selected words, when they fit on one line, are what to find.
+    const field = active instanceof HTMLTextAreaElement ? active.value.slice(active.selectionStart, active.selectionEnd) : window.getSelection()?.toString() ?? "";
+    const initial = field && field.length <= 80 && !/\n/.test(field) ? field : undefined;
+    setFindOpen(true);
+    window.requestAnimationFrame(() => findBar.current?.focus(initial));
+  };
+  const closeFind = (hit: FindHit | null) => {
+    setFindOpen(false);
+    const textarea = hit?.pane === "target" ? targetElement?.querySelector("textarea") : null;
+    // Closing on a hit in the editable translation selects it there, ready to change.
+    if (textarea && !textarea.readOnly) { textarea.focus({ preventScroll: true }); textarea.setSelectionRange(hit!.start, hit!.end); return; }
+    beforeFind.current?.focus({ preventScroll: true });
+  };
+  useShortcut(["Ctrl+f", "Meta+f"], openFind, { scope: "screen", group: "Translation review", description: "Find in the texts (press again for the browser's find)", allowInInputs: true });
   useShortcut("Alt+M", () => showMatching(), { scope: "screen", group: "Translation review", description: showMatchingShortcut, allowInInputs: true });
   useEffect(() => {
     const track = (event: FocusEvent) => {
@@ -695,6 +717,10 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     event.preventDefault(); event.stopPropagation();
     event.currentTarget.open = false; detailsSummary.current?.focus({ preventScroll: true });
   };
+  /** The translation's markers: beside the editor, or beside the changes with Show changes. */
+  const translationGutter = marking && <SentenceGutter owner="translation" sentences={targetSentences} states={targetStates} label="Checked sentences: Translation"
+    disabled={busy} layoutKey={`${showInvisibles}:${showChanges}`} onToggle={index => applyMarks("translation", states => toggled(states, index))}
+    onRange={(from, to, checked) => applyMarks("translation", states => withRange(states, from, to, checked))} />;
   /** Next unchecked: the first translation sentence not (or no longer) checked. */
   const nextUnchecked = () => {
     const index = targetStates.findIndex(state => !isChecked(state));
@@ -795,7 +821,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
         <div className="translation-tools" role="group" aria-label="Text view">
           {!readOnly && !touchOnly && <Checkbox id="review-mark-checked" label="Mark checked sentences" checked={marking} onChange={event => chooseMarking(event.target.checked)} />}
           {!readOnly && !touchOnly && <span className="translation-tools-divider" aria-hidden="true" />}
-          <Checkbox id="review-show-changes" label="Show changes" checked={showChanges && !marking} disabled={marking} onChange={event => setShowChanges(event.target.checked)} />
+          <Checkbox id="review-show-changes" label="Show changes" checked={showChanges} onChange={event => setShowChanges(event.target.checked)} />
           {pairing.available && <Checkbox id="review-couple" label="Couple scrolling" checked={coupled} onChange={event => setRequestedCoupling(event.target.checked ? couplingIdentity : null)} />}
           <Checkbox id="review-show-invisibles" label="Show invisible characters" checked={showInvisibles} onChange={event => chooseInvisibles(event.target.checked)} />
           <div className="translation-tools-end">
@@ -809,16 +835,20 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
           </div>
           {marksError && marking && <p className="sentence-save-error" role="alert">Checked sentences are not saved. <Button size="sm" variant="quiet" onClick={() => { pendingMarks.current ??= marks; sendMarks(); }}>Retry</Button></p>}
           {showInvisibles && <InvisiblesKey />}
+          {findOpen && <FindBar ref={findBar} onClose={closeFind} panes={[
+            { id: "source", name: "Source", element: sourceElement, text: workspace.source.text },
+            { id: "target", name: "Translation", element: targetElement, text },
+            ...(comparison ? [{ id: "comparison", name: "Comparison", element: comparisonElement, text: comparison.text }] : []),
+          ]} />}
         </div>
         <div className={`translation-columns${comparison ? " translation-columns--comparison" : ""}`}>
           <div className="translation-column">
             <div className="translation-column-head density-compact"><h2 className="translation-column-title">Source <LanguageTag code={sourceLanguage} /></h2>
               {marking && <SentenceCount name="Source" count={sideCount(sourceStates)} />}</div>
-            {marking
-              ? <SentenceView ref={setSourceElement} text={workspace.source.text} sentences={sourceSentences} states={sourceStates} label={`Source (${sourceLanguage})`} lang={sourceLanguage}
-                  disabled={busy} showInvisibles={showInvisibles} onToggle={index => applyMarks("source", states => toggled(states, index))}
-                  onRange={(from, to, checked) => applyMarks("source", states => withRange(states, from, to, checked))} />
-              : <TextView ref={setSourceElement} text={workspace.source.text} label={`Source (${sourceLanguage})`} lang={sourceLanguage} showInvisibles={showInvisibles} />}
+            <TextView ref={setSourceElement} text={workspace.source.text} label={`Source (${sourceLanguage})`} lang={sourceLanguage} showInvisibles={showInvisibles}
+              gutter={marking && <SentenceGutter owner="source" sentences={sourceSentences} states={sourceStates} label="Checked sentences: Source" disabled={busy} layoutKey={showInvisibles}
+                onToggle={index => applyMarks("source", states => toggled(states, index))}
+                onRange={(from, to, checked) => applyMarks("source", states => withRange(states, from, to, checked))} />} />
           </div>
           <div className="translation-column">
             <div className="translation-column-head density-compact">
@@ -829,20 +859,16 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
               {/* The text box keeps its full name; the visible title shows the flag instead of the code in brackets. */}
               <label id="review-translation-label" htmlFor="review-translation" className="visually-hidden">{`Translation (${targetLanguage})`}</label>
             </div>
-            {marking
-              ? <SentenceView ref={setTargetElement} text={text} sentences={targetSentences} states={targetStates} label={`Translation (${targetLanguage})`} lang={targetLanguage}
-                  disabled={busy} showInvisibles={showInvisibles} onToggle={index => applyMarks("translation", states => toggled(states, index))}
-                  onRange={(from, to, checked) => applyMarks("translation", states => withRange(states, from, to, checked))} />
-              : showChanges
-              ? <DiffView ref={setTargetElement} before={workspace.text} after={text} lang={targetLanguage} showInvisibles={showInvisibles} />
+            {showChanges
+              ? <DiffView ref={setTargetElement} before={workspace.text} after={text} lang={targetLanguage} showInvisibles={showInvisibles} gutter={translationGutter} />
               : <TranslationEditor ref={setTargetElement} id="review-translation" labelledBy="review-translation-label" describedBy="review-translation-note"
-                  machineText={workspace.text} value={text} lang={targetLanguage} readOnly={readOnly} disabled={busy} showInvisibles={showInvisibles}
+                  machineText={workspace.text} value={text} lang={targetLanguage} readOnly={readOnly} disabled={busy} showInvisibles={showInvisibles} gutter={translationGutter}
                   onChange={event => editText(event.target.value)}
                   onBlur={() => { composing.current = false; commitStarts(); }}
                   onCompositionStart={() => { composing.current = true; window.clearTimeout(startsTimer.current); }}
                   onCompositionEnd={() => { composing.current = false; scheduleStarts(); }} />}
             <p id="review-translation-note" className="translation-column-note">{marking
-              ? "Click a sentence to mark it as checked. Turn off Mark checked sentences to edit."
+              ? `Click a box in the margin to mark its sentence as checked. Shift+click marks a range. ${showChanges ? "Turn off Show changes to edit." : "The text stays editable."}`
               : translationNote(workspace.variant, showChanges ? "changes" : changed ? "edited" : "same", previousVersion?.variant.version)}</p>
           </div>
           {comparison && <div className="translation-column">

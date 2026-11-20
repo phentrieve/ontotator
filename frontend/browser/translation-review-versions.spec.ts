@@ -255,22 +255,19 @@ for (const [name, viewport] of sizes) {
     await page.goto(`/#/tasks/${review}`);
     await expect(target(page)).toBeVisible();
     const marking = page.getByRole("checkbox", { name: "Mark checked sentences", exact: true });
-    const translation = page.getByRole("region", { name: "Translation (de)", exact: true });
+    const translation = page.getByRole("group", { name: "Checked sentences: Translation", exact: true });
     const sentence = (index: number) => translation.locator(`[data-sentence="${index}"]`);
     // "Absatz 1. Dosis 5 mg." is one sentence; then the text repeats one sentence many times.
     await marking.check();
-    await expect(sentence(1)).toHaveText(/^Die Patientin beschreibt Symptome und die Ärztin prüft jede Angabe\./);
-    await expect(sentence(2)).toHaveText(/^Die Patientin beschreibt Symptome und die Ärztin prüft jede Angabe\./);
+    await expect(sentence(1)).toHaveAccessibleName(/^Sentence 2: Die Patientin beschreibt Symptome und die Ärztin prüft je/);
+    await expect(sentence(2)).toHaveAccessibleName(/^Sentence 3: Die Patientin beschreibt Symptome und die Ärztin prüft je/);
     await sentence(1).click();
     await expect(sentence(1)).toHaveAttribute("aria-pressed", "true");
-    // Change the checked sentence (the first of the equal ones).
-    await marking.uncheck();
+    // Change the checked sentence (the first of the equal ones); the text stays editable while marking.
     const text = await target(page).inputValue();
     await target(page).fill(text.replace("Die Patientin beschreibt Symptome", "Die Patientin beschreibt keine Symptome"));
-    await marking.check();
-    await expect(sentence(1)).toHaveText(/^Die Patientin beschreibt keine Symptome/);
+    await expect(sentence(1)).toHaveAccessibleName(/^Sentence 2: Die Patientin beschreibt keine Symptome.*\(changed since checked\)$/);
     await expect(sentence(1)).toHaveClass(/is-stale/);
-    await expect(sentence(1)).toContainText("changed since checked");
     await expect(sentence(2)).toHaveAttribute("aria-pressed", "false");
     await expect(sentence(2)).not.toHaveClass(/is-checked|is-stale/);
     await expect(translation.locator(".is-checked")).toHaveCount(0);

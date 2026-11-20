@@ -1,142 +1,130 @@
-import { forwardRef, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from "react";
-import { paragraphStarts } from "../variants/paragraphs";
-import { invisibleNodes } from "./invisibles";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { IconCheck } from "../ui/icons";
+import { clearHighlights, setHighlight } from "./highlights";
 import { isChecked, type MarkState, type Sentence } from "./sentences";
+import { firstLine, indexText, rangeAt } from "./textRanges";
 import "./translation.css";
 
-export interface SentenceViewProps {
-  text: string;
+export interface SentenceGutterProps {
+  /** One gutter per side: its highlights are kept apart from the other side's. */
+  owner: "source" | "translation";
   sentences: readonly Sentence[];
   states: readonly MarkState[];
   label: string;
-  lang?: string;
   disabled?: boolean;
-  /** Marks spaces, tabs, line ends and other invisible characters (issue 454). */
-  showInvisibles?: boolean;
+  /** Changes whenever the text may lay out anew without new sentences (invisible characters, another view). */
+  layoutKey?: unknown;
   /** Toggles one sentence. */
   onToggle: (index: number) => void;
   /** Sets the sentences from `from` to `to` to checked or unchecked. */
   onRange: (from: number, to: number, checked: boolean) => void;
 }
 
-type Drag = { pointerId: number; start: number; current: number; value: boolean };
+/** Up to three markers side by side and two rows fit beside one line; more sentences on one line overlap. */
+const COLUMNS = 3, MARKER = 14, GAP = 2;
+type Place = { top: number; left: number };
 
-const sentenceOf = (target: EventTarget | null): number | null => {
-  const element = target instanceof Element ? target.closest<HTMLElement>("[data-sentence]") : null;
-  const index = Number(element?.dataset.sentence);
-  return element && Number.isInteger(index) ? index : null;
+/** The text the gutter stands beside: the editor's mirror, else the pane itself. */
+const textRootOf = (gutter: HTMLElement): Element | null => {
+  const host = gutter.parentElement;
+  return host?.querySelector(":scope > .translation-editor-mirror") ?? host;
 };
 
-/** Text nodes with the hidden paragraph markers coupled scrolling reads, and one button per sentence. */
-function sentenceNodes(text: string, sentences: readonly Sentence[], render: (sentence: Sentence) => ReactNode, invisibles = false): ReactNode[] {
-  // Paragraph starts are code-point offsets; sentences use UTF-16 offsets.
-  const units: number[] = [];
-  let unit = 0;
-  for (const char of text) { units.push(unit); unit += char.length; }
-  units.push(unit);
-  const points = paragraphStarts(text), starts = points.map(point => units[Math.min(point, units.length - 1)]);
-  const nodes: ReactNode[] = [];
-  let paragraph = 0, position = 0, gaps = 0;
-  /** The text between two sentences (spaces, line ends). */
-  const between = (from: number, to: number) => { const part = text.slice(from, to); nodes.push(...(invisibles ? invisibleNodes(part, `g${gaps++}`) : [part])); };
-  /** Text up to `end`; a marker at `end` comes before the sentence that starts there. */
-  const gap = (end: number) => {
-    for (; paragraph < starts.length && starts[paragraph] <= end; paragraph++) {
-      if (starts[paragraph] > position) { between(position, starts[paragraph]); position = starts[paragraph]; }
-      nodes.push(<span key={`p${paragraph}`} aria-hidden="true" data-paragraph={paragraph} data-paragraph-offset={points[paragraph]} />);
-    }
-    if (end > position) { between(position, end); position = end; }
-  };
-  for (const sentence of sentences) {
-    gap(sentence.start);
-    nodes.push(render(sentence));
-    position = sentence.end;
-  }
-  gap(text.length);
-  return nodes;
-}
+const preview = (text: string) => text.length > 60 ? `${text.slice(0, 57)}…` : text;
 
 /**
- * A review text in marking mode: every sentence is a toggle button. Click toggles it,
- * Shift+click marks the range from the last clicked sentence, and a drag sets every
- * sentence passed to the opposite of the sentence it started on.
+ * Mark checked sentences (issue 256) beside a text that stays as it is: editable in the editor, selectable in every
+ * view. One marker per sentence stands in the margin at the sentence's first line; checked and changed sentences
+ * are tinted in the text itself. A click on a marker toggles its sentence, Shift+click marks the range from the
+ * last marker used; the markers are one Tab stop, the arrow keys move between them.
  */
-export const SentenceView = forwardRef<HTMLDivElement, SentenceViewProps>(function SentenceView(
-  { text, sentences, states, label, lang, disabled = false, showInvisibles = false, onToggle, onRange }, ref,
-) {
+export function SentenceGutter({ owner, sentences, states, label, disabled = false, layoutKey, onToggle, onRange }: SentenceGutterProps): JSX.Element {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const ranges = useRef<(Range | null)[]>([]);
+  const [places, setPlaces] = useState<(Place | null)[]>([]);
+  const [active, setActive] = useState(0);
   const anchor = useRef<number | null>(null);
-  const drag = useRef<Drag | null>(null);
-  const [range, setRange] = useState<Drag | null>(null);
-  const latest = useRef({ onToggle, onRange }); latest.current = { onToggle, onRange };
-  const finish = useCallback((apply: boolean) => {
-    const current = drag.current;
-    drag.current = null; setRange(null);
-    if (!current || !apply) return;
-    if (current.current === current.start) latest.current.onToggle(current.start);
-    else latest.current.onRange(current.start, current.current, current.value);
-    anchor.current = current.current;
-  }, []);
-  // A drag may end outside the text.
-  const dragging = range !== null;
-  useEffect(() => {
-    if (!dragging) return;
-    const up = (event: globalThis.PointerEvent) => { if (event.pointerId === drag.current?.pointerId) finish(true); };
-    const cancel = (event: globalThis.PointerEvent) => { if (event.pointerId === drag.current?.pointerId) finish(false); };
-    window.addEventListener("pointerup", up); window.addEventListener("pointercancel", cancel);
-    return () => { window.removeEventListener("pointerup", up); window.removeEventListener("pointercancel", cancel); };
-  }, [dragging, finish]);
-  const pointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (disabled || event.button > 0) return;
-    const index = sentenceOf(event.target);
-    if (index === null) return;
-    event.preventDefault();
-    (event.target as HTMLElement).closest<HTMLElement>("[data-sentence]")?.focus({ preventScroll: true });
-    if (event.shiftKey && anchor.current !== null) { onRange(anchor.current, index, true); anchor.current = index; return; }
-    // Touch captures the pointer on the start sentence; released, moves report the sentence below.
-    try { const target = event.target as Element; if (target.hasPointerCapture?.(event.pointerId)) target.releasePointerCapture(event.pointerId); } catch { /* Nothing to release. */ }
-    const next = { pointerId: event.pointerId, start: index, current: index, value: !isChecked(states[index]) };
-    drag.current = next; setRange(next);
+  useLayoutEffect(() => {
+    const gutter = ref.current, root = gutter && textRootOf(gutter);
+    if (!gutter || !root) return;
+    const measure = () => {
+      const index = indexText(root);
+      const found = sentences.map(sentence => rangeAt(index, sentence.start, sentence.end));
+      ranges.current = found;
+      const lines = found.map(range => range ? firstLine(range, gutter) : null);
+      // Sentences whose first lines share a line box share its margin.
+      const groups: { top: number; height: number; members: number[] }[] = [];
+      lines.forEach((line, i) => {
+        if (!line) return;
+        const group = groups.find(row => Math.abs(row.top - line.top) < 4);
+        if (group) group.members.push(i); else groups.push({ top: line.top, height: line.height, members: [i] });
+      });
+      const next: (Place | null)[] = sentences.map(() => null);
+      for (const group of groups) {
+        const rows = Math.ceil(group.members.length / COLUMNS), height = rows * MARKER + (rows - 1) * GAP;
+        group.members.forEach((member, slot) => {
+          next[member] = { top: group.top + Math.max(0, (group.height - height) / 2) + Math.floor(slot / COLUMNS) * (MARKER + GAP), left: GAP + (slot % COLUMNS) * (MARKER + GAP) };
+        });
+      }
+      setPlaces(next);
+      setHighlight("review-checked", owner, found.filter((range, i): range is Range => range !== null && isChecked(states[i])));
+      setHighlight("review-stale", owner, found.filter((range, i): range is Range => range !== null && states[i]?.kind === "stale"));
+      // A tint paints over the text's own change marks: the changes are painted again above it.
+      const changes = (selector: string) => Array.from(root.querySelectorAll(selector), element => { const range = document.createRange(); range.selectNodeContents(element); return range; });
+      setHighlight("review-insert", owner, changes("ins"));
+      setHighlight("review-delete", owner, changes("del"));
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [owner, sentences, states, layoutKey]);
+  useEffect(() => () => clearHighlights(owner, ["review-checked", "review-stale", "review-sentence-hover", "review-insert", "review-delete"]), [owner]);
+  useEffect(() => { if (active >= sentences.length) setActive(Math.max(0, sentences.length - 1)); }, [active, sentences.length]);
+  const hover = (index: number | null) => {
+    const range = index === null ? null : ranges.current[index];
+    setHighlight("review-sentence-hover", owner, range ? [range] : []);
   };
-  const pointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    const current = drag.current;
-    if (!current || event.pointerId !== current.pointerId) return;
-    let index = sentenceOf(event.target);
-    if (index === null && typeof document.elementFromPoint === "function") index = sentenceOf(document.elementFromPoint(event.clientX, event.clientY));
-    if (index === null || index === current.current) return;
-    const next = { ...current, current: index };
-    drag.current = next; setRange(next);
+  const markerOf = (index: number) => ref.current?.querySelector<HTMLElement>(`[data-sentence="${index}"]`);
+  const apply = (index: number, range: boolean) => {
+    if (disabled) return;
+    if (range && anchor.current !== null) onRange(anchor.current, index, true); else onToggle(index);
+    anchor.current = index; setActive(index);
   };
+  const click = (event: MouseEvent<HTMLButtonElement>, index: number) => { event.preventDefault(); apply(index, event.shiftKey); };
   const keyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const index = sentenceOf(event.target);
-    if (disabled || index === null || (event.key !== "Enter" && event.key !== " ")) return;
+    const index = Number((event.target as HTMLElement).dataset.sentence);
+    if (!Number.isInteger(index)) return;
     // Ctrl+Enter is the screen's submit shortcut, not a mark.
     if (event.ctrlKey || event.metaKey || event.altKey) return;
-    event.preventDefault();
-    if (event.shiftKey && anchor.current !== null) onRange(anchor.current, index, true);
-    else onToggle(index);
-    anchor.current = index;
+    const last = sentences.length - 1;
+    const to = { ArrowDown: index + 1, ArrowRight: index + 1, ArrowUp: index - 1, ArrowLeft: index - 1, Home: 0, End: last }[event.key];
+    if (to !== undefined) {
+      event.preventDefault();
+      const next = Math.max(0, Math.min(last, to));
+      setActive(next); markerOf(next)?.focus(); hover(next);
+      return;
+    }
+    if (event.key === "Enter" || event.key === " ") { event.preventDefault(); apply(index, event.shiftKey); }
   };
-  /** A click without a pointer press (assistive technology) toggles the sentence. */
-  const click = (event: MouseEvent<HTMLDivElement>) => {
-    const index = sentenceOf(event.target);
-    if (event.detail !== 0 || disabled || index === null) return;
-    onToggle(index); anchor.current = index;
-  };
-  const rangeValue = range?.value;
-  const low = range ? Math.min(range.start, range.current) : -1, high = range ? Math.max(range.start, range.current) : -2;
-  const content = useMemo(() => sentenceNodes(text, sentences, sentence => {
-    const state = states[sentence.index];
-    const inRange = sentence.index >= low && sentence.index <= high;
-    const className = ["review-sentence", isChecked(state) && "is-checked", state?.kind === "stale" && "is-stale",
-      inRange && (rangeValue ? "is-range-mark" : "is-range-unmark")].filter(Boolean).join(" ");
-    return <span key={`s${sentence.index}`} className={className} role="button" tabIndex={0} data-sentence={sentence.index}
-      aria-pressed={isChecked(state)} aria-disabled={disabled || undefined}
-      title={state?.kind === "stale" ? "Changed since checked" : undefined}>
-      {showInvisibles ? invisibleNodes(sentence.text, `s${sentence.index}`) : sentence.text}{state?.kind === "stale" && <span className="review-sr-only"> (changed since checked)</span>}</span>;
-  }, showInvisibles), [text, sentences, states, low, high, rangeValue, disabled, showInvisibles]);
-  return <div ref={ref} className={`translation-text translation-sentences${showInvisibles ? " show-invisibles" : ""}`} role="region" aria-label={label} lang={lang}
-    onPointerDown={pointerDown} onPointerMove={pointerMove} onKeyDown={keyDown} onClick={click}>{content}</div>;
-});
+  return <div ref={ref} className="sentence-gutter" data-gutter="" role="group" aria-label={label} onKeyDown={keyDown}>
+    {sentences.map(sentence => {
+      const state = states[sentence.index], place = places[sentence.index], stale = state?.kind === "stale";
+      const name = `Sentence ${sentence.index + 1}: ${preview(sentence.text)}${stale ? " (changed since checked)" : ""}`;
+      return <button key={sentence.index} type="button" data-sentence={sentence.index} aria-pressed={isChecked(state)} aria-label={name}
+        aria-disabled={disabled || undefined} title={stale ? "Changed since checked" : isChecked(state) ? "Checked" : "Mark as checked"}
+        tabIndex={sentence.index === active ? 0 : -1}
+        className={["sentence-marker", isChecked(state) && "is-checked", stale && "is-stale"].filter(Boolean).join(" ")}
+        style={place ? { top: place.top, left: place.left } : undefined}
+        onClick={event => click(event, sentence.index)} onMouseDown={event => { if (event.shiftKey) event.preventDefault(); }}
+        onPointerEnter={() => hover(sentence.index)} onPointerLeave={() => hover(null)}
+        onFocus={() => { setActive(sentence.index); hover(sentence.index); }} onBlur={() => hover(null)}>
+        {isChecked(state) && <IconCheck />}
+      </button>;
+    })}
+  </div>;
+}
 
 /** Counts of one side. */
 export interface SideCount { checked: number; total: number; stale: number }

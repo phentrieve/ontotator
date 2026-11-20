@@ -33,13 +33,14 @@ export function paragraphNodes(after: string, parts: readonly TextDiffPart[], { 
   return nodes;
 }
 
-export const DiffView = forwardRef<HTMLDivElement, { before: string; after: string; parts?: readonly TextDiffPart[]; lang?: string; showInvisibles?: boolean; label?: string }>(function DiffView({ before, after, parts, lang, showInvisibles = false, label = "Text changes" }, ref) {
+/** With `gutter`, the checked-sentence markers stand in the pane's margin (issue 256). */
+export const DiffView = forwardRef<HTMLDivElement, { before: string; after: string; parts?: readonly TextDiffPart[]; lang?: string; showInvisibles?: boolean; label?: string; gutter?: ReactNode }>(function DiffView({ before, after, parts, lang, showInvisibles = false, label = "Text changes", gutter }, ref) {
   const content = useMemo(() => paragraphNodes(after, parts ?? diffText(before, after), { invisibles: showInvisibles }), [before, after, parts, showInvisibles]);
-  return <div ref={ref} className={`translation-diff${showInvisibles ? " show-invisibles" : ""}`} role="region" aria-label={label} tabIndex={0} lang={lang}>{content}</div>;
+  return <div ref={ref} className={`translation-diff${showInvisibles ? " show-invisibles" : ""}${gutter ? " has-gutter" : ""}`} role="region" aria-label={label} tabIndex={0} lang={lang}>{gutter}{content}</div>;
 });
 
-/** Read-only reading text with paragraph markers, without any editing affordance. */
-export const TextView = forwardRef<HTMLDivElement, { text: string; label: string; lang?: string; showInvisibles?: boolean }>(function TextView({ text, label, lang, showInvisibles = false }, ref) {
+/** Read-only reading text with paragraph markers, without any editing affordance; `gutter` as in DiffView. */
+export const TextView = forwardRef<HTMLDivElement, { text: string; label: string; lang?: string; showInvisibles?: boolean; gutter?: ReactNode }>(function TextView({ text, label, lang, showInvisibles = false, gutter }, ref) {
   const content = useMemo(() => paragraphNodes(text, [{ op: "equal", text }], { invisibles: showInvisibles }), [text, showInvisibles]);
-  return <div ref={ref} className={`translation-text${showInvisibles ? " show-invisibles" : ""}`} role="region" aria-label={label} tabIndex={0} lang={lang}>{content}</div>;
+  return <div ref={ref} className={`translation-text${showInvisibles ? " show-invisibles" : ""}${gutter ? " has-gutter" : ""}`} role="region" aria-label={label} tabIndex={0} lang={lang}>{gutter}{content}</div>;
 });

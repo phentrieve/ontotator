@@ -270,22 +270,36 @@
 .translation-next-task { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
 .translation-next-task [role="status"] { flex-basis: 100%; }
 
-/* Mark checked sentences (issue 256): every sentence is a toggle; marks are the reviewer's aid only. */
+/* Mark checked sentences (issue 256): markers in the margin beside a text that stays editable and selectable;
+   checked and changed sentences are tinted over the text. The marks are the reviewer's aid only. */
 .sentence-count { margin: 0; color: var(--text-muted); font-size: var(--size-sm); line-height: var(--leading-sm); font-variant-numeric: tabular-nums; }
 .sentence-count strong { color: var(--text); font-weight: var(--weight-strong); }
 .sentence-next { margin-left: auto; }
 .sentence-save-error { display: flex; align-items: center; gap: var(--space-2); flex-basis: 100%; margin: 0; color: var(--text); }
-.translation-sentences { user-select: none; -webkit-user-select: none; }
-/* Touch drags mark sentences instead of scrolling the text; the gaps and the scroll bar still scroll. */
-.review-sentence { border-radius: 2px; cursor: pointer; touch-action: none; text-decoration: underline 2px transparent; text-underline-offset: 4px; }
-.review-sentence:hover { background: var(--surface-sunken); }
-.review-sentence:focus-visible { outline: var(--focus-width) solid var(--focus-ring); outline-offset: 1px; }
-.review-sentence.is-checked { background: var(--success-light); text-decoration-color: var(--success); }
-.review-sentence.is-stale { background: var(--warning-light); text-decoration-color: var(--warning); text-decoration-style: dashed; }
-/* The live drag range: what the sentences become when the pointer is released. */
-.review-sentence.is-range-mark { background: var(--success-light); text-decoration-color: var(--success); text-decoration-style: dotted; }
-.review-sentence.is-range-unmark { background: transparent; text-decoration-color: var(--border-strong); text-decoration-style: dotted; }
-.review-sentence[aria-disabled="true"] { cursor: default; }
+.translation-text.has-gutter, .translation-diff.has-gutter, .translation-editor.has-gutter .translation-editor-sizer { position: relative; }
+.translation-texts .translation-text.has-gutter, .translation-texts .translation-diff.has-gutter,
+.translation-editor.has-gutter .translation-editor-mirror, .translation-editor.has-gutter .translation-editor-input { padding-inline-start: 3.5rem; }
+.sentence-gutter { position: absolute; z-index: 2; top: 0; left: 0; width: 3.25rem; height: 0; }
+.sentence-marker { position: absolute; top: 0; left: 2px; display: grid; place-items: center; box-sizing: border-box; width: 14px; height: 14px; padding: 0; border: 1.5px solid var(--border-strong); border-radius: 3px; background: var(--surface-raised); color: var(--surface-raised); cursor: pointer; }
+.sentence-marker svg { width: 11px; height: 11px; }
+.sentence-marker:hover { border-color: var(--accent); }
+.sentence-marker:focus-visible { outline: var(--focus-width) solid var(--focus-ring); outline-offset: 1px; }
+.sentence-marker.is-checked { border-color: var(--success); background: var(--success); }
+.sentence-marker.is-stale { border-color: var(--warning); border-style: dashed; background: var(--warning-light); }
+.sentence-marker[aria-disabled="true"] { cursor: default; }
+::highlight(review-checked) { background-color: var(--success-light); }
+::highlight(review-stale) { background-color: var(--warning-light); }
+/* Find in the texts (Ctrl+F): one row under the text tools; hits painted like the browser's own find. */
+.find-bar { display: flex; flex-basis: 100%; align-items: center; gap: var(--space-2); min-width: 0; }
+.find-bar-input { flex: 0 1 18rem; min-width: 8rem; }
+.find-bar-status { display: flex; flex-wrap: wrap; column-gap: var(--space-3); min-width: 0; color: var(--text-muted); font-size: var(--size-sm); line-height: var(--leading-sm); font-variant-numeric: tabular-nums; }
+.find-bar-panes { color: var(--text-muted); }
+::highlight(review-find) { background-color: var(--mark-0-fill); }
+::highlight(review-find-current) { background-color: var(--mark-2-fill); }
+/* Changes inside a tinted sentence keep their own marks (Show changes and the editor's mirror). */
+::highlight(review-insert) { background-color: var(--success-light); text-decoration: underline 2px var(--success); text-underline-offset: 4px; }
+::highlight(review-delete) { background-color: var(--danger-light); text-decoration: line-through var(--danger); }
+::highlight(review-sentence-hover) { text-decoration: underline 2px var(--focus-ring); text-underline-offset: 5px; }
 
 /* Show invisible characters (issue 454). Each mark is generated content drawn over its character: it is never
    selected or copied, and being absolutely positioned it adds no width, so the text wraps as without the marks. */

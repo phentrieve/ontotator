@@ -510,21 +510,33 @@ If the source text was updated after the translation was made, **Source updates 
 
 What for: keep track of the sentences you have already checked in a long text.
 
-1. Tick **Mark checked sentences** above the texts. Both texts are now split into sentences. To edit the translation again, untick it. **Show changes** is off while you mark. Your choice is remembered in this browser.
-2. Click a sentence to mark it as checked. Click it again to remove the mark. Source and translation are marked separately.
-3. Shift+click a sentence to mark all sentences from the last one you clicked up to this one.
-4. Or press on a sentence and drag across others. Starting on an unmarked sentence marks all of them. Starting on a marked sentence removes the marks.
-5. The head of each text shows how many of its sentences are checked. **Next unchecked** jumps to the first unchecked sentence of the translation.
+1. Tick **Mark checked sentences** above the texts. A small box appears in the margin beside the first line of each sentence, in both texts. The translation stays editable, and **Show changes** still works. Your choice is remembered in this browser.
+2. Click a box to mark its sentence as checked. Click it again to remove the mark. Pointing at a box underlines its sentence. Source and translation are marked separately.
+3. Shift+click a box to mark all sentences from the last box you used up to this one.
+4. Clicks and drags in the text itself never mark: you can select, copy and edit the text as usual.
+5. The head of each text shows how many of its sentences are checked. **Next unchecked** jumps to the box of the first unchecked sentence of the translation.
 
-Checked sentences are green. If you edit a checked sentence later, it turns amber, and the head of the text counts it as *changed*. Read it again, then click it to mark it as checked.
+Checked sentences are green. If you edit a checked sentence, it turns amber at once, and the head of the text counts it as *changed*. Words you changed keep their green underline inside a marked sentence. Read the sentence again, then click its box to mark it as checked.
 
 A mark belongs to its sentence, not to its wording. When a text repeats a sentence, for example *Unauffällig.*, and you edit the one you had checked, that sentence turns amber where it stands; the same sentence elsewhere in the text stays as it was, unchecked if you had not checked it. When you add or remove text before checked sentences, their marks move with them. A checked sentence you delete loses its mark; if you take an edit back, the sentence is green again.
 
 The marks are only for you. They are saved with your review, so they are kept when you reload, close the tab or the task is paused. With the review open in two tabs, both keep their marks; a tab shows the marks of the other one after your next mark there or after **Reload from server**. They do not change your decision, and the lead and the exports never see them.
 
-With the keyboard: Tab to a sentence, then press Enter or Space to mark it. Shift+Enter marks the range from the last sentence you marked.
+With the keyboard: Tab to the boxes of a text (one Tab stop per text), move with the arrow keys, Home and End, then press Enter or Space to mark a sentence. Shift+Enter marks the range from the last sentence you marked.
 
-On a touch-only device such as a phone or tablet, **Mark checked sentences** is not offered, because a swipe on the text has to scroll. A review you can only read does not offer it either.
+On a touch-only device such as a phone or tablet, **Mark checked sentences** is not offered. A review you can only read does not offer it either.
+
+### Find in the texts
+
+What for: find a word in the source, the translation and the comparison at once.
+
+1. Press `Ctrl+F` (macOS: `Cmd+F`) in a translation review. A search field opens above the texts. Words you had selected are filled in.
+2. Type what to find. Upper and lower case do not matter. Every hit is highlighted in every text that is shown, also inside the translation you are editing and in **Show changes**, where the deleted words are skipped.
+3. Beside the field: *3 of 41* and the hits per text, for example *Source 14 · Translation 13 · Comparison 14*.
+4. `Enter` goes to the next hit, `Shift+Enter` to the previous one. The text that holds the hit scrolls it into view.
+5. `Esc` closes the search. When the current hit is in the translation, it is selected there, ready to change.
+
+Press `Ctrl+F` again inside the search field to use the browser's own find.
 
 ### Show invisible characters
 
@@ -571,4 +583,4 @@ What for: work without the mouse. Shortcuts are off while you type in a field or
 | `Alt+←` / `Alt+→` | Previous / next text |
 | `Alt+P` | Switch project |
 
-In a translation review: `1` to `4` choose a decision (outside the text), `Ctrl+Enter` submits (with a confirmation), `Alt+M` shows the matching paragraph. With **Mark checked sentences** on, Enter or Space marks the focused sentence and Shift+Enter marks a range.
+In a translation review: `1` to `4` choose a decision (outside the text), `Ctrl+Enter` submits (with a confirmation), `Alt+M` shows the matching paragraph, `Ctrl+F` (macOS: `Cmd+F`) finds in the texts. With **Mark checked sentences** on, Enter or Space on a box marks its sentence, Shift+Enter marks a range, and the arrow keys move between the boxes.

@@ -631,45 +631,102 @@ test('axe has no violations in the column head with coupling on', async ({ page 
   expect(results.violations.flatMap(v => v.nodes.map(n => `${v.id} ${n.target.join(' ')}: ${n.failureSummary ?? ''}`))).toEqual([]);
 });
 
-test('Mark checked sentences: click, Shift+click and drag per side, kept on reload, task stays open', async ({ page }) => {
+test('Mark checked sentences: markers per side beside a text that stays editable and selectable, kept on reload, task stays open', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 }); const s = await scenario(page, 'target'); await openReview(page, s);
   const toggle = page.getByRole('checkbox', { name: 'Mark checked sentences', exact: true });
   await expect(toggle).not.toBeChecked();
   await toggle.check();
-  await expect(target(page)).toHaveCount(0);
-  const translation = page.getByRole('region', { name: 'Translation (de)', exact: true });
-  const source = page.getByRole('region', { name: 'Source (en)', exact: true });
-  const sentence = (region: Locator, index: number) => region.locator(`[data-sentence="${index}"]`);
+  // Marking keeps the editor (issue 256 with changes).
+  await expect(target(page)).toHaveValue(s.texts.target);
+  const translation = page.getByRole('group', { name: 'Checked sentences: Translation', exact: true });
+  const source = page.getByRole('group', { name: 'Checked sentences: Source', exact: true });
+  const marker = (gutter: Locator, index: number) => gutter.locator(`[data-sentence="${index}"]`);
   const saved = () => page.waitForResponse(r => r.url().endsWith(`/translation-reviews/${s.assignment_id}/checked-sentences`) && r.request().method() === 'PUT');
-  await sentence(translation, 0).click();
-  await expect(sentence(translation, 0)).toHaveAttribute('aria-pressed', 'true');
-  await expect(sentence(source, 0)).toHaveAttribute('aria-pressed', 'false');
-  await sentence(translation, 2).click({ modifiers: ['Shift'] });
-  for (const index of [0, 1, 2]) await expect(sentence(translation, index)).toHaveAttribute('aria-pressed', 'true');
-  // A drag from an unchecked sentence marks all sentences passed.
-  // The middle of a sentence's first line box: a wrapped sentence's bounding box may centre on a gap.
-  const point = (index: number) => sentence(source, index).evaluate(el => { const r = el.getClientRects()[0]; return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
-  const [first, third] = [await point(0), await point(2)];
-  await page.mouse.move(first.x, first.y); await page.mouse.down();
-  await page.mouse.move(third.x, third.y, { steps: 8 });
-  await expect(sentence(source, 1)).toHaveClass(/is-range-mark/);
+  await marker(translation, 0).click();
+  await expect(marker(translation, 0)).toHaveAttribute('aria-pressed', 'true');
+  await expect(marker(source, 0)).toHaveAttribute('aria-pressed', 'false');
+  await marker(translation, 2).click({ modifiers: ['Shift'] });
+  for (const index of [0, 1, 2]) await expect(marker(translation, index)).toHaveAttribute('aria-pressed', 'true');
+  // Each marker stands beside the first line of its sentence (the first sentence starting with the emoji is unique).
+  const label = (await marker(translation, 1).getAttribute('aria-label'))!;
+  expect(label).toMatch(/^Sentence 2: A😀/u);
+  const line = await page.locator('.translation-editor-mirror').evaluate(mirror => {
+    const nodes: Text[] = []; const walker = document.createTreeWalker(mirror, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) nodes.push(node as Text);
+    let offset = nodes.map(node => node.data).join('').indexOf('A\u{1F600}');
+    for (const node of nodes) {
+      if (offset < node.data.length) { const r = document.createRange(); r.setStart(node, offset); r.setEnd(node, offset + 1); const rect = r.getClientRects()[0]; return { top: rect.top, bottom: rect.bottom }; }
+      offset -= node.data.length;
+    }
+    return null;
+  });
+  const markerBox = (await marker(translation, 1).boundingBox())!;
+  expect(markerBox.y + markerBox.height / 2).toBeGreaterThan(line!.top);
+  expect(markerBox.y + markerBox.height / 2).toBeLessThan(line!.bottom);
+  // Keyboard: Enter on the source's first marker, Shift+Enter on the third.
+  await marker(source, 0).focus(); await page.keyboard.press('Enter');
+  await marker(source, 2).focus();
   const done = saved();
-  await page.mouse.up();
-  for (const index of [0, 1, 2]) await expect(sentence(source, index)).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('Shift+Enter');
+  for (const index of [0, 1, 2]) await expect(marker(source, index)).toHaveAttribute('aria-pressed', 'true');
   expect((await done).ok()).toBe(true);
   await expect(page.locator('.sentence-count')).toHaveText([/3 of \d+ checked/, /3 of \d+ checked/]);
-  await page.getByRole('button', { name: 'Next unchecked', exact: true }).click();
-  await expect(sentence(translation, 3)).toBeFocused();
-  const results = await new AxeBuilder({ page }).include('.translation-tools').include('.translation-sentences').analyze();
-  expect(results.violations.flatMap(v => v.nodes.map(n => `${v.id} ${n.target.join(' ')}: ${n.failureSummary ?? ''}`))).toEqual([]);
+  // A drag in the source text selects it and marks nothing (issue 256, selection).
+  const region = page.getByRole('region', { name: 'Source (en)', exact: true });
+  const box = (await region.boundingBox())!;
+  await page.mouse.move(box.x + 80, box.y + 120); await page.mouse.down();
+  await page.mouse.move(box.x + 300, box.y + 160, { steps: 6 }); await page.mouse.up();
+  expect((await page.evaluate(() => window.getSelection()?.toString() ?? '')).length).toBeGreaterThan(10);
+  await expect(source.locator('[aria-pressed="true"]')).toHaveCount(3);
   // Marking alone does not start the task.
   const tasks = await (await authenticatedRequest(page, '/api/v1/me/tasks')).json() as { assignment_id: number; status: string }[];
   expect(tasks.find(t => t.assignment_id === s.assignment_id)?.status).toBe('open');
+  // An edit while marking: the edited checked sentence turns changed at once.
+  await placeCaret(page, 'Die Patientin');
+  await page.keyboard.type('Heute ');
+  await expect(marker(translation, 1)).toHaveClass(/is-stale/);
+  await expect(page.locator('.sentence-count').last()).toContainText('1 changed');
+  await page.getByRole('button', { name: 'Next unchecked', exact: true }).click();
+  await expect(marker(translation, 1)).toBeFocused();
+  const results = await new AxeBuilder({ page }).include('.translation-tools').include('.sentence-gutter').analyze();
+  expect(results.violations.flatMap(v => v.nodes.map(n => `${v.id} ${n.target.join(' ')}: ${n.failureSummary ?? ''}`))).toEqual([]);
+  await expect(review(page).locator('.translation-save-status')).toHaveText('Saved');
   await page.reload();
   await expect(page.getByRole('checkbox', { name: 'Mark checked sentences', exact: true })).toBeChecked();
-  for (const index of [0, 1, 2]) await expect(sentence(translation, index)).toHaveAttribute('aria-pressed', 'true');
-  await expect(sentence(translation, 3)).toHaveAttribute('aria-pressed', 'false');
-  // Off: the translation is editable again.
-  await page.getByRole('checkbox', { name: 'Mark checked sentences', exact: true }).uncheck();
-  await expect(target(page)).toHaveValue(s.texts.target);
+  for (const index of [0, 2]) await expect(marker(translation, index)).toHaveAttribute('aria-pressed', 'true');
+  await expect(marker(translation, 1)).toHaveClass(/is-stale/);
+  await expect(marker(translation, 3)).toHaveAttribute('aria-pressed', 'false');
+  // Show changes keeps the markers beside the changes.
+  await page.getByRole('checkbox', { name: 'Show changes', exact: true }).check();
+  await expect(page.getByRole('region', { name: 'Text changes', exact: true }).locator('ins')).toContainText('Heute');
+  await marker(translation, 3).click();
+  await expect(marker(translation, 3)).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('Find in the texts: Ctrl+F searches every shown column, also inside the editor, and scrolls the hit into its pane', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 }); const s = await scenario(page, 'target'); await openReview(page, s); await openComparison(page);
+  await target(page).focus();
+  await page.keyboard.press('Control+f');
+  const find = page.getByRole('searchbox', { name: 'Find in the texts', exact: true });
+  await expect(find).toBeFocused();
+  await find.fill('Absatz 12.');
+  await expect(review(page).locator('.find-bar-status')).toHaveText(/^1 of 1/);
+  // The hit lies far down the editor: it is scrolled into view inside its pane.
+  const editor = page.locator('.translation-editor');
+  const visible = () => page.evaluate(() => {
+    const hit = (CSS as unknown as { highlights: Map<string, { values(): IterableIterator<Range> }> }).highlights.get('review-find-current');
+    const range = hit ? [...hit.values()][0] : undefined, pane = document.querySelector('.translation-editor')!.getBoundingClientRect();
+    const rect = range?.getBoundingClientRect();
+    return !!rect && rect.top >= pane.top && rect.bottom <= pane.bottom;
+  });
+  await expect.poll(visible).toBe(true);
+  expect(await editor.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
+  await find.fill('5 mg');
+  await expect(review(page).locator('.find-bar-status')).toContainText(/Source 14 · Translation 14 · Comparison \d+/);
+  // Escape on a hit in the translation selects it there.
+  await find.fill('Absatz 3.');
+  await find.press('Escape');
+  await expect(target(page)).toBeFocused();
+  const selected = await target(page).evaluate(el => { const t = el as HTMLTextAreaElement; return t.value.slice(t.selectionStart, t.selectionEnd); });
+  expect(selected).toBe('Absatz 3.');
 });
