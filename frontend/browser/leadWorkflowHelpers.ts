@@ -12,7 +12,8 @@ export type LeadScenarioName =
   | "QUERIED_TRANSLATION_FOR_LEAD"
   | "ACCEPTED_TRANSLATION_FOR_LEAD"
   | "UPLOAD_DIALOG"
-  | "TYPO_FIX_CARRY";
+  | "TYPO_FIX_CARRY"
+  | "QUESTION_FOR_LEAD";
 
 /** The people of every lead workflow scenario. */
 export type LeadPerson = "lead" | "ana" | "ben" | "annotator";
@@ -54,9 +55,12 @@ export interface LeadScenario {
    */
   cases?: Record<
     | "chip" | "acceptance" | "rejected" | "report" | "choose_final" | "review_changes" | "not_in_plan"
-    | "queried" | "to_assign" | "accepted" | "unreviewed" | "in_review" | "take_text" | "answer_only",
+    | "queried" | "to_assign" | "accepted" | "unreviewed" | "in_review" | "take_text" | "answer_only"
+    | "ask" | "asked" | "old_query",
     string
   >;
+  /** QUESTION_FOR_LEAD: Ana's translation review task per case name (issue 553). */
+  tasks?: Record<"ask" | "asked" | "old_query", number>;
   report_id?: string;
   report_reason?: string;
   /** TYPO_FIX_CARRY: the version-1 document id per language (issue 465). */

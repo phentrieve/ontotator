@@ -301,17 +301,17 @@ test.describe("annotator.md", () => {
     await expect(page.getByRole("textbox", { name: "Translation (de)", exact: true })).toHaveValue(s.texts["failed-translation"]);
     await expect(page.getByRole("region", { name: "Source (en)", exact: true })).toBeVisible();
     await expect(page.getByRole("region", { name: "Automatic translation checks", exact: true })).toBeVisible();
-    for (const name of ["Accepted unchanged", "Accepted with corrections", "Query", "Rejected"]) {
+    for (const name of ["Accepted unchanged", "Accepted with corrections", "Rejected"]) {
       await expect(page.getByRole("radio", { name, exact: true })).toBeVisible();
     }
-    await page.getByRole("radio", { name: "Query", exact: true }).check();
+    await page.getByRole("radio", { name: "Rejected", exact: true }).check();
     await page.getByRole("checkbox", { name: "Number or unit", exact: true }).check();
     await page.getByRole("textbox", { name: "Rationale", exact: true }).fill("The automatic check flags the dose unit: please check it against the source.");
     await page.locator(":focus").blur();
     await expect(page.locator(".translation-save-status")).toHaveText("Saved");
     const submit = page.getByRole("button", { name: "Submit review…", exact: true });
     await expect(submit).not.toHaveAttribute("aria-disabled", "true");
-    // Tall enough for the four decisions, the categories, the rationale and Submit review… at once.
+    // Tall enough for the three decisions, the categories, the rationale and Submit review… at once.
     await page.setViewportSize({ width: 1280, height: 1200 });
     await page.getByRole("radio", { name: "Accepted unchanged", exact: true }).scrollIntoViewIfNeeded();
     await shot(page, "annotator-translation-review");

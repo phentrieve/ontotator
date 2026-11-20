@@ -149,7 +149,7 @@ for (const size of SIZES) {
       await page.goto(`/#/projects/${encodeURIComponent(s.project)}/progress`);
       const nav = workSidebar(page);
       await expect(nav.getByRole("link", { name: "Progress", exact: true })).toHaveAttribute("aria-current", "page");
-      expect((await entries(nav)).map(text => text.replace(/ \(\d+\)$/, ""))).toEqual(["My tasks", "Projects", "Documents", "Progress", "Settings", "Export"]);
+      expect((await entries(nav)).map(text => text.replace(/ \(\d+\)$/, ""))).toEqual(["My tasks", "Projects", "Documents", "Questions", "Progress", "Settings", "Export"]);
       await expect(administrationGear(page)).toHaveCount(0);
       expect(await menuEntries(page)).toEqual(MENU);
       await page.keyboard.press("Escape");

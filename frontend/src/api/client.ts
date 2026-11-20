@@ -258,8 +258,11 @@ export type QueryDecisionRequest = components["schemas"]["QueryDecisionRequest"]
 export type QueryDecisionResult = components["schemas"]["QueryDecisionResult"];
 export type CorrectionReasonAdditionView = components["schemas"]["CorrectionReasonAdditionView"];
 export type ResolveSourceObligationRequest = components["schemas"]["ResolveSourceObligationRequest"];
-export type ProblemReportRequest = components["schemas"]["ProblemReportRequest"];
-export type ProblemActionRequest = components["schemas"]["ProblemActionRequest"];
+type Schemas = components["schemas"];
+/** Issue 553: `kind` defaults to "problem" on the server; a text problem report leaves it out. */
+export type ProblemReportRequest = Omit<Schemas["ProblemReportRequest"], "kind"> & Partial<Pick<Schemas["ProblemReportRequest"], "kind">>;
+/** `take_proposed_text` (issue 553, with `action: "answer"`) defaults to false on the server. */
+export type ProblemActionRequest = Omit<Schemas["ProblemActionRequest"], "take_proposed_text"> & Partial<Pick<Schemas["ProblemActionRequest"], "take_proposed_text">>;
 export type ProblemReportView = components["schemas"]["ProblemReportView"];
 export type ReportEventView = components["schemas"]["ReportEventView"];
 export type ReportHoldView = components["schemas"]["ReportHoldView"];
@@ -1498,6 +1501,14 @@ export class ApiClient {
 
   async listTaskProblemReports(projectKey: string, assignmentId: number): Promise<ProblemReportView[]> {
     const query = new URLSearchParams({ assignment_id: String(assignmentId) });
+    return this.request(`/api/v1/projects/${encodeURIComponent(projectKey)}/problem-reports?${query}`, { method: "GET" });
+  }
+
+  /** Issue 553: questions to the lead (problem reports of kind "question"); a lead reads all, others their own. */
+  async listQuestions(projectKey: string, filter: { assignmentId?: number; state?: "open" | "resolved" | "withdrawn" } = {}): Promise<ProblemReportView[]> {
+    const query = new URLSearchParams({ kind: "question" });
+    if (filter.assignmentId !== undefined) query.set("assignment_id", String(filter.assignmentId));
+    if (filter.state) query.set("state", filter.state);
     return this.request(`/api/v1/projects/${encodeURIComponent(projectKey)}/problem-reports?${query}`, { method: "GET" });
   }
 

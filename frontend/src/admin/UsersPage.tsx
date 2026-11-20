@@ -75,6 +75,8 @@ const auditActions: Readonly<Record<string, string>> = {
   "problem.extend_hold": "Tasks paused for a problem",
   "problem.reopen": "Problem reopened",
   "problem.report": "Problem reported",
+  "question.ask": "Asked the lead",
+  "question.answer": "Answered a question",
   "problem.resolve": "Problem resolved",
   "problem.restart": "Task restarted after a problem",
   "problem.resume": "Tasks resumed after a problem",

@@ -21,8 +21,11 @@ import { ReviewForm } from "./ReviewForm";
 import { TypographyHintsNote } from "./typographyHints";
 import { taskText } from "../app/identity";
 import { LeadReason, QueryAnswer } from "../tasks/LeadReason";
+import { ASK_LABEL } from "../questions/labels";
+import { TaskQuestionList } from "../questions/TaskQuestionList";
+import { useTaskQuestions } from "../questions/useTaskQuestions";
 import { autoNoteText, chooseDecision, reactToTextEdit, USER_ORIGIN, type DecisionState } from "./decisionOrigin";
-import { acceptedCorrection, annotateThisTextLabel, categoryLabels, comparisonCountsDiffer, couplingEditingNote, couplingNote, decisionConsequence, decisionKeyHint, decisionLabels, decisionOutcomes, formatReviewDate, issueMessages, languageName, leadCorrectionKeyHint, leadCorrectionNote, matchingParagraphStatus, nextTaskLabel, paragraphCountChanged, paragraphCountsDiffer, remainingTasksText, reviewIssueMessage, showMatchingLabel, showMatchingShortcut, showMatchingTitle, translationNote, versionOriginRows } from "./labels";
+import { acceptedCorrection, OFFERED_DECISIONS, annotateThisTextLabel, categoryLabels, comparisonCountsDiffer, couplingEditingNote, couplingNote, decisionConsequence, decisionKeyHint, decisionLabels, decisionOutcomes, formatReviewDate, issueMessages, languageName, leadCorrectionKeyHint, leadCorrectionNote, matchingParagraphStatus, nextTaskLabel, paragraphCountChanged, paragraphCountsDiffer, remainingTasksText, reviewIssueMessage, showMatchingLabel, showMatchingShortcut, showMatchingTitle, translationNote, versionOriginRows } from "./labels";
 import { checkReview, type ClinicalCategory, type ReviewDecisionCode, type ReviewForm as FormValue } from "./reviewRules";
 import { LanguageTag } from "../ui/LanguageTag";
 import { SentenceCount, SentenceView } from "./SentenceMarks";
@@ -83,11 +86,19 @@ const withClinicalDefault = (form: Record<string, unknown>): Record<string, unkn
 /** Query and Rejected always imply a clinical change; older drafts may lack it. */
 const lacksImpliedClinical = (form: Record<string, unknown>): boolean =>
   (form.decision === "query" || form.decision === "rejected") && form.clinical_change !== true;
-const decisionKeys: readonly ReviewDecisionCode[] = ["accepted_unchanged", "accepted_corrected", "query", "rejected"];
+// Issue 553: Query is no longer offered; three decisions, three number keys.
+const decisionKeys: readonly ReviewDecisionCode[] = OFFERED_DECISIONS;
 /** A lead correction (spec F1, FD4) is submitted only as Accepted with corrections. */
 const leadDecisions: readonly ReviewDecisionCode[] = ["accepted_corrected"];
 const storedOf = (value: CheckedSentences | undefined): StoredMarks => ({ source: value?.source ?? [], translation: value?.translation ?? [] });
 const recordForm = (record: TranslationReviewRecord): Record<string, unknown> => ({ decision: record.decision, clinical_change: record.clinical_change, categories: record.categories, rationale: record.rationale });
+
+/** The passage selected in the translation editor (or elsewhere on the page) for "Ask the lead". */
+function selectedPassage(): string {
+  const editor = document.getElementById("review-translation");
+  if (editor instanceof HTMLTextAreaElement && editor.selectionStart !== editor.selectionEnd) return editor.value.slice(editor.selectionStart, editor.selectionEnd);
+  return window.getSelection()?.toString() ?? "";
+}
 
 const paragraphMarkers = (element: HTMLElement) => [...element.querySelectorAll<HTMLElement>("[data-paragraph]")];
 const paneTop = (element: HTMLElement) => element.getBoundingClientRect().top + element.clientTop;
@@ -137,6 +148,9 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   const immutableReadOnly = workspace.read_only && (!workspace.assignment.held || workspace.assignment.status === "submitted" || workspace.submitted_record !== null);
   const held = props.held ?? workspace.assignment.held;
   const leadCorrection = workspace.lead_correction;
+  // Issue 553 (prototype): "Ask the lead" in the header and "Questions to the lead" in the review panel.
+  const questions = useTaskQuestions(workspace.assignment.project_key, props.assignmentId);
+  const [asking, setAsking] = useState<{ quote: string } | null>(null);
   // Issue 341 b: the lead corrects an accepted version; the new version is reviewed again.
   // `reviewed_again` also covers a further correction after that new version was rejected or queried.
   const correctsAccepted = leadCorrection && !!workspace.reviewed_again;
@@ -573,7 +587,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   const nextTaskId = nextTask?.kind === "ready" ? nextTask.next?.assignment_id : undefined;
   useEffect(() => { if (nextTaskId !== undefined) nextTaskButton.current?.focus({ preventScroll: true }); }, [nextTaskId]);
   const saveState = saver.current?.state ?? "saved";
-  const canSubmit = !readOnly && !busy && form !== null && issues.length === 0 && nonblank(qualification)
+  const canSubmit = !readOnly && !busy && form !== null && form.decision !== "query" && issues.length === 0 && nonblank(qualification)
     && saveState === "saved" && !saver.current?.hasUnsavedChanges;
   const submit = async (cause?: SourceObligationView): Promise<boolean> => {
     const currentForm = typedForm(draftRef.current.form);
@@ -642,7 +656,6 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   useShortcut("1", () => chooseOption(decisionKeys[0]), { ...keyOptions, description: `Choose ${decisionLabels[decisionKeys[0]]}` });
   useShortcut("2", () => chooseOption(decisionKeys[1]), { ...keyOptions, description: `Choose ${decisionLabels[decisionKeys[1]]}` });
   useShortcut("3", () => chooseOption(decisionKeys[2]), { ...keyOptions, description: `Choose ${decisionLabels[decisionKeys[2]]}` });
-  useShortcut("4", () => chooseOption(decisionKeys[3]), { ...keyOptions, description: `Choose ${decisionLabels[decisionKeys[3]]}` });
   useShortcut("Ctrl+Enter", requestSubmit, { scope: "screen", group: "Translation review", description: "Submit review (asks for confirmation)", enabled: !readOnly, allowInInputs: true });
   useShortcut("Alt+M", () => showMatching(), { scope: "screen", group: "Translation review", description: showMatchingShortcut, allowInInputs: true });
   useEffect(() => {
@@ -718,6 +731,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   } satisfies Record<typeof saveState, readonly [string, StatusTone]>)[saveState];
   const submitBlocker: string | null = readOnly || busy ? null
     : !decision(rawForm.decision) ? "Choose a decision to submit."
+    : rawForm.decision === "query" ? "Query is no longer a decision. Choose another to submit."
     : !form ? "Update the unsupported values above to submit."
     : issues.length > 0 ? null
     : !nonblank(qualification) ? "Your qualification is required to submit."
@@ -779,6 +793,8 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
       <div className="translation-review-tools">
         {!readOnly && props.headerTimer}
         {props.guidelineActions}
+        {!leadCorrection && !readOnly && <Button size="sm" className="ask-lead-entry" onMouseDown={event => event.preventDefault()}
+          onClick={() => setAsking({ quote: selectedPassage() })}>{ASK_LABEL}</Button>}
         {!leadCorrection && props.reportActions}
         <span role="status" className="translation-save-status"><StatusBadge tone={statusTone}>{status}</StatusBadge></span>
         <Button size="sm" icon={<IconRetry />} onClick={() => { void reload(); }}
@@ -884,6 +900,8 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
           <LeadReason task={{ ...workspace, status: record ? "submitted" : workspace.assignment.status }} />
           {/* Issue 483: the lead's decision on this submitted query, with the answer. */}
           {record && <QueryAnswer answer={workspace.query_answer} />}
+          {!leadCorrection && <TaskQuestionList assignment={workspace.assignment} state={questions} withProposal readOnly={readOnly}
+            selectedText={selectedPassage} onShowInText={() => { void reload(); }} dialogOpen={asking} onDialogOpen={setAsking} />}
           <SourceObligationReview assignmentId={props.assignmentId} username={props.username} documentId={workspace.variant.document_id}
             translationText={text} canResolve={canSubmit && !!form && ['accepted_unchanged', 'accepted_corrected'].includes(form.decision)}
             busy={busy} readOnly={readOnly} error={error} onResolve={submit} onPending={setPendingSourceUpdates} openRef={openSourceUpdate} />
