@@ -45,13 +45,17 @@
      layer, kind, ...) is decided in one place, src/editor/markColours.ts, and the
      `.run--color-N` block in screens/editor.css binds slot N to these tokens. The state of a
      mark (own, proposal, reference, negated, selected) is carried by its line style
-     or pattern, never by the fill. */
-  --mark-0-fill: #f8f1a6;
-  --mark-1-fill: #d0edc4;
-  --mark-2-fill: #f9cba8;
-  --mark-3-fill: #cad6fd;
-  --mark-4-fill: #ecd0d6;
-  --mark-5-fill: #b8e8ec;
+     or pattern, never by the fill. Any two slots can be stacked as bands where findings
+     overlap (issue 551), so every pair differs clearly (frontend/tests/tokens.test.ts). */
+  --mark-0-fill: #f4da8f;
+  --mark-1-fill: #bff5c7;
+  --mark-2-fill: #fab9a1;
+  --mark-3-fill: #b7c9fe;
+  --mark-4-fill: #ffc8eb;
+  --mark-5-fill: #9df2ff;
+  /* The 1 px gap between two stacked bands: the sheet shows through, so it parts the bands without
+     reading as a line through the text (a dark line there looks like a strike-through). */
+  --mark-band-separator: var(--surface-raised);
 
   /* Mark states */
   --mark-line: #3b342b;
@@ -216,12 +220,12 @@
     --focus-ring: #8db6ec;
 
     /* Mark palette: six deep fills under light text; same slots as in light. */
-    --mark-0-fill: #665c00;
-    --mark-1-fill: #1d5a2c;
-    --mark-2-fill: #6e2f12;
-    --mark-3-fill: #2c478f;
-    --mark-4-fill: #7a2c4c;
-    --mark-5-fill: #085872;
+    --mark-0-fill: #6c5f0d;
+    --mark-1-fill: #054e30;
+    --mark-2-fill: #6e2b00;
+    --mark-3-fill: #3b2f83;
+    --mark-4-fill: #854f60;
+    --mark-5-fill: #06687e;
 
     /* Mark states */
     --mark-line: #ddd4c4;
@@ -300,12 +304,12 @@
     --focus-ring: #8db6ec;
 
     /* Mark palette: six deep fills under light text; same slots as in light. */
-    --mark-0-fill: #665c00;
-    --mark-1-fill: #1d5a2c;
-    --mark-2-fill: #6e2f12;
-    --mark-3-fill: #2c478f;
-    --mark-4-fill: #7a2c4c;
-    --mark-5-fill: #085872;
+    --mark-0-fill: #6c5f0d;
+    --mark-1-fill: #054e30;
+    --mark-2-fill: #6e2b00;
+    --mark-3-fill: #3b2f83;
+    --mark-4-fill: #854f60;
+    --mark-5-fill: #06687e;
 
     /* Mark states */
     --mark-line: #ddd4c4;

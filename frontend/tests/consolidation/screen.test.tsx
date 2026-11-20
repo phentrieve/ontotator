@@ -787,7 +787,7 @@ describe("ConsolidationScreen, modifiers", () => {
     const piece = [...document.querySelectorAll<HTMLElement>(".cons-mark")].find(element => element.textContent === "schwere")!;
     expect(piece.title).toBe("Severe, modifier of Seizure (Ana Weber); Severe, modifier of Hypotonia (Ben Roth)");
     expect(piece.nextElementSibling?.textContent).toBe(" (Severe, modifier of Seizure (Ana Weber); Severe, modifier of Hypotonia (Ben Roth))");
-    expect(piece.classList.contains("cons-selected")).toBe(true);
+    expect(piece.closest(".cons-selected")).not.toBeNull();
     expect(document.body.textContent).not.toContain("·");
     fireEvent.click(screen.getByRole("link", { name: "Ben Roth linked “schwere” (Severe) to Hypotonia." }));
     await waitFor(() => expect(expandedTitle()).toBe("Muskelhypotonie"));
