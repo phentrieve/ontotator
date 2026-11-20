@@ -204,7 +204,7 @@ test("EMPTY: publish v1, read it in a task, publish v2, review under v2, export 
     ana.page.on("request", request => { if (request.url().includes("example.org")) external.push(request.url()); });
     ana.page.on("dialog", dialog => { dialogs.push(dialog.message()); void dialog.dismiss(); });
     await openTask(ana.page, s, "annotate-1");
-    await expect(ana.page.getByText("This project has guidelines (v1)", { exact: true })).toBeVisible();
+    await expect(ana.page.getByText("This project has guidelines v1", { exact: true })).toBeVisible();
     await expect(ana.page.getByText("Read them before you start; they are available at any time under More › Guidelines in the toolbar.", { exact: true })).toBeVisible();
     await moreButton(ana.page).click();
     await ana.page.getByRole("menuitem", { name: "Guidelines v1 (new)", exact: true }).click();
@@ -264,7 +264,7 @@ test("EMPTY: publish v1, read it in a task, publish v2, review under v2, export 
     await expect(target).toBeVisible();
     await expect(guidelinesButton(ben.page, 2)).toBeVisible();
     await expect(guidelinesButton(ben.page, 2)).toContainText("Guidelines v2");
-    await expect(ben.page.getByText("This project has guidelines (v2)", { exact: true })).toBeVisible();
+    await expect(ben.page.getByText("This project has guidelines v2", { exact: true })).toBeVisible();
     await evidence(ben.page, "ben-review-v2");
     await ben.page.getByRole("radio", { name: "Accepted unchanged", exact: true }).check();
     await expect(ben.page.locator(".translation-save-status")).toHaveText("Saved");
@@ -530,7 +530,7 @@ test("PUBLISHED: a version with the project's own label reads 3.1 (v2) for the l
     await ana.page.goto("/#/");
     await expect(ana.page.getByRole("link", { name: /^Project guidelines 3\.1 \(v2\)(, .+)?$/ })).toBeVisible();
     await openTask(ana.page, s, "annotate-1");
-    await expect(ana.page.getByText(/^(Guidelines updated to 3\.1 \(v2\)|This project has guidelines \(3\.1 \(v2\)\))$/)).toBeVisible();
+    await expect(ana.page.getByText(/^(Guidelines updated to 3\.1 \(v2\)|This project has guidelines 3\.1 \(v2\))$/)).toBeVisible();
     await evidence(ana.page, "label-task-notice");
     await ana.page.getByRole("button", { name: "Read guidelines 3.1 (v2)", exact: true }).click();
     const tab = ana.page.locator(".inspector-pane").getByRole("tabpanel", { name: "Guidelines 3.1 (v2)", exact: true });

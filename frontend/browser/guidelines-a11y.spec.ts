@@ -209,7 +209,7 @@ test("320 px reflow without horizontal scrolling", async ({ page }) => {
   await anaOnTask(page, { width: 320, height: 720 });
   expect(await scrollWidth(page), "task page").toBeLessThanOrEqual(320);
   // The notice wraps inside the page.
-  const notice = page.getByText("This project has guidelines (v1)", { exact: true });
+  const notice = page.getByText("This project has guidelines v1", { exact: true });
   await expect(notice).toBeVisible();
   expect((await notice.boundingBox())!.x + (await notice.boundingBox())!.width).toBeLessThanOrEqual(320);
   await openGuidelines(page);
@@ -301,7 +301,7 @@ test("forced colours keep the New badge and the notice visible", async ({ page }
   await entry(page).click();
   await expect(page.getByRole("menuitem", { name: "Guidelines v1 (new)", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
-  const title = page.getByText("This project has guidelines (v1)", { exact: true });
+  const title = page.getByText("This project has guidelines v1", { exact: true });
   await expect(title).toBeVisible();
   await expect(page.getByRole("button", { name: "Read guidelines v1", exact: true })).toBeVisible();
   // Text keeps a system colour distinct from its background; the notice keeps a visible edge.

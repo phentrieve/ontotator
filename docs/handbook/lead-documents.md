@@ -89,15 +89,15 @@ The **Documents** page lists every text of the project and what it needs next. O
 | Column or mark | Meaning |
 | --- | --- |
 | **Text** | The case ID, the language, the text version and a **NEW** badge for texts that are new since your last visit. |
-| **Translation**, **Annotation**, **Finalization** | The state of each stage, with the names of the people involved. Below 1600 px width the state is shorter and the names are left out; see [On a narrow screen](#on-a-narrow-screen). |
+| **Translation**, **Annotation**, **Finalization** | The state of each stage, with the names of the people involved. Where the table has no room for them, a column shows a shorter state without the names; see [On a narrow screen](#on-a-narrow-screen). |
 | Robot icon | The text has tool proposals. |
 | **Waiting on** | Who the text waits for. **You** in bold means it waits for you. |
 | **Next step** | A button for the next action on this text, for example **Assign annotation…**, **Accept result…** or, when submissions differ, **Compare results…**. Rows that need your decision also have a coloured left edge. |
 | **Last activity** | When something last happened on the text. |
 
-A task starts with the person's first saved change; opening it is not enough, and neither is ticking checked sentences in a translation review. Until then **Translation** and **Annotation** read *assigned, not started* with the person's name, in the table (*not started* without the name below 1600 px), its tooltip, the narrow cards and the text card, where the person's row shows **Not started**. After the first save they read *in review* or *In progress*. The same holds for a task you reopened, also when you asked a reviewer who had already submitted to correct a translation: it reads *assigned, not started* again until the person saves a change after the reopen. With several people or parallel versions the cell counts them, for example *1 of 2 started*.
+A task starts with the person's first saved change; opening it is not enough, and neither is ticking checked sentences in a translation review. Until then **Translation** and **Annotation** read *assigned, not started* with the person's name, in the table (*not started* without the name where the column is short of room), its tooltip, the narrow cards and the text card, where the person's row shows **Not started**. After the first save they read *in review* or *In progress*. The same holds for a task you reopened, also when you asked a reviewer who had already submitted to correct a translation: it reads *assigned, not started* again until the person saves a change after the reopen. With several people or parallel versions the cell counts them, for example *1 of 2 started*.
 
-A text with fewer annotators than **Annotators per text** shows what its people are doing, not the free place. While someone has an open task, **Annotation** reads for example *assigned, not started · max 2* or *1 of 2 submitted · max 3* (below 1600 px *0/1 · max 2*, *1/2 · max 3*: submitted of the people who hold the text, then the limit; the tooltip has the full state), counted out of the people who hold the text; **Waiting on** names the person, the text is under **In progress**, and **Next step** still offers **Assign annotation…** for another annotator. The same holds after **Start a round…** for a text with one annotator. Only a text nobody is working on reads *1 annotator · max 2* or *Unassigned* and is listed under **To assign** (or under **Needs your decision** once its one annotation is submitted). To give texts in progress another annotator, select them and click **Assign annotation…** in the selection bar: it assigns only where a text still has a free place. To list these texts, tick **Can take another annotator** under **Annotation** in **Filter**: it lists every text whose steps include **Assign annotation…**, also while its first annotator is at work. Combine it with the tab **In progress** to see only the texts that someone already works on. When **To assign** is empty, it says so (*No text waits for an assignment*) and offers **Show texts that can take another annotator**.
+A text with fewer annotators than **Annotators per text** shows what its people are doing, not the free place. While someone has an open task, **Annotation** reads for example *assigned, not started · max 2* or *1 of 2 submitted · max 3* (short of room *0/1 · max 2*, *1/2 · max 3*: submitted of the people who hold the text, then the limit; the tooltip has the full state), counted out of the people who hold the text; **Waiting on** names the person, the text is under **In progress**, and **Next step** still offers **Assign annotation…** for another annotator. The same holds after **Start a round…** for a text with one annotator. Only a text nobody is working on reads *1 annotator · max 2* or *Unassigned* and is listed under **To assign** (or under **Needs your decision** once its one annotation is submitted). To give texts in progress another annotator, select them and click **Assign annotation…** in the selection bar: it assigns only where a text still has a free place. To list these texts, tick **Can take another annotator** under **Annotation** in **Filter**: it lists every text whose steps include **Assign annotation…**, also while its first annotator is at work. Combine it with the tab **In progress** to see only the texts that someone already works on. When **To assign** is empty, it says so (*No text waits for an assignment*) and offers **Show texts that can take another annotator**.
 
 The counts in **Annotation**, for example *0 of 1 submitted*, count only work on the newest version of the text. After a text change, a submission on the old version no longer counts: neither when it was carried to the new version, nor when the new version was started fresh. Carried work counts once it is submitted on the new version.
 
@@ -156,12 +156,16 @@ To find texts with more annotators than **Annotators per text** allows, for exam
 
 ### On a narrow screen
 
-Below 1600 px width each text keeps one line in the table. Where the table is still wider than the page, it scrolls sideways with the **Text** column kept at the left:
+The table fits the page from 1280 px width, without scrolling sideways, and each text keeps one line. It shows as much as fits: with room to spare every state has its names and **Waiting on** lists everyone. Where a column has no room, it gives up words in this order:
 
-- The stage columns show a shorter state and leave out the names, which **Waiting on** already shows. For example *assigned, not started (Ana Weber)* reads *not started*, *1 of 2 submitted* reads *1/2 submitted*, *ready to compare* reads *to compare*, *Check changes, newer result* reads *Check changes* and *Final is on old text* reads *on old text*. Submitted work from proposals that waits for the new version's proposals reads *v1 work waits* (*v2 has no proposals yet*).
+- **Paused by lead** and **Typography hints** in the **Text** column become a pause icon and a pilcrow (¶) icon. Point at the icon to read the full mark.
+- The widest stage column, then the next, shows a shorter state and leaves out the names, which **Waiting on** already shows. For example *assigned, not started (Ana Weber)* reads *not started*, *1 of 2 submitted* reads *1/2 submitted*, *ready to compare* reads *to compare*, *Check changes, newer result* reads *Check changes* and *Final is on old text* reads *on old text*. Submitted work from proposals that waits for the new version's proposals reads *v1 work waits* (*v2 has no proposals yet*).
+  A paused consolidation reads *paused* after the pause icon.
 - **Waiting on** shows one name and *+n* for the others.
-- **Text** keeps *source*, the version marker and **NEW** on the line and cuts a long case ID with *…*.
+- **Text** keeps *source*, the version marker and **NEW** on the line and cuts a long case ID with *…*. Only if that is still too wide, a crowded **Text** cell puts its marks on a second line.
 - Point at a cell to see the full state with the names in its tooltip. Screen readers read the full state.
+
+Below 1280 px, where even the short form is wider than the page, the table scrolls sideways with the **Text** column kept at the left.
 
 Below 700 px width, each case is a card with its texts. Click a stage status to see the latest activity and the actions for that stage. Click **Details** to open the full text card.
 
@@ -280,11 +284,11 @@ If the reviewer submits **Accepted with corrections**, the corrected text become
 
 What for: tell the reviewer more after you sent the request, for example a second place to look at.
 
-1. Open the text card and click **Translation**. The reviewer's row under **Translation reviewers** shows the request: *Correction requested on 18 Nov 2026, 09:00:* and the reason in quotes.
+1. Open the text card and click **Translation**. The reviewer's row under **Translation reviewers** shows the request: *Correction requested on 18 Nov, 09:00:* and the reason in quotes.
 2. In that row, click **Add to the reason…**.
 3. Enter the **Addition to the reason** and click **Add to the reason**. Without an addition the button stays grey and says *Enter an addition first.*
 
-The reason as you sent it stays as it is; it cannot be edited. Each addition is a line of its own below it, with the date and who added it, for example *Added by you on 18 Nov 2026, 10:12: Paragraph 3 as well.* The reviewer reads it below the reason, in **My tasks** and in the review (*Added by the lead on …*). **History** has a line for the request and one for each addition. Only a project lead can add, and only while the review is open: after the reviewer submitted it, or after the task was removed, the addition is refused (*Nothing can be added to this reason any more.*).
+The reason as you sent it stays as it is; it cannot be edited. Each addition is a line of its own below it, with the date and who added it, for example *Added by you on 18 Nov, 10:12: Paragraph 3 as well.* The reviewer reads it below the reason, in **My tasks** and in the review (*Added by the lead on …*). **History** has a line for the request and one for each addition. Only a project lead can add, and only while the review is open: after the reviewer submitted it, or after the task was removed, the addition is refused (*Nothing can be added to this reason any more.*).
 
 ## Work plans and assignments
 
@@ -369,7 +373,7 @@ What for: give translation reviews or annotations to people.
 2. Check what the selection needs. If it needs more than one task or language, the line **This selection needs** lists every step, one task in one language each, for example *Translation review de ✓ · Annotation de · Annotation en*. Steps you are through have a tick, a skipped step reads *(skipped)*, the current step is bold, and *Step 2 of 3* says where you are. Then check the **Task**. Annotation that waits for a review you skipped is no longer listed: it cannot start in this dialog.
 3. In the table of people (**Person**, **Reads**, **Open tasks**), pick the reviewer, or tick everyone who should annotate. The task has one language: each ticked person gets every selected text in that language that still has a free place. *Administrator* marks a system administrator; leave them unticked unless they take part.
 4. Read the summary below the table, for example *Ana Weber gets 3 translation reviews (de).*
-5. Click the assign button, for example *Assign 20*.
+5. Click the assign button, for example *Assign 20 tasks*.
 
 ![The assign dialog with members, their languages and open tasks](images/lead-assign.png)
 
@@ -493,7 +497,7 @@ A person who has the task open when you pause is told with the next thing they d
 
 On **Documents**, a paused text carries the badge **Paused by lead**; point at it to read who paused it, when and why. Its open work is nobody's turn: **Waiting on** does not name the people, and the stage shows the pause sign. To list the paused texts, tick **Paused by lead** under **Flags** in **Filter**. The text card shows a notice **Paused by lead** with who, when and why, and each paused person's row says *Paused by lead*.
 
-A text whose consolidation is open keeps it while paused. The row reads *consolidating · paused* under **Finalization** and its annotations stay *2 of 2 submitted*, because submitted work is not paused. In the text card, **Finalization** keeps the consolidator's row with *Paused by lead*, and **Consolidate…** is not offered: the open consolidation continues after the release. The same holds when the consolidator reported a problem and that report pauses the consolidation; the row then waits for you with **Decide on report…**. In **History**, the lines of a consolidation stand under **Finalization**.
+A text whose consolidation is open keeps it while paused. The row reads *consolidating · paused* with the pause icon under **Finalization** (short of room: *paused*) and its annotations stay *2 of 2 submitted*, because submitted work is not paused. In the text card, **Finalization** keeps the consolidator's row with *Paused by lead*, and **Consolidate…** is not offered: the open consolidation continues after the release. The same holds when the consolidator reported a problem and that report pauses the consolidation; the row then waits for you with **Decide on report…**. In **History**, the lines of a consolidation stand under **Finalization**.
 
 To release:
 
@@ -534,7 +538,7 @@ What for: assign a single review or annotation.
 
 With more than five people on a text, the line *Assigned:* names the first five and how many more there are, for example *and 3 more*; the list marks each of them *Already assigned*.
 
-When every place of the text is taken, the other people turn grey with the reason, for example *no free place (1 per text)*. This is the limit of the text, not of the person. A text that already has more annotators than its limit says both numbers, for example *Limit reached: 10 assigned, limit 8.*
+When every place of the text is taken, the other people turn grey with the reason, for example *no free place (1 per text)*. **Assign…** in the selection bar for a text whose places are all taken says the same, for example *Limit reached: 1 assigned, limit 1.*, and offers **Change…**. This is the limit of the text, not of the person. A text that already has more annotators than its limit says both numbers, for example *Limit reached: 10 assigned, limit 8.*
 
 To change the limit of annotators per text from here, click **Change…** next to the limit and enter the number (1 or more; if the server has its own maximum, the field takes no more than that). A number you typed stays when you switch between the two choices below. If the button cannot act, the popover says why, for example *The project setting is already 1.*
 
@@ -550,8 +554,8 @@ What for: spread a batch of texts evenly across people.
 The proposal uses the languages in each person's profile: a person is proposed for a text only if they read its languages, or list no languages at all. People who list the text's languages come first; people with no languages listed only fill the places left over. Among them, fewest open tasks come first.
 
 1. In the assign dialog, click **Distribute evenly…**. The proposal takes the place of the assign dialog; **Close** without confirming returns to it.
-2. Set **People per document** and click **Propose**.
-3. Check the proposal. The tasks are assigned in the order of the table, and each person sees theirs in that order in **My tasks**. Change a person in any cell, or click **Propose again**. Texts nobody can take are listed under **Unassignable documents**.
+2. Set **People per text** and click **Propose**.
+3. Check the proposal. The tasks are assigned in the order of the table, and each person sees theirs in that order in **My tasks**. Change a person in any cell, or click **Propose again**. Texts nobody can take are listed under **Texts nobody can take**.
 4. Click **Confirm**. This covers only the task shown in the assign dialog. If the selection needs more, the assign dialog comes back on the next step; otherwise it closes and the message says the assignments are saved.
 
 If you chose someone whose profile lists other languages than the text needs, the dialog stays open after **Confirm** and asks; click **Assign anyway**. The other rows are already saved.

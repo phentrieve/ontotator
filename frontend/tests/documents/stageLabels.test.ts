@@ -165,9 +165,9 @@ describe("narrow table states (issue 248)", () => {
     "Your choice": null,
     "waiting": null,
     "consolidating (2 of 3 groups open)": "consolidating",
-    // The pause is the cell's ⏸ glyph where "· paused" would be cut.
-    "consolidating · paused (2 of 3 groups open)": "consolidating",
-    "consolidating · paused": "consolidating",
+    // The pause stays in words beside the pause icon (issue 549).
+    "consolidating · paused (2 of 3 groups open)": "paused",
+    "consolidating · paused": "paused",
     // Issue 543: some annotations moved to the new version, some wait on the old one.
     "3 on v2, 1 waiting on v1": "1 left on v1",
   };

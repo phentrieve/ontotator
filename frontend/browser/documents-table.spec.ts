@@ -325,8 +325,9 @@ test("S6 case-0390 de: open problem report with a paused task", async ({ page })
 
   const de = textRow(page, caseId, "de");
   expect(await hasDecisionEdge(de)).toBe(true);
-  // One line: the pause glyph, the card's state and who is paused; the full text (with the reason) is in the title.
-  await expect(rowCell(de, "annotation")).toContainText("⏸");
+  // One line: the pause icon (drawn, not a font glyph: issue 549), the card's state and who is paused; the full text
+  // (with the reason) is in the title.
+  await expect(rowCell(de, "annotation").locator('.stage-cell-symbol[data-symbol="⏸"] svg')).toBeVisible();
   await expect(rowCell(de, "annotation")).toContainText(`open: ${names["ann-0001"]}`);
   await expect(rowCell(de, "next").getByRole("button").first()).toHaveAccessibleName(textNamePattern("Decide on report…, ", caseId, "de"));
   await expect(documentsTab(page, "Needs your decision", 1)).toBeVisible();

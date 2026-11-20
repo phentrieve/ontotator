@@ -18,7 +18,8 @@ import {
   type VariantSummary,
 } from "../api/client";
 import { personLabel } from "../app/identity";
-import { formatDateTime, labelFor, plural } from "../app/labels";
+import { labelFor, plural } from "../app/labels";
+import { formatTime } from "../app/submissionLabels";
 import { DOCUMENT_FIELDS, MY_TASKS, PANEL_STAGES, PANEL_TABS, routeHref, type NavigateOptions, type PanelStage, type PanelTab, type ProjectDocumentsQuery, type Route } from "../app/router";
 import { categoryLabels, decisionLabels } from "../translation/labels";
 import { submissionGuidelineLabel } from "../guidelines/submissionLabel";
@@ -1032,7 +1033,7 @@ function ReviewHistory({ projectKey, documentId, onClose }: { projectKey: string
     {error !== undefined && <ErrorNotice error={error} />}{records === null && error === undefined && <p role="status">Loading reviews …</p>}
     {records?.length === 0 && <p>No one has reviewed this translation yet.</p>}
     {records && <ol className="review-history">{records.map(record => <li key={record.id}>
-      <p><strong>{labelFor(decisionLabels, record.decision)}</strong> by {record.reviewer_pseudonym}, <time dateTime={record.created_at}>{formatDateTime(record.created_at)}</time></p>
+      <p><strong>{labelFor(decisionLabels, record.decision)}</strong> by {record.reviewer_pseudonym}, <time dateTime={record.created_at}>{formatTime(record.created_at)}</time></p>
       <p className="cell-secondary review-guideline">{submissionGuidelineLabel(record.guideline_version, record.guideline_withdrawn, null, record.guideline_label)}</p>
       <p className="cell-secondary">{[record.reviewer_qualification, record.reviewer_languages.length ? `reads ${record.reviewer_languages.join(", ")}` : ""].filter(Boolean).join(", ")}</p>
       <p>{record.status_before === record.status_after ? `Translation status stayed ${labelFor(translationStatusLabels, record.status_after)}.` : `Translation status changed from ${labelFor(translationStatusLabels, record.status_before)} to ${labelFor(translationStatusLabels, record.status_after)}.`}</p>

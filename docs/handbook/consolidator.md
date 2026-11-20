@@ -58,7 +58,7 @@ If the project hides annotator names, the screen says *Annotator names are hidde
 
 If the lead gave a reason when starting the consolidation, it shows above the groups, for example *Reason from the lead: Term and assertion differ*, and under the task in **My tasks**.
 
-If the lead reopened a consolidation you had submitted, a line above the groups says when and why, for example *Reopened by the lead on 18 Nov 2026, 10:00: The onset is still open.* In **My tasks**, click the **Reopened** badge to read it. A consolidation the lead withdrew is no longer in **My tasks**; ask the lead why.
+If the lead reopened a consolidation you had submitted, a line above the groups says when and why, for example *Reopened by the lead on 18 Nov, 10:00: The onset is still open.* In **My tasks**, click the **Reopened** badge to read it. A consolidation the lead withdrew is no longer in **My tasks**; ask the lead why.
 
 The header holds **Open in full editor**, **Report a text problem** and, if the project has guidelines, a button such as *Guidelines v2*. **More…** appears once you decided a group.
 

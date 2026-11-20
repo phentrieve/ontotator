@@ -6,7 +6,7 @@ import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, AuthError, type AdminUser, type CodeResponse, type CreatedUser, type CurrentUser } from "../src/api/client";
 import { auditActor, auditDetails, auditTarget, fieldLabels, UsersPage } from "../src/admin/UsersPage";
-import { formatDateTime, formatShortDateTime } from "../src/app/labels";
+import { formatTime, fullTimestamp } from "../src/app/submissionLabels";
 
 const currentUser: CurrentUser = { username: "root", display_name: "Root", pseudonym: "ann-root", is_system_admin: true, csrf_token: "csrf" };
 const root: AdminUser = { id: 1, qualification: null, username: "root", display_name: "Root", email: null, pseudonym: "ann-root", is_system_admin: true, active: true, languages: ["de"], projects: [], setup_pending: false, anonymised: false };
@@ -264,8 +264,8 @@ describe("account status, projects at creation, history and erasure", () => {
     expect(table.getByRole("columnheader", { name: /Setup/ })).toBeTruthy();
     expect(table.getByText("Pending")).toBeTruthy();
     expect(table.getByText("Never")).toBeTruthy();
-    const login = table.getByText(formatShortDateTime("2026-10-20T08:00:00Z"));
-    expect(login.getAttribute("title")).toBe(formatDateTime("2026-10-20T08:00:00Z"));
+    const login = table.getByText(formatTime("2026-10-20T08:00:00Z"));
+    expect(login.getAttribute("title")).toBe(fullTimestamp("2026-10-20T08:00:00Z"));
     more("alex");
     expect(screen.queryByRole("menuitem", { name: "New setup code" })).toBeNull();
     expect(screen.getByRole("menuitem", { name: "Activate" }).getAttribute("aria-describedby")).toBeTruthy();
@@ -335,7 +335,7 @@ describe("account status, projects at creation, history and erasure", () => {
     expect(within(dialog).getByText("Task: Annotation")).toBeTruthy();
     expect(within(dialog).getByText("Problem resolved")).toBeTruthy();
     expect(within(dialog).getByText("User: Alex Smith")).toBeTruthy();
-    expect(within(dialog).getByText(formatShortDateTime("2026-10-18T08:00:00Z"))).toBeTruthy();
+    expect(within(dialog).getByText(formatTime("2026-10-18T08:00:00Z"))).toBeTruthy();
     expect(api.adminUserAudit).toHaveBeenCalledWith("alex");
   });
 
@@ -381,12 +381,12 @@ describe("account status, projects at creation, history and erasure", () => {
       .toBe("Added: hp-es.babelon.tsv");
     // API tokens (issue 305): kind, scopes and a formatted expiry; the name goes to Whom, the owner only if someone else acted.
     const created = { ...base, actor: "user:root", action: "api_token.create", target_type: "api_token", target_id: "6", details: { name: "nightly", kind: "personal", owner: "lena", scopes: ["read", "project-admin"], expires_at: "2027-02-03T11:54:22.241326+00:00" } };
-    expect(auditDetails(created)).toBe(`Personal token; Scopes: Read, Project administration; Expires: ${formatDateTime("2027-02-03T11:54:22.241326+00:00")}; Owner: lena`);
+    expect(auditDetails(created)).toBe(`Personal token; Scopes: Read, Project administration; Expires: ${formatTime("2027-02-03T11:54:22.241326+00:00")}; Owner: lena`);
     expect(auditDetails({ ...created, actor: "user:lena", action: "api_token.revoke", details: { name: "nightly", kind: "personal", owner: "lena" } })).toBe("Personal token");
     expect(auditTarget(created)).toBe("API token “nightly”");
     expect(auditTarget({ ...created, details: {} })).toBe("API token 6");
     expect(auditDetails({ ...base, details: { name: "N", api_token: { id: 6, name: "nightly" } } })).toBe("Name: N; Via API token: nightly");
-    expect(auditDetails({ ...base, details: { ends_at: "2027-02-03T11:54:22Z" } })).toBe(`Ends at: ${formatDateTime("2027-02-03T11:54:22Z")}`);
+    expect(auditDetails({ ...base, details: { ends_at: "2027-02-03T11:54:22Z" } })).toBe(`Ends at: ${formatTime("2027-02-03T11:54:22Z")}`);
   });
 
   it("says which languages were added and removed (#467)", () => {
@@ -415,7 +415,7 @@ describe("account status, projects at creation, history and erasure", () => {
         name: { before: "Study", after: "Study One" }, tool_proposal_mode: { before: "proposals", after: "scratch" },
       },
     } })).toBe("Annotators per text: 1 → 3; Hide annotator names during consolidation: off → on; Description; "
-      + "New imports: Plan review and annotation for every translation → Plan nothing; I plan texts on Documents; Languages of the texts: none → de, fr; "
+      + "New imports: Plan review and annotation for every translation → Plan nothing; I plan texts on Documents; Languages of the texts: any language → de, fr; "
       + "Name: Study → Study One; Texts with tool proposals: Annotators work from the proposals → Annotators start from scratch");
     // The two fields behind one choice show as that choice.
     expect(auditDetails({ ...base, details: { fields: ["require_spanless_note"], changes: { allow_spanless_findings: { before: true, after: true }, require_spanless_note: { before: true, after: false } } } }))
