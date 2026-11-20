@@ -52,8 +52,12 @@ export function ModifierLine({ modifiers, layerId, termLabel }: {
     const label = termLabel(layerId, id);
     return label ? { label, role: "modifier", exclusiveClass: null } : undefined;
   });
-  return sorted.length > 0 ? <p className="mod-lines">Modifiers: {sorted.map((modifier, index) => <span key={modifier.term_id}>
-    {index > 0 && ", "}<b>{termLabel(layerId, modifier.term_id) ?? modifier.term_id}</b></span>)}</p> : null;
+  // Issue 525: each modifier with its term ID, as in the Modifiers section ("Severe · HP:0012828").
+  return sorted.length > 0 ? <p className="mod-lines">Modifiers: {sorted.map((modifier, index) => {
+    const label = termLabel(layerId, modifier.term_id);
+    return <span key={modifier.term_id}>{index > 0 && ", "}<b>{label ?? modifier.term_id}</b>
+      {label && <span className="mod-line-code"> · {modifier.term_id}</span>}</span>;
+  })}</p> : null;
 }
 
 /** One row of the saved findings list in the editor sidebar. */

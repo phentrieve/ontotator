@@ -1,5 +1,6 @@
 import { act, render, screen, fireEvent, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { SearchManager } from "../src/editor/searchState";
 import { ReviewActions, type TargetProposal } from "../src/editor/ReviewActions";
 
 describe("ReviewActions", () => {
@@ -415,9 +416,47 @@ describe("ReviewActions: modifiers of a proposal (DN-9 A)", () => {
     render(<ReviewActions target={target} termLabel="Seizure" source={source([{ term_id: "HP:0012828", segments: [{ start: 5, end: 12 }] }])}
       documentText={TEXT} termInfo={info} currentDecision={null} draftAnnotations={[]} onDecide={vi.fn()} />);
     const list = screen.getByRole("list", { name: "Modifiers of Seizure" });
-    expect(list.textContent).toBe("Severe “schwere”");
+    expect(list.textContent).toBe("Severe · HP:0012828 “schwere”");
     expect(screen.queryByRole("button", { name: /Actions, Severe/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "+ Add modifier…" })).toBeNull();
+  });
+
+  describe("in place on an open proposal (issue 525)", () => {
+    const controls = () => ({ onAdd: vi.fn().mockResolvedValue(undefined), onRemove: vi.fn(), onLinkSpan: vi.fn(), onRemoveSpan: vi.fn(),
+      searchProps: { searchManager: new SearchManager({ searchOntology: vi.fn() } as any), annotationId: "p", layerId: "hpo",
+        workspaceKey: { project_key: "pkg", document_id: "d", annotator_id: "a", mode: "proposal_check" as const, scope_id: "s", target_set_id: "t" } } });
+    const severe = [{ term_id: "HP:0012828", segments: [{ start: 5, end: 12 }] }];
+
+    it("an open proposal gets the controls of a finding and a line on what a change does", async () => {
+      const modifierControls = controls();
+      render(<ReviewActions target={target} termLabel="Seizure" source={source(severe)} documentText={TEXT} termInfo={info}
+        currentDecision={null} draftAnnotations={[]} onDecide={vi.fn()} onAdoptAndEdit={vi.fn()} modifierControls={modifierControls} />);
+      expect(screen.getByText("A change makes your copy of the proposal (Edit & Replace).")).toBeDefined();
+      expect(screen.getByRole("button", { name: "+ Add modifier…" })).toBeDefined();
+      fireEvent.click(screen.getByRole("button", { name: "Actions, Severe" }));
+      fireEvent.click(await screen.findByRole("menuitem", { name: "Remove modifier" }));
+      expect(modifierControls.onRemove).toHaveBeenCalledWith("HP:0012828");
+    });
+
+    it("an open proposal without modifiers offers + Add modifier…", () => {
+      render(<ReviewActions target={target} termLabel="Seizure" source={source([])} documentText={TEXT} termInfo={info}
+        currentDecision={null} draftAnnotations={[]} onDecide={vi.fn()} modifierControls={controls()} />);
+      expect(screen.getByRole("heading", { name: "Modifiers" })).toBeDefined();
+      expect(screen.getByRole("button", { name: "+ Add modifier…" })).toBeDefined();
+    });
+
+    it.each([
+      ["decided", { currentDecision: { decision_id: "d", target: { annotation_id: "p", version: "v" }, outcome: "confirmed", reviewer_id: "r" } as any }],
+      ["being replaced by a copy", { hasCopy: true }],
+      ["read-only", { readOnly: true }],
+    ])("a proposal that is %s keeps read-only rows", (_name, props) => {
+      render(<ReviewActions target={target} termLabel="Seizure" source={source(severe)} documentText={TEXT} termInfo={info}
+        currentDecision={null} draftAnnotations={[]} onDecide={vi.fn()} modifierControls={controls()} {...props} />);
+      expect(screen.getByRole("list", { name: "Modifiers of Seizure" }).textContent).toBe("Severe · HP:0012828 “schwere”");
+      expect(screen.queryByRole("button", { name: /Actions, Severe/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: "+ Add modifier…" })).toBeNull();
+      expect(screen.queryByText("A change makes your copy of the proposal (Edit & Replace).")).toBeNull();
+    });
   });
 
   it("shows no Modifiers section without modifiers", () => {

@@ -49,6 +49,20 @@ button.mod-row-main:focus-visible {
 .mod-row-quote {
   color: var(--text-muted);
 }
+/* Issue 525: the term ID after the name, muted and smaller, as under a finding's term (TermName). */
+.mod-row-code,
+.mod-lines .mod-line-code {
+  color: var(--text-muted);
+  font-size: var(--size-sm);
+  font-weight: 400;
+}
+/* The line breaks after a comma, not between a name and its code. */
+.mod-lines .mod-line-code {
+  white-space: nowrap;
+}
+.mod-hint {
+  margin: 0 0 var(--space-2);
+}
 /* "no text span · Link a text span" follows the name, as in mockup 01 A. */
 .mod-row-main:has(+ .mod-row-nospan) {
   flex: 0 1 auto;

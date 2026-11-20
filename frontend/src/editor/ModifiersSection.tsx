@@ -16,6 +16,10 @@ export interface ModifiersSectionProps {
   readOnly?: boolean;
   /** Chip text; the editor shows "Severe · “schwere”", the consolidation passes its own wording. */
   chipText?: (label: string, quote: string | null, role: TermInfo["role"]) => string;
+  /** Issue 525: what stands between a row's name and its term ID ("Severe · HP:0012828"); the consolidation has no "·" (DN-10). */
+  codeSeparator?: string;
+  /** One line under the heading, e.g. what a change of a proposal's modifiers does. */
+  hint?: string;
   /** Adds a modifier without a text span; resolves once saved. `role` is the search candidate's. */
   onAdd?: (termId: string, label: string, role: TermInfo["role"]) => Promise<unknown>;
   onLinkSpan?: (termId: string) => void;
@@ -33,7 +37,7 @@ export interface ModifiersSectionProps {
  * Modifiers of one finding (spec "Modifiers section", B3-4 mockup 01 A): plain rows with an actions menu, the "Two severities" /
  * "Two onsets" warning and "+ Add modifier…". Depends on no editor state, so the consolidation can reuse it.
  */
-export function ModifiersSection({ finding, modifiers, text, termInfo, readOnly = false, chipText = editorChipText,
+export function ModifiersSection({ finding, modifiers, text, termInfo, readOnly = false, chipText = editorChipText, codeSeparator = " · ", hint,
   onAdd, onLinkSpan, onRemoveSpan, onRemove, selectedTermId = null, onSelectModifier, searchProps }: ModifiersSectionProps): JSX.Element {
   const headingId = useId();
   const [searching, setSearching] = useState(false);
@@ -49,6 +53,7 @@ export function ModifiersSection({ finding, modifiers, text, termInfo, readOnly 
 
   return <section className="detail-section mod-section" data-modifiers-section aria-labelledby={headingId}>
     <h3 id={headingId} className="mod-heading">Modifiers</h3>
+    {hint && <p className="field-hint mod-hint">{hint}</p>}
     {sorted.length > 0 && <ul className="mod-rows" aria-label={`Modifiers of ${finding}`}>
       {sorted.map(modifier => {
         const info = termInfo(modifier.term_id);
@@ -65,8 +70,10 @@ export function ModifiersSection({ finding, modifiers, text, termInfo, readOnly 
         const words = cohortTag ? content.slice(0, -tail.length) : content;
         // The name in strong text, the quote muted after a space (mockup 01 A, R-6); the cohort tag keeps its " · ".
         const name = words.startsWith(label) ? label : "";
-        const body = <>{name && <span className="mod-row-label">{name}</span>}<span className="mod-row-quote">{name ? words.slice(name.length).replace(/^ · /, " ") : words}</span>
-          {cohortTag && <> · <span className="mod-cohort">{COHORT_TAG}</span></>}</>;
+        // Issue 525: every row names its term ID after the name, as the finding's own term does.
+        const code = label !== modifier.term_id && <span className="mod-row-code">{codeSeparator}{modifier.term_id}</span>;
+        const body = <>{name && <span className="mod-row-label">{name}</span>}{name && code}<span className="mod-row-quote">{name ? words.slice(name.length).replace(/^ · /, " ") : words}</span>
+          {!name && code}{cohortTag && <> · <span className="mod-cohort">{COHORT_TAG}</span></>}</>;
         const selected = selectedTermId === modifier.term_id;
         return <li key={modifier.term_id} className={["mod-row", selected && "is-sel"].filter(Boolean).join(" ")} data-modifier-chip={modifier.term_id} tabIndex={-1}
           aria-current={selected ? "true" : undefined}>

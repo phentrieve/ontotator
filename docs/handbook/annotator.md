@@ -113,7 +113,7 @@ What for: record a term that the text mentions.
 
 To drop a mark without adding a finding, click **Discard** or press Esc.
 
-To look the marked words up elsewhere, for example in a web search, click **Copy text** or press `Ctrl+C` (`Cmd+C` on a Mac). Both copy the marked text of the new finding, or the selected (otherwise the first) mention of the selected finding or tool proposal; parts of a mention with words in between are joined by a space. Text you have selected in a field is copied as usual. **Copy text** is also at each mention under **Mentions**.
+To look the marked words up elsewhere, for example in a web search, click **Copy text** or press `Ctrl+C` (`Cmd+C` on a Mac). Both copy the marked text of the new finding, or the selected (otherwise the first) mention of the selected finding or tool proposal, always in full and on one line: line breaks become spaces, and parts of a mention with words in between are joined by a space. Right after you mark text, `Ctrl+C` copies the whole marked text, although **Search term** holds it selected and may show only its first 80 characters. Text you have selected in a field yourself is copied as usual. Text you select in the text itself is copied as it stands, line breaks included, without the colours of the marks. **Copy text** is also at each mention under **Mentions**.
 
 ## Search a term
 
@@ -222,6 +222,8 @@ What for: add severity, onset, pattern and similar details to a finding.
 1. Select the finding. In **Modifiers**, click **+ Add modifier…**, type into **Search modifier** and choose the modifier.
 2. Optional: to link the modifier to the words that state it, click **Link a text span** and mark the text.
 
+Every modifier row names the modifier and its code, for example *Severe · HP:0012828*, followed by the linked words. The line *Modifiers:* in the findings list names the codes too, as do the text view and the consolidation.
+
 You can also start from the text:
 
 1. Mark the words, for example "severe", and pick a modifier hit.
@@ -231,6 +233,8 @@ You can also start from the text:
 If the modifier's words lie inside the finding's text span, for example "severe" in "severe periorbital oedema", a box under **Modifiers** offers to take them out of the span. It shows the span now, with the words that go struck through, and the span after. Click **Exclude from span** to apply it; the finding then marks the remaining words, in two parts if the modifier was in the middle. Click **Keep span** to leave the span as it is. **Undo** in the message or in the header takes the change back.
 
 To change a modifier later, open its row menu: **Link a text span…**, **Remove text span** or **Remove modifier**. A removal can be undone with **Undo** in the message or in the header.
+
+A tool proposal's modifiers change the same way while the proposal is open; see [Review tool proposals](#review-tool-proposals).
 
 ## Undo, redo and reset your changes
 
@@ -271,6 +275,7 @@ Tools make mistakes. Check every proposal as if you had marked it yourself: the 
 4. Decide:
    - **Confirm**: the passage, term and all values are right. Values tagged **Defaulted** were not set by the tool but prefilled; Confirm accepts them as shown, so check them too.
    - **Reject**: the proposal is wrong and nothing should replace it.
+   - A wrong or missing modifier: change it right in the proposal's **Modifiers**, with **+ Add modifier…**, **Remove modifier** or **Link a text span…**, as on your own finding. The line *A change makes your copy of the proposal (Edit & Replace).* says what happens: the first change makes your copy (as **Edit & Replace** does), the change goes to the copy, and the proposal is **Replaced**. The copy's details open with the line *Your change made a copy; the proposal is decided as Replaced.* and **Undo**, which takes back the copy and the change together: the proposal is open again. For **Link a text span…**, the copy is made once you mark the text. A decided proposal, or one with a copy, lists its modifiers without these controls.
    - **Edit & Replace**: the proposal is nearly right. You get an editable copy that replaces it; correct the term, values or text span in the copy. The copy is listed indented under its proposal in **Review Proposals**, as *Your copy*, with the line *replaces this proposal*, not under **Your own findings**. The row shows *No changes yet* or what you changed, for example *Assertion: Present → Absent*. The proposal reads **Being replaced** until the copy differs, then **Replaced**. In the details, the editor names the proposal it replaces and what you changed. Click **Done, back to the proposal** when you are finished. The proposal then reads *Replaced by* with the term and your changes. If the copy has no changes, Done removes it and the proposal is open again. Confirming a default in the copy changes no value, so the proposal is not replaced by that alone. While the copy exists, the proposal's button reads **Open your copy**.
    - **Unresolved**: only if you really cannot decide; the other three decisions are the normal case. Write a **Reviewer note** saying why, then click **Save decision**. The proposal is submitted with your note and a reviewer flag. It does not block submitting. Another annotator's Confirm does not settle it: the finding does not count as agreed, and whoever decides, the consolidator or the lead, sees your flag and note. Only **Confirm** confirms a proposal's prefilled values: on an unresolved proposal they stay recorded as defaults, and its row shows **Defaults not confirmed**. The result line under **Your own findings** counts such a proposal as unresolved, for example "1 confirmed proposal, 1 unresolved proposal, 1 own finding".
 5. After each decision, the next open proposal is selected. Press `k` right after a decision to go back to it.

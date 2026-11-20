@@ -92,7 +92,7 @@ import {
 } from "../editor/ReviewActions";
 import { useSearchLanguages } from "../editor/searchLanguages";
 import { SearchPanel } from "../editor/SearchPanel";
-import { prefillHint, prefillQuery } from "../editor/termSearch";
+import { isUntouchedPrefill, passageText, prefillHint, prefillQuery } from "../editor/termSearch";
 import { focusTextAt } from "../editor/textFocus";
 import { useMediaQuery } from "../ui/useMediaQuery";
 import { SearchManager } from "../editor/searchState";
@@ -403,7 +403,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const lastTargetIdRef = useRef<string | null>(null);
   /** U-2: what the last decision did; shown while the selection it made (`listKey`, null: none) is unchanged.
    *  `decidedKey`: the proposal just decided, where K goes back to; `decidedTerm` names it. */
-  const [advanceStatus, setAdvanceStatus] = useState<{ listKey: string | null; text: string; decidedKey: string; decidedTerm?: string } | null>(null);
+  // Issue 525: `undo` adds an Undo button to the line (a proposal's modifier change that made a copy).
+  const [advanceStatus, setAdvanceStatus] = useState<{ listKey: string | null; text: string; decidedKey: string; decidedTerm?: string; undo?: () => void } | null>(null);
   if (selectedTargetId) lastTargetIdRef.current = selectedTargetId;
   // A carried input without a finding on this text (placeholder row); exclusive with the others.
   const [selectedInputId, setSelectedInputId] = useState<string | null>(null);
@@ -1916,6 +1917,15 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     if (linkSpan) {
       modifierCommands.setLinkSpan(null);
       setMobilePane("details");
+      // Issue 525: an open proposal's modifier: Edit & Replace, and the span goes to the copy (one step).
+      // The offer to exclude the words from the span then applies to the copy (as after attaching, M-5).
+      if (linkSpan.proposal) {
+        const { proposal, termId } = linkSpan;
+        const copied: { saved?: Draft; copyId?: string } = {};
+        await changeProposalModifier(proposal, async copyId => { copied.saved = await modifierCommands.setSegments(copyId, termId, payload.segments); copied.copyId = copyId; });
+        if (copied.saved && copied.copyId) offerExclusion(copied.saved, copied.copyId, termId);
+        return;
+      }
       let saved: Draft;
       try { saved = await modifierCommands.setSegments(linkSpan.annotationId, linkSpan.termId, payload.segments); } catch { return; }
       announceCarried(`Linked “${quoteSegments(view.document.text, payload.segments, 40)}” to ${linkSpan.term}.`);
@@ -2374,8 +2384,10 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
 
   // Ctrl+C (Cmd+C) with nothing else selected copies the active passage, to look it up elsewhere: the marked
   // text of a new finding, else the selected (or first) mention of the selected finding or, in a task from
-  // proposals, of the selected tool proposal. Several segments are joined by a space, as a web search reads them.
-  // A selection of its own (a field, the page) copies as usual.
+  // proposals, of the selected tool proposal. Several segments are joined by a space and line breaks become
+  // spaces, as a web search reads them; the passage is never cut. A selection of its own (a field, the page)
+  // copies as usual, except the search prefill the panel selected itself (cut at PREFILL_MAX): while the user
+  // has not touched it, the whole passage is copied (PREFILL_SELECTED).
   const passageRef = useRef("");
   const passageRefs = selectedAnnotation?.annotation.evidence_refs ?? [];
   const targetEvidence = selectedTarget && !selectedAnnotation ? targetSnapshot?.evidence ?? [] : [];
@@ -2384,12 +2396,15 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const passageSegments = pendingAnnotation?.segments?.length ? pendingAnnotation.segments
     : allEvidenceMap[(passageRefs.find(ref => ref.evidence_id === selectedEvidenceId) ?? passageRefs[0])?.evidence_id ?? ""]?.mention.segments
       ?? targetMention?.mention.segments;
-  passageRef.current = passageSegments?.length ? quoteOf(view.document.text, passageSegments, " ") : "";
+  passageRef.current = passageSegments?.length ? passageText(view.document.text, passageSegments) : "";
   useEffect(() => {
     const copyPassage = (event: ClipboardEvent) => {
       const active = document.activeElement;
-      if ((active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) && active.selectionStart !== active.selectionEnd) return;
-      if (window.getSelection()?.toString() || !passageRef.current || !event.clipboardData) return;
+      const field = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement ? active : null;
+      if (field && field.selectionStart !== field.selectionEnd) {
+        if (!isUntouchedPrefill(field)) return;
+      } else if (window.getSelection()?.toString()) return;
+      if (!passageRef.current || !event.clipboardData) return;
       event.clipboardData.setData("text/plain", passageRef.current);
       event.preventDefault();
     };
@@ -2835,6 +2850,42 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     const copy = copyId ? draft.annotations?.find(a => a.annotation.annotation_id === copyId) : undefined;
     return !copy || (copy.annotation.evidence_refs?.length ?? 0) > 1;
   };
+  /**
+   * Issue 525: a modifier change on an open proposal. Proposals stay immutable, so Edit & Replace runs first and the
+   * change goes to the copy, through the same commands as on the copy itself. One step: Undo takes back both, and the
+   * copy then differs, so the proposal is decided as Replaced (syncReplacementDecision, as for any edit of a copy).
+   */
+  const changeProposalModifier = (target: TargetProposal, change: (copyId: string) => Promise<unknown>) => inStep(async () => {
+    if (readOnlyRef.current) return;
+    const copyId = await handleAdoptAndEditTarget(target);
+    if (!copyId) return;
+    // The modifier commands report their own failure.
+    try { await change(copyId); } catch { return; }
+    const revision = latestDraft.current.revision;
+    const replaced = (latestDraft.current.decisions ?? []).some(d => refKey(d.target) === refKey(target) && d.outcome === "changed");
+    setAdvanceStatus({ listKey: `annotation:${copyId}`, decidedKey: "",
+      text: replaced ? "Your change made a copy; the proposal is decided as Replaced." : "Your change made a copy of the proposal.",
+      undo: () => { void undoProposalChange(target, revision); } });
+  });
+  /** The Undo of that line: through the history while the change is the newest step, else Discard copy. */
+  const undoProposalChange = (target: TargetProposal, revision: number) => undoFromToast(revision, () => discardCopy(target), () => {
+    returnToProposal(target);
+    setAdvanceStatus({ listKey: `target:${refKey(target)}`, decidedKey: "", text: "Change undone. The proposal is open again." });
+  });
+  /** The Modifiers controls of an open proposal (issue 525): the same commands as on a finding, on the copy. */
+  const proposalModifierControls = (target: TargetProposal) => {
+    const layerId = target.layer_id;
+    if (readOnly || !layerId || !modifierLayerIds.has(layerId) || !editableLayerIds.includes(layerId)) return undefined;
+    return {
+      onAdd: (termId: string) => changeProposalModifier(target, copyId => modifierCommands.add(copyId, termId)),
+      onRemove: (termId: string) => { void changeProposalModifier(target, copyId => mutateAnnotationAndSyncDecision(copyId,
+        () => enqueueMutation({ command: "remove_modifier", annotation_id: copyId, term_id: termId })).catch(error => { reportError(error); throw error; })); },
+      onRemoveSpan: (termId: string) => { void changeProposalModifier(target, copyId => modifierCommands.setSegments(copyId, termId, [])); },
+      onLinkSpan: (termId: string) => startProposalLinkSpan(target, termId),
+      searchProps: { searchManager: modifierSearchManager, annotationId: target.annotation_id, workspaceKey: view.key, layerId,
+        languages: searchLanguagesFor(layerId) },
+    };
+  };
   /** M-4 on a proposal: proposals stay immutable, so Edit & Replace runs first and the copy's mention moves. */
   const moveProposalMention = async (target: TargetProposal, index: number) => {
     const wanted = targetSnapshotOf(target)?.evidence?.[index]?.mention.segments;
@@ -3095,11 +3146,20 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     tabs.showDetailsNow();
     if (inspectorRef.current) chipIn(inspectorRef.current, mode.termId)?.focus({ preventScroll: true });
   };
+  /** Issue 525: "Link a text span" on an open proposal's modifier; the selection then runs Edit & Replace first. */
+  const startProposalLinkSpan = (target: TargetProposal, termId: string) => {
+    if (readOnlyRef.current || !target.layer_id) return;
+    const finding = termLabel(target.layer_id, target.term_id ?? target.annotation_id) ?? target.term_id ?? target.annotation_id;
+    modifierCommands.setLinkSpan({ annotationId: target.annotation_id, termId, term: termLabel.info(target.layer_id, termId)?.label ?? termId, finding, proposal: target });
+    setMobilePane("text");
+    setTextFocusRequest({ offset: null });
+  };
   // Another selection ends "Link a text span".
   useEffect(() => {
-    if (linkSpan && linkSpan.annotationId !== selectedAnnotationId) modifierCommands.setLinkSpan(null);
+    if (linkSpan && (linkSpan.proposal ? refKey(linkSpan.proposal) !== selectedTargetId || !!selectedAnnotationId
+      : linkSpan.annotationId !== selectedAnnotationId)) modifierCommands.setLinkSpan(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only a selection change ends the link mode
-  }, [selectedAnnotationId]);
+  }, [selectedAnnotationId, selectedTargetId]);
 
   /**
    * A modifier marked inside its finding's span: the offer to exclude its words from that span (SpanExclusionOffer).
@@ -4434,7 +4494,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
               M2 M-2: a framed success strip with a check icon, spacing below, so it reads as a status. */}
           <div aria-live="polite" data-advance-status>
             {advanceStatus?.listKey === selectedListKey && <InlineMessage tone="success" live={false}>
-              <p className="advance-strip"><IconCheck />{advanceStatus.text}{advanceStatus.listKey && advanceStatus.decidedKey && <span aria-hidden="true"> <Kbd>K</Kbd>: back to {advanceStatus.decidedTerm}</span>}</p>
+              <p className="advance-strip"><IconCheck />{advanceStatus.text}{advanceStatus.listKey && advanceStatus.decidedKey && <span aria-hidden="true"> <Kbd>K</Kbd>: back to {advanceStatus.decidedTerm}</span>}
+                {advanceStatus.undo && <>{" "}<Button type="button" size="sm" onClick={advanceStatus.undo}>Undo</Button></>}</p>
             </InlineMessage>}
           </div>
           {!readOnly && !pendingAnnotation && selectedReanchorItem && selectedAnnotation && <InlineMessage tone="warning">
@@ -4609,6 +4670,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
                 setNoteDrafts((prev) => ({ ...prev, [k]: value }));
               }}
               onAdoptAndEdit={() => { void handleAdoptAndEditTarget(selectedTarget); }}
+              modifierControls={proposalModifierControls(selectedTarget)}
               onShowInTree={handleShowInTree}
               hasCopy={proposalHasCopy(selectedTarget)}
               onDiscardCopy={() => { void discardCopy(selectedTarget); }}

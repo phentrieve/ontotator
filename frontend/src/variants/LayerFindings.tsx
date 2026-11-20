@@ -27,12 +27,14 @@ export function LayerFindings({ label, annotations, labelFor, text }: {
       {shown.map(({ annotation, version }) => {
         const term = labelFor(annotation.layer_id, annotation.term_id);
         const modifierLabel = (id: string) => labelFor(annotation.layer_id, id) ?? id;
+        // Issue 525: a modifier names its term ID, as the editor's rows do ("Severe · HP:0012828").
+        const modifierName = (id: string) => { const label = labelFor(annotation.layer_id, id); return label ? `${label} · ${id}` : id; };
         const modifiers = sortByLabel(annotation.modifiers ?? [], id => ({ label: modifierLabel(id), role: 'modifier', exclusiveClass: null }));
         return <li key={JSON.stringify([annotation.annotation_id, version])}>
           <span className="layer-finding-term">{term ? `${term} (${annotation.term_id})` : annotation.term_id}</span>
           {Object.entries(annotation.axes_values ?? {}).map(([axis, value]) => value != null && <AxisValue key={axis} value={value} />)}
           {modifiers.length > 0 && <span className="layer-finding-line">{`Modifiers: ${modifiers.map(modifier =>
-            chipText(modifierLabel(modifier.term_id), modifier.segments?.length ? quoteOf(text, modifier.segments) : null, 'modifier')).join(', ')}`}</span>}
+            chipText(modifierName(modifier.term_id), modifier.segments?.length ? quoteOf(text, modifier.segments) : null, 'modifier')).join(', ')}`}</span>}
           {!annotation.evidence_refs?.length && <span className="layer-finding-line">No text span</span>}
           {annotation.note && <span className="layer-finding-line">{`Note: ${annotation.note}`}</span>}
         </li>;

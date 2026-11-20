@@ -170,6 +170,8 @@ export interface ModifierToggleCell {
   otherText: boolean;
   /** "Take Severe “schwere” from Ana Weber for Modifiers (2 of 3)". */
   name: string;
+  /** Issue 525: the modifier's term and label (its row names the ID after the label); absent for "No modifiers". */
+  term?: { id: string; label: string };
 }
 export interface ComparisonCell { inputId: string; value: string; display: string; chosen: boolean; toggles?: ModifierToggleCell[] }
 export interface ComparisonRow {
@@ -315,7 +317,8 @@ function modifiersRow(group: ConsolidationGroupView, people: readonly Consolidat
     const toggles: ModifierToggleCell[] = own.length ? own.map(toggle => {
       const label = modifierText(toggle.modifier, text, linked);
       return { id: toggle.id, label, majority: toggle.majority, cohort: toggle.modifier.kind === "cohort", pressed: selection.has(toggle.id),
-        otherText: other.has(toggle.id), name: toggleName(label, set.personName, toggle.majority) };
+        otherText: other.has(toggle.id), name: toggleName(label, set.personName, toggle.majority),
+        term: { id: toggle.modifier.term_id, label: toggle.modifier.term_label } };
     }) : [{ id: NO_MODIFIERS, label: "No modifiers", majority: options.none?.majority ?? null, cohort: false, pressed: selection.has(NO_MODIFIERS),
       otherText: false, name: toggleName("No modifiers", set.personName, options.none?.majority ?? null) }];
     return { inputId: set.inputId, value: toggles.map(toggle => toggle.id).join(" "), toggles,

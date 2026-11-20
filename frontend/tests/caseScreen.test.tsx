@@ -1,7 +1,7 @@
 import { ShortcutHelpHost } from "../src/ui/ShortcutHelp";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { act, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CaseScreen, initialAxisValues, type WorkspaceView } from "../src/app/CaseScreen";
 import { api, ApiError, AuthError, ConflictError, ValidationError, type Draft } from "../src/api/client";
@@ -2622,9 +2622,9 @@ describe("CaseScreen: finding modifiers (attach mode, Modifiers section, marks)"
     await waitFor(() => expect(payloads(apply)).toEqual([{ command: "add_modifier", annotation_id: "seizure", term_id: "HP:0012828", segments: [pos("schwere")] }]));
     await waitFor(() => expect(document.activeElement?.closest('[data-modifier-chip="HP:0012828"]')).not.toBeNull());
     expect(container.querySelector(".attach-mention-banner")).toBeNull();
-    expect(screen.getByRole("list", { name: "Modifiers of Seizure" }).textContent).toContain("Severe “schwere”");
+    expect(screen.getByRole("list", { name: "Modifiers of Seizure" }).textContent).toContain("Severe · HP:0012828 “schwere”");
     expect(announcer(container)).toBe("Attached Severe to Seizure. Next: mark more text, or add another modifier with “+ Add modifier…”.");
-    expect(container.querySelector('[data-list-key="annotation:seizure"] .mod-lines')!.textContent).toBe("Modifiers: Severe");
+    expect(container.querySelector('[data-list-key="annotation:seizure"] .mod-lines')!.textContent).toBe("Modifiers: Severe · HP:0012828");
     const modRun = runsOf(container, "mod:seizure:HP:0012828")[0];
     expect(modRun.classList.contains("run--modifier")).toBe(true);
     expect(modRun.title).toBe("Severe, modifier of Seizure");
@@ -3427,7 +3427,7 @@ describe("CaseScreen: finding modifiers (attach mode, Modifiers section, marks)"
       const { view } = reviewView([{ term_id: "HP:0012828", segments: [pos("schwere")] }], false);
       const { container } = await setup(view, severeHits, false);
       const row = container.querySelector<HTMLElement>('[data-list-key^="target:"]')!;
-      await waitFor(() => expect(row.querySelector(".mod-lines")?.textContent).toBe("Modifiers: Severe"));
+      await waitFor(() => expect(row.querySelector(".mod-lines")?.textContent).toBe("Modifiers: Severe · HP:0012828"));
       const modRun = () => runsOf(container, "target:prop-seizure:prop-v:mod:prop-seizure:HP:0012828")[0];
       expect(modRun().classList.contains("run--modifier")).toBe(true);
       expect(modRun().title).toBe("Severe, modifier of Seizure");
@@ -3481,6 +3481,12 @@ describe("CaseScreen: finding modifiers (attach mode, Modifiers section, marks)"
         } else if (p.command === "add_modifier") {
           const ann = find(p.annotation_id);
           ann.modifiers = [...(ann.modifiers ?? []).filter((m: Mod) => m.term_id !== p.term_id), { term_id: p.term_id, ...(p.segments ? { segments: p.segments } : {}) }];
+        } else if (p.command === "remove_modifier") {
+          const ann = find(p.annotation_id);
+          ann.modifiers = (ann.modifiers ?? []).filter((m: Mod) => m.term_id !== p.term_id);
+        } else if (p.command === "set_modifier_segments") {
+          const ann = find(p.annotation_id);
+          ann.modifiers = (ann.modifiers ?? []).map((m: Mod) => m.term_id === p.term_id ? { term_id: p.term_id, segments: p.segments } : m);
         }
         return current;
       });
@@ -3646,6 +3652,170 @@ describe("CaseScreen: finding modifiers (attach mode, Modifiers section, marks)"
       await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
       expect(payloads(apply)).toHaveLength(1);
       expect(decide).not.toHaveBeenCalled();
+    });
+
+    describe("change an open proposal's modifiers in place (issue 525)", () => {
+      const recurrentHits = { search_id: "s-rec", candidates: [{ term_id: "HP:0031796", label: "Recurrent", rank: 1, display_pos: 1, role: "modifier" }] };
+      const PROPOSAL_MODS: Mod[] = [{ term_id: "HP:0012828", segments: [pos("schwere")] }, { term_id: "HP:0031796" }];
+      /** A proposal check (history on) with Severe “schwere” and a spanless Recurrent on the proposal. */
+      const checkView = (modifiers: Mod[] = PROPOSAL_MODS) => {
+        const made = reviewView(modifiers, false);
+        made.view.key.mode = "proposal_check"; made.view.draft.key.mode = "proposal_check";
+        return made;
+      };
+      const proposalRow = (container: HTMLElement) => container.querySelector<HTMLElement>('[data-list-key^="target:"]')!;
+      const proposalPanel = () => document.querySelector<HTMLElement>('.review-actions__proposal[aria-label="Proposal details"]')!;
+      /** What a path wrote: commands and decisions in order, with the generated ids named by their first use. */
+      const written = (apply: { mock: { calls: unknown[][]; invocationCallOrder: number[] } }, decide: { mock: { calls: unknown[][]; invocationCallOrder: number[] } }) => {
+        const names = new Map<string, string>();
+        const name = (value: unknown): unknown => typeof value === "string" ? value.replace(/(ann|ev)-[0-9a-f-]{36}/g, id =>
+          names.get(id) ?? (names.set(id, `id${names.size}`), names.get(id)!)) : value;
+        const plain = (value: unknown): unknown => Array.isArray(value) ? value.map(plain)
+          : value && typeof value === "object" ? Object.fromEntries(Object.entries(value).map(([k, v]) => [k, plain(v)])) : name(value);
+        const calls = [...apply.mock.calls.map(call => ({ order: apply.mock.invocationCallOrder[apply.mock.calls.indexOf(call)], kind: "command", call })),
+          ...decide.mock.calls.map(call => ({ order: decide.mock.invocationCallOrder[decide.mock.calls.indexOf(call)], kind: "decision", call }))]
+          .sort((a, b) => a.order - b.order);
+        return calls.map(({ kind, call }) => ({ kind, payload: plain((call[1] as { payload: unknown }).payload) }));
+      };
+      const stepsOf = (apply: { mock: { calls: unknown[][] } }, decide: { mock: { calls: unknown[][] } }) =>
+        new Set([...apply.mock.calls, ...decide.mock.calls].map(call => (call[1] as { step_id?: string }).step_id));
+      const addRecurrentIn = async (scope: HTMLElement) => {
+        fireEvent.click(within(scope).getByRole("button", { name: "+ Add modifier…" }));
+        const input = screen.getByRole("combobox", { name: "Search modifier" });
+        fireEvent.change(input, { target: { value: "rec" } });
+        await waitFor(() => expect(input.getAttribute("aria-activedescendant")).toBeTruthy());
+        fireEvent.keyDown(input, { key: "Enter" });
+      };
+      /** Selects the proposal once its terms have labels. */
+      const openProposal = async (container: HTMLElement) => {
+        await waitFor(() => expect(proposalRow(container).querySelector(".mod-lines")?.textContent).toContain("Severe"));
+        fireEvent.click(proposalRow(container));
+        await waitFor(() => expect(within(proposalPanel()).getByRole("list", { name: "Modifiers of Seizure" })).toBeDefined());
+      };
+      const historyNone = () => vi.spyOn(api, "getHistory").mockResolvedValue({ available: true, revision: 0, undo: null, redo: null, undo_count: 0, redo_count: 0, changed: false } as never);
+
+      it("an open proposal's Modifiers have the controls of a finding and say what a change does", async () => {
+        historyNone();
+        const { view } = checkView();
+        const { container } = await setup(view, recurrentHits, false);
+        await openProposal(container);
+        const panel = proposalPanel();
+        expect(within(panel).getByText("A change makes your copy of the proposal (Edit & Replace).")).toBeDefined();
+        expect(within(panel).getByRole("button", { name: "+ Add modifier…" })).toBeDefined();
+        expect(within(panel).getByRole("button", { name: "Actions, Severe" })).toBeDefined();
+        expect(within(panel).getByRole("button", { name: "Link a text span" })).toBeDefined();
+        expect(within(panel).getByRole("list", { name: "Modifiers of Seizure" }).textContent).toBe("Recurrent · HP:0031796no text span · Link a text spanSevere · HP:0012828 “schwere”");
+      });
+
+      it("a decided proposal keeps read-only rows", async () => {
+        const { view, target } = checkView();
+        view.draft.decisions = [{ decision_id: "d0", target, outcome: "confirmed", reviewer_id: "ann" }] as never;
+        historyNone();
+        const { container } = await setup(view, recurrentHits, false);
+        await openProposal(container);
+        const panel = proposalPanel();
+        expect(within(panel).getByRole("list", { name: "Modifiers of Seizure" })).toBeDefined();
+        expect(within(panel).queryByRole("button", { name: "+ Add modifier…" })).toBeNull();
+        expect(within(panel).queryByRole("button", { name: /^Actions,/ })).toBeNull();
+      });
+
+      it("+ Add modifier… writes exactly what Edit & Replace and then + Add modifier… on the copy writes, in one step", async () => {
+        // Today's path: Edit & Replace, then the copy's own Modifiers.
+        historyNone();
+        const before = checkView([{ term_id: "HP:0012828", segments: [pos("schwere")] }]);
+        const first = await setup(before.view, recurrentHits, false);
+        const today = draftSpy(before.view);
+        await openProposal(first.container);
+        fireEvent.click(screen.getByRole("button", { name: /Edit & Replace/ }));
+        await screen.findByRole("button", { name: "Done, back to the proposal" });
+        await addRecurrentIn(first.container.querySelector<HTMLElement>(".inspector-pane")!);
+        await waitFor(() => expect(today.decide).toHaveBeenCalled());
+        const expected = written(today.apply, today.decide);
+        cleanup(); vi.restoreAllMocks();
+
+        historyNone();
+        const after = checkView([{ term_id: "HP:0012828", segments: [pos("schwere")] }]);
+        const second = await setup(after.view, recurrentHits, false);
+        const inPlace = draftSpy(after.view);
+        await openProposal(second.container);
+        await addRecurrentIn(proposalPanel());
+        await waitFor(() => expect(inPlace.decide).toHaveBeenCalled());
+        expect(written(inPlace.apply, inPlace.decide)).toEqual(expected);
+        expect(expected.map(entry => entry.kind === "command" ? (entry.payload as { command: string }).command : (entry.payload as { outcome: string }).outcome))
+          .toEqual(["create_annotation", "add_modifier", "changed"]);
+        expect(inPlace.decide).toHaveBeenCalledWith("ws-mod", expect.objectContaining({ payload: expect.objectContaining({ target: after.target, outcome: "changed",
+          replacement: expect.objectContaining({ annotation_id: payloads(inPlace.apply)[0].annotation_id }) }) }));
+        // One user step: the copy, the modifier and the decision share one step (one Undo).
+        const steps = stepsOf(inPlace.apply, inPlace.decide);
+        expect(steps.size).toBe(1);
+        expect([...steps][0]).toEqual(expect.any(String));
+        // The copy is open, with the line and its Undo; the proposal reads Replaced.
+        await waitFor(() => expect(second.container.querySelector("[data-advance-status]")!.textContent).toBe("Your change made a copy; the proposal is decided as Replaced. Undo"));
+        expect(second.container.querySelector('[data-replacement-strip]')).not.toBeNull();
+        await waitFor(() => expect(proposalRow(second.container).textContent).toContain("Replaced"));
+      });
+
+      it("Remove modifier on the proposal writes Edit & Replace and remove_modifier on the copy, then Replaced; no second Undo toast", async () => {
+        historyNone();
+        const { view, target } = checkView();
+        const { container } = await setup(view, recurrentHits, false);
+        const { apply, decide } = draftSpy(view);
+        await openProposal(container);
+        fireEvent.click(within(proposalPanel()).getByRole("button", { name: "Actions, Severe" }));
+        fireEvent.click(await screen.findByRole("menuitem", { name: "Remove modifier" }));
+        await waitFor(() => expect(decide).toHaveBeenCalled());
+        const [create, removed] = payloads(apply);
+        expect(create).toEqual(expect.objectContaining({ command: "create_annotation", source_annotation_id: "prop-seizure", source_version: "prop-v" }));
+        expect(removed).toEqual({ command: "remove_modifier", annotation_id: create.annotation_id, term_id: "HP:0012828" });
+        expect(decide).toHaveBeenCalledWith("ws-mod", expect.objectContaining({ payload: expect.objectContaining({ target, outcome: "changed",
+          replacement: expect.objectContaining({ annotation_id: create.annotation_id }) }) }));
+        expect(stepsOf(apply, decide).size).toBe(1);
+        expect(screen.queryByText(/^Removed Severe from Seizure/)).toBeNull();
+        await waitFor(() => expect(screen.getByText("Your change made a copy; the proposal is decided as Replaced.", { exact: false })).toBeDefined());
+      });
+
+      it("Link a text span on the proposal waits for the text; the selection makes the copy and links the span in one step", async () => {
+        historyNone();
+        const { view, target } = checkView();
+        const { container } = await setup(view, recurrentHits, false);
+        const { apply, decide } = draftSpy(view);
+        await openProposal(container);
+        fireEvent.click(within(proposalPanel()).getByRole("button", { name: "Link a text span" }));
+        expect(container.querySelector(".attach-mention-banner")!.textContent).toContain("Select the text for Recurrent, then press Enter. Esc cancels.");
+        // Nothing is written before the text is chosen.
+        expect(payloads(apply)).toEqual([]);
+        mark(container, "wiederholt");
+        await waitFor(() => expect(decide).toHaveBeenCalled());
+        const [create, linked] = payloads(apply);
+        expect(create).toEqual(expect.objectContaining({ command: "create_annotation", source_annotation_id: "prop-seizure" }));
+        expect(linked).toEqual({ command: "set_modifier_segments", annotation_id: create.annotation_id, term_id: "HP:0031796", segments: [pos("wiederholt")] });
+        expect(decide).toHaveBeenCalledWith("ws-mod", expect.objectContaining({ payload: expect.objectContaining({ target, outcome: "changed" }) }));
+        expect(stepsOf(apply, decide).size).toBe(1);
+      });
+
+      it("Undo on the line takes the step back through the history and the proposal is open and selected again", async () => {
+        const { view } = checkView([{ term_id: "HP:0012828", segments: [pos("schwere")] }]);
+        // After the change (revisions 2 to 4: copy, modifier, decision) the history has the step on top.
+        let changed = false;
+        vi.spyOn(api, "getHistory").mockImplementation(async () => (changed ? { available: true, revision: 4, undo: { before_revision: 1, after_revision: 4, action: "add_modifier",
+          outcome: null, annotation_id: "x", layer_id: "phenotype", term_id: "HP:0001250", commands: 3 }, redo: null, undo_count: 1, redo_count: 0, changed: true }
+          : { available: true, revision: 1, undo: null, redo: null, undo_count: 0, redo_count: 0, changed: false }) as never);
+        const history = vi.spyOn(api, "applyHistory").mockImplementation(async (_ws, envelope) => ({ ...structuredClone(view.draft), revision: envelope.expected_revision + 1 }) as never);
+        const { container } = await setup(view, recurrentHits, false);
+        const { decide } = draftSpy(view);
+        await openProposal(container);
+        await addRecurrentIn(proposalPanel());
+        await waitFor(() => expect(decide).toHaveBeenCalled());
+        changed = true;
+        const strip = container.querySelector<HTMLElement>("[data-advance-status]")!;
+        fireEvent.click(await within(strip).findByRole("button", { name: "Undo" }));
+        await waitFor(() => expect(history).toHaveBeenCalledTimes(1));
+        expect(history.mock.calls[0][1].payload).toEqual({ command: "undo_step", step: 4 });
+        await waitFor(() => expect(strip.textContent).toBe("Change undone. The proposal is open again."));
+        expect(proposalRow(container).getAttribute("aria-pressed")).toBe("true");
+        expect(proposalRow(container).textContent).toContain("Pending");
+        expect(within(proposalPanel()).getByRole("button", { name: "+ Add modifier…" })).toBeDefined();
+      });
     });
 
     describe("the way back from a copy (#240, #257)", () => {

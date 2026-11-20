@@ -11,6 +11,10 @@ const NERVOUS_SYSTEM = "HP:0000707";
 const AREFLEXIA = "HP:0001284";
 const HEARING = "HP:0000365";
 const HYPOTONIA = "HP:0001252";
+// tests/browser_server.py COPY_PASSAGE_TEXT: a line break after "weakness", 108 characters (the prefill keeps 80 at most).
+const PASSAGE_PROJECT = "pkg-copy-passage";
+const PASSAGE = "Mild weakness\nof both legs, worse in the evening and after long walks, with frequent falls since the spring.";
+const PASSAGE_ONE_LINE = PASSAGE.replace("\n", " ");
 const LOOK_NOTE = "Only looking: nothing can be changed from here.";
 const CHOOSE_NOTE = "Only looking: nothing changes until you choose a term and confirm.";
 
@@ -108,6 +112,56 @@ test.describe("copy the marked text", () => {
     // And the annotation flow is unchanged.
     await annotate(page, 14, 21, "Seizure", SEIZURE, 1);
     await expect(ownAnnotations(page)).toHaveCount(1);
+  });
+
+  test("Ctrl+C right after marking a passage over a line break copies all of it on one line; a selection made in the field copies just that", async ({ page, browserName }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await importPackage(page, "", PASSAGE_PROJECT, "copy-long");
+    await openCase(page, { task: "annotate" });
+
+    await selectText(page, 0, PASSAGE.length);
+    // The search starts with the marked words, shortened and selected.
+    await expect(search(page)).toBeFocused();
+    const prefill = await search(page).inputValue();
+    expect(prefill.length).toBeLessThan(PASSAGE_ONE_LINE.length);
+    expect(await search(page).evaluate((field: HTMLInputElement) => [field.selectionStart, field.selectionEnd])).toEqual([0, prefill.length]);
+    await copyByKeyboard(page, browserName, PASSAGE_ONE_LINE);
+    // Again: the copy did not touch it.
+    await copyByKeyboard(page, browserName, PASSAGE_ONE_LINE);
+    await expectCopyButton(page, page.locator(".inspector-pane"), PASSAGE_ONE_LINE);
+
+    // A part of the field selected by hand copies just that part.
+    await search(page).click();
+    await search(page).press("End");
+    for (let step = 0; step < 4; step += 1) await search(page).press("Shift+ArrowLeft");
+    await copyByKeyboard(page, browserName, prefill.slice(-4));
+    // The whole field selected by hand copies the field.
+    await search(page).press("ControlOrMeta+a");
+    await copyByKeyboard(page, browserName, prefill);
+    // No selection in the field: the passage again.
+    await search(page).press("End");
+    await copyByKeyboard(page, browserName, PASSAGE_ONE_LINE);
+
+    // Text selected in the text pane (here not yet committed as a mark) copies as it stands, line break included,
+    // as plain text only: no colours of the marks.
+    await page.locator(".text-container").evaluate((container) => {
+      (document.activeElement as HTMLElement | null)?.blur();
+      const runs = [...container.querySelectorAll<HTMLElement>(".run")];
+      const at = (offset: number): [Node, number] => {
+        const run = [...runs].reverse().find((candidate) => Number(candidate.dataset.start) <= offset)!;
+        return [run.firstChild!, offset - Number(run.dataset.start)];
+      };
+      const range = document.createRange();
+      range.setStart(...at(5));
+      range.setEnd(...at(26));
+      window.getSelection()!.removeAllRanges();
+      window.getSelection()!.addRange(range);
+    });
+    await copyByKeyboard(page, browserName, "weakness\nof both legs");
+    if (browserName === "chromium") {
+      const types = await page.evaluate(async () => (await navigator.clipboard.read()).flatMap((item) => [...item.types]));
+      expect(types).toEqual(["text/plain"]);
+    }
   });
 
   test("a selected finding copies its mention, several segments joined by a space", async ({ page, browserName }) => {
