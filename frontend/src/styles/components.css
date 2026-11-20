@@ -632,7 +632,8 @@ a.shell-product { color: inherit; text-decoration: none; }
 /* Administration's sidebar: the way back to the work pages, above the area's own entries. */
 .shell-nav-back { display: flex; align-items: center; gap: var(--space-1); color: var(--text-muted); }
 .shell-nav-back + .shell-nav-group { margin-top: var(--space-3); }
-/* Top right: Handbook, the gear to Administration (system administrators) and the user menu (issue 510). */
+/* Top right: Handbook, the gear to Administration (system administrators), the notifications bell (issue 557) and
+   the user menu (issue 510). */
 .shell-actions { flex-wrap: nowrap; }
 .shell-admin { position: relative; flex: none; padding: 5px 8px; }
 .shell-admin[aria-current] { color: var(--accent); background: var(--accent-light); }
@@ -857,6 +858,8 @@ ul.task-counts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space
   .shell-reading .shell-breadcrumb li + li::before { margin-right: var(--space-1); }
   .shell-reading .shell-product { display: none; }
   .shell-reading .shell-actions { width: auto; flex: none; flex-wrap: nowrap; }
+  /* The bell and the user menu touch (44 px targets each), so the breadcrumb keeps its two lines (issue 557). */
+  .shell-reading .shell-actions:has(.shell-notifications) { column-gap: 0; }
   .shell-reading .shell-help { display: none; }
   .shell-reading .shell-nav-help { display: block; margin-top: var(--space-3); }
   .shell-reading .current-user { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -867,7 +870,7 @@ ul.task-counts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space
   /* Touch targets (issue 550, U5-03; WCAG 2.5.5): every control of the header and of the sidebar or Administration
      navigation is at least 44 × 44 px on a phone: the product name, the gear, the user menu, Handbook, Sections, the
      project pages and the Administration pages. */
-  .shell-header :is(.shell-admin, .shell-user-menu, .shell-help),
+  .shell-header :is(.shell-admin, .shell-notifications, .shell-user-menu, .shell-help),
   .shell-reading-navigation > summary {
     min-width: var(--touch-target);
     min-height: var(--touch-target);

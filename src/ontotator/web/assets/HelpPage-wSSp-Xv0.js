@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-CIAP8xY_.js";import{n as a,t as o}from"./lib-CUM0vyBO.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-DyTzNa1m.js";import{n as a,t as o}from"./lib-CWrCtM1s.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -1631,12 +1631,33 @@ The header is the same on every page:
 - The breadcrumb shows where you are, for example **My tasks** or **Documents**.
 - At the top right is the user menu: a button with your display name, your pseudonym and your roles. It holds **Profile**, **My technical reports**, **Technical problem…**, the **Theme** (**System**, **Light** or **Dark**) and **Log out**. Open it with a click, or with Enter or the arrow keys; Escape closes it. On a phone the button in the editor shows your initials.
 - System administrators also see a gear next to it. It opens **Administration** (see [Administration](admin.md)). A number on the gear counts the open technical reports.
+- The bell next to the user menu shows your notifications. A number on it counts the unread ones. See [Notifications](#notifications).
 - **Handbook** in the header opens this handbook inside the app. On the Documents, consolidation and translation review screens, **Help** opens the handbook section about that screen; in the editor it is **More** > **Help for this screen**. On the project forms, a link next to the task profile opens the section that explains it. In the text card, **How to use it** next to *Newer set available* opens the section on new tool proposals. Click a screenshot in the handbook to open it at full size in a new tab.
 - Below the chapter list, the handbook shows the app's version and commit, for example \`Ontotator 0.3.0 · commit cc65cea\`. Quote it when you report a problem.
 
 ![The user menu, open at the top right: Profile, My technical reports, Technical problem…, the theme choice and Log out](images/getting-started-user-menu.png)
 
 The sidebar is for your work. It lists the project switcher, **My tasks** and **Projects**. The number after **My tasks** counts your open tasks, the same tasks as the **To do** tab; it updates as soon as you submit a text. Clicking **My tasks** or **Projects** loads your projects and the count again, so a project you were just added to shows up without reloading the page. Leads also see their project's pages (**Documents**, **Progress**, **Settings**, **Export**); the list **Translation reviews** opens from **Progress**, which stays marked while the list is open. In the editor, the sidebar folds into **Sections**; click it to open it. The user menu and the gear stay at the top right there too.
+
+## Notifications
+
+What for: learn about new work without looking for it.
+
+The bell at the top right, next to the user menu, tells you about:
+
+- a new task for you (*New task: annotation of case-0102 de*);
+- a task of yours that the lead reopened (*Task reopened: …*) or released after a pause (*Task released: …*);
+- for leads: a text problem that someone reported in your project (*Text problem from Ana Weber (ann-0004): case-0042 de*).
+
+A number on the bell counts the unread notifications. It updates every minute and when you come back to the window.
+
+1. Click the bell. A short list opens with the newest notifications first. Unread ones have a dot and bold text. Each one names the project and the time.
+2. Click a notification to open its place: the task, or the problem report. It is then marked as read.
+3. To mark one as read without opening it, click **Mark as read** next to it. **Mark all as read** below the list marks all of them.
+
+With the keyboard, Tab to the bell and press Enter; Tab moves through the list and Escape closes it. On a phone the list opens as a full screen sheet.
+
+Notifications never contain the text of a case, a reason or a comment: only the names of the task, the text and the person. They are kept for 30 days once read and for 180 days at most; you keep the newest 200. A notification about a task that is no longer yours, or from a project you left, is not shown.
 
 ## Report a technical problem
 

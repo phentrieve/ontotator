@@ -7,6 +7,8 @@ from uuid import uuid4
 from pydantic import ValidationError
 from sqlalchemy import Connection, RowMapping, func, insert, select, update
 
+from ontotator.application.notifications import notify, notify_leads
+
 # The view models live in problem_report_views; re-exported for routes and callers.
 from ontotator.application.problem_report_views import (
     AffectedTask as AffectedTask,
@@ -273,7 +275,7 @@ class ProblemReportService:
                 .order_by(TaskHoldRow.created_at, TaskHoldRow.hold_id)
                 .limit(1)
             ).scalar_one_or_none()
-            conn.execute(
+            owner = conn.execute(
                 update(AssignmentRow)
                 .where(AssignmentRow.id == aid)
                 .values(
@@ -282,7 +284,21 @@ class ProblemReportService:
                     workflow_revision=AssignmentRow.workflow_revision + 1,
                     updated_at=now,
                 )
-            )
+                .returning(AssignmentRow.user_id, AssignmentRow.project_id)
+            ).one()
+            if remaining is None:
+                # Issue 557: the task can be worked on again; its owner learns
+                # it unless they released it themselves.
+                notify(
+                    conn,
+                    owner.user_id,
+                    owner.project_id,
+                    "task_released",
+                    actor_id=released_by,
+                    assignment_id=aid,
+                    target_id=report_id,
+                    at=now,
+                )
 
     def report(
         self,
@@ -406,6 +422,16 @@ class ProblemReportService:
                 target_id=rid,
                 project_id=pid,
                 details={"assignment_id": assignment_id},
+                at=now,
+            )
+            # Issue 557: the leads' bell; the reason stays in the report.
+            notify_leads(
+                conn,
+                pid,
+                "text_problem_received",
+                actor_id=fresh.user_id,
+                assignment_id=assignment_id,
+                target_id=rid,
                 at=now,
             )
             result = self._view(conn, rid, fresh, project)
