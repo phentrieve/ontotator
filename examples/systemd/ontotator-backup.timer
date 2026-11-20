@@ -1,0 +1,13 @@
+# /etc/systemd/system/ontotator-backup.timer
+# Enable with: systemctl enable --now ontotator-backup.timer
+[Unit]
+Description=Nightly Ontotator backup
+
+[Timer]
+OnCalendar=*-*-* 03:30:00 UTC
+# Catch up after the host was off at 03:30.
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target
