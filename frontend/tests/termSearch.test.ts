@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { firstUsableIndex, matchLine, NO_PREFILL_HINT, prefillHint, prefillQuery } from "../src/editor/termSearch";
+import { firstUsableIndex, keepsPrefillSelected, matchLine, NO_PREFILL_HINT, passageText, prefillHint, prefillQuery } from "../src/editor/termSearch";
 
 describe("prefillQuery", () => {
   it("joins segments with a space and collapses whitespace", () => {
@@ -15,6 +15,40 @@ describe("prefillQuery", () => {
   });
   it("counts codepoints, not UTF-16 units", () => {
     expect(prefillQuery("😀 seizure", [{ start: 2, end: 9 }])).toBe("seizure");
+  });
+});
+describe("passageText", () => {
+  it("turns line breaks and runs of whitespace into one space and is never cut", () => {
+    const text = `Der Patient hat\r\n  ${"wort ".repeat(30)}\nEnde`;
+    const value = passageText(text, [{ start: 0, end: text.length }]);
+    expect(value).toBe(`Der Patient hat ${"wort ".repeat(30)}Ende`);
+    expect(Array.from(value).length).toBeGreaterThan(80);
+  });
+  it("joins segments with words between by a space and keeps adjacent ones together", () => {
+    const text = "No\nfever, but cough";
+    expect(passageText(text, [{ start: 0, end: 2 }, { start: 3, end: 8 }])).toBe("No fever");
+    expect(passageText(text, [{ start: 0, end: 2 }, { start: 14, end: 19 }])).toBe("No cough");
+    expect(passageText(text, [{ start: 3, end: 6 }, { start: 6, end: 8 }])).toBe("fever");
+  });
+  it("counts codepoints, not UTF-16 units", () => {
+    expect(passageText("😀 seizure", [{ start: 2, end: 9 }])).toBe("seizure");
+  });
+});
+describe("keepsPrefillSelected", () => {
+  const key = (key: string, mods: Partial<Record<"ctrlKey" | "metaKey" | "altKey" | "shiftKey", boolean>> = {}) =>
+    ({ key, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, ...mods });
+  it("keeps the mark for the modifier keys and the copy shortcuts", () => {
+    for (const k of ["Control", "Meta", "Shift", "Alt"]) expect(keepsPrefillSelected(key(k))).toBe(true);
+    expect(keepsPrefillSelected(key("c", { ctrlKey: true }))).toBe(true);
+    expect(keepsPrefillSelected(key("C", { metaKey: true }))).toBe(true);
+    expect(keepsPrefillSelected(key("Insert", { ctrlKey: true }))).toBe(true);
+  });
+  it("drops it for anything else: typing, Ctrl+A, arrows, Shift+arrows", () => {
+    expect(keepsPrefillSelected(key("c"))).toBe(false);
+    expect(keepsPrefillSelected(key("a", { ctrlKey: true }))).toBe(false);
+    expect(keepsPrefillSelected(key("ArrowLeft"))).toBe(false);
+    expect(keepsPrefillSelected(key("ArrowLeft", { shiftKey: true }))).toBe(false);
+    expect(keepsPrefillSelected(key("C", { ctrlKey: true, shiftKey: true }))).toBe(false);
   });
 });
 describe("prefillHint", () => {

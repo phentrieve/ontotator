@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-DVh-NUSd.js";import{n as a,t as o}from"./lib-CFJDf3Fq.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-DneQ_htd.js";import{n as a,t as o}from"./lib-CM3A7Fm8.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -516,7 +516,7 @@ What for: record a term that the text mentions.
 
 To drop a mark without adding a finding, click **Discard** or press Esc.
 
-To look the marked words up elsewhere, for example in a web search, click **Copy text** or press \`Ctrl+C\` (\`Cmd+C\` on a Mac). Both copy the marked text of the new finding, or the selected (otherwise the first) mention of the selected finding or tool proposal; parts of a mention with words in between are joined by a space. Text you have selected in a field is copied as usual. **Copy text** is also at each mention under **Mentions**.
+To look the marked words up elsewhere, for example in a web search, click **Copy text** or press \`Ctrl+C\` (\`Cmd+C\` on a Mac). Both copy the marked text of the new finding, or the selected (otherwise the first) mention of the selected finding or tool proposal, always in full and on one line: line breaks become spaces, and parts of a mention with words in between are joined by a space. Right after you mark text, \`Ctrl+C\` copies the whole marked text, although **Search term** holds it selected and may show only its first 80 characters. Text you have selected in a field yourself is copied as usual. Text you select in the text itself is copied as it stands, line breaks included, without the colours of the marks. **Copy text** is also at each mention under **Mentions**.
 
 ## Search a term
 
@@ -1514,7 +1514,7 @@ The editor has three columns: the list of **Findings** on the left, in the order
 ## 5. Mark a finding
 
 1. Read the text from the start. When it names a finding, for example "seizures", select the words with the mouse.
-2. The panel **New finding** opens. **Search term** already holds the marked words, and the hits are listed under **Terms**. **Copy text** under the marked words copies them, for example to look them up in a web search; see [Mark text and add a finding](annotator.md#mark-text-and-add-a-finding).
+2. The panel **New finding** opens. **Search term** already holds the marked words, and the hits are listed under **Terms**. **Copy text** under the marked words, or \`Ctrl+C\` (\`Cmd+C\` on a Mac), copies all of them on one line, for example to look them up in a web search; see [Mark text and add a finding](annotator.md#mark-text-and-add-a-finding).
 3. Read the hits before you choose: the search matches words, not meaning, and only a term whose name or synonym equals your words is sure to be on top. If the top hit is the right term, press Enter; a hit tagged **Weak match** is added only after you choose it with \`↓\`. Otherwise, click another hit, or try another word or a synonym in **Search term**. If you picked the wrong term, click **Change term** in the finding: the search starts with the marked words again.
 
 ![The New finding panel with the marked text and the term search open](images/annotator-new-finding.png)

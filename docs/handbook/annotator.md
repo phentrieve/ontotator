@@ -113,7 +113,7 @@ What for: record a term that the text mentions.
 
 To drop a mark without adding a finding, click **Discard** or press Esc.
 
-To look the marked words up elsewhere, for example in a web search, click **Copy text** or press `Ctrl+C` (`Cmd+C` on a Mac). Both copy the marked text of the new finding, or the selected (otherwise the first) mention of the selected finding or tool proposal; parts of a mention with words in between are joined by a space. Text you have selected in a field is copied as usual. **Copy text** is also at each mention under **Mentions**.
+To look the marked words up elsewhere, for example in a web search, click **Copy text** or press `Ctrl+C` (`Cmd+C` on a Mac). Both copy the marked text of the new finding, or the selected (otherwise the first) mention of the selected finding or tool proposal, always in full and on one line: line breaks become spaces, and parts of a mention with words in between are joined by a space. Right after you mark text, `Ctrl+C` copies the whole marked text, although **Search term** holds it selected and may show only its first 80 characters. Text you have selected in a field yourself is copied as usual. Text you select in the text itself is copied as it stands, line breaks included, without the colours of the marks. **Copy text** is also at each mention under **Mentions**.
 
 ## Search a term
 

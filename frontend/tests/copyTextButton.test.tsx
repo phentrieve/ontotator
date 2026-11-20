@@ -27,4 +27,11 @@ describe("CopyTextButton", () => {
     fireEvent.click(button);
     expect(writeText).toHaveBeenCalledWith("alpha");
   });
+
+  it("copies line breaks and runs of whitespace as one space", () => {
+    const writeText = clipboard();
+    render(<CopyTextButton text={" Mild weakness\r\nof both\n\n legs "} />);
+    fireEvent.click(screen.getByRole("button", { name: "Copy text" }));
+    expect(writeText).toHaveBeenCalledWith("Mild weakness of both legs");
+  });
 });

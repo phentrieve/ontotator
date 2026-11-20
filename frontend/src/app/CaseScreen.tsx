@@ -92,7 +92,7 @@ import {
 } from "../editor/ReviewActions";
 import { useSearchLanguages } from "../editor/searchLanguages";
 import { SearchPanel } from "../editor/SearchPanel";
-import { prefillHint, prefillQuery } from "../editor/termSearch";
+import { isUntouchedPrefill, passageText, prefillHint, prefillQuery } from "../editor/termSearch";
 import { focusTextAt } from "../editor/textFocus";
 import { useMediaQuery } from "../ui/useMediaQuery";
 import { SearchManager } from "../editor/searchState";
@@ -2369,8 +2369,10 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
 
   // Ctrl+C (Cmd+C) with nothing else selected copies the active passage, to look it up elsewhere: the marked
   // text of a new finding, else the selected (or first) mention of the selected finding or, in a task from
-  // proposals, of the selected tool proposal. Several segments are joined by a space, as a web search reads them.
-  // A selection of its own (a field, the page) copies as usual.
+  // proposals, of the selected tool proposal. Several segments are joined by a space and line breaks become
+  // spaces, as a web search reads them; the passage is never cut. A selection of its own (a field, the page)
+  // copies as usual, except the search prefill the panel selected itself (cut at PREFILL_MAX): while the user
+  // has not touched it, the whole passage is copied (PREFILL_SELECTED).
   const passageRef = useRef("");
   const passageRefs = selectedAnnotation?.annotation.evidence_refs ?? [];
   const targetEvidence = selectedTarget && !selectedAnnotation ? targetSnapshot?.evidence ?? [] : [];
@@ -2379,12 +2381,15 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const passageSegments = pendingAnnotation?.segments?.length ? pendingAnnotation.segments
     : allEvidenceMap[(passageRefs.find(ref => ref.evidence_id === selectedEvidenceId) ?? passageRefs[0])?.evidence_id ?? ""]?.mention.segments
       ?? targetMention?.mention.segments;
-  passageRef.current = passageSegments?.length ? quoteOf(view.document.text, passageSegments, " ") : "";
+  passageRef.current = passageSegments?.length ? passageText(view.document.text, passageSegments) : "";
   useEffect(() => {
     const copyPassage = (event: ClipboardEvent) => {
       const active = document.activeElement;
-      if ((active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) && active.selectionStart !== active.selectionEnd) return;
-      if (window.getSelection()?.toString() || !passageRef.current || !event.clipboardData) return;
+      const field = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement ? active : null;
+      if (field && field.selectionStart !== field.selectionEnd) {
+        if (!isUntouchedPrefill(field)) return;
+      } else if (window.getSelection()?.toString()) return;
+      if (!passageRef.current || !event.clipboardData) return;
       event.clipboardData.setData("text/plain", passageRef.current);
       event.preventDefault();
     };
