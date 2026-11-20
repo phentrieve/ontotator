@@ -67,6 +67,10 @@ async function fixTypos(page: Page, caseId: string) {
   const dialog = page.getByRole("dialog", { name: `Fix typos, ${caseId} de v1`, exact: true });
   const editor = dialog.getByRole("textbox", { name: "Corrected text", exact: true });
   await editor.fill((await editor.inputValue()).replace("hypotonia", "Hypotonie"));
+  // Issue 547, U2-06: the submitted review is not "nobody worked on it"; it stays with v1, and v2 gets its own.
+  await expect(dialog.getByText("Nobody has worked on v1 yet.", { exact: true })).toHaveCount(0);
+  await expect(dialog.getByText("A submitted translation review stays with the version it reviewed. To have v2 reviewed, use Resolve… › Assign a new review… on this row after saving.", { exact: true })).toBeVisible();
+  await shot(page, `u2-06-fix-typos-${page.viewportSize()!.width}`);
   await dialog.getByRole("button", { name: "Typo", exact: true }).click();
   await dialog.getByRole("button", { name: "Save as v2", exact: true }).click();
   await expect(dialog).toHaveCount(0);
@@ -92,6 +96,8 @@ for (const [name, viewport] of sizes) {
     await options.getByRole("button", { name: "Assign a new review…", exact: true }).click();
     const assign = page.getByRole("dialog", { name: "Assign translation review", exact: true });
     await expect(assign.locator(".assign-context strong").first()).toHaveText(new RegExp(`^${esc(caseId)}\\s*de\\s*v2$`));
+    // Issue 547, U2-07: Ana's review of v1 is named as such, not as an assignment of v2; "assigned" once.
+    await expect(assign.locator(".assign-muted", { hasText: /^Nobody assigned yet/ })).toHaveText(new RegExp(`^Nobody assigned yet · Earlier: Ana Weber \\(${esc(s.pseudonyms.ana)}\\) reviewed v1$`));
     await assign.getByRole("radio", { name: /^Ben Roth/ }).check();
     await shot(page, `f1-assign-dialog-${name}`);
     await assign.getByRole("button", { name: /^Assign/ }).last().click();

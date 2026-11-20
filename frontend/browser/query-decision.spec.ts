@@ -144,6 +144,11 @@ for (const [name, viewport] of sizes) {
     // Without an answer nothing is saved.
     const accept = dialog.getByRole("button", { name: "Accept v1", exact: true });
     await expect(accept).toHaveAttribute("aria-disabled", "true");
+    // Issue 547, U2-05: a click without an answer says so once, at the field.
+    await accept.click();
+    await expect(dialog.getByText("Enter the answer to the reviewer.", { exact: true })).toHaveCount(1);
+    await expect(dialog.locator(".field-hint-error")).toHaveText("Enter the answer to the reviewer.");
+    await shot(page, `answer-empty-${name}`);
     await dialog.getByRole("textbox", { name: /^Answer to the reviewer/ }).fill("The short form is meant; the source is the same in both places.");
     await shot(page, `answer-dialog-${name}`);
     await accept.click();

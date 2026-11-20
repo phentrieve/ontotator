@@ -458,7 +458,25 @@ it("lists holders with their assignment date", async () => {
     const dated = { ...row, work: row.work.map(item => ({ ...item, assigned_at: new Date(2026, 9, 23, 10, 40).toISOString() })) } as DocumentRowView;
     render(<AssignWorkDialog mode="row" projectKey="p/key" row={dated} task="annotate" onClose={vi.fn()} onAssigned={vi.fn()} />);
     await ready();
-    expect(screen.getByText(/Assigned: Ana Weber \(ann-0004\), assigned today 10:40/)).toBeDefined();
+    // "assigned" once (issue 547, U2-07).
+    expect(screen.getByText(/^Assigned: /).textContent).toBe("Assigned: Ana Weber (ann-0004), today 10:40");
+  } finally { vi.useRealTimers(); }
+});
+
+it("a translation review after Fix typos: earlier reviews are named as reviews of their version, not as assigned here (issue 547, U2-07)", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(2026, 9, 23, 17, 0));
+  try {
+    const base = row.versions[0];
+    const fixed = {
+      ...row,
+      versions: [{ ...base, document_id: "doc-case-0101-v1", translation_status: "reviewed", latest_review_decision: "rejected", is_newest_in_chain: false },
+        { ...base, version: 2, origin: "editorial_correction", derived_from: "doc-case-0101-v1", translation_status: "reviewed", latest_review_decision: "rejected" }],
+      work: [{ ...row.work[0], document_id: "doc-case-0101-v1", task: "translation_review", status: "submitted", assigned_at: new Date(2026, 9, 23, 15, 50).toISOString() }],
+    } as unknown as DocumentRowView;
+    render(<AssignWorkDialog mode="row" projectKey="p/key" row={fixed} task="translation_review" onClose={vi.fn()} onAssigned={vi.fn()} />);
+    await ready();
+    expect(screen.getByText(/^Nobody assigned yet/).textContent).toBe("Nobody assigned yet · Earlier: Ana Weber (ann-0004) reviewed v1");
   } finally { vi.useRealTimers(); }
 });
 
