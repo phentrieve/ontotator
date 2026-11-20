@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-20
+
 ### Added
 
 - MCP: `preview_change` shows the dry run of a changing tool as a tool that reads only (#485). A tool with `confirm` does its dry run without it, but it is marked as changing data, so a client that asks before or refuses every changing tool could not show the dry run. `preview_change` takes `tool` (any tool with `confirm`) and its `arguments`, and returns that tool's own dry run with `preview_of` and `how_to_apply`; to apply, the model calls the tool itself with `confirm=true`. It refuses `confirm` and `preview_token`, and while it runs the MCP server sends only requests that change nothing (a GET, a `/preview` route or a body with `"preview": true`): `set_member_roles` with roles to add only, which needs no `confirm`, is stopped before anything is sent. One tool, not a read-only twin of each changing tool. No API change.
@@ -512,7 +514,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 First public release.
 
-[Unreleased]: https://github.com/phentrieve/ontotator/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/phentrieve/ontotator/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/phentrieve/ontotator/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/phentrieve/ontotator/compare/v0.10.2...v0.11.0
 [0.10.2]: https://github.com/phentrieve/ontotator/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/phentrieve/ontotator/compare/v0.10.0...v0.10.1
