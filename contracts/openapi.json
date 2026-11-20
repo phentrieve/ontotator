@@ -32781,6 +32781,34 @@
             ],
             "title": "Round Id"
           },
+          "round_ordinal": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Round Ordinal"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "consolidation",
+                  "carry_forward",
+                  "annotation",
+                  "proposal_check"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
           "guideline_version": {
             "anyOf": [
               {

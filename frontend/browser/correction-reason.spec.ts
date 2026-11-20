@@ -67,7 +67,17 @@ for (const [name, viewport] of sizes) {
     await expect(dialog).toContainText(`${s.display_names.ana} reads your addition below the reason, with its date. The reason as sent stays as it is.`);
     const add = dialog.locator(".modal-actions").getByRole("button", { name: "Add to the reason", exact: true });
     await expect(add).toBeDisabled();
+    // Issue 547, U2-08: the grey button says why, and the field label does not touch the quoted reason.
+    await expect(dialog.getByText("Enter an addition first.", { exact: true })).toBeVisible();
+    const gap = await dialog.evaluate(element => {
+      const quote = element.querySelector(".correction-request-reason")!.getBoundingClientRect();
+      const label = element.querySelector(".correction-reason-dialog .form-label")!.getBoundingClientRect();
+      return label.top - quote.bottom;
+    });
+    expect(gap).toBeGreaterThanOrEqual(8);
+    if (name === "1440") await dialog.screenshot({ path: test.info().outputPath("add-to-reason.png") });
     await dialog.getByLabel("Addition to the reason").fill(NOTE);
+    await expect(dialog.getByText("Enter an addition first.", { exact: true })).toHaveCount(0);
     expect(await noHorizontalScroll(page)).toBe(true);
     await add.click();
     await expect(dialog).toBeHidden();

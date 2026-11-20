@@ -11300,6 +11300,10 @@ export interface components {
             mode: string;
             /** Round Id */
             round_id?: string | null;
+            /** Round Ordinal */
+            round_ordinal?: number | null;
+            /** Kind */
+            kind?: ("consolidation" | "carry_forward" | "annotation" | "proposal_check") | null;
             /** Guideline Version */
             guideline_version?: number | null;
             /** Guideline Label */
