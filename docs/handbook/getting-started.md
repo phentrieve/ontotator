@@ -59,8 +59,8 @@ What for: know where things are.
 The header is the same on every page:
 
 - **Ontotator** on the left takes you to the start page.
-- The breadcrumb shows where you are, for example **My tasks** or **Documents**.
-- At the top right is the user menu: a button with your display name, your pseudonym and your roles. It holds **Profile**, **My technical reports**, **Technical problem…**, the **Theme** (**System**, **Light** or **Dark**) and **Log out**. Open it with a click, or with Enter or the arrow keys; Escape closes it. On a phone the button in the editor shows your initials.
+- The breadcrumb shows where you are, for example **My tasks** or **Documents**. In the editor on a wide screen the text's name is in the toolbar next to it, not again in the breadcrumb.
+- At the top right is the user menu: a button with your display name, your pseudonym and your roles. It holds **Profile**, **My technical reports**, **Technical problem…**, the **Theme** (**System**, **Light** or **Dark**) and **Log out**. Open it with a click, or with Enter or the arrow keys; Escape closes it. In the editor the button shows your initials: on a phone, and on a wide screen, where the header and the text's toolbar share one bar.
 - System administrators also see a gear next to it. It opens **Administration** (see [Administration](admin.md)). A number on the gear counts the open technical reports.
 - **Handbook** in the header opens this handbook inside the app. On the Documents, consolidation and translation review screens, **Help** opens the handbook section about that screen; in the editor it is **More** > **Help for this screen**. On the project forms, a link next to the task profile opens the section that explains it. In the text card, **How to use it** next to *Newer set available* opens the section on new tool proposals. Click a screenshot in the handbook to open it at full size in a new tab.
 - Below the chapter list, the handbook shows the app's version and commit, for example `Ontotator 0.3.0 · commit cc65cea`. Quote it when you report a problem.
