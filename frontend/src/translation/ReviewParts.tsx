@@ -3,8 +3,9 @@ import type { BracketCheck, TranslationReviewRecord } from "../api/client";
 import { personLabel } from "../app/identity";
 import { submissionGuidelineLabel } from "../guidelines/submissionLabel";
 import { Button, IconCheck, IconChevronRight, IconWarning, StatusBadge, EmptyValue } from "../ui";
-import { addedBrackets, allChecksLine, calmCheckText, earlierChecksText, sourceUpdatesOpenText, sourceUpdatesOpenTitle, categoryLabels, checkBandText, checkDeviationGuidance, checkExplanation, checkLabel, checkNoLocation, decisionConsequences, decisionLabels, formatReviewDate, translationStatusLabel } from "./labels";
+import { addedBrackets, allChecksLine, calmCheckText, earlierChecksText, sourceUpdatesOpenText, sourceUpdatesOpenTitle, categoryLabels, checkBandText, checkDeviationGuidance, checkExplanation, checkLabel, checkNoLocation, decisionConsequences, decisionLabels, translationStatusLabel } from "./labels";
 import type { ClinicalCategory, ReviewDecisionCode } from "./reviewRules";
+import { formatTime } from "../app/submissionLabels";
 
 type CheckRow = { code: string; passed: boolean; detail: string | null };
 function checkRows(raw: readonly unknown[]): CheckRow[] {
@@ -101,10 +102,11 @@ export function ReviewSummary({ record, heading }: { record: TranslationReviewRe
       <div><dt>Decision</dt><dd>{decisionLabels[record.decision] ?? record.decision}</dd></div>
       <div><dt>Clinically relevant change</dt><dd>{record.clinical_change ? `Yes: ${categoryList(record.categories)}` : "No"}</dd></div>
       <div><dt>Rationale</dt><dd className="review-summary-rationale">{record.rationale?.trim() ? record.rationale : <EmptyValue />}</dd></div>
-      <div><dt>Status of the reviewed version</dt><dd>{translationStatusLabel(record.status_after)}</dd></div>
+      {/* The status this review gave the version, kept as it was (issue 546: the lead may have accepted it since). */}
+      <div><dt>Status after this review</dt><dd>{translationStatusLabel(record.status_after)}</dd></div>
       <div><dt>Reviewer</dt><dd>{personLabel({ pseudonym: record.reviewer_pseudonym })}{record.reviewer_qualification ? `, ${record.reviewer_qualification}` : ""}</dd></div>
       <div><dt>Guidelines</dt><dd>{submissionGuidelineLabel(record.guideline_version, record.guideline_withdrawn, null, record.guideline_label).replace(/^Guidelines:? /, "")}</dd></div>
-      <div><dt>Submitted</dt><dd><time dateTime={record.created_at}>{formatReviewDate(record.created_at)}</time></dd></div>
+      <div><dt>Submitted</dt><dd><time dateTime={record.created_at}>{formatTime(record.created_at)}</time></dd></div>
     </dl>
   </section>;
 }

@@ -68,7 +68,7 @@ Words you meet in the app, in alphabetical order. The handbook uses one word per
 | Consolidation | A task that merges differing submissions on one text into one result. |
 | Consolidator | The person who does a consolidation. Needs the **Consolidator** role in the project. |
 | Default (prefilled value) | A value a new finding starts with, tagged **Default**. It counts as not confirmed until you confirm or change it. |
-| Document | The app's word for a text on the **Documents** page and in a few labels such as **People per document**. Same as *text* in this handbook. |
+| Document | The app's word for a text in the page name **Documents**. Same as *text* in this handbook. |
 | Final result | The one submission or consolidation per text that the lead accepts. Only final results are exported. |
 | Finalization | The third part of the lead's text card, where the lead accepts the final result or starts a consolidation. |
 | Finding | One ontology term marked in a text, with its values, modifiers and zero or more mentions. |

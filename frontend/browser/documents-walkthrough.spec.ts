@@ -113,7 +113,7 @@ test("step 2: the lead assigns the review to Ana (3 clicks)", async () => {
   await clicks.count(action("Assign review…"));
   const dialog = page.getByRole("dialog", { name: /^Assign/ });
   await clicks.count(dialog.getByRole("radio", { name: new RegExp(`^${ANA}`) }));
-  await clicks.count(dialog.getByRole("button", { name: "Assign 1", exact: true }));
+  await clicks.count(dialog.getByRole("button", { name: "Assign 1 task", exact: true }));
   await expect(dialog).toHaveCount(0);
 
   await expectStage(cell("translation"), { state: `assigned, not started (${ANA})`, who: "" });

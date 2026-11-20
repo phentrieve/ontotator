@@ -77,15 +77,15 @@ async function waitForPreviewOf(usernames: string[]) { await waitFor(() => expec
 
 it("preselects the task from the plan and lets several steps be chosen", async () => {
   const view = render(<AssignWorkDialog {...casesProps()} />);
-  expect(await screen.findByText("Translation review, de, 20 versions")).toBeDefined();
+  expect(await screen.findByText("Translation review, de, 20 texts")).toBeDefined();
   expect(screen.getByText("from the plan")).toBeDefined();
-  expect(screen.getByRole("dialog", { name: "Assign 20 cases" })).toBeDefined();
+  expect(screen.getByRole("dialog", { name: "Assign tasks" })).toBeDefined();
   view.unmount();
   vi.mocked(api.selectionSummary).mockResolvedValue(summary([{ task: "annotate", language: "fr", versions: 12, cases: 12 }, { task: "translation_review", language: "de", versions: 20, cases: 20 }]));
   render(<AssignWorkDialog {...casesProps()} />);
   const select = await screen.findByRole("combobox", { name: "Task" });
-  expect((select as HTMLSelectElement).selectedOptions[0].textContent).toBe("Translation review, de, 20 versions");
-  expect(screen.getByRole("option", { name: "Annotation, fr, 12 versions" })).toBeDefined();
+  expect((select as HTMLSelectElement).selectedOptions[0].textContent).toBe("Translation review, de, 20 texts");
+  expect(screen.getByRole("option", { name: "Annotation, fr, 12 texts" })).toBeDefined();
   await ready();
   fireEvent.change(select, { target: { value: "annotate:fr" } });
   await waitFor(() => expect(lastPreview()).toMatchObject({ task: "annotate", language: "fr" }));
@@ -121,7 +121,7 @@ it("shows ineligible members muted with the reason and aria-disabled", async () 
     fireEvent.click(eva);
     expect((eva as HTMLInputElement).checked).toBe(false);
     expect(screen.getByRole("checkbox", { name: /Dan Mertens.*does not read de/ })).toBeDefined();
-    const finn = screen.getByRole("checkbox", { name: /Finn Ott.*Already annotating 3 of these cases/ });
+    const finn = screen.getByRole("checkbox", { name: /Finn Ott.*Already annotating 3 of these texts/ });
     expect(finn.getAttribute("aria-disabled")).toBeNull();
     fireEvent.click(finn);
     expect((finn as HTMLInputElement).checked).toBe(true);
@@ -163,7 +163,7 @@ it("One person: radio per member and live summary", async () => {
   fireEvent.click(radio(/Ana Weber/));
   await waitForPreviewOf(["ana"]);
   expect(screen.getByRole("status", { name: "Summary" }).textContent).toContain("Ana Weber gets 20 translation reviews (de). Open tasks: 3 → 23.");
-  fireEvent.click(screen.getByRole("button", { name: "Assign 20" }));
+  fireEvent.click(screen.getByRole("button", { name: "Assign 20 tasks" }));
   await waitFor(() => expect(props.onAssigned).toHaveBeenCalled());
   expect(api.commitAssignmentBatch).toHaveBeenCalledWith("p/key", expect.objectContaining({ task: "translation_review", language: "de", mode: "one", usernames: ["ana"], expected_preview_digest: "digest-1", confirm_language: false }));
 });
@@ -187,7 +187,7 @@ it("Annotation for many texts: ticked people each get every text up to the limit
   expect(screen.getByRole("status", { name: "Summary" }).textContent).toContain("Ana Weber gets 20 annotations (de). Open tasks: 3 → 23.");
   expect(screen.getByRole("status", { name: "Summary" }).textContent).toContain("Ben Roth gets 19 annotations (de).");
   expect(screen.getByRole("status", { name: "Summary" }).textContent).toContain("case-0101 de: 1 assigned (limit 2)");
-  fireEvent.click(screen.getByRole("button", { name: "Assign 39" }));
+  fireEvent.click(screen.getByRole("button", { name: "Assign 39 tasks" }));
   await waitFor(() => expect(props.onAssigned).toHaveBeenCalledWith("39 annotations assigned to Ana Weber and Ben Roth", []));
   expect(api.commitAssignmentBatch).toHaveBeenCalledWith("p/key", expect.objectContaining({ mode: "each", usernames: ["ana", "ben"] }));
 });
@@ -195,7 +195,7 @@ it("Annotation for many texts: ticked people each get every text up to the limit
 it("keeps Assign unavailable with a reason until a choice exists", async () => {
   vi.mocked(api.selectionSummary).mockResolvedValue(summary([{ task: "annotate", language: "de", versions: 20, cases: 20 }]));
   render(<AssignWorkDialog {...casesProps()} />); await ready();
-  const assign = screen.getByRole("button", { name: "Assign 20" });
+  const assign = screen.getByRole("button", { name: "Assign 20 tasks" });
   expect(assign.getAttribute("aria-disabled")).toBe("true");
   expect(document.getElementById(assign.getAttribute("aria-describedby")!)!.textContent).toBe("Choose people first.");
   fireEvent.click(assign);
@@ -208,12 +208,12 @@ it("asks Assign anyway in the dialog for a language mismatch", async () => {
   await waitForPreviewOf(["dan"]);
   // The mismatch is said at the person and in the confirmation, not a third time in the summary (#47 A-21).
   expect(screen.getByRole("status", { name: "Summary" }).textContent).not.toContain("does not read");
-  fireEvent.click(screen.getByRole("button", { name: "Assign 20" }));
+  fireEvent.click(screen.getByRole("button", { name: "Assign 20 tasks" }));
   expect(api.commitAssignmentBatch).not.toHaveBeenCalled();
   expect(screen.getByRole("region", { name: "Confirm languages" }).textContent).toContain("Dan Mertens does not read de.");
   // One "Assign anyway": the footer's primary button, no second one in the confirmation.
   expect(screen.getAllByRole("button", { name: "Assign anyway" })).toHaveLength(1);
-  expect(screen.queryByRole("button", { name: "Assign 20" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Assign 20 tasks" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Assign anyway" }));
   await waitFor(() => expect(api.commitAssignmentBatch).toHaveBeenCalledWith("p/key", expect.objectContaining({ usernames: ["dan"], confirm_language: true })));
   await waitFor(() => expect(props.onAssigned).toHaveBeenCalled());
@@ -229,10 +229,10 @@ it("says that the tasks of texts still in review open after the acceptance (issu
 it("closes and reports the result for one person and split", async () => {
   skipped = [{ case_id: "case-0120", language: "de", reason: "waiting_for_review" }];
   const props = casesProps(); render(<AssignWorkDialog {...props} />); await ready();
-  expect(screen.getByRole("status", { name: "Summary" }).textContent).toContain("1 without a translation review under way: assign the review first");
+  expect(screen.getByRole("status", { name: "Summary" }).textContent).toContain("1 text without a translation review under way: assign the review first");
   fireEvent.click(radio(/Ana Weber/));
   await waitForPreviewOf(["ana"]);
-  fireEvent.click(screen.getByRole("button", { name: "Assign 19" }));
+  fireEvent.click(screen.getByRole("button", { name: "Assign 19 tasks" }));
   await waitFor(() => expect(props.onAssigned).toHaveBeenCalledWith("19 translation reviews assigned to Ana Weber. Also skipped: case-0120", ["case-0120"]));
 });
 
@@ -248,7 +248,7 @@ it("walks a de + en selection through review, then annotation, and says what com
   expect(stepItems()).toEqual(["> Translation review de", "Annotation en"]);
   expect(overview()).toContain("Step 1 of 2");
   fireEvent.click(radio(/Ana Weber/)); await waitForPreviewOf(["ana"]);
-  fireEvent.click(screen.getByRole("button", { name: "Assign 20" }));
+  fireEvent.click(screen.getByRole("button", { name: "Assign 20 tasks" }));
   await waitFor(() => expect(lastPreview()).toMatchObject({ task: "annotate", language: "en", usernames: [] }));
   expect(props.onAssigned).not.toHaveBeenCalled();
   expect(screen.getByText("20 translation reviews assigned to Ana Weber. Next: annotation (en). Close when you are done.")).toBeDefined();
@@ -256,10 +256,10 @@ it("walks a de + en selection through review, then annotation, and says what com
   expect(stepItems()).toEqual(["Translation review de ✓, done", "> Annotation en"]);
   expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Skip this task" })).toBeNull();
-  expect((screen.getByRole("option", { name: "Translation review, de, 20 versions, done" }) as HTMLOptionElement).selected).toBe(false);
+  expect((screen.getByRole("option", { name: "Translation review, de, 20 texts, done" }) as HTMLOptionElement).selected).toBe(false);
   await ready();
   fireEvent.click(await screen.findByRole("checkbox", { name: /Ben Roth/ })); await waitForPreviewOf(["ben"]);
-  fireEvent.click(screen.getByRole("button", { name: "Assign 20" }));
+  fireEvent.click(screen.getByRole("button", { name: "Assign 20 tasks" }));
   await waitFor(() => expect(props.onAssigned).toHaveBeenCalledWith("20 translation reviews assigned to Ana Weber. 20 annotations assigned to Ben Roth", []));
 });
 
@@ -284,7 +284,7 @@ it("annotation that waits for the review shows up front and is the next step onc
   expect(overview()).toContain("Step 1 of 2");
   expect(screen.queryByRole("combobox", { name: "Task" })).toBeNull();
   fireEvent.click(radio(/Ana Weber/)); await waitForPreviewOf(["ana"]);
-  fireEvent.click(screen.getByRole("button", { name: "Assign 20" }));
+  fireEvent.click(screen.getByRole("button", { name: "Assign 20 tasks" }));
   await waitFor(() => expect(lastPreview()).toMatchObject({ task: "annotate", language: "de", usernames: [] }));
   expect(overview()).toContain("Step 2 of 2");
 });
@@ -308,7 +308,7 @@ it("closing names what is left unassigned, also after skipping, and offers those
   vi.mocked(api.selectionSummary).mockResolvedValue(summary([{ task: "translation_review", language: "de", versions: 2, cases: 2 }, { task: "annotate", language: "en", versions: 2, cases: 2 }]));
   const props = { ...casesProps(), caseIds: few }; render(<AssignWorkDialog {...props} />); await ready();
   fireEvent.click(radio(/Ana Weber/)); await waitForPreviewOf(["ana"]);
-  fireEvent.click(screen.getByRole("button", { name: "Assign 2" }));
+  fireEvent.click(screen.getByRole("button", { name: "Assign 2 tasks" }));
   await screen.findByText(/^2 translation reviews assigned to Ana Weber\. Next: annotation \(en\)/);
   fireEvent.click(screen.getAllByRole("button", { name: "Close" }).at(-1)!);
   await waitFor(() => expect(props.onAssigned).toHaveBeenCalledWith("2 translation reviews assigned to Ana Weber. Left unassigned: annotation of case-0101 en, case-0102 en", few));
@@ -344,7 +344,7 @@ it("says so when it cannot check what is left, and still reports the assignments
   const props = casesProps(); render(<AssignWorkDialog {...props} />); await ready();
   fireEvent.click(radio(/Ana Weber/)); await waitForPreviewOf(["ana"]);
   vi.mocked(api.selectionSummary).mockRejectedValue(new Error("offline"));
-  fireEvent.click(screen.getByRole("button", { name: "Assign 20" }));
+  fireEvent.click(screen.getByRole("button", { name: "Assign 20 tasks" }));
   await waitFor(() => expect(props.onAssigned).toHaveBeenCalledWith("20 translation reviews assigned to Ana Weber. Could not check what is left unassigned", []));
 });
 
@@ -352,12 +352,12 @@ it("keeps the dialog open listing refused cases by text and person", async () =>
   vi.mocked(api.commitAssignmentBatch).mockRejectedValue(new ApiError(409, "refused", "ASSIGNMENT_BATCH_REFUSED", { refused: [{ case_id: "case-0101", language: "de", document_id: "doc-case-0101", username: "ana", code: "NOT_IN_WORK_PLAN" }] }));
   const props = casesProps(); render(<AssignWorkDialog {...props} />); await ready();
   fireEvent.click(radio(/Ana Weber/)); await waitForPreviewOf(["ana"]);
-  fireEvent.click(screen.getByRole("button", { name: "Assign 20" }));
+  fireEvent.click(screen.getByRole("button", { name: "Assign 20 tasks" }));
   const list = await screen.findByRole("list", { name: "Refused assignments" });
   expect(list.textContent).toContain("case-0101 de — Ana Weber (ann-0004)");
   expect(screen.getByText(/Nothing was assigned/)).toBeDefined();
   expect(props.onAssigned).not.toHaveBeenCalled();
-  expect(screen.getByRole("dialog", { name: "Assign 20 cases" })).toBeDefined();
+  expect(screen.getByRole("dialog", { name: "Assign tasks" })).toBeDefined();
 });
 
 it("reloads the preview after ASSIGNMENT_BATCH_STALE", async () => {
@@ -366,12 +366,12 @@ it("reloads the preview after ASSIGNMENT_BATCH_STALE", async () => {
   fireEvent.click(radio(/Ana Weber/)); await waitForPreviewOf(["ana"]);
   const calls = vi.mocked(api.previewAssignmentBatch).mock.calls.length;
   digest = "digest-2";
-  fireEvent.click(screen.getByRole("button", { name: "Assign 20" }));
+  fireEvent.click(screen.getByRole("button", { name: "Assign 20 tasks" }));
   expect(await screen.findByText(/The cases or people changed/)).toBeDefined();
   await waitFor(() => expect(vi.mocked(api.previewAssignmentBatch).mock.calls.length).toBeGreaterThan(calls));
   await waitFor(() => expect(screen.queryByText("Calculating…")).toBeNull());
   expect((radio(/Ana Weber/) as HTMLInputElement).checked).toBe(true);
-  fireEvent.click(screen.getByRole("button", { name: "Assign 20" }));
+  fireEvent.click(screen.getByRole("button", { name: "Assign 20 tasks" }));
   await waitFor(() => expect(api.commitAssignmentBatch).toHaveBeenLastCalledWith("p/key", expect.objectContaining({ expected_preview_digest: "digest-2" })));
 });
 
@@ -580,7 +580,7 @@ it("row mode can assign a new review of an accepted translation", async () => {
   await ready();
   expect(lastPreview()).toMatchObject({ task: "translation_review", review_accepted_translation: true, case_ids: ["case-0101"] });
   fireEvent.click(radio(/Ana Weber/)); await waitForPreviewOf(["ana"]);
-  fireEvent.click(screen.getByRole("button", { name: "Assign 1" }));
+  fireEvent.click(screen.getByRole("button", { name: "Assign 1 task" }));
   await waitFor(() => expect(api.commitAssignmentBatch).toHaveBeenCalledWith("p/key", expect.objectContaining({ task: "translation_review", review_accepted_translation: true, usernames: ["ana"] })));
   await waitFor(() => expect(onAssigned).toHaveBeenCalledWith("1 translation review assigned to Ana Weber"));
 });
@@ -593,7 +593,7 @@ it("row mode assigns a translation review after a source change with review_reas
   expect(screen.getByText("Review after a source change")).toBeDefined();
   expect(lastPreview()).toMatchObject({ task: "translation_review", review_reason: "source_changed", case_ids: ["case-0101"] });
   fireEvent.click(radio(/Ana Weber/)); await waitForPreviewOf(["ana"]);
-  fireEvent.click(screen.getByRole("button", { name: "Assign 1" }));
+  fireEvent.click(screen.getByRole("button", { name: "Assign 1 task" }));
   await waitFor(() => expect(api.commitAssignmentBatch).toHaveBeenCalledWith("p/key", expect.objectContaining({ review_reason: "source_changed", usernames: ["ana"] })));
 });
 
@@ -607,7 +607,7 @@ it("the acknowledgement appears only for unreviewed targets and gates Assign", a
   await waitForPreviewOf(["ana"]);
   const box = acknowledgement()!;
   expect(document.getElementById(box.getAttribute("aria-describedby")!)!.textContent).toBe("Translation review not accepted yet: case-0102 de");
-  const assign = screen.getByRole("button", { name: "Assign 20" });
+  const assign = screen.getByRole("button", { name: "Assign 20 tasks" });
   expect(assign.getAttribute("aria-disabled")).toBe("true");
   expect(document.getElementById(assign.getAttribute("aria-describedby")!)!.textContent).toBe("Confirm annotating before the translation review is accepted.");
   fireEvent.click(assign);
@@ -625,7 +625,7 @@ it("no acknowledgement for reviewed targets", async () => {
   fireEvent.click(screen.getByRole("checkbox", { name: /Ana Weber/ }));
   await waitForPreviewOf(["ana"]);
   expect(acknowledgement()).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Assign 20" }));
+  fireEvent.click(screen.getByRole("button", { name: "Assign 20 tasks" }));
   await waitFor(() => expect(props.onAssigned).toHaveBeenCalled());
   expect(api.commitAssignmentBatch).toHaveBeenCalledWith("p/key", expect.objectContaining({ confirm_unreviewed_translation: false }));
 });
@@ -1017,7 +1017,7 @@ it("a skipped step reads skipped, not done; annotation that waits for it is no s
   await waitFor(() => expect(lastPreview()).toMatchObject({ task: "annotate", language: "en" }));
   await waitFor(() => expect(stepItems()).toEqual(["Translation review de (skipped)", "> Annotation en"]));
   expect(overview()).toContain("Step 2 of 2");
-  expect(screen.getByRole("option", { name: "Translation review, de, 20 versions, skipped" })).toBeDefined();
+  expect(screen.getByRole("option", { name: "Translation review, de, 20 texts, skipped" })).toBeDefined();
 });
 
 it("keeps the order of the steps when the server lists them differently after a step", async () => {
@@ -1042,4 +1042,29 @@ it("never shows the texts of the step before under the next step's task", async 
   await waitFor(() => expect(answers.length).toBeGreaterThan(0));
   await waitFor(() => expect(screen.getByRole("list", { name: "Steps" }).textContent).toContain("(skipped)"));
   expect(screen.queryByText(/case-0101 de/)).toBeNull();
+});
+
+it("a selection of one fully staffed text says the limit is reached and offers Change…, never Loading… (issue 549, U3-03)", async () => {
+  // The server has no step for the text: it holds as many annotators as its limit allows.
+  vi.mocked(api.selectionSummary).mockResolvedValue(summary([]));
+  skipped = [{ case_id: "case-0103", language: "de", reason: "already_assigned", per_text: 1, assigned: 1 }];
+  render(<AssignWorkDialog {...casesProps()} caseIds={["case-0103"]} rows={[{ case_id: "case-0103", language: "de" }]} />);
+  const dialog = await screen.findByRole("dialog", { name: "Assign tasks" });
+  expect(await within(dialog).findByText("Limit reached: 1 assigned, limit 1.")).toBeDefined();
+  expect(within(dialog).getByRole("button", { name: /^Change… \(limit: 1 annotator per text\)/ })).toBeDefined();
+  await ready();
+  expect(within(dialog).queryByText("Loading…")).toBeNull();
+  const assign = within(dialog).getByRole("button", { name: "Assign" });
+  expect(assign.getAttribute("aria-disabled")).toBe("true");
+  expect(document.getElementById(assign.getAttribute("aria-describedby")!)?.textContent).toBe("Limit reached: 1 assigned, limit 1.");
+  expect(within(dialog).getByText("Annotation, de")).toBeDefined();
+});
+
+it("a selection with nothing to assign and no full text says so instead of Loading… (issue 549, U3-03)", async () => {
+  vi.mocked(api.selectionSummary).mockResolvedValue(summary([]));
+  skipped = [{ case_id: "case-0103", language: "de", reason: "step_differs" }];
+  render(<AssignWorkDialog {...casesProps()} caseIds={["case-0103"]} rows={[{ case_id: "case-0103", language: "de" }]} />);
+  const dialog = await screen.findByRole("dialog", { name: "Assign tasks" });
+  expect(await within(dialog).findAllByText("No text in the selection needs a task.")).not.toHaveLength(0);
+  expect(within(dialog).queryByText("Loading…")).toBeNull();
 });

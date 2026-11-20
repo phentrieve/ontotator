@@ -27,6 +27,10 @@ function Icon({ children, className }: { children: React.ReactNode; className?: 
 
 type IconProps = { className?: string };
 
+/** Two bars: a pause (issue 549; the font glyph U+23F8 is an empty box without a system font that has it). */
+export const IconPause = (p: IconProps) => <Icon {...p}><path d="M5.5 3v10M10.5 3v10" strokeWidth="2.5" strokeLinecap="butt" /></Icon>;
+/** A pilcrow: spacing and invisible characters (typography hints). */
+export const IconPilcrow = (p: IconProps) => <Icon {...p}><path d="M7.5 13V3h5M10.5 3v10M7.5 3a3 3 0 0 0 0 6" /></Icon>;
 export const IconChevronLeft = (p: IconProps) => <Icon {...p}><path d="m10 3-5 5 5 5" /></Icon>;
 export const IconChevronRight = (p: IconProps) => <Icon {...p}><path d="m6 3 5 5-5 5" /></Icon>;
 export const IconSort = (p: IconProps) => <Icon {...p}><path d="m5 5 3-3 3 3M5 11l3 3 3-3" /></Icon>;

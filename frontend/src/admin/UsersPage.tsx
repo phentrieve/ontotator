@@ -6,7 +6,8 @@ import { ErrorNotice } from "./ErrorNotice";
 import { fieldError } from "./errors";
 import { LanguagesField } from "./LanguagesField";
 import { importPlanOptions, toolProposalOptions } from "./projectFields";
-import { formatDateTime, formatShortDateTime, humanize, labelFor, roleLabels, taskLabels } from "../app/labels";
+import { humanize, labelFor, roleLabels, taskLabels } from "../app/labels";
+import { formatTime, fullTimestamp } from "../app/submissionLabels";
 import { KIND_LABELS, SCOPE_LABELS } from "../me/TokensSection";
 
 export interface UsersPageProps {
@@ -141,7 +142,8 @@ const spanlessChoice = (allowed: unknown, note: unknown): string =>
 /** A setting's value as its screen shows it: a checkbox is on or off, a choice has its label. */
 const settingValue = (field: string, value: unknown): string =>
   typeof value === "boolean" ? (value ? "on" : "off")
-    : Array.isArray(value) ? value.map(String).join(", ") || "none"
+    // Settings says "Empty: any language" (issue 546): an empty list of languages allows every language, never none.
+    : Array.isArray(value) ? value.map(String).join(", ") || (field === "languages" ? "any language" : "none")
     : field === "import_plan" ? importPlanOptions.find(option => option.value === value)?.label ?? String(value)
     : field === "tool_proposal_mode" ? toolProposalOptions.find(option => option.value === value)?.label ?? String(value)
     : isBlank(value) ? "none" : String(value);
@@ -172,7 +174,7 @@ const isBlank = (value: unknown): boolean =>
   value === null || value === undefined || value === "" || (Array.isArray(value) ? value.length === 0 : typeof value === "object" && Object.keys(value).length === 0);
 const auditValue = (key: string, value: unknown): string =>
   key === "task" && typeof value === "string" ? labelFor(taskLabels, value)
-    : key.endsWith("_at") && typeof value === "string" ? formatDateTime(value)
+    : key.endsWith("_at") && typeof value === "string" ? formatTime(value)
     : Array.isArray(value) ? value.filter(item => !isBlank(item)).map(item => item !== null && typeof item === "object" && !Array.isArray(item) ? `(${auditValue(key, item)})` : auditValue(key, item)).join(", ")
       : typeof value === "boolean" ? (value ? "yes" : "no")
         : value !== null && typeof value === "object" ? auditEntries(value as Record<string, unknown>).join(", ") : String(value);
@@ -197,7 +199,7 @@ export function auditDetails(event: AuditEvent, userNames?: ReadonlyMap<number, 
   if (event.action === "api_token.create" || event.action === "api_token.revoke") return [
     `${labelFor(KIND_LABELS, String(details.kind))} token`,
     Array.isArray(details.scopes) && `Scopes: ${details.scopes.map(scope => labelFor(SCOPE_LABELS, String(scope))).join(", ")}`,
-    typeof details.expires_at === "string" && `Expires: ${formatDateTime(details.expires_at)}`,
+    typeof details.expires_at === "string" && `Expires: ${formatTime(details.expires_at)}`,
     typeof details.owner === "string" && details.owner !== auditActor(event.actor) && `Owner: ${details.owner}`,
   ].filter(Boolean).join("; ");
   return auditEntries(details, userNames).join("; ");
@@ -431,7 +433,7 @@ function UsersContent({ currentUser, routeLeaveRef }: UsersPageProps): JSX.Eleme
     { id: "admin", header: "Admin", cell: user => user.is_system_admin ? <StatusBadge tone="info">Admin</StatusBadge> : "No" },
     { id: "active", header: "Active", cell: user => user.anonymised ? "Anonymised" : user.active ? "Yes" : "No" },
     { id: "setup", header: "Setup", cell: user => user.setup_pending ? "Pending" : user.anonymised ? <EmptyValue /> : "Done", sortValue: user => user.setup_pending ? 0 : 1 },
-    { id: "last-login", header: "Last login", cell: user => user.last_login_at ? <time dateTime={user.last_login_at} title={formatDateTime(user.last_login_at)}>{formatShortDateTime(user.last_login_at)}</time> : "Never", sortValue: user => user.last_login_at ?? "" },
+    { id: "last-login", header: "Last login", cell: user => user.last_login_at ? <time dateTime={user.last_login_at} title={fullTimestamp(user.last_login_at)}>{formatTime(user.last_login_at)}</time> : "Never", sortValue: user => user.last_login_at ?? "" },
     { id: "actions", header: "Actions", cell: user => user.anonymised ? <Toolbar label={`Actions for ${user.username}`}>
       <Button size="sm" disabled={pageBlocked} aria-label={`History of ${user.username}`} onClick={() => { void showHistory(user.username); }}>History</Button>
     </Toolbar> : <Toolbar label={`Actions for ${user.username}`}>
@@ -503,7 +505,7 @@ function UsersContent({ currentUser, routeLeaveRef }: UsersPageProps): JSX.Eleme
     {history && <Dialog open title={`History of ${history.username}`} size="lg" className="audit-history-dialog" onClose={() => setHistory(null)} closeOnBackdrop>
       {history.events === null ? <InlineMessage tone="info">Loading history…</InlineMessage> : history.error !== undefined ? <ErrorNotice error={history.error} /> :
         <DataTable label="History" rows={history.events} rowKey={event => `${event.at}-${event.action}-${event.target_id}-${JSON.stringify(event.details)}`} empty={<EmptyState title="No recorded changes." />} columns={[
-          { id: "at", header: "When", cell: event => <time className="audit-when" dateTime={event.at} title={formatDateTime(event.at)}>{formatShortDateTime(event.at)}</time> },
+          { id: "at", header: "When", cell: event => <time className="audit-when" dateTime={event.at} title={fullTimestamp(event.at)}>{formatTime(event.at)}</time> },
           { id: "actor", header: "By", cell: event => auditActor(event.actor) },
           { id: "action", header: "What", cell: event => labelFor(auditActions, event.action) },
           { id: "target", header: "Whom", cell: auditTarget },

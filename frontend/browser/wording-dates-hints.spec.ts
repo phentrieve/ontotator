@@ -48,10 +48,10 @@ test("Documents at 1440 px: status cells are not cut, rows and proposal sets car
   const accepted = rowCell(textRow(page, "EN100028", "en"), "finalization").locator(".documents-status");
   await expect(accepted).toContainText(/accepted \d{1,2} [A-Z][a-z]{2}$/);
   for (const cell of [annotation, accepted]) {
-    const room = await cell.evaluate(element => ({ cut: element.scrollWidth - element.clientWidth, spare: parseFloat(getComputedStyle(element).maxWidth) - element.scrollWidth }));
+    const room = await cell.evaluate(element => ({ cut: element.scrollWidth - element.clientWidth, cap: getComputedStyle(element).maxWidth }));
     expect(room.cut).toBeLessThanOrEqual(0);
-    // Other systems draw the same words wider: the cap leaves at least 16 px.
-    expect(room.spare).toBeGreaterThanOrEqual(16);
+    // Other systems draw the same words wider: no fixed cap, the table chooses words that fit (issue 544).
+    expect(room.cap).toBe("none");
   }
   const cut = await documentsTable(page).locator(".documents-status.stage-cell").evaluateAll(cells => cells.filter(cell => cell.scrollWidth > cell.clientWidth).map(cell => cell.textContent));
   expect(cut).toEqual([]);

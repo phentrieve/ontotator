@@ -187,7 +187,7 @@ function GuidelineNoticeMessage({ notice, place, onRead, onClose }: { notice: Gu
   const changeName = (change: GuidelineNotice["changes"][number]) => guidelineVersionName(change.version, change.label);
   const read = <Button variant="quiet" size="sm" onClick={onRead}>Read guidelines {to}</Button>;
   if (notice.from_version === null) {
-    return <InlineMessage tone="info" title={`This project has guidelines (${to})`} onDismiss={onClose}>
+    return <InlineMessage tone="info" title={`This project has guidelines ${to}`} onDismiss={onClose}>
       <p className="task-guidelines-notice-text">{`Read them before you start; they are available at any time under ${entryPlaces[place]}.`}</p>
       {read}
     </InlineMessage>;

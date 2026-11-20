@@ -375,7 +375,7 @@ test("S12 Resume task opens the report with the pause preselected; releasing it 
   await openDocuments(page, s, "?decision=report-or-pause");
   // The filtered list has loaded (fr is not a decision), so the visit remembers de.
   await expect(textName(page, caseId, "fr")).toHaveCount(0);
-  await expect(rowCell(textRow(page, caseId, "de"), "annotation")).toContainText("⏸");
+  await expect(rowCell(textRow(page, caseId, "de"), "annotation").locator('.stage-cell-symbol[data-symbol="⏸"] svg')).toBeVisible();
   await rowAction(page, "Resume task…", caseId, "de").click();
 
   await expect(page.getByText(/^Problem report · /)).toBeVisible();

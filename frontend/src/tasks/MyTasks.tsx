@@ -3,7 +3,9 @@ import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { api, onSessionRestored, type ProjectSummary, type TaskSummary } from "../api/client";
 import { routeHref, type NavigateOptions, type Route, type TaskStatusTab } from "../app/router";
 import { ErrorNotice } from "../admin/ErrorNotice";
-import { assignmentStatusLabels, consolidationReasonText, formatDateTime, reopenNotice, roleLabels, taskLabels } from "../app/labels";
+import { assignmentStatusLabels, consolidationReasonText, reopenNotice, roleLabels, taskLabels } from "../app/labels";
+import { fullTimestamp } from "../app/submissionLabels";
+import { relativeDay } from "../app/assignedDate";
 import { taskText } from "../app/identity";
 import { failedChecksTitle } from "../translation/labels";
 import { IconInfo, IconWarning } from "../ui/icons";
@@ -227,7 +229,8 @@ export function MyTasks({ project, status, projects, onNavigate, username }: MyT
       {task.held && pauseMarks(task).map(mark => <Fragment key={mark.cause}><StatusBadge tone="warning">{mark.badge}</StatusBadge><p className="task-hold-reason" title={mark.reason}>{mark.reason}</p></Fragment>)}
     </> },
     { id: "assigned", header: "Assigned", cell: task => <AssignedDate at={task.assigned_at} /> },
-    { id: "changed", header: "Last change", cell: task => <time dateTime={task.updated_at}>{formatDateTime(task.updated_at)}</time> },
+    // Issue 546: the rule of "assigned" in the same row ("today 15:53", "yesterday", "Mon", "14 Oct"); the full time in the title.
+    { id: "changed", header: "Last change", cell: task => <time dateTime={task.updated_at} title={fullTimestamp(task.updated_at)}>{relativeDay(new Date(task.updated_at), new Date())}</time> },
     { id: "open", header: "Action", cell: task => task.waiting_for_translation_review ? <span className="cell-secondary">Opens once a translation is accepted</span> : task.waiting_for_lead ? <span className="cell-secondary">The lead decides how it continues</span> : <a className="btn btn-secondary" href={routeHref({ name: "task", assignmentId: task.assignment_id })} onKeyDown={onSpaceActivate} onClick={event => {
       if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
       event.preventDefault(); onNavigate({ name: "task", assignmentId: task.assignment_id });

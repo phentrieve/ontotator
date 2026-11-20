@@ -43,14 +43,14 @@ it("zero facets are collapsed behind Show n empty filters; a checked one stays",
   const { open } = renderPopover({ final_state: "final" });
   open();
   const dialog = screen.getByRole("dialog", { name: "Filter" });
-  expect(within(dialog).queryByRole("checkbox", { name: "In progress, 0 texts" })).toBeNull();
+  expect(within(dialog).queryByRole("checkbox", { name: "In review, 0 texts" })).toBeNull();
   expect(within(dialog).getByRole("checkbox", { name: "Final, 0 texts" })).toBeTruthy();
   const toggle = within(dialog).getByRole("button", { name: /^Show \d+ empty filters$/ });
   expect(toggle.getAttribute("aria-expanded")).toBe("false");
   fireEvent.click(toggle);
-  expect(within(dialog).getByRole("checkbox", { name: "In progress, 0 texts" })).toBeTruthy();
+  expect(within(dialog).getByRole("checkbox", { name: "In review, 0 texts" })).toBeTruthy();
   fireEvent.click(within(dialog).getByRole("button", { name: "Hide empty filters" }));
-  expect(within(dialog).queryByRole("checkbox", { name: "In progress, 0 texts" })).toBeNull();
+  expect(within(dialog).queryByRole("checkbox", { name: "In review, 0 texts" })).toBeNull();
 });
 
 it("four fieldsets with counts, muted zero facets stay checkable when checked", () => {
@@ -74,7 +74,7 @@ it("four fieldsets with counts, muted zero facets stay checkable when checked", 
   expect(within(dialog).getByRole("checkbox", { name: "No final yet, 9 texts" })).toBeTruthy();
   expect(within(dialog).getByRole("checkbox", { name: "You, 2 texts" })).toBeTruthy();
   // A zero facet is muted and not checkable…
-  const zero = within(dialog).getByRole("checkbox", { name: "In progress, 0 texts" }) as HTMLInputElement;
+  const zero = within(dialog).getByRole("checkbox", { name: "In review, 0 texts" }) as HTMLInputElement;
   expect(zero.getAttribute("aria-disabled")).toBe("true");
   expect(zero.disabled).toBe(false);
   expect(zero.closest("label")!.className).toContain("documents-facet--muted");

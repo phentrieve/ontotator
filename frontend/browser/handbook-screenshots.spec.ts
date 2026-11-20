@@ -409,14 +409,14 @@ test.describe("lead.md", () => {
     // Assign work to the selected texts: the three de texts, Assign review…, Ana.
     for (const caseId of s.case_ids.de!) await rowCell(textRow(page, caseId, "de"), "select").getByRole("checkbox").check();
     await selectionBar(page).getByRole("button", { name: "Assign review…", exact: true }).click();
-    const assign = page.getByRole("dialog", { name: /^Assign\W+3 cases$/ });
+    const assign = page.getByRole("dialog", { name: "Assign tasks", exact: true });
     await expect(assign.getByRole("combobox", { name: /^Task/ })).toHaveValue("translation_review:de");
     const members = assign.getByRole("table", { name: "Members" });
     for (const header of ["Person", "Reads", "Open tasks"]) await expect(members.getByRole("columnheader", { name: header })).toBeVisible();
     await assign.getByRole("radio", { name: new RegExp(`^${s.display_names.ana}`) }).click();
     await expect(assign.getByRole("status", { name: "Summary" })).toContainText(`${s.display_names.ana} gets 3 translation reviews (de).`);
     await shot(page, "lead-assign");
-    await assign.getByRole("button", { name: "Assign 3", exact: true }).click();
+    await assign.getByRole("button", { name: "Assign 3 tasks", exact: true }).click();
     // The three cases also have fr translations: the dialog stays open on the next language (issue 195) and Close ends it.
     await expect(assign.getByRole("combobox", { name: /^Task/ })).toHaveValue("translation_review:fr");
     await expect(assign.getByText(/Next: translation review \(fr\)\. Close when you are done\.$/)).toBeVisible();
@@ -454,7 +454,7 @@ test.describe("lead.md", () => {
     await rowAction(page, "Assign review…", caseId, "de").click();
     let dialog = page.getByRole("dialog", { name: /^Assign/ });
     await dialog.getByRole("radio", { name: /^Ana Weber/ }).click();
-    await dialog.getByRole("button", { name: "Assign 1", exact: true }).click();
+    await dialog.getByRole("button", { name: "Assign 1 task", exact: true }).click();
     await expect(dialog).toHaveCount(0);
     await act({ actor: "ana", action: "accept_review" });
     await openDocuments(page, s.project);

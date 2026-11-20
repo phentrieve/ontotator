@@ -165,7 +165,7 @@ test("close while paused: Documents shows the orphaned pause, Resume task releas
   await expect(row).toBeVisible();
   // The orphaned pause is the row's next step (a decision for the lead): "Resume task…" in the Action column.
   await expect(row).toHaveClass(/data-table-row--decision/);
-  await expect(rowCell(row, "annotation")).toContainText("⏸");
+  await expect(rowCell(row, "annotation").locator('.stage-cell-symbol[data-symbol="⏸"] svg')).toBeVisible();
   await rowAction(page, "Resume task…", caseId, "de").click();
 
   // The report page opens "Release pause" with the reporter's task preselected; nothing was sent yet.
@@ -190,7 +190,7 @@ test("close while paused: Documents shows the orphaned pause, Resume task releas
   await expect(plain).toBeVisible();
   await expect(rowAction(page, "Resume task…", caseId, "de")).toHaveCount(0);
   await expect(rowAction(page, "Decide on report…", caseId, "de")).toHaveCount(0);
-  await expect(rowCell(plain, "annotation")).not.toContainText("⏸");
+  await expect(rowCell(plain, "annotation").locator('.stage-cell-symbol[data-symbol="⏸"] svg')).toHaveCount(0);
   const expanded = await expand(page, caseId, "de");
   await expect(expanded.getByText(/task is paused, but its report is resolved/)).toHaveCount(0);
   await expect(expanded.getByRole("link", { name: "Resume task" })).toHaveCount(0);

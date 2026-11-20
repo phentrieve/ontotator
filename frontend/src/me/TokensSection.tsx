@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { api, type ApiToken, type ApiTokenScope, type CreateApiToken, type CreatedApiToken } from "../api/client";
 import { ErrorNotice } from "../admin/ErrorNotice";
-import { formatDateTime } from "../app/labels";
+import { formatTime } from "../app/submissionLabels";
 import { helpHref } from "../help/sections";
 import { Button, Checkbox, ConfirmDialog, DataTable, Dialog, EmptyState, EmptyValue, InlineMessage, StatusBadge, TextInput, type Column, type StatusTone } from "../ui";
 
@@ -117,8 +117,8 @@ export function TokensSection({ mode }: { mode: TokensSectionMode }): JSX.Elemen
     ...(mode.kind !== "personal" ? [{ id: "owner", header: "Owner", cell: (token: ApiToken) => `${token.owner_display_name} (${token.owner})` }] : []),
     ...(mode.kind === "admin" ? [{ id: "project", header: "Project", cell: (token: ApiToken) => token.project_key ?? <EmptyValue /> }] : []),
     { id: "scopes", header: "Scopes", cell: token => token.scopes.map(scope => SCOPE_LABELS[scope]).join(", ") },
-    { id: "expires", header: "Expires", cell: token => <time dateTime={token.expires_at}>{formatDateTime(token.expires_at)}</time> },
-    { id: "used", header: "Last used", cell: token => token.last_used_at ? <time dateTime={token.last_used_at}>{formatDateTime(token.last_used_at)}</time> : <EmptyValue /> },
+    { id: "expires", header: "Expires", cell: token => <time dateTime={token.expires_at}>{formatTime(token.expires_at)}</time> },
+    { id: "used", header: "Last used", cell: token => token.last_used_at ? <time dateTime={token.last_used_at}>{formatTime(token.last_used_at)}</time> : <EmptyValue /> },
     { id: "state", header: "Status", cell: token => { const state = tokenState(token); const reason = state === "Revoked" && token.revoked_reason && token.revoked_reason !== "revoked" ? REVOKE_REASONS[token.revoked_reason] ?? "automatically" : null;
       return <><StatusBadge tone={STATE_TONES[state]}>{state}</StatusBadge>{reason && <span className="field-hint"> {reason}</span>}</>; } },
     { id: "actions", header: <span className="visually-hidden">Actions</span>, cell: token => tokenState(token) === "Active"

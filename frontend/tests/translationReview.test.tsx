@@ -231,7 +231,9 @@ it("uses the current immutable submitted record without a saver or write control
   const summary = within(screen.getByRole("region", { name: "Submitted review" }));
   expect(summary.getByText("Accepted with corrections")).toBeDefined();
   expect(summary.getByText("R, Reviewer")).toBeDefined();
-  expect(summary.getByText(/^\d{1,2} October 2026 at \d{2}:\d{2}$/)).toBeDefined();
+  // Issue 546: the one date format of the app; the status is the one this review gave, named as such.
+  expect(summary.getByText(/^\d{1,2} [A-Z][a-z]{2}(?: \d{4})?, \d{2}:\d{2}$/)).toBeDefined();
+  expect(summary.getByText("Status after this review")).toBeDefined();
   expect(screen.getByText("Older review")).toBeDefined();
   vi.useFakeTimers(); await clock(1600); expect(save).not.toHaveBeenCalled(); expect(submit).not.toHaveBeenCalled();
   expect(await routeLeaveRef.current!()).toBe(true);
