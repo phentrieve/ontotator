@@ -19,13 +19,21 @@ describe("CopyTextButton", () => {
     expect(screen.getByRole("button", { name: "Copy text" })).toBeDefined();
   });
 
-  it("compact is an icon named 'Copy text' that copies the same", async () => {
+  it("is an icon without visible text, named 'Copy text', that copies", async () => {
     const writeText = clipboard();
-    render(<CopyTextButton text="alpha" compact />);
+    render(<CopyTextButton text="alpha" />);
     const button = screen.getByRole("button", { name: "Copy text" });
     expect(button.textContent).toBe("");
+    expect(button.querySelector("svg")).not.toBeNull();
     fireEvent.click(button);
     expect(writeText).toHaveBeenCalledWith("alpha");
+    expect((await screen.findByRole("button", { name: "Copied" })).textContent).toBe("");
+  });
+
+  it("says 'Copy failed' when the clipboard is unavailable", async () => {
+    render(<CopyTextButton text="alpha" />);
+    fireEvent.click(screen.getByRole("button", { name: "Copy text" }));
+    await screen.findByRole("button", { name: "Copy failed" });
   });
 
   it("copies line breaks and runs of whitespace as one space", () => {
