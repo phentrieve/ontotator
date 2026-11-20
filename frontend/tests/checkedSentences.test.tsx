@@ -10,18 +10,6 @@ const SOURCE = "First source. Second source! Third source?";
 const TRANSLATION = "Erster Satz. Zweiter Satz. Dritter Satz. Vierter Satz.";
 const KEY = "ontotator.translationReview.markChecked.v1:alice";
 
-// jsdom has no PointerEvent; without it button, shiftKey and pointerId would be dropped.
-if (typeof window.PointerEvent === "undefined") {
-  class TestPointerEvent extends MouseEvent {
-    pointerId: number;
-    constructor(type: string, init: PointerEventInit = {}) {
-      super(type, init);
-      this.pointerId = init.pointerId ?? 0;
-    }
-  }
-  (window as unknown as { PointerEvent: unknown }).PointerEvent = TestPointerEvent;
-}
-
 afterEach(() => { cleanup(); window.localStorage.clear(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 function setup(changes: Parameters<typeof reviewWorkspace>[0] = {}, marking = true) {
@@ -40,18 +28,10 @@ function setup(changes: Parameters<typeof reviewWorkspace>[0] = {}, marking = tr
   return { saveDraft, saveMarks, routeLeaveRef, workspace };
 }
 const region = (name: string) => screen.getByRole("region", { name });
-const sentences = (name: string) => [...region(name).querySelectorAll<HTMLElement>("[data-sentence]")];
+/** The markers of one side, by the name of its text. */
+const sentences = (name: string) => [...screen.getByRole("group", { name: `Checked sentences: ${name.replace(/ \(.*\)$/, "")}` }).querySelectorAll<HTMLElement>("[data-sentence]")];
 const pressed = (name: string) => sentences(name).map(element => element.getAttribute("aria-pressed") === "true");
 const counter = () => [...document.querySelectorAll(".sentence-count")].map(element => element.textContent).join(" / ");
-function click(element: HTMLElement, init: PointerEventInit = {}) {
-  fireEvent.pointerDown(element, { button: 0, pointerId: 1, ...init });
-  fireEvent.pointerUp(element, { button: 0, pointerId: 1, ...init });
-}
-function drag(from: HTMLElement, over: HTMLElement[]) {
-  fireEvent.pointerDown(from, { button: 0, pointerId: 2 });
-  for (const element of over) fireEvent.pointerMove(element, { pointerId: 2 });
-  fireEvent.pointerUp(over.at(-1) ?? from, { pointerId: 2 });
-}
 
 describe("sentence splitting", () => {
   it("splits one long paragraph into sentences with and without Intl.Segmenter", () => {
@@ -163,32 +143,34 @@ describe("Mark checked sentences", () => {
     const toggle = await screen.findByRole("checkbox", { name: "Mark checked sentences" }) as HTMLInputElement;
     expect(toggle.checked).toBe(false);
     expect(screen.getByRole("textbox", { name: "Translation (de)" })).toBeDefined();
-    expect(region("Source (en)").querySelector("[data-sentence]")).toBeNull();
+    expect(document.querySelector("[data-sentence]")).toBeNull();
     expect(screen.queryByRole("button", { name: "Next unchecked" })).toBeNull();
     fireEvent.click(toggle);
     expect(window.localStorage.getItem(KEY)).toBe("1");
-    expect(screen.queryByRole("textbox", { name: "Translation (de)" })).toBeNull();
+    // Marking keeps the translation editable and Show changes available (issue 256 with changes).
+    expect(screen.getByRole("textbox", { name: "Translation (de)" })).toBeDefined();
     expect(sentences("Source (en)")).toHaveLength(3);
     expect(sentences("Translation (de)")).toHaveLength(4);
-    expect((screen.getByRole("checkbox", { name: "Show changes" }) as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByRole("checkbox", { name: "Show changes" }) as HTMLInputElement).disabled).toBe(false);
     fireEvent.click(toggle);
     expect(window.localStorage.getItem(KEY)).toBe("0");
-    expect(screen.getByRole("textbox", { name: "Translation (de)" })).toBeDefined();
+    expect(document.querySelector("[data-sentence]")).toBeNull();
     expect(saveMarks).not.toHaveBeenCalled();
   });
 
-  it("click toggles one side only and saves the marks without a draft save", async () => {
+  it("a marker click toggles one side only and saves the marks without a draft save", async () => {
     const { saveMarks, saveDraft } = setup();
     await screen.findByRole("button", { name: "Next unchecked" });
     vi.useFakeTimers();
-    click(sentences("Translation (de)")[1]);
+    fireEvent.click(sentences("Translation (de)")[1]);
     expect(pressed("Translation (de)")).toEqual([false, true, false, false]);
     expect(pressed("Source (en)")).toEqual([false, false, false]);
     expect(sentences("Translation (de)")[1].className).toContain("is-checked");
+    expect(sentences("Translation (de)")[1].getAttribute("aria-label")).toBe("Sentence 2: Zweiter Satz.");
     expect(counter()).toBe("Source: 0 of 3 checked / Translation: 1 of 4 checked");
-    click(sentences("Translation (de)")[1]);
+    fireEvent.click(sentences("Translation (de)")[1]);
     expect(pressed("Translation (de)")).toEqual([false, false, false, false]);
-    click(sentences("Source (en)")[2]);
+    fireEvent.click(sentences("Source (en)")[2]);
     await act(async () => { await vi.advanceTimersByTimeAsync(700); });
     expect(saveMarks).toHaveBeenCalledTimes(1);
     // With the marks it was made from, so the server applies only this change (issue 284).
@@ -196,11 +178,11 @@ describe("Mark checked sentences", () => {
     expect(saveDraft).not.toHaveBeenCalled();
   });
 
-  it("Shift+click and Shift+Enter mark the range from the last clicked sentence", async () => {
+  it("Shift+click and Shift+Enter mark the range from the last marker used; the markers are one Tab stop", async () => {
     setup();
     await screen.findByRole("button", { name: "Next unchecked" });
-    click(sentences("Translation (de)")[0]);
-    click(sentences("Translation (de)")[2], { shiftKey: true });
+    fireEvent.click(sentences("Translation (de)")[0]);
+    fireEvent.click(sentences("Translation (de)")[2], { shiftKey: true });
     expect(pressed("Translation (de)")).toEqual([true, true, true, false]);
     fireEvent.keyDown(sentences("Source (en)")[0], { key: "Enter" });
     expect(pressed("Source (en)")).toEqual([true, false, false]);
@@ -211,25 +193,27 @@ describe("Mark checked sentences", () => {
     // The submit shortcut leaves the marks alone.
     fireEvent.keyDown(sentences("Source (en)")[1], { key: "Enter", ctrlKey: true });
     expect(pressed("Source (en)")).toEqual([true, false, true]);
+    // One Tab stop per side; the arrow keys move between the markers.
+    expect(sentences("Source (en)").map(element => element.tabIndex)).toEqual([-1, 0, -1]);
+    fireEvent.keyDown(sentences("Source (en)")[1], { key: "ArrowDown" });
+    expect(document.activeElement).toBe(sentences("Source (en)")[2]);
+    expect(sentences("Source (en)").map(element => element.tabIndex)).toEqual([-1, -1, 0]);
+    fireEvent.keyDown(sentences("Source (en)")[2], { key: "Home" });
+    expect(document.activeElement).toBe(sentences("Source (en)")[0]);
   });
 
-  it("drag from an unchecked sentence marks the range and from a checked one unmarks it", async () => {
-    setup();
+  it("a click in the text marks nothing: the text can be selected and edited while marking", async () => {
+    const { saveMarks } = setup();
     await screen.findByRole("button", { name: "Next unchecked" });
-    const items = () => sentences("Translation (de)");
-    fireEvent.pointerDown(items()[0], { button: 0, pointerId: 3 });
-    fireEvent.pointerMove(items()[2], { pointerId: 3 });
-    // The live range shows what the release will do.
-    expect(items().slice(0, 3).every(element => element.className.includes("is-range-mark"))).toBe(true);
-    expect(items()[3].className).not.toContain("is-range");
-    fireEvent.pointerUp(items()[2], { pointerId: 3 });
-    expect(pressed("Translation (de)")).toEqual([true, true, true, false]);
-    drag(items()[3], [items()[2], items()[1]]);
-    // Started on an unchecked sentence: everything passed is checked.
-    expect(pressed("Translation (de)")).toEqual([true, true, true, true]);
-    drag(items()[2], [items()[1]]);
-    expect(pressed("Translation (de)")).toEqual([true, false, false, true]);
+    vi.useFakeTimers();
+    fireEvent.click(region("Source (en)"));
+    const textbox = screen.getByRole("textbox", { name: "Translation (de)" }) as HTMLTextAreaElement;
+    fireEvent.click(textbox);
+    fireEvent.change(textbox, { target: { value: "Erster Satz. Zweiter Satz. Dritter Satz. Vierter Satz. Fünfter Satz." } });
+    expect(pressed("Translation (de)")).toEqual([false, false, false, false, false]);
     expect(pressed("Source (en)")).toEqual([false, false, false]);
+    await act(async () => { await vi.advanceTimersByTimeAsync(700); });
+    expect(saveMarks).not.toHaveBeenCalled();
   });
 
   it("shows stored marks, an edited checked sentence as changed since checked, and Next unchecked", async () => {
@@ -244,27 +228,24 @@ describe("Mark checked sentences", () => {
     const items = sentences("Translation (de)");
     expect(pressed("Translation (de)")).toEqual([true, false, false, true]);
     expect(items[1].className).toContain("is-stale");
-    expect(items[1].textContent).toContain("changed since checked");
+    expect(items[1].getAttribute("aria-label")).toContain("changed since checked");
     expect(counter()).toBe("Source: 1 of 3 checked / Translation: 2 of 4 checked · 1 changed");
     fireEvent.click(screen.getByRole("button", { name: "Next unchecked" }));
     expect(document.activeElement).toBe(items[1]);
     expect(scroll).toHaveBeenCalled();
-    click(items[1]);
+    fireEvent.click(items[1]);
     expect(sentences("Translation (de)")[1].className).toContain("is-checked");
     expect(counter()).toBe("Source: 1 of 3 checked / Translation: 3 of 4 checked");
     fireEvent.click(screen.getByRole("button", { name: "Next unchecked" }));
     expect(document.activeElement).toBe(sentences("Translation (de)")[2]);
   });
 
-  it("an edit after checking makes the mark stale until it is ticked again", async () => {
-    setup({}, false);
-    const toggle = await screen.findByRole("checkbox", { name: "Mark checked sentences" });
-    fireEvent.click(toggle);
-    click(sentences("Translation (de)")[0]);
-    click(sentences("Translation (de)")[3]);
-    fireEvent.click(toggle);
+  it("an edit while marking makes the mark of the edited sentence stale at once", async () => {
+    setup();
+    await screen.findByRole("button", { name: "Next unchecked" });
+    fireEvent.click(sentences("Translation (de)")[0]);
+    fireEvent.click(sentences("Translation (de)")[3]);
     fireEvent.change(screen.getByRole("textbox", { name: "Translation (de)" }), { target: { value: "Erster Satz neu. Zweiter Satz. Dritter Satz. Vierter Satz." } });
-    fireEvent.click(toggle);
     expect(sentences("Translation (de)")[0].className).toContain("is-stale");
     expect(sentences("Translation (de)")[3].className).toContain("is-checked");
     expect(counter()).toBe("Source: 0 of 3 checked / Translation: 1 of 4 checked · 1 changed");
@@ -273,25 +254,97 @@ describe("Mark checked sentences", () => {
   it("an edited checked sentence stays changed at its place; the equal sentence further down is not checked", async () => {
     const text = "Herz. Unauffällig. Lunge. Unauffällig.";
     const base = reviewWorkspace();
-    const { saveMarks } = setup({ text, draft: { ...base.draft, text } }, false);
-    const toggle = await screen.findByRole("checkbox", { name: "Mark checked sentences" });
-    fireEvent.click(toggle);
-    click(sentences("Translation (de)")[1]);
-    fireEvent.click(toggle);
+    const { saveMarks } = setup({ text, draft: { ...base.draft, text } });
+    await screen.findByRole("button", { name: "Next unchecked" });
+    fireEvent.click(sentences("Translation (de)")[1]);
     vi.useFakeTimers();
-    fireEvent.change(screen.getByRole("textbox", { name: "Translation (de)" }), { target: { value: "Herz. Unauffällig bis auf ein Systolikum. Lunge. Unauffällig." } });
-    fireEvent.click(toggle);
-    const items = sentences("Translation (de)");
-    expect(items.map(item => item.className.includes("is-stale"))).toEqual([false, true, false, false]);
+    const textbox = () => screen.getByRole("textbox", { name: "Translation (de)" });
+    fireEvent.change(textbox(), { target: { value: "Herz. Unauffällig bis auf ein Systolikum. Lunge. Unauffällig." } });
+    expect(sentences("Translation (de)").map(item => item.className.includes("is-stale"))).toEqual([false, true, false, false]);
     expect(pressed("Translation (de)")).toEqual([false, false, false, false]);
     expect(counter()).toBe("Source: 0 of 3 checked / Translation: 0 of 4 checked · 1 changed");
     // A new sentence before them: the changed mark moves with its sentence and is stored there.
-    fireEvent.click(toggle);
-    fireEvent.change(screen.getByRole("textbox", { name: "Translation (de)" }), { target: { value: "Neu. Herz. Unauffällig bis auf ein Systolikum. Lunge. Unauffällig." } });
-    fireEvent.click(toggle);
+    fireEvent.change(textbox(), { target: { value: "Neu. Herz. Unauffällig bis auf ein Systolikum. Lunge. Unauffällig." } });
     expect(sentences("Translation (de)").map(item => item.className.includes("is-stale"))).toEqual([false, false, true, false, false]);
     await act(async () => { await vi.advanceTimersByTimeAsync(700); });
     expect(saveMarks.mock.calls.at(-1)![1].translation).toEqual([{ index: 2, hash: sentenceHash("Unauffällig.") }]);
+  });
+
+  it("with Show changes the markers stand beside the changes and still toggle", async () => {
+    setup({ draft: { text: "Erster Satz. Zweiter Satz neu. Dritter Satz. Vierter Satz.", form: {}, revision: 6 } });
+    await screen.findByRole("button", { name: "Next unchecked" });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Show changes" }));
+    const changes = region("Text changes");
+    expect(changes.querySelector("ins")?.textContent).toContain("neu");
+    expect(changes.querySelectorAll("[data-sentence]")).toHaveLength(4);
+    fireEvent.click(sentences("Translation (de)")[1]);
+    expect(pressed("Translation (de)")).toEqual([false, true, false, false]);
+    expect(screen.getByText(/Turn off Show changes to edit\./)).toBeDefined();
+  });
+
+  it("the circles are not part of the text: not in the textarea, not in the text nodes, no text of their own", async () => {
+    setup();
+    await screen.findByRole("button", { name: "Next unchecked" });
+    fireEvent.click(sentences("Translation (de)")[0]);
+    const textbox = screen.getByRole("textbox", { name: "Translation (de)" }) as HTMLTextAreaElement;
+    expect(textbox.value).toBe(TRANSLATION);
+    // Each sentence has one circle, with no text and no icon: the text reads as without them.
+    for (const name of ["Source (en)", "Translation (de)"]) for (const marker of sentences(name)) {
+      expect(marker.className).toContain("sentence-marker");
+      expect(marker.textContent).toBe("");
+      expect(marker.childElementCount).toBe(0);
+    }
+    expect(region("Source (en)").textContent).toBe(SOURCE);
+    expect(sentences("Translation (de)")[0].className).toContain("is-checked");
+  });
+
+  it("One sentence per line is offered while marking, remembered, lists each side's own sentences and only shows them", async () => {
+    const LINES = "ontotator.translationReview.sentencePerLine.v1:alice";
+    setup({}, false);
+    const marking = await screen.findByRole("checkbox", { name: "Mark checked sentences" });
+    expect(screen.queryByRole("checkbox", { name: "One sentence per line" })).toBeNull();
+    fireEvent.click(marking);
+    const lines = screen.getByRole("checkbox", { name: "One sentence per line" }) as HTMLInputElement;
+    expect(lines.checked).toBe(false);
+    fireEvent.click(sentences("Translation (de)")[1]);
+    fireEvent.click(lines);
+    expect(window.localStorage.getItem(LINES)).toBe("1");
+    // Each side on its own: 3 source rows, 4 translation rows, no pairing.
+    const rows = (name: string) => [...screen.getByRole("group", { name: `Checked sentences: ${name}` }).querySelectorAll("li")].map(row => row.querySelector(".sentence-line-text")!.textContent!.trim());
+    expect(rows("Source")).toEqual(["First source.", "Second source!", "Third source?"]);
+    expect(rows("Translation")).toEqual(["Erster Satz.", "Zweiter Satz.", "Dritter Satz.", "Vierter Satz."]);
+    expect(pressed("Translation (de)")).toEqual([false, true, false, false]);
+    // Display only: no editor, no Show changes, a note on where to edit.
+    expect(screen.queryByRole("textbox", { name: "Translation (de)" })).toBeNull();
+    expect((screen.getByRole("checkbox", { name: "Show changes" }) as HTMLInputElement).disabled).toBe(true);
+    expect(screen.getByText(/To edit, turn off One sentence per line\./)).toBeDefined();
+    // The rows hold exactly the text, the boxes none of it.
+    const group = screen.getByRole("group", { name: "Checked sentences: Translation" });
+    const clone = group.cloneNode(true) as HTMLElement;
+    clone.querySelectorAll("[data-sentence]").forEach(box => box.remove());
+    expect(clone.textContent).toBe(TRANSLATION);
+    // The boxes toggle, Shift+click marks a range, the keys move between them.
+    fireEvent.click(sentences("Translation (de)")[3], { shiftKey: false });
+    fireEvent.click(sentences("Source (en)")[0]);
+    fireEvent.click(sentences("Source (en)")[2], { shiftKey: true });
+    expect(pressed("Source (en)")).toEqual([true, true, true]);
+    expect(pressed("Translation (de)")).toEqual([false, true, false, true]);
+    fireEvent.keyDown(sentences("Translation (de)")[3], { key: "ArrowUp" });
+    expect(document.activeElement).toBe(sentences("Translation (de)")[2]);
+    fireEvent.keyDown(sentences("Translation (de)")[2], { key: " " });
+    expect(pressed("Translation (de)")).toEqual([false, true, true, true]);
+    // Off again: the editable flowing text with its circles, the marks kept.
+    fireEvent.click(lines);
+    expect(window.localStorage.getItem(LINES)).toBe("0");
+    expect(screen.getByRole("textbox", { name: "Translation (de)" })).toBeDefined();
+    expect(pressed("Translation (de)")).toEqual([false, true, true, true]);
+    // Marking off hides the choice; marking on again brings the remembered view back.
+    fireEvent.click(lines);
+    fireEvent.click(marking);
+    expect(screen.queryByRole("checkbox", { name: "One sentence per line" })).toBeNull();
+    expect(screen.getByRole("textbox", { name: "Translation (de)" })).toBeDefined();
+    fireEvent.click(marking);
+    expect(screen.queryByRole("textbox", { name: "Translation (de)" })).toBeNull();
   });
 
   it("is not offered on a touch-only device", async () => {
@@ -322,10 +375,10 @@ describe("saving checked sentences (issue 284)", () => {
     // Another tab checked the fourth sentence meanwhile: the answer carries it.
     saveMarks.mockImplementationOnce(async (_id, body) => ({ ...body, translation: [...(body.translation ?? []), mark(3)] }));
     vi.useFakeTimers();
-    click(sentences("Translation (de)")[0]);
+    fireEvent.click(sentences("Translation (de)")[0]);
     await act(async () => { await vi.advanceTimersByTimeAsync(700); });
     expect(pressed("Translation (de)")).toEqual([true, false, false, true]);
-    click(sentences("Translation (de)")[1]);
+    fireEvent.click(sentences("Translation (de)")[1]);
     await act(async () => { await vi.advanceTimersByTimeAsync(700); });
     expect(saveMarks).toHaveBeenCalledTimes(2);
     expect(saveMarks.mock.calls[1][2]).toEqual({ source: [], translation: [mark(0), mark(3)] });
@@ -336,7 +389,7 @@ describe("saving checked sentences (issue 284)", () => {
     const { saveMarks } = setup();
     await screen.findByRole("button", { name: "Next unchecked" });
     vi.useFakeTimers();
-    click(sentences("Translation (de)")[2]);
+    fireEvent.click(sentences("Translation (de)")[2]);
     window.dispatchEvent(new Event("beforeunload"));
     expect(saveMarks).toHaveBeenCalledTimes(1);
     expect(saveMarks).toHaveBeenLastCalledWith(17, { source: [], translation: [mark(2)] }, { source: [], translation: [] }, { keepalive: true });
@@ -349,7 +402,7 @@ describe("saving checked sentences (issue 284)", () => {
     await screen.findByRole("button", { name: "Next unchecked" });
     let store!: () => void;
     saveMarks.mockImplementationOnce((_id, body) => new Promise(resolve => { store = () => resolve(body); }));
-    click(sentences("Translation (de)")[0]);
+    fireEvent.click(sentences("Translation (de)")[0]);
     fireEvent.click(screen.getByRole("button", { name: "Reload from server" }));
     await act(async () => { await Promise.resolve(); });
     expect(saveMarks).toHaveBeenCalledTimes(1);
@@ -361,7 +414,7 @@ describe("saving checked sentences (issue 284)", () => {
   it("leaving the review sends the waiting marks first", async () => {
     const { saveMarks, routeLeaveRef } = setup();
     await screen.findByRole("button", { name: "Next unchecked" });
-    click(sentences("Source (en)")[1]);
+    fireEvent.click(sentences("Source (en)")[1]);
     let allowed: boolean | undefined;
     await act(async () => { allowed = await routeLeaveRef.current!(); });
     expect(allowed).toBe(true);

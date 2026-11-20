@@ -134,17 +134,15 @@ for (const [width, height] of [[1440, 900], [390, 844]] as const) test(`marks at
   expect(errors).toEqual([]);
 });
 
-test('marks in Mark checked sentences keep every sentence a toggle', async ({ page }) => {
+test('marks with Mark checked sentences: the text keeps its marks, the circles stand before the sentences', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   const s = await open(page);
   await toggle(page).check();
   await page.getByRole('checkbox', { name: 'Mark checked sentences', exact: true }).check();
-  const translation = page.getByRole('region', { name: 'Translation (de)', exact: true });
-  await expect(marked(page, '[aria-label="Translation (de)"]', 'line-end')).toHaveCount(26);
-  expect(await translation.evaluate(element => [...element.childNodes].map(node => node.textContent).join(''))).toBe(s.texts.target);
-  // A click on a marked space inside a sentence toggles that sentence.
-  const first = translation.locator('[data-sentence="0"]');
-  await first.locator('.invisible-char').first().click();
+  await expect(marked(page, '.translation-editor-mirror', 'line-end')).toHaveCount(26);
+  await expect(target(page)).toHaveValue(s.texts.target);
+  const first = page.getByRole('group', { name: 'Checked sentences: Translation', exact: true }).locator('[data-sentence="0"]');
+  await first.click();
   await expect(first).toHaveAttribute('aria-pressed', 'true');
   await shot(page, '454-review-sentences-on-1440');
 });

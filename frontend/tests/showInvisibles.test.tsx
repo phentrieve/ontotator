@@ -113,7 +113,7 @@ describe("Show invisible characters", () => {
     expect(document.querySelectorAll(".invisible-char")).toHaveLength(0);
   });
 
-  it("marks the change view and the sentence view too", async () => {
+  it("marks the change view and the text beside the sentence markers too", async () => {
     window.localStorage.setItem(KEY, "1");
     setup();
     await toggle();
@@ -124,12 +124,11 @@ describe("Show invisible characters", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "Show changes" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Mark checked sentences" }));
     expect(window.localStorage.getItem(MARKING)).toBe("1");
-    const sentences = screen.getByRole("region", { name: "Translation (de)" });
-    expect(sentences.textContent).toBe(TRANSLATION);
-    expect(count(sentences, "tab")).toBe(1);
-    expect(count(sentences, "line-end")).toBe(2);
-    // A click on a mark inside a sentence still toggles that sentence.
-    const first = sentences.querySelector<HTMLElement>("[data-sentence='0']")!;
-    expect(first.querySelector(".invisible-char")).not.toBeNull();
+    // Marking keeps the editor: its mirror carries the marks, the markers stand beside it.
+    const mirror = document.querySelector<HTMLElement>(".translation-editor-mirror")!;
+    expect(count(mirror, "tab")).toBe(1);
+    expect(count(mirror, "line-end")).toBe(2);
+    expect(screen.getByRole("group", { name: "Checked sentences: Translation" }).querySelector(".invisible-char")).toBeNull();
+    expect((screen.getByRole("textbox", { name: "Translation (de)" }) as HTMLTextAreaElement).value).toBe(TRANSLATION);
   });
 });
