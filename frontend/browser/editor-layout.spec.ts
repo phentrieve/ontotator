@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { guidelineScenario, loginGuidelineUser } from "./guidelineHelpers";
-import { loginExisting, moreAction, selectText } from "./helpers";
+import { loginExisting, moreAction, selectText, userMenuButton } from "./helpers";
 
 /**
  * Editor layout (editor spec sections 6, 8 and 10; plan F10): dialogs keep Close reachable
@@ -271,21 +271,22 @@ test("default widths grow with the viewport: findings 260–340 px, inspector 38
   expect(await label.evaluate(element => getComputedStyle(element).hyphens)).toBe("auto");
 });
 
-test("390 px: the shell header is one compact row (Sections, breadcrumb, Log out)", async ({ page }) => {
+test("390 px: the shell header is one compact row (Sections, breadcrumb, user menu)", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await openT5(page);
   const header = page.locator(".shell-header");
   const sections = header.locator(".shell-reading-navigation > summary");
-  const logout = header.getByRole("button", { name: "Log out", exact: true });
+  const logout = userMenuButton(page);
   await expect(sections).toBeVisible();
   await expect(logout).toBeVisible();
   await expect(header.getByRole("navigation", { name: "Breadcrumb" })).toBeVisible();
-  // Same row: the tops of Sections and Log out line up; the header stays far below the old ~150 px.
+  // Same row: the tops of Sections and the user menu line up; the header stays far below the old ~150 px.
   const [a, b] = await Promise.all([sections.boundingBox(), logout.boundingBox()]);
   expect(Math.abs(a!.y - b!.y)).toBeLessThan(8);
   expect((await header.boundingBox())!.height).toBeLessThanOrEqual(80);
-  // The identity is still read out.
+  // The identity is still read out; the button shows the initials.
   await expect(page.getByTestId("current-user")).toHaveCount(1);
+  await expect(logout.locator(".shell-user-initials")).toBeVisible();
   await evidence(page, "shell-header-390");
 });
 
@@ -454,7 +455,8 @@ test.describe("half-width editor", () => {
     await selectText(page, 18, 25);
     await page.getByLabel("Search term", { exact: true }).fill("seizure");
     await page.locator(".candidate-card").filter({ hasText: "HP:0001250" }).first().click();
-    await expect(page.getByRole("button", { name: "Show in tree" })).toBeVisible();
+    // Exact: while the search is still open, its hit has "Show in tree: Seizure" (issue 523). Wait for the finding's button.
+    await expect(page.getByRole("button", { name: "Show in tree", exact: true })).toBeVisible();
   }
 
   test("960 × 1000: tree open and closed, guidelines drawer open and closed", async ({ page }) => {

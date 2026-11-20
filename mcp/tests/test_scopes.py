@@ -17,7 +17,7 @@ import httpx
 import pytest
 from conftest import call
 from contract import scope, spec
-from fake_api import FakeApi, token_view
+from fake_api import PT_A, FakeApi, marked, token_view
 from mcp import Client
 from shapes import build, page, panel, row, submission, work
 
@@ -66,6 +66,7 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
     profile.write_text('{"schema": "ontotator-task-profile/v1"}')
     return {
         "whoami": {},
+        "list_my_tasks": {},
         "list_projects": {},
         "list_ontologies": {},
         "list_ontology_files": {},
@@ -125,13 +126,13 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
         "accept_agreeing_texts": {
             "project": "p",
             "confirm": True,
-            "preview_token": "sha256:x",
+            "preview_token": PT_A,
         },
         "change_final_results": {
             "project": "p",
             "texts": [{"case_id": "c", "language": "en"}],
             "confirm": True,
-            "preview_token": "sha256:x",
+            "preview_token": PT_A,
         },
         "undo_change_final_results": {"project": "p", "undo_id": 7, "confirm": True},
         "final_export_check": {"project": "p"},
@@ -162,13 +163,13 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "texts": [{"case_id": "c", "language": "en"}],
             "reason": "Guideline 2.3",
             "confirm": True,
-            "preview_token": "sha256:x",
+            "preview_token": marked(PT_A, "Guideline 2.3"),
         },
         "withdraw_open_tasks": {
             "project": "p",
             "texts": [{"case_id": "c", "language": "en"}],
             "confirm": True,
-            "preview_token": "sha256:x",
+            "preview_token": marked(PT_A),
         },
         "undo_reopen_or_withdraw": {"project": "p", "undo_id": 7, "confirm": True},
         "start_rounds": {
@@ -177,20 +178,20 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "kind": "clean_restart",
             "reason": "New tool set",
             "confirm": True,
-            "preview_token": "sha256:x",
+            "preview_token": marked(PT_A, "New tool set"),
         },
         "pause_texts": {
             "project": "p",
             "texts": [{"case_id": "c", "language": "en"}],
             "reason": "Clinic is checking",
             "confirm": True,
-            "preview_token": "sha256:x",
+            "preview_token": PT_A,
         },
         "release_texts": {
             "project": "p",
             "texts": [{"case_id": "c", "language": "en"}],
             "confirm": True,
-            "preview_token": "sha256:x",
+            "preview_token": PT_A,
         },
         "hand_over_open_tasks": {
             "project": "p",
@@ -229,6 +230,7 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "submission_id": "s1",
             "include_text": True,
         },
+        "get_consolidation_inputs": {"assignment_id": 4, "include_text": True},
         "withdraw_guideline": {"project": "p", "version": 2},
         "start_new_round": {
             "project": "p",
@@ -250,7 +252,7 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "mode": "scratch",
             "reason": "Proposals were wrong",
             "confirm": True,
-            "preview_token": "sha256:x",
+            "preview_token": PT_A,
         },
         "restore_annotation_mode": {
             "project": "p",
@@ -295,6 +297,14 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "method": "machine_translation",
             "provider": "DeepL",
             "expected_previous_sha256": "a" * 64,
+            "confirm": True,
+        },
+        "decide_translation_query": {
+            "project": "p",
+            "document_id": "d",
+            "decision": "unchanged",
+            "answer": "The short form is meant.",
+            "preview_token": "sha256:" + "a" * 64,
             "confirm": True,
         },
         "editorial_correction": {
@@ -421,6 +431,17 @@ def _flows(fake: FakeApi) -> None:
                 workflow_revision=1,
             )
         ],
+    )
+    # get_consolidation_inputs: a consolidation task with one round.
+    fake.on(
+        "GET",
+        "/api/v1/assignments/{assignment_id}",
+        build("AssignmentView", id=4, task="review", document_id="c-en-v1"),
+    )
+    fake.on(
+        "GET",
+        "/api/v1/assignments/{assignment_id}/rounds",
+        [build("WorkRoundView", round_id="r1", kind="consolidation")],
     )
     fake.on(
         "GET",

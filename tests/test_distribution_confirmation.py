@@ -509,3 +509,31 @@ def test_reciprocal_admin_confirmations_in_separate_projects_finish_without_dead
         second = pool.submit(run, "q", "bob", "alice")
         assert [row.username for row in first.result(timeout=15).created] == ["bob"]
         assert [row.username for row in second.result(timeout=15).created] == ["alice"]
+
+
+def test_confirmed_rows_are_assigned_in_their_order(stored):
+    """Issue 488: the order of the confirmed table is the order of assignment
+    ("first" has the later upload position)."""
+    from sqlalchemy import select
+
+    from ontotator.assignments.service import AssignmentService
+    from ontotator.storage.tables import AssignmentRow
+
+    db, proposals, project, users = stored
+    original = proposals.propose(
+        Actor.cli(), "p", ["first", "second"], "annotate", per_document=1, seed=7
+    )
+    rows = [ConfirmationRow("first", "alice"), ConfirmationRow("second", "alice")]
+    result = DistributionConfirmationService(db).confirm(
+        Actor.cli(), "p", rows, original.context, task="annotate"
+    )
+    assert [row.document_id for row in result.created] == ["first", "second"]
+    with db.transaction() as conn:
+        stored_order = conn.execute(
+            select(AssignmentRow.document_id)
+            .where(AssignmentRow.project_id == project)
+            .order_by(AssignmentRow.id)
+        ).scalars()
+        assert list(stored_order) == ["first", "second"]
+    tasks = AssignmentService(db).my_tasks(users["alice"])
+    assert [task.document_id for task in tasks] == ["first", "second"]

@@ -5,6 +5,7 @@ import { CodeOnceDialog } from "./CodeOnceDialog";
 import { ErrorNotice } from "./ErrorNotice";
 import { fieldError } from "./errors";
 import { LanguagesField } from "./LanguagesField";
+import { importPlanOptions, toolProposalOptions } from "./projectFields";
 import { formatDateTime, formatShortDateTime, humanize, labelFor, roleLabels, taskLabels } from "../app/labels";
 import { KIND_LABELS, SCOPE_LABELS } from "../me/TokensSection";
 
@@ -16,6 +17,11 @@ export interface UsersPageProps {
 type Handover = CodeResponse & { kind: "setup" | "reset"; username: string };
 type PendingChange = { username: string; change: AdminUserPatch; kind: "admin" | "deactivate"; fromEdit: boolean };
 type EditState = { baseline: AdminUser; draft: AdminUser };
+/**
+ * Rows the users table shows before "Show all": every row costs the browser, and a thousand rows made
+ * opening New user and typing in it take seconds.
+ */
+const SHOWN_USERS = 100;
 /** From this many projects the New user grid gets a "Find project" field. */
 const PROJECT_FILTER_FROM = 8;
 /** Member languages drive the language warnings and Distribute evenly; none listed counts as unknown (issue 193). */
@@ -78,10 +84,13 @@ const auditActions: Readonly<Record<string, string>> = {
   "text_change.carry": "Text change carried over",
   "text_change.move": "Text change moved",
   "text_change.resolve": "Text change resolved",
+  "text_change.typo_fix_carry": "Annotation moved to a typo fix automatically",
   "translation.accept_external_review": "External translation review accepted",
+  "translation.correction_reason_added": "Added to the reason of a translation correction",
   "translation.correction_requested": "Translation correction requested",
   "translation.editorial_correction": "Typo fix in a translation",
   "translation.lead_correction_started": "Lead correction of a translation started",
+  "translation.query_decided": "Query on a translation decided",
   "translation.review": "Translation reviewed",
   "translation.source_reviewed": "Source text reviewed",
   "translation.version_uploaded": "New translation version uploaded",
@@ -93,6 +102,72 @@ const auditActions: Readonly<Record<string, string>> = {
   "work_plan.update": "Work plan changed",
   "text.annotations_per_text": "Annotators per text changed for one text",
 };
+/**
+ * Changed fields by the names of the screens: a project's Settings (General, Workflow, Annotation, Ontology) and a
+ * person's profile (Users › Edit, Account). A field added later on the server shows as its humanized code.
+ */
+export const fieldLabels: Readonly<Record<string, string>> = {
+  name: "Name",
+  description: "Description",
+  languages: "Languages of the texts",
+  import_plan: "New imports",
+  tool_proposal_mode: "Texts with tool proposals",
+  annotations_per_text: "Annotators per text",
+  annotate_accepted_translations_only: "Annotate only after the translation review is accepted",
+  adjudicator_not_annotator: "Consolidator must not be one of the text's annotators",
+  blind_consolidation: "Hide annotator names during consolidation",
+  record_working_time: "Record working time",
+  allow_spanless_findings: "Findings that point to no text passage",
+  require_spanless_note: "Findings that point to no text passage",
+  require_chosen_axes: "Annotators must confirm every value before submitting",
+  contiguous_mentions_only: "A finding must be one continuous passage",
+  creation_defaults: "Prefilled values",
+  hidden_axis_values: "Values annotators can choose",
+  pins: "Ontology version",
+  profile: "Task profile",
+  display_name: "Display name",
+  email: "E-mail",
+  qualification: "Qualification",
+  orcid: "ORCID",
+  orcid_consent: "Name me (display name and ORCID) as a contributor in exports",
+};
+type Change = { before: unknown; after: unknown };
+const isChange = (value: unknown): value is Change =>
+  value !== null && typeof value === "object" && "before" in value && "after" in value;
+const SPANLESS = ["allow_spanless_findings", "require_spanless_note"];
+/** The one choice the two spanless fields make on Settings › Annotation. */
+const spanlessChoice = (allowed: unknown, note: unknown): string =>
+  allowed === false ? "Not allowed" : note === false ? "Allowed, reason optional" : "Allowed with a reason";
+/** A setting's value as its screen shows it: a checkbox is on or off, a choice has its label. */
+const settingValue = (field: string, value: unknown): string =>
+  typeof value === "boolean" ? (value ? "on" : "off")
+    : Array.isArray(value) ? value.map(String).join(", ") || "none"
+    : field === "import_plan" ? importPlanOptions.find(option => option.value === value)?.label ?? String(value)
+    : field === "tool_proposal_mode" ? toolProposalOptions.find(option => option.value === value)?.label ?? String(value)
+    : isBlank(value) ? "none" : String(value);
+/** Changed fields by their screen names, with "old → new" where the event recorded the values (issue 472). */
+function changedFields(fields: unknown[], recorded: unknown): string {
+  const changes = (recorded !== null && typeof recorded === "object" ? recorded : {}) as Record<string, unknown>;
+  const change = (field: string): Change | null => { const value = changes[field]; return isChange(value) ? value : null; };
+  const [allowed, note] = SPANLESS.map(change);
+  const entries = fields.map(String).map(field => {
+    const label = labelFor(fieldLabels, field);
+    if (SPANLESS.includes(field)) return allowed && note
+      ? `${label}: ${spanlessChoice(allowed.before, note.before)} → ${spanlessChoice(allowed.after, note.after)}` : label;
+    const values = change(field);
+    return values ? `${label}: ${settingValue(field, values.before)} → ${settingValue(field, values.after)}` : label;
+  });
+  // The two spanless fields are one choice; values hold commas, so entries with values are split by semicolons.
+  return [...new Set(entries)].join(entries.some(entry => entry.includes(" → ")) ? "; " : ", ");
+}
+/** "Added: fr. Removed: es." for a change of a person's languages (issue 467); older events recorded no languages. */
+function languageChange(details: Record<string, unknown>): string {
+  if (!Array.isArray(details.before) || !Array.isArray(details.after)) return "";
+  const [before, after] = [details.before.map(String), details.after.map(String)];
+  const added = after.filter(language => !before.includes(language));
+  const removed = before.filter(language => !after.includes(language));
+  return [added.length && `Added: ${added.join(", ")}.`, removed.length && `Removed: ${removed.join(", ")}.`].filter(Boolean).join(" ") || "No change.";
+}
 const isBlank = (value: unknown): boolean =>
   value === null || value === undefined || value === "" || (Array.isArray(value) ? value.length === 0 : typeof value === "object" && Object.keys(value).length === 0);
 const auditValue = (key: string, value: unknown): string =>
@@ -113,7 +188,8 @@ export function auditDetails(event: AuditEvent, userNames?: ReadonlyMap<number, 
   if (Array.isArray(details.roles)) return details.roles.map(role => labelFor(roleLabels, String(role))).join(", ");
   if (typeof details.active === "boolean") return details.active ? "Activated" : "Deactivated";
   if (typeof details.is_system_admin === "boolean") return details.is_system_admin ? "Granted" : "Withdrawn";
-  if (Array.isArray(details.fields)) return details.fields.map(field => humanize(String(field))).join(", ");
+  if (event.action === "user.languages") return languageChange(details);
+  if (Array.isArray(details.fields)) return changedFields(details.fields, details.changes);
   // A move to the newest translations: the files, not the kept conditions (issue 254).
   if (event.action === "project.translations_refresh") return auditEntries({ added: details.added, replaced: details.replaced, removed: details.removed }).join("; ");
   if (typeof details.purpose === "string" && Object.keys(details).length === 1) return `${humanize(details.purpose)} code`;
@@ -158,6 +234,9 @@ function UsersContent({ currentUser, routeLeaveRef }: UsersPageProps): JSX.Eleme
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<unknown>();
   const [filter, setFilter] = useState("");
+  const [allUsers, setAllUsers] = useState(false);
+  // Accounts created on this page stay in view beyond the first rows.
+  const [createdHere, setCreatedHere] = useState<ReadonlySet<string>>(new Set());
   const [projectFilter, setProjectFilter] = useState("");
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [create, setCreate] = useState<CreateUserRequest>(emptyCreate);
@@ -234,7 +313,7 @@ function UsersContent({ currentUser, routeLeaveRef }: UsersPageProps): JSX.Eleme
     try {
       const response = await api.adminCreateUser({ ...create, email: create.email?.trim() || null, qualification: create.qualification?.trim() || null });
       if (epoch !== lifetime.current) return;
-      replaceUser(response.user); setCreate(emptyCreate()); setCreating(false); showCode(response, "setup", response.user.username);
+      replaceUser(response.user); setCreatedHere(names => new Set(names).add(response.user.username)); setCreate(emptyCreate()); setCreating(false); showCode(response, "setup", response.user.username);
     } catch (error: unknown) {
       if (epoch === lifetime.current) setCreateError(error);
     } finally {
@@ -333,6 +412,8 @@ function UsersContent({ currentUser, routeLeaveRef }: UsersPageProps): JSX.Eleme
   // Projects with a ticked role stay in view while filtering.
   const shownProjects = projects.filter(project => !projectQuery || roleFor(project.project_key).length > 0
     || project.name.toLowerCase().includes(projectQuery) || project.project_key.toLowerCase().includes(projectQuery));
+  // Two projects can share a name: those rows also give the project key (issue 472).
+  const projectLabel = (project: { name: string; project_key: string }) => projects.filter(item => item.name === project.name).length > 1 ? `${project.name} (${project.project_key})` : project.name;
   const toggleNewRole = (key: string, role: string, on: boolean) => {
     const roles = on ? [...roleFor(key), role] : roleFor(key).filter(item => item !== role);
     const others = (create.projects ?? []).filter(item => item.project_key !== key);
@@ -375,7 +456,11 @@ function UsersContent({ currentUser, routeLeaveRef }: UsersPageProps): JSX.Eleme
       {users !== null && <DataTable label="Users" columns={columns}
         // A click on the row (not on its buttons) highlights it; a second click clears it.
         rowProps={user => ({ className: ["users-row", user.username === notice?.username && "users-row--changed"].filter(Boolean).join(" "), selected: user.username === selectedUser,
-          onClick: event => { if (!(event.target as Element).closest("button, a, input, summary")) setSelectedUser(current => current === user.username ? null : user.username); } })} rows={users.filter(user => user.username.toLowerCase().includes(query) || user.display_name.toLowerCase().includes(query))} rowKey={user => user.username} empty={<EmptyState title={query ? "No matching users." : "No users to display."} />} />}
+          onClick: event => { if (!(event.target as Element).closest("button, a, input, summary")) setSelectedUser(current => current === user.username ? null : user.username); } })} rows={users.filter(user => user.username.toLowerCase().includes(query) || user.display_name.toLowerCase().includes(query))} rowKey={user => user.username} empty={<EmptyState title={query ? "No matching users." : "No users to display."} />}
+        rowLimit={allUsers ? undefined : { count: SHOWN_USERS, keep: user => createdHere.has(user.username) || user.username === notice?.username, more: total => <div className="users-more">
+          <span>The first {SHOWN_USERS} of {total} users are shown. Type into Filter users to find someone.</span>
+          <Button size="sm" disabled={pageBlocked} onClick={() => setAllUsers(true)}>Show all {total}</Button>
+        </div> }} />}
     </section>
     {creating && <Dialog open title="New user" onClose={busy ? undefined : () => setCreating(false)}>
       <form aria-label="New user" onSubmit={event => { event.preventDefault(); void createUser(); }}>
@@ -389,9 +474,9 @@ function UsersContent({ currentUser, routeLeaveRef }: UsersPageProps): JSX.Eleme
           {/* One grid: the role names head the columns once; each checkbox keeps "Project: Role" as its name. */}
           {projects.length > PROJECT_FILTER_FROM && <TextInput id="new-projects-filter" className="new-user-projects-filter" label="Find project" type="search" value={projectFilter} onChange={event => setProjectFilter(event.target.value)} />}
           <div className="new-user-projects-row" aria-hidden="true"><span />{projectRoles.map(role => <span key={role}>{roleLabels[role]}</span>)}</div>
-          {shownProjects.map(project => <div key={project.project_key} className="new-user-projects-row" role="group" aria-label={project.name}>
-            <span title={project.name}>{project.name}</span>
-            {projectRoles.map(role => <Checkbox key={role} id={`new-${project.project_key}-${role}`} label={<span className="visually-hidden">{roleLabels[role]}</span>} aria-label={`${project.name}: ${roleLabels[role]}`} checked={roleFor(project.project_key).includes(role)} onChange={event => toggleNewRole(project.project_key, role, event.target.checked)} />)}
+          {shownProjects.map(project => <div key={project.project_key} className="new-user-projects-row" role="group" aria-label={projectLabel(project)}>
+            <span title={projectLabel(project)}>{projectLabel(project)}</span>
+            {projectRoles.map(role => <Checkbox key={role} id={`new-${project.project_key}-${role}`} label={<span className="visually-hidden">{roleLabels[role]}</span>} aria-label={`${projectLabel(project)}: ${roleLabels[role]}`} checked={roleFor(project.project_key).includes(role)} onChange={event => toggleNewRole(project.project_key, role, event.target.checked)} />)}
           </div>)}
         </fieldset>}
         {createError !== undefined && !usernameError && !displayNameError && <ErrorNotice error={createError} />}

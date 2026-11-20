@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { importPackage, openCase, selectText } from "./helpers";
 import { clampSidebarWidth, inspectorWidth, sidebarLimits } from "../src/editor/sidebarWidth";
+import { LOW_LAYOUT_BELOW, LOW_LAYOUT_HYSTERESIS } from "../src/editor/treeHeight";
 
 // The fixture's ontology (tests/fixtures/hp.json) is a single-parent tree:
 // All > { Clinical modifier > { Clinical course > Onset, Severity }, Frequency,
@@ -11,6 +12,9 @@ import { clampSidebarWidth, inspectorWidth, sidebarLimits } from "../src/editor/
 
 const revision = (page: Page) => page.locator(".status-badge");
 const showInTree = (page: Page) => page.getByRole("button", { name: "Show in tree" });
+/** In a low window the open tree has the column and the annotation panel is one line (issue 521). */
+const showFinding = (page: Page) => page.getByRole("group", { name: "Finding", exact: true }).getByRole("button", { name: "Show finding" });
+const findingBar = (page: Page) => page.getByRole("group", { name: "Finding", exact: true });
 /** There is one form of the tree. Nothing on the page may be a dialog while it is open. */
 const anyDialog = (page: Page) => page.locator('[role="dialog"], [aria-modal], dialog');
 const treePanel = (page: Page) => page.getByRole("region", { name: "Ontology tree" });
@@ -19,6 +23,9 @@ const ownAnnotations = (page: Page) => page.locator(".sidebar [data-list-key^='a
 /** The tree row of a term. */
 const treeItem = (page: Page, termId: string) =>
   page.getByRole("tree", { name: "Terms" }).locator(`li[role="treeitem"][data-term-id="${termId}"]`);
+
+/** Where the tree's height is kept: per user, in the browser (editor/treeHeight.ts). */
+const TREE_HEIGHT_KEY = (username: string) => `ontotator.editor.treeHeight.v1:${username}`;
 
 const SEIZURE = "HP:0001250";
 const DIALEPTIC = "HP:0011146";
@@ -339,6 +346,7 @@ test.describe("ontology tree", () => {
     };
     const forward = await stopsInTree("Tab");
     expect(forward.filter((stop) => stop !== "details")).toEqual([
+      "BUTTON:Hide details",
       `A:View ${SENSORINEURAL} on hpo.jax.org`,
       "BUTTON:Use this term",
     ]);
@@ -349,6 +357,7 @@ test.describe("ontology tree", () => {
     expect(backward.filter((stop) => stop !== "details")).toEqual([
       "BUTTON:Use this term",
       `A:View ${SENSORINEURAL} on hpo.jax.org`,
+      "BUTTON:Hide details",
       `LI:${SENSORINEURAL}`,
       "BUTTON:Close tree",
     ]);
@@ -587,6 +596,158 @@ test.describe("ontology tree", () => {
     expect(stored).toEqual([]);
   });
 
+  test("the divider above the docked tree sets its height, is kept, and resets on a double click", async ({ page }) => {
+    await openWithSeizure(page, "tree-height", { width: 1440, height: 900 });
+    await page.evaluate((key) => window.localStorage.removeItem(key), TREE_HEIGHT_KEY("tree-height"));
+    await showInTree(page).click();
+    await expect(treePanel(page)).toBeVisible();
+    // The loaded tree takes the focus once; wait for that, or it takes it from the divider later.
+    await expect(treeItem(page, SEIZURE)).toBeFocused();
+    const divider = page.getByRole("separator", { name: "Resize ontology tree" });
+    await expect(divider).toBeVisible();
+    await expect(divider).toHaveAttribute("aria-orientation", "horizontal");
+    await expect(divider).toHaveAttribute("aria-controls", "ontology-tree");
+    const storedHeight = () => page.evaluate((key) => window.localStorage.getItem(key), TREE_HEIGHT_KEY("tree-height"));
+
+    const before = await box(page.locator(".tree-host"));
+    // Unset, it reports the height the layout gives the tree, and the limits: 220 px for the tree, 160 px left for the panel.
+    const column = await box(page.locator(".app-layout"));
+    await expect(divider).toHaveAttribute("aria-valuenow", String(Math.round(before.height)));
+    await expect(divider).toHaveAttribute("aria-valuemin", "220");
+    await expect(divider).toHaveAttribute("aria-valuemax", String(Math.floor(column.height - 160)));
+    const grip = await box(divider);
+    // It lies on the tree's upper edge, across the column.
+    expect(Math.abs(grip.y + grip.height / 2 - before.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(grip.width - before.width)).toBeLessThanOrEqual(1);
+
+    // A click that moves nothing only focuses it: the layout's own split stays.
+    await page.mouse.click(grip.x + grip.width / 2, grip.y + grip.height / 2);
+    await expect(divider).toBeFocused();
+    await expect(page.locator(".app-layout")).not.toHaveClass(/tree-sized/);
+    expect(await storedHeight()).toBeNull();
+    // So does a drag given up with Escape.
+    await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2 - 90, { steps: 3 });
+    await expect(page.locator(".app-layout")).toHaveClass(/tree-sized/);
+    await page.keyboard.press("Escape");
+    await page.mouse.up();
+    await expect(page.locator(".app-layout")).not.toHaveClass(/tree-sized/);
+    expectSameBox(await box(page.locator(".tree-host")), before);
+    expect(await storedHeight()).toBeNull();
+
+    await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2 - 150, { steps: 5 });
+    await page.mouse.up();
+    const taller = await box(page.locator(".tree-host"));
+    expect(Math.abs(taller.height - (before.height + 150))).toBeLessThan(6);
+    // The annotation panel keeps its place above, smaller.
+    await expect(page.locator(".inspector-pane h2")).toBeVisible();
+    expect(await storedHeight()).toBe(String(Math.round(taller.height)));
+    await expect(divider).toHaveAttribute("aria-valuenow", String(Math.round(taller.height)));
+
+    await divider.focus();
+    await page.keyboard.press("ArrowDown");
+    expect((await box(page.locator(".tree-host"))).height).toBeLessThan(taller.height - 10);
+    await page.keyboard.press("ArrowUp");
+    expect(Math.abs((await box(page.locator(".tree-host"))).height - taller.height)).toBeLessThan(2);
+
+    // The ends: the tree never takes the panel's last 160 px, and never has less than 220 px itself,
+    // which hold its header, some rows and "Use this term" in full.
+    await page.keyboard.press("End");
+    const panelBox = await box(page.locator(".inspector-pane"));
+    let tree = await box(page.locator(".tree-host"));
+    expect(Math.abs(panelBox.height - 160)).toBeLessThanOrEqual(1);
+    expect(Math.abs(tree.y + tree.height - 900)).toBeLessThanOrEqual(1);
+    await expect(page.locator(".inspector-pane h2")).toBeInViewport({ ratio: 1 });
+    await page.keyboard.press("Home");
+    tree = await box(page.locator(".tree-host"));
+    expect(Math.abs(tree.height - 220)).toBeLessThanOrEqual(1);
+    expect((await box(treePanel(page).locator(".tree-browser__tree"))).height).toBeGreaterThanOrEqual(3 * (await box(treeItem(page, SEIZURE))).height);
+    await expect(treePanel(page).getByRole("button", { name: "Use this term" })).toBeInViewport({ ratio: 1 });
+    await expect(treePanel(page).getByRole("button", { name: "Close tree" })).toBeInViewport({ ratio: 1 });
+    expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBeTruthy();
+
+    await divider.dblclick();
+    await expect(page.locator(".app-layout")).not.toHaveClass(/tree-sized/);
+    expect(Math.abs((await box(page.locator(".tree-host"))).height - before.height)).toBeLessThan(2);
+    expect(await storedHeight()).toBeNull();
+
+    // Two columns: the tree sits beside the panel, and there is no divider to drag.
+    await page.setViewportSize({ width: 1000, height: 900 });
+    await expect(divider).toBeHidden();
+  });
+
+  test("a low window (1280x600): the tree can take more than its default, the height survives a reload and follows the window", async ({ page }) => {
+    await openWithSeizure(page, "tree-height-low", { width: 1280, height: 600 });
+    const key = TREE_HEIGHT_KEY("tree-height-low");
+    await page.evaluate((name) => window.localStorage.removeItem(name), key);
+    await showInTree(page).click();
+    await expect(treeItem(page, SEIZURE)).toBeFocused();
+    // A window this low gives the open tree the whole column (issue 521): "Show finding" shares it again.
+    await showFinding(page).click();
+    const divider = page.getByRole("separator", { name: "Resize ontology tree" });
+    const host = page.locator(".tree-host");
+    const rows = treePanel(page).locator(".tree-browser__tree");
+    const column = await box(page.locator(".app-layout"));
+    const before = { tree: await box(host), rows: await box(rows) };
+    const max = Math.floor(column.height - 160);
+    // There is room to give: the default leaves the panel more than its 160 px.
+    expect(max).toBeGreaterThan(before.tree.height + 20);
+
+    await divider.focus();
+    await page.keyboard.press("End");
+    await expect(divider).toHaveAttribute("aria-valuenow", String(max));
+    const grown = { tree: await box(host), rows: await box(rows), panel: await box(page.locator(".inspector-pane")) };
+    expect(Math.abs(grown.tree.height - max)).toBeLessThanOrEqual(1);
+    expect(grown.rows.height).toBeGreaterThan(before.rows.height + 10);
+    expect(Math.abs(grown.panel.height - 160)).toBeLessThanOrEqual(1);
+    expect(Math.abs(grown.tree.y + grown.tree.height - 600)).toBeLessThanOrEqual(1);
+    await expect(page.locator(".inspector-pane h2")).toBeInViewport({ ratio: 1 });
+    await expect(treePanel(page).getByRole("button", { name: "Use this term" })).toBeInViewport({ ratio: 1 });
+    expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBeTruthy();
+    expect(await page.evaluate((name) => window.localStorage.getItem(name), key)).toBe(String(max));
+
+    // A higher window: the height is the one chosen, and the panel gets the rest.
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await expect.poll(async () => Math.round((await box(host)).height)).toBe(max);
+    // A window too low for it: the tree gives way down to its 220 px, the preference stays.
+    await page.setViewportSize({ width: 1280, height: 480 });
+    await expect.poll(async () => Math.round((await box(host)).height)).toBeLessThanOrEqual(Math.max(220, 480 - column.y - 160) + 1);
+    expect((await box(host)).height).toBeGreaterThanOrEqual(219);
+    expect(await page.evaluate((name) => window.localStorage.getItem(name), key)).toBe(String(max));
+    await page.setViewportSize({ width: 1280, height: 600 });
+    await expect.poll(async () => Math.round((await box(host)).height)).toBe(max);
+
+    // The style sheet holds the same limits on its own: a height from nowhere pushes neither part out.
+    await page.evaluate(() => document.querySelector<HTMLElement>(".app-layout")!.style.setProperty("--tree-height", "5000px"));
+    expect(Math.abs((await box(page.locator(".inspector-pane"))).height - 160)).toBeLessThanOrEqual(1);
+    await page.evaluate(() => document.querySelector<HTMLElement>(".app-layout")!.style.setProperty("--tree-height", "10px"));
+    expect(Math.abs((await box(host)).height - 220)).toBeLessThanOrEqual(1);
+
+    // After a reload the tree opens at the chosen height; a stored value that is no height is ignored.
+    for (const [stored, expected] of [[String(max), max], ["99999", max], ["12", 220], ["tall", null]] as const) {
+      await page.evaluate(([name, value]) => window.localStorage.setItem(name, value), [key, stored] as const);
+      await page.goto("/#/?project=browser-fixture-tree");
+      await page.reload();
+      await expect(page.locator("#project-select")).toHaveValue("browser-fixture-tree");
+      await openCase(page, { task: "annotate" });
+      await ownAnnotations(page).first().click();
+      await showInTree(page).click();
+      await expect(treeItem(page, SEIZURE)).toBeFocused();
+      await showFinding(page).click();
+      if (expected === null) {
+        await expect(page.locator(".app-layout")).not.toHaveClass(/tree-sized/);
+        expectSameBox(await box(host), before.tree);
+      } else {
+        await expect(page.locator(".app-layout")).toHaveClass(/tree-sized/);
+        expect(Math.abs((await box(host)).height - expected), `stored ${stored}`).toBeLessThanOrEqual(1);
+        expect((await box(page.locator(".inspector-pane"))).height).toBeGreaterThanOrEqual(159);
+      }
+    }
+  });
+
   test("in the three-column layout the tree is under the annotation panel at every width, never beside it", async ({ page }) => {
     // A long display name: the case header's identity badge must not take another line.
     const user = await page.request.post(
@@ -724,6 +885,72 @@ test.describe("ontology tree", () => {
     const names = stored.flatMap((change) => Object.keys(change as object));
     expect(names.filter((name) => name.includes("tree"))).toEqual([]);
   });
+
+  for (const size of [{ width: 1440, height: 900 }, { width: 1280, height: 600 }, { width: 800, height: 700 }, { width: 390, height: 844 }]) {
+    test(`'Hide details' at ${size.width}x${size.height} leaves name, id and 'Use this term', and the rows get the room`, async ({ page }) => {
+      // Marked in a wide window (the same steps at every size), then looked at in this one.
+      await openWithSeizure(page, `tree-details-${size.width}`);
+      await page.setViewportSize(size);
+      if (size.width <= 700) await page.getByRole("navigation", { name: "Select view" }).getByRole("button", { name: "Details" }).click();
+      await showInTree(page).click();
+      const panel = treePanel(page);
+      await expect(treeItem(page, SEIZURE)).toBeFocused();
+      const rows = panel.locator(".tree-browser__tree");
+      const detail = panel.locator(".tree-detail");
+      const use = panel.getByRole("button", { name: "Use this term" });
+      await expect(detail.locator(".tree-detail__definition")).toBeVisible();
+      const open = { tree: await box(page.locator(".tree-host")), rows: await box(rows), detail: await box(detail), use: await box(use) };
+
+      const hide = panel.getByRole("button", { name: "Hide details" });
+      await expect(hide).toHaveAttribute("aria-expanded", "true");
+      // By the name, not in the action row: "Use this term" and its hint are where they were.
+      expect((await box(hide)).y).toBeLessThan(open.use.y - 20);
+      await hide.focus();
+      await page.keyboard.press("Enter");
+      const show = panel.getByRole("button", { name: "Show details" });
+      await expect(show).toBeFocused();
+      await expect(show).toHaveAttribute("aria-expanded", "false");
+      await expect(detail.locator(".tree-detail__definition")).toHaveCount(0);
+      await expect(detail.locator(".tree-detail__name")).toHaveText("Seizure");
+      await expect(detail.locator(".tree-detail__id")).toHaveText(SEIZURE);
+      await expect(detail.getByRole("link", { name: `View ${SEIZURE} on hpo.jax.org` })).toBeVisible();
+      const closed = { tree: await box(page.locator(".tree-host")), rows: await box(rows), detail: await box(detail), use: await box(use) };
+      // The pane is the same; what the details gave up, the rows have.
+      expectSameBox(closed.tree, open.tree);
+      expect(closed.detail.height).toBeLessThanOrEqual(open.detail.height - 18);
+      expect(closed.rows.height).toBeGreaterThanOrEqual(open.rows.height + 18);
+      expect(Math.abs(closed.rows.height - open.rows.height - (open.detail.height - closed.detail.height))).toBeLessThanOrEqual(1);
+      expect(closed.use.height).toBe(open.use.height);
+      await expect(use).toBeInViewport({ ratio: 1 });
+      await expect(show).toBeInViewport({ ratio: 1 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
+
+      // Another term: its details stay hidden, name and id follow.
+      await treeItem(page, STATUS_EPILEPTICUS).click();
+      await expect(detail.locator(".tree-detail__id")).toHaveText(STATUS_EPILEPTICUS);
+      await expect(detail.locator(".tree-detail__definition")).toHaveCount(0);
+      await expect(use).toBeEnabled();
+
+      // Kept for this person in this browser: after a reload the next tree opens without details.
+      await page.goto("/#/?project=browser-fixture-tree");
+      await page.reload();
+      await expect(page.locator("#project-select")).toHaveValue("browser-fixture-tree");
+      await openCase(page, { task: "annotate" });
+      if (size.width <= 700) {
+        await page.getByRole("navigation", { name: "Select view" }).getByRole("button", { name: "Findings" }).click();
+        await ownAnnotations(page).first().click();
+        await page.getByRole("navigation", { name: "Select view" }).getByRole("button", { name: "Details" }).click();
+      } else await ownAnnotations(page).first().click();
+      await showInTree(page).click();
+      await expect(treeItem(page, SEIZURE)).toBeFocused();
+      await expect(show).toBeVisible();
+      await expect(detail.locator(".tree-detail__definition")).toHaveCount(0);
+      await show.click();
+      await expect(detail.locator(".tree-detail__definition")).toBeVisible();
+      await expect(panel.getByRole("button", { name: "Hide details" })).toHaveAttribute("aria-expanded", "true");
+      expect(Math.abs((await box(rows)).height - open.rows.height)).toBeLessThanOrEqual(1);
+    });
+  }
 
   for (const size of [
     // 1025-1059 px: the editor's own width (container query), not the viewport breakpoint, stacks it.
@@ -925,5 +1152,205 @@ test.describe("ontology tree", () => {
       });
     }
     expect(opens).toEqual([]);
+  });
+});
+
+test.describe("ontology tree in a low window (issue 521)", () => {
+  /** Rows of the tree that are wholly in view, in its own box and in the window. */
+  const rowsInView = (page: Page) => page.evaluate(() => {
+    const box = document.querySelector(".tree-browser__tree")!.getBoundingClientRect();
+    return [...document.querySelectorAll<HTMLElement>('.tree-browser__tree li[role="treeitem"]')].filter((row) => {
+      const r = row.getBoundingClientRect();
+      return r.height > 0 && r.top >= box.top - 1 && r.bottom <= Math.min(box.bottom, window.innerHeight) + 1;
+    }).length;
+  });
+  const announcer = (page: Page) => page.locator("[data-carried-announcer]");
+  const layout = (page: Page) => page.locator(".app-layout");
+
+  test("1280x600: the open tree takes the right column, the finding stays in one line, and 'Show finding' shares it again", async ({ page }) => {
+    await openWithSeizure(page, "tree-low-column", { width: 1280, height: 600 });
+    const key = TREE_HEIGHT_KEY("tree-low-column");
+    await page.evaluate((name) => window.localStorage.removeItem(name), key);
+    const inspectorBefore = await box(page.locator(".inspector-pane"));
+    await showInTree(page).click();
+    await expect(treeItem(page, SEIZURE)).toBeFocused();
+    await expect(layout(page)).toHaveClass(/panel-given-to-tree--column/);
+    await expect(announcer(page)).toHaveText("The ontology tree takes the column. The finding is shown in one line above it.");
+
+    // The finding: its marked words and its term, in one bar at the top of the column.
+    const bar = findingBar(page);
+    await expect(bar).toContainText("“seizure”");
+    await expect(bar).toContainText("Seizure");
+    await expect(bar).toContainText(SEIZURE);
+    await expect(showFinding(page)).toHaveAttribute("aria-expanded", "false");
+    await expect(page.locator(".inspector-pane h2")).toBeHidden();
+    await expect(showInTree(page)).toBeHidden();
+    // No divider: the column is the tree's alone.
+    await expect(page.getByRole("separator", { name: "Resize ontology tree" })).toHaveCount(0);
+    const column = await box(layout(page));
+    const barBox = await box(bar);
+    const tree = await box(page.locator(".tree-host"));
+    expect(Math.abs(barBox.y - column.y)).toBeLessThanOrEqual(1);
+    expect(barBox.height).toBeLessThanOrEqual(60);
+    expect(Math.abs(tree.y - (barBox.y + barBox.height))).toBeLessThanOrEqual(2);
+    expect(Math.abs(tree.y + tree.height - 600)).toBeLessThanOrEqual(1);
+    expect(Math.abs(tree.x - inspectorBefore.x)).toBeLessThanOrEqual(1);
+    // Done when (issue 521): ten rows in view without dragging anything.
+    expect(await rowsInView(page)).toBeGreaterThanOrEqual(10);
+    const rowsBox = await box(treePanel(page).locator(".tree-browser__tree"));
+    expect(rowsBox.height).toBeGreaterThanOrEqual(10 * (await box(treeItem(page, SEIZURE))).height);
+    await expect(treePanel(page).getByRole("button", { name: "Use this term" })).toBeInViewport({ ratio: 1 });
+    expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBeTruthy();
+
+    // "Use this term" changes the finding, and the bar says so.
+    await treeItem(page, STATUS_EPILEPTICUS).click();
+    await treePanel(page).getByRole("button", { name: "Use this term" }).click();
+    await expect(revision(page)).toHaveAttribute("title", "Revision 2");
+    await expect(bar).toContainText(STATUS_EPILEPTICUS);
+    await expect(bar).toContainText("Status epilepticus");
+    await expect(layout(page)).toHaveClass(/panel-given-to-tree--column/);
+
+    // "Hide details" works as everywhere: the rows get the room.
+    const rowsWithDetails = rowsBox.height;
+    await treePanel(page).getByRole("button", { name: "Hide details" }).click();
+    await expect.poll(async () => (await box(treePanel(page).locator(".tree-browser__tree"))).height).toBeGreaterThan(rowsWithDetails + 18);
+    await treePanel(page).getByRole("button", { name: "Show details" }).click();
+
+    // From the keyboard, the whole panel is back; the focus stays on the button.
+    await showFinding(page).focus();
+    await page.keyboard.press("Enter");
+    const hide = bar.getByRole("button", { name: "Hide finding" });
+    await expect(hide).toBeFocused();
+    await expect(hide).toHaveAttribute("aria-expanded", "true");
+    await expect(layout(page)).not.toHaveClass(/panel-given-to-tree/);
+    await expect(page.locator(".inspector-pane h2")).toBeVisible();
+    await expect(page.locator(".inspector-pane h2")).toContainText(STATUS_EPILEPTICUS);
+    const divider = page.getByRole("separator", { name: "Resize ontology tree" });
+    await expect(divider).toBeVisible();
+    const shared = await box(page.locator(".tree-host"));
+    expect(shared.height).toBeLessThan(tree.height - 100);
+    expect((await box(page.locator(".inspector-pane"))).height).toBeGreaterThanOrEqual(159);
+
+    // The divider's height applies only while the two share the column.
+    await divider.focus();
+    await page.keyboard.press("Home");
+    await expect(divider).toHaveAttribute("aria-valuenow", "220");
+    await expect(layout(page)).toHaveClass(/tree-sized/);
+    await expect.poll(async () => Math.round((await box(page.locator(".tree-host"))).height)).toBe(220);
+    await hide.click();
+    await expect(showFinding(page)).toHaveAttribute("aria-expanded", "false");
+    await expect(layout(page)).not.toHaveClass(/tree-sized/);
+    expectSameBox(await box(page.locator(".tree-host")), tree);
+    expect(await page.evaluate((name) => window.localStorage.getItem(name), key)).toBe("220");
+    await showFinding(page).click();
+    await expect.poll(async () => Math.round((await box(page.locator(".tree-host"))).height)).toBe(220);
+    await bar.getByRole("button", { name: "Hide finding" }).click();
+
+    // Closed from inside the tree, the panel is back and the focus goes to "Show in tree".
+    await treeItem(page, STATUS_EPILEPTICUS).click();
+    await page.keyboard.press("Escape");
+    await expect(treePanel(page)).toHaveCount(0);
+    await expect(bar).toHaveCount(0);
+    await expect(layout(page)).not.toHaveClass(/panel-given-to-tree/);
+    await expect(showInTree(page)).toBeFocused();
+    expectSameBox(await box(page.locator(".inspector-pane")), inspectorBefore);
+
+    // Opened again, the tree has the column again ("Show finding" lasts while the tree is open);
+    // "Close tree" also leaves the focus on "Show in tree".
+    await showInTree(page).click();
+    await expect(treeItem(page, STATUS_EPILEPTICUS)).toBeFocused();
+    await expect(showFinding(page)).toHaveAttribute("aria-expanded", "false");
+    await treePanel(page).getByRole("button", { name: "Close tree" }).click();
+    await expect(showInTree(page)).toBeFocused();
+  });
+
+  test("the threshold has a margin: resizing across it does not switch the layout back and forth", async ({ page }) => {
+    await openWithSeizure(page, "tree-low-hysteresis", { width: 1280, height: 600 });
+    await showInTree(page).click();
+    await expect(treeItem(page, SEIZURE)).toBeFocused();
+    await expect(layout(page)).toHaveClass(/panel-given-to-tree--column/);
+    // What the window has above the layout (header and case toolbar).
+    const chrome = 600 - (await box(layout(page))).height;
+    const height = (column: number) => Math.round(chrome + column);
+    // Just above the threshold, within the margin: still low.
+    await page.setViewportSize({ width: 1280, height: height(LOW_LAYOUT_BELOW + LOW_LAYOUT_HYSTERESIS / 2) });
+    await expect(layout(page)).toHaveClass(/panel-given-to-tree--column/);
+    // Beyond the margin the panel and the tree share the column; back within it, they still do.
+    await page.setViewportSize({ width: 1280, height: height(LOW_LAYOUT_BELOW + LOW_LAYOUT_HYSTERESIS + 8) });
+    await expect(layout(page)).not.toHaveClass(/panel-given-to-tree/);
+    await expect(findingBar(page)).toHaveCount(0);
+    await expect(page.locator(".inspector-pane h2")).toBeVisible();
+    await page.setViewportSize({ width: 1280, height: height(LOW_LAYOUT_BELOW + LOW_LAYOUT_HYSTERESIS / 2) });
+    await expect(layout(page)).not.toHaveClass(/panel-given-to-tree/);
+    await page.setViewportSize({ width: 1280, height: height(LOW_LAYOUT_BELOW - 8) });
+    await expect(layout(page)).toHaveClass(/panel-given-to-tree--column/);
+    // The focus was in the tree all along.
+    await expect(treeItem(page, SEIZURE)).toBeFocused();
+  });
+
+  for (const size of [{ width: 1440, height: 900 }, { width: 1440, height: 700 }, { width: 1000, height: 700 }]) {
+    test(`${size.width}x${size.height} is not low: the panel and the tree share as before`, async ({ page }) => {
+      await openWithSeizure(page, `tree-not-low-${size.width}-${size.height}`, size);
+      await showInTree(page).click();
+      await expect(treeItem(page, SEIZURE)).toBeFocused();
+      await expect(layout(page)).toHaveClass(/tree-open/);
+      await expect(layout(page)).not.toHaveClass(/panel-given-to-tree/);
+      await expect(findingBar(page)).toHaveCount(0);
+      await expect(page.locator(".inspector-pane h2")).toBeInViewport({ ratio: 1 });
+      await expect(showInTree(page)).toBeInViewport({ ratio: 1 });
+      await expect(announcer(page)).not.toContainText("ontology tree");
+      if (size.width > 1060) await expect(page.getByRole("separator", { name: "Resize ontology tree" })).toBeVisible();
+    });
+  }
+
+  test("844x390, a phone in landscape: the tree stands in place of the panel beside the text, and is usable", async ({ page }) => {
+    await openWithSeizure(page, "tree-low-landscape");
+    await page.setViewportSize({ width: 844, height: 390 });
+    const textBefore = await box(page.locator(".center-pane"));
+    const inspectorBefore = await box(page.locator(".inspector-pane"));
+    // Without the tree the panel stands beside the text (issue 466).
+    expect(Math.abs(textBefore.x + textBefore.width - inspectorBefore.x)).toBeLessThanOrEqual(1);
+    await showInTree(page).click();
+    await expect(treeItem(page, SEIZURE)).toBeFocused();
+    await expect(layout(page)).toHaveClass(/panel-given-to-tree--beside/);
+    await expect(announcer(page)).toHaveText("The ontology tree stands in place of the annotation panel. Close the tree to bring the panel back.");
+    await expect(page.locator(".inspector-pane")).toBeHidden();
+    await expect(findingBar(page)).toHaveCount(0);
+
+    const tree = await box(page.locator(".tree-host"));
+    expectSameBox(await box(page.locator(".center-pane")), textBefore);
+    expectSameBox(tree, inspectorBefore);
+    expect(Math.abs(tree.y + tree.height - 390)).toBeLessThanOrEqual(1);
+    // Usable: rows in view, and "Use this term" whole.
+    expect(await rowsInView(page)).toBeGreaterThanOrEqual(1);
+    await expect(treeItem(page, SEIZURE)).toBeInViewport({ ratio: 1 });
+    const use = treePanel(page).getByRole("button", { name: "Use this term" });
+    await expect(use).toBeInViewport({ ratio: 1 });
+    await expect(treePanel(page).getByRole("button", { name: "Close tree" })).toBeInViewport({ ratio: 1 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
+    expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBeTruthy();
+    // The finding being changed is the one selected in the list and marked in the text.
+    await expect(ownAnnotations(page).first()).toContainText(SEIZURE);
+
+    // By keyboard: down to a child and select it; "Use this term" is whole in view.
+    await page.keyboard.press("ArrowDown");
+    await expect(treeItem(page, DIALEPTIC)).toBeFocused();
+    await expect(treeItem(page, DIALEPTIC)).toBeInViewport({ ratio: 1 });
+    await page.keyboard.press("Enter");
+    await expect(treeItem(page, DIALEPTIC)).toHaveAttribute("aria-selected", "true");
+    await expect(use).toBeEnabled();
+    await expect(use).toBeInViewport({ ratio: 1 });
+    await use.click();
+    await expect(revision(page)).toHaveAttribute("title", "Revision 2");
+    await expect(ownAnnotations(page).first()).toContainText(DIALEPTIC);
+
+    // Closing the tree brings the panel back beside the text, with the focus on "Show in tree".
+    await treeItem(page, DIALEPTIC).click();
+    await page.keyboard.press("Escape");
+    await expect(treePanel(page)).toHaveCount(0);
+    await expect(layout(page)).not.toHaveClass(/panel-given-to-tree/);
+    expectSameBox(await box(page.locator(".inspector-pane")), inspectorBefore);
+    await expect(page.locator(".inspector-pane h2")).toContainText(DIALEPTIC);
+    await expect(showInTree(page)).toBeFocused();
   });
 });

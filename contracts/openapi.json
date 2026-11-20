@@ -2562,6 +2562,51 @@
         "x-ontotator-scope": "session"
       }
     },
+    "/api/v1/translation-reviews/{assignment_id}/draft/typography-hints": {
+      "get": {
+        "tags": [
+          "translation-reviews"
+        ],
+        "summary": "Draft Typography Hints",
+        "description": "Spacing errors and invisible characters of the saved draft text.\n\nRule codes and positions only, as the hints of a text version; shown in\nthe confirmation of \"Submit review\u2026\". They block nothing.",
+        "operationId": "draft_typography_hints_api_v1_translation_reviews__assignment_id__draft_typography_hints_get",
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Assignment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftTypographyHintsView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "read",
+        "x-ontotator-project-token": true
+      }
+    },
     "/api/v1/translation-reviews/{assignment_id}/checked-sentences": {
       "put": {
         "tags": [
@@ -2756,6 +2801,155 @@
                     "$ref": "#/components/schemas/TranslationReviewRecord"
                   },
                   "title": "Response Project Review Records Api V1 Projects  Key  Translation Reviews Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "read",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/translation-review-list": {
+      "get": {
+        "tags": [
+          "translation-reviews"
+        ],
+        "summary": "Translation Review List",
+        "description": "Submitted and open translation reviews (leads and system admins).",
+        "operationId": "translation_review_list_api_v1_projects__key__translation_review_list_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "reviewer",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The reviewer's pseudonym.",
+              "title": "Reviewer"
+            },
+            "description": "The reviewer's pseudonym."
+          },
+          {
+            "name": "decision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "accepted_unchanged",
+                      "accepted_corrected",
+                      "query",
+                      "rejected",
+                      "open"
+                    ],
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Decision"
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Languages of the reviewed texts.",
+              "title": "Language"
+            },
+            "description": "Languages of the reviewed texts."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "-submitted",
+                "submitted"
+              ],
+              "type": "string",
+              "description": "By submitted date; open reviews always come last.",
+              "default": "-submitted",
+              "title": "Sort"
+            },
+            "description": "By submitted date; open reviews always come last."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranslationReviewListPage"
                 }
               }
             }
@@ -5234,7 +5428,9 @@
                     "enum": [
                       "guidelines_unclear",
                       "over_limit",
-                      "lead_paused"
+                      "lead_paused",
+                      "can_take_annotator",
+                      "typography_hints"
                     ],
                     "type": "string"
                   }
@@ -5835,7 +6031,9 @@
                     "enum": [
                       "guidelines_unclear",
                       "over_limit",
-                      "lead_paused"
+                      "lead_paused",
+                      "can_take_annotator",
+                      "typography_hints"
                     ],
                     "type": "string"
                   }
@@ -6190,7 +6388,7 @@
             "required": true,
             "schema": {
               "type": "integer",
-              "maximum": 20,
+              "maximum": 2147483647,
               "minimum": 1,
               "title": "Annotations Per Text"
             }
@@ -7043,7 +7241,7 @@
           "bulk-task-actions"
         ],
         "summary": "Bulk Undo",
-        "description": "Undo a bulk reopen or withdrawal by the ``undo.id`` of its apply.\n\nThe server keeps what the action changed; the request names only that\nrecord. It works once, for the lead who applied the action, before\n``undo.expires_at``, and only while the texts are exactly as the action\nleft them (tasks, drafts, review drafts, rounds, final results, plan,\nversions); otherwise 409 ``BULK_UNDO_STALE`` and nothing is undone.\nReopened tasks are submitted again; withdrawn tasks come back with their\ndrafts. An action that reopened a translation review has no Undo.\n``preview: true`` changes nothing: it lists the tasks the Undo would\nbring back (``tasks``) and, in ``blocked``, why it cannot run now\n(``changed``, ``not_in_plan``, ``person_unavailable``); a record that is\nunknown, expired or already undone is refused in a preview too.",
+        "description": "Undo a bulk reopen or withdrawal by the ``undo.id`` of its apply.\n\nThe server keeps what the action changed; the request names only that\nrecord. It works once, for the lead who applied the action, before\n``undo.expires_at``, and only while the texts are exactly as the action\nleft them (tasks, drafts, review drafts, rounds, final results, plan,\nversions); otherwise 409 ``BULK_UNDO_STALE`` and nothing is undone.\nReopened tasks are submitted again; withdrawn tasks come back with their\ndrafts. An action that reopened a translation review has no Undo.\n``preview: true`` changes nothing: it lists the tasks the Undo would\nbring back (``tasks``) and, in ``blocked``, why it cannot run now\n(``changed``, ``not_in_plan``, ``person_unavailable``); a record that is\nunknown, expired or already undone is refused in a preview too.\n``blocked_texts`` names each text in the way and what changed on it\n(``texts``: how many texts the action changed). The refusal of a blocked\nUndo carries that answer as ``preview`` in its details.",
         "operationId": "bulk_undo_api_v1_projects__key__bulk_task_actions_undo_post",
         "parameters": [
           {
@@ -7570,6 +7768,61 @@
         "x-ontotator-project-token": true
       }
     },
+    "/api/v1/assignments/{assignment_id}/correction-reason": {
+      "post": {
+        "tags": [
+          "translation-workflow"
+        ],
+        "summary": "Add Correction Reason",
+        "description": "Issue 483: the lead adds to the reason of \"Ask a reviewer to correct\u2026\"\nwhile the review is open. Append-only: the reason as sent never changes.",
+        "operationId": "add_correction_reason_api_v1_assignments__assignment_id__correction_reason_post",
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Assignment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectionReasonAdditionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorrectionReasonAdditionView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
     "/api/v1/projects/{key}/documents/{doc}/lead-correction": {
       "post": {
         "tags": [
@@ -7923,6 +8176,122 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EditorialCorrectionResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
+    "/api/v1/projects/{key}/documents/{doc}/query-decision": {
+      "get": {
+        "tags": [
+          "translation-workflow"
+        ],
+        "summary": "Preview Query Decision",
+        "description": "Issue 483, read only: the queried review of this version with the\nreviewer's proposed text, this version's text and whether a lead can\ndecide the query.",
+        "operationId": "preview_query_decision_api_v1_projects__key__documents__doc__query_decision_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "doc",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Doc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryDecisionPreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      },
+      "post": {
+        "tags": [
+          "translation-workflow"
+        ],
+        "summary": "Decide Query",
+        "description": "Issue 483: close a queried translation review as the lead: take the\nreviewer's text as the next version, accepted, or accept this version as\nit is; with an answer the reviewer reads at their submitted task.",
+        "operationId": "decide_query_api_v1_projects__key__documents__doc__query_decision_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "doc",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Doc"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryDecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryDecisionResult"
                 }
               }
             }
@@ -13100,6 +13469,13 @@
           "rows_over_target": {
             "type": "integer",
             "title": "Rows Over Target"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/AnnotationTargetRow"
+            },
+            "type": "array",
+            "title": "Rows"
           }
         },
         "type": "object",
@@ -13107,6 +13483,29 @@
           "rows_over_target"
         ],
         "title": "AnnotationTargetPreview"
+      },
+      "AnnotationTargetRow": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "annotators": {
+            "type": "integer",
+            "title": "Annotators"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "annotators"
+        ],
+        "title": "AnnotationTargetRow"
       },
       "AnnotationTypeDefinition": {
         "properties": {
@@ -13203,7 +13602,7 @@
             "anyOf": [
               {
                 "type": "integer",
-                "maximum": 20.0,
+                "maximum": 2147483647.0,
                 "minimum": 1.0
               },
               {
@@ -13284,7 +13683,7 @@
             "anyOf": [
               {
                 "type": "integer",
-                "maximum": 20.0,
+                "maximum": 2147483647.0,
                 "minimum": 1.0
               },
               {
@@ -13901,6 +14300,17 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
           }
         },
         "type": "object",
@@ -14391,7 +14801,8 @@
             "enum": [
               "case",
               "import",
-              "activity"
+              "activity",
+              "given"
             ],
             "title": "Sort",
             "default": "case"
@@ -14493,7 +14904,8 @@
             "enum": [
               "case",
               "import",
-              "activity"
+              "activity",
+              "given"
             ],
             "title": "Sort",
             "default": "case"
@@ -14699,6 +15111,17 @@
           "project_per_text": {
             "type": "integer",
             "title": "Project Per Text"
+          },
+          "max_per_text": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Per Text"
           },
           "digest": {
             "type": "string",
@@ -14924,6 +15347,11 @@
             "pattern": "^[0-9]{0,9}$",
             "title": "Expected Latest Version",
             "default": ""
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "default": ""
           }
         },
         "type": "object",
@@ -14965,6 +15393,61 @@
           "files[]"
         ],
         "title": "Body_upload_ontology_results_api_v1_admin_ontologies_upload_results_post"
+      },
+      "BracketCheck": {
+        "properties": {
+          "source_count": {
+            "type": "integer",
+            "title": "Source Count"
+          },
+          "translation_count": {
+            "type": "integer",
+            "title": "Translation Count"
+          },
+          "passages": {
+            "items": {
+              "$ref": "#/components/schemas/BracketedPassage"
+            },
+            "type": "array",
+            "title": "Passages"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_count",
+          "translation_count",
+          "passages"
+        ],
+        "title": "BracketCheck",
+        "description": "``passages`` is empty unless the translation has more passages."
+      },
+      "BracketedPassage": {
+        "properties": {
+          "start": {
+            "type": "integer",
+            "title": "Start"
+          },
+          "end": {
+            "type": "integer",
+            "title": "End"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "text"
+        ],
+        "title": "BracketedPassage"
       },
       "BulkAcceptance": {
         "properties": {
@@ -15248,7 +15731,7 @@
             "title": "Status"
           },
           "person": {
-            "$ref": "#/components/schemas/PersonRefView"
+            "$ref": "#/components/schemas/MemberRefView"
           },
           "text_paused": {
             "type": "boolean",
@@ -15998,7 +16481,7 @@
             "title": "Status"
           },
           "person": {
-            "$ref": "#/components/schemas/PersonRefView"
+            "$ref": "#/components/schemas/MemberRefView"
           },
           "text_paused": {
             "type": "boolean",
@@ -16128,6 +16611,17 @@
                 "type": "null"
               }
             ]
+          },
+          "texts": {
+            "type": "integer",
+            "title": "Texts"
+          },
+          "blocked_texts": {
+            "items": {
+              "$ref": "#/components/schemas/BulkUndoTextBlock"
+            },
+            "type": "array",
+            "title": "Blocked Texts"
           }
         },
         "type": "object",
@@ -16174,7 +16668,7 @@
             "title": "Status"
           },
           "person": {
-            "$ref": "#/components/schemas/PersonRefView"
+            "$ref": "#/components/schemas/MemberRefView"
           }
         },
         "type": "object",
@@ -16188,6 +16682,44 @@
           "person"
         ],
         "title": "BulkUndoTaskView"
+      },
+      "BulkUndoTextBlock": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "final",
+              "versions",
+              "plan",
+              "tasks",
+              "submissions",
+              "drafts",
+              "not_in_plan",
+              "person_unavailable"
+            ],
+            "title": "Reason"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "reason",
+          "message"
+        ],
+        "title": "BulkUndoTextBlock"
       },
       "BulkUndoView": {
         "properties": {
@@ -17509,6 +18041,76 @@
         ],
         "title": "CorrectionAssignmentRequest"
       },
+      "CorrectionReasonAdditionRequest": {
+        "properties": {
+          "note": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "note"
+        ],
+        "title": "CorrectionReasonAdditionRequest",
+        "description": "Issue 483: what the lead adds to the reason of a correction request."
+      },
+      "CorrectionReasonAdditionView": {
+        "properties": {
+          "assignment_id": {
+            "type": "integer",
+            "title": "Assignment Id"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          },
+          "added_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Added At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "assignment_id",
+          "note",
+          "added_at"
+        ],
+        "title": "CorrectionReasonAdditionView",
+        "description": "One addition to the reason of a correction request, as saved."
+      },
+      "CorrectionRequestView": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Requested At"
+          },
+          "additions": {
+            "items": {
+              "$ref": "#/components/schemas/ReasonAdditionView"
+            },
+            "type": "array",
+            "title": "Additions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason",
+          "requested_at"
+        ],
+        "title": "CorrectionRequestView",
+        "description": "Why the lead asked for this review with \"Ask a reviewer to correct\u2026\"\n(issue 483): the reason as sent, and what the lead added to it since."
+      },
       "CreateProjectRequest": {
         "properties": {
           "key": {
@@ -17992,7 +18594,7 @@
             "title": "Recorded At"
           },
           "author": {
-            "$ref": "#/components/schemas/PersonRefView"
+            "$ref": "#/components/schemas/MemberRefView"
           }
         },
         "type": "object",
@@ -18765,7 +19367,9 @@
                 "enum": [
                   "guidelines_unclear",
                   "over_limit",
-                  "lead_paused"
+                  "lead_paused",
+                  "can_take_annotator",
+                  "typography_hints"
                 ]
               },
               {
@@ -18774,7 +19378,9 @@
                   "enum": [
                     "guidelines_unclear",
                     "over_limit",
-                    "lead_paused"
+                    "lead_paused",
+                    "can_take_annotator",
+                    "typography_hints"
                   ]
                 },
                 "type": "array"
@@ -19186,6 +19792,10 @@
               }
             ]
           },
+          "typography_hints": {
+            "type": "integer",
+            "title": "Typography Hints"
+          },
           "consolidation_progress": {
             "anyOf": [
               {
@@ -19408,6 +20018,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/VersionEditorialCorrectionView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "query_decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VersionQueryDecisionView"
               },
               {
                 "type": "null"
@@ -19654,6 +20274,49 @@
         ],
         "title": "DraftResponse"
       },
+      "DraftTypographyHintsView": {
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "description": "Draft revision the hints were computed for."
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts",
+            "description": "Number of hints per rule code."
+          },
+          "hints": {
+            "items": {
+              "$ref": "#/components/schemas/TypographyHintView"
+            },
+            "type": "array",
+            "title": "Hints"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "description": "True when 'hints' holds fewer than 'total'."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "revision",
+          "total",
+          "counts",
+          "hints",
+          "truncated"
+        ],
+        "title": "DraftTypographyHintsView"
+      },
       "Duplicate": {
         "properties": {
           "document_id": {
@@ -19805,6 +20468,72 @@
         ],
         "title": "EditorProposal",
         "description": "Editor projection; producer metadata never changes snapshot hashes."
+      },
+      "EditorialCarryPerson": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "submitted",
+              "started"
+            ],
+            "title": "Status"
+          },
+          "carried": {
+            "type": "boolean",
+            "title": "Carried"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "number_changed",
+                  "final_result",
+                  "consolidation",
+                  "translation_not_accepted",
+                  "from_proposals",
+                  "task_paused",
+                  "findings_need_check",
+                  "not_submitted",
+                  "not_carryable"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "findings": {
+            "type": "integer",
+            "title": "Findings"
+          },
+          "needs_check": {
+            "type": "integer",
+            "title": "Needs Check"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "display_name",
+          "status",
+          "carried",
+          "reason",
+          "findings",
+          "needs_check"
+        ],
+        "title": "EditorialCarryPerson",
+        "description": "Issue 465: one person's started or submitted annotation on the\ncorrected version and whether the typo fix moves it to the new version\nby itself (``carried``). ``reason`` says why not: ``number_changed``,\n``final_result``, ``consolidation``, ``translation_not_accepted``,\n``from_proposals``, ``task_paused``,\n``findings_need_check``, ``not_submitted`` (started, not submitted) or\n``not_carryable``; such work keeps the manual flow."
       },
       "EditorialChange": {
         "properties": {
@@ -20033,6 +20762,20 @@
                 "type": "null"
               }
             ]
+          },
+          "annotation_carry": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EditorialCarryPerson"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annotation Carry"
           }
         },
         "type": "object",
@@ -20207,6 +20950,18 @@
           "tasks_following": {
             "type": "integer",
             "title": "Tasks Following"
+          },
+          "annotations_carried": {
+            "type": "integer",
+            "title": "Annotations Carried",
+            "default": 0
+          },
+          "annotation_carry": {
+            "items": {
+              "$ref": "#/components/schemas/EditorialCarryPerson"
+            },
+            "type": "array",
+            "title": "Annotation Carry"
           }
         },
         "type": "object",
@@ -20722,7 +21477,7 @@
           "author": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -20739,6 +21494,17 @@
               }
             ],
             "title": "Guideline Version"
+          },
+          "guideline_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guideline Label"
           },
           "guideline_withdrawn": {
             "type": "boolean",
@@ -20991,7 +21757,7 @@
           "selected_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -21235,7 +22001,7 @@
           "author": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -21587,6 +22353,17 @@
             "type": "integer",
             "title": "Version"
           },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
           "kind": {
             "type": "string",
             "enum": [
@@ -21767,6 +22544,17 @@
             "type": "integer",
             "title": "Version"
           },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
           "change_note": {
             "anyOf": [
               {
@@ -21813,6 +22601,17 @@
           "to_version": {
             "type": "integer",
             "title": "To Version"
+          },
+          "to_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Label"
           },
           "changes": {
             "items": {
@@ -21883,6 +22682,17 @@
           "version": {
             "type": "integer",
             "title": "Version"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
           },
           "kind": {
             "type": "string",
@@ -22834,7 +23644,7 @@
           "paused_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -22984,6 +23794,47 @@
           "roles"
         ],
         "title": "MemberChange"
+      },
+      "MemberRefView": {
+        "properties": {
+          "pseudonym": {
+            "type": "string",
+            "title": "Pseudonym"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "is_me": {
+            "type": "boolean",
+            "title": "Is Me",
+            "default": false
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pseudonym"
+        ],
+        "title": "MemberRefView",
+        "description": "A person in a lead's task views (Documents rows, previews of the bulk\nactions), with the login name API clients name a person by (issue 471).\n\n``username`` only for a lead and of a current member of the project, as\nthe members list shows it; otherwise None. Every other view uses\n``PersonRefView``, which has no such field: problem reports, the audit\nand the job list name nobody's login."
       },
       "MissingFinalView": {
         "properties": {
@@ -24165,7 +25016,7 @@
           "reviewer": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -24719,7 +25570,7 @@
             "title": "Status"
           },
           "person": {
-            "$ref": "#/components/schemas/PersonRefView"
+            "$ref": "#/components/schemas/MemberRefView"
           },
           "paused_by_report": {
             "type": "boolean",
@@ -26541,6 +27392,18 @@
             "type": "integer",
             "title": "Submitted",
             "default": 0
+          },
+          "translation_reviews_submitted": {
+            "type": "integer",
+            "title": "Translation Reviews Submitted"
+          },
+          "annotations_submitted": {
+            "type": "integer",
+            "title": "Annotations Submitted"
+          },
+          "reviews_submitted": {
+            "type": "integer",
+            "title": "Reviews Submitted"
           }
         },
         "type": "object",
@@ -27242,6 +28105,17 @@
             "title": "Annotation Policy Revision",
             "default": 1
           },
+          "annotations_per_text_max": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annotations Per Text Max"
+          },
           "frozen_translations": {
             "anyOf": [
               {
@@ -27358,7 +28232,7 @@
             "anyOf": [
               {
                 "type": "integer",
-                "maximum": 20.0,
+                "maximum": 2147483647.0,
                 "minimum": 1.0
               },
               {
@@ -27780,6 +28654,352 @@
         "title": "Provenance",
         "description": "Origin and extraction details for an annotation or statement."
       },
+      "QueriedReviewView": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "assignment_id": {
+            "type": "integer",
+            "title": "Assignment Id"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "rationale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rationale"
+          },
+          "categories": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "omission",
+                "addition",
+                "assertion",
+                "value",
+                "anatomy",
+                "terminology",
+                "source"
+              ]
+            },
+            "type": "array",
+            "title": "Categories"
+          },
+          "proposed_text": {
+            "type": "string",
+            "title": "Proposed Text"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "assignment_id",
+          "document_id",
+          "version",
+          "rationale",
+          "categories",
+          "proposed_text",
+          "created_at"
+        ],
+        "title": "QueriedReviewView",
+        "description": "The translation review submitted as a query that the lead decides."
+      },
+      "QueryAnswer": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "reviewer_text",
+              "unchanged"
+            ],
+            "title": "Kind"
+          },
+          "accepted_version": {
+            "type": "integer",
+            "title": "Accepted Version"
+          },
+          "decided_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Decided At"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
+          "edited": {
+            "type": "boolean",
+            "title": "Edited",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "accepted_version",
+          "decided_at"
+        ],
+        "title": "QueryAnswer",
+        "description": "The lead's decision on the reviewer's query (issue 483), as the\nreviewer reads it at the submitted task.\n\n``reviewer_text``: the proposed text became version\n``accepted_version`` (``edited``: the lead changed it before saving);\n``unchanged``: the reviewed version (or its typo fix) was accepted as it\nis. ``answer`` is what the lead wrote."
+      },
+      "QueryDecisionPreview": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "next_version": {
+            "type": "integer",
+            "title": "Next Version"
+          },
+          "translation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translation Status"
+          },
+          "text_sha256": {
+            "type": "string",
+            "title": "Text Sha256"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QueriedReviewView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proposes_changes": {
+            "type": "boolean",
+            "title": "Proposes Changes"
+          },
+          "review_on": {
+            "type": "boolean",
+            "title": "Review On"
+          },
+          "annotate_accepted_only": {
+            "type": "boolean",
+            "title": "Annotate Accepted Only"
+          },
+          "annotations": {
+            "$ref": "#/components/schemas/LeadCorrectionAnnotationsView"
+          },
+          "open_consolidations": {
+            "type": "integer",
+            "title": "Open Consolidations"
+          },
+          "final_result": {
+            "type": "boolean",
+            "title": "Final Result"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "case_id",
+          "language",
+          "version",
+          "next_version",
+          "translation_status",
+          "text_sha256",
+          "text",
+          "available",
+          "reason",
+          "review",
+          "proposes_changes",
+          "review_on",
+          "annotate_accepted_only",
+          "annotations",
+          "open_consolidations",
+          "final_result"
+        ],
+        "title": "QueryDecisionPreview",
+        "description": "Issue 483, read only: the query a lead decides at this version."
+      },
+      "QueryDecisionRequest": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "reviewer_text",
+              "unchanged"
+            ],
+            "title": "Kind"
+          },
+          "expected_text_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Text Sha256"
+          },
+          "expected_review_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Expected Review Id"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "expected_text_sha256",
+          "expected_review_id"
+        ],
+        "title": "QueryDecisionRequest",
+        "description": "Issue 483: the lead's decision on a queried translation review.\n\n``reviewer_text``: ``text`` (the reviewer's proposed text, as the lead\nconfirmed it) becomes the next version, accepted. ``unchanged``: the\nversion is accepted as it is, and ``answer`` is required."
+      },
+      "QueryDecisionResult": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "reviewer_text",
+              "unchanged"
+            ],
+            "title": "Kind"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "decided_document_id": {
+            "type": "string",
+            "title": "Decided Document Id"
+          },
+          "decided_version": {
+            "type": "integer",
+            "title": "Decided Version"
+          },
+          "translation_status": {
+            "type": "string",
+            "const": "accepted",
+            "title": "Translation Status"
+          },
+          "text_sha256": {
+            "type": "string",
+            "title": "Text Sha256"
+          },
+          "edited": {
+            "type": "boolean",
+            "title": "Edited"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "kind",
+          "document_id",
+          "version",
+          "decided_document_id",
+          "decided_version",
+          "translation_status",
+          "text_sha256",
+          "edited"
+        ],
+        "title": "QueryDecisionResult"
+      },
       "ReanchorItem": {
         "properties": {
           "proposal_set_id": {
@@ -27957,6 +29177,57 @@
           "reviewer_id"
         ],
         "title": "ReanchorResolution"
+      },
+      "ReasonAddition": {
+        "properties": {
+          "note": {
+            "type": "string",
+            "title": "Note"
+          },
+          "added_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Added At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "note",
+          "added_at"
+        ],
+        "title": "ReasonAddition",
+        "description": "A lead's addition to the reason of a correction request (issue 483),\nas the reviewer reads it: what and when. The reviewer reads \"the lead\",\nnot the lead's name, as for the reason itself."
+      },
+      "ReasonAdditionView": {
+        "properties": {
+          "note": {
+            "type": "string",
+            "title": "Note"
+          },
+          "added_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Added At"
+          },
+          "added_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MemberRefView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "note",
+          "added_at"
+        ],
+        "title": "ReasonAdditionView",
+        "description": "A lead's addition to the reason of a correction request (issue 483)."
       },
       "ReasonRequest": {
         "properties": {
@@ -28443,7 +29714,7 @@
           "reporter": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -28820,6 +30091,20 @@
             ],
             "title": "Second Review Reason"
           },
+          "second_review_additions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReasonAddition"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Second Review Additions"
+          },
           "reopened_at": {
             "anyOf": [
               {
@@ -28842,6 +30127,26 @@
               }
             ],
             "title": "Reopen Reason"
+          },
+          "query_answer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QueryAnswer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "added_brackets": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BracketCheck"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -28884,7 +30189,7 @@
             "title": "Status"
           },
           "person": {
-            "$ref": "#/components/schemas/PersonRefView"
+            "$ref": "#/components/schemas/MemberRefView"
           }
         },
         "type": "object",
@@ -29200,7 +30505,12 @@
               "round_started",
               "final_chosen",
               "final_changed",
-              "final_restored"
+              "final_restored",
+              "text_paused",
+              "text_released",
+              "carried_by_typo_fix",
+              "correction_requested",
+              "correction_reason_added"
             ],
             "title": "Kind"
           },
@@ -29223,7 +30533,7 @@
           "by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -29255,7 +30565,7 @@
           "from_person": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -29265,7 +30575,7 @@
           "to_person": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -29324,6 +30634,28 @@
               }
             ],
             "title": "Reason"
+          },
+          "from_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Version"
+          },
+          "to_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Version"
           }
         },
         "additionalProperties": false,
@@ -29333,7 +30665,7 @@
           "at"
         ],
         "title": "RowChangeView",
-        "description": "A change of who works on a row, how, or of its final result: its\nHistory line, with who did it, when and (where one was given) why.\n\n``by`` is the person who made the change; a withdrawn final result\n(#343) names the lead in ``from_person`` instead. ``reopened``,\n``reopen_undone`` and ``round_started`` name the task and its person\n(``assignment_id``, ``to_person``); the ``final_*`` kinds name the\nresults (``from_result`` the one replaced, ``to_result`` the one final\nafterwards; null when the submission is no longer among the row's)."
+        "description": "A change of who works on a row, how, or of its final result: its\nHistory line, with who did it, when and (where one was given) why.\n\n``by`` is the person who made the change; a withdrawn final result\n(#343) names the lead in ``from_person`` instead. ``reopened``,\n``reopen_undone`` and ``round_started`` name the task and its person\n(``assignment_id``, ``to_person``); the ``final_*`` kinds name the\nresults (``from_result`` the one replaced, ``to_result`` the one final\nafterwards; null when the submission is no longer among the row's).\n``text_paused`` and ``text_released`` (issue 464) are a lead's pause and\nrelease of the text, with ``by`` and the ``reason`` given.\n``carried_by_typo_fix`` (issue 465): the submitted annotation of\n``to_person`` moved to the typo fix's new version by itself.\n``correction_requested`` is \"Ask a reviewer to correct\u2026\" and\n``correction_reason_added`` an addition to its reason (issue 483), the\ntask and its person as for ``reopened``, the text in ``reason``."
       },
       "RowItemView": {
         "properties": {
@@ -29495,7 +30827,7 @@
           "reporter": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -29591,7 +30923,7 @@
       "RowResultRefView": {
         "properties": {
           "author": {
-            "$ref": "#/components/schemas/PersonRefView"
+            "$ref": "#/components/schemas/MemberRefView"
           },
           "consolidation": {
             "type": "boolean",
@@ -29685,7 +31017,7 @@
           "author": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -29836,7 +31168,7 @@
           "author": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -29853,6 +31185,17 @@
               }
             ],
             "title": "Guideline Version"
+          },
+          "guideline_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guideline Label"
           },
           "guideline_withdrawn": {
             "type": "boolean",
@@ -30640,7 +31983,7 @@
         "properties": {
           "people": {
             "items": {
-              "$ref": "#/components/schemas/PersonRefView"
+              "$ref": "#/components/schemas/MemberRefView"
             },
             "type": "array",
             "title": "People"
@@ -30768,6 +32111,7 @@
                   "translation_not_accepted",
                   "unchanged",
                   "with_corrections",
+                  "typos_fixed",
                   "in_package",
                   "outside",
                   "review_off",
@@ -30776,6 +32120,7 @@
                   "not_exported",
                   "carried_on_submit",
                   "lead_pause",
+                  "report_pause",
                   "v2_not_annotated",
                   "no_target_proposals",
                   "correction",
@@ -30928,7 +32273,6 @@
               "type": "string"
             },
             "type": "array",
-            "maxItems": 40,
             "minItems": 2,
             "title": "Source Submission Ids"
           },
@@ -31136,7 +32480,7 @@
           "reporter": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -31172,7 +32516,7 @@
           "person": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -31186,7 +32530,7 @@
           },
           "people": {
             "items": {
-              "$ref": "#/components/schemas/PersonRefView"
+              "$ref": "#/components/schemas/MemberRefView"
             },
             "type": "array",
             "title": "People"
@@ -31412,6 +32756,11 @@
             "type": "string",
             "title": "Author Label"
           },
+          "is_me": {
+            "type": "boolean",
+            "title": "Is Me",
+            "default": false
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -31442,6 +32791,17 @@
               }
             ],
             "title": "Guideline Version"
+          },
+          "guideline_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guideline Label"
           },
           "guideline_withdrawn": {
             "type": "boolean",
@@ -31868,6 +33228,32 @@
               }
             ],
             "title": "Second Review Reason"
+          },
+          "second_review_additions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReasonAddition"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Second Review Additions"
+          },
+          "query_answered_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query Answered At"
           },
           "report_answered": {
             "type": "boolean",
@@ -33011,7 +34397,7 @@
           "paused_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -33370,6 +34756,206 @@
         ],
         "title": "TranslationCheckView"
       },
+      "TranslationReviewListPage": {
+        "properties": {
+          "reviews": {
+            "items": {
+              "$ref": "#/components/schemas/TranslationReviewListRow"
+            },
+            "type": "array",
+            "title": "Reviews"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "reviewers": {
+            "items": {
+              "$ref": "#/components/schemas/PersonRefView"
+            },
+            "type": "array",
+            "title": "Reviewers"
+          },
+          "languages": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Languages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reviews",
+          "total",
+          "limit",
+          "offset",
+          "reviewers",
+          "languages"
+        ],
+        "title": "TranslationReviewListPage"
+      },
+      "TranslationReviewListRow": {
+        "properties": {
+          "review_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Id"
+          },
+          "assignment_id": {
+            "type": "integer",
+            "title": "Assignment Id"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "reviewer": {
+            "$ref": "#/components/schemas/PersonRefView"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "accepted_unchanged",
+              "accepted_corrected",
+              "query",
+              "rejected",
+              "open"
+            ],
+            "title": "Decision"
+          },
+          "clinical_change": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clinical Change"
+          },
+          "categories": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "omission",
+                "addition",
+                "assertion",
+                "value",
+                "anatomy",
+                "terminology",
+                "source"
+              ]
+            },
+            "type": "array",
+            "title": "Categories"
+          },
+          "rationale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rationale"
+          },
+          "changed_passages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changed Passages"
+          },
+          "created_variant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created Variant Id"
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At"
+          },
+          "assigned_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "review_id",
+          "assignment_id",
+          "document_id",
+          "case_id",
+          "language",
+          "version",
+          "reviewer",
+          "decision",
+          "clinical_change",
+          "categories",
+          "rationale",
+          "changed_passages",
+          "created_variant_id",
+          "submitted_at",
+          "assigned_at"
+        ],
+        "title": "TranslationReviewListRow",
+        "description": "One translation review of the project.\n\n``decision`` is ``open`` for an assigned review that is not submitted\n(again); then ``review_id``, the form fields and ``submitted_at`` are\nnull. ``changed_passages``: the passages the reviewer's text differs in\nfrom the reviewed text, compared by words (0 when the text is unchanged,\nnull when the texts differ too much to count). ``created_variant_id``:\nthe version an \"accepted with corrections\" review created."
+      },
       "TranslationReviewRecord": {
         "properties": {
           "id": {
@@ -33503,6 +35089,17 @@
             "type": "boolean",
             "title": "Guideline Withdrawn",
             "default": false
+          },
+          "guideline_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guideline Label"
           }
         },
         "type": "object",
@@ -33934,7 +35531,8 @@
               "TAB",
               "ZERO_WIDTH_CHARACTER",
               "SOFT_HYPHEN",
-              "CONTROL_CHARACTER"
+              "CONTROL_CHARACTER",
+              "DOUBLE_FULL_STOP"
             ],
             "title": "Rule"
           },
@@ -34761,7 +36359,7 @@
           "accepted_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -34827,7 +36425,7 @@
           "discarded_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -34873,7 +36471,7 @@
           "corrected_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -35021,6 +36619,78 @@
         ],
         "title": "VersionOrigin",
         "description": "How a version after the first was made, for its reviewer.\n\n``upload``: a lead uploaded the text (\"Upload new version\u2026\", with the\nupload record's fields); ``review_correction``: a translation reviewer\ncorrected the previous version; ``lead_correction``: a lead did\n(\"Correct the translation\u2026\"); ``editorial_correction``: a lead fixed\nspacing, typos or grammar without a review (\"Fix typos\u2026\", ``note`` is\nthe recorded reason); ``correction``: no record (an import)."
+      },
+      "VersionQueryDecisionView": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "reviewer_text",
+              "unchanged"
+            ],
+            "title": "Kind"
+          },
+          "decided_document_id": {
+            "type": "string",
+            "title": "Decided Document Id"
+          },
+          "reviewed_document_id": {
+            "type": "string",
+            "title": "Reviewed Document Id"
+          },
+          "reviewer_assignment_id": {
+            "type": "integer",
+            "title": "Reviewer Assignment Id"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
+          "edited": {
+            "type": "boolean",
+            "title": "Edited",
+            "default": false
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MemberRefView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "decided_document_id",
+          "reviewed_document_id",
+          "reviewer_assignment_id"
+        ],
+        "title": "VersionQueryDecisionView",
+        "description": "The lead's decision on a query that accepted this version (issue 483)."
       },
       "VersionRef": {
         "properties": {
@@ -35479,7 +37149,7 @@
           "uploaded_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -35686,7 +37356,7 @@
           "person": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -35724,7 +37394,7 @@
           "assigned_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -35774,6 +37444,16 @@
             "type": "boolean",
             "title": "Waiting For Lead",
             "default": false
+          },
+          "correction_request": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CorrectionRequestView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,

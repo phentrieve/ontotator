@@ -29,13 +29,17 @@ _VERSION_FK = (
 
 
 class GuidelineVersionRow(Base):
-    """One uploaded version: number, kind, size and hash; never changed."""
+    """One uploaded version: number, kind, size and hash; never changed.
+
+    ``label`` is the project's own name of the version ("3.1"), given at
+    publish; it stays when the version is withdrawn."""
 
     __tablename__ = "guideline_versions"
     __table_args__ = (
         CheckConstraint("version >= 1", name="version"),
         CheckConstraint("kind IN ('markdown', 'text')", name="kind"),
         CheckConstraint("size_bytes <= 262144", name="size_bytes"),
+        CheckConstraint("char_length(label) BETWEEN 1 AND 40", name="label"),
     )
     project_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey(f"{SCHEMA}.projects.id"), primary_key=True
@@ -49,6 +53,7 @@ class GuidelineVersionRow(Base):
     )
     created_by_label: Mapped[str]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    label: Mapped[str | None]
 
 
 class GuidelineContentRow(Base):

@@ -82,6 +82,9 @@
 .person-row-name { font-weight: var(--weight-strong); }
 .person-row-pseudonym,
 .person-row-details { color: var(--text-muted); font-size: var(--size-sm); line-height: var(--leading-sm); }
+/* The reason of "Ask a reviewer to correct…" with the lead's additions (issue 483), under the reviewer's row. */
+.correction-request-reason { overflow-wrap: anywhere; }
+.correction-request-quote { padding-inline-start: var(--space-3); border-inline-start: 3px solid var(--border-strong); color: var(--text); }
 .person-row-pseudonym { font-weight: var(--weight-regular); }
 .person-row-status { grid-area: status; justify-self: start; }
 .person-row-actions { grid-area: actions; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); }

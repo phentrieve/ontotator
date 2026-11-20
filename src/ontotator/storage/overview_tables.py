@@ -42,6 +42,9 @@ class DocumentsVisitRow(Base):
 class TextChangeResolutionRow(Base):
     """How work on an old text version was handled (append-only).
 
+    A submission may have several rows for one target version: every carry
+    is kept, also one whose task was withdrawn later (issue 461).
+
     ``decided_by`` is NULL for the system carry after ``finish_then_carry``;
     that row has ``assignment_id`` NULL and the new submission.
     """
@@ -68,12 +71,15 @@ class TextChangeResolutionRow(Base):
             name="assignment_or_submission",
         ),
         UniqueConstraint("project_id", "assignment_id"),
-        # Explicit: the conventional name exceeds PostgreSQL's 63 characters.
-        UniqueConstraint(
+        # Not unique since 0047 (issue 461): a carry whose task was withdrawn
+        # without a submission may be followed by a new carry of the same
+        # submission to the same version. The service allows one standing
+        # decision (``storage.text_change_carries``).
+        Index(
+            "ix_text_change_resolutions_submission_target",
             "project_id",
             "submission_id",
             "to_document_id",
-            name="uq_text_change_resolutions_submission_target",
         ),
     )
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
@@ -94,6 +100,51 @@ class TextChangeResolutionRow(Base):
         BigInteger, ForeignKey(f"{SCHEMA}.users.id")
     )
     decided_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class TypoFixCarryRow(Base):
+    """A submission the system made on a typo fix's new version (issue 465).
+
+    Append-only, one row per carried copy. After "Fix typos…" the person's
+    submitted annotation (``source_submission_id`` on ``from_document_id``)
+    is moved to the new version without anyone's click: the copy
+    (``submission_id`` on ``to_document_id``) has the same author and the
+    same findings, placed on the new text. This row is the copy's origin:
+    it is not a second annotation of that person (exports, counts) and it
+    names the correction (``correction_id``) that caused it.
+    """
+
+    __tablename__ = "typo_fix_carries"
+    __table_args__ = (
+        _document_fk("from_document_id"),
+        _document_fk("to_document_id"),
+        ForeignKeyConstraint(
+            ["project_id", "submission_id"],
+            [f"{SCHEMA}.submissions.project_id", f"{SCHEMA}.submissions.submission_id"],
+        ),
+        ForeignKeyConstraint(
+            ["project_id", "source_submission_id"],
+            [f"{SCHEMA}.submissions.project_id", f"{SCHEMA}.submissions.submission_id"],
+        ),
+        UniqueConstraint("project_id", "submission_id"),
+        Index(
+            "ix_typo_fix_carries_source",
+            "project_id",
+            "source_submission_id",
+        ),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.projects.id")
+    )
+    submission_id: Mapped[str]
+    source_submission_id: Mapped[str]
+    correction_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.translation_editorial_corrections.id")
+    )
+    from_document_id: Mapped[str]
+    to_document_id: Mapped[str]
+    carried_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
 class DraftSnapshotRow(Base):

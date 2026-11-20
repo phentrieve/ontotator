@@ -288,9 +288,13 @@ export function nextOtherDecision(page: DocumentRowsPage, afterKey: string): Nex
   return null;
 }
 
-/** "Keep final on v1" (the final's version). */
+/**
+ * "Keep final on v1" (the final's version). A text with one version has no other version to move to (issue 469):
+ * "Keep the current final result".
+ */
 export function keepLabel(row: DocumentRowView): string {
   const final = row.final;
+  if ((row.versions ?? []).length <= 1) return "Keep the current final result";
   return `Keep final on ${final ? versionName(final.version ?? 1, final.chain_name ?? "", row.parallel_roots) : "this version"}`;
 }
 

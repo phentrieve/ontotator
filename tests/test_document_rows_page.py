@@ -339,6 +339,7 @@ ROW_KEYS = {
     "proposal_set_unrecorded",
     "annotations_per_text",
     "lead_pause",
+    "typography_hints",
     "consolidation_progress",
     "unreviewed_translation",
 }
@@ -360,6 +361,7 @@ VERSION_KEYS = {
     "discarded",
     "upload",
     "editorial_correction",
+    "query_decision",
 }
 WORK_KEYS = {
     "person",
@@ -384,6 +386,7 @@ WORK_KEYS = {
     "unreviewed_translation",
     "waiting_for_translation_review",
     "waiting_for_lead",
+    "correction_request",
 }
 FINAL_KEYS = {
     "author",

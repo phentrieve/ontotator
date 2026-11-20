@@ -102,6 +102,23 @@ describe("actual typed variant reads", () => {
     expect(fetch.mock.calls[2][0]).toBe(`https://same.example${base}/cases`);
   });
 
+  it("gives own submissions a readable local time in the versions and in the text view layers (issue 472)", async () => {
+    const stamp = "2026-11-17T13:39:13.222074";
+    const own: Schemas["VersionRef"] = { kind: "own", id: "s1", label: "My annotation, from scratch", created_at: stamp };
+    const { client } = transport([own, ref]);
+    const refs = await client.listAnnotationVersions(project, documentId);
+    expect(refs.map(item => item.label)).toEqual([expect.stringMatching(/^My annotation, from scratch, 17 Nov( 2026)?, 13:39$/), "Tool"]);
+    const layers = transport({ entries: [
+      { kind: "own", ref: own, label: own.label, state: "submitted", count: 2, available: true },
+      { kind: "submission", ref: { ...own, kind: "submission", label: "ann-0004" }, label: "Ana Weber, submitted 17 Nov", state: "submitted", count: 2, available: true },
+      { kind: "person", ref: null, label: "Tom Reis, not started", state: "not_started", available: false, reason: "Not submitted yet." },
+    ] });
+    const entries = await layers.client.listTextLayers(project, documentId);
+    expect(entries.map(entry => entry.label)).toEqual([expect.stringMatching(/^My annotation, from scratch, 17 Nov( 2026)?, 13:39$/), "Ana Weber, submitted 17 Nov", "Tom Reis, not started"]);
+    expect(entries[1].ref?.label).toMatch(/^ann-0004 · 17 Nov( 2026)?, 13:39$/);
+    expect(entries.flatMap(entry => [entry.label, entry.ref?.label]).join(" ")).not.toContain("13:39:13");
+  });
+
   it("adds an actual assignment hint only when supplied", async () => {
     const { client, fetch } = transport([ref]);
     await client.listAnnotationVersions(project, documentId, 41);

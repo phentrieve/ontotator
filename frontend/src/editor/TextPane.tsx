@@ -62,7 +62,7 @@ export interface TextPaneProps {
 }
 
 const mentionsSignature = (mentions: MentionDisplay[]): string =>
-  JSON.stringify(mentions.map((m) => [m.evidence_id, m.kind ?? "", m.colorIndex ?? 0, m.negated ?? false, m.label ?? "", m.segments.map((s) => [s.start, s.end])]));
+  JSON.stringify(mentions.map((m) => [m.evidence_id, m.kind ?? "", m.colorIndex ?? 0, m.colourKey ?? "", m.negated ?? false, m.label ?? "", m.segments.map((s) => [s.start, s.end])]));
 
 /** The older wording of a passage as one line (marker name and tooltip). */
 const beforeWording = (passage: ChangePassage): string => passage.before.map((part) => part.text).join("").replace(/\s+/g, " ").trim();
@@ -203,6 +203,8 @@ export const TextPane: React.FC<TextPaneProps> = ({
   latestPassages.current = passageMarks;
   const [tip, setTip] = useState<{ index: number; anchor: DOMRect } | null>(null);
   const hideTimer = useRef<number | undefined>();
+  /** The passage whose tooltip was opened by a tap or click on its marker: it stays until it is dismissed. */
+  const pinnedTip = useRef<number | null>(null);
 
   const callbacks = useRef({ onSelection, onPick, onResizeMention, onHoverMentions, readOnly });
   callbacks.current = { onSelection, onPick, onResizeMention, onHoverMentions, readOnly };
@@ -304,7 +306,8 @@ export const TextPane: React.FC<TextPaneProps> = ({
   }, [passagesKey]);
 
   // The removed-text tooltip opens on hover and on keyboard focus of its marker and follows it while anything scrolls;
-  // Esc, blur or leaving it close it.
+  // Esc, blur or leaving it close it. A tap or click on the marker keeps it open (issue 468: on a touch screen the
+  // pointer "leaves" right after the tap) until the marker is tapped again, something else is tapped, or Esc.
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -316,15 +319,32 @@ export const TextPane: React.FC<TextPaneProps> = ({
       setTip({ index: Number(marker.dataset.passage), anchor: marker.getBoundingClientRect() });
     };
     const hideSoon = (event: Event) => {
-      if (!markerOf(event.target)) return;
+      if (!markerOf(event.target) || pinnedTip.current !== null) return;
       window.clearTimeout(hideTimer.current);
       hideTimer.current = window.setTimeout(() => setTip(null), 200);
     };
-    const hideNow = () => { window.clearTimeout(hideTimer.current); setTip(null); };
+    const close = () => { pinnedTip.current = null; window.clearTimeout(hideTimer.current); setTip(null); };
+    // Focus moving on closes it; a kept tooltip stays while the focus only drops (a tap inside the tooltip).
+    const hideNow = (event: FocusEvent) => { if (pinnedTip.current === null || event.relatedTarget) close(); };
     const follow = () => setTip((open) => {
       const marker = open ? container.querySelector<HTMLElement>(`.change-removed[data-passage="${open.index}"]`) : null;
+      if (open && !marker) pinnedTip.current = null;
       return open && marker ? { ...open, anchor: marker.getBoundingClientRect() } : null;
     });
+    // A tap or click: on the marker it opens and keeps the tooltip, or closes the one it keeps; anywhere else
+    // (but not inside the tooltip, which may scroll) it closes a kept tooltip.
+    const onClick = (event: MouseEvent) => {
+      const marker = markerOf(event.target);
+      if (marker && container.contains(marker)) {
+        const index = Number(marker.dataset.passage);
+        if (pinnedTip.current === index) { close(); return; }
+        pinnedTip.current = index;
+        window.clearTimeout(hideTimer.current);
+        setTip({ index, anchor: marker.getBoundingClientRect() });
+        return;
+      }
+      if (pinnedTip.current !== null && !(event.target instanceof Element && event.target.closest(".change-tip"))) close();
+    };
     // On the focused marker the arrow keys scroll a long earlier wording inside the tooltip.
     const onKey = (event: KeyboardEvent) => {
       if (!markerOf(event.target) || (event.key !== "ArrowDown" && event.key !== "ArrowUp") || event.shiftKey) return;
@@ -338,9 +358,12 @@ export const TextPane: React.FC<TextPaneProps> = ({
     container.addEventListener("mouseout", hideSoon);
     container.addEventListener("focusout", hideNow);
     container.addEventListener("keydown", onKey);
+    document.addEventListener("click", onClick, true);
     window.addEventListener("scroll", follow, true);
     return () => {
       window.clearTimeout(hideTimer.current);
+      pinnedTip.current = null;
+      document.removeEventListener("click", onClick, true);
       container.removeEventListener("mouseover", show);
       container.removeEventListener("focusin", show);
       container.removeEventListener("mouseout", hideSoon);
@@ -359,6 +382,7 @@ export const TextPane: React.FC<TextPaneProps> = ({
       event.preventDefault();
       event.stopImmediatePropagation();
       window.clearTimeout(hideTimer.current);
+      pinnedTip.current = null;
       setTip(null);
     };
     window.addEventListener("keydown", onEscape, true);
@@ -421,8 +445,8 @@ export const TextPane: React.FC<TextPaneProps> = ({
       <div ref={attachTextElement} className="text-container density-reading" tabIndex={0} data-changes={changes ? changes.op : undefined} />
       {tip && passages?.[tip.index] && <RemovedTip passage={passages[tip.index]} index={tip.index} since={passagesSince} anchor={tip.anchor}
         onEnter={() => window.clearTimeout(hideTimer.current)}
-        // Leaving the tooltip closes it, unless its marker still has the keyboard focus.
-        onLeave={() => { if (!(document.activeElement instanceof HTMLElement && document.activeElement.matches(`.change-removed[data-passage="${tip.index}"]`))) setTip(null); }} />}
+        // Leaving the tooltip closes it, unless it is kept open (tap or click) or its marker still has the keyboard focus.
+        onLeave={() => { if (pinnedTip.current === null && !(document.activeElement instanceof HTMLElement && document.activeElement.matches(`.change-removed[data-passage="${tip.index}"]`))) setTip(null); }} />}
     </div>
   );
 };

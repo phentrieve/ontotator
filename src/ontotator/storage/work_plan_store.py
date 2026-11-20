@@ -51,6 +51,7 @@ __all__ = [
     "add_acceptance",
     "bump_revisions",
     "clear_restored",
+    "counted_typo_fixes",
     "decided_rows",
     "discarded",
     "effective_plan",
@@ -112,6 +113,46 @@ def inherited_review_decisions(
         if current != document_id and decision in ("rejected", "query"):
             result[document_id] = decision
     return result
+
+
+def counted_typo_fixes(conn: Connection, pid: int) -> frozenset[str]:
+    """The versions made by an editorial correction (issue 453) that count
+    whatever their review decision is (``Version.typo_fix_counts``).
+
+    A typo fix is the text it fixes: it counts when that version does. Only
+    the fix of a correction takes that correction's rejected or queried
+    decision as "not newer" (the version before the correction is the target
+    again, as before the fix). The fix of a first version counts, and so does
+    a fix that was reviewed itself: a review of it never falls back to the
+    same text with the typos.
+    """
+    rows = conn.execute(
+        select(
+            EditorialCorrectionRow.document_id,
+            EditorialCorrectionRow.previous_document_id,
+            DocumentRow.origin,
+        )
+        .join(
+            DocumentRow,
+            and_(
+                DocumentRow.project_id == EditorialCorrectionRow.project_id,
+                DocumentRow.document_id == EditorialCorrectionRow.previous_document_id,
+            ),
+        )
+        .where(EditorialCorrectionRow.project_id == pid)
+    ).all()
+    if not rows:
+        return frozenset()
+    fixed = {row.document_id: (row.previous_document_id, row.origin) for row in rows}
+    reviewed = set(_review_decisions(conn, pid, sorted(fixed)))
+    counted: set[str] = set()
+    for document_id in fixed:
+        current, origin = document_id, None
+        while current in fixed and current not in reviewed:
+            current, origin = fixed[current]
+        if current in fixed or origin != "correction":
+            counted.add(document_id)
+    return frozenset(counted)
 
 
 def _latest_decisions(
@@ -179,6 +220,7 @@ def language_versions(
         return query if doc_ids is None else query.where(column.in_(doc_ids))
 
     decisions = _latest_decisions(conn, project_id, doc_ids)
+    typo_fixes = counted_typo_fixes(conn, project_id)
     packaged = set(
         conn.execute(
             scoped(
@@ -228,6 +270,7 @@ def language_versions(
                 translation_status=row.translation_status,
                 position=row.position,
                 latest_decision=decisions.get(row.document_id),
+                typo_fix_counts=row.document_id in typo_fixes,
             )
         )
     result: dict[RowKey, LanguageVersion] = {}

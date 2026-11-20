@@ -22,8 +22,8 @@ DocumentId = Annotated[
     Field(
         description=(
             "ID of one text version (document_id from list_texts): its hints"
-            " with positions. None: the number of hints of each text of the"
-            " project."
+            " with positions; a case ID is not a document_id. None: the number"
+            " of hints of each text of the project."
         )
     ),
 ]
@@ -110,8 +110,8 @@ def register_typography(
             blocks nothing and is not stored. Without document_id: one page
             of texts with their counts per rule ('next_after' for the next
             page; only texts with a hint are listed). Text is returned only
-            with include_text, which exists because this server runs with
-            ONTOTATOR_MCP_READ_CONTENT=1.
+            with include_text, which exists because this MCP server runs
+            with ONTOTATOR_MCP_READ_CONTENT=1.
             """
             return await hints(project, document_id, after, all_versions, include_text)
 
@@ -134,6 +134,8 @@ def register_typography(
             blocks nothing and is not stored. Without document_id: one page
             of texts with their counts per rule ('next_after' for the next
             page; only texts with a hint are listed). No text is returned:
-            excerpts need a server started with ONTOTATOR_MCP_READ_CONTENT=1.
+            excerpts need this MCP server (not the Ontotator server) to run
+            with ONTOTATOR_MCP_READ_CONTENT=1, set in the MCP client's
+            configuration of ontotator-mcp; whoami says whether it is on.
             """
             return await hints(project, document_id, after, all_versions, False)

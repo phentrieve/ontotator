@@ -60,7 +60,10 @@ APPEND_ONLY_TABLES = (
     "discarded_variants",
     "translation_version_uploads",
     "translation_editorial_corrections",
+    "translation_query_decisions",
+    "translation_correction_reason_additions",
     "text_change_resolutions",
+    "typo_fix_carries",
     "draft_snapshots",
     "guideline_versions",
     "guideline_withdrawals",
@@ -92,9 +95,7 @@ class ProjectRow(Base):
 
     __tablename__ = "projects"
     __table_args__ = (
-        CheckConstraint(
-            "annotations_per_text BETWEEN 1 AND 20", name="annotations_per_text"
-        ),
+        CheckConstraint("annotations_per_text >= 1", name="annotations_per_text"),
         CheckConstraint(
             "import_plan IN ('nothing', 'review_and_annotate_translations')",
             name="import_plan",

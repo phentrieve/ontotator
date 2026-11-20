@@ -273,7 +273,7 @@ describe("TreeBrowser: one walk", () => {
 
     // The selected node is the annotation's current term.
     expect(useButton().disabled).toBe(true);
-    expect(screen.getByText("This is the annotation's current term.")).toBeDefined();
+    expect(screen.getByText("This is the finding's current term.")).toBeDefined();
 
     fireEvent.click(item("Status epilepticus"));
     expect(item("Status epilepticus").getAttribute("aria-selected")).toBe("true");
@@ -296,7 +296,7 @@ describe("TreeBrowser: one walk", () => {
     expect(load).toHaveBeenCalledTimes(1);
   });
 
-  it("does not offer to assign while the annotation is not the one being edited", async () => {
+  it("only shows terms while nothing can be changed from it: no button, and it says so", async () => {
     vi.spyOn(api, "openTree").mockResolvedValue(seizureWalk());
     vi.spyOn(api, "loadTreeNode").mockResolvedValue({
       detail: detail("HP:2133", "Status epilepticus"),
@@ -304,15 +304,94 @@ describe("TreeBrowser: one walk", () => {
       path: [],
       levels: [],
     });
-    const { props } = renderBrowser({ canAssign: false });
+    const { props, container } = renderBrowser({ canAssign: false });
     await loaded();
 
     fireEvent.click(item("Status epilepticus"));
+    await detailPane(container).findByText("Status epilepticus", { selector: ".tree-detail__name" });
 
-    expect(useButton().disabled).toBe(true);
-    expect(screen.getByText("Select one of your annotations to assign a term from the tree.")).toBeDefined();
-    fireEvent.click(useButton());
+    expect(screen.queryByRole("button", { name: /Use this term/ })).toBeNull();
+    expect(container.querySelector(".tree-detail__actions")).toBeNull();
+    const note = screen.getByRole("status");
+    expect(note.textContent).toBe("Only looking: nothing can be changed from here.");
+    // Read with the region's name when the focus enters it.
+    expect(screen.getByRole("region", { name: "Ontology tree" }).getAttribute("aria-describedby")).toBe(note.id);
     expect(props.onUseTerm).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["proposal", "Proposal: decide as Changed with Status epilepticus (HP:2133)"],
+    ["new", "New finding: choose Status epilepticus (HP:2133)"],
+  ] as const)("in mode %s, takes a term only after a confirmation that says what happens", async (mode, effect) => {
+    vi.spyOn(api, "openTree").mockResolvedValue(seizureWalk());
+    vi.spyOn(api, "loadTreeNode").mockResolvedValue({
+      detail: detail("HP:2133", "Status epilepticus"),
+      children: [],
+      path: [],
+      levels: [],
+    });
+    const { props, container } = renderBrowser({ mode, currentHint: "This is the proposed term." });
+    await loaded();
+    expect(screen.getByRole("status").textContent).toBe("Only looking: nothing changes until you choose a term and confirm.");
+    // The start term is the proposed one: nothing to take.
+    const take = () => screen.getByRole("button", { name: "Use this term instead…" }) as HTMLButtonElement;
+    expect(take().disabled).toBe(true);
+    expect(screen.getByText("This is the proposed term.")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Use this term" })).toBeNull();
+
+    fireEvent.click(item("Status epilepticus"));
+    await detailPane(container).findByText("Status epilepticus", { selector: ".tree-detail__name" });
+    fireEvent.click(take());
+    expect(props.onUseTerm).not.toHaveBeenCalled();
+
+    // The confirmation names the effect and has the focus.
+    const group = screen.getByRole("group", { name: effect });
+    const confirm = within(group).getByRole("button", { name: "Confirm" });
+    expect(document.activeElement).toBe(confirm);
+
+    // Cancel (or Escape) changes nothing and gives the focus back to the button.
+    fireEvent.click(within(group).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("group", { name: effect })).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(take()));
+    fireEvent.click(take());
+    fireEvent.keyDown(screen.getByRole("button", { name: "Confirm" }), { key: "Escape" });
+    expect(screen.queryByRole("group", { name: effect })).toBeNull();
+    expect(props.onClose).not.toHaveBeenCalled();
+
+    // Another term closes an open confirmation: it names one term only.
+    fireEvent.click(take());
+    fireEvent.click(item("Dialeptic seizure"));
+    expect(screen.queryByRole("group", { name: effect })).toBeNull();
+    fireEvent.click(item("Status epilepticus"));
+
+    fireEvent.click(take());
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(props.onUseTerm).toHaveBeenCalledWith("HP:2133", "walk-1", "Status epilepticus"));
+    expect(props.onUseTerm).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.queryByRole("group", { name: effect })).toBeNull());
+    // Back in the tree, on the term just taken.
+    await waitFor(() => expect(document.activeElement).toBe(item("Status epilepticus")));
+  });
+
+  it("closes the confirmation and says why when taking the term fails", async () => {
+    vi.spyOn(api, "openTree").mockResolvedValue(seizureWalk());
+    vi.spyOn(api, "loadTreeNode").mockResolvedValue({
+      detail: detail("HP:2133", "Status epilepticus"),
+      children: [],
+      path: [],
+      levels: [],
+    });
+    const onUseTerm = vi.fn().mockRejectedValue(new Error("Nothing was changed."));
+    const { container } = renderBrowser({ mode: "proposal", onUseTerm });
+    await loaded();
+    fireEvent.click(item("Status epilepticus"));
+    await detailPane(container).findByText("Status epilepticus", { selector: ".tree-detail__name" });
+    fireEvent.click(screen.getByRole("button", { name: "Use this term instead…" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe("Nothing was changed.");
+    expect(screen.queryByRole("button", { name: "Confirm" })).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Use this term instead…" })));
   });
 
   it("shows why assigning failed and stays usable", async () => {

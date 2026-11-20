@@ -59,7 +59,7 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
       await expect(groups.nth(2)).toContainText("Skip 1 text · a consolidation is open: finish or withdraw it first");
       await expect(groups.nth(2)).toContainText("EN100028 en");
       await expect(groups.nth(3)).toContainText("Keep 2 open tasks · not submitted yet");
-      await expect(dialog.locator(".work-plan-summary")).toHaveText("Will change: 7 assignments in 5 texts");
+      await expect(dialog.locator(".work-plan-summary")).toHaveText("Will change: 7 tasks in 5 texts");
       await groups.nth(0).getByRole("button", { name: "Show all 5" }).click();
       await expect(groups.nth(0)).toContainText("EN100022 en, EN100023 en, EN100024 en, EN100025 en, EN100026 en");
 

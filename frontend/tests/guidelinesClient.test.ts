@@ -48,5 +48,9 @@ describe("guideline client", () => {
     expect((first.body as FormData).get("change_note")).toBe("");
     expect((second.body as FormData).get("expected_latest_version")).toBe("3");
     expect((second.body as FormData).get("change_note")).toBe("Clearer");
+    // No label: the field is not sent at all.
+    expect((second.body as FormData).has("label")).toBe(false);
+    await client.publishGuideline("p/key", { file, changeNote: "", expectedLatestVersion: 3, label: "3.1" });
+    expect((fetch.mock.calls[2][1].body as FormData).get("label")).toBe("3.1");
   });
 });

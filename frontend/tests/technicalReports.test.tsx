@@ -207,20 +207,25 @@ describe("navigation", () => {
   it("offers the report to everyone and the open count to administrators", async () => {
     vi.spyOn(api, "listMyTasks").mockReturnValue(new Promise(() => {}));
     vi.spyOn(api, "adminTechnicalReportSummary").mockResolvedValue({ open: 2 });
-    render(<Shell user={user} projects={[]} route={{ name: "tasks" }} onNavigate={vi.fn()} onLogout={vi.fn()}>Page</Shell>);
-    expect(await screen.findByRole("link", { name: "Technical reports, 2 open" })).toBeDefined();
-    const entry = screen.getByRole("button", { name: "Report a technical problem…" });
-    expect(entry.textContent).toBe("Technical problem…");
-    await userEvent.setup().click(entry);
+    const { rerender } = render(<Shell user={user} projects={[]} route={{ name: "tasks" }} onNavigate={vi.fn()} onLogout={vi.fn()}>Page</Shell>);
+    // On the work pages the gear carries the count; in Administration its sidebar entry does.
+    const gear = await screen.findByRole("link", { name: "Administration, 2 open technical reports" });
+    expect(gear.querySelector(".shell-admin-count")?.textContent).toBe("2");
+    expect(screen.queryByRole("link", { name: /^Technical reports/ })).toBeNull();
+    rerender(<Shell user={user} projects={[]} route={{ name: "adminUsers" }} onNavigate={vi.fn()} onLogout={vi.fn()}>Page</Shell>);
+    expect((await screen.findByRole("link", { name: "Technical reports, 2 open" })).textContent).toBe("Technical reports (2)");
+    await userEvent.setup().click(screen.getByRole("button", { name: /^User menu/ }));
+    await userEvent.setup().click(screen.getByRole("menuitem", { name: "Technical problem…" }));
     expect(screen.getByRole("dialog", { name: "Report a technical problem" })).toBeDefined();
   });
 
-  it("asks no count for other users", () => {
+  it("asks no count for other users", async () => {
     vi.spyOn(api, "listMyTasks").mockReturnValue(new Promise(() => {}));
     const summary = vi.spyOn(api, "adminTechnicalReportSummary");
     render(<Shell user={{ ...user, is_system_admin: false }} projects={[]} route={{ name: "tasks" }} onNavigate={vi.fn()} onLogout={vi.fn()}>Page</Shell>);
-    expect(screen.queryByRole("link", { name: /Technical reports/ })).toBeNull();
-    expect(screen.getByRole("button", { name: "Report a technical problem…" })).toBeDefined();
+    expect(screen.queryByRole("link", { name: /Technical reports|Administration/ })).toBeNull();
+    await userEvent.setup().click(screen.getByRole("button", { name: /^User menu/ }));
+    expect(screen.getByRole("menuitem", { name: "Technical problem…" })).toBeDefined();
     expect(summary).not.toHaveBeenCalled();
   });
 });

@@ -22,6 +22,7 @@ from sqlalchemy import Connection, func, insert, select
 
 from ontotator.application.translation_reviews import TranslationReviewService
 from ontotator.application.translation_workflow import work_on_version
+from ontotator.application.typo_fix_carry import carry_after_typo_fix, plan_carry
 from ontotator.application.version_uploads import VersionUploadService
 from ontotator.assignments.service import move_waiting_tasks, unopened_tasks
 from ontotator.auth.audit import Actor, record_audit
@@ -202,8 +203,11 @@ class EditorialCorrectionService:
         ``tasks_following``: annotation tasks nobody opened, which move to the
         new version. With a text, ``findings`` counts the findings of the
         submitted annotations on this version and how many of them the
-        text-change steps could not place (``needs_check``), and ``proposals``
-        the tool proposals that are carried and the ones left for a check.
+        text-change steps could not place (``needs_check``), ``proposals``
+        the tool proposals that are carried and the ones left for a check,
+        and ``annotation_carry`` per person with started or submitted work
+        whether the annotation moves to the new version by itself (issue
+        465, ``typo_fix_carry``) and, if not, why.
         """
         pid = project["id"]
         following = conn.execute(
@@ -215,6 +219,7 @@ class EditorialCorrectionService:
             "tasks_following": following,
             "findings": None,
             "proposals": None,
+            "annotation_carry": None,
         }
         if proposed is None:
             return result
@@ -248,6 +253,11 @@ class EditorialCorrectionService:
             total += len(findings)
             unplaced += len(unplaced_findings(findings, previous, proposed))
         result["findings"] = {"submitted": total, "needs_check": unplaced}
+        # Issue 465: per person, whether the annotation moves by itself.
+        result["annotation_carry"] = [
+            item.view()
+            for item in plan_carry(conn, repo, key, pid, variant, previous, proposed)
+        ]
         mapping = text_map(previous, proposed)
         sources = reanchor_sources(conn, pid, variant.document_id)
         outcomes = [
@@ -345,9 +355,11 @@ class EditorialCorrectionService:
         The new version is a ``correction`` of ``document_id`` with its
         translation status; the corrected version keeps its status, as after
         a lead correction or an upload. Annotation tasks nobody opened follow
-        the new version; started and submitted work, consolidations and a
-        final result stay on the corrected version for the text-change steps;
-        tool proposals are re-anchored, as after a review. Refused with
+        the new version; a submitted annotation whose findings all re-anchor
+        moves there by itself when no number changed (issue 465,
+        ``typo_fix_carry``); other started and submitted work, consolidations
+        and a final result stay on the corrected version for the text-change
+        steps; tool proposals are re-anchored, as after a review. Refused with
         ``EDITORIAL_CORRECTION_NOT_AVAILABLE`` and a ``reason`` (see
         ``preview``, and ``reason_required``), with ``VARIANT_REVIEW_STALE``
         when the corrected text is not the one named, and with
@@ -424,6 +436,23 @@ class EditorialCorrectionService:
                 now,
                 waiting_only=False,
             )
+            # Issue 465: submitted annotations whose findings all re-anchor
+            # follow by themselves, when no number changed.
+            repo = Repository(self.db)
+            carry = carry_after_typo_fix(
+                conn,
+                repo,
+                key=project_key,
+                pid=pid,
+                source=variant,
+                target_document_id=child.document_id,
+                correction_id=correction_id,
+                items=plan_carry(
+                    conn, repo, project_key, pid, variant, previous, proposed
+                ),
+                now=now,
+            )
+            carried = [item for item in carry if item.carried]
             record_audit(
                 conn,
                 actor,
@@ -447,6 +476,7 @@ class EditorialCorrectionService:
                     "diff": change["diff"],
                     "number_changes": change["number_changes"],
                     "tasks_following": following,
+                    "annotations_carried": len(carried),
                 },
                 at=now,
             )
@@ -473,6 +503,8 @@ class EditorialCorrectionService:
                 "inserted_characters": change["inserted_characters"],
                 "deleted_characters": change["deleted_characters"],
                 "tasks_following": following,
+                "annotations_carried": len(carried),
+                "annotation_carry": [item.view() for item in carry],
             }
 
 

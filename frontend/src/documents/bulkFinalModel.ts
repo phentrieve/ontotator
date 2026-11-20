@@ -7,7 +7,7 @@
  * text, or of none when a text changed since (`finalUndoneText`, `finalUndoRefusal`). "Accept agreeing results…"
  * has none; its consequences step says so.
  */
-import { ApiError, type AcceptAgreeingView, type BulkChangeFinalUndoView, type BulkChangeFinalView } from "../api/client";
+import { ApiError, type AcceptAgreeingView, type BulkChangeFinalUndoView, type BulkChangeFinalView, type BulkUndoResult } from "../api/client";
 import { plural } from "../app/labels";
 import { textLabel } from "../app/identity";
 import { shortPerson, type PreviewGroup } from "./bulkActionModel";
@@ -127,27 +127,55 @@ export function finalUndoneText(view: Pick<BulkChangeFinalUndoView, "restore_cou
   return exports ? `${back} ${plural(exports, "final export")} made meanwhile ${exports === 1 ? "stays as it is" : "stay as they are"}, with the changed results.` : back;
 }
 
-/** What changed on a text since the action, so that its earlier final result cannot come back. */
+/**
+ * What changed on a text since the action, so that the Undo cannot run: the first five block the Undo of a changed
+ * final result and of a bulk Reopen or Withdraw; the last three only the latter (issue 469).
+ */
 const UNDO_BLOCKS: Readonly<Record<string, string>> = {
   final: "its final result was changed, confirmed again or withdrawn",
   versions: "a version of the text was added, discarded or restored",
   plan: "its work plan changed",
   tasks: "a task was assigned, reopened, withdrawn or paused, or got a new round",
   submissions: "something was submitted or discarded",
+  drafts: "work on a task was saved",
+  not_in_plan: "the text no longer plans the task, or its version was discarded",
+  person_unavailable: "a person of a task is no longer an active member with this role",
 };
+
+interface UndoBlock { case_id: string; language: string; reason: string; message: string }
+
+/** "Undo is not possible: 2 of 8 texts changed since (EN100023 en: its work plan changed; and 1 more text). Nothing was undone." */
+function undoRefusalText(blocked: readonly UndoBlock[], texts: number): string | null {
+  const first = blocked[0];
+  if (!first) return null;
+  const more = blocked.length - 1;
+  const why = `${textLabel(first)}: ${UNDO_BLOCKS[first.reason] ?? first.message}${more ? `; and ${plural(more, "more text")}` : ""}`;
+  return `Undo is not possible: ${blocked.length} of ${plural(texts, "text")} changed since (${why}). Nothing was undone.`;
+}
+
+/** The answer a refused Undo carries (`details.preview`); null for any other failure. */
+function refusedUndoView<T>(error: unknown): T | null {
+  if (!(error instanceof ApiError) || error.code !== "BULK_UNDO_STALE" || typeof error.details !== "object" || error.details === null) return null;
+  return (error.details.preview as T | undefined) ?? null;
+}
 
 /**
  * A refused Undo names the first text in its way: "Undo is not possible: 2 of 8 texts changed since (EN100023 en: its
  * final result was changed, confirmed again or withdrawn; and 1 more text). Nothing was undone."; null for any other failure.
  */
 export function finalUndoRefusal(error: unknown): string | null {
-  if (!(error instanceof ApiError) || error.code !== "BULK_UNDO_STALE" || typeof error.details !== "object" || error.details === null) return null;
-  const view = error.details.preview as BulkChangeFinalUndoView | undefined;
-  const first = view?.blocked?.[0];
-  if (!view || !first) return null;
-  const more = view.blocked.length - 1;
-  const why = `${textLabel(first)}: ${UNDO_BLOCKS[first.reason] ?? first.message}${more ? `; and ${plural(more, "more text")}` : ""}`;
-  return `Undo is not possible: ${view.blocked.length} of ${plural(view.texts, "text")} changed since (${why}). Nothing was undone.`;
+  const view = refusedUndoView<BulkChangeFinalUndoView>(error);
+  return view?.blocked ? undoRefusalText(view.blocked, view.texts) : null;
+}
+
+/**
+ * The same for the Undo of a bulk Reopen or Withdraw (issue 469): "Undo is not possible: 1 of 7 texts changed since
+ * (EN100022 en: a task was assigned, reopened, withdrawn or paused, or got a new round). Nothing was undone."; null
+ * when the refusal names no text (an expired or used Undo).
+ */
+export function taskUndoRefusal(error: unknown): string | null {
+  const view = refusedUndoView<BulkUndoResult>(error);
+  return view?.blocked_texts ? undoRefusalText(view.blocked_texts, view.texts ?? view.blocked_texts.length) : null;
 }
 
 /** "Accepted the results of 38 texts." / "Changed the final result of 8 texts." */
