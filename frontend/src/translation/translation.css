@@ -123,7 +123,8 @@
 .translation-pinned-bar .translation-submit-reason { flex: 1 1 14rem; min-width: 0; }
 .translation-submit-reason-line { display: flex; min-width: 0; white-space: nowrap; }
 .translation-submit-reason-first { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.translation-submit-reason-more { flex: none; }
+/* Flex items drop the leading space of " and 1 more" (issue 547, U2-04): the gap stands for it. */
+.translation-submit-reason-more { flex: none; margin-inline-start: 0.25em; }
 .translation-pinned-bar .translation-submit-reason + .btn-primary { margin-left: 0; }
 .translation-submit-reason,
 .translation-submit-note { margin: 0; font-size: var(--size-md); line-height: var(--leading-md); color: var(--text-muted); }

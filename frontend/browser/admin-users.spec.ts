@@ -348,7 +348,8 @@ test("Anonymise…: only for a deactivated account, after typing its username; n
   expect(errors).toEqual([]);
 });
 
-test("with 1,500 more accounts the table shows the first 100, New user opens and Show all lists every account", async ({ page }) => {
+for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) test(`${viewport.width} px: with 1,500 more accounts the table shows the first 100, New user opens and Show all lists every account`, async ({ page }) => {
+  await page.setViewportSize(viewport);
   // At the end of the browser suite the fixture server holds about 2,000 accounts. The rendered table grew with
   // them until clicking New user… took longer than the action timeout (CI, handbook-screenshots.spec.ts).
   const extra = 1_500;
@@ -367,7 +368,18 @@ test("with 1,500 more accounts the table shows the first 100, New user opens and
   await loginThroughForm(page, admin, admin);
   await page.goto("/#/admin/users");
   const total = (await (await authenticatedRequest(page, "/api/v1/admin/users/")).json() as unknown[]).length + extra;
-  await expect(table(page)).toContainText(`The first 100 of ${total} users are shown.`);
+  // Issue 550, U5-02: the hint and Show all stand below the table, readable and in reach on a phone without swiping sideways.
+  const more = page.locator(".users-more");
+  await expect(more).toContainText(`The first 100 of ${total} users are shown. Type into Filter users to find someone.`);
+  await expect(more.locator("xpath=ancestor::*[contains(@class, 'data-table-scroll')]")).toHaveCount(0);
+  await more.scrollIntoViewIfNeeded();
+  for (const part of [more.locator("span"), more.getByRole("button", { name: `Show all ${total}`, exact: true })]) {
+    const box = (await part.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+  }
+  expect(await more.locator("span").evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  if (viewport.width === 390) await page.screenshot({ path: test.info().outputPath("users-more-phone.png") });
   await expect(table(page).locator("tbody tr.users-row")).toHaveCount(100);
   // What the page costs stays bounded: before, every account was a row (about 37 elements each).
   expect(await page.evaluate(() => document.getElementsByTagName("*").length)).toBeLessThan(10_000);
@@ -375,7 +387,7 @@ test("with 1,500 more accounts the table shows the first 100, New user opens and
   const create = page.getByRole("form", { name: "New user" });
   await create.getByLabel(/^Username/).fill(`lena-${suffix}`);
   await expect(create.getByLabel(/^Username/)).toHaveValue(`lena-${suffix}`);
-  await create.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("dialog", { name: "New user", exact: true }).getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(create).toHaveCount(0);
   // Filter users searches every account, also those after the first 100.
   await page.getByLabel("Filter users", { exact: true }).fill("bulk-1499");
@@ -384,4 +396,34 @@ test("with 1,500 more accounts the table shows the first 100, New user opens and
   await page.getByRole("button", { name: `Show all ${total}`, exact: true }).click();
   await expect(table(page).locator("tbody tr.users-row")).toHaveCount(total);
   expect(errors).toEqual([]);
+});
+
+// Issue 550, U5-08: in a low window the fields scroll and Cancel and Create user stay in view in the dialog's footer.
+for (const viewport of [{ width: 1280, height: 720 }, { width: 1440, height: 900 }]) test(`${viewport.width}×${viewport.height}: New user keeps Cancel and Create user in view, also with a field error`, async ({ page }) => {
+  await page.setViewportSize(viewport);
+  const errors = collectErrors(page);
+  const admin = `users-low-${randomUUID().slice(0, 8)}`;
+  expect((await page.request.post("/__test_user__", { params: { username: admin, pseudonym: admin, system_admin: "true", assign: "none" } })).ok()).toBeTruthy();
+  await loginThroughForm(page, admin, admin);
+  await page.goto("/#/admin/users");
+  await page.getByRole("button", { name: "New user…", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "New user", exact: true });
+  const inView = async () => {
+    for (const name of ["Cancel", "Create user"]) {
+      const box = (await dialog.getByRole("button", { name, exact: true }).boundingBox())!;
+      const frame = (await dialog.boundingBox())!;
+      expect(box.y, name).toBeGreaterThanOrEqual(frame.y);
+      expect(box.y + box.height, name).toBeLessThanOrEqual(Math.min(frame.y + frame.height, viewport.height));
+    }
+  };
+  await inView();
+  await dialog.getByLabel(/^Username/).fill("Not Valid");
+  await dialog.getByLabel(/^Display name/).fill("Someone");
+  await dialog.getByRole("button", { name: "Create user", exact: true }).click();
+  await expect(dialog.getByText(/^Use 3–64 lowercase/)).toBeVisible();
+  await inView();
+  if (viewport.height === 720) await page.screenshot({ path: test.info().outputPath("new-user-low.png") });
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(errors.filter(line => !/status of 4\d\d/.test(line))).toEqual([]);
 });

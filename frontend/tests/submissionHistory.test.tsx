@@ -8,7 +8,7 @@ import { historical } from './variantFixtures';
 import { guidelineListing, guidelineSummary } from './projectFixtures';
 
 const summary = { submission_id: 'immutable/submission', document_id: 'target', author_label: 'Reader A', is_me: true,
-  created_at: '2026-10-18T12:00:00Z', mode: 'independent' as const, round_id: null, guideline_withdrawn: false };
+  created_at: '2026-10-18T12:00:00Z', mode: 'independent' as const, round_id: null, kind: 'annotation' as const, guideline_withdrawn: false };
 const detail = { summary, annotations: historical.annotations, evidence: [], decisions: [], checked_layer_ids: [], document_checked: false,
   reanchor_inputs: [], reanchor_resolutions: [], round_inputs: [], round_input_resolutions: [] };
 const leadRows = submissions('case 1', 'de', { submissions: [
@@ -71,12 +71,25 @@ it('shows non-leads only their own submissions without the Final column and link
     annotations: refKey({ kind: 'own', id: 'immutable/submission' }) });
 });
 
+// Issue 547, U4-07: the Round column says the round, as the lead's table does, and Kind the kind.
+it('names the round and the kind of a carried submission for a non-lead as the lead reads them', async () => {
+  vi.mocked(api.listSubmissionHistory).mockResolvedValue([
+    { ...summary, submission_id: 'input-a', author_label: 'ann-0001', is_me: false, round_id: 'round-7', round_ordinal: 1, kind: 'carry_forward' },
+  ]);
+  render(<SubmissionHistory {...base} />);
+  const table = await openHistory();
+  const cells = within(table).getAllByRole('row')[1].querySelectorAll('td');
+  const header = [...within(table).getAllByRole('columnheader')].map(cell => cell.textContent);
+  expect(cells[header.indexOf('Round')].textContent).toMatch(/^Round 1/);
+  expect(cells[header.indexOf('Kind')].textContent).toBe('Carried annotation');
+});
+
 // Issue 470: a consolidator who is not the lead also gets the submissions of their round.
 it('does not mark or link another person\'s submission for a non-lead, and says whose results these are', async () => {
   vi.mocked(api.listSubmissionHistory).mockResolvedValue([
     { ...summary, submission_id: 'input-a', author_label: 'ann-0001', is_me: false },
     { ...summary, submission_id: 'input-b', author_label: 'Annotator B', is_me: false, created_at: '2026-10-18T12:30:00Z' },
-    { ...summary, submission_id: 'mine', author_label: 'adj-0003', mode: 'review' as const, round_id: 'round-1', created_at: '2026-10-18T13:00:00Z' },
+    { ...summary, submission_id: 'mine', author_label: 'adj-0003', mode: 'review' as const, round_id: 'round-1', kind: 'consolidation' as const, created_at: '2026-10-18T13:00:00Z' },
   ]);
   const onNavigate = vi.fn();
   render(<SubmissionHistory {...base} onNavigate={onNavigate} />);

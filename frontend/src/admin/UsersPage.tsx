@@ -462,8 +462,10 @@ function UsersContent({ currentUser, routeLeaveRef }: UsersPageProps): JSX.Eleme
           <Button size="sm" disabled={pageBlocked} onClick={() => setAllUsers(true)}>Show all {total}</Button>
         </div> }} />}
     </section>
-    {creating && <Dialog open title="New user" onClose={busy ? undefined : () => setCreating(false)}>
-      <form aria-label="New user" onSubmit={event => { event.preventDefault(); void createUser(); }}>
+    {/* Issue 550, U5-08: Cancel and Create user in the footer, which stays in view while the fields scroll in a low window. */}
+    {creating && <Dialog open title="New user" onClose={busy ? undefined : () => setCreating(false)}
+      footer={<><Button disabled={busy} onClick={() => setCreating(false)}>Cancel</Button><Button ref={createButton} type="submit" form="new-user-form" variant="primary" disabled={blocked}>Create user</Button></>}>
+      <form id="new-user-form" aria-label="New user" onSubmit={event => { event.preventDefault(); void createUser(); }}>
         <TextInput ref={usernameInput} id="new-username" label="Username" error={usernameError} required minLength={3} maxLength={64} value={create.username} disabled={blocked} onChange={event => { setCreateError(undefined); setCreate({ ...create, username: event.target.value }); }} />
         <TextInput ref={displayNameInput} id="new-name" label="Display name" error={displayNameError} required maxLength={120} value={create.display_name} disabled={blocked} onChange={event => { setCreateError(undefined); setCreate({ ...create, display_name: event.target.value }); }} />
         <TextInput id="new-email" label="E-mail" type="email" value={create.email ?? ""} disabled={blocked} onChange={event => setCreate({ ...create, email: event.target.value })} />
@@ -480,7 +482,6 @@ function UsersContent({ currentUser, routeLeaveRef }: UsersPageProps): JSX.Eleme
           </div>)}
         </fieldset>}
         {createError !== undefined && !usernameError && !displayNameError && <ErrorNotice error={createError} />}
-        <Toolbar label="New user actions"><Button disabled={busy} onClick={() => setCreating(false)}>Cancel</Button><Button ref={createButton} type="submit" variant="primary" disabled={blocked}>Create user</Button></Toolbar>
       </form>
     </Dialog>}
     {editing && <Dialog open title={`Edit ${editing.baseline.username}`} onClose={busy || confirmation ? undefined : () => setEditing(null)}>

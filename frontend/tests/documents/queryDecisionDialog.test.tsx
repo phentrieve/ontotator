@@ -101,7 +101,11 @@ it("Answer and accept the version as it is: the answer is required", async () =>
   expect(within(dialog).queryByRole("textbox", { name: "Reviewer’s text" })).toBeNull();
   const accept = within(dialog).getByRole("button", { name: "Accept v1" });
   fireEvent.click(accept);
-  expect(within(dialog).getAllByText("Enter the answer to the reviewer.").length).toBeGreaterThan(0);
+  // One hint, at the field (issue 547, U2-05); the button points to it.
+  expect(within(dialog).getAllByText("Enter the answer to the reviewer.")).toHaveLength(1);
+  const fieldError = within(dialog).getByText("Enter the answer to the reviewer.");
+  expect(fieldError.classList.contains("field-hint-error")).toBe(true);
+  expect(accept.getAttribute("aria-describedby")).toBe(fieldError.id);
   expect(api.decideQuery).not.toHaveBeenCalled();
   fireEvent.change(within(dialog).getByRole("textbox", { name: /^Answer to the reviewer/ }), { target: { value: "The short form is meant." } });
   fireEvent.click(accept);
