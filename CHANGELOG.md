@@ -52,6 +52,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Ontology tree in a low window (1280 × 600): opened from a proposal or a reference, it now takes the right column as it does for an own finding (#542). The proposal is named in one line above the tree, **Show finding** brings back its details and decisions, and **Use this term instead…** stays in view. Before, the panel and the tree shared the column and only about three rows of the tree were visible.
 - Documents: the table fits the page from 1280 px without scrolling sideways, also with **Typography hints**, long states and two people in **Waiting on** (#544). A column shows as much as fits, not what a window width allows: with room to spare (for example at 1920 px) the full states with their names, else first **Paused by lead** and **Typography hints** as icons, then the widest stage column in its short form, then the next. Status and **Waiting on** cells are no longer cut at a fixed width.
 - Documents: the pause of a text or a consolidation is a drawn icon, not the font glyph ⏸, which showed as an empty box without a system font that has it, and a paused consolidation reads *paused* in the short form instead of only *consolidating* (#549).
 - Assign dialog: **Assign…** for a selection whose texts are at their annotator limit says *Limit reached: 1 assigned, limit 1.* and offers **Change…**; it no longer waits at *Loading…* (#549).
