@@ -15,7 +15,8 @@ const created: CreatedUser = { user: { ...alex, username: "bea", display_name: "
 const reset: CodeResponse = { code: "new-reset-secret", expires_at: "2026-10-17T13:30:00Z" };
 const deferred = <T,>() => { let resolve!: (value: T) => void; let reject!: (error: unknown) => void; const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
 const load = () => screen.findByText("Alex Smith");
-const newForm = () => within(screen.getByRole("form", { name: "New user" }));
+/** The New user dialog: its fields are in the form, its buttons in the footer (issue 550, U5-08). */
+const newForm = () => within(screen.getByRole("dialog", { name: "New user" }));
 const editForm = () => within(screen.getByRole("form", { name: "Edit user" }));
 /** Opens a row's More menu; with `item`, chooses that action. */
 const more = (username: string, item?: string) => {
@@ -48,6 +49,17 @@ describe("users administration", () => {
     expect(screen.queryByRole("form", { name: "New user" })).toBeNull(); expect(screen.getByRole("group", { name: "Users actions" }).textContent).toContain("New user…");
     fireEvent.change(screen.getByLabelText("Filter users"), { target: { value: "SMITH" } }); expect(table.queryByText("Root")).toBeNull();
     fireEvent.change(screen.getByLabelText("Filter users"), { target: { value: "root" } }); expect(table.queryByText("Alex Smith")).toBeNull();
+  });
+
+  it("keeps Cancel and Create user in the dialog footer, in view while the fields scroll (issue 550, U5-08)", async () => {
+    render(<UsersPage currentUser={currentUser} />); await load();
+    fireEvent.click(screen.getByRole("button", { name: "New user…" }));
+    const dialog = screen.getByRole("dialog", { name: "New user" });
+    for (const name of ["Cancel", "Create user"]) {
+      const button = within(dialog).getByRole("button", { name });
+      expect(button.closest(".modal-actions")?.parentElement).toBe(dialog);
+      expect(button.closest(".ui-dialog-body")).toBeNull();
+    }
   });
 
   it("creates a user and keeps the setup code transient until acknowledged close", async () => {
@@ -440,6 +452,8 @@ describe("users table with many accounts", () => {
     await screen.findByText("Person 98");
     expect(bodyRows()).toHaveLength(100);
     expect(document.querySelector(".users-more")?.textContent).toBe("The first 100 of 250 users are shown. Type into Filter users to find someone.Show all 250");
+    // Issue 550, U5-02: below the table, outside the area that scrolls sideways on a phone.
+    expect(document.querySelector(".users-more")?.closest(".data-table-scroll")).toBeNull();
     expect(screen.queryByText("Person 99")).toBeNull();
     // Filtering searches all accounts, not only the shown ones.
     fireEvent.change(document.querySelector("#users-filter")!, { target: { value: "person" } });

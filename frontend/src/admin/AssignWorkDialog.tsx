@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { api, ApiError, type BatchAssignRequest, type BatchPersonView, type BatchPreview, type BatchSkipView, type DocumentRowFilters, type DocumentRowView, type RowRefView } from "../api/client";
 import { personLabel, textLabel } from "../app/identity";
-import { assignedText } from "../app/assignedDate";
+import { relativeDay } from "../app/assignedDate";
 import { plural } from "../app/labels";
 import { versionName } from "../documents/labels";
 import { reopenableReviews, workPersonName } from "../documents/reviewReason";
@@ -565,17 +565,6 @@ function AssignWorkEditor(props: AssignWorkDialogProps): JSX.Element {
     summaryLines.push(...skippedLines(fresh.skipped, language, task));
   }
 
-  const now = new Date();
-  const holders = props.mode === "row" && task ? props.row.work.filter(item => item.task === task).map(item => {
-    const name = personLabel(item.person ?? { pseudonym: item.author_label });
-    return item.assigned_at ? `${name}, ${assignedText(new Date(item.assigned_at), now)}` : name;
-  }) : [];
-  const textMode = props.mode === "row" && task === "annotate" ? props.row.annotation_mode ?? null : null;
-  /** One status line: mode, who holds the task (of the limit), the limit. */
-  const status = [
-    textMode && (textMode.mode === "proposals" ? "From proposals" : `From scratch${textMode.source === "no_proposals" ? " (no tool proposals)" : ""}`),
-    holders.length ? `Assigned: ${holdersLine(holders)}` : "Nobody assigned yet",
-  ].filter(Boolean).join(" · ");
   /** Parallel roots of one text share its label: name the chain. */
   const rootLabel = (item: { case_id: string; language: string; document_id: string }) => {
     const version = props.mode === "row" && props.row.parallel_roots ? props.row.versions.find(entry => entry.document_id === item.document_id) : undefined;
@@ -584,6 +573,28 @@ function AssignWorkEditor(props: AssignWorkDialogProps): JSX.Element {
   // The version the task is assigned on, as the preview names it (one text, one target); the newest until it is known.
   const newest = props.mode === "row" ? (shown?.targets.length === 1 ? shown.targets[0] : undefined)
     ?? props.row.versions.filter(version => version.is_newest_in_chain).at(-1) ?? props.row.versions.at(-1) : undefined;
+
+  const now = new Date();
+  const work = props.mode === "row" && task ? props.row.work.filter(item => item.task === task) : [];
+  // Issue 547, U2-07: a translation review reviews one version. A review of an earlier one (before "Fix typos…") is not
+  // assigned on this version: it is named apart, as what it was, so the line does not read as if this version were assigned.
+  const earlier = task === "translation_review" && newest ? work.filter(item => item.document_id !== newest.document_id) : [];
+  const holders = work.filter(item => !earlier.includes(item)).map(item => {
+    const name = personLabel(item.person ?? { pseudonym: item.author_label });
+    return item.assigned_at ? `${name}, ${relativeDay(new Date(item.assigned_at), now)}` : name;
+  });
+  const reviewedBefore = earlier.map(item => {
+    const version = props.mode === "row" ? props.row.versions.find(entry => entry.document_id === item.document_id) : undefined;
+    const short = version ? versionName(version.version, version.chain_name, props.mode === "row" && props.row.parallel_roots) : `v${item.version}`;
+    return `${personLabel(item.person ?? { pseudonym: item.author_label })} ${item.status === "submitted" ? "reviewed" : "on"} ${short}`;
+  });
+  const textMode = props.mode === "row" && task === "annotate" ? props.row.annotation_mode ?? null : null;
+  /** One status line: mode, who holds the task (of the limit), the limit; earlier reviews of other versions. */
+  const status = [
+    textMode && (textMode.mode === "proposals" ? "From proposals" : `From scratch${textMode.source === "no_proposals" ? " (no tool proposals)" : ""}`),
+    holders.length ? `Assigned: ${holdersLine(holders)}` : "Nobody assigned yet",
+    reviewedBefore.length ? `Earlier: ${holdersLine(reviewedBefore)}` : null,
+  ].filter(Boolean).join(" · ");
   const reasonId = `${id}-assign-reason`;
   const limitId = `${id}-limit`;
   const limitReachedId = `${id}-limit-reached`;

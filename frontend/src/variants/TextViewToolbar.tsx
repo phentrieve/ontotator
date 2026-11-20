@@ -12,14 +12,15 @@ export interface TextViewToolbarProps {
   children: ReactNode;
 }
 
-/** The text view's one toolbar (spec §4): Documents, case id with language, the selects, Compare, Text card. */
+/** The text view's one toolbar (spec §4): Documents, case id with language, the selects, Compare, Text card (the two links for leads only). */
 export function TextViewToolbar({ projectKey, caseId, language, documents, onNavigate, canManage = true, children }: TextViewToolbarProps): JSX.Element {
   const link = (route: Route, text: ReactNode, className = 'btn btn-secondary btn-sm') => <a className={className} href={routeHref(route)} onKeyDown={onSpaceActivate} onClick={(event: MouseEvent) => {
     if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
     event.preventDefault(); onNavigate(route);
   }}>{text}</a>;
   return <div className="case-toolbar text-view-toolbar" role="group" aria-label="Text view">
-    {link({ name: 'projectDocuments', key: projectKey, ...documents }, <><span aria-hidden="true">‹ </span>Documents</>, 'btn btn-quiet btn-sm')}
+    {/* Issue 547, U4-07: Documents is for leads only, so the way back there is too, like the Text card. */}
+    {canManage && link({ name: 'projectDocuments', key: projectKey, ...documents }, <><span aria-hidden="true">‹ </span>Documents</>, 'btn btn-quiet btn-sm')}
     <h1 className="case-title">{caseId}</h1>
     <LanguageTag code={language} />
     {children}

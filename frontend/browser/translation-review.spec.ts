@@ -580,6 +580,20 @@ test('390x844: checkbox hidden, action works', async ({ page }) => {
   await evidence(page, '21-narrow-action');
 });
 
+test('390x844: the pinned reason line keeps the space before "and 1 more" (issue 547, U2-04)', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 }); const s = await scenario(page, 'target'); await openReview(page, s);
+  await page.getByRole('radio', { name: 'Rejected', exact: true }).check();
+  const line = page.locator('.translation-pinned-bar .translation-submit-reason-line');
+  await expect(line).toContainText('and 1 more');
+  // The two spans are flex items: the leading space of the second one is dropped, so a gap stands for it.
+  const gap = await line.evaluate(element => {
+    const [first, more] = [element.querySelector('.translation-submit-reason-first')!, element.querySelector('.translation-submit-reason-more')!];
+    return more.getBoundingClientRect().left - first.getBoundingClientRect().right;
+  });
+  expect(gap).toBeGreaterThanOrEqual(3);
+  await evidence(page, '22-phone-reason-space');
+});
+
 test('Your review can be resized and collapsed, both kept on reload, and the page never scrolls sideways (#410)', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 }); const s = await scenario(page, 'target'); await openReview(page, s);
   const rail = page.locator('.translation-decision');

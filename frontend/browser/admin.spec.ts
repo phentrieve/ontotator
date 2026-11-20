@@ -39,7 +39,7 @@ async function createUser(page: Page, username: string): Promise<Actor> {
   await form.getByLabel(/^Display name/).fill(username);
   await form.getByLabel("Languages", { exact: true }).fill("en");
   await form.getByLabel("Languages", { exact: true }).press("Enter");
-  await form.getByRole("button", { name: "Create user", exact: true }).click();
+  await page.getByRole("dialog", { name: "New user", exact: true }).getByRole("button", { name: "Create user", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Setup code for " + username, exact: true });
   await expect(dialog).toBeVisible();
   const code = await dialog.locator("code").innerText();

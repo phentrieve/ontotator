@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import { MenuButton, menuPosition } from "../../src/ui/MenuButton";
@@ -138,4 +138,16 @@ it("groups radio choices: a labelled group, aria-checked, arrows pass through, c
   expect(first).toHaveBeenCalledOnce();
   expect(screen.queryByRole("menu")).toBeNull();
   expect(document.activeElement).toBe(button);
+});
+
+it("closes when the browser goes Back or Forward (issue 550, U5-04)", async () => {
+  const user = userEvent.setup();
+  const { button } = setup();
+  for (const event of [new HashChangeEvent("hashchange"), new PopStateEvent("popstate")]) {
+    await user.click(button);
+    expect(screen.getByRole("menu")).toBeTruthy();
+    act(() => { window.dispatchEvent(event); });
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+  }
 });

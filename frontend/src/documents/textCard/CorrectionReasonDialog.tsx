@@ -60,12 +60,17 @@ export function CorrectionReasonDialog({ assignmentId, name, request, onCancel, 
       writing.current = false;
     }
   };
+  // Issue 547, U2-08: the grey button says why it is grey, as the other dialogs do.
+  const empty = !note.trim();
   return <Dialog open title="Add to the reason" size="md" onClose={busy ? undefined : onCancel}
-    footer={<><Button disabled={busy} onClick={onCancel}>Cancel</Button>
-      <Button variant="primary" disabled={!note.trim() || busy} loading={busy} onClick={() => { void add(); }}>Add to the reason</Button></>}>
-    <p>{`${name} reads your addition below the reason, with its date. The reason as sent stays as it is.`}</p>
-    <CorrectionRequestReason request={request} />
-    <Textarea id={`${fieldId}-note`} label="Addition to the reason" value={note} disabled={busy} maxLength={2000} onChange={event => setNote(event.target.value)} />
-    {error !== undefined && <ErrorNotice error={error} />}
+    footer={<>{empty && <span id={`${fieldId}-reason`} className="dialog-footer-reason">Enter an addition first.</span>}
+      <Button disabled={busy} onClick={onCancel}>Cancel</Button>
+      <Button variant="primary" disabled={empty || busy} loading={busy} aria-describedby={empty ? `${fieldId}-reason` : undefined} onClick={() => { void add(); }}>Add to the reason</Button></>}>
+    <div className="correction-reason-dialog">
+      <p>{`${name} reads your addition below the reason, with its date. The reason as sent stays as it is.`}</p>
+      <CorrectionRequestReason request={request} />
+      <Textarea id={`${fieldId}-note`} label="Addition to the reason" value={note} disabled={busy} maxLength={2000} onChange={event => setNote(event.target.value)} />
+      {error !== undefined && <ErrorNotice error={error} />}
+    </div>
   </Dialog>;
 }

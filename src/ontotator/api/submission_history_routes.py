@@ -14,7 +14,11 @@ from ontotator.application.consolidation_blinding import (
     Blinding,
     submission_blinding,
 )
-from ontotator.application.round_reads import enrich_inputs, round_source_text
+from ontotator.application.round_reads import (
+    enrich_inputs,
+    round_labels,
+    round_source_text,
+)
 from ontotator.authz.visibility import current_access, require_case_text
 from ontotator.authz.workflow import may_read_human_submission
 from ontotator.domain.annotations import AnnotationSnapshot
@@ -25,6 +29,7 @@ from ontotator.domain.reanchor_resolution import (
     ReanchorResolution,
 )
 from ontotator.domain.review import ReviewDecision
+from ontotator.domain.submission_labels import SubmissionKind, submission_kind
 from ontotator.domain.work_rounds import (
     CARRY_ROUND_KINDS,
     RoundInputView,
@@ -54,6 +59,10 @@ class SubmissionHistorySummary(BaseModel):
     created_at: datetime
     mode: str
     round_id: str | None = None
+    # Issue 547 (U4-07): the round number and the kind as the lead's
+    # submissions table names them ("Round 1", "Carried annotation").
+    round_ordinal: int | None = None
+    kind: SubmissionKind | None = None
     guideline_version: int | None = None
     # The project's own name of that version ("3.1"), if it has one.
     guideline_label: str | None = None
@@ -166,6 +175,19 @@ def _history(
             if any(row["guideline_version"] is not None for row in rows)
             else {}
         )
+        owners = {
+            row["submission_id"]: bindings.get(row["submission_id"])
+            or row["payload"].get("origin_key", {}).get("round_id")
+            for row in rows
+        }
+        labels = round_labels(
+            conn, pid, {rid for rid in owners.values() if rid is not None}
+        )
+        unnumbered: tuple[str | None, int | None] = (None, None)
+        label_of = {
+            sid: labels.get(rid, unnumbered) if rid else unnumbered
+            for sid, rid in owners.items()
+        }
         summaries = [
             SubmissionHistorySummary(
                 submission_id=row["submission_id"],
@@ -174,8 +196,9 @@ def _history(
                 is_me=row["annotator_id"] == access.pseudonym,
                 created_at=row["created_at"],
                 mode=row["mode"],
-                round_id=bindings.get(row["submission_id"])
-                or row["payload"].get("origin_key", {}).get("round_id"),
+                round_id=owners[row["submission_id"]],
+                round_ordinal=label_of[row["submission_id"]][1],
+                kind=submission_kind(label_of[row["submission_id"]][0], row["mode"]),
                 guideline_version=row["guideline_version"],
                 guideline_label=facts[row["guideline_version"]].label
                 if row["guideline_version"] is not None

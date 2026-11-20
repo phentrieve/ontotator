@@ -284,7 +284,7 @@ it("admin edits nullable qualification and sets it on new-user creation (#198)",
   fireEvent.change(create.getByLabelText(/^Username/), { target: { value: "carol" } });
   fireEvent.change(create.getByLabelText(/^Display name/), { target: { value: "Carol" } });
   fireEvent.change(create.getByLabelText("Qualification"), { target: { value: " MD " } });
-  fireEvent.click(create.getByRole("button", { name: "Create user" }));
+  fireEvent.click(within(screen.getByRole("dialog", { name: "New user" })).getByRole("button", { name: "Create user" }));
   await waitFor(() => expect(api.adminCreateUser).toHaveBeenCalledWith(expect.objectContaining({ username: "carol", qualification: "MD" })));
 });
 
