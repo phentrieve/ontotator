@@ -34,6 +34,7 @@ from ontotator_mcp.tooling import (
     tool_message,
 )
 from ontotator_mcp.tooling import person as person_names
+from ontotator_mcp.tools_monitoring import without_report_content
 from ontotator_mcp.tools_setup import OPEN_STATES, _cut, unknown_texts
 
 Project = Annotated[str, Field(description="Project key, e.g. 'ward-7'.")]
@@ -316,7 +317,9 @@ def handover_plan(
     return moves, kept
 
 
-def register_people(server: MCPServer, api: OntotatorClient) -> None:
+def register_people(
+    server: MCPServer, api: OntotatorClient, *, read_content: bool = False
+) -> None:
     # No overwrite: the tool stays additive (#385), and an earlier codes file
     # may hold the only copy of other people's codes.
     @register(server, scopes="admin", effect="additive", idempotent=True)
@@ -1155,4 +1158,6 @@ def register_people(server: MCPServer, api: OntotatorClient) -> None:
             limit=limit,
             offset=offset,
         )
+        if not read_content:
+            listed = [without_report_content(report) for report in listed]
         return listing(listed)
