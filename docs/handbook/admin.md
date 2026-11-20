@@ -170,7 +170,7 @@ What for: see which releases are on the server and which projects use them.
 2. The table lists file name, kind, release, language, checksum and upload time.
 3. **Pinned by** lists the projects that use (*pin*) a file. Click a project key to open its settings on the **Ontology** tab. Unused files read **Not pinned**.
 4. **Frozen without** lists, for a translation file, the projects that froze their translations without it. The file does not reach them. Click a project key to see its frozen translations.
-5. Click **Copy** next to a checksum to copy it.
+5. Click the copy icon next to a checksum to copy the full checksum.
 6. Click **Refresh inventory** to reload the list.
 
 To move a project to a newer release, upload it here, then follow [Move a started project to a newer release](lead-settings.md#move-a-started-project-to-a-newer-release).
