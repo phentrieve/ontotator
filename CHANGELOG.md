@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-20
+
 ### Added
 
 - Acceptance seed: demo login buttons for the seeded accounts (#559). `scripts/seed_acceptance.py prepare` writes `demo-logins.override.json`, a Compose override for the app that sets `ONTOTATOR_DEMO_LOGINS_FILE` and mounts the run's `demo-logins.json` read-only by its absolute path. After a complete seed, `seed` writes `demo-logins.json` with demo-lead, demo-reviewer, demo-annotator and the development `admin`; the `restart` command of `commands.json` starts the app with it, the first `start` does not. The existing rules apply: the app refuses the setting in production and with a non-loopback public origin. Open the stack at `http://127.0.0.1:<port>`. Development and acceptance stacks only; no change to the app.
@@ -510,7 +512,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 First public release.
 
-[Unreleased]: https://github.com/phentrieve/ontotator/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/phentrieve/ontotator/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/phentrieve/ontotator/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/phentrieve/ontotator/compare/v0.10.2...v0.11.0
 [0.10.2]: https://github.com/phentrieve/ontotator/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/phentrieve/ontotator/compare/v0.10.0...v0.10.1
