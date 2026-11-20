@@ -40,6 +40,10 @@ ACTORS = {
     ),
     "demo-annotator": ("Annotator", "annotator", ["de"], None),
 }
+# DEVELOPMENT ONLY bootstrap admin of docker-compose.dev.yml (its password hash).
+BOOTSTRAP_ADMIN = ("admin", "development-only-password", "Administrator")
+# Where the app container reads the demo login file (ONTOTATOR_DEMO_LOGINS_FILE).
+DEMO_LOGINS_TARGET = "/run/ontotator-demo-logins.json"
 
 
 def digest(path: Path) -> str:
@@ -144,9 +148,11 @@ def output_path(root: Path, output: Path, *, existing: bool = False) -> Path:
     return resolved
 
 
-def write_private(path: Path, value: Any) -> None:
+def write_private(path: Path, value: Any, *, mode: int = 0o600) -> None:
     # Exclusive creation prevents overwriting credentials, failure markers or runs.
-    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, mode)
+    if mode != 0o600:
+        os.chmod(path, mode)  # not narrowed by the umask
     with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
         json.dump(value, handle, indent=2, ensure_ascii=False)
         handle.write("\n")
@@ -159,6 +165,43 @@ def compose_environment(cfg: dict[str, Any], directory: Path) -> dict[str, str]:
         "ONTOTATOR_MIGRATE_TARGET": "head",
         "GITHUB_TOKEN_FILE": str(directory / "unused-build-token"),
     }
+
+
+def demo_logins_override(directory: Path) -> dict[str, Any]:
+    """The Compose override that offers the seeded accounts as demo logins.
+
+    DEMO ONLY, for this loopback development stack: the app sends every listed
+    password to every browser that opens the login page, and refuses to start
+    with it in production or with a non-loopback public origin. The source is an
+    absolute path that must exist (a missing file fails the start instead of
+    Docker creating an empty directory there); it is mounted read-only.
+    """
+    return {
+        "services": {
+            "app": {
+                "environment": {"ONTOTATOR_DEMO_LOGINS_FILE": DEMO_LOGINS_TARGET},
+                "volumes": [
+                    {
+                        "type": "bind",
+                        "source": str(directory.resolve() / "demo-logins.json"),
+                        "target": DEMO_LOGINS_TARGET,
+                        "read_only": True,
+                        "bind": {"create_host_path": False},
+                    }
+                ],
+            }
+        }
+    }
+
+
+def demo_logins(passwords: dict[str, str]) -> list[dict[str, str]]:
+    """One login button per seeded account and the development bootstrap admin."""
+    rows = [
+        {"username": username, "password": passwords[username], "label": data[0]}
+        for username, data in ACTORS.items()
+    ]
+    username, password, label = BOOTSTRAP_ADMIN
+    return [*rows, {"username": username, "password": password, "label": label}]
 
 
 def require_fresh(users: str, projects: str, ontologies: str) -> None:
@@ -312,6 +355,8 @@ def prepare(cfg: dict[str, Any], directory: Path, inputs: Path = INPUTS) -> None
         override,
         {"services": {name: {"image": cfg["image"]} for name in ("app", "migrate")}},
     )
+    demo_override = directory / "demo-logins.override.json"
+    write_private(demo_override, demo_logins_override(directory))
     environment = compose_environment(cfg, directory)
     # JSON quotes are supported by Compose dotenv; protects spaces/backslashes.
     (directory / "compose.env").write_text(
@@ -322,6 +367,7 @@ def prepare(cfg: dict[str, Any], directory: Path, inputs: Path = INPUTS) -> None
         directory=str(directory),
         base_compose=str(ROOT / "docker-compose.dev.yml"),
         override=str(override),
+        demo_logins_override=str(demo_override),
         env_file=str(directory / "compose.env"),
         environment=environment,
         base_sha256=digest(ROOT / "docker-compose.dev.yml"),
@@ -335,10 +381,20 @@ def prepare(cfg: dict[str, Any], directory: Path, inputs: Path = INPUTS) -> None
     write_private(
         directory / "commands.json",
         {
+            # Before seed: the stack without demo logins (seed verifies this).
             "start": [*stack.command, "up", "-d", "--no-build", "--wait"],
             "status": [*stack.command, "ps", "--all"],
             "stop": [*stack.command, "stop"],
-            "restart": [*stack.command, "up", "-d", "--no-build", "--wait"],
+            # After seed: restarts the app with the demo login buttons.
+            "restart": [
+                *stack.command,
+                "-f",
+                str(demo_override),
+                "up",
+                "-d",
+                "--no-build",
+                "--wait",
+            ],
             "logs": [*stack.command, "logs", "--tail", "100", "app"],
             "host": cfg["host"],
             "environment": environment,
@@ -470,6 +526,7 @@ def load_prepared(directory: Path) -> dict[str, Any]:
     if (
         cfg["base_compose"] != str(ROOT / "docker-compose.dev.yml")
         or cfg["override"] != str(directory / "image.override.json")
+        or cfg["demo_logins_override"] != str(directory / "demo-logins.override.json")
         or cfg["env_file"] != str(directory / "compose.env")
     ):
         raise ValueError("Prepared Compose identity changed")
@@ -487,6 +544,10 @@ def load_prepared(directory: Path) -> dict[str, Any]:
     }
     if json.loads(Path(cfg["override"]).read_text(encoding="utf-8")) != expected:
         raise ValueError("Prepared image override changed")
+    if json.loads(
+        Path(cfg["demo_logins_override"]).read_text(encoding="utf-8")
+    ) != demo_logins_override(directory):
+        raise ValueError("Prepared demo login override changed")
     environment = compose_environment(cfg, directory)
     expected_env = "".join(
         f"{key}={json.dumps(value)}\n" for key, value in environment.items()
@@ -566,7 +627,12 @@ def seed(directory: Path) -> None:
     inputs = Path(cfg.get("inputs", INPUTS))
     if any(
         (directory / name).exists()
-        for name in ("seed-started.json", "credentials.json", "seed-result.json")
+        for name in (
+            "seed-started.json",
+            "credentials.json",
+            "seed-result.json",
+            "demo-logins.json",
+        )
     ):
         raise ValueError("Seed was already attempted; ordinary restart needs no reseed")
     stack = Stack(cfg)
@@ -768,6 +834,10 @@ def seed(directory: Path) -> None:
             "correction_pending_journey": "not preseeded; final packaged validation required",
         },
     )
+    # DEMO ONLY: read by the app user of the container through the read-only
+    # mount, so readable by others; these passwords are shown to every browser
+    # that opens the login page anyway. Written last, after a complete seed.
+    write_private(directory / "demo-logins.json", demo_logins(passwords), mode=0o644)
 
 
 def main() -> int:
