@@ -113,6 +113,11 @@ test.describe("the right column as a rail (issue 540)", () => {
     await expect(railDivider(page)).toHaveAttribute("aria-valuenow", "380");
     await page.keyboard.press("Shift+ArrowLeft");
     await expect(railDivider(page)).toHaveAttribute("aria-valuenow", "444");
+    await expect(railDivider(page)).toBeFocused();
+    await page.keyboard.press("Shift+ArrowLeft");
+    await expect(railDivider(page)).toHaveAttribute("aria-valuenow", "508");
+    await page.keyboard.press("Shift+ArrowRight");
+    await expect(railDivider(page)).toHaveAttribute("aria-valuenow", "444");
     // Written 300 ms after the last key, as the findings column's width.
     await expect.poll(() => page.evaluate(() => Object.entries(localStorage).find(([key]) => key.startsWith("ontotator.editor.detailsWidth.v1:"))?.[1])).toBe("444");
 

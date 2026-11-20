@@ -102,6 +102,8 @@ describe("the right column as a rail (issue 540)", () => {
     const divider = screen.getByRole("separator", { name: "Resize details panel" });
     fireEvent.keyDown(divider, { key: "ArrowLeft", shiftKey: true });
     expect(container.querySelector<HTMLElement>(".app-layout")!.style.getPropertyValue("--inspector-width")).toBe("444px");
+    fireEvent.keyDown(divider, { key: "ArrowLeft", shiftKey: true });
+    expect(divider.getAttribute("aria-valuenow")).toBe("508");
     fireEvent.keyDown(divider, { key: "End" });
     expect(divider.getAttribute("aria-valuenow")).toBe("640");
     await waitFor(() => expect(window.localStorage.getItem(detailsWidthKey("ada"))).toBe("640"));
