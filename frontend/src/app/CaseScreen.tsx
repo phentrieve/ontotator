@@ -4498,8 +4498,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
                 </InlineMessage>}
                 {pendingIsMarkedSpan
                   ? <>
-                    <p className="pending-quote">“{quoteSegments(view.document.text, pendingAnnotation.segments)}”{" "}
-                      <CopyTextButton text={passageRef.current} onAnnounce={announceCarried} /></p>
+                    <p className="pending-quote">“{quoteSegments(view.document.text, pendingAnnotation.segments)}”<CopyTextButton text={passageRef.current} onAnnounce={announceCarried} /></p>
                     <p className="form-hint">Adjust the marked text with its edge handles, or mark new text to replace it.</p>
                   </>
                   : <p>

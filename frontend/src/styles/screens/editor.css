@@ -1629,6 +1629,11 @@
   line-height: var(--leading-reading);
   overflow-wrap: anywhere;
 }
+/* "Copy text" right after the quote: a margin, not a space, keeps the quote's text exact. */
+.pending-quote > .btn {
+  margin-inline-start: var(--space-2);
+  vertical-align: middle;
+}
 
 @media (forced-colors: active) {
   .candidate-card[aria-selected="true"] {
