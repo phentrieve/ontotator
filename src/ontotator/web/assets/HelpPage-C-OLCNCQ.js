@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-uiAz37lH.js";import{n as a,t as o}from"./lib-CI-oRE6F.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-B1dQhwQI.js";import{n as a,t as o}from"./lib-BWzRA2dx.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -635,7 +635,9 @@ You can also start from the text:
 
 If the modifier's words lie inside the finding's text span, for example "severe" in "severe periorbital oedema", a box under **Modifiers** offers to take them out of the span. It shows the span now, with the words that go struck through, and the span after. Click **Exclude from span** to apply it; the finding then marks the remaining words, in two parts if the modifier was in the middle. Click **Keep span** to leave the span as it is. **Undo** in the message or in the header takes the change back.
 
-To change a modifier later, open its row menu: **Link a text span…**, **Remove text span** or **Remove modifier**. A removal can be undone with **Undo** in the message or in the header.
+You can take up the offer later. When you open a finding and one of its modifiers still lies inside its span, that modifier's row shows a small link *In span · Exclude*. Click **Exclude**, or choose **Exclude from finding's span** in the row menu: the same box opens. There is no link and no menu item when the modifier covers the whole span, would cut a word in half, or the mention has imported negation cues. A tool proposal's span is never changed: once your change makes the copy, the offer is for the copy.
+
+To change a modifier later, open its row menu: **Link a text span…**, **Remove text span**, **Exclude from finding's span** or **Remove modifier**. A removal can be undone with **Undo** in the message or in the header.
 
 A tool proposal's modifiers change the same way while the proposal is open; see [Review tool proposals](#review-tool-proposals).
 

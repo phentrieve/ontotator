@@ -7,10 +7,13 @@ assigned to the annotator, round 1 started. ``with_finding=1`` adds Seizure
 on "Krampfanfälle" through ``create_annotation`` (``wide=1``: on "wiederholt
 schwere Krampfanfälle", modifier words inside); ``standalone=1`` writes a
 standalone Severe finding on "schwere" past the editing commands (old data);
-``proposal=1`` imports a tool proposal Seizure on "Krampfanfälle"; the project
+``proposal=1`` imports a tool proposal Seizure on "Krampfanfälle" (``wide=1``:
+on "wiederholt schwere Krampfanfälle"); the project
 default "from proposals" makes the round a proposal check (M2 M-5).
 ``proposal_modifiers=1`` (with ``proposal=1``) gives that proposal Severe on
 "schwere" and a spanless Recurrent (issue 525).
+``inside=1`` (with ``with_finding=1``) also attaches Severe on "schwere" to
+that finding, inside its span when ``wide=1`` (issue 535).
 It returns the values scenarios' shape plus ``round_id`` and
 ``workspace_key``. Test server only, never shipped.
 """
@@ -133,6 +136,7 @@ def build_modifiers(
     standalone: bool = False,
     proposal: bool = False,
     proposal_modifiers: bool = False,
+    inside: bool = False,
 ) -> dict[str, Any]:
     from modifier_fixtures import MOD_DE, MOD_PATH, MOD_PIN, MOD_SHA, modifier_profile
     from t1_builders import native_unit
@@ -165,7 +169,8 @@ def build_modifiers(
     person(scenario, "ben", ["annotator"], qualification="Physician")
     person(scenario, "annotator", ["annotator"])
 
-    seizure = span("Krampfanfälle")
+    # wide=1 also widens the proposal (issue 535: modifier words inside its span).
+    seizure = span("wiederholt schwere Krampfanfälle" if wide else "Krampfanfälle")
     tool = [annotation("p-seizure", (seizure.start, seizure.end), text=TEXT)]
     if proposal_modifiers:
         severe = span("schwere")
@@ -213,6 +218,17 @@ def build_modifiers(
                 "chosen_axis_ids": [],
             },
         )
+        if inside:
+            _command(
+                scenario,
+                workspace_key,
+                {
+                    "command": "add_modifier",
+                    "annotation_id": "seizure",
+                    "term_id": "HP:0012828",
+                    "segments": [span("schwere").model_dump()],
+                },
+            )
     if standalone:
         _insert_standalone(scenario, workspace_key)
     return result(
@@ -235,6 +251,7 @@ def register_modifier_scenario_route(app: FastAPI) -> None:
         standalone: int = Query(0),
         proposal: int = Query(0),
         proposal_modifiers: int = Query(0),
+        inside: int = Query(0),
     ) -> dict[str, Any]:
         return build_modifiers(
             app,
@@ -243,6 +260,7 @@ def register_modifier_scenario_route(app: FastAPI) -> None:
             standalone=bool(standalone),
             proposal=bool(proposal),
             proposal_modifiers=bool(proposal_modifiers),
+            inside=bool(inside),
         )
 
     app.router.routes.insert(0, app.router.routes.pop())

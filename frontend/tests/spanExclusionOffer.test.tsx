@@ -23,4 +23,11 @@ describe("SpanExclusionOffer", () => {
     expect(onAccept).toHaveBeenCalledTimes(1);
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
+
+  it("opened from the modifier's row, it focuses Exclude from span (issue 535)", () => {
+    const offer = exclusionOffer(text, [{ evidenceId: "ev", segments: [seg("wiederholt schwere Krampfanfälle")] }], [seg("schwere")])!;
+    render(<SpanExclusionOffer finding="Seizure" modifier="Severe" text={text} offer={offer} onAccept={vi.fn()} onDismiss={vi.fn()} autoFocus />);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Exclude from span" }));
+  });
 });
+

@@ -367,7 +367,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const [attachFocusId, setAttachFocusId] = useState<string | null>(null);
   /** A target chosen by click or Enter that already has the term with another span: the inspector offers "Replace text span". */
   const [attachReplaceId, setAttachReplaceId] = useState<string | null>(null);
-  const [spanOffer, setSpanOffer] = useState<(SpanExclusion & { annotationId: string; termId: string; modifier: Seg[] }) | null>(null);
+  const [spanOffer, setSpanOffer] = useState<(SpanExclusion & { annotationId: string; termId: string; modifier: Seg[]; fromRow?: boolean }) | null>(null);
   /** The finding under the pointer or with focus (row or mark): its marks and modifier segments are framed. */
   const [hoverFrameId, setHoverFrameId] = useState<string | null>(null);
   const [textResyncToken, setTextResyncToken] = useState(0);
@@ -3166,17 +3166,23 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
    * Made after the modifier's span is saved (attach, link, convert); shown while the finding is selected and neither
    * its mention nor the modifier's span has changed since.
    */
-  const offerExclusion = (saved: Draft, annotationId: string, termId: string) => {
-    const snapshot = saved.annotations?.find(a => a.annotation.annotation_id === annotationId);
+  const exclusionFor = (source: Draft, annotationId: string, termId: string) => {
+    const snapshot = source.annotations?.find(a => a.annotation.annotation_id === annotationId);
     const modifier = snapshot?.annotation.modifiers?.find(m => m.term_id === termId)?.segments ?? [];
-    if (!snapshot || readOnlyRef.current || !editableLayerIds.includes(snapshot.annotation.layer_id)) { setSpanOffer(null); return; }
-    const evidence = new Map((saved.evidence ?? []).map(ev => [ev.mention.evidence_id, ev.mention]));
+    if (!snapshot || readOnlyRef.current || !editableLayerIds.includes(snapshot.annotation.layer_id)) return null;
+    const evidence = new Map((source.evidence ?? []).map(ev => [ev.mention.evidence_id, ev.mention]));
     const mentions = (snapshot.annotation.evidence_refs ?? []).flatMap(ref => {
       const mention = evidence.get(ref.evidence_id);
       return mention ? [{ evidenceId: mention.evidence_id, segments: mention.segments, cueSegments: mention.cue_segments }] : [];
     });
     const offer = exclusionOffer(view.document.text, mentions, modifier);
-    setSpanOffer(offer ? { ...offer, annotationId, termId, modifier: modifier.map(s => ({ start: s.start, end: s.end })) } : null);
+    return offer ? { ...offer, annotationId, termId, modifier: modifier.map(s => ({ start: s.start, end: s.end })) } : null;
+  };
+  const offerExclusion = (saved: Draft, annotationId: string, termId: string) => setSpanOffer(exclusionFor(saved, annotationId, termId));
+  /** Issue 535: from the modifier's row (its menu, or "In span · Exclude"); the box takes the focus. */
+  const openExclusion = (annotationId: string, termId: string) => {
+    const offer = exclusionFor(latestDraft.current, annotationId, termId);
+    setSpanOffer(offer ? { ...offer, fromRow: true } : null);
   };
   const sameSegments = (a: readonly Seg[] | undefined, b: readonly Seg[]) =>
     !!a && a.length === b.length && a.every((s, index) => s.start === b[index].start && s.end === b[index].end);
@@ -4753,6 +4759,10 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
                   onAdd={termId => modifierCommands.add(id, termId)}
                   onLinkSpan={termId => startLinkSpan(id, termId)}
                   onRemoveSpan={termId => { void modifierCommands.removeSpan(id, termId, label(termId)).catch(() => undefined); }}
+                  // Issue 535: a modifier inside the finding's span offers the exclusion from its row too.
+                  canExcludeFromSpan={termId => !!exclusionFor(draft, id, termId)}
+                  onExcludeFromSpan={termId => openExclusion(id, termId)}
+                  exclusionTermId={liveSpanOffer?.annotationId === id ? liveSpanOffer.termId : null}
                   onRemove={termId => {
                     void modifierCommands.remove(id, termId, label(termId), finding).then(
                       // The chip is gone: focus stays in the section.
@@ -4764,7 +4774,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
               })() : undefined}
               spanExclusion={liveSpanOffer && selectedAnnotation ? <SpanExclusionOffer finding={findingNameOf(selectedAnnotation)}
                 modifier={termLabel.info(selectedAnnotation.annotation.layer_id, liveSpanOffer.termId)?.label ?? liveSpanOffer.termId}
-                text={view.document.text} offer={liveSpanOffer} onAccept={() => { void acceptSpanOffer(); }} onDismiss={dismissSpanOffer} /> : undefined}
+                text={view.document.text} offer={liveSpanOffer} autoFocus={!!liveSpanOffer.fromRow}
+                onAccept={() => { void acceptSpanOffer(); }} onDismiss={dismissSpanOffer} /> : undefined}
               termLabel={selectedAnnotation ? termLabel(selectedAnnotation.annotation.layer_id, selectedAnnotation.annotation.term_id) : null}
               axesConfig={currentAxesConfig}
               noteValue={selectedAnnotation ? annotationNoteDrafts[selectedAnnotation.annotation.annotation_id] ?? selectedAnnotation.annotation.note ?? "" : ""}

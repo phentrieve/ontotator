@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Button } from "../ui/Button";
 import { InlineMessage } from "../ui/InlineMessage";
 import { quoteOf } from "./modifiers";
@@ -13,6 +14,8 @@ export interface SpanExclusionOfferProps {
   offer: SpanExclusion;
   onAccept: () => void;
   onDismiss: () => void;
+  /** Opened from the modifier's row (its menu or "In span · Exclude"): focus goes to Exclude from span. */
+  autoFocus?: boolean;
 }
 
 /** Copy of the offer in one place. */
@@ -25,10 +28,14 @@ export const exclusionCopy = {
 
 /**
  * Shown under Modifiers once a modifier's text lies inside its finding's span: the span now, its words that go struck
- * through, and the span after. Accept edits the finding's mention; Keep span changes nothing.
+ * through, and the span after. Accept edits the finding's mention; Keep span changes nothing. It opens after the modifier's
+ * span is saved, or from the modifier's row ("Exclude from finding's span" in its menu, "In span · Exclude").
  */
-export function SpanExclusionOffer({ finding, modifier, text, offer, onAccept, onDismiss }: SpanExclusionOfferProps): JSX.Element {
+export function SpanExclusionOffer({ finding, modifier, text, offer, onAccept, onDismiss, autoFocus = false }: SpanExclusionOfferProps): JSX.Element {
   const words = quoteOf(text, offer.removed);
+  const accept = useRef<HTMLButtonElement>(null);
+  // After the row's menu has given the focus back to its button.
+  useEffect(() => { if (autoFocus) accept.current?.focus(); }, [autoFocus, offer.evidenceId]);
   return <div className="mod-exclude" data-span-exclusion>
     <InlineMessage tone="info" aria-label={`Exclude ${modifier} from the span`}>
       <p className="mod-exclude-question">{exclusionCopy.question(words, finding)}</p>
@@ -40,7 +47,7 @@ export function SpanExclusionOffer({ finding, modifier, text, offer, onAccept, o
         <dd data-exclusion-after>{quoteOf(text, offer.after)}</dd>
       </dl>
       <div className="mod-exclude-actions">
-        <Button size="sm" variant="primary" onClick={onAccept}>{exclusionCopy.accept}</Button>
+        <Button ref={accept} size="sm" variant="primary" onClick={onAccept}>{exclusionCopy.accept}</Button>
         <Button size="sm" onClick={onDismiss}>{exclusionCopy.dismiss}</Button>
       </div>
     </InlineMessage>
