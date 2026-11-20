@@ -116,6 +116,15 @@ test("a modifier marked inside the span: Exclude from span splits the finding; U
   await expect(offer(page)).toHaveCount(0);
 });
 
+test("in a laptop window the box scrolls into view when it opens after attaching", async ({ page }) => {
+  await open(page);
+  await page.setViewportSize({ width: 1440, height: 760 });
+  await attachSevere(page);
+  await expect(offer(page)).toContainText("Exclude “schwere” from the text span of Seizure?");
+  await expect(offer(page).getByRole("button", { name: "Exclude from span" })).toBeInViewport({ ratio: 1 });
+  await expect(offer(page).getByRole("button", { name: "Keep span" })).toBeInViewport({ ratio: 1 });
+});
+
 test("Keep span changes nothing", async ({ page }) => {
   await open(page);
   await attachSevere(page);

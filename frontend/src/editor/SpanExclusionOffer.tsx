@@ -34,9 +34,24 @@ export const exclusionCopy = {
 export function SpanExclusionOffer({ finding, modifier, text, offer, onAccept, onDismiss, autoFocus = false }: SpanExclusionOfferProps): JSX.Element {
   const words = quoteOf(text, offer.removed);
   const accept = useRef<HTMLButtonElement>(null);
-  // After the row's menu has given the focus back to its button.
-  useEffect(() => { if (autoFocus) accept.current?.focus(); }, [autoFocus, offer.evidenceId]);
-  return <div className="mod-exclude" data-span-exclusion>
+  const box = useRef<HTMLDivElement>(null);
+  // The box opens under Modifiers, often below the fold of the right column (a laptop window): bring it into view, only as
+  // far as needed. The rows above it still settle after it mounts (the new modifier row), so it follows for a moment.
+  useEffect(() => {
+    const element = box.current;
+    if (!element) return;
+    const behavior: ScrollBehavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+    const reveal = () => element.scrollIntoView?.({ block: "nearest", behavior });
+    reveal();
+    if (typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(([entry]) => { if (entry.intersectionRatio < 1) reveal(); }, { threshold: 1 });
+    observer.observe(element);
+    const stop = window.setTimeout(() => observer.disconnect(), 1000);
+    return () => { observer.disconnect(); window.clearTimeout(stop); };
+  }, [offer.evidenceId]);
+  // From the modifier's row (its menu or "In span · Exclude"): the focus goes to Exclude from span.
+  useEffect(() => { if (autoFocus) accept.current?.focus({ preventScroll: true }); }, [autoFocus, offer.evidenceId]);
+  return <div ref={box} className="mod-exclude" data-span-exclusion>
     <InlineMessage tone="info" aria-label={`Exclude ${modifier} from the span`}>
       <p className="mod-exclude-question">{exclusionCopy.question(words, finding)}</p>
       <dl className="mod-exclude-preview">
