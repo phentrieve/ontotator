@@ -165,7 +165,7 @@ def require_fresh(users: str, projects: str, ontologies: str) -> None:
     rows = [line.split("\t") for line in users.splitlines() if line.strip()]
     if (
         len(rows) != 1
-        or len(rows[0]) != 4
+        or len(rows[0]) < 4
         or rows[0][0] != "admin"
         or rows[0][3] != "active, admin"
         or projects.strip()

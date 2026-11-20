@@ -68,6 +68,13 @@ def test_only_expected_bootstrap_identity_is_fresh(seed):
     seed["require_fresh"]("admin\tp\tAdministrator\tactive, admin\n", "", "")
 
 
+def test_fresh_accepts_the_current_users_list_with_e_mail_and_projects(seed):
+    # `ontotator admin users list` prints six columns since e-mail and projects were added.
+    seed["require_fresh"](
+        "admin\tann-0001\tAdministrator\tactive, admin\t-\t-\n", "", ""
+    )
+
+
 def test_local_output_must_be_new_and_inside_ignored_acceptance_area(seed, tmp_path):
     root = tmp_path / "checkout"
     root.mkdir()
