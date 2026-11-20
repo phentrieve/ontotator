@@ -230,6 +230,11 @@ chapter = "admin.md"
 glob = "frontend/src/admin/ExportHistory.tsx"
 chapter = "lead-results.md"
 
+# The lead's list of translation reviews (#483).
+[[map]]
+glob = "frontend/src/admin/TranslationReviewsPage.tsx"
+chapter = "lead-results.md"
+
 [[map]]
 glob = "frontend/src/admin/ProjectSettingsPage.tsx"
 chapter = "lead-settings.md"

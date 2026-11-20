@@ -9,9 +9,9 @@ from mcp.server.mcpserver import MCPServer
 from pydantic import Field
 
 from ontotator_mcp.client import OntotatorClient, project_path, seg
-from ontotator_mcp.errors import OntotatorError
+from ontotator_mcp.errors import OntotatorError, check_preview_token, stale_note
 from ontotator_mcp.models import TextRef
-from ontotator_mcp.tooling import register
+from ontotator_mcp.tooling import person, register, tool_message
 from ontotator_mcp.tools_setup import unknown_texts
 
 Project = Annotated[str, Field(description="Project key, e.g. 'ward-7'.")]
@@ -75,10 +75,11 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
             list[str] | None,
             Field(
                 description=(
-                    "Submissions to merge (2 to 40, the API's bound); None:"
-                    " every eligible one."
+                    "Submissions to merge: at least 2; at most 40, or twice"
+                    " the text's annotations per text when that is more"
+                    " (beyond that the API refuses with ROUND_INPUT_INVALID"
+                    " and names the bound); None: every eligible one."
                 ),
-                max_length=40,
             ),
         ] = None,
         reason: str | None = None,
@@ -87,8 +88,11 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
         """Start a consolidation of a text's submissions by a consolidator.
 
         Creates the consolidator's task; the consolidation itself is done in
-        the web interface. A consolidator lacking the role gets it
-        (``role_granted``).
+        the web interface. The consolidator needs the 'adjudicator' role
+        (set_member_roles); only the token's owner, as a lead naming
+        themselves, gets it on the way (``role_granted``). There is no dry
+        run. Refused while this person already has an open consolidation
+        task on the text (WORKFLOW_REVISION_CONFLICT).
         """
         panel = await api.get(_panel_path(project, case_id, language))
         eligible = [s for s in _listed(panel.get("submissions", [])) if s["eligible"]]
@@ -107,17 +111,37 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
                 "Not every source submission is an eligible submission of this"
                 " text: " + ", ".join(s["submission_id"] for s in eligible)
             )
-        started: dict[str, Any] = await api.post(
-            project_path(project, "consolidations"),
-            {
-                "document_id": chosen[0]["document_id"],
-                "reviewer": reviewer,
-                "source_submission_ids": source_submission_ids,
-                "reason": reason,
-                "confirm_language": confirm_language,
-                "request_id": str(uuid.uuid4()),
-            },
-        )
+        try:
+            started: dict[str, Any] = await api.post(
+                project_path(project, "consolidations"),
+                {
+                    "document_id": chosen[0]["document_id"],
+                    "reviewer": reviewer,
+                    "source_submission_ids": source_submission_ids,
+                    "reason": reason,
+                    "confirm_language": confirm_language,
+                    "request_id": str(uuid.uuid4()),
+                },
+            )
+        except OntotatorError as exc:
+            if exc.code == "WORKFLOW_REVISION_CONFLICT":
+                # This tool names no task revision, so the conflict is an
+                # open consolidation task of this person; repeating never helps.
+                raise exc.with_advice(
+                    f"{reviewer} already has an open consolidation task on"
+                    f" {case_id} {language}; nothing was started. Have it"
+                    " submitted, or withdraw it (list_assignments,"
+                    " withdraw_task), then repeat the call. Or name another"
+                    " consolidator."
+                ) from None
+            if exc.code == "ASSIGNEE_ROLE_MISSING":
+                raise exc.with_advice(
+                    f"{reviewer} lacks the consolidator role; nothing was"
+                    " started. Add 'adjudicator' to the person's roles with"
+                    " set_member_roles (list_people shows them), then repeat"
+                    " the call."
+                ) from None
+            raise
         return started
 
     @register(server, scopes="project-admin", effect="destructive")
@@ -161,7 +185,8 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
 
         def summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
             skipped = [
-                {key: item[key] for key in ("case_id", "language", "reason", "message")}
+                {key: item[key] for key in ("case_id", "language", "reason")}
+                | {"message": tool_message(item)}
                 for item in found.get("skipped", [])
             ]
             # Texts with Annotate off are counted, and listed last.
@@ -183,10 +208,7 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
         if not confirm:
             preview: dict[str, Any] = await api.post(path, {"preview": True, **scope})
             return summary(preview, False)
-        if preview_token is None:
-            raise OntotatorError(
-                "Run the dry run first and pass its preview_token with confirm."
-            )
+        check_preview_token(preview_token)
         try:
             applied: dict[str, Any] = await api.post(
                 path, {"preview_token": preview_token, **scope}
@@ -199,8 +221,7 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
                 raise
             return summary(fresh, False) | {
                 "stale": True,
-                "note": "Texts changed since the dry run; nothing was accepted."
-                " Check this new dry run and confirm with its preview_token.",
+                "note": stale_note("Texts", "accepted"),
             }
         return summary(applied, True)
 
@@ -268,7 +289,8 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
         def summary(found: dict[str, Any], applied: bool) -> dict[str, Any]:
             changes = found.get("changes", [])
             skipped = [
-                {key: item[key] for key in ("case_id", "language", "reason", "message")}
+                {key: item[key] for key in ("case_id", "language", "reason")}
+                | {"message": tool_message(item)}
                 for item in found.get("skipped", [])
             ]
             return {
@@ -287,10 +309,7 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
         if not confirm:
             preview: dict[str, Any] = await api.post(path, body | {"preview": True})
             return summary(preview, False)
-        if preview_token is None:
-            raise OntotatorError(
-                "Run the dry run first and pass its preview_token with confirm."
-            )
+        check_preview_token(preview_token)
         try:
             applied: dict[str, Any] = await api.post(
                 path, body | {"preview_token": preview_token}
@@ -303,8 +322,7 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
                 raise
             return summary(fresh, False) | {
                 "stale": True,
-                "note": "Texts changed since the dry run; nothing was changed."
-                " Check this new dry run and confirm with its preview_token.",
+                "note": stale_note("Texts", "changed"),
             }
         return summary(applied, True)
 
@@ -353,8 +371,7 @@ def register_results(server: MCPServer, api: OntotatorClient) -> None:
                     "submission_id": item.get("submission_id"),
                     "version": item.get("version"),
                     "replaces_submission_id": item.get("from_submission_id"),
-                    "chosen_by": (item.get("selected_by") or {}).get("display_name")
-                    or (item.get("selected_by") or {}).get("pseudonym"),
+                    "chosen_by": person(item.get("selected_by")),
                     "chosen_at": item.get("selected_at"),
                 }
                 for item in found.get("restores", [])

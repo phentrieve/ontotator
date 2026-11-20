@@ -80,9 +80,9 @@ export function TaskProblemActions({ assignment, textName, onSaveBeforeReport, o
   const leadActed = (reports ?? []).some(r => r.state === "open" && r.withdrawable === false);
 
   return <>
-    {renderEntry ? renderEntry({ id: "problems", label: `${readOnly ? "Text problems" : "Report a text problem…"}${entry.badge ? ` (${entry.badge})` : ""}`, onSelect: openDialog })
+    {renderEntry ? renderEntry({ id: "problems", label: `${readOnly || entry.paused ? "Text problems" : "Report a text problem…"}${entry.badge ? ` (${entry.badge})` : ""}`, onSelect: openDialog })
     : <Button size="sm" className="problem-entry" onClick={openDialog}>
-      {readOnly ? "Text problems" : "Report a text problem"}
+      {readOnly || entry.paused ? "Text problems" : "Report a text problem"}
       {entry.badge && <> <span className="problem-badge" aria-hidden="true">{entry.paused && <IconWarning />}{entry.badge}</span></>}
       <span className="visually-hidden"> {entry.accessibleSuffix}</span>
     </Button>}

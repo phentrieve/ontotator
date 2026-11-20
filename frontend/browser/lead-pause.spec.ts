@@ -186,7 +186,7 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
     if (phone) await tom.getByRole("group", { name: "New finding", exact: true }).getByRole("button", { name: "Choose term", exact: true }).click();
     await tom.getByLabel("Search term", { exact: true }).fill("HP:0001250");
     // The search is the first thing the server refuses: the banner names the cause; the marked passage stays.
-    await expect(tom.getByText(`Paused by lead: ${WHY}`)).toBeVisible();
+    await expect(tom.locator(".paused-notice").getByText(`Paused by lead: ${WHY}`)).toBeVisible();
     await expect(tom.getByRole("heading", { name: "New finding" })).toBeVisible();
     await tom.getByRole("button", { name: "Show more" }).click();
     await expect(tom.getByText("Your local input is kept.", { exact: false })).toBeVisible();
@@ -420,7 +420,7 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
     await expect(keep).toHaveCount(0);
     await expect(add).toHaveCount(0);
     await kim.getByRole("button", { name: "Show more" }).click();
-    await expect(kim.getByText("To continue, open “Report a text problem” and choose “Resume my task…”", { exact: false })).toBeVisible();
+    await expect(kim.getByText("To continue, open “Text problems” and choose “Resume my task…”", { exact: false })).toBeVisible();
     expect(await noHorizontalScroll(kim)).toBe(true);
     await shot(kim, `464-consolidation-paused-by-report${suffix}`);
     await kim.goto(`${task}?view=editor`);

@@ -147,7 +147,7 @@ Before you start: an administrator must have uploaded the new release ([Upload o
 4. Read the panel **Check before moving**:
    - The first table (**Becomes**, **Why**) lists draft terms that will be replaced by their successor.
    - The second table (**Status**, **Suggestions**) lists draft terms that are obsolete or missing in the new release, and proposals on such terms that are not yet rejected or replaced. Proposals are never rewritten. Their annotators must change them before submitting.
-5. Click **Move to this release**, or **Cancel**. The page says **Ontology release changed.**
+5. Click **Move to this release**, or **Cancel**. The page says **Ontology release changed.** The card **Translations** then reads *Not frozen yet.* until the next term search ([See which translations the project uses](#see-which-translations-the-project-uses)).
 
 ![The check before moving to another release. The first table shows which draft terms are replaced automatically, the second which ones annotators must change by hand.](images/lead-move-release-check.png)
 
@@ -161,13 +161,13 @@ What for: check which translation files term searches use in this project.
 
 1. Open **Settings**, tab **Ontology**.
 2. Read the card **Translations**.
-   - *Not frozen yet.* The first term search or opening a text in the editor takes the translation files on the server then.
+   - *Not frozen yet.* The first term search or opening a text in the editor takes the translation files on the server then. The card also reads like this right after **Move to this release**: the move ends the earlier freeze, and the next use freezes again.
    - *No translations: searches use the English names only.* The project froze when no translation file was on the server.
    - Otherwise the card lists the frozen files with their language, ontology and checksum. *Uploaded later, not used here* names files on the server that the project does not use.
    - *Translations updated on …* says when and by whom the project last moved to the newest translations: by display name and pseudonym, or *from the command line*. Only leads and system administrators see who; other members see only when.
    - **Earlier translations** lists, collapsed, the files earlier searches used and until when.
 
-The project froze its translations at the first use of its ontology. A file an administrator uploads after that does not reach the project by itself ([When a translation reaches a project](admin.md#when-a-translation-reaches-a-project)). To use it, see [Use the newest translations](#use-the-newest-translations). Changing the ontology version, the branches or the annotation scheme, or replacing the task profile, ends the freeze: the next use takes the files on the server then. The ended files stay listed under **Earlier translations**.
+The project froze its translations at the first use of its ontology. A file an administrator uploads after that does not reach the project by itself ([When a translation reaches a project](admin.md#when-a-translation-reaches-a-project)). To use it, see [Use the newest translations](#use-the-newest-translations). Changing the ontology version, the branches or the annotation scheme, or replacing the task profile, ends the freeze: the next use takes the files on the server then. The ended files are listed under **Earlier translations** once the project is frozen again.
 
 ## Use the newest translations
 
@@ -214,7 +214,7 @@ What for: new findings start with these values. They stay marked as not confirme
 What for: hide values the project does not use from the editor.
 
 1. Open **Settings**, tab **Annotation**, and open **Values annotators can choose**.
-2. Click a value to switch it off (hidden) or on (shown). The prefilled value of a value field cannot be hidden.
+2. Click a value to switch it off (hidden) or on (shown). The prefilled value of a value field cannot be hidden: it is greyed, and the row says why, for example *“Present” is prefilled and cannot be hidden.*
 3. Click **Save changes**.
 
 Existing findings keep their values. A finding with a hidden value must be changed before it is saved again.
@@ -244,7 +244,7 @@ A text's own plan can override this until work on it starts.
 What for: decide how many people annotate each text and who may consolidate.
 
 1. Open **Settings**, tab **Workflow**, card **Annotation and consolidation**.
-2. Set **Annotators per text** (1 to 20). It is an upper limit; fewer is fine. A single text can have its own number, also 1 to 20 ([Assign work to the selected texts](lead-documents.md#assign-work-to-the-selected-texts)). The agreement compares every two annotators of a text, so a text with 20 annotators adds 190 pairs to agreement.csv.
+2. Set **Annotators per text** (1 or more). It is an upper limit; fewer is fine. Ontotator has no maximum of its own. The administrator of the server can set one: the hint below the field then names it, for example *This server allows at most 8.*, and a larger number is refused. A number saved before the server got its maximum stays until you change it. A single text can have its own number, with the same bounds ([Assign work to the selected texts](lead-documents.md#assign-work-to-the-selected-texts)). The agreement compares every two annotators of a text, so a text with 20 annotators adds 190 pairs to agreement.csv, and one with 30 adds 435.
 3. Tick **Annotate only after the translation review is accepted** if translations must be reviewed before annotation. Nobody can then annotate a translation that is not accepted; you can still assign annotators while the review is underway ([Assign work to the selected texts](lead-documents.md#assign-work-to-the-selected-texts)).
 4. Tick **Consolidator must not be one of the text's annotators** if annotators may not consolidate their own texts.
 5. Tick **Hide annotator names during consolidation** if consolidators should decide without knowing who marked what. Off by default.
@@ -276,7 +276,7 @@ Before you start: the person needs an account ([Create a user account](admin.md#
 2. Click **Add member…**.
 3. In **Username**, type at least three letters of the name, or the exact username or e-mail. Pick the person from the suggestions.
 4. Tick one or more roles: **Lead**, **Annotator**, **Consolidator**.
-5. Click **Add member**. The page confirms the new role.
+5. Click **Add member**. The page confirms the new role. A username that is not accepted is said under the field. If you typed the name instead of choosing the suggestion, the message names the username to use.
 
 Annotators also do translation reviews. Only people with the **Consolidator** role can be chosen as consolidator of a text. Ontotator sends no e-mail; tell the person that they were added.
 
@@ -288,7 +288,7 @@ What for: give or take away a role.
 2. Tick a role checkbox to give the role. It saves at once.
 3. Untick a role checkbox to take it away, then confirm with **Remove role**. This logs the person out on all devices; they can log in again right away. Taking away the lead role also revokes the project API tokens the person created for this project, unless they are a system administrator. Their personal tokens keep working, but no longer with the role you took away.
 
-A project needs at least one lead: **Add another project lead before removing the last lead.**
+A project needs at least one lead: **Add another project lead before removing the last lead.** When you are the project's only lead and untick your own **Lead** box or click **Remove…** on your row, this message appears at once, without a confirmation.
 
 The exception is a system administrator, who may take away the last lead, their own lead role included, for example to hand a project over. The dialog then says *This project will have no lead. You can still manage it as system administrator.* On their own row it does not speak of lost access or revoked tokens, because an administrator keeps both. A project without a lead shows "–" under **Lead** on **Projects** and can only be managed by an administrator until one is added ([Add a member](#add-a-member)).
 
@@ -327,10 +327,13 @@ Before you start: published versions cannot be edited, only withdrawn. Check the
 2. Without guidelines, the form is already open (**No guidelines yet**). Otherwise, click **Publish a new version**.
 3. Choose a `.md` or `.txt` file (UTF-8, up to 256 KB) in **Guideline file (.md or .txt, up to 256 KB)**.
 4. Check the preview.
-5. Optional: describe the change in **What changed? (optional)**.
-6. Click the publish button, for example *Publish as v2*. Or click **Discard**.
+5. Optional: enter the version your document gives itself, for example *3.1*, in **Your version of the guideline (optional)** (one line, up to 40 characters).
+6. Optional: describe the change in **What changed? (optional)**.
+7. Click the publish button, for example *Publish as v2*. Or click **Discard**.
 
 Everyone sees a notice in their next task.
+
+The number after *v* counts the uploads of this project: the first file you publish is v1, the next one v2, also when you publish an earlier text again. It is not the version of your document. If your document has its own version, enter it in step 5: the app then shows it before the upload number everywhere, for example *Guidelines 3.1 (v2)*, *Guidelines updated to 3.1 (v2)* in the notice, and *Guidelines 3.1 (v2) (current: 3.2 (v3))* on a submitted result. Without it, everything reads *Guidelines v2*. Your version cannot be changed after publishing. To correct it, publish the text again with the right one.
 
 ## See who has read the guidelines
 
@@ -348,13 +351,13 @@ What for: go back to an earlier text.
 
 1. Open **Settings**, tab **Guidelines**.
 2. In the row of the old version, click **More…**, then the republish item, for example *Republish v1…*.
-3. The form opens with the old text. Click the publish button, for example *Publish as v3*.
+3. The form opens with the old text and, if the old version had one, its own version in **Your version of the guideline (optional)**. Click the publish button, for example *Publish as v3*.
 
 ## Withdraw a guideline version
 
 What for: remove a version that must no longer be read, for example because it contains a mistake.
 
-Warning: the text of the withdrawn version is deleted for good. The version number stays, and results made under it show it as withdrawn. No guideline is in force until you publish or republish one.
+Warning: the text of the withdrawn version is deleted for good. The version number and your own version of it stay, and results made under it show it as withdrawn, for example *Guidelines 3.1 (v2) (withdrawn)*. No guideline is in force until you publish or republish one.
 
 1. Open **Settings**, tab **Guidelines**.
 2. In the version's row, click **More…**, then the withdraw item, for example *Withdraw v2…*.

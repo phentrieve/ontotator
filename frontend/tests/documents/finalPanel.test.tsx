@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, AuthError, ConflictError, type DocumentRowView, type DocumentRowsPage, type FinalPanelView, type RowSubmissions, type WorkRoundView } from "../../src/api/client";
 import { formatTime } from "../../src/app/submissionLabels";
 import { DecisionBlock, type DecisionBlockProps } from "../../src/documents/FinalPanel";
-import { AGREEMENT_EXPLANATION, agreementText, compareSummary, consolidateHint, detailDifferenceLines, relatedTermLines, consolidationBreakdown, remainingText, noMoreFinalsText, consolidationStartedToast, nextFinalDecision, nextOtherDecision, unresolvedLines } from "../../src/documents/finalPanelText";
+import { AGREEMENT_EXPLANATION, agreementText, compareSummary, consolidateHint, detailDifferenceLines, relatedTermLines, consolidationBreakdown, remainingText, noMoreFinalsText, consolidationStartedToast, keepLabel, nextFinalDecision, nextOtherDecision, unresolvedLines } from "../../src/documents/finalPanelText";
 import { notifyFinalSelectionChanged } from "../../src/variants/finalSelectionState";
 import { refKey } from "../../src/variants/versionState";
 import { guidelineListing, guidelineSummary } from "../projectFixtures";
@@ -393,8 +393,11 @@ describe("decided", () => {
     afterDecision = page([group("case-122", [{ ...decided, final: final({ case_id: "case-122", language: "de", document_id: "case-122-de", submission_id: "case-122-s2", author_label: "ann-0004", revision: 5 }) }]), group("case-123", [waiting])]);
     const onDecided = vi.fn<(key: string, undo?: { id: number } | null) => void>();
     const onAdvance = vi.fn();
+    const before = page([group("case-122", [decided]), group("case-123", [waiting])]);
+    let showPage: (value: typeof before) => void = () => undefined;
     function Page(): JSX.Element {
-      const [current, setCurrent] = useState(page([group("case-122", [decided]), group("case-123", [waiting])]));
+      const [current, setCurrent] = useState(before);
+      showPage = setCurrent;
       return <DecisionBlock projectKey="p" rowKey="case-122:de" page={current} query={{}} now={now} changeFinal onClose={vi.fn()} onAdvance={onAdvance} onReload={vi.fn()} onNavigate={vi.fn()}
         onDecided={(key, undo) => { onDecided(key, undo); setCurrent(afterDecision!); }} />;
     }
@@ -407,6 +410,10 @@ describe("decided", () => {
     // case-123 waits for a decision, but the lead came to change this text: no jump.
     expect(onAdvance).not.toHaveBeenCalled();
     await waitFor(() => expect(liveRegion().textContent).toBe("Final result saved for case-122 de."));
+    expect(document.querySelector(".final-panel-success")).not.toBeNull();
+    // Undo in the page's toast brings the earlier final result back: the line about the saved one goes (review 2, F7 b).
+    act(() => showPage(page([group("case-122", [decided]), group("case-123", [waiting])])));
+    await waitFor(() => expect(document.querySelector(".final-panel-success")).toBeNull());
   });
 
   it("opens on the compare content with changeFinal", async () => {
@@ -496,6 +503,17 @@ describe("review changes", () => {
     await screen.findByRole("button", { name: "Keep final on v1" });
     const lines = [...block().querySelectorAll(".selection-notice-lines > li")].map(line => line.textContent);
     expect(lines).toContain("v2 was queried in review. No action needed.");
+  });
+
+  it("a text with one version offers Keep the current final result, not a version (issue 469)", async () => {
+    const target = reviewRow("case-116", "de");
+    const single = { ...target, versions: [target.versions[0]] };
+    expect(keepLabel(single)).toBe("Keep the current final result");
+    expect(keepLabel(target)).toBe("Keep final on v1");
+    panels[rowKey("case-116", "de")] = finalPanel({ submissions: [anaSubmission("case-116", "de")], causes: single.issues });
+    renderPanel("case-116:de", page([group("case-116", [single])]));
+    expect(await screen.findByRole("button", { name: "Keep the current final result" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^Keep final on/ })).toBeNull();
   });
 
   it("makes Keep unavailable for the lead's own final while the rule is on", async () => {

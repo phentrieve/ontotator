@@ -78,4 +78,15 @@ describe("GuidelinesPage", () => {
     render(<GuidelinesPage projectKey="p/key" canManage={false} onNavigate={vi.fn()} />);
     expect(await screen.findByText("Network down")).toBeDefined();
   });
+
+  it("names labelled versions 3.2 (v3) in the heading and the list; unlabelled ones stay v1 (#487)", async () => {
+    vi.spyOn(api, "listGuidelines").mockResolvedValue(guidelineListing([guidelineSummary(3, { label: "3.2" }), withdrawnGuideline(2, null, { label: "3.1" }), guidelineSummary(1)]));
+    vi.mocked(api.getGuideline).mockImplementation(async (_key, version) => guidelineDocument(guidelineSummary(version, { label: version === 3 ? "3.2" : null })));
+    render(<GuidelinesPage projectKey="p/key" canManage={false} onNavigate={vi.fn()} />);
+    expect(await screen.findByRole("heading", { level: 2, name: "Guidelines 3.2 (v3)" })).toBeDefined();
+    const list = within(versionList());
+    expect(list.getByRole("link", { name: "3.2 (v3)" }).getAttribute("href")).toBe("#/projects/p%2Fkey/guidelines/v3");
+    expect(list.getByText("3.1 (v2), Withdrawn 21 Oct")).toBeDefined();
+    expect(list.getByRole("link", { name: "v1" })).toBeDefined();
+  });
 });

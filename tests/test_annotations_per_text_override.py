@@ -165,7 +165,11 @@ def test_the_project_lowering_preview_skips_texts_with_their_own_value(tmp_path)
             params={"annotations_per_text": 1},
         )
         assert response.status_code == 200, response.text
-        return int(response.json()["rows_over_target"])
+        body = response.json()
+        # Issue 471: the texts are named, and they are the ones counted.
+        assert len(body["rows"]) == body["rows_over_target"]
+        assert all(row["annotators"] > 1 for row in body["rows"])
+        return int(body["rows_over_target"])
 
     assert over() == 1
     assert _put(env, 2).status_code == 200
@@ -176,7 +180,8 @@ def test_refusals(tmp_path):
     env = proposal_env(tmp_path, per_text=1)
     unknown = _put(env, 2, case="nope")
     assert unknown.status_code == 404 and unknown.json()["code"] == "DOCUMENT_NOT_FOUND"
-    assert _put(env, 21).status_code == 422  # issue 447: 1 to 20
+    # Issue 457: no built-in maximum; only the column's type bounds it.
+    assert _put(env, 2**31).status_code == 422
     assert _put(env, 0).status_code == 422
     assert (
         env.lead.put(

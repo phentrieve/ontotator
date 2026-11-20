@@ -39,7 +39,44 @@ describe("ComparisonTable", () => {
     expect(cells).toHaveLength(1);
     expect(cells[0].getAttribute("colspan")).toBe("3");
     expect(cells[0].querySelector(".axis-value--patient")?.textContent).toBe("Patient");
-    expect(screen.getByText("“muscular hypotonia” (overlapping, comes with the chosen finding)")).toBeTruthy();
+    // #472: everyone marked the same passage, so the Text row agrees like any other row.
+    expect(screen.getByText("“muscular hypotonia” (all agree)").closest("td")?.className).toBe("cons-agreed cons-agreed-once");
+    expect(document.body.textContent).not.toContain("overlapping");
+  });
+
+  // Issue 470: with many people the table scrolls sideways; one line per row to decide says who holds which value.
+  it("a row to decide among many people says who holds which value, in a line that stays in view", () => {
+    const people = Array.from({ length: 6 }, (_, index) => ({ person_id: `annotator-${index}`, label: `Annotator ${"ABCDEF"[index]}`, lane: Math.min(index + 1, 4) }));
+    const many = group("g-many", ["term_related", "values_differ"], people.map((person, index) => member(`in-${index}`, person,
+      index % 3 === 2 ? "HP:0000707" : "HP:0001252", index % 3 === 2 ? "Abnormality of the nervous system" : "Hypotonia", [span("muscular hypotonia")],
+      { axes: { assertion: index === 1 ? "absent" : "present", experiencer: "patient", temporality: "current" } })),
+    { differing_axes: ["assertion"], term_lineage: ["HP:0000707", "HP:0001252"] });
+    render(<Harness group={many} people={people} />);
+    const rows = [...document.querySelectorAll("tbody tr")];
+    // Term row, its split, then the parent-term sentence; Assertion row, its split.
+    expect(rows.slice(0, 5).map(row => row.className)).toEqual(["cons-row--conflict", "cons-row-hint cons-row-split", "cons-row-hint cons-row-hint",
+      "cons-row--conflict", "cons-row-hint cons-row-split"]);
+    expect(rows[1].textContent).toBe("Hypotonia 4 · Abnormality of the nervous system 2 (C, F)");
+    expect(rows[2].textContent).toBe("Abnormality of the nervous system is a parent term of Hypotonia.");
+    expect(rows[4].textContent).toBe("Present 5 · Absent 1 (B)");
+    // Each line is one cell across the table whose content is pinned (.cons-pin), as is an agreed value shown once.
+    for (const index of [1, 2, 4]) {
+      expect(rows[index].querySelector("td")?.getAttribute("colspan")).toBe("7");
+      expect(rows[index].querySelector("td > .cons-pin")?.textContent).toBe(rows[index].textContent);
+    }
+    expect(screen.getByText("“muscular hypotonia” (all agree)").className).toBe("cons-pin cons-pin-value");
+    // Blinding: letters only, never a name or pseudonym.
+    expect(document.querySelector(".cons-compare")?.textContent).not.toMatch(/ann-\d|annotator-\d/);
+    // Read-only (a decided group): no rows to decide, no split lines.
+    cleanup();
+    render(<Harness group={many} people={people} readOnly />);
+    expect(document.querySelector(".cons-row-split")).toBeNull();
+    expect(document.querySelector(".cons-row-hint")?.textContent).toBe("Abnormality of the nervous system is a parent term of Hypotonia.");
+  });
+
+  it("three people fit without the split line", () => {
+    render(<Harness group={hypotoniaThree()} />);
+    expect(document.querySelector(".cons-row-split")).toBeNull();
   });
 
   it("an agreed value stands under every person, the line across is the narrow variant (B5-2)", () => {
@@ -162,6 +199,6 @@ describe("ComparisonTable, Modifiers row", () => {
 
   it("agreed modifiers are one grey line", () => {
     render(<Harness group={seizure("g", ["match"], [[ANA, [severe("schwere")]], [BEN, [severe("schwere")]]])} people={PEOPLE} text={MOD_TEXT} />);
-    expect(screen.getByText("Severe “schwere” (all agree)").getAttribute("colspan")).toBe("2");
+    expect(screen.getByText("Severe “schwere” (all agree)").closest("td")?.getAttribute("colspan")).toBe("2");
   });
 });

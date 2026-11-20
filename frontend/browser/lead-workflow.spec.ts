@@ -13,7 +13,7 @@ import {
   documentsReady, documentsTab, moreMarker, notInPlanSwitch, openDecisionBlock, rowBox, openFilters, openTextCard, rowAction, rowCell, textCard, textName, textNamePattern,
   textRow, textVersionItems,
 } from "./documentsHelpers";
-import { authenticatedRequest, loginThroughForm } from "./helpers";
+import { authenticatedRequest, clickLogOut, loginThroughForm } from "./helpers";
 import { leadScenario, pasteCaseIds, type LeadPerson, type LeadScenario } from "./leadWorkflowHelpers";
 
 test.setTimeout(240_000);
@@ -502,13 +502,13 @@ test("ROWS: row actions within three clicks", async ({ page }) => {
   await page.getByRole("link", { name: "Back to Documents" }).first().click();
   await documentsReady(page);
 
-  // Review changes… (PLAN_RESTORED): the card with "Keep final on v1": 2 (the checkbox confirmation is gone).
+  // Review changes… (PLAN_RESTORED): the card with "Keep the current final result" (one version, issue 469): 2 (the checkbox confirmation is gone).
   clicks = counter(page);
   await clicks.click(rowAction(page, "Review changes…", cases.review_changes, "de"));
   const review = await openDecisionBlock(page, cases.review_changes, "de");
-  await expect(review.getByRole("button", { name: "Keep final on v1", exact: true })).toBeVisible();
+  await expect(review.getByRole("button", { name: "Keep the current final result", exact: true })).toBeVisible();
   await evidence(page, "row-review-changes", review);
-  await clicks.click(review.getByRole("button", { name: "Keep final on v1", exact: true }));
+  await clicks.click(review.getByRole("button", { name: "Keep the current final result", exact: true }));
   expect(clicks.total).toBe(2);
   await expect(review.locator(".final-panel-success")).toContainText(new RegExp(`Final result saved for ${esc(cases.review_changes)}${SEP}de\\.`));
   await textCard(page, cases.review_changes, "de").getByRole("button", { name: "Close", exact: true }).first().click();
@@ -566,7 +566,7 @@ test("lead lands on the last-used project, else on Projects (F8, D4)", async ({ 
   // Open b's Documents, log out and in again: the last-used project.
   await page.goto(`/#/projects/${encodeURIComponent(b)}/documents`);
   await expect(page.getByRole("heading", { name: "Documents", level: 1 })).toBeVisible();
-  await page.getByRole("button", { name: "Log out", exact: true }).click();
+  await clickLogOut(page);
   await expect(page.getByRole("form", { name: "Log in to Ontotator" })).toBeVisible();
   await loginDana();
   await expect(page).toHaveURL(new RegExp(`#/projects/${esc(b)}/documents`));
@@ -779,7 +779,7 @@ test("every Progress count opens Documents with the same number of rows", async 
     // Texts in view: the text names plus the not-planned sources folded into their case lines.
     const shown = page.getByRole("button", { name: /^Text case-\d{4} [a-z]{2}$|^source [a-z]{2} \(native\), \d+ translations?$/ });
     if (Number(count) === 0) {
-      await expect(page.getByText(/^(No texts match these filters\.|Nothing needs your decision|Nothing to assign|Nothing in progress|Nothing done yet|No texts yet)$/).first(), label).toBeVisible();
+      await expect(page.getByText(/^(No texts match these filters\.|Nothing needs your decision|No text waits for an assignment|Nothing in progress|Nothing done yet|No texts yet)$/).first(), label).toBeVisible();
     }
     await expect(shown, `${label} (${link.href})`).toHaveCount(Number(count));
     checked.push(`${label}: ${count}`);

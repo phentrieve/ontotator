@@ -6,7 +6,8 @@ import { api, type AssignmentView, type DocumentRowView } from "../../src/api/cl
 import { routeHref, type ProjectDocumentsQuery, type Route } from "../../src/app/router";
 import { formatTime } from "../../src/app/submissionLabels";
 import { TextCard, type TextCardProps } from "../../src/documents/textCard/TextCard";
-import type { SegmentId } from "../../src/documents/textCard/cardModel";
+import { rowDay, type SegmentId } from "../../src/documents/textCard/cardModel";
+import { proposalSetText, sameDaySets } from "../../src/documents/textCard/AnnotationPart";
 import { annotateItem, cardRow } from "./cardFixtures";
 import { final, round, stepOf, submission, submissions, version, work } from "./fixtures";
 import { ana, cell, luc, tom } from "./tableFixtures";
@@ -215,6 +216,26 @@ describe("annotation part", () => {
     expect(within(part()).queryByText(/Newer set available/)).toBeNull();
   });
 
+  it("tells two proposal sets of one day apart by their time, and a submission of today by its time (issue 472)", () => {
+    const set = (set_id: number, imported_at: string, newest: boolean) => ({ set_id, imported_at, tool: "phentrieve", tool_version: "1.4", proposal_count: 24, newest });
+    const part = () => within(card()).getByRole("region", { name: "Annotation" });
+    const morning = set(1, "2026-11-17T09:12:00", false), afternoon = set(2, "2026-11-17T13:40:00", true);
+    renderCard({ row: assignRow({ proposal_set: morning, newer_proposal_set: afternoon }) });
+    expect(within(part()).getByText("Proposals").closest("p")!.textContent)
+      .toBe("Proposals set 2026-11-17 09:12 (phentrieve 1.4), 24 proposals Newer set available: 2026-11-17 13:40 How to use it");
+    expect(sameDaySets(morning, [afternoon])).toBe("minutes");
+    expect(sameDaySets(morning, [morning, null, set(3, "2026-11-18T08:00:00", true)])).toBe(false);
+    // Two imports within one minute: the seconds tell them apart.
+    const second = set(4, "2026-11-17T09:12:40", true);
+    expect(sameDaySets(morning, [second])).toBe("seconds");
+    expect(proposalSetText(second, "seconds")).toBe("set 2026-11-17 09:12:40 (phentrieve 1.4), 24 proposals");
+    // The day of a row follows the rule of "assigned today 13:39".
+    expect(rowDay("2026-10-21T09:05:00", now)).toBe("today 09:05");
+    expect(rowDay("2026-10-20T09:05:00", now)).toBe("yesterday");
+    expect(rowDay("2026-10-02T09:05:00", now)).toBe("2 Oct");
+    expect(rowDay(null, now)).toBeNull();
+  });
+
   it("names the older set while any task is on it, and says when a set was not recorded (issue 337)", () => {
     const set = (set_id: number, imported_at: string, newest: boolean) => ({ set_id, imported_at, tool: "phentrieve", tool_version: "1.4", proposal_count: 24, newest });
     const part = () => within(card()).getByRole("region", { name: "Annotation" });
@@ -302,12 +323,12 @@ describe("annotation part", () => {
     expect(within(rows[1]).getByText("Assigned 14 Oct").getAttribute("title")).toBe("Assigned 14 Oct 2026, 09:00 by Lena Lead");
     expect(rows[1].textContent).toContain("Assigned 14 Oct by you, from proposals");
     expect(actions(rows[1])).toEqual(["Reassign Tom Reis’s annotation", "Remove Tom Reis’s assignment, the draft is discarded"]);
-    expect(rows[2].textContent).toContain("Submitted 18 Oct, 3 findings · assigned 12 Oct");
+    expect(rows[2].textContent).toContain("Submitted Sun, 3 findings · assigned 12 Oct");
     expect(actions(rows[2])).toEqual(["Open annotation of Ana Weber", "Reopen Ana Weber’s annotation", "Remove Ana Weber’s assignment"]);
     // The status pills say it in words and shape.
     expect(rows.map(item => item.querySelector(".status-pill")!.textContent)).toEqual(["Reopened", "In progress", "Submitted"]);
     fireEvent.click(within(rows[2]).getByRole("button", { name: "Reopen Ana Weber’s annotation" }));
-    expect(screen.getByRole("dialog", { name: "Reopen case-200 de" })).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: /^Reopen case-200 de for / })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     fireEvent.click(within(rows[0]).getByRole("button", { name: "Remove Luc Martin’s assignment" }));
     const revoke = screen.getByRole("dialog", { name: "Remove assignment?" });
@@ -324,7 +345,7 @@ describe("annotation part", () => {
     const link = await within(people).findByRole("link", { name: "Open annotation of Ana Weber (assignment removed)" });
     const removed = link.closest("li")!;
     expect(removed.classList.contains("person-row--removed")).toBe(true);
-    expect(removed.textContent).toBe("Ana Weber ann-0003Removed 19 Oct · submitted 18 Oct, kept in the historyRemovedOpen annotation");
+    expect(removed.textContent).toBe("Ana Weber ann-0003Removed Mon · submitted Sun, kept in the historyRemovedOpen annotation");
     expect(within(removed).queryByRole("button")).toBeNull();
     fireEvent.click(link);
     expect(onNavigate).toHaveBeenCalledWith({ name: "projectCase", key: "p", caseId: "case-200", variant: "case-200-de", show: "submission:s-ana", documents: query });
@@ -335,7 +356,7 @@ describe("annotation part", () => {
     }));
     renderCard({ canManage: false });
     const plain = (await within(card()).findByRole("link", { name: "Open annotation of Ana Weber (assignment removed)" })).closest("li")!;
-    expect(plain.textContent).toBe("Ana Weber ann-0003Assignment removed · submitted 18 Oct, kept in the historyRemovedOpen annotation");
+    expect(plain.textContent).toBe("Ana Weber ann-0003Assignment removed · submitted Sun, kept in the historyRemovedOpen annotation");
   });
 
   it("names the version of each person's task when the text has several versions (issue 445)", async () => {
@@ -358,7 +379,7 @@ describe("annotation part", () => {
     const list = within(card()).getByRole("list", { name: "Annotators" });
     await within(list).findByRole("link", { name: "Open annotation of Ana Weber" });
     const rows = within(list).getAllByRole("listitem").map(item => item.querySelector(".person-row-details")?.textContent);
-    expect(rows).toEqual(["Assigned 14 Oct, from proposals · v2", "Submitted 18 Oct, 3 findings · assigned 12 Oct · v1", "Assignment removed · submitted 17 Oct, kept in the history · v1"]);
+    expect(rows).toEqual(["Assigned 14 Oct, from proposals · v2", "Submitted Sun, 3 findings · assigned 12 Oct · v1", "Assignment removed · submitted Sat, kept in the history · v1"]);
     cleanup();
     // Parallel roots: the chain name, as in the submissions table.
     renderCard({ row: assignRow({ versions, work: people, parallel_roots: true }) });
@@ -370,7 +391,7 @@ describe("annotation part", () => {
     renderCard({ row: assignRow({ work: [people[0]] }) });
     const single = within(card()).getByRole("list", { name: "Annotators" });
     await within(single).findByRole("link", { name: "Open annotation of Ana Weber" });
-    expect(within(single).getAllByRole("listitem")[0].querySelector(".person-row-details")?.textContent).toBe("Submitted 18 Oct, 3 findings · assigned 12 Oct");
+    expect(within(single).getAllByRole("listitem")[0].querySelector(".person-row-details")?.textContent).toBe("Submitted Sun, 3 findings · assigned 12 Oct");
   });
 
   it("after removing a person, focus moves to the next person's first button, else to Assign annotators…", async () => {
@@ -457,6 +478,48 @@ describe("translation part", () => {
     expect(onNavigate).toHaveBeenCalledWith({ name: "projectCase", key: "p", caseId: "case-200", variant: "case-200-de", compare: "case-200-en", documents: query });
   });
 
+  it("issue 483: the reason of a correction request with its additions, and Add to the reason… for the lead", async () => {
+    const request = {
+      reason: "Check the dose.", requested_at: "2026-10-20T09:00:00",
+      additions: [{ note: "Paragraph 3 as well.", added_at: "2026-10-20T10:00:00", added_by: { pseudonym: "lead-0001", display_name: null, is_me: true } }],
+    };
+    const row = assignRow({
+      versions: [version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "accepted" })],
+      work: [work({ assignment_id: 5, document_id: "case-200-de", task: "translation_review", status: "open", author_label: "ann-0003", person: ana, correction_request: request })],
+    });
+    const add = vi.spyOn(api, "addCorrectionReason").mockResolvedValue({ assignment_id: 5, note: "And the footnote.", added_at: "2026-10-21T11:00:00" });
+    const { onChanged } = renderCard({ row, initialSegment: "translation" });
+    const reviewers = within(card()).getByRole("list", { name: "Translation reviewers" });
+    const reason = within(reviewers).getByRole("note", { name: "Reason of the correction request" });
+    expect(reason.textContent).toContain("“Check the dose.”");
+    expect(reason.textContent).toContain("Added by you on ");
+    expect(reason.textContent).toContain(": Paragraph 3 as well.");
+    fireEvent.click(within(reviewers).getByRole("button", { name: "Add to the reason for Ana Weber" }));
+    const dialog = screen.getByRole("dialog", { name: "Add to the reason" });
+    const confirm = within(dialog).getAllByRole("button", { name: "Add to the reason" }).at(-1)!;
+    expect((confirm as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(within(dialog).getByLabelText("Addition to the reason"), { target: { value: "  And the footnote. " } });
+    fireEvent.click(confirm);
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    expect(add).toHaveBeenCalledWith(5, "And the footnote.");
+    expect(screen.queryByRole("dialog", { name: "Add to the reason" })).toBeNull();
+  });
+
+  it("issue 483: no Add to the reason… without a request or for a reader who is not the lead", () => {
+    const row = assignRow({
+      versions: [version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "accepted" })],
+      work: [work({ assignment_id: 5, document_id: "case-200-de", task: "translation_review", status: "open", author_label: "ann-0003", person: ana })],
+    });
+    renderCard({ row, initialSegment: "translation" });
+    expect(within(card()).queryByRole("button", { name: /^Add to the reason/ })).toBeNull();
+    expect(within(card()).queryByRole("note", { name: "Reason of the correction request" })).toBeNull();
+    cleanup();
+    const requested = { ...row, work: [{ ...row.work[0], correction_request: { reason: "Check the dose.", requested_at: "2026-10-20T09:00:00", additions: [] } }] };
+    renderCard({ row: requested, initialSegment: "translation", canManage: false });
+    expect(within(card()).getByRole("note", { name: "Reason of the correction request" })).toBeTruthy();
+    expect(within(card()).queryByRole("button", { name: /^Add to the reason/ })).toBeNull();
+  });
+
   it("after a review: the newest version per chain, older ones collapsed, one Ask a reviewer to correct…, submitted reviews under their version", () => {
     const versions = [
       version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "reviewed", chain_name: "m1", is_newest_in_chain: false }),
@@ -515,6 +578,20 @@ describe("translation part", () => {
     expect(accept[0].getAttribute("aria-label")).toBe("Accept mt v1 of case-200 de…");
     fireEvent.click(accept[0]);
     expect(onAcceptVersion).toHaveBeenCalledWith(row, versions[2]);
+  });
+
+  it("issue 483: a version accepted by the lead's decision on a query names the decision and the answer", () => {
+    const lead = { pseudonym: "ann-0002", display_name: "Project lead", is_me: false };
+    const decision = { decided_document_id: "case-200-de", reviewed_document_id: "case-200-de", reviewer_assignment_id: 31, decided_at: "2026-11-18T10:12:00", decided_by: lead };
+    const versions = [
+      version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "reviewed", latest_review_decision: "query", chain_name: "m1", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "m1", translation_status: "accepted",
+        query_decision: { ...decision, kind: "reviewer_text", answer: "Yes, as proposed.", edited: false } }),
+    ];
+    const review = work({ assignment_id: 31, document_id: "case-200-de", task: "translation_review", status: "submitted", author_label: "ann-0003", person: { pseudonym: "ann-0003", display_name: "Ana Weber", is_me: false } });
+    renderCard({ row: assignRow({ versions, work: [review] }), initialSegment: "translation", now: new Date("2026-11-20T12:00:00") });
+    const part = within(card()).getByRole("heading", { name: "Translation" }).closest("section")!;
+    expect(within(part).getByText("Accepted: decision on the query of Ana Weber (ann-0003), the reviewer’s text taken, Project lead (ann-0002), 18 Nov, 10:12 · Answer: Yes, as proposed.")).toBeTruthy();
   });
 
   it("issue 453: a version made by an editorial correction names who corrected it and why", () => {
@@ -745,6 +822,25 @@ describe("one layout for the parts (issues 329, 331, 332)", () => {
     expect([...groupA.querySelectorAll(".text-version-name")].map(name => name.textContent)).toEqual(["Provider A v1", "Provider A v2"]);
     // The chain is in the name: no repeated chain column.
     expect(part.querySelector(".text-version-chain")).toBeNull();
+  });
+
+  it("review 2, F1: a review of a version a lead fixed typos in is not reopened, and only the newest version is asked to be corrected", () => {
+    const fixed = [
+      version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "accepted", latest_review_decision: "accepted_unchanged", chain_name: "m1", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "m1", translation_status: "accepted",
+        editorial_correction: { reason: "Typo", previous_document_id: "case-200-de", inserted_characters: 1, deleted_characters: 1, corrected_at: "2026-11-17T10:12:00", corrected_by: null } }),
+    ];
+    const review = work({ assignment_id: 5, document_id: "case-200-de", task: "translation_review", status: "submitted", author_label: "ann-0003", person: ana });
+    const variant = (document_id: string) => [document_id, { document_id, translation_status: "accepted", text_sha256: "x" }] as const;
+    const tools = { ...textTools([toolAssignment(5, "submitted", { task: "translation_review", pseudonym: "ann-0003" })]),
+      variants: new Map([variant("case-200-de"), variant("case-200-de-v2")]) as unknown as TextVersionsTools["variants"], onRequestCorrection: vi.fn() };
+    renderCard({ row: assignRow({ versions: fixed, work: [review] }), initialSegment: "translation", textVersionTools: tools });
+    const part = within(card()).getByRole("heading", { name: "Translation" }).closest("section")!;
+    within(part).getByText("Older versions (1)").closest("details")!.open = true;
+    const row = within(within(part).getByRole("list", { name: "Assignments on v1" })).getByRole("listitem");
+    // The server refuses the reopening (VARIANT_REVIEW_STALE): the fix is reviewed, so no button offers it.
+    expect(within(row).getAllByRole("button").map(button => button.getAttribute("aria-label"))).toEqual(["Remove Ana Weber’s review assignment"]);
+    expect(within(part).getAllByText("Ask a reviewer to correct…").map(button => button.getAttribute("aria-label"))).toEqual(["Ask a reviewer to correct v2 of case-200 de…"]);
   });
 
   it("moved work is a plain person row saying where it went", () => {

@@ -112,7 +112,9 @@ class _Context:
                 self.resolution_of[resolution.assignment_id] = resolution.resolution
                 if resolution.resolution == "moved":
                     self.moved_to[resolution.assignment_id] = resolution.to_document_id
-            if resolution.submission_id is not None:
+            if resolution.submission_id is not None and not resolution.lapsed:
+                # A lapsed carry (issue 461) settles nothing: rule 3b offers
+                # the carry again.
                 self.submission_resolutions.setdefault(
                     resolution.submission_id, set()
                 ).add(resolution.resolution)
@@ -238,6 +240,24 @@ def _editorial_correction(facts: RowFacts, document_id: str) -> dict[str, Any] |
         "deleted_characters": record["deleted_characters"],
         "corrected_at": record["corrected_at"],
         "corrected_by": facts.people.get(corrected_by) if corrected_by else None,
+    }
+
+
+def _query_decision(facts: RowFacts, document_id: str) -> dict[str, Any] | None:
+    """The lead's decision on a query that accepted a version (issue 483)."""
+    record = facts.query_decisions.get(document_id)
+    if record is None:
+        return None
+    decided_by = record["decided_by"]
+    return {
+        "kind": record["kind"],
+        "decided_document_id": record["document_id"],
+        "reviewed_document_id": record["reviewed_document_id"],
+        "reviewer_assignment_id": record["assignment_id"],
+        "answer": record["answer"],
+        "edited": record["edited"],
+        "decided_at": record["decided_at"],
+        "decided_by": facts.people.get(decided_by) if decided_by else None,
     }
 
 
@@ -573,6 +593,7 @@ def _build_row(ctx: _Context, case_id: str, language: str) -> dict[str, Any]:
                 "discarded": _discard(facts, v.document_id),
                 "upload": _upload(facts, v.document_id),
                 "editorial_correction": _editorial_correction(facts, v.document_id),
+                "query_decision": _query_decision(facts, v.document_id),
             }
             for chain in chains
             for v in chain.versions
@@ -653,6 +674,9 @@ def _build_row(ctx: _Context, case_id: str, language: str) -> dict[str, Any]:
             "override": facts.per_text_overrides.get(key),
         },
         "lead_pause": _lead_pause(ctx, key),
+        "typography_hints": sum(
+            facts.typography_hints.get(chain.newest.document_id, 0) for chain in live
+        ),
         "consolidation_progress": None,
         "unreviewed_translation": steps_rules.unreviewed_translation(
             ctx.step_facts[key]
@@ -890,6 +914,30 @@ def _work_item(
         "waiting_for_translation_review": item.assignment_id in ctx.waiting
         and item.assignment_id not in ctx.waiting_for_lead,
         "waiting_for_lead": item.assignment_id in ctx.waiting_for_lead,
+        "correction_request": _correction_request(ctx, item),
+    }
+
+
+def _correction_request(
+    ctx: _Context, item: rules.AssignmentFact
+) -> dict[str, Any] | None:
+    """The lead's request of "Ask a reviewer to correct…" behind a translation
+    review, with the additions to its reason (issue 483); None otherwise."""
+    request = ctx.facts.correction_requests.get(item.assignment_id)
+    if request is None:
+        return None
+    return {
+        "reason": request["reason"],
+        "requested_at": request["requested_at"],
+        "additions": [
+            {
+                "note": addition["note"],
+                "added_at": addition["added_at"],
+                # None: added through an API token, or by an account since erased.
+                "added_by": ctx.facts.people.get(addition["added_by"] or 0),
+            }
+            for addition in request["additions"]
+        ],
     }
 
 
@@ -1827,9 +1875,13 @@ def case_ids(facts: RowFacts, query: RowQuery) -> tuple[list[str], int, bool]:
 
 
 def sorted_case_ids(facts: RowFacts, case_ids: Sequence[str], sort: str) -> list[str]:
-    """``case_ids`` (deduplicated) in Documents order; unknown IDs last, as given."""
+    """``case_ids`` (deduplicated) in Documents order; unknown IDs last, as given.
+
+    ``sort`` "given" keeps the order of ``case_ids`` (issue 488)."""
     known = {version.case_id for version in facts.versions}
     unique = list(dict.fromkeys(case_ids))
+    if sort == "given":
+        return unique
     ordered = _sort_cases(
         facts, (case_id for case_id in unique if case_id in known), sort
     )

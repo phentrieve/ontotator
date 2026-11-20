@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { api, onSessionRestored, type CurrentUser, type ProjectSummary } from "../api/client";
 import { roleLabels } from "./labels";
 import { AppShell, type Crumb } from "../ui/AppShell";
+import { IconChevronLeft, IconGear } from "../ui/icons";
+import type { MenuItem } from "../ui/MenuButton";
+import { chooseTheme, THEME_CHOICES, useThemeChoice } from "../ui/theme";
 import { MY_TASKS, routeHref, type Route } from "./router";
 import { projectDestination, ProjectSwitcher } from "./ProjectPicker";
 import { rememberedProject } from "./lastProject";
@@ -9,7 +12,7 @@ import { useDocumentsSummary } from "../documents/useDocumentsSummary";
 import { TASKS_CHANGED } from "../tasks/tasksEvents";
 import { TechnicalReportHost } from "../reports/TechnicalReportDialog";
 import { TECHNICAL_REPORTS_CHANGED } from "../reports/TechnicalReportsPage";
-import { openTechnicalReport, REPORT_ENTRY_LABEL, REPORT_NAV_LABEL } from "../reports/technicalReport";
+import { openTechnicalReport, REPORT_NAV_LABEL, SHOW_MY_TECHNICAL_REPORTS } from "../reports/technicalReport";
 
 export interface ShellProps {
   user: CurrentUser;
@@ -26,6 +29,13 @@ export interface ShellProps {
   navigation?: unknown;
 }
 
+/** A plain click navigates in the app (with its leave guards); modified clicks keep the browser's behaviour. */
+const inApp = (destination: Route, onNavigate: ShellProps["onNavigate"]) => (event: MouseEvent<HTMLAnchorElement>) => {
+  if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  onNavigate(destination);
+};
+
 function NavigationLink({ destination, current, onNavigate, label, children }: {
   destination: Route; current: Route; onNavigate: ShellProps["onNavigate"]; label?: string; children: ReactNode;
 }): JSX.Element {
@@ -35,11 +45,7 @@ function NavigationLink({ destination, current, onNavigate, label, children }: {
   const inTasks = destination.name === "tasks" && current.name === "task";
   return <a href={routeHref(destination)} className="shell-nav-link" aria-label={label}
     aria-current={active ? "page" : inTasks ? "location" : undefined}
-    onClick={(event) => {
-      if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-      event.preventDefault();
-      onNavigate(destination);
-    }}>{children}</a>;
+    onClick={inApp(destination, onNavigate)}>{children}</a>;
 }
 
 const ROLE_ORDER = ["lead", "adjudicator", "annotator"] as const;
@@ -54,7 +60,6 @@ export function shellRole(user: CurrentUser, projects: readonly ProjectSummary[]
   return labels.length ? labels.join(", ") : undefined;
 }
 
-/**
 /**
  * Unsubmitted own tasks, loaded once per session and again on window focus, a restored session, a tasks-changed
  * event (an own submit or new work round, so the count never lags behind it) or a change of `navigation` (opening
@@ -93,6 +98,11 @@ function useOpenTaskCount(username: string, navigation: unknown): number | null 
   }, [navigation]);
   return count?.username === username ? count.value : null;
 }
+
+/** The pages of the area Administration (issue 510): they have their own sidebar. */
+const ADMIN_AREA: ReadonlySet<Route["name"]> = new Set(["adminUsers", "adminOntologies", "adminReports", "adminSettings"]);
+/** Where the gear leads. */
+const ADMIN_START: Route = { name: "adminUsers" };
 
 /** Open technical reports for a system administrator (the navigation badge); null for others or while unknown. */
 function useOpenReportCount(admin: boolean, navigation: unknown): number | null {
@@ -137,27 +147,32 @@ export function Shell({ user, projects, route, onNavigate, onLogout, breadcrumb,
   const documentsLink = (key: string) => needsDecision
     ? link({ name: "projectDocuments", key, segment: "decision" }, `Documents (${needsDecision})`, `Documents, ${needsDecision} need your decision`)
     : link({ name: "projectDocuments", key }, "Documents");
-  const nav = <>
+  const inAdmin = user.is_system_admin && ADMIN_AREA.has(route.name);
+  const reportsLink = openReports
+    ? link({ name: "adminReports" }, `Technical reports (${openReports})`, `Technical reports, ${openReports} open`)
+    : link({ name: "adminReports" }, "Technical reports");
+  // Administration has its own sidebar; the work sidebar holds no administration entry.
+  const adminNav = <>
+    <a href={routeHref({ name: "projects" })} className="shell-nav-link shell-nav-back" onClick={inApp({ name: "projects" }, onNavigate)}>
+      <IconChevronLeft /> Back to Projects</a>
+    <section className="shell-nav-group" aria-labelledby="shell-admin-heading">
+      <h2 id="shell-admin-heading">Administration</h2>
+      <ul className="shell-nav-list">
+        {link({ name: "adminUsers" }, "Users")}
+        {link({ name: "adminOntologies" }, "Ontologies")}
+        {reportsLink}
+        {link({ name: "adminSettings" }, "Server settings")}
+      </ul>
+    </section>
+  </>;
+  const workNav = <>
     {switcher}
     <ul className="shell-nav-list">
       {/* "All" explicitly, so a reload of My tasks never triggers the last-used landing. */}
       {link(MY_TASKS, openTasks === null ? "My tasks" : `My tasks (${openTasks})`)}
-      {projects.length > 0 && link({ name: "projects" }, "Projects")}
-      {link({ name: "me" }, "Profile")}
-      <li><button type="button" className="shell-nav-link" aria-label={REPORT_ENTRY_LABEL} onClick={openTechnicalReport}>{REPORT_NAV_LABEL}</button></li>
+      {/* An administrator without a project still creates one there (New project). */}
+      {(projects.length > 0 || user.is_system_admin) && link({ name: "projects" }, "Projects")}
     </ul>
-    {user.is_system_admin && <section className="shell-nav-group" aria-label="Administration">
-      <h2>Administration</h2>
-      <ul className="shell-nav-list">
-        {link({ name: "adminUsers" }, "Users")}
-        {link({ name: "adminOntologies" }, "Ontologies")}
-        {openReports
-          ? link({ name: "adminReports" }, `Technical reports (${openReports})`, `Technical reports, ${openReports} open`)
-          : link({ name: "adminReports" }, "Technical reports")}
-        {link({ name: "projectNew" }, "New project")}
-        {link({ name: "adminSettings" }, "Server settings")}
-      </ul>
-    </section>}
     {current?.can_manage && <section className="shell-nav-group" aria-label="Current project sections">
         <h2 title={current.name}>{current.name}</h2>
         <ul className="shell-nav-list">
@@ -168,9 +183,28 @@ export function Shell({ user, projects, route, onNavigate, onLogout, breadcrumb,
         </ul>
       </section>}
   </>;
+  const theme = useThemeChoice();
+  const userMenu: MenuItem[] = [
+    { id: "profile", label: "Profile", onSelect: () => onNavigate({ name: "me" }) },
+    { id: "my-reports", label: "My technical reports", onSelect: () => {
+      onNavigate({ name: "me", section: "technical-reports" });
+      // Already on Profile: the section scrolls into view.
+      window.dispatchEvent(new Event(SHOW_MY_TECHNICAL_REPORTS));
+    } },
+    { id: "report", label: REPORT_NAV_LABEL, onSelect: openTechnicalReport },
+    ...THEME_CHOICES.map(({ value, label }) => ({ id: `theme-${value}`, label, group: "Theme", checked: theme === value, onSelect: () => chooseTheme(value) })),
+    { id: "logout", label: "Log out", onSelect: onLogout },
+  ];
+  // The gear: only system administrators see it. Its place is kept whether or not reports are open (no layout shift).
+  const gear = user.is_system_admin && <a href={routeHref(ADMIN_START)} className="btn btn-quiet btn-sm shell-admin"
+    aria-label={openReports ? `Administration, ${openReports} open technical reports` : "Administration"} title="Administration"
+    aria-current={inAdmin ? "location" : undefined} onClick={inApp(ADMIN_START, onNavigate)}>
+    <IconGear />{!!openReports && <span className="shell-admin-count" aria-hidden="true">{openReports > 99 ? "99+" : openReports}</span>}
+  </a>;
   // The logo's start page: the current project's landing (Documents for leads, its My tasks otherwise), else My tasks.
   const home = current ? projectDestination(current) : MY_TASKS;
-  return <AppShell user={user} onLogout={onLogout} breadcrumb={breadcrumb} nav={nav} role={shellRole(user, projects, current, route.name === "task" ? taskKind : undefined)}
+  return <AppShell user={user} userMenu={userMenu} actions={gear} breadcrumb={breadcrumb} nav={inAdmin ? adminNav : workNav}
+    navLabel={inAdmin ? "Administration" : "Sections"} role={shellRole(user, projects, current, route.name === "task" ? taskKind : undefined)}
     homeHref={routeHref(home)} onHome={() => onNavigate(home)}
     density={(route.name === "task" || route.name === "projectCase") ? "reading" : "compact"}>{children}<TechnicalReportHost /></AppShell>;
 }

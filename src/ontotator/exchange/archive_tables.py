@@ -115,6 +115,8 @@ ARCHIVED: tuple[ArchivedTable, ...] = (
     ArchivedTable("discarded_submissions"),
     ArchivedTable("documents_visits"),
     ArchivedTable("text_change_resolutions"),
+    # Submissions a typo fix carried to its new version (issue 465).
+    ArchivedTable("typo_fix_carries"),
     ArchivedTable("draft_snapshots"),
     ArchivedTable("work_plans"),
     ArchivedTable("work_plan_rows"),
@@ -126,6 +128,10 @@ ARCHIVED: tuple[ArchivedTable, ...] = (
     ArchivedTable("translation_version_uploads"),
     # Editorial corrections of translation versions (issue 453).
     ArchivedTable("translation_editorial_corrections"),
+    # A lead's decisions on queried translation reviews (issue 483).
+    ArchivedTable("translation_query_decisions"),
+    # A lead's additions to the reason of a correction request (issue 483).
+    ArchivedTable("translation_correction_reason_additions"),
     ArchivedTable("final_selections"),
     ArchivedTable("final_selection_events"),
     ArchivedTable("export_selection_snapshots"),
@@ -181,6 +187,18 @@ EXTRA_REFERENCES: tuple[ExtraReference, ...] = (
         "payload",
         ("producer", "review_id"),
         "translation_reviews",
+        orphans=True,
+    ),
+    # A query decision names the review it decides (issue 483).
+    ExtraReference(
+        "translation_query_decisions", "review_id", (), "translation_reviews"
+    ),
+    # A re-anchoring job may also come from a lead's query decision.
+    ExtraReference(
+        "jobs",
+        "payload",
+        ("producer", "decision_id"),
+        "translation_query_decisions",
         orphans=True,
     ),
     # The audit trail records the rows it is about; a row the archive lacks
@@ -263,6 +281,10 @@ PLAIN_INTEGER_COLUMNS: frozenset[tuple[str, str]] = frozenset()
 TEXT_REFERENCES: dict[tuple[str, str], tuple[str, str]] = {
     ("assignments", "active_round_id"): ("work_rounds", "round_id"),
     ("problem_reports", "round_id"): ("work_rounds", "round_id"),
+    ("translation_correction_reason_additions", "round_id"): (
+        "work_rounds",
+        "round_id",
+    ),
 }
 # Text columns named like a server-wide id that are not references to one.
 PLAIN_TEXT_ID_COLUMNS: frozenset[tuple[str, str]] = frozenset()

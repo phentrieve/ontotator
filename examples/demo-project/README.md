@@ -35,8 +35,8 @@ Mia Kühn also needs a **Qualification**, for example *Neurologist, native Germa
 
 Log in as a system administrator. Background: [Set up a new project for a lead](../../docs/handbook/admin.md#set-up-a-new-project-for-a-lead).
 
-1. **Load the HPO release.** **Administration** › **Ontologies**, choose `hp.json` in **Ontology files**, click **Upload files**. **Upload results** reads **Added**, and **Uploaded files** lists release `2026-09-01` with checksum `a7b3a012e7b4`. See [Upload ontology releases and translation files](../../docs/handbook/admin.md#upload-ontology-releases-and-translation-files).
-2. **Create the project.** **Administration** › **New project**:
+1. **Load the HPO release.** Click the gear at the top right (**Administration**), open **Ontologies**, choose `hp.json` in **Ontology files**, click **Upload files**. **Upload results** reads **Added**, and **Uploaded files** lists release `2026-09-01` with checksum `a7b3a012e7b4`. See [Upload ontology releases and translation files](../../docs/handbook/admin.md#upload-ontology-releases-and-translation-files).
+2. **Create the project.** **Projects** › **New project**:
    - **Project key** `neuro-demo`, **Name** *Neurology phenotype demo*, **Description** *Synthetic demo project: invented neurology letters, HPO phenotypes.*
    - **Languages of the texts**: type `en`, click **Add language**; type `de`, click **Add language**.
    - **Built-in template**: *HPO phenotype*. The ontology file (*hp 2026-09-01*), **Allowed roots for HP** (`HP:0000118`) and **Annotation scheme for HP** (*HPO phenotype (fixed qualifiers, modifiers)*) are filled in; keep them, the bundle expects exactly these.

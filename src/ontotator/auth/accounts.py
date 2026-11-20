@@ -311,6 +311,15 @@ def _rewrite_username(
             )
         )
     )
+    # The erased languages leave the trail too (#467); the events stay.
+    conn.execute(
+        update(AuditEventRow)
+        .where(
+            AuditEventRow.target_user_id == user_id,
+            AuditEventRow.action == "user.languages",
+        )
+        .values(details=AuditEventRow.details.op("-")("before").op("-")("after"))
+    )
     # Only the erasure itself may rewrite history: close the window again.
     conn.execute(text("SET LOCAL ontotator.erasure = off"))
     conn.execute(
@@ -398,6 +407,13 @@ class AccountService:
             user = self._lock_user(conn, username)
             if normalized and _user(user).anonymised:
                 raise _anonymised(user.username)
+            before = sorted(
+                conn.execute(
+                    select(UserLanguageRow.language).where(
+                        UserLanguageRow.user_id == user.id
+                    )
+                ).scalars()
+            )
             conn.execute(
                 delete(UserLanguageRow).where(UserLanguageRow.user_id == user.id)
             )
@@ -415,6 +431,8 @@ class AccountService:
                 "user.languages",
                 target_type="user",
                 target_id=user.username,
+                # The history says what was added and removed (#467).
+                details={"before": before, "after": sorted(normalized)},
                 at=self._now(),
             )
 
