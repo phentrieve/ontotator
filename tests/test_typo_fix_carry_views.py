@@ -1,5 +1,5 @@
-"""What the lead and the annotator see after a typo fix moved annotations
-(issues 543 and 545).
+"""What the lead and the annotator see after a typo fix moved annotations,
+and what History and Last activity show (issues 543 and 545).
 
 The fixture is the one of ``test_typo_fix_carry``: one accepted German
 translation; the fix removes a space after "Krampfanfälle" and corrects
