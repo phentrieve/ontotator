@@ -71,8 +71,8 @@ export interface DataTableProps<T> {
   /** Called with the column id when a sortable header is activated; turns off client-side sorting. */
   onSort?: (column: string) => void;
   /**
-   * Without `groups`: only the first `count` sorted rows and the later ones `keep` names, then a full-width row
-   * with `more(total)`.
+   * Without `groups`: only the first `count` sorted rows and the later ones `keep` names, then `more(total)` below
+   * the table, outside its sideways scroll.
    */
   rowLimit?: { count: number; more: (total: number) => ReactNode; keep?: (row: T) => boolean };
 }
@@ -134,6 +134,7 @@ export function DataTable<T>({ label, columns, rows, rowKey, initialSort, empty,
   };
   const emptyBody = <tbody><tr><td colSpan={span}>{empty ?? "No items to display."}</td></tr></tbody>;
   let body: ReactNode;
+  let more: ReactNode = null;
   if (groups) {
     body = groups.length ? groups.map((group) => {
       const { className: headerClassName, ...headerProps } = group.headerProps ?? {};
@@ -160,19 +161,20 @@ export function DataTable<T>({ label, columns, rows, rowKey, initialSort, empty,
     const sortedRows = sortRows(rows);
     const limited = rowLimit !== undefined && sortedRows.length > rowLimit.count;
     const shownRows = limited ? sortedRows.filter((row, index) => index < rowLimit.count || rowLimit.keep?.(row)) : sortedRows;
-    body = sortedRows.length ? <tbody>{shownRows.map(renderRow)}
-      {limited && <tr className="data-table-more"><td colSpan={span}>{rowLimit.more(sortedRows.length)}</td></tr>}</tbody> : emptyBody;
+    body = sortedRows.length ? <tbody>{shownRows.map(renderRow)}</tbody> : emptyBody;
+    // Below the table, not in it (issue 550, U5-02): in a table that scrolls sideways on a phone, a row's text was cut and its button out of view.
+    if (limited) more = <div className="data-table-more">{rowLimit.more(sortedRows.length)}</div>;
   }
   const sortable = (column: Column<T>) => Boolean(column.sortValue || (onSort && column.sortable));
   const sortBy = (column: Column<T>) => onSort
     ? onSort(column.id)
     : setSort({ column: column.id, direction: sort?.column === column.id && sort.direction === "asc" ? "desc" : "asc" });
-  return <div className="data-table-scroll"><table aria-busy={busy ? true : undefined} className={["data-table", "density-compact", className].filter(Boolean).join(" ")}>
+  return <><div className="data-table-scroll"><table aria-busy={busy ? true : undefined} className={["data-table", "density-compact", className].filter(Boolean).join(" ")}>
     <caption className="visually-hidden">{label}</caption>
     <thead><tr>{selectColumn && <th scope="col" className="data-table-select-cell">{selectionHeader ?? <span className="visually-hidden">Select</span>}</th>}
       {columns.map((column) => <th key={column.id} scope="col" style={{ width: column.width, textAlign: column.align ?? "start" }} aria-sort={sortable(column) ? sort?.column === column.id ? sort.direction === "asc" ? "ascending" : "descending" : "none" : undefined}>
       {sortable(column) ? <button className="data-table-sort" type="button" onClick={() => sortBy(column)}>{column.header}<svg className="data-table-sort-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d={sort?.column === column.id && sort.direction === "desc" ? "M4 6l4 4 4-4" : "M4 10l4-4 4 4"} fill="none" stroke="currentColor" strokeWidth="1.5" /></svg></button> : column.header}
     </th>)}</tr></thead>
     {body}
-  </table></div>;
+  </table></div>{more}</>;
 }

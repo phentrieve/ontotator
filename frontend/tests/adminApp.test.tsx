@@ -31,7 +31,8 @@ async function create() {
   const form = await screen.findByRole("form", { name: "New user" });
   fireEvent.change(within(form).getByLabelText("Username (required)"), { target: { value: "bea" } });
   fireEvent.change(within(form).getByLabelText("Display name (required)"), { target: { value: "Bea" } });
-  fireEvent.click(within(form).getByRole("button", { name: "Create user" }));
+  // The buttons are in the dialog's footer, outside the form (issue 550, U5-08).
+  fireEvent.click(within(screen.getByRole("dialog", { name: "New user" })).getByRole("button", { name: "Create user" }));
 }
 
 it("keeps pending issuance and visible one-time code through shell/hash/logout until actual Close", async () => {

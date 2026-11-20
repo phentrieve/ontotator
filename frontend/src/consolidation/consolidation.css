@@ -57,10 +57,14 @@
 /* Three equal steps across the zone's width; the title keeps a gap below the path. */
 .cons-heading > nav { width: 100%; }
 .cons-heading > nav + .case-title { margin-top: var(--space-3); }
+/* The title is a grid item of a start-aligned column: without a cap it was as wide as its text and ran out of the
+   page on a phone, its ellipsis out of view (issue 548, U4-08). On a phone it wraps, so the version stays readable. */
+.cons-heading > .case-title { max-width: 100%; }
 
 .cons-header-progress { width: 340px; max-width: 100%; }
 @media (max-width: 760px) {
   .cons-header { grid-template-columns: minmax(0, 1fr); }
+  .cons-heading > .case-title { white-space: normal; overflow-wrap: anywhere; }
 }
 
 .cons-muted {
