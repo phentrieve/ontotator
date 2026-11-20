@@ -403,7 +403,14 @@ MAY_REFUSE = {
     "get_upload",
     "get_job",
     "get_problem_report",
+    # It answers as the dry run it runs, which may be refused.
+    "preview_change",
 }
+
+
+def listed_properties(tools: list[Any], name: str) -> dict[str, Any]:
+    """The input properties of the listed tool ``name``."""
+    return next(t for t in tools if t.name == name).input_schema.get("properties", {})
 
 
 def _needles(text: str) -> list[str]:
@@ -484,7 +491,10 @@ async def test_no_default_tool_returns_text_of_a_project(
             for tool in tools:
                 properties = tool.input_schema.get("properties", {})
                 assert "include_text" not in properties, tool.name
-                if TOOL_SCOPES[tool.name].effect != "read":
+                # preview_change runs the dry runs below, as they are.
+                if TOOL_SCOPES[tool.name].effect != "read" or tool.name == (
+                    "preview_change"
+                ):
                     continue
                 arguments = dict(OTHER_ARGUMENTS.get(tool.name, {}))
                 if "project" in properties:
@@ -511,6 +521,11 @@ async def test_no_default_tool_returns_text_of_a_project(
                     {"project": project, "texts": [text], "reason": "Check"},
                 ),
                 ("withdraw_open_tasks", {"project": project, "texts": [text]}),
+            ]
+            calls += [
+                ("preview_change", {"tool": name, "arguments": arguments})
+                for name, arguments in list(calls)
+                if name in TOOL_SCOPES and "confirm" in listed_properties(tools, name)
             ]
             for name, arguments in calls:
                 result = await client.call_tool(name, arguments)

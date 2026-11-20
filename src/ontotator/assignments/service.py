@@ -60,6 +60,7 @@ from ontotator.authz.project_authority import (
 from ontotator.domain.annotation_modes import AnnotationMode, workspace_mode
 from ontotator.domain.errors import DomainError
 from ontotator.domain.next_steps import translations_accepted
+from ontotator.domain.translation_review import ReviewDecisionCode
 from ontotator.domain.variants import VariantInfo
 from ontotator.domain.workspace import WorkspaceMode
 from ontotator.projects.assignments import revoke_assignments
@@ -216,6 +217,30 @@ def query_answer_times(
     return {row.id: row.decided_at for row in rows}
 
 
+def submitted_review_decisions(
+    conn: Connection, assignment_ids: Sequence[int]
+) -> dict[int, ReviewDecisionCode]:
+    """The decision of each submitted translation review (issue 472): only
+    the task's current submission counts, as for ``query_answer_times``."""
+    if not assignment_ids:
+        return {}
+    from ontotator.storage.tables import TranslationReviewRow
+
+    rows = conn.execute(
+        select(AssignmentRow.id, TranslationReviewRow.decision)
+        .join(
+            TranslationReviewRow,
+            TranslationReviewRow.assignment_id == AssignmentRow.id,
+        )
+        .where(
+            AssignmentRow.id.in_(sorted(assignment_ids)),
+            AssignmentRow.last_submission_id
+            == func.concat("tr-", TranslationReviewRow.id),
+        )
+    )
+    return {row.id: cast(ReviewDecisionCode, row.decision) for row in rows}
+
+
 def latest_reopen(
     conn: Connection, assignment_id: int
 ) -> tuple[datetime, str | None] | None:
@@ -285,6 +310,9 @@ class TaskSummary:
     # A submitted translation review that asked a query: when the lead decided
     # it (issue 483; the answer is in the review's workspace); None otherwise.
     query_answered_at: datetime | None = None
+    # A submitted translation review: the reviewer's decision, so My tasks
+    # says more than "Submitted" (issue 472); None for other tasks.
+    review_decision: ReviewDecisionCode | None = None
     # R-26: a lead answered one of the owner's reports on this task since the
     # owner last opened it.
     report_answered: bool = False
@@ -1744,14 +1772,13 @@ class AssignmentService:
                     if r["assignment_id"] in second_reviews
                 },
             )
-            query_answers = query_answer_times(
-                conn,
-                [
-                    r["assignment_id"]
-                    for r in rows
-                    if r["task"] == "translation_review" and r["status"] == "submitted"
-                ],
-            )
+            submitted_reviews = [
+                r["assignment_id"]
+                for r in rows
+                if r["task"] == "translation_review" and r["status"] == "submitted"
+            ]
+            query_answers = query_answer_times(conn, submitted_reviews)
+            review_decisions = submitted_review_decisions(conn, submitted_reviews)
             reports = {
                 r.report_id: r
                 for r in conn.execute(
@@ -1924,6 +1951,7 @@ class AssignmentService:
                         second_review_reason=second[1] if second else None,
                         second_review_additions=additions.get(row["assignment_id"]),
                         query_answered_at=query_answers.get(row["assignment_id"]),
+                        review_decision=review_decisions.get(row["assignment_id"]),
                     )
                 )
             return result
