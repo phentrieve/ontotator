@@ -40,6 +40,10 @@
 .translation-checks-line .icon { flex: none; }
 .translation-checks--failed .translation-checks-line .icon { color: var(--warning); }
 .translation-checks-calm { color: var(--text-muted); }
+/* Ontotator's check for added passages in brackets (issue 484): a line of its own under the run's checks. */
+.translation-checks-brackets { display: flex; align-items: center; gap: var(--space-2); flex-basis: 100%; margin: 0; padding-bottom: var(--space-1); color: var(--text); }
+.translation-checks-brackets .icon { flex: none; color: var(--warning); }
+.translation-check-passages { margin: 0; padding-left: var(--space-5); }
 .translation-checks-toggle .translation-checks-chevron { transition: transform 0.15s ease-out; }
 .translation-checks-toggle[aria-expanded="true"] .translation-checks-chevron { transform: rotate(90deg); }
 .translation-check-details { max-height: 40vh; overflow: auto; padding: var(--space-3) var(--space-5) var(--space-4); background: var(--surface-raised); }
@@ -170,6 +174,15 @@
 .review-history-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-serif); }
 .review-confirm p { margin: var(--space-4) 0 0; }
 .review-confirm-final { font-weight: var(--weight-strong); }
+/* Typography hints of the text to be saved (issue 484): a line and, behind "Show them", the place of each hint. */
+.review-confirm-hints { margin: var(--space-4) 0; }
+.review-confirm-hints p { margin: 0; }
+.review-confirm-hint-list { display: grid; gap: var(--space-2); margin: var(--space-2) 0 0; padding: 0; list-style: none; max-height: 14rem; overflow-y: auto; }
+.review-confirm-hint-list li { display: grid; gap: 2px; min-width: 0; }
+.review-confirm-hint-rule { color: var(--text-muted); font-size: var(--size-sm); }
+.review-confirm-hint-excerpt { font-family: var(--font-serif); white-space: pre-wrap; overflow-wrap: anywhere; }
+.review-confirm-hint-excerpt mark { padding: 1px 0; background: var(--warning-light); color: inherit; outline: 1px solid var(--warning); }
+.review-confirm-hints .review-confirm-hints-more { margin-top: var(--space-2); color: var(--text-muted); font-size: var(--size-sm); }
 
 @media (min-width: 700px) {
   /* Side by side, head, pane and note of every column share the rows of the columns grid (subgrid):
@@ -223,6 +236,10 @@
   .translation-texts .translation-column > .translation-diff,
   .translation-texts .translation-column > .translation-editor { height: auto; min-height: 12rem; max-height: 50vh; max-height: 50dvh; }
   .translation-review-bar, .translation-checks-band, .translation-check-details { padding-inline: var(--space-4); }
+  /* Translation details: the panel spans the bar instead of running off the right edge. */
+  .translation-review-bar { position: relative; }
+  .translation-review-bar .translation-details { position: static; }
+  .translation-review-bar .translation-details[open] > dl { left: var(--space-4); right: var(--space-4); min-width: 0; }
   .translation-texts { padding-inline: var(--space-4); }
   .translation-decision-body, .translation-decision-footer, .translation-pinned-bar { padding-inline: var(--space-4); }
   .translation-text, .translation-review .translation-diff, .translation-editor-mirror, .translation-editor-input { padding-inline: var(--space-4); }
@@ -284,6 +301,9 @@
 .show-invisibles [data-invisible="zero-width"]::before { content: ""; top: 0.2em; bottom: 0.2em; left: -1px; border-left: 2px solid var(--warning); }
 /* Soft hyphen: a raised "not" sign between the two neighbours. */
 .show-invisibles [data-invisible="soft-hyphen"]::before { content: "\00AC"; top: -0.55em; left: 0; transform: translateX(-50%); font-size: 0.75em; color: var(--warning); }
+/* The key of the marks, on a line of its own below the Text view choices. */
+.invisibles-key { flex-basis: 100%; margin: 0; color: var(--text-muted); font-size: var(--size-sm); line-height: var(--leading-sm); }
+.invisibles-key-mark { color: var(--text); font-weight: var(--weight-strong); }
 /* The mark of a line end hangs over the right edge of a full line; it must not make the box scroll sideways. */
 .translation-text.show-invisibles, .translation-review .translation-diff.show-invisibles, .translation-diff.show-invisibles, .translation-editor.show-invisibles { overflow-x: hidden; }
 

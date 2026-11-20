@@ -28,8 +28,12 @@ test("the Annotation part names the set, a newer one with its help, and the text
   const card = await openTextCard(page, CASE, "en");
   await showSegment(card, "Annotation");
   const line = card.locator(".text-card-proposal-set");
-  await expect(line).toContainText(/^Proposals set \d{4}-\d{2}-\d{2} \(test-tool 1\), 3 proposals/);
-  await expect(line.getByText(/^Newer set available: \d{4}-\d{2}-\d{2}$/)).toBeVisible();
+  // Both sets of this fixture are imported on the same day, within seconds: each shows its time (issue 472).
+  await expect(line).toContainText(/^Proposals set \d{4}-\d{2}-\d{2} \d\d:\d\d(:\d\d)? \(test-tool 1\), 3 proposals/);
+  const newer = line.getByText(/^Newer set available: \d{4}-\d{2}-\d{2} \d\d:\d\d(:\d\d)?$/);
+  await expect(newer).toBeVisible();
+  const shown = ((await line.textContent()) ?? "").match(/^Proposals set (\S+ \S+) /)?.[1];
+  expect(await newer.textContent()).not.toBe(`Newer set available: ${shown}`);
   const help = line.getByRole("link", { name: "How to use it", exact: true });
   await expect(help).toHaveAttribute("href", /work-from-new-tool-proposals/);
   await expect(help).toHaveAttribute("target", "_blank");
@@ -47,7 +51,7 @@ test("the limit popover gives one text its own limit; the project keeps its valu
   await showSegment(card, "Annotation");
   await card.getByRole("button", { name: "Assign annotators…", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: /^Assign / });
-  await dialog.getByRole("button", { name: "About the limit: 2 annotators per text" }).click();
+  await dialog.getByRole("button", { name: "Change… (limit: 2 annotators per text)" }).click();
   const popover = page.getByRole("dialog", { name: "Annotators per text" });
   await expect(popover.getByRole("radio", { name: `Only for the selected text (${SCRATCH} en)` })).toBeChecked();
   await expect(popover.getByRole("radio", { name: "For all texts" })).not.toBeChecked();

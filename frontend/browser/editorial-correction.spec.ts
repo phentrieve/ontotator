@@ -114,7 +114,7 @@ test("a comma added to an accepted translation becomes an accepted v2 on one pag
   await evidence(page, "453-dialog-changes");
   await save.click();
   await expect(dialog).toHaveCount(0);
-  await expect(page.locator(".ui-toast .ui-toast-message")).toHaveText(`Typos fixed: v2 of ${caseId} de saved. It stays Accepted.`);
+  await expect(page.locator(".ui-toast .ui-toast-message")).toHaveText(`Typos fixed: v2 of ${caseId} de saved. It stays Accepted. 1 annotation moved to v2.`);
 
   // v2 is a correction of v1 and accepted; v1 stays accepted with its work.
   const after = await openTextCard(page, caseId, "de");

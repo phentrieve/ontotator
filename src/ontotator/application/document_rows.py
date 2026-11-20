@@ -36,6 +36,7 @@ from ontotator.application.final_causes import (
     latest_review_decisions,
 )
 from ontotator.application.people import person_refs
+from ontotator.application.typography_counts import typography_hint_counts
 from ontotator.auth.audit import Actor
 from ontotator.authz.policy import Access
 from ontotator.authz.scoped import ScopedRepository
@@ -71,6 +72,7 @@ from ontotator.storage.tables import (
     TranslationReviewRow,
     UserRow,
 )
+from ontotator.storage.text_change_carries import carry_lapsed
 from ontotator.storage.text_pause import TextPause, paused_texts
 from ontotator.storage.text_settings import per_text_overrides
 from ontotator.storage.workflow_tables import (
@@ -260,6 +262,10 @@ class ResolutionFact:
     resolution: str
     from_document_id: str
     to_document_id: str
+    # A carry whose task was withdrawn or removed without a submission
+    # (issue 461): it settles nothing any more, the submission can be
+    # carried again.
+    lapsed: bool = False
 
 
 @dataclass(frozen=True)
@@ -310,6 +316,9 @@ class RowFacts:
     # document id -> record of the editorial correction that made the
     # version (issue 453, ``editorial_corrections.editorial_corrections``)
     editorial_corrections: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # document id -> the lead's decision on a query that accepted the version
+    # (issue 483, ``query_decisions.query_decisions``)
+    query_decisions: dict[str, dict[str, Any]] = field(default_factory=dict)
     annotations_per_text: int = 1
     rule_on: bool = True  # annotate_accepted_translations_only
     # user id -> PersonRefView fields (lead viewer: display names included)
@@ -327,6 +336,9 @@ class RowFacts:
     # assignment id -> reason of the correction request of its active round
     # (Review "re_review" line 2, D26)
     correction_reasons: dict[int, str] = field(default_factory=dict)
+    # assignment id -> that request: reason, requested_at and the lead's
+    # additions (issue 483; the reviewer row of the text card)
+    correction_requests: dict[int, dict[str, Any]] = field(default_factory=dict)
     # assignment id -> finding count of its last submission
     findings: dict[int, int] = field(default_factory=dict)
     # (case, language) -> newest event on the row not caused by the viewer
@@ -370,6 +382,9 @@ class RowFacts:
     # of these sets and of the sets the rounds started from.
     newest_sets: dict[str, int] = field(default_factory=dict)
     proposal_sets: dict[int, ProposalSetFact] = field(default_factory=dict)
+    # Issue 484: typography hints of the newest version of each chain that
+    # has any (document id -> count); computed, never stored.
+    typography_hints: dict[str, int] = field(default_factory=dict)
 
     def per_text(self, key: tuple[str, str]) -> int:
         """The effective "Annotations per text" of the text ``key`` (issue 422)."""
@@ -564,6 +579,7 @@ def load_others_activity(
 
 def _versions(conn: Connection, pid: int) -> list[rules.Version]:
     decisions = latest_review_decisions(conn, pid)
+    typo_fixes = work_plan_store.counted_typo_fixes(conn, pid)
     return [
         rules.Version(
             document_id=row.document_id,
@@ -577,6 +593,7 @@ def _versions(conn: Connection, pid: int) -> list[rules.Version]:
             translation_status=row.translation_status,
             position=row.position,
             latest_decision=decisions.get(row.document_id),
+            typo_fix_counts=row.document_id in typo_fixes,
         )
         for row in conn.execute(
             select(
@@ -976,19 +993,23 @@ def _latest_reviews(conn: Connection, pid: int) -> dict[str, ReviewRecord]:
     }
 
 
-def _correction_reasons(
+def _correction_requests(
     conn: Connection, pid: int, assignments: list[rules.AssignmentFact]
-) -> dict[int, str]:
-    """Reason of each correction request (``translation.correction_requested``)
-    whose round is still the assignment's active round."""
+) -> dict[int, dict[str, Any]]:
+    """Each correction request (``translation.correction_requested``) whose
+    round is still the assignment's active round: its reason, when it was
+    sent and the lead's additions to the reason (issue 483), oldest first,
+    with ``added_by`` as a user id."""
+    from ontotator.assignments.service import correction_reason_additions
+
     active = {
         str(item.assignment_id): item.active_round_id
         for item in assignments
         if item.task == "translation_review" and item.active_round_id is not None
     }
-    reasons: dict[int, str] = {}
+    requests: dict[int, dict[str, Any]] = {}
     for row in conn.execute(
-        select(AuditEventRow.target_id, AuditEventRow.details)
+        select(AuditEventRow.target_id, AuditEventRow.at, AuditEventRow.details)
         .where(
             AuditEventRow.project_id == pid,
             AuditEventRow.action == "translation.correction_requested",
@@ -999,8 +1020,19 @@ def _correction_reasons(
         details = row.details or {}
         round_id = active.get(row.target_id)
         if round_id is not None and details.get("round_id") == round_id:
-            reasons[int(row.target_id)] = str(details.get("reason") or "")
-    return reasons
+            requests[int(row.target_id)] = {
+                "reason": str(details.get("reason") or ""),
+                "requested_at": row.at,
+                "additions": [],
+            }
+    additions = correction_reason_additions(
+        conn, {aid: active[str(aid)] for aid in requests}
+    )
+    for aid, items in additions.items():
+        requests[aid]["additions"] = [
+            {"note": note, "added_at": at, "added_by": by} for at, note, by in items
+        ]
+    return requests
 
 
 def _findings(conn: Connection, pid: int) -> dict[int, int]:
@@ -1043,6 +1075,7 @@ def _resolutions(conn: Connection, pid: int) -> list[ResolutionFact]:
             resolution=row.resolution,
             from_document_id=row.from_document_id,
             to_document_id=row.to_document_id,
+            lapsed=row.lapsed,
         )
         for row in conn.execute(
             select(
@@ -1051,6 +1084,7 @@ def _resolutions(conn: Connection, pid: int) -> list[ResolutionFact]:
                 TextChangeResolutionRow.resolution,
                 TextChangeResolutionRow.from_document_id,
                 TextChangeResolutionRow.to_document_id,
+                carry_lapsed().label("lapsed"),
             )
             .where(TextChangeResolutionRow.project_id == pid)
             .order_by(TextChangeResolutionRow.id)
@@ -1268,6 +1302,11 @@ def load_facts(
     )
 
     editorial = {} if summary else load_editorial(conn, pid)
+    from ontotator.application.query_decisions import (
+        query_decisions as load_query_decisions,
+    )
+
+    decided_queries = {} if summary else load_query_decisions(conn, pid)
     versions = _versions(conn, pid)
     assignments = _assignments(conn, pid)
     reports = _reports(conn, pid)
@@ -1275,6 +1314,7 @@ def load_facts(
     latest_reviews = {} if lean else _latest_reviews(conn, pid)
     author_ids = _user_ids(conn, (item.annotator_id for item in selected.values()))
     lead_pauses = paused_texts(conn, pid)
+    correction_requests = {} if lean else _correction_requests(conn, pid, assignments)
     people = (
         {}
         if summary
@@ -1301,12 +1341,24 @@ def load_facts(
                     for item in editorial.values()
                     if item["corrected_by"]
                 ),
+                *(
+                    item["decided_by"]
+                    for item in decided_queries.values()
+                    if item["decided_by"]
+                ),
                 *(item.reviewer_id for item in latest_reviews.values()),
                 *author_ids.values(),
                 *(item.paused_by for item in lead_pauses.values() if item.paused_by),
+                *(
+                    addition["added_by"]
+                    for request in correction_requests.values()
+                    for addition in request["additions"]
+                    if addition["added_by"]
+                ),
             ],
             viewer_id=viewer_user_id,
             viewer_is_lead=True,  # Documents is lead-only
+            logins_of_project=pid,
         )
     )
     people_fields = {uid: ref.model_dump() for uid, ref in people.items()}
@@ -1348,6 +1400,7 @@ def load_facts(
         acceptances=acceptances,
         uploads=uploads,
         editorial_corrections=editorial,
+        query_decisions=decided_queries,
         annotations_per_text=project.annotations_per_text,
         rule_on=project.annotate_accepted_translations_only,
         people=people_fields,
@@ -1357,11 +1410,15 @@ def load_facts(
             conn,
             (item.annotator_id for item in selected.values()),
             viewer_id=viewer_user_id,
+            logins_of_project=pid,
         ),
         author_ids=author_ids,
         decided=_decided(conn, pid),
         latest_reviews=latest_reviews,
-        correction_reasons={} if lean else _correction_reasons(conn, pid, assignments),
+        correction_reasons={
+            aid: request["reason"] for aid, request in correction_requests.items()
+        },
+        correction_requests=correction_requests,
         findings={} if lean else _findings(conn, pid),
         others_activity={} if lean else load_others_activity(conn, pid, viewer_user_id),
         baseline_at=None
@@ -1386,6 +1443,13 @@ def load_facts(
         per_text_overrides=per_text_overrides(conn, pid),
         lead_pauses=lead_pauses,
         **_proposal_set_facts(conn, pid, summary=summary),
+        typography_hints={}
+        if lean
+        else typography_hint_counts(
+            conn,
+            pid,
+            (chain.newest.document_id for chain in rules.build_chains(versions)),
+        ),
     )
 
 

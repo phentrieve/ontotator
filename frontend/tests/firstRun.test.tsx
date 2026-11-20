@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { chooseUserMenu } from "./support/userMenu";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -44,7 +45,7 @@ describe("editor and page polish", () => {
     render(<App onLogout={onLogout} />);
     fireEvent.click(await screen.findByRole("link", { name: /^(Start|Continue|View)$/ }));
     await screen.findByRole("group", { name: "Case" });
-    fireEvent.click(screen.getByRole("button", { name: "Log out" }));
+    chooseUserMenu("Log out");
     expect(onLogout).toHaveBeenCalledOnce();
     expect(screen.queryByRole("dialog")).toBeNull();
   });

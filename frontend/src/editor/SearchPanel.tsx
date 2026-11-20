@@ -43,6 +43,8 @@ export interface SearchPanelProps {
   onPickModifier?: (candidate: SearchCandidate, searchId?: string) => void;
   /** The layer's profile classifies modifiers (HPO phenotype): offer the "Modifiers only" chip and the `mod:` prefix (M2 M-3). */
   modifierFilter?: boolean;
+  /** Issue 523: "Show in tree" at the active hit opens the ontology tree there, only to look. */
+  onShowInTree?: (candidate: SearchCandidate) => void;
 }
 
 /** Reason line of a modifier hit in "Change term" and the tree: allowed, but usually a modifier (some name a finding, e.g. Stillbirth). */
@@ -74,6 +76,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
   assignMode = "new",
   onPickModifier,
   modifierFilter = false,
+  onShowInTree,
 }) => {
   const [modifiersOnly, setModifiersOnly] = useState(false);
   // "Modifiers only" switched on by the `mod:` prefix: an emptied field switches it off again.
@@ -449,6 +452,10 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
         // pane, so it is a named region in the Tab order: a keyboard user can reach it and scroll it with the arrows.
         <section className="candidate-preview" data-testid="candidate-preview" aria-labelledby={`${listboxId}-preview`} tabIndex={0}>
           <div id={`${listboxId}-preview`} className="candidate-preview-title">{`Definition of ${candidates[shownActive].label} (${candidates[shownActive].term_id})`}</div>
+          {onShowInTree && <Button type="button" size="sm" variant="secondary" className="annotation-tree-button"
+            aria-label={`Show in tree: ${candidates[shownActive].label}`}
+            title="Show this term in the ontology tree, only to look: broader and narrower terms"
+            onClick={() => onShowInTree(candidates[shownActive])}>Show in tree</Button>}
           <p className="candidate-preview-text">{candidates[shownActive].definition || "This term has no definition in the ontology."}</p>
         </section>
       )}

@@ -12,7 +12,7 @@ export interface ProjectsPageProps {
   /** The current (last-used) project; marked "✓ Current". */
   currentKey?: string;
   onNavigate: (route: Route) => void;
-  /** A system administrator also gets "Show practice projects (n)" (issue 266). */
+  /** A system administrator also gets "New project" and "Show practice projects (n)" (issue 266). */
   isAdmin?: boolean;
   /** Reload the project list (a project archive was imported). */
   onProjectsChanged?: () => void;
@@ -66,8 +66,8 @@ export function ProjectsPage({ projects, currentKey, onNavigate, isAdmin = false
   const needle = search.trim().toLocaleLowerCase();
   const shown = projects.filter(item => `${item.name} ${item.project_key}`.toLocaleLowerCase().includes(needle));
   // Quiet buttons: a filled primary "Open" in every row competes with itself (#47 A-19).
-  const link = (destination: Route, text: string) => <a href={routeHref(destination)}
-    className="btn btn-sm btn-secondary"
+  const link = (destination: Route, text: string, className = "btn btn-sm btn-secondary") => <a href={routeHref(destination)}
+    className={className}
     onClick={(event: MouseEvent<HTMLAnchorElement>) => {
       if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
       event.preventDefault();
@@ -96,7 +96,11 @@ export function ProjectsPage({ projects, currentKey, onNavigate, isAdmin = false
     </span> },
   ];
   return <section className="projects-page" aria-labelledby="projects-heading">
-    <h1 id="projects-heading">Projects</h1>
+    <div className="projects-page__head">
+      <h1 id="projects-heading">Projects</h1>
+      {/* Above the list, where it is seen without scrolling; Practice projects and Project archives follow below the list. */}
+      {isAdmin && link({ name: "projectNew" }, "New project", "btn btn-primary")}
+    </div>
     {projects.length === 0 ? <EmptyState title="You are not a member of any project yet."><p>Ask your project lead or an administrator to add you to a project, then reload this page.</p></EmptyState> : <>
       {projects.length > PROJECT_SEARCH_THRESHOLD && <TextInput id="projects-search" type="search" label="Find project"
         value={search} onChange={event => setSearch(event.target.value)} />}

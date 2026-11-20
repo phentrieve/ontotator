@@ -144,6 +144,9 @@ async def test_setup_import_status_and_export(
         assert me["token"]["kind"] == "system"
         assert me["token"]["expires_in_days"] <= 1
         assert "warning" in me["token"]
+        # The MCP server is the release the app is (#486): no warning.
+        assert me["server"]["version"] == me["mcp_server"]["version"]
+        assert "warning" not in me
 
         uploads = await call(
             client, "upload_ontology_files", {"paths": [str(FIXTURES / "hp.json")]}
@@ -166,7 +169,7 @@ async def test_setup_import_status_and_export(
         )
         assert created["name"] == "MCP smoke"
         assert PROJECT in {
-            p["project_key"] for p in await call(client, "list_projects", {})
+            p["project_key"] for p in (await call(client, "list_projects", {}))["items"]
         }
 
         check = await call(
@@ -197,7 +200,7 @@ async def test_setup_import_status_and_export(
             "set_member_roles",
             {"project": PROJECT, "username": "ann1", "roles": ["annotator"]},
         )
-        people = await call(client, "list_people", {"project": PROJECT})
+        people = (await call(client, "list_people", {"project": PROJECT}))["items"]
         assert "ann1" in {p["username"] for p in people}
 
         # Taking a role away is a dry run until confirmed.
@@ -205,11 +208,11 @@ async def test_setup_import_status_and_export(
         dry = await call(client, "set_member_roles", remove)
         assert dry["applied"] is False
         assert dry["plan"]["removed_roles"] == ["annotator"]
-        people = await call(client, "list_people", {"project": PROJECT})
+        people = (await call(client, "list_people", {"project": PROJECT}))["items"]
         assert "ann1" in {p["username"] for p in people}
         done = await call(client, "set_member_roles", remove | {"confirm": True})
         assert done["applied"] is True
-        people = await call(client, "list_people", {"project": PROJECT})
+        people = (await call(client, "list_people", {"project": PROJECT}))["items"]
         assert "ann1" not in {p["username"] for p in people}
         await call(
             client,
@@ -219,6 +222,8 @@ async def test_setup_import_status_and_export(
 
         overview = await call(client, "project_overview", {"project": PROJECT})
         assert overview["name"] == "MCP smoke"
+        # Issue 457: the server's maximum of annotations per text; none here.
+        assert overview["annotations_per_text_max"] is None
 
         # A cohort joins: accounts, codes in a private file, roles and work.
         codes = tmp_path / "codes.csv"
@@ -354,7 +359,7 @@ async def test_setup_import_status_and_export(
         # Nothing is submitted (that needs the browser): only the imported
         # tool proposals are offered. Their passages are offsets; with
         # include_text each carries the text it marks.
-        [offered] = await call(reader, "list_annotation_versions", about)
+        [offered] = (await call(reader, "list_annotation_versions", about))["items"]
         assert offered["kind"] == "proposals"
         one = about | {"kind": "proposals", "version_id": offered["id"]}
         plain = await call(reader, "get_annotation_version", one)
@@ -436,7 +441,9 @@ async def test_no_default_tool_returns_text_of_a_project(
                     content, "get_text_version", about | {"include_text": True}
                 )
                 needles += _needles(version["text"])
-                for offered in await call(content, "list_annotation_versions", about):
+                for offered in (await call(content, "list_annotation_versions", about))[
+                    "items"
+                ]:
                     found = await call(
                         content,
                         "get_annotation_version",
@@ -453,11 +460,13 @@ async def test_no_default_tool_returns_text_of_a_project(
                         for segment in evidence["mention"]["segments"]
                         if " " in segment["text"]
                     ]
-            reviews = await call(
-                content,
-                "list_translation_reviews",
-                {"project": project, "include_text": True},
-            )
+            reviews = (
+                await call(
+                    content,
+                    "list_translation_reviews",
+                    {"project": project, "include_text": True},
+                )
+            )["items"]
             needles += [n for r in reviews for n in _needles(r["proposed_text"])]
         needles = sorted(set(needles))
         assert len(needles) >= 3, needles
@@ -565,7 +574,10 @@ async def test_a_bulk_reopen_and_a_withdrawal_can_be_undone(
         assert sorted(t["assignment_id"] for t in would["would_restore"]) == sorted(
             changed
         )
-        assert {t["person"] for t in would["would_restore"]} == {"Tom Reis", "R. Roe"}
+        restored = [t["person"] for t in would["would_restore"]]
+        assert {p["display_name"] for p in restored} == {"Tom Reis", "R. Roe"}
+        # One person, three names (#471): the login name comes with them.
+        assert all(p["username"] and p["pseudonym"] for p in restored)
         # The dry run changed nothing.
         assert await _statuses(client, project) == reopened
         undone = await call(client, "undo_reopen_or_withdraw", undo | {"confirm": True})
@@ -646,6 +658,148 @@ async def test_a_bulk_reopen_and_a_withdrawal_can_be_undone(
 
 
 @pytest.mark.anyio
+async def test_a_queried_translation_is_decided_both_ways(
+    live: dict[str, str],
+) -> None:
+    """decide_translation_query against the real routes (issue 485, point 4):
+    the reviewer's text becomes the accepted next version, or the version is
+    accepted as it is; the changed passages only with the content opt-in."""
+    made = _scenario(live, "QUERIED_TRANSLATION_FOR_LEAD")
+    project = made["project"]
+    taken = f"{made['cases']['take_text']}~de~v1"
+    kept = f"{made['cases']['answer_only']}~de~v1"
+    rejected = f"{made['cases']['rejected']}~de~v1"
+    async with Client(_server(live, made["token"])) as client:
+        take = {"project": project, "document_id": taken, "decision": "reviewer_text"}
+        shown = await client.call_tool("decide_translation_query", take)
+        dry = shown.structured_content
+        assert dry is not None and dry["applied"] is False
+        plan = dry["plan"]
+        assert plan["available"] is True and plan["next_version"] == 2
+        assert plan["change"]["passages_changed"] >= 1
+        assert plan["change"]["inserted_characters"] > 0
+        # Neither the text, the reviewer's words nor the question.
+        whole = _whole(shown)
+        assert "diff_note" in plan["change"] and '"diff":' not in whole
+        assert "muscular" not in whole and "short form" not in whole
+        confirm = {"confirm": True, "preview_token": dry["preview_token"]}
+        early = await call(
+            client,
+            "decide_translation_query",
+            take | confirm | {"answer": "Yes, the long form."},
+        )
+        # The answer was not in the dry run: nothing is changed.
+        assert early["applied"] is False and "nothing was changed" in early["note"]
+        take["answer"] = "Yes, the long form."
+        dry = await call(client, "decide_translation_query", take)
+        done = await call(
+            client,
+            "decide_translation_query",
+            take | {"confirm": True, "preview_token": dry["preview_token"]},
+        )
+        assert done["applied"] is True
+        result = done["result"]
+        assert (result["kind"], result["version"]) == ("reviewer_text", 2)
+        assert result["translation_status"] == "accepted"
+        assert result["decided_document_id"] == taken and result["edited"] is False
+        again = await call(client, "decide_translation_query", take)
+        assert again["plan"]["reason"] == "already_decided"
+        assert "decided once" in again["plan"]["hint"]
+        assert again["preview_token"] is None
+        other = await call(
+            client, "decide_translation_query", take | {"document_id": rejected}
+        )
+        assert other["plan"]["reason"] == "not_a_query"
+        assert "start_lead_correction" in other["plan"]["hint"]
+
+    async with Client(_server(live, made["token"], read_content=True)) as content:
+        keep = {
+            "project": project,
+            "document_id": kept,
+            "decision": "unchanged",
+            "answer": "The short form is meant.",
+        }
+        dry = await call(content, "decide_translation_query", keep)
+        assert dry["plan"]["review"]["question"].startswith("The source says")
+        not_taken = dry["plan"]["reviewer_text_not_taken"]
+        assert any("muscular" in passage["new_text"] for passage in not_taken["diff"])
+        done = await call(
+            content,
+            "decide_translation_query",
+            keep | {"confirm": True, "preview_token": dry["preview_token"]},
+        )
+        assert done["applied"] is True
+        kept_result = done["result"]
+        assert (kept_result["kind"], kept_result["version"]) == ("unchanged", 1)
+        assert kept_result["document_id"] == kept
+        assert kept_result["translation_status"] == "accepted"
+        for document_id in (kept, result["document_id"]):
+            version = await call(
+                content,
+                "get_text_version",
+                {"project": project, "document_id": document_id},
+            )
+            assert version["translation_status"] == "accepted", document_id
+
+
+@pytest.mark.anyio
+async def test_a_version_is_uploaded_from_a_reviews_proposed_text(
+    live: dict[str, str],
+) -> None:
+    """upload_translation_version with from_review_id and replacements
+    (issue 485, point 3): the text is the review's, not retyped."""
+    made = _scenario(live, "QUERIED_TRANSLATION_FOR_LEAD")
+    project = made["project"]
+    document_id = f"{made['cases']['take_text']}~de~v1"
+    async with Client(_server(live, made["token"])) as client:
+        [review] = (
+            await call(
+                client,
+                "list_translation_reviews",
+                {"project": project, "document_id": document_id},
+            )
+        )["items"]
+        fixes = [{"old": "muscular hypotonia", "new": "low muscle tone"}]
+        upload = {
+            "project": project,
+            "document_id": document_id,
+            "method": "manual_correction",
+            "from_review_id": review["id"],
+            "replacements": fixes,
+        }
+        shown = await client.call_tool("upload_translation_version", upload)
+        dry = shown.structured_content
+        assert dry is not None and dry["applied"] is False
+        plan = dry["plan"]
+        assert plan["available"] is True and plan["passages_changed"] >= 1
+        assert "diff" not in plan and "low muscle tone" not in _whole(shown)
+        with pytest.raises(ToolFailed, match=r"Replacement 1 \(old 'no such words'\)"):
+            await call(
+                client,
+                "upload_translation_version",
+                upload | {"replacements": [{"old": "no such words", "new": "x"}]},
+            )
+        done = await call(
+            client,
+            "upload_translation_version",
+            upload | {"confirm": True, "expected_previous_sha256": plan["text_sha256"]},
+        )
+        assert done["applied"] is True and done["result"]["version"] == 2
+    async with Client(_server(live, made["token"], read_content=True)) as content:
+        stored = await call(
+            content,
+            "get_text_version",
+            {
+                "project": project,
+                "document_id": done["result"]["document_id"],
+                "include_text": True,
+            },
+        )
+        assert "low muscle tone" in stored["text"]
+        assert "muscular" not in stored["text"]
+
+
+@pytest.mark.anyio
 async def test_wrong_input_is_named_not_ignored(live: dict[str, str]) -> None:
     """A misspelt argument is refused, and a text the project does not have
     is named by every bulk tool (review findings F3 and F4)."""
@@ -710,3 +864,76 @@ async def test_wrong_input_is_named_not_ignored(live: dict[str, str]) -> None:
         )
         assert done["applied"] is True and done["unknown_texts"] == wrong
         assert done["selection"] == f"4 texts of project '{project}'"
+
+
+@pytest.mark.anyio
+async def test_a_blinded_consolidator_reads_the_inputs_of_their_task(
+    live: dict[str, str],
+) -> None:
+    """Issue 471 point 7: with annotator names hidden, the consolidator's
+    personal token finds their consolidation task, reads its inputs and
+    each input's submission, under the opaque IDs and "Annotator A" of the
+    web interface; an annotator of the inputs reads none of it."""
+    made = _scenario(live, "blind-consolidation")
+    project = made["project"]
+    # Who must not be named, and the real IDs that must not come back.
+    hidden = [
+        value
+        for person in ("ann-0001", "ann-0002")
+        for value in (made["users"][person], made["pseudonyms"][person])
+    ] + list(made["submissions"])
+    async with Client(
+        _server(live, made["tokens"]["adj"], read_content=True)
+    ) as consolidator:
+        tasks = await call(consolidator, "list_my_tasks", {})
+        [task] = [
+            t
+            for t in tasks["items"]
+            if t["project_key"] == project and t["task"] == "review"
+        ]
+        found = await call(
+            consolidator,
+            "get_consolidation_inputs",
+            {"assignment_id": task["assignment_id"], "include_text": True},
+        )
+        [round_] = found["rounds"]
+        assert round_["kind"] == "consolidation"
+        inputs = round_["inputs"]
+        assert len(inputs) > 10
+        authors = {
+            i["source_snapshot"]["annotation"]["provenance"]["actor"]["actor_id"]
+            for i in inputs
+        }
+        assert authors == {"annotator-a", "annotator-b"}
+        # Each passage with its text, on request.
+        segment = inputs[0]["source_snapshot"]["evidence"][0]["mention"]["segments"][0]
+        assert segment["text"] == made["text"][segment["start"] : segment["end"]]
+        sources = sorted({i["source_submission_id"] for i in inputs})
+        assert len(sources) == 2
+        assert all(s.startswith("sub-z") for s in sources)
+        # get_submission takes the opaque IDs as they are.
+        labels = set()
+        whole = json.dumps(found)
+        for sid in sources:
+            submission = await call(
+                consolidator,
+                "get_submission",
+                {
+                    "project": project,
+                    "document_id": found["document_id"],
+                    "submission_id": sid,
+                },
+            )
+            labels.add(submission["summary"]["author_label"])
+            whole += json.dumps(submission)
+        assert labels == {"Annotator A", "Annotator B"}
+        assert [value for value in hidden if value in whole] == []
+    async with Client(
+        _server(live, made["tokens"]["ann-0001"], read_content=True)
+    ) as annotator:
+        with pytest.raises(ToolFailed, match="ASSIGNMENT_NOT_FOUND"):
+            await call(
+                annotator,
+                "get_consolidation_inputs",
+                {"assignment_id": task["assignment_id"]},
+            )

@@ -58,6 +58,22 @@ describe("project members", () => {
     expect((screen.getByRole("checkbox", { name: "lead: Lead" }) as HTMLInputElement).checked).toBe(true);
   });
 
+  it("tells the project's only lead at once that the lead role cannot go, without a confirmation (review 2, F7 d)", async () => {
+    render(<MembersSection projectKey="p" currentUser={{ username: "lead", is_system_admin: false }} />);
+    fireEvent.click(await screen.findByRole("checkbox", { name: "lead: Lead" }));
+    expect(screen.getByRole("alert").textContent).toContain("Add another project lead before removing the last lead.");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect((screen.getByRole("checkbox", { name: "lead: Lead" }) as HTMLInputElement).checked).toBe(true);
+    // "Remove…" on the same row is the same removal.
+    fireEvent.click(screen.getByRole("button", { name: "Remove Lead from the project" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("alert").textContent).toContain("Add another project lead before removing the last lead.");
+    expect(api.setMemberRoles).not.toHaveBeenCalled();
+    // Another role of the same person is still confirmed as before.
+    fireEvent.click(screen.getByRole("checkbox", { name: "alice: Annotator" }));
+    expect(screen.getByRole("dialog")).toBeDefined();
+  });
+
   it("confirms all actual affected assignment details before resending with revocation", async () => {
     vi.mocked(api.setMemberRoles).mockRejectedValueOnce(new ApiError(409, "Has work", "MEMBER_HAS_ASSIGNMENTS", { assignments: [{ id: 2, document_id: "doc-reopened", task: "annotate" }, { id: 3, document_id: "doc-in-progress", task: "review" }] })).mockResolvedValueOnce({ ...members[0], roles: [] });
     render(<MembersSection projectKey="p" />);
@@ -165,6 +181,27 @@ describe("project members", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "New member: Annotator" }));
     fireEvent.click(screen.getByRole("button", { name: "Add member" }));
     expect((await screen.findByRole("alert")).textContent).toContain("There is no user with this username. Check the spelling.");
+  });
+
+  it("says a refused username at the field, and names the username when the display name was typed (issue 472)", async () => {
+    vi.mocked(api.listMemberCandidates).mockResolvedValue([{ username: "maria.k", display_name: "Maria Klein", languages: [] }]);
+    vi.mocked(api.setMemberRoles).mockRejectedValue(new ApiError(422, "Invalid username", "USERNAME_INVALID"));
+    render(<MembersSection projectKey="p" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Add member…" }));
+    const field = () => screen.getByLabelText(/^Username/) as HTMLInputElement;
+    fireEvent.change(field(), { target: { value: "Maria Klein" } });
+    await screen.findByRole("option", { name: /^maria\.k Maria Klein/ });
+    fireEvent.click(screen.getByRole("checkbox", { name: "New member: Annotator" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add member" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("This is the person's name. Choose the person from the list, or type the username: maria.k.");
+    // At the field: the field is marked invalid and described by the message; no second notice elsewhere.
+    expect(field().getAttribute("aria-invalid")).toBe("true");
+    expect(field().getAttribute("aria-describedby")?.split(" ")).toContain(alert.id);
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    // Typing again takes the message away.
+    fireEvent.change(field(), { target: { value: "maria.k" } });
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("adds a typed username without loading the whole user list", async () => {

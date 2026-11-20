@@ -19,6 +19,7 @@ from ontotator_mcp.tools_people import register_people
 from ontotator_mcp.tools_results import register_results
 from ontotator_mcp.tools_setup import register_setup
 from ontotator_mcp.tools_status import register_status
+from ontotator_mcp.tools_translation_decisions import register_translation_decisions
 from ontotator_mcp.tools_typography import register_typography
 
 INSTRUCTIONS = """\
@@ -30,6 +31,7 @@ machine-proposal imports, accounts, people, assignments, work plan), changes
 while a project runs (reassigning, withdrawing or reopening tasks, handing a
 leaving person's tasks on, new rounds, annotation mode changes, undo of a
 work plan change or of a bulk reopen or withdrawal, translation corrections,
+the lead's decision on a queried translation (decide_translation_query),
 text changes, problem report decisions),
 status (progress, agreement, problem reports) and results (consolidation
 start, accepting agreeing texts, choosing a final result, exports and
@@ -50,17 +52,35 @@ whoami to check the connection. Tools that read or write local files only
 use paths inside the folders of ONTOTATOR_MCP_FILES_DIR and refuse without
 that variable; the other tools work without it. Long imports and exports are jobs: tools
 wait for them by default; get_job polls one.
+
+Answers are short by default. list_texts returns at most 100 texts in a
+short form: ask for more with 'fields', page with 'limit' and 'offset'
+('next_offset'). project_audit leaves out each event's details
+(include_details) and project_overview the links (include_links). A tool
+that lists things returns {'items': [...], 'count': n}, also when nothing
+is found.
+
+Names. A person is always 'username', 'display_name' and 'pseudonym'; a
+name the server does not return is null (project_audit names nobody's
+login: match by pseudonym). Arguments take the username.
+The task 'review' is a consolidation: results say 'review', and arguments
+that take task names accept 'consolidation' as well. A case ID is not a
+document_id: a document_id names one version of one text, so take it from
+list_texts (for a source text the two can be the same string).
 """
 
 # Added to the instructions when ONTOTATOR_MCP_READ_CONTENT=1.
 CONTENT_INSTRUCTIONS = """
-One exception to "no tool reads them": this server was started with
+One exception to "no tool reads them": this MCP server was started with
 ONTOTATOR_MCP_READ_CONTENT=1, so get_text_version, list_annotation_versions,
-get_annotation_version and get_submission read texts and submitted
-annotations (never drafts, and nothing can be written). They return
+get_annotation_version, get_submission and get_consolidation_inputs read
+texts and submitted annotations (never drafts, and nothing can be written). They return
 clinical text only with include_text; ask for it only when the task needs
 the wording. The same holds for include_text of list_translation_reviews
-and list_typography_hints, which exists only on this server.
+and list_typography_hints, which exists only on this server. The dry runs
+of decide_translation_query and upload_translation_version return the
+changed passages ('diff') on this server; without the variable they count
+them.
 """
 
 
@@ -87,7 +107,8 @@ def build_server(
     )
     register_setup(server, api)
     register_people(server, api)
-    register_lead(server, api)
+    register_lead(server, api, read_content=settings.read_content)
+    register_translation_decisions(server, api, read_content=settings.read_content)
     register_status(server, api)
     register_monitoring(server, api, read_content=settings.read_content)
     register_typography(server, api, read_content=settings.read_content)

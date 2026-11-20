@@ -59,7 +59,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 it("groups the preview by consequence, with every reason a text is skipped (issue 336 step 4)", () => {
   const groups = modeGroups(modePreview());
   expect(groups.map(group => `${group.title} · ${group.detail}`)).toEqual([
-    "Annotate 4 texts from scratch · discards 5 submissions, removes 3 unsubmitted assignments",
+    "Annotate 4 texts from scratch · discards 5 submissions, removes 3 unsubmitted tasks",
     "Skip 1 text · final result chosen: use Withdraw final… first",
     "Skip 1 text · already annotated from scratch",
     "Skip 1 text · no annotation work yet: set the mode with Plan…",
@@ -77,14 +77,14 @@ it("names every person affected with what happens to their work", () => {
   expect(affectedPeople(modePreview()).map(affectedLine)).toEqual([
     "Tom Reis: 3 submissions are discarded.",
     "Carla Diaz: 1 consolidation is discarded; 1 unsubmitted consolidation is removed.",
-    "R. Roe: 1 submission is discarded; 2 unsubmitted assignments are removed.",
+    "R. Roe: 1 submission is discarded; 2 unsubmitted tasks are removed.",
   ]);
 });
 
 it("says plainly what is discarded and that the bulk change cannot be undone here", () => {
   expect(modeConsequences(modePreview())).toEqual([
     "The annotation of 4 texts starts again from scratch: assign them anew.",
-    "5 submissions are discarded and 3 unsubmitted assignments are removed (drafts are kept). Discarded work is kept, not deleted: it no longer counts for progress, consolidation, the final result or exports.",
+    "5 submissions are discarded and 3 unsubmitted tasks are removed (drafts are kept). Discarded work is kept, not deleted: it no longer counts for progress, consolidation, the final result or exports.",
     "This cannot be undone here. Restore… in a text card brings one text back while no new annotation has started on it.",
   ]);
   expect(modeConsequences(modePreview({ changes: [change("a", [], [assignment("a", 1)])] }))[1]).toBe("No submitted work is discarded.");
@@ -117,7 +117,7 @@ it("asks for the mode and a reason, lists the people, then applies with the prev
   expect(await within(dialog).findByText("Annotate 4 texts from scratch")).toBeTruthy();
   expect(api.bulkChangeMode).toHaveBeenCalledWith("p", { rows, mode: "scratch", preview: true }, expect.any(AbortSignal));
   expect(within(within(dialog).getByRole("list", { name: "Affected people" })).getAllByRole("listitem").map(item => item.textContent)).toEqual([
-    "Tom Reis: 3 submissions are discarded.", "Carla Diaz: 1 consolidation is discarded; 1 unsubmitted consolidation is removed.", "R. Roe: 1 submission is discarded; 2 unsubmitted assignments are removed.",
+    "Tom Reis: 3 submissions are discarded.", "Carla Diaz: 1 consolidation is discarded; 1 unsubmitted consolidation is removed.", "R. Roe: 1 submission is discarded; 2 unsubmitted tasks are removed.",
   ]);
   expect(within(dialog).getByText("Will change:").parentElement?.textContent).toBe("Will change: the annotation mode of 4 texts");
   fireEvent.click(within(dialog).getByRole("button", { name: "Show all 4" }));

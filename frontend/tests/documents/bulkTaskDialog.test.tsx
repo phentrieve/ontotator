@@ -65,8 +65,8 @@ it("groups the preview by consequence and names people with their counts (decisi
   ]);
   expect(groups[0].texts).toEqual(["EN100022 de", "EN100023 de", "EN100025 de", "EN100026 de"]);
   expect(peopleCounts([task("a", 1, roe), task("b", 2, tom), task("c", 3, roe)])).toBe("R. Roe 2, Tom Reis 1");
-  expect(willChangeText(reopenPreview())).toBe("5 assignments in 4 texts");
-  expect(appliedText(reopenPreview({ applied: true }))).toBe("Reopened 5 assignments in 4 texts.");
+  expect(willChangeText(reopenPreview())).toBe("5 tasks in 4 texts");
+  expect(appliedText(reopenPreview({ applied: true }))).toBe("Reopened 5 tasks in 4 texts.");
   const withdraw = previewGroups(reopenPreview({ action: "withdraw", changes: [task("a", 1, tom, "open"), task("b", 2, roe, "in_progress")], kept: [], skipped: [] }));
   expect(withdraw.map(group => group.title)).toEqual(["Withdraw 1 open task", "Withdraw 1 started task, drafts kept"]);
 });
@@ -95,9 +95,9 @@ it("previews, needs a reason and I understand, then applies with the preview's t
   expect(within(dialog).getByText("EN100022 de, EN100023 de, EN100025 de, …", { exact: false })).toBeTruthy();
   fireEvent.click(within(dialog).getByRole("button", { name: "Show all 4" }));
   expect(within(dialog).getByText("EN100022 de, EN100023 de, EN100025 de, EN100026 de", { exact: false })).toBeTruthy();
-  expect(within(dialog).getByText("Will change:").parentElement?.textContent).toBe("Will change: 5 assignments in 4 texts");
+  expect(within(dialog).getByText("Will change:").parentElement?.textContent).toBe("Will change: 5 tasks in 4 texts");
 
-  const apply = within(dialog).getByRole("button", { name: "Reopen 5 assignments" });
+  const apply = within(dialog).getByRole("button", { name: "Reopen 5 tasks" });
   expect(apply.getAttribute("aria-disabled")).toBe("true");
   expect(within(dialog).getByText("Enter the reason first.")).toBeTruthy();
   fireEvent.change(within(dialog).getByLabelText("Reason (required)"), { target: { value: "Guideline 2.3 changed" } });
@@ -118,14 +118,14 @@ it("shows the fresh preview when the texts changed since (PREVIEW_STALE)", async
   const dialog = await screen.findByRole("dialog", { name: "Reopen: 7 texts" });
   await within(dialog).findByText("Reopen 5 submitted tasks");
   fireEvent.change(within(dialog).getByLabelText("Reason (required)"), { target: { value: "Why" } });
-  fireEvent.click(within(dialog).getByRole("button", { name: "Reopen 5 assignments" }));
+  fireEvent.click(within(dialog).getByRole("button", { name: "Reopen 5 tasks" }));
   fireEvent.click(within(dialog).getByLabelText("I understand"));
   const fresh = reopenPreview({ changes: [task("EN100022", 1)], preview_token: "sha256:b" });
   vi.mocked(api.bulkReopen).mockRejectedValueOnce(new ApiError(409, "stale", "PREVIEW_STALE", { preview: fresh } as never));
-  fireEvent.click(within(dialog).getByRole("button", { name: "Reopen 5 assignments" }));
+  fireEvent.click(within(dialog).getByRole("button", { name: "Reopen 5 tasks" }));
   expect(await within(dialog).findByText("The texts changed since the preview. Check the new preview.")).toBeTruthy();
   expect(within(dialog).getByText("Reopen 1 submitted task")).toBeTruthy();
-  expect(within(dialog).getByRole("button", { name: "Reopen 1 assignment" })).toBeTruthy();
+  expect(within(dialog).getByRole("button", { name: "Reopen 1 task" })).toBeTruthy();
 });
 
 it("withdraw offers started tasks and the limit as options", async () => {
@@ -169,16 +169,37 @@ it("More actions lists Reopen… and Withdraw open tasks…, applies and offers 
   const dialog = await screen.findByRole("dialog", { name: "Reopen: 7 texts" });
   await within(dialog).findByText("Reopen 5 submitted tasks");
   fireEvent.change(within(dialog).getByLabelText("Reason (required)"), { target: { value: "Why" } });
-  fireEvent.click(within(dialog).getByRole("button", { name: "Reopen 5 assignments" }));
+  fireEvent.click(within(dialog).getByRole("button", { name: "Reopen 5 tasks" }));
   fireEvent.click(within(dialog).getByLabelText("I understand"));
   const undo = { id: 41, expires_at: "2026-11-15T12:00:00Z" };
   vi.mocked(api.bulkReopen).mockResolvedValueOnce(reopenPreview({ applied: true, undo }));
-  fireEvent.click(within(dialog).getByRole("button", { name: "Reopen 5 assignments" }));
-  expect(await screen.findByText("Reopened 5 assignments in 4 texts.")).toBeTruthy();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Reopen 5 tasks" }));
+  expect(await screen.findByText("Reopened 5 tasks in 4 texts.")).toBeTruthy();
   expect(screen.queryByRole("dialog")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Undo" }));
   await waitFor(() => expect(api.bulkUndo).toHaveBeenCalledWith("p", 41));
   expect(await screen.findByText("The reopened tasks are submitted again.")).toBeTruthy();
+});
+
+it("a refused Undo of Reopen… names the text that changed and what changed (issue 469)", async () => {
+  vi.spyOn(api, "selectionSummary").mockResolvedValue(summary);
+  const blocked_texts = [{ case_id: "EN100022", language: "en", reason: "tasks", message: "A task of the text changed since." }];
+  vi.spyOn(api, "bulkUndo").mockRejectedValue(new ApiError(409, "stale", "BULK_UNDO_STALE", { reason: "changed", preview: { undone: 0, applied: false, texts: 4, blocked_texts } }));
+  render(<Harness />);
+  await waitFor(() => expect(api.bulkWithdraw).toHaveBeenCalled());
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+  fireEvent.click(within(screen.getByRole("menu", { name: "More actions" })).getAllByRole("menuitem")[0]);
+  const dialog = await screen.findByRole("dialog", { name: "Reopen: 7 texts" });
+  await within(dialog).findByText("Reopen 5 submitted tasks");
+  fireEvent.change(within(dialog).getByLabelText("Reason (required)"), { target: { value: "Why" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Reopen 5 tasks" }));
+  fireEvent.click(within(dialog).getByLabelText("I understand"));
+  vi.mocked(api.bulkReopen).mockResolvedValueOnce(reopenPreview({ applied: true, undo: { id: 41, expires_at: "2026-11-15T12:00:00Z" } }));
+  fireEvent.click(within(dialog).getByRole("button", { name: "Reopen 5 tasks" }));
+  await screen.findByText("Reopened 5 tasks in 4 texts.");
+  fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+  expect(await screen.findByText("Undo is not possible: 1 of 4 texts changed since (EN100022 en: a task was assigned, reopened, withdrawn or paused, or got a new round). Nothing was undone.")).toBeTruthy();
+  expect(screen.queryByText("Undo is no longer possible: the texts changed since.")).toBeNull();
 });
 
 it("Start a round… groups the preview with every reason a task is kept or a text is skipped (issue 336 step 3)", () => {
@@ -195,7 +216,7 @@ it("Start a round… groups the preview with every reason a task is kept or a te
   ]);
   expect(lines("clean_restart")[0]).toBe("Restart 5 submitted tasks in a new round · Tom Reis 4, R. Roe 1");
   expect(lines("clean_restart").at(-1)).toBe("Keep 1 submitted task · no work round to restart (older or imported work): use Reopen…");
-  expect(willChangeText(roundPreview())).toBe("5 assignments in 4 texts");
+  expect(willChangeText(roundPreview())).toBe("5 tasks in 4 texts");
   expect(willChangeText(roundPreview("carry_forward", { changes: [] }))).toBe("No submitted annotation in the selected texts can start a round.");
   expect(appliedText(roundPreview("carry_forward", { applied: true }))).toBe("Started 5 rounds in 4 texts.");
   expect(unavailableReason("start_round", roundPreview())).toBeNull();
@@ -206,12 +227,12 @@ it("Start a round… groups the preview with every reason a task is kept or a te
 it("Start a round… says plainly what is set aside and that it cannot be undone here", () => {
   expect(consequenceLines(roundPreview("carry_forward"))).toEqual([
     "2 people get 5 tasks back in My tasks, in a new round that starts with what they submitted.",
-    "The earlier submissions no longer count as submitted: each task must be submitted again. The earlier rounds stay readable under More › Work rounds.",
+    "The earlier submissions no longer count as submitted: each task must be submitted again. Each person still reads their earlier rounds in the task, under More › Work rounds.",
     "This cannot be undone here. There is no way back for a single text either: the person submits the new round.",
   ]);
   expect(consequenceLines(roundPreview("clean_restart"))).toEqual([
     "2 people get 5 tasks back in My tasks, in a new round without any of the earlier findings. Tasks from tool proposals start again from the newest proposals, all open.",
-    "The submitted work of these 5 tasks is set aside: it no longer counts as submitted and is not carried into the new round. The earlier rounds stay readable under More › Work rounds.",
+    "The submitted work of these 5 tasks is set aside: it no longer counts as submitted and is not carried into the new round. Each person still reads their earlier rounds in the task, under More › Work rounds.",
     "This cannot be undone here, and no action on a single text brings the set-aside work back into the task.",
   ]);
 });

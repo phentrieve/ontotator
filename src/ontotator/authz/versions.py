@@ -173,7 +173,9 @@ def visible_annotation_versions(
         VersionRef(
             kind="own",
             id=row.submission_id,
-            label=f"{_OWN_LABELS.get(row.mode, 'My submission')}, {row.created_at}",
+            # No timestamp in the label: `created_at` carries it, and the web
+            # interface adds the local time (issue 472).
+            label=_OWN_LABELS.get(row.mode, "My submission"),
             created_at=row.created_at,
         )
         for row in own
@@ -184,7 +186,7 @@ def visible_annotation_versions(
             VersionRef(
                 kind="submission",
                 id=row.submission_id,
-                label=f"{row.annotator_id} · {row.recorded_at.isoformat()}",
+                label=row.annotator_id,
                 created_at=row.recorded_at,
             )
             for row in conn.execute(

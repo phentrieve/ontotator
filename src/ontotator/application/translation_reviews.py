@@ -12,8 +12,10 @@ from sqlalchemy import Connection, RowMapping, func, insert, select, update
 from ontotator.assignments.service import (
     Assignment,
     AssignmentService,
+    ReasonAddition,
     latest_reopen,
     move_waiting_tasks,
+    reason_additions,
     second_review_requests,
 )
 from ontotator.auth.audit import Actor, record_audit
@@ -26,6 +28,7 @@ from ontotator.authz.visibility import (
     require_document,
     visible_documents,
 )
+from ontotator.domain.bracketed_passages import BracketCheck, check_added_brackets
 from ontotator.domain.errors import DomainError, RevisionConflict, project_not_found
 from ontotator.domain.translation_review import (
     LEAD_CORRECTION_DECISION,
@@ -35,6 +38,11 @@ from ontotator.domain.translation_review import (
     ReviewForm,
     check_review,
     next_status,
+)
+from ontotator.domain.typography import (
+    TypographyHint,
+    count_by_rule,
+    typography_hints,
 )
 from ontotator.domain.variants import (
     TranslationStatus,
@@ -160,12 +168,15 @@ class TranslationReviewRecord(BaseModel):
     # The guideline version in force at submit (G15); NULL when none was.
     guideline_version: int | None = None
     guideline_withdrawn: bool = False
+    # The project's own name of that version ("3.1"); set with the flag above.
+    guideline_label: str | None = None
 
 
 def with_guideline_withdrawn(
     conn: Connection, project_id: int, records: list[TranslationReviewRecord]
 ) -> list[TranslationReviewRecord]:
-    """``records`` with ``guideline_withdrawn`` set from the stamped versions."""
+    """``records`` with ``guideline_withdrawn`` and ``guideline_label`` set
+    from the stamped versions."""
     if not any(r.guideline_version is not None for r in records):
         return records
     facts = guideline_facts(conn, project_id)
@@ -174,7 +185,10 @@ def with_guideline_withdrawn(
         r
         if r.guideline_version is None
         else r.model_copy(
-            update={"guideline_withdrawn": facts[r.guideline_version].withdrawn}
+            update={
+                "guideline_withdrawn": facts[r.guideline_version].withdrawn,
+                "guideline_label": facts[r.guideline_version].label,
+            }
         )
         for r in records
     ]
@@ -246,6 +260,24 @@ class VersionOrigin:
 
 
 @dataclass(frozen=True)
+class QueryAnswer:
+    """The lead's decision on the reviewer's query (issue 483), as the
+    reviewer reads it at the submitted task.
+
+    ``reviewer_text``: the proposed text became version
+    ``accepted_version`` (``edited``: the lead changed it before saving);
+    ``unchanged``: the reviewed version (or its typo fix) was accepted as it
+    is. ``answer`` is what the lead wrote.
+    """
+
+    kind: Literal["reviewer_text", "unchanged"]
+    accepted_version: int
+    decided_at: datetime
+    answer: str | None = None
+    edited: bool = False
+
+
+@dataclass(frozen=True)
 class ReviewDraft:
     text: str
     form: dict[str, Any]
@@ -282,8 +314,38 @@ class ReviewWorkspace:
     # latest "Reopen…" while the task is reopened.
     second_review_at: datetime | None = None
     second_review_reason: str | None = None
+    # What the lead added to that reason afterwards (issue 483), oldest first;
+    # None without an addition.
+    second_review_additions: tuple[ReasonAddition, ...] | None = None
     reopened_at: datetime | None = None
     reopen_reason: str | None = None
+    # The lead's decision on this submitted query, with the answer; None
+    # while the lead has not decided it and for other decisions.
+    query_answer: QueryAnswer | None = None
+    # Issue 484: bracketed passages of the reviewed version against those of
+    # its source, computed when the review is opened. More in the translation
+    # is shown in the checks band; it asks for nothing and is not counted in
+    # ``failed_checks``.
+    added_brackets: BracketCheck | None = None
+
+
+# Hints listed for a draft; the counts stay exact.
+DRAFT_HINTS_MAX = 200
+
+
+@dataclass(frozen=True)
+class DraftTypographyHints:
+    """Typography hints of the stored draft text (issue 484), never stored.
+
+    ``revision`` is the draft revision the hints were computed for. Positions
+    count Unicode code points, as everywhere.
+    """
+
+    revision: int
+    total: int
+    counts: dict[str, int]
+    hints: list[TypographyHint]
+    truncated: bool
 
 
 class TranslationReviewService:
@@ -578,6 +640,13 @@ class TranslationReviewService:
             second = second_review_requests(
                 conn, {assignment.id: assignment.active_round_id}
             ).get(assignment.id)
+            additions = (
+                reason_additions(conn, {assignment.id: assignment.active_round_id}).get(
+                    assignment.id
+                )
+                if second
+                else None
+            )
             reopen = (
                 latest_reopen(conn, assignment.id)
                 if assignment.status == "reopened"
@@ -596,12 +665,14 @@ class TranslationReviewService:
                 )
             ).all()
             by_id = {document_id: text for document_id, text in texts}
+            version_text = self._text(conn, pid, variant)
+            source_text = self._text(conn, pid, source)
             return ReviewWorkspace(
                 assignment,
                 variant,
                 ancestor,
-                self._text(conn, pid, variant),
-                ReviewText(source, self._text(conn, pid, source)),
+                version_text,
+                ReviewText(source, source_text),
                 [ReviewText(v, by_id[v.document_id]) for v in comparisons],
                 version_failed_checks(variant, ancestor),
                 draft,
@@ -621,9 +692,50 @@ class TranslationReviewService:
                 else ReviewText(previous, self._text(conn, pid, previous)),
                 second_review_at=second[0] if second else None,
                 second_review_reason=second[1] if second else None,
+                second_review_additions=additions,
                 reopened_at=reopen[0] if reopen else None,
                 reopen_reason=reopen[1] if reopen else None,
+                query_answer=self._query_answer(conn, submitted),
+                added_brackets=check_added_brackets(source_text, version_text),
             )
+
+    def draft_typography_hints(
+        self, access: Access, assignment_id: int
+    ) -> DraftTypographyHints:
+        """Hints of the text the review would save: the stored draft, or the
+        reviewed version while nothing was saved. Whoever may open the review
+        may read them; nothing is written."""
+        with self.db.transaction() as conn:
+            assignment, pid, _ = self._authority(conn, access, assignment_id)
+            variant, _, _, _ = self._context(assignment)
+            row = conn.execute(
+                select(
+                    TranslationReviewDraftRow.text, TranslationReviewDraftRow.revision
+                ).where(TranslationReviewDraftRow.assignment_id == assignment.id)
+            ).one_or_none()
+            if row is None:
+                text, revision = self._text(conn, pid, variant), 0
+            else:
+                text, revision = row.text, row.revision
+        hints = typography_hints(text)
+        return DraftTypographyHints(
+            revision,
+            len(hints),
+            count_by_rule(hints),
+            hints[:DRAFT_HINTS_MAX],
+            len(hints) > DRAFT_HINTS_MAX,
+        )
+
+    @staticmethod
+    def _query_answer(
+        conn: Connection, submitted: TranslationReviewRecord | None
+    ) -> QueryAnswer | None:
+        if submitted is None or submitted.decision != "query":
+            return None
+        from ontotator.application.query_decisions import decisions_of_reviews
+
+        found = decisions_of_reviews(conn, [submitted.id]).get(submitted.id)
+        return None if found is None else QueryAnswer(**found)
 
     @staticmethod
     def _version_origin(

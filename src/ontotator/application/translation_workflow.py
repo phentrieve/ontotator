@@ -249,6 +249,93 @@ class TranslationWorkflowService:
             )
             return assignments._get(conn, assignment.id)
 
+    def add_correction_reason(
+        self, actor: Actor, assignment_id: int, note: str
+    ) -> dict[str, Any]:
+        """Issue 483: the lead adds to the reason of a correction request.
+
+        Append-only: the reason of the request stays as it was sent, each
+        addition is a row of its own with who added it and when. Only while
+        the requested review is open: refused with
+        ``CORRECTION_REASON_NOT_AVAILABLE`` for a submitted (``submitted``)
+        or withdrawn (``withdrawn``) review, and for a task whose current
+        round was not started by "Ask a reviewer to correct…"
+        (``not_a_correction_request``). The rights are those of the request.
+        """
+        note = note.strip()
+        if not note:
+            raise DomainError(
+                "CORRECTION_REASON_NOT_AVAILABLE", {"reason": "note_required"}
+            )
+        from ontotator.assignments.service import second_review_requests
+        from ontotator.storage.plan_tables import CorrectionReasonAdditionRow
+
+        assignments = AssignmentService(self.db)
+        with self.db.transaction() as conn:
+            key = assignments._locate(conn, assignment_id)
+            project = assignments._prepare(conn, actor, key)
+            row = (
+                conn.execute(
+                    select(AssignmentRow)
+                    .where(AssignmentRow.id == assignment_id)
+                    .with_for_update(key_share=True)
+                )
+                .mappings()
+                .one()
+            )
+            round_id = row["active_round_id"]
+            requested = (
+                row["task"] == "translation_review"
+                and round_id is not None
+                and assignment_id
+                in second_review_requests(conn, {assignment_id: round_id})
+            )
+            if not requested:
+                raise DomainError(
+                    "CORRECTION_REASON_NOT_AVAILABLE",
+                    {"reason": "not_a_correction_request"},
+                )
+            if row["revoked_at"] is not None:
+                raise DomainError(
+                    "CORRECTION_REASON_NOT_AVAILABLE", {"reason": "withdrawn"}
+                )
+            if row["status"] == "submitted":
+                raise DomainError(
+                    "CORRECTION_REASON_NOT_AVAILABLE", {"reason": "submitted"}
+                )
+            added = conn.execute(
+                insert(CorrectionReasonAdditionRow)
+                .values(
+                    project_id=project["id"],
+                    assignment_id=assignment_id,
+                    round_id=round_id,
+                    note=note,
+                    added_by=actor.user_id,
+                )
+                .returning(
+                    CorrectionReasonAdditionRow.id,
+                    CorrectionReasonAdditionRow.added_at,
+                )
+            ).one()
+            record_audit(
+                conn,
+                actor,
+                "translation.correction_reason_added",
+                target_type="assignment",
+                target_id=assignment_id,
+                project_id=project["id"],
+                details={
+                    "note": note,
+                    "document_id": row["document_id"],
+                    "round_id": round_id,
+                },
+            )
+            return {
+                "assignment_id": assignment_id,
+                "note": note,
+                "added_at": added.added_at,
+            }
+
     def start_lead_correction(
         self,
         actor: Actor,

@@ -1,17 +1,34 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
-import { AppShell } from "../../src/ui/AppShell";
+import { AppShell, initials } from "../../src/ui/AppShell";
 import type { CurrentUser } from "../../src/api/client";
 const user = { username: "alex", display_name: "Alex", pseudonym: "a1" } as CurrentUser;
-it("shows_product_user_and_logout", () => {
-  const logout = vi.fn(); render(<AppShell user={user} onLogout={logout}>Content</AppShell>);
+it("shows_product_and_user_menu", () => {
+  const logout = vi.fn(); render(<AppShell user={user} userMenu={[{ id: "logout", label: "Log out", onSelect: logout }]}>Content</AppShell>);
   expect(screen.getByText("Ontotator")).toBeTruthy();
   expect(screen.getByText("Clinical Curation Workbench")).toBeTruthy();
   expect(screen.getByTestId("current-user").textContent).toBe("Alex (a1)");
   expect(screen.getByTestId("current-user").title).toBe("");
-  screen.getByRole("button", { name: "Log out" }).click(); expect(logout).toHaveBeenCalledOnce();
+  const button = screen.getByRole("button", { name: "User menu: Alex (a1)" });
+  expect(button.contains(screen.getByTestId("current-user"))).toBe(true);
+  // The initials stand in for the name where the header is narrow (CSS); they are not read out.
+  expect(button.querySelector(".shell-user-initials")?.textContent).toBe("AL");
+  fireEvent.click(button);
+  fireEvent.click(screen.getByRole("menuitem", { name: "Log out" })); expect(logout).toHaveBeenCalledOnce();
 });
-it("no_logout_without_handler", () => { render(<AppShell user={user}>Content</AppShell>); expect(screen.queryByRole("button", { name: "Log out" })).toBeNull(); });
+it("no_user_menu_without_items", () => {
+  render(<AppShell user={user}>Content</AppShell>);
+  expect(screen.queryByRole("button", { name: /^User menu/ })).toBeNull();
+  expect(screen.getByTestId("current-user").textContent).toBe("Alex (a1)");
+});
+it.each([["Maria Demo", "MD"], ["anna-lena von berg", "AB"], ["Čeněk", "ČE"], ["  ", "?"], ["x", "X"]])("initials of %j are %s", (name, expected) => {
+  expect(initials(name)).toBe(expected);
+});
+it("header_actions_sit_between_handbook_and_the_user_menu", () => {
+  render(<AppShell user={user} userMenu={[{ id: "a", label: "A", onSelect: vi.fn() }]} actions={<a href="#/admin/users">Gear</a>}>Content</AppShell>);
+  const actions = document.querySelector(".shell-actions")!;
+  expect([...actions.querySelectorAll("a, button")].map(element => element.textContent)).toEqual(["Handbook", "Gear", "Alex (a1)AL"]);
+});
 it("breadcrumb_marks_the_current_page", () => {
   const back = vi.fn(); render(<AppShell user={null} breadcrumb={[{ label: "Projects", href: "/projects" }, { label: "Project", onClick: back }, { label: "Case 1" }]}>Content</AppShell>);
   expect(screen.getByRole("navigation", { name: "Breadcrumb" })).toBeTruthy();

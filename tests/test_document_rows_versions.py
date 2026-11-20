@@ -60,6 +60,7 @@ def _lead_ref(env: Any) -> dict[str, Any]:
     return {
         "pseudonym": lead.pseudonym,
         "display_name": lead.display_name,
+        "username": lead.username,
         "is_me": True,
     }
 

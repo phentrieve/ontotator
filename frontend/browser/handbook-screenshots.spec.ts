@@ -11,7 +11,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { cardSegment, documentsReady, openTextCard, personRow, rowCell, showSegment, textRow } from "./documentsHelpers";
 import { newBadge, openDocuments, rowAction, textCard } from "./documentsOverviewHelpers";
 import { guidelineScenario, loginGuidelineUser } from "./guidelineHelpers";
-import { expectSubmitted, loginExisting, loginThroughForm, openTasksHome, selectText, TEST_PASSWORD } from "./helpers";
+import { expectSubmitted, loginExisting, loginThroughForm, openAdministration, openTasksHome, openUserMenu, selectText, TEST_PASSWORD } from "./helpers";
 import { leadScenario } from "./leadWorkflowHelpers";
 import { loginOverviewUser, overviewAct, overviewScenario, type OverviewActBody, type OverviewScenario } from "./overviewHelpers";
 import { proposalCheckScenario, loginScenarioUser as loginProposalUser } from "./proposalCheckHelpers";
@@ -105,7 +105,8 @@ test.describe("admin.md", () => {
     const form = await setPasswordForm(page, "admin.demo");
     await form.getByRole("button", { name: "Set password and log in" }).click();
     await expect(page.getByTestId("current-user")).toContainText("admin.demo");
-    await page.goto("/#/admin/users");
+    await openAdministration(page);
+    await expect(page).toHaveURL(/#\/admin\/users$/);
     await page.getByRole("button", { name: "New user…", exact: true }).click();
     const create = page.getByRole("form", { name: "New user" });
     await create.getByLabel(/^Username/).fill("lena.demo");
@@ -131,6 +132,7 @@ test.describe("admin.md", () => {
     );
     await page.getByRole("button", { name: "Upload files", exact: true }).click();
     await expect(page.getByRole("table", { name: "Upload results", exact: true })).toContainText("hp.json");
+    await page.getByRole("link", { name: "Back to Projects", exact: true }).click();
     await page.getByRole("link", { name: "New project", exact: true }).click();
     await expect(page).toHaveURL(/#\/projects\/new$/);
     await page.getByLabel(/^Project key/).fill("demo-phenotypes");
@@ -178,6 +180,16 @@ test.describe("getting-started.md", () => {
     await expect(page.getByRole("link", { name: /^Project guidelines v1/ })).toBeVisible();
     await expect(page.getByRole("link", { name: /^(Start|Continue)/ })).toHaveCount(2);
     await shot(page, "getting-started-my-tasks");
+  });
+
+  test("Find your way around: the user menu", async ({ page }) => {
+    const s = await guidelineScenario(page, "PUBLISHED");
+    await loginGuidelineUser(page, s, "ana");
+    await expect(page.getByRole("navigation", { name: "Sections" }).getByRole("link", { name: /^My tasks \(\d+\)$/ })).toBeVisible();
+    const menu = await openUserMenu(page);
+    for (const name of ["Profile", "My technical reports", "Technical problem…", "Log out"]) await expect(menu.getByRole("menuitem", { name, exact: true })).toBeVisible();
+    for (const name of ["System", "Light", "Dark"]) await expect(menu.getByRole("group", { name: "Theme" }).getByRole("menuitemradio", { name, exact: true })).toBeVisible();
+    await shot(page, "getting-started-user-menu");
   });
 });
 

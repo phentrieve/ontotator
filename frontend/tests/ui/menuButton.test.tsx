@@ -107,3 +107,35 @@ it("a disabled item stays focusable with its reason and does nothing when chosen
   expect(reset).not.toHaveBeenCalled();
   expect(screen.getByRole("menu")).toBeDefined();
 });
+
+it("groups radio choices: a labelled group, aria-checked, arrows pass through, choosing keeps the menu open", async () => {
+  const user = userEvent.setup();
+  const first = vi.fn(); const light = vi.fn(); const last = vi.fn();
+  function Host() {
+    return <MenuButton label="User menu" buttonLabel="Me" items={[
+      { id: "first", label: "First", onSelect: first },
+      { id: "system", label: "System", group: "Theme", checked: true, onSelect: vi.fn() },
+      { id: "light", label: "Light", group: "Theme", checked: false, onSelect: light },
+      { id: "last", label: "Last", onSelect: last },
+    ]} />;
+  }
+  render(<Host />);
+  const button = screen.getByRole("button", { name: "User menu" });
+  await user.click(button);
+  const group = screen.getByRole("group", { name: "Theme" });
+  expect([...group.querySelectorAll("[role=menuitemradio]")].map(element => [element.textContent, element.getAttribute("aria-checked")])).toEqual([["System", "true"], ["Light", "false"]]);
+  expect(screen.getAllByRole("menuitem").map(element => element.textContent)).toEqual(["First", "Last"]);
+  await user.keyboard("{ArrowDown}{ArrowDown}");
+  expect(document.activeElement?.textContent).toBe("Light");
+  await user.keyboard("{Enter}");
+  expect(light).toHaveBeenCalledOnce();
+  expect(screen.getByRole("menu")).toBeDefined();
+  await user.keyboard("{ArrowDown}");
+  expect(document.activeElement?.textContent).toBe("Last");
+  await user.keyboard("{End}{Home}");
+  expect(document.activeElement?.textContent).toBe("First");
+  await user.keyboard("{Enter}");
+  expect(first).toHaveBeenCalledOnce();
+  expect(screen.queryByRole("menu")).toBeNull();
+  expect(document.activeElement).toBe(button);
+});

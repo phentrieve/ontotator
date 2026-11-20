@@ -91,11 +91,13 @@ describe("design tokens", () => {
   });
 
   it("only_tokens_css_declares_colours", () => {
-    const offenders = filesUnder(resolve(src, "styles"))
+    // Every stylesheet of the app, not only styles/: a colour outside tokens.css has no dark value (issue 492).
+    // "%23…" is a "#…" colour inside a data: image.
+    const offenders = filesUnder(src)
       .filter((path) => path.endsWith(".css") && path !== resolve(src, "styles/tokens.css"))
       .flatMap((path) => {
         const css = readFileSync(path, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
-        const literals = css.match(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/g) ?? [];
+        const literals = css.match(/#[0-9a-fA-F]{3,8}\b|%23[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(|\b(?:hwb|lab|lch|oklab|oklch)\(/g) ?? [];
         const named: string[] = [];
         for (const declaration of css.matchAll(/(?:^|[;{])\s*([\w-]+)\s*:\s*([^;{}]+)/g)) {
           if (!/^(?:color|background(?:-color|-image)?|border(?:-[\w-]+)?|outline(?:-color)?|(?:box|text)-shadow|fill|stroke|caret-color|accent-color|text-decoration(?:-color)?|column-rule(?:-color)?|scrollbar-color)$/i.test(declaration[1])) continue;

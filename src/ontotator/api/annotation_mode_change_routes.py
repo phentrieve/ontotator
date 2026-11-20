@@ -7,7 +7,7 @@ from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ontotator.api.identity import PrincipalDep
-from ontotator.api.person_views import PersonRefView
+from ontotator.api.person_views import MemberRefView, PersonRefView
 from ontotator.api.routes import get_access
 from ontotator.api.work_plan_routes import (
     MAX_CASE_ID_LENGTH,
@@ -54,7 +54,7 @@ class DiscardedSubmissionView(BaseModel):
     document_id: str
     mode: str
     recorded_at: datetime
-    author: PersonRefView
+    author: MemberRefView
 
 
 class RevokedAssignmentView(BaseModel):
@@ -62,7 +62,7 @@ class RevokedAssignmentView(BaseModel):
     document_id: str
     task: Literal["annotate", "review"]
     status: str
-    person: PersonRefView
+    person: MemberRefView
 
 
 class ModeChangePreview(BaseModel):

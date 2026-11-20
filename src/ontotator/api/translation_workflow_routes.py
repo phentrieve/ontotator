@@ -1,6 +1,6 @@
 """Deliberate correction allocation and displayed source-obligation resolution."""
 
-from datetime import date
+from datetime import date, datetime
 from typing import Literal, Self
 
 from fastapi import APIRouter, Request
@@ -11,10 +11,15 @@ from ontotator.api.encoded_routes import EncodedParameterRoute
 from ontotator.api.identity import PrincipalDep
 from ontotator.api.routes import get_access
 from ontotator.application.editorial_corrections import EditorialCorrectionService
+from ontotator.application.query_decisions import (
+    QueryDecisionKind,
+    QueryDecisionService,
+)
 from ontotator.application.translation_reviews import TranslationReviewRecord
 from ontotator.application.translation_workflow import TranslationWorkflowService
 from ontotator.application.version_uploads import UploadMethod, VersionUploadService
 from ontotator.auth.audit import Actor
+from ontotator.domain.translation_review import ClinicalCategory
 from ontotator.domain.work_rounds import SourceReviewObligation
 
 router = APIRouter(
@@ -28,6 +33,21 @@ class CorrectionAssignmentRequest(BaseModel):
     expected_text_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     reason: str = Field(min_length=1)
     confirm_language: bool = False
+
+
+class CorrectionReasonAdditionRequest(BaseModel):
+    """Issue 483: what the lead adds to the reason of a correction request."""
+
+    model_config = ConfigDict(extra="forbid")
+    note: str = Field(min_length=1, max_length=2000)
+
+
+class CorrectionReasonAdditionView(BaseModel):
+    """One addition to the reason of a correction request, as saved."""
+
+    assignment_id: int
+    note: str
+    added_at: datetime
 
 
 class LeadCorrectionRequest(BaseModel):
@@ -208,6 +228,39 @@ class EditorialProposals(BaseModel):
     needs_check: int
 
 
+class EditorialCarryPerson(BaseModel):
+    """Issue 465: one person's started or submitted annotation on the
+    corrected version and whether the typo fix moves it to the new version
+    by itself (``carried``). ``reason`` says why not: ``number_changed``,
+    ``final_result``, ``consolidation``, ``translation_not_accepted``,
+    ``from_proposals``, ``task_paused``,
+    ``findings_need_check``, ``not_submitted`` (started, not submitted) or
+    ``not_carryable``; such work keeps the manual flow."""
+
+    username: str
+    display_name: str
+    status: Literal["submitted", "started"]
+    carried: bool
+    reason: (
+        Literal[
+            "number_changed",
+            "final_result",
+            "consolidation",
+            "translation_not_accepted",
+            "from_proposals",
+            "task_paused",
+            "findings_need_check",
+            "not_submitted",
+            "not_carryable",
+        ]
+        | None
+    )
+    # Findings of the submission (editable layers) and how many of them
+    # cannot be placed on the new text.
+    findings: int
+    needs_check: int
+
+
 class EditorialCorrectionPreview(BaseModel):
     """What an editorial correction of this version would do (read only)."""
 
@@ -243,6 +296,9 @@ class EditorialCorrectionPreview(BaseModel):
     diff: list[EditorialChange] | None
     findings: EditorialFindings | None
     proposals: EditorialProposals | None
+    # With a text or replacements: per person, whether the annotation moves
+    # to the new version by itself (issue 465).
+    annotation_carry: list[EditorialCarryPerson] | None = None
 
 
 class EditorialCorrectionResult(BaseModel):
@@ -257,6 +313,94 @@ class EditorialCorrectionResult(BaseModel):
     inserted_characters: int
     deleted_characters: int
     tasks_following: int
+    # Issue 465: submitted annotations the fix moved to the new version, and
+    # per person what happened to their work.
+    annotations_carried: int = 0
+    annotation_carry: list[EditorialCarryPerson] = Field(default_factory=list)
+
+
+class QueriedReviewView(BaseModel):
+    """The translation review submitted as a query that the lead decides."""
+
+    id: int
+    assignment_id: int
+    # The version the reviewer read (the decided version, or the version a
+    # typo fix was made of).
+    document_id: str
+    version: int
+    rationale: str | None
+    categories: list[ClinicalCategory]
+    # The text the reviewer proposed with the query.
+    proposed_text: str
+    created_at: datetime
+
+
+class QueryDecisionPreview(BaseModel):
+    """Issue 483, read only: the query a lead decides at this version."""
+
+    document_id: str
+    case_id: str
+    language: str
+    version: int
+    next_version: int
+    translation_status: str | None
+    # The hash of this version's text, which the decision names.
+    text_sha256: str
+    # This version's text, to compare the reviewer's text with.
+    text: str
+    available: bool
+    # already_decided, discarded, not_newest, review_open, not_a_query.
+    reason: str | None
+    review: QueriedReviewView | None
+    # The reviewer's text differs from this version's text.
+    proposes_changes: bool
+    review_on: bool
+    annotate_accepted_only: bool
+    annotations: LeadCorrectionAnnotationsView
+    open_consolidations: int
+    final_result: bool
+
+
+class QueryDecisionRequest(BaseModel):
+    """Issue 483: the lead's decision on a queried translation review.
+
+    ``reviewer_text``: ``text`` (the reviewer's proposed text, as the lead
+    confirmed it) becomes the next version, accepted. ``unchanged``: the
+    version is accepted as it is, and ``answer`` is required.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    kind: QueryDecisionKind
+    # The text hash of the decided version and the id of the querying review
+    # (both from the preview).
+    expected_text_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    expected_review_id: int = Field(gt=0)
+    text: str | None = Field(default=None, min_length=1, max_length=MAX_VERSION_TEXT)
+    # What the reviewer reads at their submitted task.
+    answer: str | None = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def _fields(self) -> Self:
+        if (self.kind == "reviewer_text") != (self.text is not None):
+            raise ValueError("Give the text with reviewer_text, and only then.")
+        if self.kind == "unchanged" and not (self.answer or "").strip():
+            raise ValueError("Accepting the version as it is needs an answer.")
+        return self
+
+
+class QueryDecisionResult(BaseModel):
+    case_id: str
+    language: str
+    kind: QueryDecisionKind
+    # The accepted version: the new one, or the decided version itself.
+    document_id: str
+    version: int
+    decided_document_id: str
+    decided_version: int
+    translation_status: Literal["accepted"]
+    text_sha256: str
+    # The lead changed the reviewer's text before saving it.
+    edited: bool
 
 
 class SourceObligationView(SourceReviewObligation):
@@ -288,6 +432,24 @@ def assign_correction(
         Actor.user(principal.user_id, principal.username), key, doc, **body.model_dump()
     )
     return _views(request, [row])[0]
+
+
+@router.post("/assignments/{assignment_id}/correction-reason")
+def add_correction_reason(
+    assignment_id: int,
+    body: CorrectionReasonAdditionRequest,
+    request: Request,
+    principal: PrincipalDep,
+) -> CorrectionReasonAdditionView:
+    """Issue 483: the lead adds to the reason of "Ask a reviewer to correct…"
+    while the review is open. Append-only: the reason as sent never changes."""
+    return CorrectionReasonAdditionView.model_validate(
+        _service(request).add_correction_reason(
+            Actor.user(principal.user_id, principal.username),
+            assignment_id,
+            body.note,
+        )
+    )
 
 
 @router.post("/projects/{key}/documents/{doc:path}/lead-correction")
@@ -397,6 +559,45 @@ def editorial_correction(
     version of this translation, with this version's status."""
     return EditorialCorrectionResult.model_validate(
         _editorial(request).correct(
+            Actor.user(principal.user_id, principal.username),
+            key,
+            doc,
+            **body.model_dump(),
+        )
+    )
+
+
+def _query_decisions(request: Request) -> QueryDecisionService:
+    return QueryDecisionService(request.app.state.repo.db, request.app.state.jobs)
+
+
+@router.get("/projects/{key}/documents/{doc:path}/query-decision")
+def preview_query_decision(
+    key: str, doc: str, request: Request, principal: PrincipalDep
+) -> QueryDecisionPreview:
+    """Issue 483, read only: the queried review of this version with the
+    reviewer's proposed text, this version's text and whether a lead can
+    decide the query."""
+    return QueryDecisionPreview.model_validate(
+        _query_decisions(request).preview(
+            Actor.user(principal.user_id, principal.username), key, doc
+        )
+    )
+
+
+@router.post("/projects/{key}/documents/{doc:path}/query-decision")
+def decide_query(
+    key: str,
+    doc: str,
+    body: QueryDecisionRequest,
+    request: Request,
+    principal: PrincipalDep,
+) -> QueryDecisionResult:
+    """Issue 483: close a queried translation review as the lead: take the
+    reviewer's text as the next version, accepted, or accept this version as
+    it is; with an answer the reviewer reads at their submitted task."""
+    return QueryDecisionResult.model_validate(
+        _query_decisions(request).decide(
             Actor.user(principal.user_id, principal.username),
             key,
             doc,

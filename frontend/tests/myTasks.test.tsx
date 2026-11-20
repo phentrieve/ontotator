@@ -55,6 +55,14 @@ describe("My tasks component", () => {
     expect(within(rows[1]).queryByText("Answer to your report")).toBeNull();
   });
 
+  it("marks a submitted query the lead decided (issue 483)", async () => {
+    vi.mocked(api.listMyTasks).mockResolvedValue([{ ...task(3, "submitted"), query_answered_at: "2026-11-18T10:12:00Z" }, task(1, "submitted")]);
+    render(<MyTasks projects={[]} onNavigate={vi.fn()} />);
+    const rows = await screen.findAllByTestId("task-row");
+    expect(within(rows[0]).getByText("Answer from the lead")).toBeDefined();
+    expect(within(rows[1]).queryByText("Answer from the lead")).toBeNull();
+  });
+
   it("links the answer badge to the answered report (#18)", async () => {
     const onNavigate = vi.fn();
     vi.mocked(api.listMyTasks).mockResolvedValue([{ ...task(3, "open"), report_answered: true, answered_report_id: "r-7" }]);
@@ -176,6 +184,8 @@ describe("My tasks component", () => {
       // The reopen reason is written out; there is no badge to tap.
       expect(reopened).toMatch(/doc-4.*Project P.*Annotation.*Reopened.*The project lead reopened this task on .+\. Reason: Check the onset\./);
       expect(screen.queryByRole("button", { name: "Reopened, why" })).toBeNull();
+      // Narrow: the notice under the badge says it once.
+      expect(rows[0].querySelector(".task-lead-reason")).toBeNull();
       expect(paused).toMatch(/In progress.*Paused.*The text names two doses\./);
       // Two projects are listed: each row names its project.
       expect(consolidation).toMatch(/doc-2.*Project Q \(q\).*Consolidation.*Reason from the lead: Assertion differs.*Open/);
@@ -192,6 +202,10 @@ describe("My tasks component", () => {
     const rows = await screen.findAllByTestId("task-row");
     // The row keeps only the badge; the sentence opens from its info button.
     expect(rows[0].textContent).not.toContain("reopened this task");
+    // Review 2, F7 c: the reason is written out under the task name, as the reason for a second review is; a
+    // reopening without a reason adds no line.
+    expect(rows[0].querySelector(".task-lead-reason")!.textContent).toMatch(/^Reopened by the lead on .+: Check the onset\.$/);
+    expect(rows[1].querySelector(".task-lead-reason")).toBeNull();
     expect(within(rows[2]).queryByRole("button", { name: "Reopened, why" })).toBeNull();
     fireEvent.click(within(rows[0]).getByRole("button", { name: "Reopened, why" }));
     expect((await screen.findByRole("dialog", { name: "Why reopened" })).textContent).toMatch(/The project lead reopened this task on .+\. Reason: Check the onset\./);
@@ -220,6 +234,18 @@ describe("My tasks component", () => {
     // The request set the status "Reopened"; the badge never says "No reason given." beside the reason.
     fireEvent.click(within(rows[0]).getByRole("button", { name: "Reopened, why" }));
     expect((await screen.findByRole("dialog", { name: "Why reopened" })).textContent).toMatch(/^Second review requested by the lead on .+: Check the dose in paragraph 2\.$/);
+  });
+
+  it("issue 483: what the lead added to the reason stands below it, with its date", async () => {
+    vi.mocked(api.listMyTasks).mockResolvedValue([
+      { ...task(5, "open"), task: "translation_review", second_review_at: "2026-11-17T09:30:00Z", second_review_reason: "Units.",
+        second_review_additions: [{ note: "Paragraph 3 as well.", added_at: "2026-11-17T11:00:00Z" }] }]);
+    render(<MyTasks projects={[]} onNavigate={vi.fn()} />);
+    const [row] = await screen.findAllByTestId("task-row");
+    const lines = within(row).getAllByText(/^(Second review requested|Added by the lead)/).map(line => line.textContent);
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatch(/^Second review requested by the lead on .+: Units\.$/);
+    expect(lines[1]).toMatch(/^Added by the lead on .+: Paragraph 3 as well\.$/);
   });
 
   it("marks a task whose text a lead paused, and names both causes when a report pauses it too (issue 464)", async () => {
@@ -631,13 +657,14 @@ describe("My tasks guideline links", () => {
   it("links Project guidelines v3 once per project with a version in force", async () => {
     vi.spyOn(api, "listMyTasks").mockResolvedValue([...tasks, task(5, "open", "r", "Project R")]);
     vi.mocked(api.listGuidelines).mockImplementation(async key => key === "p" ? guidelineListing([guidelineSummary(3), guidelineSummary(2)])
-      : key === "q" ? guidelineListing([guidelineSummary(1)]) : guidelineListing([withdrawnGuideline(2), guidelineSummary(1)]));
+      : key === "q" ? guidelineListing([guidelineSummary(1, { label: "3.1" })]) : guidelineListing([withdrawnGuideline(2), guidelineSummary(1)]));
     const onNavigate = vi.fn();
     const { rerender } = render(<MyTasks projects={[]} onNavigate={onNavigate} />);
     await screen.findAllByTestId("task-row");
     const links = await screen.findAllByRole("link", { name: /^Project guidelines/ });
     // Ordered as the project filter options; R has no version in force (its current one is withdrawn).
-    expect(links.map(link => link.textContent)).toEqual(["Project guidelines v3, Project P", "Project guidelines v1, Project Q"]);
+    // Q's version has the project's own label, shown before the upload number (#487).
+    expect(links.map(link => link.textContent)).toEqual(["Project guidelines v3, Project P", "Project guidelines 3.1 (v1), Project Q"]);
     expect(links.map(link => link.getAttribute("href"))).toEqual(["#/projects/p/guidelines", "#/projects/q/guidelines"]);
     expect(vi.mocked(api.listGuidelines).mock.calls.map(([key]) => key).sort()).toEqual(["p", "q", "r"]);
     fireEvent.click(links[0]);

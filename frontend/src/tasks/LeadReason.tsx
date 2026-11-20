@@ -7,6 +7,8 @@ export interface LeadReasonFacts {
   reopen_reason?: string | null;
   second_review_at?: string | null;
   second_review_reason?: string | null;
+  /** What the lead added to the reason since (issue 483), oldest first. */
+  second_review_additions?: readonly { note: string; added_at: string }[] | null;
 }
 
 const on = (at: string | null | undefined) => at ? ` on ${formatDateTime(at)}` : "";
@@ -15,6 +17,12 @@ const on = (at: string | null | undefined) => at ? ` on ${formatDateTime(at)}` :
 export function secondReviewText(task: LeadReasonFacts): string | null {
   if (!task.second_review_at && !task.second_review_reason) return null;
   return `Second review requested by the lead${on(task.second_review_at)}${task.second_review_reason ? `: ${task.second_review_reason}` : "."}`;
+}
+
+/** "Added by the lead on 18 Nov 2026, 09:05: Paragraph 3 as well.", one line per addition, below the request; none without a request. */
+export function reasonAdditionLines(task: LeadReasonFacts): string[] {
+  if (!secondReviewText(task)) return [];
+  return (task.second_review_additions ?? []).map(addition => `Added by the lead${on(addition.added_at)}: ${addition.note}`);
 }
 
 /**
@@ -29,7 +37,7 @@ export function reopenedText(task: LeadReasonFacts): string | null {
 
 /** The lead's reasons for a task, in the order they were given. */
 export function leadReasonLines(task: LeadReasonFacts): string[] {
-  return [secondReviewText(task), reopenedText(task)].filter((line): line is string => line !== null);
+  return [secondReviewText(task), ...reasonAdditionLines(task), reopenedText(task)].filter((line): line is string => line !== null);
 }
 
 /**
@@ -40,4 +48,31 @@ export function LeadReason({ task, className = "lead-reason" }: { task: LeadReas
   const lines = leadReasonLines(task);
   if (lines.length === 0) return null;
   return <div className={className} role="note" aria-label="From the lead">{lines.map(line => <p key={line}>{line}</p>)}</div>;
+}
+
+/** The lead's decision on a submitted query (issue 483), as the translation review's workspace carries it. */
+export interface QueryAnswerFacts {
+  kind: "reviewer_text" | "unchanged";
+  accepted_version: number;
+  decided_at: string;
+  answer?: string | null;
+  edited?: boolean;
+}
+
+/** "Your text was accepted as v2." / "…, with changes by the lead." / "v1 was accepted as it is." */
+export function queryOutcomeText(answer: QueryAnswerFacts): string {
+  if (answer.kind === "unchanged") return `v${answer.accepted_version} was accepted as it is.`;
+  return `Your text was accepted as v${answer.accepted_version}${answer.edited ? ", with changes by the lead" : ""}.`;
+}
+
+/**
+ * The lead's decision on the reviewer's query with the answer, at the submitted review (My tasks, View result).
+ * Renders nothing while the lead has not decided the query.
+ */
+export function QueryAnswer({ answer }: { answer: QueryAnswerFacts | null | undefined }): JSX.Element | null {
+  if (!answer) return null;
+  return <div className="lead-reason" role="note" aria-label="Answer from the lead">
+    <p>{`The lead decided your query${on(answer.decided_at)}. ${queryOutcomeText(answer)}`}</p>
+    {answer.answer?.trim() ? <p>{`Answer from the lead: ${answer.answer.trim()}`}</p> : <p>The lead wrote no answer.</p>}
+  </div>;
 }

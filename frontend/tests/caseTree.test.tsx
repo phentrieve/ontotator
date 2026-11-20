@@ -102,7 +102,7 @@ const reviewView = (annotations: any[], decisions: any[] = []): WorkspaceView =>
 /**
  * A tree for any start term: Root > (the start term, "Beta term" HP:B). Every walk gets its own id.
  */
-const mockTree = () => {
+const mockTree = (extra: { synonyms?: string[]; definition?: string } = {}) => {
   let walks = 0;
   const labelOf = (termId: string) => (termId === "HP:B" ? "Beta term" : `Term ${termId}`);
   const root = { term_id: "HP:R", label: "Root", child_count: 2, role: "finding" as const };
@@ -115,6 +115,7 @@ const mockTree = () => {
     synonyms: [],
     translations: {},
     parents: [root],
+    ...extra,
   });
   const open = vi.spyOn(api, "openTree").mockImplementation(async (req) => {
     walks += 1;
@@ -150,6 +151,15 @@ const mockServer = (view: WorkspaceView) => {
   let current = view.draft;
   const apply = vi.spyOn(api, "applyCommand").mockImplementation(async (_workspaceId, envelope) => {
     const command: any = envelope.payload;
+    if (command.command === "create_annotation") {
+      const source = command.source_annotation_id ? [`${command.source_annotation_id}:${command.source_version}`] : undefined;
+      const created = snapshot(command.annotation_id, command.term_id, source);
+      current = {
+        ...current, revision: current.revision + 1,
+        annotations: [...(current.annotations ?? []), created], evidence: [...(current.evidence ?? []), ...created.evidence],
+      };
+      return current;
+    }
     current = {
       ...current,
       revision: current.revision + 1,
@@ -214,7 +224,51 @@ describe("the tree in the case screen", () => {
     expect(link.parentElement).toBe(detail.querySelector(".tree-detail__id")?.parentElement);
   });
 
-  it("is offered at an own annotation with a term and nowhere else", () => {
+  it("hides the details under the tree down to name and id, and remembers that for the user", async () => {
+    window.localStorage.clear();
+    mockTree({ synonyms: ["Alpha synonym"], definition: "A made-up definition." });
+    const versionContext = { canBrowseVersions: false, username: "ada", assignmentId: 1, onNavigate: vi.fn() };
+    const first = render(<CaseScreen view={baseView([snapshot("a1", "HP:A")])} workspaceId="ws" onClose={vi.fn()} versionContext={versionContext} />);
+    const panel = await openPanel(first.container, "a1");
+    const detail = panel.querySelector<HTMLElement>(".tree-detail")!;
+    expect(await within(detail).findByText("Alpha synonym")).toBeTruthy();
+
+    const hide = within(detail).getByRole("button", { name: "Hide details" });
+    expect(hide.getAttribute("aria-expanded")).toBe("true");
+    // The switch names what it shows and hides, open or closed.
+    expect(detail.querySelector(`#${hide.getAttribute("aria-controls")}`)).not.toBeNull();
+    // It stands by the name; the action row is "Use this term" and its hint, as before.
+    expect(hide.parentElement).toBe(detail.querySelector(".tree-detail__name")?.parentElement);
+    expect(detail.querySelectorAll(".tree-detail__actions button")).toHaveLength(1);
+    fireEvent.click(hide);
+    expect(within(detail).queryByText("Alpha synonym")).toBeNull();
+    expect(within(detail).queryByText("A made-up definition.")).toBeNull();
+    expect(detail.querySelector(".tree-detail__id")?.textContent).toBe("HP:A");
+    expect(detail.classList.contains("tree-detail--compact")).toBe(true);
+    const show = within(detail).getByRole("button", { name: "Show details" });
+    expect(show.getAttribute("aria-expanded")).toBe("false");
+    expect(detail.querySelector(`#${show.getAttribute("aria-controls")}`)).not.toBeNull();
+    expect(within(detail).getByRole("button", { name: "Use this term" })).toBeTruthy();
+    expect(window.localStorage.getItem("ontotator.editor.treeDetails.v1:ada")).toBe("closed");
+    first.unmount();
+
+    // Another person at this browser starts with the details shown; "ada" finds them hidden again.
+    const other = render(<CaseScreen view={baseView([snapshot("a1", "HP:A")])} workspaceId="ws" onClose={vi.fn()}
+      versionContext={{ ...versionContext, username: "ben" }} />);
+    expect(within(await openPanel(other.container, "a1")).getByRole("button", { name: "Hide details" })).toBeTruthy();
+    other.unmount();
+    const again = render(<CaseScreen view={baseView([snapshot("a1", "HP:A")])} workspaceId="ws" onClose={vi.fn()} versionContext={versionContext} />);
+    const reopened = (await openPanel(again.container, "a1")).querySelector<HTMLElement>(".tree-detail")!;
+    expect(reopened.classList.contains("tree-detail--compact")).toBe(true);
+    expect(within(reopened).queryByText("Alpha synonym")).toBeNull();
+
+    fireEvent.click(within(reopened).getByRole("button", { name: "Show details" }));
+    expect(await within(reopened).findByText("Alpha synonym")).toBeTruthy();
+    expect(window.localStorage.getItem("ontotator.editor.treeDetails.v1:ada")).toBe("open");
+    window.localStorage.clear();
+  });
+
+  it("is offered wherever a term is shown: an own finding, a proposal, a reference (issue 523)", () => {
     const { container } = render(
       <CaseScreen view={reviewView([snapshot("a1", "HP:A")])} workspaceId="ws" onClose={vi.fn()} />,
     );
@@ -223,16 +277,16 @@ describe("the tree in the case screen", () => {
 
     fireEvent.click(container.querySelector<HTMLElement>('[data-list-key^="target:"]')!);
     expect(screen.getByText(/Review decision for this proposal/i)).toBeDefined();
-    expect(showInTree()).toBeNull();
+    expect(showInTree()).not.toBeNull();
 
     fireEvent.click(container.querySelector<HTMLElement>('[data-list-key^="source:"]')!);
     expect(screen.getByLabelText("Reference details")).toBeDefined();
-    expect(showInTree()).toBeNull();
+    expect(showInTree()).not.toBeNull();
 
     fireEvent.click(entry(container, "a1"));
     expect(showInTree()).not.toBeNull();
 
-    // While the term of a new annotation is still being chosen there is nothing to show.
+    // A new annotation has no term yet: the tree is offered at a hit of its search (see below).
     fireEvent.click(screen.getByRole("button", { name: /Add finding without a text span/ }));
     expect(showInTree()).toBeNull();
   });
@@ -265,7 +319,9 @@ describe("the tree in the case screen", () => {
     expect(layout.classList.contains("tree-open")).toBe(true);
     expect(panel.parentElement!.className).toBe("tree-host");
     expect(panel.parentElement!.parentElement).toBe(layout);
-    expect(layout.lastElementChild).toBe(panel.parentElement);
+    // Only the divider that sets the tree's height follows it.
+    expect(panel.parentElement!.nextElementSibling?.getAttribute("aria-label")).toBe("Resize ontology tree");
+    expect(layout.lastElementChild).toBe(panel.parentElement!.nextElementSibling);
     expect(panel.parentElement!.previousElementSibling).toBe(container.querySelector(".inspector-pane"));
     // One control in the header: close. There is nothing to keep open or to store.
     const header = panel.querySelector<HTMLElement>(".tree-browser__header")!;
@@ -341,7 +397,7 @@ describe("the tree in the case screen", () => {
     expect(apply).toHaveBeenCalledTimes(1);
     expect(panelNow()).toBe(panel);
     expect(rowOf(panel, "Term HP:A").hasAttribute("aria-current")).toBe(false);
-    await waitFor(() => expect(within(panel).getByText("This is the annotation's current term.")).toBeDefined());
+    await waitFor(() => expect(within(panel).getByText("This is the finding's current term.")).toBeDefined());
     expect(useButton(panel).disabled).toBe(true);
     // Still the same walk.
     expect(open).toHaveBeenCalledTimes(1);
@@ -507,7 +563,7 @@ describe("the tree in the case screen", () => {
     expect(decide).not.toHaveBeenCalled();
   });
 
-  it("jumps to another own annotation with a term, and closes for anything else", async () => {
+  it("follows every selection with a term, and closes when nothing is selected", async () => {
     const view = reviewView([snapshot("a1", "HP:A"), snapshot("a2", "HP:C")]);
     const { open } = mockTree();
     const { container } = render(<CaseScreen view={view} workspaceId="ws" onClose={vi.fn()} />);
@@ -533,28 +589,31 @@ describe("the tree in the case screen", () => {
     expect(useButton(panelNow()).disabled).toBe(false);
     expect(open).toHaveBeenCalledTimes(2);
 
-    // A proposal: nothing to assign a term to, so the tree closes, and does not come back by itself.
+    // A proposal: the tree stays and moves to the proposed term, only to look until a term is confirmed.
     fireEvent.click(container.querySelector<HTMLElement>('[data-list-key^="target:"]')!);
-    expect(screen.getByText(/Review decision for this proposal/i)).toBeDefined();
+    await waitFor(() => expect(open).toHaveBeenCalledTimes(3));
+    expect(open.mock.calls[2][0]).toMatchObject({ layer_id: "phenotype", term_id: "HP:P" });
+    // The id its copy would get, never the proposal's own.
+    expect(open.mock.calls[2][0].annotation_id).toMatch(/^ann-/);
+    await within(panelNow()).findByText("Term HP:P", { selector: ".tree-label" });
+    expect(within(panelNow()).getByRole("status").textContent).toBe("Only looking: nothing changes until you choose a term and confirm.");
+    expect(within(panelNow()).getByRole("button", { name: "Use this term instead…" })).toBeDefined();
+
+    // A reference: looking only, and the walk is logged under an id of its own.
+    fireEvent.click(container.querySelector<HTMLElement>('[data-list-key^="source:"]')!);
+    await waitFor(() => expect(open).toHaveBeenCalledTimes(4));
+    expect(open.mock.calls[3][0]).toMatchObject({ layer_id: "phenotype", term_id: "HP:F" });
+    expect(open.mock.calls[3][0].annotation_id).toMatch(/^look-/);
+    await within(panelNow()).findByText("Term HP:F", { selector: ".tree-label" });
+    expect(within(panelNow()).getByRole("status").textContent).toBe("Only looking: nothing can be changed from here.");
+    expect(within(panelNow()).queryByRole("button", { name: /Use this term/ })).toBeNull();
+
+    // Selecting nothing at all closes it, and it does not come back by itself.
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(container.querySelector(".doc-item.selected")).toBeNull();
     noTree();
     fireEvent.click(entry(container, "a2"));
     await new Promise((resolve) => setTimeout(resolve, 0));
-    noTree();
-    expect(open).toHaveBeenCalledTimes(2);
-
-    // A reference closes it the same way.
-    fireEvent.click(screen.getByRole("button", { name: "Show in tree" }));
-    await screen.findByRole("region", { name: "Ontology tree" });
-    fireEvent.click(container.querySelector<HTMLElement>('[data-list-key^="source:"]')!);
-    noTree();
-
-    // And so does selecting nothing at all.
-    fireEvent.click(entry(container, "a1"));
-    fireEvent.click(screen.getByRole("button", { name: "Show in tree" }));
-    await screen.findByRole("region", { name: "Ontology tree" });
-    expect(open).toHaveBeenCalledTimes(4);
-    fireEvent.keyDown(document.body, { key: "Escape" });
-    expect(container.querySelector(".doc-item.selected")).toBeNull();
     noTree();
     expect(open).toHaveBeenCalledTimes(4);
   });
@@ -583,6 +642,134 @@ describe("the tree in the case screen", () => {
     expect(layout.classList.contains("tree-open")).toBe(true);
     expect(rowOf(panel, "Beta term").getAttribute("aria-selected")).toBe("true");
     expect(open).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("the tree only to look, and taking a term after a confirmation (issue 523)", () => {
+  const takeButton = (scopeEl: HTMLElement) =>
+    within(scopeEl).getByRole("button", { name: "Use this term instead…" }) as HTMLButtonElement;
+  const showFor = async (container: HTMLElement, selector: string) => {
+    fireEvent.click(container.querySelector<HTMLElement>(selector)!);
+    fireEvent.click(screen.getByRole("button", { name: "Show in tree" }));
+    const panel = await screen.findByRole("region", { name: "Ontology tree" });
+    await within(panel).findByText("Beta term", { selector: ".tree-label" });
+    return panel;
+  };
+
+  it("an undecided proposal: looking changes nothing; Confirm runs Edit & Replace with the term, decided as Changed", async () => {
+    const view = reviewView([]);
+    const { open } = mockTree();
+    const { apply, decide } = mockServer(view);
+    const { container } = render(<CaseScreen view={view} workspaceId="ws" onClose={vi.fn()} />);
+    const panel = await showFor(container, '[data-list-key^="target:"]');
+    const walkId = open.mock.calls[0][0].annotation_id;
+    expect(open.mock.calls[0][0]).toMatchObject({ term_id: "HP:P", layer_id: "phenotype" });
+    // The proposed term itself is nothing to take.
+    expect(takeButton(panel).disabled).toBe(true);
+    expect(within(panel).getByText("This is the proposed term.")).toBeDefined();
+
+    fireEvent.click(rowOf(panel, "Beta term"));
+    expect(apply).not.toHaveBeenCalled();
+    await waitFor(() => expect(takeButton(panel).disabled).toBe(false));
+    fireEvent.click(takeButton(panel));
+    expect(apply).not.toHaveBeenCalled();
+    const confirm = within(panel).getByRole("group", { name: "Proposal: decide as Changed with Beta term (HP:B)" });
+    fireEvent.click(within(confirm).getByRole("button", { name: "Confirm" }));
+
+    await waitFor(() => expect(decide).toHaveBeenCalledTimes(1));
+    // The same commands as Edit & Replace and a new term: the copy (with the walk's id), then its term.
+    expect(apply.mock.calls.map(([, envelope]) => (envelope.payload as any).command)).toEqual(["create_annotation", "set_term"]);
+    expect(apply.mock.calls[0][1].payload).toMatchObject({
+      command: "create_annotation", annotation_id: walkId, term_id: "HP:P", source_annotation_id: "prop", source_version: "prop-v1",
+    });
+    expect(apply.mock.calls[1][1].payload).toEqual({
+      command: "set_term", annotation_id: walkId, term_id: "HP:B", search_event_id: "walk-1",
+    });
+    expect(decide.mock.calls[0][1].payload).toMatchObject({
+      target: { annotation_id: "prop", version: "prop-v1" },
+      outcome: "changed",
+      replacement: { annotation_id: walkId, version: `${walkId}-v2` },
+    });
+    // The copy is selected; the tree stays with it, the same walk, and now assigns directly.
+    expect(entry(container, walkId).classList.contains("selected")).toBe(true);
+    expect(panelNow()).toBe(panel);
+    expect(open).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(rowOf(panel, "Beta term").getAttribute("aria-current")).toBe("true"));
+    expect(within(panel).queryByRole("status")).toBeNull();
+    expect(useButton(panel).disabled).toBe(true);
+  });
+
+  it.each([
+    ["a decided proposal", () => reviewView([], [{ decision_id: "d1", target: { annotation_id: "prop", version: "prop-v1" }, outcome: "confirmed", reviewer_id: "dr-a" }]), '[data-list-key^="target:"]', {}],
+    ["a reference", () => reviewView([]), '[data-list-key^="source:"]', {}],
+    ["other people's findings in a consolidation", () => reviewView([]), '[data-list-key^="target:"]', { roundKind: "consolidation" as const }],
+    ["a submitted own finding", () => baseView([snapshot("a1", "HP:A")]), '[data-list-key="annotation:a1"]', { readOnly: true }],
+  ])("%s: only to look, with no button", async (_name, viewOf, selector, extra) => {
+    mockTree();
+    const { apply, decide } = mockServer(viewOf());
+    const { container } = render(<CaseScreen view={viewOf()} workspaceId="ws" onClose={vi.fn()} {...extra} />);
+    const panel = await showFor(container, selector);
+
+    expect(within(panel).getByRole("status").textContent).toBe("Only looking: nothing can be changed from here.");
+    fireEvent.click(rowOf(panel, "Beta term"));
+    await within(panel).findByText("Beta term", { selector: ".tree-detail__name" });
+    expect(within(panel).queryByRole("button", { name: /Use this term/ })).toBeNull();
+    expect(apply).not.toHaveBeenCalled();
+    expect(decide).not.toHaveBeenCalled();
+  });
+
+  it("a hit of the search for a new finding: the tree opens there; Confirm chooses the term as the hit would", async () => {
+    const view = baseView([]);
+    const { open } = mockTree();
+    const { apply } = mockServer(view);
+    vi.spyOn(api, "searchOntology").mockResolvedValue({ search_id: "s1", candidates: [{ term_id: "HP:H", label: "Hit term", rank: 1 }] } as any);
+    render(<CaseScreen view={view} workspaceId="ws" onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Add finding without a text span" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Search term" }), { target: { value: "hit" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Show in tree: Hit term" }));
+
+    const panel = await screen.findByRole("region", { name: "Ontology tree" });
+    await within(panel).findByText("Beta term", { selector: ".tree-label" });
+    // Out in the open next to the search, not stepped aside.
+    expect(panel.parentElement!.hidden).toBe(false);
+    const pendingId = open.mock.calls[0][0].annotation_id;
+    expect(pendingId).toMatch(/^ann-/);
+    expect(open.mock.calls[0][0]).toMatchObject({ term_id: "HP:H", layer_id: "phenotype" });
+    expect(within(panel).getByRole("status").textContent).toBe("Only looking: nothing changes until you choose a term and confirm.");
+
+    fireEvent.click(rowOf(panel, "Beta term"));
+    await waitFor(() => expect(takeButton(panel).disabled).toBe(false));
+    fireEvent.click(takeButton(panel));
+    expect(apply).not.toHaveBeenCalled();
+    const confirm = within(panel).getByRole("group", { name: "New finding: choose Beta term (HP:B)" });
+    fireEvent.click(within(confirm).getByRole("button", { name: "Confirm" }));
+
+    await waitFor(() => expect(apply).toHaveBeenCalledTimes(1));
+    expect(apply.mock.calls[0][1].payload).toMatchObject({
+      command: "create_annotation", annotation_id: pendingId, term_id: "HP:B", search_event_id: "walk-1",
+    });
+    // The new finding is selected and the walk stays with it.
+    await waitFor(() => expect(screen.queryByRole("combobox", { name: "Search term" })).toBeNull());
+    expect(panelNow()).toBe(panel);
+    expect(open).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("the stepped-aside tree after a new finding", () => {
+  it("goes to the new finding's term once its term is chosen from the search", async () => {
+    const view = baseView([snapshot("a1", "HP:A")]);
+    const { open } = mockTree();
+    mockServer(view);
+    vi.spyOn(api, "searchOntology").mockResolvedValue({ search_id: "s1", candidates: [{ term_id: "HP:H", label: "Hit term", rank: 1 }] } as any);
+    const { container } = render(<CaseScreen view={view} workspaceId="ws" onClose={vi.fn()} />);
+    await openPanel(container, "a1");
+    fireEvent.click(screen.getByRole("button", { name: "Add finding without a text span" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Search term" }), { target: { value: "hit" } });
+    fireEvent.click(await screen.findByText("Hit term", { selector: ".candidate-label" }));
+
+    await waitFor(() => expect(open).toHaveBeenCalledTimes(2));
+    expect(open.mock.calls[1][0]).toMatchObject({ term_id: "HP:H" });
+    expect(open.mock.calls[1][0].annotation_id).toBe((api.applyCommand as any).mock.calls[0][1].payload.annotation_id);
   });
 });
 

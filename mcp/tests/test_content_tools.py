@@ -116,7 +116,7 @@ async def test_the_content_tools_exist_with_the_variable(
 ) -> None:
     listed = {tool.name: tool for tool in (await content_client.list_tools()).tools}
     default = {tool.name for tool in (await mcp_client.list_tools()).tools}
-    # Exactly the four tools more; nothing else changes.
+    # Exactly the content tools more; nothing else changes.
     assert set(listed) - default == set(CONTENT_TOOLS)
     assert default <= set(listed)
     for name in CONTENT_TOOLS:
@@ -230,7 +230,8 @@ async def test_list_annotation_versions_returns_the_offered_states(
     found = await call(
         content_client, "list_annotation_versions", {"project": "p", "document_id": DOC}
     )
-    assert [(ref["kind"], ref["id"]) for ref in found] == [
+    assert found["count"] == 2
+    assert [(ref["kind"], ref["id"]) for ref in found["items"]] == [
         ("submission", "s1"),
         ("proposals", "7"),
     ]
@@ -381,6 +382,168 @@ async def test_a_passage_outside_the_text_keeps_its_offsets(
         },
     )
     assert found["evidence"][0]["mention"]["segments"] == [_span("seizures")]
+
+
+# get_consolidation_inputs
+
+TASK = "/api/v1/assignments/{assignment_id}"
+ROUNDS = "/api/v1/assignments/{assignment_id}/rounds"
+INPUTS = "/api/v1/rounds/{round_id}/inputs"
+# Opaque IDs, as the server gives them to a blinded consolidator.
+BLIND_SOURCE = "sub-z" + "1" * 16
+
+
+def _consolidation(fake: FakeApi, *, task: str = "review") -> None:
+    fake.on(
+        "GET",
+        TASK,
+        build(
+            "AssignmentView",
+            id=7,
+            project_key="p",
+            document_id=DOC,
+            task=task,
+            status="in_progress",
+            username="adj",
+            pseudonym="P-adj",
+        ),
+    )
+    fake.on(
+        "GET",
+        ROUNDS,
+        [
+            build(
+                "WorkRoundView",
+                round_id="z" + "2" * 64,
+                kind="consolidation",
+                state="editable",
+                active=True,
+                annotator_id="P-adj",
+                input_submission_ids=[BLIND_SOURCE],
+            )
+        ],
+    )
+    snapshot = _snapshot("a1", "Fever")
+    snapshot["annotation"]["provenance"]["actor"]["actor_id"] = "annotator-a"
+    fake.on(
+        "GET",
+        INPUTS,
+        [
+            build(
+                "RoundInputView",
+                input_id="input-z" + "3" * 64 + "-e0",
+                source_submission_id=BLIND_SOURCE,
+                source_ref=build("AnnotationRef", annotation_id="a1"),
+                source_snapshot=snapshot,
+                target_snapshot=None,
+            )
+        ],
+    )
+
+
+async def test_consolidation_inputs_are_the_rounds_and_inputs_the_web_reads(
+    fake: FakeApi, content_client: Client
+) -> None:
+    _consolidation(fake)
+    found = await call(content_client, "get_consolidation_inputs", {"assignment_id": 7})
+    assert found["assignment_id"] == 7
+    assert (found["project_key"], found["document_id"]) == ("p", DOC)
+    [round_] = found["rounds"]
+    assert round_["kind"] == "consolidation"
+    assert round_["input_submission_ids"] == [BLIND_SOURCE]
+    [item] = round_["inputs"]
+    # The route's answer, unchanged: the opaque ids and the blinded author.
+    assert item["source_submission_id"] == BLIND_SOURCE
+    actor = item["source_snapshot"]["annotation"]["provenance"]["actor"]
+    assert actor["actor_id"] == "annotator-a"
+    assert item["source_snapshot"]["evidence"][0]["mention"]["segments"] == [
+        _span("Fever")
+    ]
+    # Nothing of the task view the inputs do not need: not even the
+    # consolidator's own names.
+    for name in ("username", "pseudonym", "display_name", "user_id", "annotator_id"):
+        assert name not in found and name not in round_, name
+    assert TEXT not in str(found)
+    assert fake.templates() == [("GET", TASK), ("GET", ROUNDS), ("GET", INPUTS)]
+    # The path names the round as the server gave it.
+    assert fake.calls[2].request.url.path == f"/api/v1/rounds/{'z' + '2' * 64}/inputs"
+
+
+async def test_consolidation_inputs_add_span_texts_on_request(
+    fake: FakeApi, content_client: Client
+) -> None:
+    _consolidation(fake)
+    _texts(fake)
+    found = await call(
+        content_client,
+        "get_consolidation_inputs",
+        {"assignment_id": 7, "include_text": True},
+    )
+    [item] = found["rounds"][0]["inputs"]
+    assert item["source_snapshot"]["evidence"][0]["mention"]["segments"] == [
+        _span("Fever") | {"text": "Fever"}
+    ]
+    assert fake.templates()[-1] == ("GET", f"{P}/documents/{{doc}}/text")
+
+
+async def test_consolidation_inputs_refuse_a_task_that_is_not_a_consolidation(
+    fake: FakeApi, content_client: Client
+) -> None:
+    _consolidation(fake, task="annotate")
+    with pytest.raises(ToolFailed, match="not a consolidation"):
+        await call(content_client, "get_consolidation_inputs", {"assignment_id": 7})
+    # Nothing but the task itself was read.
+    assert fake.templates() == [("GET", TASK)]
+
+
+async def test_consolidation_inputs_of_someone_elses_task_are_refused(
+    fake: FakeApi, content_client: Client
+) -> None:
+    fake.on("GET", TASK, refusal(404, "ASSIGNMENT_NOT_FOUND", "No such task."))
+    with pytest.raises(ToolFailed) as raised:
+        await call(content_client, "get_consolidation_inputs", {"assignment_id": 7})
+    assert "HTTP 404 ASSIGNMENT_NOT_FOUND" in str(raised.value)
+    assert fake.templates() == [("GET", TASK)]
+
+
+async def test_list_my_tasks_names_each_task_by_its_assignment_id(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    fake.on(
+        "GET",
+        "/api/v1/me/tasks",
+        [
+            build(
+                "TaskSummary",
+                assignment_id=7,
+                project_key="p",
+                document_id=DOC,
+                task="review",
+                status="open",
+            )
+        ],
+    )
+    found = await call(mcp_client, "list_my_tasks", {})
+    assert found["count"] == 1
+    [task] = found["items"]
+    assert (task["assignment_id"], task["task"], task["status"]) == (
+        7,
+        "review",
+        "open",
+    )
+    assert set(task) == {
+        "assignment_id",
+        "project_key",
+        "document_id",
+        "case_id",
+        "language",
+        "version",
+        "task",
+        "status",
+        "active_round_id",
+        "held",
+        "updated_at",
+    }
 
 
 # Errors

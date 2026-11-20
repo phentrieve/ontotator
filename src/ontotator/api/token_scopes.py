@@ -139,6 +139,8 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     ("GET", f"{P}/documents/{{doc:path}}/submissions/{{submission_id:path}}"): "read",
     ("GET", f"{P}/documents/{{doc:path}}/translation-reviews"): "read",
     ("GET", f"{P}/translation-reviews"): "read",
+    # Issue 483: the lead's list of translation reviews (leads only).
+    ("GET", f"{P}/translation-review-list"): "read",
     ("POST", f"{P}/documents/{{doc:path}}/translation-correction-assignment"): (
         "project-admin"
     ),
@@ -155,6 +157,11 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
         "POST",
         f"{P}/documents/{{doc:path}}/editorial-correction/preview",
     ): "project-admin",
+    # Issue 483: the lead decides a queried review; a lead's project work,
+    # as the editorial correction above.
+    ("POST", f"{P}/documents/{{doc:path}}/query-decision"): "project-admin",
+    # Its preview: only a token that may decide needs it.
+    ("GET", f"{P}/documents/{{doc:path}}/query-decision"): "project-admin",
     ("POST", f"{P}/variants/{{document_id:path}}/discard"): "project-admin",
     # Issue 341 d: accept exactly one version, as the discard above.
     ("POST", f"{P}/variants/{{document_id:path}}/accept"): "project-admin",
@@ -227,6 +234,11 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     # Text changes after annotation (issue 345): the lead moves open work to
     # the new text version, or lets it finish or withdraws it.
     ("POST", "/api/v1/assignments/{assignment_id}/move-to-version"): "project-admin",
+    # Issue 483: the lead adds to the reason of a correction request, a lead's
+    # project work as the request itself.
+    ("POST", "/api/v1/assignments/{assignment_id}/correction-reason"): (
+        "project-admin"
+    ),
     ("POST", "/api/v1/assignments/{assignment_id}/text-change-resolution"): (
         "project-admin"
     ),
@@ -286,6 +298,12 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     # draft and its decision are made by the person it is assigned to, never
     # by a machine acting as them (issue 345), so these stay with the session.
     ("PUT", "/api/v1/translation-reviews/{assignment_id}/draft"): SESSION,
+    # Reads what the workspace route already returns (the draft text), as
+    # rule codes and positions.
+    (
+        "GET",
+        "/api/v1/translation-reviews/{assignment_id}/draft/typography-hints",
+    ): "read",
     ("PUT", "/api/v1/translation-reviews/{assignment_id}/checked-sentences"): SESSION,
     ("POST", "/api/v1/translation-reviews/{assignment_id}/submit"): SESSION,
     ("GET", "/api/v1/translation-reviews/{assignment_id}/source-obligations"): "read",
@@ -352,6 +370,9 @@ PROJECT_RESOLVED: frozenset[tuple[str, str]] = frozenset(
         # project with AssignmentService._locate.
         ("POST", "/api/v1/assignments/{assignment_id}/move-to-version"),
         ("POST", "/api/v1/assignments/{assignment_id}/text-change-resolution"),
+        # Issue 483: TranslationWorkflowService.add_correction_reason finds
+        # the assignment's project with AssignmentService._locate.
+        ("POST", "/api/v1/assignments/{assignment_id}/correction-reason"),
         # Issue 351: the task itself, its submissions and rounds. The task's
         # project is found by AssignmentService (readable, _locate) or the
         # owner check of the route (_owned_assignment).
@@ -370,6 +391,10 @@ PROJECT_RESOLVED: frozenset[tuple[str, str]] = frozenset(
         ("GET", "/api/v1/rounds/{round_id}/consolidation"),
         # Translation reviews: TranslationReviewService._authority.
         ("GET", "/api/v1/translation-reviews/{assignment_id}"),
+        (
+            "GET",
+            "/api/v1/translation-reviews/{assignment_id}/draft/typography-hints",
+        ),
         ("GET", "/api/v1/translation-reviews/{assignment_id}/source-obligations"),
     }
 )

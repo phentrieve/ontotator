@@ -105,6 +105,19 @@ export function editorialCorrectionLabel(record: NonNullable<DocumentVersionView
   return [[who, record.corrected_at ? formatTime(record.corrected_at, { now }) : null].filter(Boolean).join(", "), record.reason.trim()].filter(Boolean).join(" · ");
 }
 
+/**
+ * Issue 483: the lead's decision on a query that accepted this version, e.g.
+ * "Accepted: decision on the query of Ana Weber (ann-0003), the reviewer’s text taken, Project lead (ann-0002), 18 Nov, 10:12 · Answer: Yes, as proposed."
+ * ("the version kept as it is"; "the reviewer’s text taken with changes" when the lead changed it).
+ */
+export function queryDecisionLabel(record: NonNullable<DocumentVersionView["query_decision"]>, row: Pick<DocumentRowView, "work" | "moved_work">, now?: Date): string {
+  const reviewer = [...row.work, ...(row.moved_work ?? [])].find(item => item.assignment_id === record.reviewer_assignment_id)?.person;
+  const what = record.kind === "unchanged" ? "the version kept as it is" : record.edited ? "the reviewer’s text taken with changes" : "the reviewer’s text taken";
+  const head = [`Accepted: decision on the query${reviewer ? ` of ${identityLabel(reviewer)}` : ""}`, what, record.decided_by ? identityLabel(record.decided_by) : null,
+    record.decided_at ? formatTime(record.decided_at, { now }) : null].filter(Boolean).join(", ");
+  return [head, record.answer?.trim() ? `Answer: ${record.answer.trim()}` : null].filter(Boolean).join(" · ");
+}
+
 /** Acceptance record of a translation version (spec "Annotate without review: acceptance record"). */
 export interface VersionAcceptance {
   source: "package" | "lead" | "override";
@@ -232,11 +245,14 @@ export const TextVersions = forwardRef<HTMLUListElement, TextVersionsProps>(func
       const fullName = `${name} of ${rowName(row)}`;
       const discarded = isDiscarded(row, version);
       const acceptance = acceptanceOf(version);
+      // A lead fixed typos in this version: a review of it is not reopened, the fix is reviewed.
+      const typosFixed = row.versions.some(entry => entry.editorial_correction?.previous_document_id === version.document_id);
       let actions: ReactNode = null;
       // The actions that change this version's text, in button order (the hint line under the buttons names them).
       const offered: VersionAction[] = [];
       if (tools) {
-        const ask = !!variant && variant.translation_status === "accepted";
+        // The server refuses a correction request for a version a correction was made of: only the newest is asked.
+        const ask = !!variant && variant.translation_status === "accepted" && version.is_newest_in_chain;
         const correct = !!tools.onCorrectTranslation && correctableVersion(row, version);
         const typos = !!tools.onEditorialCorrection && uploadableVersion(row, version);
         const upload = !!tools.onUploadVersion && uploadableVersion(row, version);
@@ -271,6 +287,7 @@ export const TextVersions = forwardRef<HTMLUListElement, TextVersionsProps>(func
         </div>
         {version.upload && <p className="text-version-record">{uploadLabel(version.upload, now)}</p>}
         {version.editorial_correction && <p className="text-version-record">{editorialCorrectionLabel(version.editorial_correction, now)}</p>}
+        {version.query_decision && <p className="text-version-record">{queryDecisionLabel(version.query_decision, row, now)}</p>}
         {acceptance && <p className="text-version-record">{acceptanceLabel(acceptance, now)}</p>}
         {discarded && discardLabel(version, now) !== "Discarded" && <p className="text-version-record">{discardLabel(version, now)}</p>}
         {work.length > 0 && <PersonList label={`Assignments on ${name}`}>
@@ -281,6 +298,7 @@ export const TextVersions = forwardRef<HTMLUListElement, TextVersionsProps>(func
             return plain
               ? <PersonRow key={`${item.assignment_id}-${item.moved_to_version ?? ""}`} name={workerName(item)} pseudonym={item.person?.pseudonym ?? item.author_label} details={details} status={versionWorkStatus(item)} />
               : <WorkPersonRow key={item.assignment_id} item={item} caseId={row.case_id} textName={fullName} details={details} canManage={canManage} tools={tools}
+                noReopen={item.task === "translation_review" && typosFixed}
                 onChanged={() => tools?.onAssignmentsChanged()} onRemoved={focusAfterRemoval} />;
           })}
         </PersonList>}

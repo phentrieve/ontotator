@@ -399,6 +399,25 @@ describe("SearchPanel", () => {
     expect(preview().textContent).toContain("Definition of Seizure (HP:0001250)");
   });
 
+  it("offers 'Show in tree' for the active hit only where asked for, and takes nothing with it (issue 523)", async () => {
+    const onShowInTree = vi.fn(), onSelectCandidate = vi.fn();
+    const input = renderPanel(vi.fn().mockResolvedValue(threeHits), { onShowInTree, onSelectCandidate });
+    fireEvent.change(input, { target: { value: "seizure" } });
+    await waitFor(() => expect(activeId(input)).toBe(options()[1].id));
+    const preview = screen.getByTestId("candidate-preview");
+    fireEvent.click(within(preview).getByRole("button", { name: "Show in tree: Seizure" }));
+    expect(onShowInTree).toHaveBeenCalledWith(expect.objectContaining({ term_id: "HP:0001250" }));
+    expect(onSelectCandidate).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(within(screen.getByTestId("candidate-preview")).getByRole("button", { name: "Show in tree: Febrile seizure" })).toBeDefined();
+    cleanup();
+
+    const without = renderPanel(vi.fn().mockResolvedValue(threeHits));
+    fireEvent.change(without, { target: { value: "seizure" } });
+    await waitFor(() => expect(activeId(without)).toBe(options()[1].id));
+    expect(screen.queryByRole("button", { name: /Show in tree/ })).toBeNull();
+  });
+
   it("shows no definition preview without an active hit", async () => {
     const input = renderPanel(vi.fn().mockResolvedValue(threeHits), { canAssign: false });
     fireEvent.change(input, { target: { value: "seizure" } });

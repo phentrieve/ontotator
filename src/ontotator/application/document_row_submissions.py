@@ -42,12 +42,17 @@ from ontotator.storage.workflow_tables import (
 
 
 def lead_pseudonym_refs(
-    conn: Connection, pseudonyms: Iterable[str], *, viewer_id: int
+    conn: Connection,
+    pseudonyms: Iterable[str],
+    *,
+    viewer_id: int,
+    logins_of_project: int | None = None,
 ) -> dict[str, dict[str, Any]]:
     """PersonRefView fields per pseudonym for a lead viewer (D1).
 
     Submissions and rounds name their author by pseudonym only; a pseudonym
-    without an account keeps the pseudonym alone.
+    without an account keeps the pseudonym alone. ``logins_of_project`` as
+    in ``person_refs``.
     """
     wanted = sorted(set(pseudonyms))
     if not wanted:
@@ -55,7 +60,13 @@ def lead_pseudonym_refs(
     ids = conn.execute(
         select(UserRow.id).where(UserRow.pseudonym.in_(wanted))
     ).scalars()
-    refs = person_refs(conn, ids, viewer_id=viewer_id, viewer_is_lead=True)
+    refs = person_refs(
+        conn,
+        ids,
+        viewer_id=viewer_id,
+        viewer_is_lead=True,
+        logins_of_project=logins_of_project,
+    )
     known = {ref.pseudonym: ref.model_dump() for ref in refs.values()}
     return {
         pseudonym: known.get(
@@ -447,12 +458,15 @@ def _row_changes(
 ) -> list[dict[str, Any]]:
     """What leads and annotators changed on the row, oldest first:
     reassignments, mode changes, reopened tasks (and a bulk reopen that was
-    undone), new rounds, and every change of the final result (chosen,
-    replaced, a change undone, withdrawn (#343)).
+    undone), new rounds, every change of the final result (chosen,
+    replaced, a change undone, withdrawn (#343)), and each pause and release
+    of the text by a lead (issue 464).
 
     Tasks and rounds come from the audit trail (``assignment.reopen``,
     ``assignment.reopen_undone``, ``round.create``: the reason is stored
-    only there), the final result from its event log. ``ordinals`` numbers
+    only there; ``text_change.typo_fix_carry``: a submitted annotation that
+    moved to a typo fix by itself, issue 465; a correction request and each
+    addition to its reason, issue 483), the final result from its event log. ``ordinals`` numbers
     the row's rounds; ``results`` names a submission as a final result.
     """
     reassigned = conn.execute(
@@ -522,7 +536,14 @@ def _row_changes(
         .where(
             AuditEventRow.project_id == pid,
             AuditEventRow.action.in_(
-                ["assignment.reopen", "assignment.reopen_undone", "round.create"]
+                [
+                    "assignment.reopen",
+                    "assignment.reopen_undone",
+                    "round.create",
+                    "text_change.typo_fix_carry",
+                    "translation.correction_requested",
+                    "translation.correction_reason_added",
+                ]
             ),
             AuditEventRow.target_type.in_(["assignment", "work_round"]),
             AssignmentRow.project_id == pid,
@@ -530,9 +551,27 @@ def _row_changes(
         )
         .order_by(AuditEventRow.id)
     ).all()
+    # Issue 464: the lead paused or released the text. The audit trail keeps
+    # every pause and release (the text's settings only the pause in place).
+    pauses = conn.execute(
+        select(
+            AuditEventRow.at,
+            AuditEventRow.action,
+            AuditEventRow.actor_user_id,
+            AuditEventRow.details,
+        )
+        .where(
+            AuditEventRow.project_id == pid,
+            AuditEventRow.action.in_(["text.pause", "text.release"]),
+            AuditEventRow.target_type == "text",
+            AuditEventRow.target_id == f"{case_id} {language}",
+        )
+        .order_by(AuditEventRow.id)
+    ).all()
     people = person_refs(
         conn,
         {
+            *(row.actor_user_id for row in pauses if row.actor_user_id is not None),
             *(row.user_id for row in reassigned),
             *replacements.values(),
             *(
@@ -550,6 +589,7 @@ def _row_changes(
         },
         viewer_id=viewer_user_id,
         viewer_is_lead=True,
+        logins_of_project=pid,
     )
 
     def person(user_id: int | None) -> dict[str, Any] | None:
@@ -612,9 +652,33 @@ def _row_changes(
             }
         elif row.action == "assignment.reopen":
             change |= {"kind": "reopened", "reason": details.get("reason")}
+        elif row.action == "text_change.typo_fix_carry":
+            # Issue 465: the annotation moved to a typo fix by itself.
+            change |= {
+                "kind": "carried_by_typo_fix",
+                "from_version": details.get("from_version"),
+                "to_version": details.get("to_version"),
+            }
+        elif row.action == "translation.correction_requested":
+            # "Ask a reviewer to correct…", and each addition to its reason
+            # (issue 483): the reason is stored only in the audit trail.
+            change |= {"kind": "correction_requested", "reason": details.get("reason")}
+        elif row.action == "translation.correction_reason_added":
+            change |= {"kind": "correction_reason_added", "reason": details.get("note")}
         else:
             change["kind"] = "reopen_undone"
         changes.append(change)
+    for row in pauses:
+        changes.append(
+            {
+                "kind": "text_paused"
+                if row.action == "text.pause"
+                else "text_released",
+                "at": row.at,
+                "by": person(row.actor_user_id),
+                "reason": (row.details or {}).get("reason"),
+            }
+        )
     # The final result, event by event: the first choice (also the first
     # after a withdrawal), each replacement, each change that was undone. A
     # result confirmed again (its warnings acknowledged) is no change.
@@ -720,6 +784,7 @@ def build_submissions(
             *(row.pseudonym for row in open_reviews),
         ],
         viewer_id=viewer_user_id,
+        logins_of_project=pid,
     )
     owner = {
         row.submission_id: row.round_id or archived_owner.get(row.submission_id)
@@ -771,6 +836,9 @@ def build_submissions(
                 "finding_count": int(row.findings),
                 "author": people[row.annotator_id],
                 "guideline_version": row.guideline_version,
+                "guideline_label": facts[row.guideline_version].label
+                if row.guideline_version is not None
+                else None,
                 "guideline_withdrawn": row.guideline_version is not None
                 and facts[row.guideline_version].withdrawn,
                 "kept_automatically": kept.get(row.submission_id, 0),

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MutableRefObject, type ReactNode } from "react";
-import { api, ApiError, type CheckedSentences, type ReviewWorkspace, type TaskSummary, type TranslationReviewRecord, type SourceObligationView } from "../api/client";
+import { api, ApiError, type CheckedSentences, type DraftTypographyHints, type ReviewWorkspace, type TaskSummary, type TranslationReviewRecord, type SourceObligationView } from "../api/client";
 import { ErrorNotice } from "../admin/ErrorNotice";
 import { nextOpenTask } from "../app/caseOrder";
 import { MY_TASKS, routeHref, type Route, type RouteLeaveGuard } from "../app/router";
@@ -18,13 +18,15 @@ import { SourceObligationReview } from './SourceObligationReview';
 import { notifyFinalSelectionChanged } from '../variants/finalSelectionState';
 import { ChecksSummary, ReviewSummary, SubmitSummary } from "./ReviewParts";
 import { ReviewForm } from "./ReviewForm";
+import { TypographyHintsNote } from "./typographyHints";
 import { taskText } from "../app/identity";
-import { LeadReason } from "../tasks/LeadReason";
+import { LeadReason, QueryAnswer } from "../tasks/LeadReason";
 import { autoNoteText, chooseDecision, reactToTextEdit, USER_ORIGIN, type DecisionState } from "./decisionOrigin";
 import { acceptedCorrection, annotateThisTextLabel, categoryLabels, comparisonCountsDiffer, couplingEditingNote, couplingNote, decisionConsequence, decisionKeyHint, decisionLabels, decisionOutcomes, formatReviewDate, issueMessages, languageName, leadCorrectionKeyHint, leadCorrectionNote, matchingParagraphStatus, nextTaskLabel, paragraphCountChanged, paragraphCountsDiffer, remainingTasksText, reviewIssueMessage, showMatchingLabel, showMatchingShortcut, showMatchingTitle, translationNote, versionOriginRows } from "./labels";
 import { checkReview, type ClinicalCategory, type ReviewDecisionCode, type ReviewForm as FormValue } from "./reviewRules";
 import { LanguageTag } from "../ui/LanguageTag";
 import { SentenceCount, SentenceView } from "./SentenceMarks";
+import { InvisiblesKey } from "./invisibles";
 import { isChecked, rebaseMarks, resolveMarks, splitSentences, storedMarks, toggled, withRange, type MarkState, type Sentence, type Side, type StoredMarks } from "./sentences";
 
 export interface TranslationReviewScreenProps {
@@ -168,6 +170,18 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   const nextTaskButton = useRef<HTMLButtonElement | null>(null);
   const [serverIssues, setServerIssues] = useState<string[]>([]);
   const [showChanges, setShowChanges] = useState(false), [confirming, setConfirming] = useState(false);
+  /** Typography hints of the saved draft, read when the confirmation opens (issue 484); they block nothing. */
+  const [draftHints, setDraftHints] = useState<DraftTypographyHints | null>(null);
+  useEffect(() => {
+    setDraftHints(null);
+    if (!confirming) return;
+    let active = true;
+    // The confirmation opens only on a saved draft, so the stored text is the text on screen. A failure shows no line.
+    Promise.resolve().then(() => api.getDraftTypographyHints(props.assignmentId)).then(found => {
+      if (active && found.revision === (saver.current?.revision ?? workspace.draft.revision)) setDraftHints(found);
+    }, () => { /* The hints are a help only. */ });
+    return () => { active = false; };
+  }, [confirming, props.assignmentId, workspace.draft.revision]);
   /** Source updates of this translation that are not reviewed; the ordinary submit names them (it does not resolve one). */
   const [pendingSourceUpdates, setPendingSourceUpdates] = useState(0);
   const openSourceUpdate = useRef<(() => void) | null>(null);
@@ -773,7 +787,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     </div>
     {/* Under the task header, as in the annotation editor; gone once the review is submitted here. */}
     {!readOnly && props.guidelineNotice}
-    <ChecksSummary failed={workspace.failed_checks} all={allChecks}
+    <ChecksSummary failed={workspace.failed_checks} all={allChecks} brackets={workspace.added_brackets}
       earlier={workspace.variant.document_id !== workspace.translation_ancestor.document_id ? { checked: workspace.translation_ancestor.version, version: workspace.variant.version } : undefined} />
     <div className={`translation-workspace${wide && panelCollapsed ? " translation-workspace--collapsed" : ""}`}
       style={railOpen ? { "--review-panel-width": `${panel.width}px` } as CSSProperties : undefined}>
@@ -794,6 +808,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
                 items={comparisons.map(row => ({ id: row.id, label: row.name.replace(/^t/, "T"), onSelect: () => showComparison(true, row.id) }))} />)}
           </div>
           {marksError && marking && <p className="sentence-save-error" role="alert">Checked sentences are not saved. <Button size="sm" variant="quiet" onClick={() => { pendingMarks.current ??= marks; sendMarks(); }}>Retry</Button></p>}
+          {showInvisibles && <InvisiblesKey />}
         </div>
         <div className={`translation-columns${comparison ? " translation-columns--comparison" : ""}`}>
           <div className="translation-column">
@@ -867,12 +882,14 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
           </div>
           {/* Why the lead asked for this review, where the reviewer decides; a reopen only until it is submitted again. */}
           <LeadReason task={{ ...workspace, status: record ? "submitted" : workspace.assignment.status }} />
+          {/* Issue 483: the lead's decision on this submitted query, with the answer. */}
+          {record && <QueryAnswer answer={workspace.query_answer} />}
           <SourceObligationReview assignmentId={props.assignmentId} username={props.username} documentId={workspace.variant.document_id}
             translationText={text} canResolve={canSubmit && !!form && ['accepted_unchanged', 'accepted_corrected'].includes(form.decision)}
             busy={busy} readOnly={readOnly} error={error} onResolve={submit} onPending={setPendingSourceUpdates} openRef={openSourceUpdate} />
           {submitted && <InlineMessage tone="success" title="Review submitted"><p>{correctsAccepted && submitted.decision === "accepted_corrected" ? acceptedCorrection.outcome : decisionOutcomes[submitted.decision]}</p>
             {createdVersion !== null && <p>A corrected version v{createdVersion} was created.</p>}
-            {submitted.created_variant_id && createdVersion === null && <Button size="sm" onClick={() => { void loadCreated(submitted); }}>Retry corrected version metadata</Button>}</InlineMessage>}
+            {submitted.created_variant_id && createdVersion === null && <><p>A corrected version was created, but its number could not be loaded.</p><Button size="sm" onClick={() => { void loadCreated(submitted); }}>Load the version number again</Button></>}</InlineMessage>}
           {submitted && leadCorrection && <div className="translation-next-task">
             {navigateLink({ name: "projectDocuments", key: projectKey, case: workspace.variant.case_id, language: workspace.variant.language }, "Back to Documents", "btn btn-secondary")}
           </div>}
@@ -935,6 +952,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     {form && <ConfirmDialog focusConfirm={!sourceUpdateOpen} open={confirming} title="Submit this review?" confirmLabel={sourceUpdateOpen ? "Submit without the source update" : "Submit review"} cancelLabel="Keep editing" busy={busy}
       message={<SubmitSummary sourceUpdates={sourceUpdateOpen ? { count: pendingSourceUpdates, onReview: () => { setConfirming(false); openSourceUpdate.current?.(); } } : undefined} decision={form.decision} clinical={form.clinical_change} categories={form.categories ?? []} rationale={form.rationale}
         failedChecks={form.decision === "accepted_unchanged" ? workspace.failed_checks.map(check => check.code) : []}
+        typography={draftHints && <TypographyHintsNote text={text} found={draftHints} own={changed} />}
         consequence={!correctsAccepted ? decisionConsequence(form.decision, workspace.variant) : versionAccepted ? acceptedCorrection.consequence : acceptedCorrection.consequenceNotAccepted} />}
       onCancel={() => setConfirming(false)} onConfirm={() => { void submit(); }} />}
     {leave && <Dialog open title={leave.kind === "logout" ? "Unsaved changes" : "Changes not saved"} onClose={busy ? undefined : () => closeLeave(false)} footer={<>

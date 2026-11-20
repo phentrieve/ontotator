@@ -13,6 +13,7 @@ import { AxisValue } from "../ui/AxisValue";
 import type { AxisDefinition } from "./AnnotationPanel";
 import { ModifiersSection } from "./ModifiersSection";
 import { quoteOf, type TermInfo } from "./modifiers";
+import { sentenceAround } from "./passageContext";
 import { CopyTextButton } from "./CopyTextButton";
 import { actorName } from "./actorName";
 
@@ -56,6 +57,8 @@ export interface ReviewActionsProps {
   draftAnnotations: AnnotationSnapshot[];
   evidence?: components["schemas"]["EvidenceSnapshot"][];
   documentText?: string;
+  /** Issue 468: also show the sentence around each quoted passage (one pane at a time: the text is not on screen). */
+  showSentence?: boolean;
   onDecide: (payload: DecisionPayload) => void;
   onAdoptAndEdit?: () => void;
   /** Issue 257: an Edit & Replace copy of this proposal exists (changed or not). */
@@ -90,6 +93,8 @@ export interface ReviewActionsProps {
   onDraftUnresolved?: () => void;
   /** Label and role of a modifier term of the proposal (read-only chips, DN-9 A). */
   termInfo?: (termId: string) => TermInfo | undefined;
+  /** Issue 523: opens the ontology tree at the proposed term, to look before deciding. */
+  onShowInTree?: () => void;
 }
 
 type NoteSaveSession = {
@@ -138,6 +143,7 @@ export const ReviewActions: React.FC<ReviewActionsProps> = ({
   replacementChanges = null,
   evidence = [],
   documentText = "",
+  showSentence = false,
   note: controlledNote,
   onNoteChange,
   noteSaveDelayMs = 800,
@@ -148,6 +154,7 @@ export const ReviewActions: React.FC<ReviewActionsProps> = ({
   requireChosenAxes = false,
   onDraftUnresolved,
   termInfo,
+  onShowInTree,
 }) => {
   const targetIdentity = JSON.stringify([target.annotation_id, target.version]);
   const { metadata: sourceMetadata, label: sourceLabel } = useProposalMetadata(source);
@@ -237,12 +244,15 @@ export const ReviewActions: React.FC<ReviewActionsProps> = ({
 
       <div className="detail-section review-actions__proposal" aria-label="Proposal details" tabIndex={-1}>
         <strong className="review-actions__term"><TermName termId={target.term_id ?? target.annotation_id} label={termLabel} /></strong>
+        {onShowInTree && target.term_id && <>{" "}<Button type="button" variant="secondary" size="sm" className="annotation-tree-button"
+          title="Show this term in the ontology tree: broader and narrower terms" onClick={onShowInTree}>Show in tree</Button></>}
         {/* #20: the evidence and its source right under the term, before the values and modifiers. */}
         {evidence.length ? evidence.map((ev, index) => {
           const quote = quoteOf(documentText, ev.mention.segments);
           // Several mentions or spans: each quote visits its own mark in the text.
           const visitable = onShowMention && (evidence.length > 1 || ev.mention.segments.length > 1);
-          return <p className="review-actions__quote" key={`${ev.mention.evidence_id}:${ev.version}`}>
+          const sentence = showSentence ? sentenceAround(documentText, ev.mention.segments) : null;
+          return <React.Fragment key={`${ev.mention.evidence_id}:${ev.version}`}><p className="review-actions__quote">
             {visitable ? <button type="button" className="review-actions__quote-button" aria-label={`Show mention ${index + 1}: “${quote}”`}
               onClick={() => onShowMention(ev)}>{quote}</button> : quote}
             {/* As for a finding's mention: the passage to look up elsewhere, several segments joined by a space. */}
@@ -250,7 +260,10 @@ export const ReviewActions: React.FC<ReviewActionsProps> = ({
             {onMoveMention && !readOnly && evidence.length > 1 && <>{" "}<Button size="sm" aria-label={`Move mention ${index + 1} to a new finding`}
               title="Runs Edit & Replace: your copy keeps the other mentions, this one becomes its own finding"
               onClick={() => onMoveMention(index)}>Move to a new finding</Button></>}
-          </p>;
+          </p>
+          {sentence && <p className="review-actions__sentence"><span className="visually-hidden">In the text: </span>
+            {sentence.map((part, at) => part.marked ? <mark key={at}>{part.text}</mark> : <span key={at}>{part.text}</span>)}</p>}
+          </React.Fragment>;
         }) : <p className="review-actions__quote">No text mention (spanless)</p>}
         {/* One source line: the tool's declared name (as in the AI badge), else the actor id. */}
         <p className="review-actions__origin">

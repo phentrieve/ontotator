@@ -620,6 +620,7 @@ class WorkRoundService:
         expected_workflow_revision: int,
         lead: bool,
         owner: str,
+        complete_carried: bool = False,
     ) -> WorkRoundView:
         """Create the round on the caller's transaction (exclusive project lock).
 
@@ -627,6 +628,10 @@ class WorkRoundService:
         the text-change operations record their own. ``owner`` is the
         assignee's pseudonym; ``lead`` whether the actor manages assignments.
         ``draft_sources`` are ``draft_snapshots`` IDs (kind ``text_change``).
+        ``complete_carried`` (a carry from scratch only): the draft starts
+        with every carried finding and its input resolved, as the person's
+        own completion would leave it (the carry after a typo fix, issue
+        465); an input that could not be placed is refused.
         """
         assignment_id = int(assignment["id"])
         if assignment["workflow_revision"] != expected_workflow_revision:
@@ -1077,6 +1082,10 @@ class WorkRoundService:
             )
         )
         start = _carried_start(key, plan, inputs) if plan is not None else None
+        if complete_carried:
+            if kind != "carry_forward" or plan is not None:
+                raise DomainError("ROUND_INPUT_INVALID")
+            start = _completed_start(inputs)
         self.repo._create_draft(conn, pid, key, _key_str(key), targets, start)
         if kind == "consolidation":
             # Matching findings are kept automatically (U14, T9); both start
@@ -1087,6 +1096,33 @@ class WorkRoundService:
 
             take_over_matches(conn, self.repo, pid, key)
         return self.repo.get_work_round(project, rid)
+
+
+def _completed_start(inputs: list[dict[str, Any]]) -> _InitialContent:
+    """The first draft of a carry from scratch with every input completed:
+    each carried finding, and its input resolved by it (issue 465). Refused
+    when an input could not be placed: that needs the person's check."""
+    from ontotator.domain.serialization import decode_snapshot
+
+    annotations: list[AnnotationSnapshot] = []
+    resolutions: list[RoundInputResolution] = []
+    for payload in inputs:
+        if payload["target_snapshot"] is None:
+            raise DomainError("ROUND_INPUT_INVALID", "A finding needs a check")
+        carried = decode_snapshot(payload["target_snapshot"])
+        annotations.append(carried)
+        resolutions.append(
+            RoundInputResolution(
+                input_id=payload["input_id"],
+                outcome="completed",
+                annotation_ref=AnnotationRef(
+                    annotation_id=carried.annotation.annotation_id,
+                    version=carried.version,
+                ),
+            )
+        )
+    evidence = [e for a in annotations for e in a.evidence]
+    return _InitialContent(annotations, evidence, [], None, tuple(resolutions))
 
 
 def _carried_start(

@@ -452,6 +452,60 @@ def rejected_translation_for_lead(app: FastAPI) -> dict[str, Any]:
     )
 
 
+QUERIED_CASES = {
+    "take_text": "case-0101",
+    "answer_only": "case-0102",
+    "rejected": "case-0103",
+}
+# What Ana changes in the texts she queries, and her question.
+QUERY_OLD, QUERY_NEW = "hypotonia", "muscular hypotonia"
+QUERY_RATIONALE = "The source says muscular hypotonia. Is the short form meant?"
+
+
+def queried_translation_for_lead(app: FastAPI) -> dict[str, Any]:
+    """Issue 483: rule on, 3 cases with de review + annotate. Ana queried the
+    de translations of case-0101 and case-0102, each with a proposed text
+    ("hypotonia" became "muscular hypotonia") and a question; she rejected
+    case-0103. The lead decides the queries under "Resolve…"."""
+    from ontotator.application.translation_reviews import TranslationReviewService
+
+    scenario = lead_project(app, "QUERIED_TRANSLATION_FOR_LEAD")
+    scenario.app.state.accounts.update_profile(
+        Actor.cli(), scenario.users["lead"], qualification="Physician"
+    )
+    case_ids = cases(101, 3)
+    docs = import_units(scenario, case_units(case_ids, ("de",)))
+    plan(scenario, case_ids, {"de": REVIEW_AND_ANNOTATE})
+    review = TranslationReviewService(scenario.db, scenario.app.state.jobs)
+    access, _actor = identity(scenario, "ana")
+    for name in ("take_text", "answer_only"):
+        document_id = docs[(QUERIED_CASES[name], "de")]
+        assignment_id = assign(scenario, document_id, "ana", "translation_review")
+        opened = review.open(access, assignment_id)
+        revision = review.save_draft(
+            access,
+            assignment_id,
+            expected_revision=opened.draft.revision,
+            text=opened.text.replace(QUERY_OLD, QUERY_NEW),
+            form={
+                "decision": "query",
+                "clinical_change": True,
+                "categories": ["terminology"],
+                "rationale": QUERY_RATIONALE,
+            },
+        )
+        review.submit(access, assignment_id, expected_revision=revision)
+    review_translation(
+        scenario, docs[(QUERIED_CASES["rejected"], "de")], "ana", "rejected"
+    )
+    return result(
+        scenario,
+        all_rows(case_ids, ("de",)),
+        case_ids={"de": list(case_ids)},
+        cases=dict(QUERIED_CASES),
+    )
+
+
 ACCEPTED_FOR_LEAD_CASES = {
     "accepted": "case-0101",
     "unreviewed": "case-0102",
@@ -489,6 +543,53 @@ def accepted_translation_for_lead(app: FastAPI) -> dict[str, Any]:
         all_rows(case_ids, ("de",)),
         case_ids={"de": list(case_ids)},
         cases=dict(ACCEPTED_FOR_LEAD_CASES),
+    )
+
+
+TYPO_FIX_CASE = "case-0465"
+# A typo in the hypotonia passage; the seizure passage stays as it is.
+TYPO_FIX_TEXT = SYNTHETIC.replace("generalized hypotonia", "generalized hypotnia")
+
+
+def typo_fix_carry(app: FastAPI) -> dict[str, Any]:
+    """Issue 465: an accepted de translation of case-0465 with a typo in
+    "hypotnia" and two submitted annotations: Cy Annotator marked
+    "seizures" (a passage the fix leaves as it is), Ben marked "hypotnia"
+    (the word the fix corrects). After "Fix typos…" Cy's annotation moves
+    to v2 by itself; Ben's needs a check and stays on v1."""
+    from browser_carry_fixture import HYPOTONIA, SEIZURE, _create, _span
+    from browser_documents_scenarios import finish_round, start_round
+    from t1_builders import native_unit, translation_unit
+
+    scenario = lead_project(app, "TYPO_FIX_CARRY")
+    source = native_unit(TYPO_FIX_CASE, "en", SYNTHETIC, case_id=TYPO_FIX_CASE)
+    docs = import_units(
+        scenario,
+        [source, translation_unit(TYPO_FIX_CASE, "de", TYPO_FIX_TEXT, source=source)],
+    )
+    plan(scenario, [TYPO_FIX_CASE], {"de": REVIEW_AND_ANNOTATE})
+    document_id = docs[(TYPO_FIX_CASE, "de")]
+    review_translation(scenario, document_id, "ana", "accepted_unchanged")
+    for name, term, part in (
+        ("annotator", SEIZURE, "seizures"),
+        ("ben", HYPOTONIA, "hypotnia"),
+    ):
+        started = start_round(
+            scenario, assign(scenario, document_id, name, "annotate"), name
+        )
+        _create(
+            scenario,
+            name,
+            started.workspace_key,
+            term,
+            span=_span(TYPO_FIX_TEXT, part),
+        )
+        finish_round(scenario, name, started.workspace_key)
+    return result(
+        scenario,
+        all_rows([TYPO_FIX_CASE], ("de",)),
+        case_ids={"de": [TYPO_FIX_CASE]},
+        documents={"de": document_id},
     )
 
 
@@ -569,8 +670,10 @@ BUILDERS: dict[str, Builder] = {
     "ACCEPTANCE": build_acceptance,
     "ROWS": build_rows,
     "REJECTED_TRANSLATION_FOR_LEAD": rejected_translation_for_lead,
+    "QUERIED_TRANSLATION_FOR_LEAD": queried_translation_for_lead,
     "ACCEPTED_TRANSLATION_FOR_LEAD": accepted_translation_for_lead,
     "UPLOAD_DIALOG": build_upload_dialog,
+    "TYPO_FIX_CARRY": typo_fix_carry,
 }
 
 
