@@ -2661,6 +2661,60 @@
         "x-ontotator-scope": "session"
       }
     },
+    "/api/v1/translation-reviews/{assignment_id}/segment-pairs": {
+      "put": {
+        "tags": [
+          "translation-reviews"
+        ],
+        "summary": "Save Segment Pairs",
+        "description": "The reviewer's own segment pairs and their checks; not part of the review.",
+        "operationId": "save_segment_pairs_api_v1_translation_reviews__assignment_id__segment_pairs_put",
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Assignment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SegmentPairs"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentPairs"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "session"
+      }
+    },
     "/api/v1/translation-reviews/{assignment_id}/submit": {
       "post": {
         "tags": [
@@ -30052,6 +30106,16 @@
           "checked_sentences": {
             "$ref": "#/components/schemas/CheckedSentences"
           },
+          "segment_pairs": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SegmentPairs"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "version_origin": {
             "anyOf": [
               {
@@ -31756,6 +31820,95 @@
         ],
         "title": "Segment",
         "description": "Zero-based Unicode codepoint interval [start, end)."
+      },
+      "SegmentPair": {
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/SegmentSpan"
+          },
+          "translation": {
+            "$ref": "#/components/schemas/SegmentSpan"
+          },
+          "manual": {
+            "type": "boolean",
+            "title": "Manual",
+            "default": false
+          },
+          "checked": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:[0-9a-f]{8}|stale)$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "translation"
+        ],
+        "title": "SegmentPair",
+        "description": "One aligned pair: a passage of the source and the passage of the translation.\n\n``checked`` is the hash of the pair's translation when the reviewer checked it,\nor ``stale`` for a pair joined from a partly checked one; the client compares it\nwith the hash of the passage now. ``manual``: made by a merge or a split."
+      },
+      "SegmentPairs": {
+        "properties": {
+          "source_hash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}$",
+            "title": "Source Hash"
+          },
+          "text_hash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}$",
+            "title": "Text Hash"
+          },
+          "pairs": {
+            "items": {
+              "$ref": "#/components/schemas/SegmentPair"
+            },
+            "type": "array",
+            "maxItems": 5000,
+            "title": "Pairs"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_hash",
+          "text_hash"
+        ],
+        "title": "SegmentPairs",
+        "description": "The reviewer's alignment of the source and the draft text, with its checks.\n\n``source_hash`` and ``text_hash`` name the texts the passages refer to; a client\nthat finds other texts aligns them anew."
+      },
+      "SegmentSpan": {
+        "properties": {
+          "start": {
+            "type": "integer",
+            "maximum": 10000000.0,
+            "minimum": 0.0,
+            "title": "Start"
+          },
+          "end": {
+            "type": "integer",
+            "maximum": 10000000.0,
+            "minimum": 0.0,
+            "title": "End"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "SegmentSpan",
+        "description": "A passage of one text, in UTF-16 code units as the browser counts them."
       },
       "SelectedRowsRequest": {
         "properties": {
