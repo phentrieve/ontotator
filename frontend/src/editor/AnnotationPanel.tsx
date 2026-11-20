@@ -12,7 +12,7 @@ import { SearchPanel } from "./SearchPanel";
 import { TermName } from "./TermName";
 import type { SearchLanguageControl } from "./searchLanguages";
 import type { SearchManager, WorkspaceKey } from "./searchState";
-import { IconClose, IconTrash } from "../ui/icons";
+import { IconClose, IconMoveOut, IconPlus, IconTrash, IconTree } from "../ui/icons";
 import { axisOptionLabel } from "./axisLabels";
 import { InlineMessage } from "../ui/InlineMessage";
 import { Kbd } from "../ui/Kbd";
@@ -21,6 +21,10 @@ import { useValuesLayout } from "./valuesLayout";
 import { quoteOf } from "./modifiers";
 import { prefillQuery } from "./termSearch";
 import { CopyTextButton } from "./CopyTextButton";
+import { DismissibleHint } from "./DismissibleHint";
+
+/** Why a greyed-out control of a read-only finding does nothing (issue 542, U1-05). */
+export const READ_ONLY_REASON = "Read-only: this work cannot be changed here.";
 
 export type AxesValues = Record<string, string | null>;
 export type Axes = AxesValues;
@@ -273,18 +277,17 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
             <h2 className="term-heading">
               <TermName termId={currentTerm} label={termLabel} />{" "}<AiBadge provenance={ann.provenance} source={source} />
             </h2>
-            {onShowInTree && currentTerm && (
-              <Button
-                type="button"
-                variant="secondary" size="sm" className="annotation-tree-button"
-                onClick={onShowInTree}
-                title="Show this term in the ontology tree: broader and narrower terms"
-              >
-                Show in tree
-              </Button>
-            )}
           </div>
+          {/* One action row (issue 540): the tree, the term and the way out, as icons where the meaning is clear. */}
           <div className="term-heading-actions">
+            {onShowInTree && currentTerm && (
+              <IconButton
+                variant="quiet" size="sm" className="annotation-tree-button"
+                label="Show in tree" icon={<IconTree />}
+                onClick={onShowInTree}
+                title="Show in tree: broader and narrower terms of this term"
+              />
+            )}
             <Button
               ref={changeTermButton}
               type="button"
@@ -417,21 +420,14 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
           })}
           {/* The "Default" tag marks each axis; one short line says how to confirm. */}
           {confirmableDefaults.length > 0 && !readOnly && onConfirmDefaults
-            && <p className="form-hint">{hasSelectDefault
+            && <DismissibleHint id="confirm-defaults">{hasSelectDefault
               ? "Click a highlighted default, Confirm next to a list, or “Confirm defaults” to confirm it."
-              : "Click a highlighted default or “Confirm defaults” to confirm it."}</p>}
+              : "Click a highlighted default or “Confirm defaults” to confirm it."}</DismissibleHint>}
           {valuesError && <InlineMessage tone="error">{valuesError}</InlineMessage>}
         </section>
       )}
 
       {modifiersSection}
-
-      <div className="detail-section">
-        <Textarea id={`annotation-note-${ann.annotation_id}`} label={noteRequired ? "Reason for no text span" : "Note"}
-          data-repair="annotation-note" hint={noteHint} required={noteRequired} value={noteValue ?? ann.note ?? ""} readOnly={readOnly}
-          error={noteRequired && !(noteValue ?? ann.note ?? "").trim() ? "A reason is required for a finding without a text span." : undefined}
-          onChange={event => onChangeNote?.(event.target.value)} onBlur={onSaveNote} />
-      </div>
 
       {/* 3. Evidence Mentions */}
       <div className="detail-section">
@@ -442,7 +438,7 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
             variant="secondary" size="sm"
             disabled={readOnly} onClick={() => onSetIntent("new_mention")}
             aria-pressed={isAttachingMention}
-            title="Mark text to add another mention for this term"
+            title={readOnly ? READ_ONLY_REASON : "Mark text to add another mention for this term"}
           >
             {isAttachingMention ? "Select text…" : "Add mention"}
           </Button>
@@ -496,31 +492,25 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
                   ) : (
                   <div className="mention-card__actions">
                     {snippet && <CopyTextButton text={quoteOf(documentText, segments, " ")} onAnnounce={onCopyAnnounce} />}
-                    {onMoveMention && linkedEvidence.length > 1 && <Button
-                      type="button"
-                      variant="secondary" size="sm"
+                    {onMoveMention && linkedEvidence.length > 1 && <IconButton
+                      variant="quiet" size="sm" label="Move to a new finding" icon={<IconMoveOut />}
                       disabled={readOnly} onClick={() => { if (!readOnly) onMoveMention(ev.mention.evidence_id); }}
-                      title="This mention gets its own finding with the same term and values, which you can then change"
-                    >
-                      Move to a new finding
-                    </Button>}
-                    <Button
-                      type="button"
-                      variant="secondary" size="sm"
+                      title={readOnly ? READ_ONLY_REASON : "Move to a new finding: this mention gets its own finding with the same term and values, which you can then change"}
+                    />}
+                    <IconButton
+                      variant="quiet" size="sm" label="Add segment" icon={<IconPlus />}
                       disabled={readOnly} onClick={() => {
                         if (readOnly) return;
                         onSelectEvidence(ev.mention.evidence_id);
                         onSetIntent("extend_mention");
                       }}
-                      title="Add another text segment to this mention"
-                    >
-                      Add segment
-                    </Button>
+                      title={readOnly ? READ_ONLY_REASON : "Add segment: another piece of text for this mention"}
+                    />
                     <Button
                       type="button"
                       variant="danger" size="sm"
                       disabled={readOnly || (linkedEvidence.length === 1 && !!detachLastBlockedReason)} onClick={() => setConfirmDetachId(ev.mention.evidence_id)}
-                      title="Detach this mention from the finding"
+                      title={readOnly ? READ_ONLY_REASON : "Detach this mention from the finding"}
                     >
                       Remove
                     </Button>
@@ -532,10 +522,19 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
           </div>
         )}
         {/* Inside the section, so the hint keeps the pane's inset (#21). */}
-        {detachLastBlockedReason && <p className="field-hint">{detachLastBlockedReason}</p>}
+        {/* Read-only, nothing can be removed: the hint would suggest a way that does not exist (issue 542, U1-05). */}
+        {detachLastBlockedReason && !readOnly && <p className="field-hint">{detachLastBlockedReason}</p>}
       </div>
 
-      {/* 4. Delete finding */}
+      {/* 4. Note: after the mentions, in the order the sections are used while annotating (issue 540). */}
+      <div className="detail-section">
+        <Textarea id={`annotation-note-${ann.annotation_id}`} label={noteRequired ? "Reason for no text span" : "Note"}
+          data-repair="annotation-note" hint={noteHint} required={noteRequired} value={noteValue ?? ann.note ?? ""} readOnly={readOnly}
+          error={noteRequired && !(noteValue ?? ann.note ?? "").trim() ? "A reason is required for a finding without a text span." : undefined}
+          onChange={event => onChangeNote?.(event.target.value)} onBlur={onSaveNote} />
+      </div>
+
+      {/* 5. Delete finding */}
       <div className="detail-section delete-section">
         {confirmDelete ? (
           <div role="group" aria-label="Confirm deletion" className="delete-confirm">

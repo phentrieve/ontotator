@@ -516,7 +516,7 @@ for (const size of SIZES) {
     test.beforeEach(async ({ page }) => { await page.setViewportSize({ width: size.width, height: size.height }); });
     const take = (page: Page) => treePanel(page).getByRole("button", { name: "Use this term instead…" });
 
-    test("an undecided proposal: look at its neighbours, then confirm another term: decided as Changed", async ({ page }) => {
+    test("an undecided proposal: look at its neighbours, then confirm another term: decided as Replaced", async ({ page }) => {
       const errors = consoleErrors(page);
       await importPackage(page, "", FIXTURE, `look-proposal-${size.name}`, { proposals: true });
       await openCase(page, { task: "annotate" });
@@ -536,7 +536,7 @@ for (const size of SIZES) {
 
       // The confirmation says what happens, takes the focus, and Cancel changes nothing.
       await take(page).click();
-      const confirm = treePanel(page).getByRole("group", { name: `Proposal: decide as Changed with Areflexia (${AREFLEXIA})` });
+      const confirm = treePanel(page).getByRole("group", { name: `Proposal: decide as Replaced with Areflexia (${AREFLEXIA})` });
       await expect(confirm).toBeVisible();
       await expect(confirm.getByRole("button", { name: "Confirm" })).toBeFocused();
       await shot(page, `${size.name}-look-proposal-confirm`);
