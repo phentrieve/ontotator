@@ -629,11 +629,13 @@
 
 .run--color-5 { --run-fill: var(--mark-5-fill); }
 
-/* Overlapping marks (issue 524): one band per colour inside the same lower highlight zone, band 0 at the
-   bottom; editor/markColours.ts keeps different terms that overlap apart in colour and vendor/spans.js
-   (bandClasses) orders the bands by the marks' start in the text. Only the background changes: the line
-   height, the text and the lines of the mark states stay as they are. `run--band-I-N` gives band I the
-   fill of slot N. */
+/* Overlapping marks (issue 524): one band per colour, band 0 at the bottom; editor/markColours.ts keeps different
+   terms that overlap apart in colour and vendor/spans.js (bandClasses) orders the bands by the marks' start in the
+   text. Only the background changes: the line height, the text and the lines of the mark states stay as they are.
+   `run--band-I-N` gives band I the fill of slot N.
+   Legible at normal size (issue 551): stacked bands fill the run from 12% of its height, not only the lower half,
+   and a 1 px gap of the sheet (`--mark-band-separator`) parts every two bands. Two bands: band 0 keeps the zone of
+   a single mark (54% to 100%), so it runs on into a neighbour of the same finding; three bands share it in thirds. */
 
 .run--band-0-0 { --run-band-0: var(--mark-0-fill); }
 .run--band-0-1 { --run-band-0: var(--mark-1-fill); }
@@ -664,25 +666,30 @@
 .run--band-3-5 { --run-band-3: var(--mark-5-fill); }
 
 .run--bands-2 {
-  --run-highlight: linear-gradient(to bottom, transparent 0 40%,
-    var(--run-band-1) 54% 77%, var(--run-band-0) 77% 100%);
+  --run-highlight: linear-gradient(to bottom, transparent 0 6%,
+    var(--run-band-1) 12% calc(54% - 1px), var(--mark-band-separator) calc(54% - 1px) 54%,
+    var(--run-band-0) 54% 100%);
 }
 
 .run--bands-3 {
-  --run-highlight: linear-gradient(to bottom, transparent 0 40%,
-    var(--run-band-2) 54% 69%, var(--run-band-1) 69% 85%, var(--run-band-0) 85% 100%);
+  --run-highlight: linear-gradient(to bottom, transparent 0 6%,
+    var(--run-band-2) 12% calc(41% - 1px), var(--mark-band-separator) calc(41% - 1px) 41%,
+    var(--run-band-1) 41% calc(70% - 1px), var(--mark-band-separator) calc(70% - 1px) 70%,
+    var(--run-band-0) 70% 100%);
 }
 
 /* Four or more colours: two bands, and a top band striped in the third and fourth colour (a separate layer,
-   placed over 54% to 69% of the run). A fifth colour has no band of its own. */
+   placed over 12% to 41% of the run: 12% = (100% - 29%) x 16.9%). A fifth colour has no band of its own. */
 
 .run--bands-more {
-  --run-highlight: linear-gradient(to bottom, transparent 0 69%,
-    var(--run-band-1) 69% 85%, var(--run-band-0) 85% 100%);
+  --run-highlight: linear-gradient(to bottom, transparent 0 calc(41% - 1px),
+    var(--mark-band-separator) calc(41% - 1px) 41%,
+    var(--run-band-1) 41% calc(70% - 1px), var(--mark-band-separator) calc(70% - 1px) 70%,
+    var(--run-band-0) 70% 100%);
   --run-stripes: repeating-linear-gradient(90deg, var(--run-band-2) 0 4px, var(--run-band-3) 4px 8px);
   background-image: var(--run-highlight), var(--run-stripes);
-  background-size: 100% 100%, 100% 15%;
-  background-position: 0 0, 0 63.5%;
+  background-size: 100% 100%, 100% 29%;
+  background-position: 0 0, 0 16.9%;
   background-repeat: no-repeat;
 }
 
@@ -767,8 +774,8 @@
   background-image:
     repeating-linear-gradient(135deg, transparent 0 5px, var(--mark-negated-hatch) 5px 6px),
     var(--run-highlight), var(--run-stripes);
-  background-size: auto, 100% 100%, 100% 15%;
-  background-position: 0 0, 0 0, 0 63.5%;
+  background-size: auto, 100% 100%, 100% 29%;
+  background-position: 0 0, 0 0, 0 16.9%;
   background-repeat: repeat, no-repeat, no-repeat;
 }
 

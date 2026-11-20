@@ -151,8 +151,10 @@ describe("design tokens", () => {
    * second iteration). The state of a mark is told by its line style or pattern
    * (solid, dashed, dotted, hatch, frame; see browser/design.spec.ts), so the fills
    * only have to keep neighbouring terms apart, not carry meaning. Floors, CIEDE2000:
-   * - normal vision, pairwise >= 10 (was 12): clearly different side by side
-   *   (a just-noticeable difference is about 1-2, "obviously different" about 5);
+   * - normal vision, pairwise >= 20 (issue 551; was 10): any two slots can be stacked
+   *   as thin bands where findings overlap, and a band of a few pixels needs a larger
+   *   difference than two marks side by side (a just-noticeable difference is about
+   *   1-2, "obviously different" about 5; yellow and green at 13 read as one colour);
    * - every fill against the sheet >= 10: a mark is visible without its line;
    * - simulated protan, deutan and tritan dichromacy (Machado 2009, severity 1),
    *   pairwise >= 4 (was 8): no two slots collapse into the same colour. Light,
@@ -160,7 +162,15 @@ describe("design tokens", () => {
    *   again, which is what the user rejected; the line styles are the guarantee.
    */
   it("mark_fills_are_distinct_for_normal_vision", () => {
-    expect(below(pairs(FILLS), deltaE2000, 10)).toEqual([]);
+    expect(below(pairs(FILLS), deltaE2000, 20)).toEqual([]);
+    expect(below(cross(FILLS, ["--surface-raised"]), deltaE2000, 10)).toEqual([]);
+  });
+
+  it("stacked_bands_are_parted_by_a_gap_of_the_sheet", () => {
+    // The 1 px gap between two stacked bands is the sheet: every fill differs from it (the floor above, >= 10), in
+    // both themes (themeTokens.test.ts), and the gap follows the theme with the sheet.
+    const css = readFileSync(resolve(here, "../src/styles/tokens.css"), "utf8");
+    expect(css).toMatch(/--mark-band-separator:\s*var\(--surface-raised\);/);
     expect(below(cross(FILLS, ["--surface-raised"]), deltaE2000, 10)).toEqual([]);
   });
 
