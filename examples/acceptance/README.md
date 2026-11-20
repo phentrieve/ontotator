@@ -52,6 +52,28 @@ populated state is refused before seed writes. An ordinary restart uses the same
 Compose project, files and environment, preserves both named volumes and needs
 **no seed**. There is no automatic reset or volume deletion.
 
+### Demo login buttons
+
+`prepare` also writes `demo-logins.override.json`, a Compose override for the app
+only. It sets `ONTOTATOR_DEMO_LOGINS_FILE` and mounts `demo-logins.json` from the
+run directory read-only, by its absolute path. The `start` command of
+`commands.json` does not use it: seed checks that the stack runs without it.
+
+After a complete seed, `demo-logins.json` lists demo-lead, demo-reviewer,
+demo-annotator and the development `admin` with their passwords. Run the
+`restart` command of `commands.json`: it starts the app again with the override,
+and the login page shows one button per account. Later starts use `restart` too.
+If the file is missing, the start fails; Docker does not create it.
+
+This is for this local stack only. The app sends these passwords to every browser
+that opens the login page, so `demo-logins.json` is readable by all (mode 0644;
+the app user in the container must read it). The app refuses to start with the
+setting in production or with a public origin that is not a loopback address. See
+"Demo logins" in [docs/operations.md](../../docs/operations.md).
+
+Open the stack at `http://127.0.0.1:<port>`, not `localhost`: the origin check
+refuses a login from another origin.
+
 ## Full-HPO input set
 
 `full-hpo-sources.json` pins the official HPO **2026-09-01** release and its
