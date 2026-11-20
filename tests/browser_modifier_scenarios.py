@@ -4,7 +4,8 @@
 pinned with ``MOD_PIN`` (``hp-modifiers.json``, T1 profile ``hpo-phenotype``)
 with the lead workflow's four people and one German text planned annotate,
 assigned to the annotator, round 1 started. ``with_finding=1`` adds Seizure
-on "Krampfanfälle" through ``create_annotation``; ``standalone=1`` writes a
+on "Krampfanfälle" through ``create_annotation`` (``wide=1``: on "wiederholt
+schwere Krampfanfälle", modifier words inside); ``standalone=1`` writes a
 standalone Severe finding on "schwere" past the editing commands (old data);
 ``proposal=1`` imports a tool proposal Seizure on "Krampfanfälle"; the project
 default "from proposals" makes the round a proposal check (M2 M-5).
@@ -126,6 +127,7 @@ def build_modifiers(
     app: FastAPI,
     *,
     with_finding: bool = False,
+    wide: bool = False,
     standalone: bool = False,
     proposal: bool = False,
 ) -> dict[str, Any]:
@@ -185,7 +187,7 @@ def build_modifiers(
         ),
     )
     if with_finding:
-        seizure = span("Krampfanfälle")
+        seizure = span("wiederholt schwere Krampfanfälle" if wide else "Krampfanfälle")
         _command(
             scenario,
             workspace_key,
@@ -217,12 +219,14 @@ def register_modifier_scenario_route(app: FastAPI) -> None:
     @app.post("/__test_modifiers__")
     def modifier_scenario(
         with_finding: int = Query(0),
+        wide: int = Query(0),
         standalone: int = Query(0),
         proposal: int = Query(0),
     ) -> dict[str, Any]:
         return build_modifiers(
             app,
             with_finding=bool(with_finding),
+            wide=bool(wide),
             standalone=bool(standalone),
             proposal=bool(proposal),
         )
