@@ -1447,6 +1447,22 @@ describe("plan chips on the page", () => {
       .toBe("Fixed: Tom Reis has submitted work started from proposals. Changing the mode discards that work.");
   });
 
+  it("the fixed mode names everyone whose submitted work a change discards, also work a typo fix moved (issue 543)", async () => {
+    const person = (pseudonym: string, display_name: string) => ({ pseudonym, display_name, is_me: false });
+    const fr = { ...planRow("case-0101", "fr", stepOf("assign_annotation")), proposal_count: 12, annotation_mode: { mode: "proposals" as const, source: "project" as const, locked: true, override: null, proposal_count: 12 },
+      work: [
+        work({ assignment_id: 4, document_id: "case-0101-fr", task: "annotate", status: "submitted", person: person("ann-0004", "Tom Reis") }),
+        work({ assignment_id: 5, document_id: "case-0101-fr", task: "annotate", status: "submitted", person: person("ann-0005", "Ana Weber") }),
+        work({ assignment_id: 6, document_id: "case-0101-fr", task: "annotate", status: "submitted", person: person("ann-0006", "Eva Lang") }),
+      ] };
+    mockRows(page([group("case-0101", [fr], { plan_revision: 2 })]));
+    renderPage({ query: { panel: "case-0101:fr", panel_stage: "annotation" } });
+    const card = await textCard("case-0101 fr");
+    const mode = await within(card).findByRole("radiogroup", { name: "Annotation plan" });
+    expect(document.getElementById(mode.getAttribute("aria-describedby")!)!.textContent)
+      .toBe("Fixed: Tom Reis, Ana Weber and Eva Lang have submitted work started from proposals. Changing the mode discards that work.");
+  });
+
   it("Change mode… on a locked mode opens the warning that names the discarded work (#109)", async () => {
     const fr = { ...planRow("case-0101", "fr", stepOf("assign_annotation")), proposal_count: 12, annotation_mode: { mode: "proposals" as const, source: "locked" as const, locked: true, override: null, proposal_count: 12 },
       work: [work({ assignment_id: 4, document_id: "case-0101-fr", task: "annotate", status: "submitted", person: { pseudonym: "ann-0004", display_name: "Tom Reis", is_me: false } })] };

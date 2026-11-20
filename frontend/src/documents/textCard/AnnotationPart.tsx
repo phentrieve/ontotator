@@ -11,7 +11,7 @@ import { StatusBadge } from "../../ui/StatusBadge";
 import { RouteLink } from "../RowCells";
 import { shortName } from "../stageLabels";
 import type { TextVersionsTools } from "../TextVersions";
-import { dayMonth, personVersion, rowDay, textViewRoute, type CardWorkItem } from "./cardModel";
+import { carriedOnward, dayMonth, personVersion, rowDay, textViewRoute, type CardWorkItem } from "./cardModel";
 import { PersonList, PersonRow, useFocusAfterRemoval } from "./PersonRow";
 import { assignedLine, workerName, WorkPersonRow } from "./WorkPersonRow";
 
@@ -80,8 +80,11 @@ function joined(parts: readonly ReactNode[]): ReactNode {
   return parts.filter(Boolean).map((part, index) => <span key={index}>{index > 0 && " · "}{part}</span>);
 }
 
-/** Submissions that are annotation layers (from scratch, or a check of the tool proposals). */
-const LAYER_KINDS: ReadonlySet<RowSubmissionView["kind"]> = new Set(["annotation", "proposal_check"]);
+/**
+ * Submissions that are annotation layers: from scratch, a check of the tool proposals, or work carried to a newer
+ * version (by "Carry to v2…" or by a typo fix, issue 543).
+ */
+const LAYER_KINDS: ReadonlySet<RowSubmissionView["kind"]> = new Set(["annotation", "proposal_check", "carry_forward"]);
 
 /** Order of the rows: unsubmitted first (needs the lead), then submitted; each by assignment date. */
 const byAssignment = (a: CardWorkItem, b: CardWorkItem) => (a.assigned_at ?? "").localeCompare(b.assigned_at ?? "") || a.assignment_id - b.assignment_id;
@@ -123,7 +126,8 @@ export function AnnotationPart({ row, projectKey, query, submissions, changes, c
   const assignButton = useRef<HTMLButtonElement>(null);
   const focusAfterRemoval = useFocusAfterRemoval(assignButton);
   const mode = row.annotation_mode ?? null;
-  const people = ordered(row.work.filter(item => item.task === "annotate" && item.moved_to_version == null));
+  // Work a person carried to a newer version is listed once, on that version (issue 543).
+  const people = ordered(row.work.filter(item => item.task === "annotate" && item.moved_to_version == null && !carriedOnward(row, item)));
   const documents = new Set(row.versions.map(version => version.document_id));
   // The newest annotation layer per person on this text.
   const layers = new Map<string, RowSubmissionView>();
@@ -176,17 +180,22 @@ export function AnnotationPart({ row, projectKey, query, submissions, changes, c
     {(people.length > 0 || removedPeople.length > 0) && <PersonList label="Annotators">
       {people.map(item => {
         const layer = item.status === "submitted" ? layerOf(item.author_label, item.document_id) : undefined;
-        const day = layer ? rowDay(layer.recorded_at, now) : null;
+        // Issue 543: an annotation a typo fix moved is the person's own: their submission day and assignment, and the move.
+        const moved = item.moved_by_typo_fix && layer?.submission_id === item.moved_by_typo_fix.submission_id ? item.moved_by_typo_fix : null;
+        const day = layer ? rowDay(moved?.submitted_at ?? layer.recorded_at, now) : null;
         const submittedText = layer ? `Submitted${day ? ` ${day}` : ""}, ${plural(layer.finding_count, "finding")}` : null;
+        const movedText = moved ? `moved from ${moved.from_version != null ? `v${moved.from_version}` : "the old version"} by the typo fix ${rowDay(moved.moved_at, now) ?? ""}`.trim() : null;
+        const assignedItem = item.moved_by_typo_fix ? { ...item, assigned_at: item.moved_by_typo_fix.assigned_at ?? null, assigned_by: item.moved_by_typo_fix.assigned_by ?? null } : item;
         // "Assigned 18 Oct by you, from proposals · v2"; "Submitted 22 Oct, 14 findings · assigned 15 Oct · v1" (the
         // version only when the text has several, issue 445).
         // A new round of submitted work (issue: lead review F3): "Round 2, started by you 17 Nov" before the assignment.
         const roundText = item.status !== "submitted" ? roundLine(item, changes) : null;
-        const assignedText = assignedLine(item, now, !submittedText && !item.held && !roundText);
+        const assignedText = assignedLine(assignedItem, now, !submittedText && !item.held && !roundText);
         const modeText = item.status !== "submitted" && item.annotation_mode ? MODE_TEXT[item.annotation_mode] : null;
         const details = joined([
           pausedWord(item),
           submittedText,
+          movedText,
           roundText,
           assignedText ? <>{assignedText}{modeText && `, ${modeText}`}</> : modeText,
           personVersion(row, item),

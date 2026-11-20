@@ -774,7 +774,21 @@ def build_submissions(
         for sid in item.get("submission_ids", []):
             archived_owner.setdefault(sid, rid)
 
-    rows = _submissions(conn, pid, documents)
+    # Issue 543: a typo-fix copy stands where the person's own submission
+    # stood (the comparisons and consolidations take this order).
+    from ontotator.application.typo_fix_carry import typo_fix_moves
+
+    found = _submissions(conn, pid, documents)
+    moved = typo_fix_moves(conn, pid) if found else {}
+    rows = sorted(
+        found,
+        key=lambda row: (
+            moved[row.submission_id].first_recorded_at
+            if row.submission_id in moved
+            else row.recorded_at,
+            row.submission_id,
+        ),
+    )
     open_reviews = _open_translation_reviews(conn, pid, documents)
     people = lead_pseudonym_refs(
         conn,
@@ -842,6 +856,7 @@ def build_submissions(
                 "guideline_withdrawn": row.guideline_version is not None
                 and facts[row.guideline_version].withdrawn,
                 "kept_automatically": kept.get(row.submission_id, 0),
+                "moved_by_typo_fix": row.submission_id in moved,
             }
         )
 

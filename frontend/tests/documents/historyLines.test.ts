@@ -7,6 +7,7 @@ const now = new Date("2026-10-21T23:00:00");
 const ana = { pseudonym: "ann-0003", display_name: "Ana Weber", is_me: false };
 const tom = { pseudonym: "ann-0004", display_name: "Tom Reis", is_me: false };
 const luc = { pseudonym: "ann-0005", display_name: "Luc Martin", is_me: false };
+const lead = { pseudonym: "lead-0002", display_name: "Project Lead", is_me: false };
 
 /** case-201 de: Ana accepted v1 unchanged, Tom submitted Round 1, Luc annotates, the lead chose the final. */
 function walkthroughRow() {
@@ -15,8 +16,8 @@ function walkthroughRow() {
     versions: [version({ document_id: "case-201-de", origin: "machine_translation", translation_status: "accepted", latest_review_decision: "accepted_unchanged" })],
     work: [
       work({ assignment_id: 1, document_id: "case-201-de", task: "translation_review", status: "submitted", author_label: "ann-0003", person: ana }),
-      work({ assignment_id: 2, document_id: "case-201-de", status: "submitted", author_label: "ann-0004", person: tom, round_ordinal: 1 }),
-      work({ assignment_id: 3, document_id: "case-201-de", status: "in_progress", author_label: "ann-0005", person: luc, round_ordinal: 1 }),
+      work({ assignment_id: 2, document_id: "case-201-de", status: "submitted", author_label: "ann-0004", person: tom, round_ordinal: 1, assigned_at: "2026-10-20T21:00:00", assigned_by: lead }),
+      work({ assignment_id: 3, document_id: "case-201-de", status: "in_progress", author_label: "ann-0005", person: luc, round_ordinal: 1, assigned_at: "2026-10-21T08:00:00", assigned_by: lead }),
     ],
     stages: stages({ review: stageCell("accepted", "done", { people: [ana], at: "2026-10-20T22:09:00", note: "unchanged" }) }),
     final: final({ case_id: "case-201", language: "de", document_id: "case-201-de", submission_id: "s-tom", selected_by: "lead-0002", selected_at: "2026-10-20T22:20:00" }),
@@ -25,13 +26,13 @@ function walkthroughRow() {
 const tomSubmission = submission({ submission_id: "s-tom", document_id: "case-201-de", author_label: "ann-0004", author: tom, round_ordinal: 1, finding_count: 1, recorded_at: "2026-10-21T22:15:00" });
 
 describe("historyLines", () => {
-  it("writes one line per stage as the spec examples", () => {
+  it("writes one line per review, submission, open task and the final, in time order (issue 545)", () => {
     const lines = historyLines(walkthroughRow(), [tomSubmission], { me: "lead-0002", now });
     expect(lines.map(line => line.text)).toEqual([
       "Review: Ana Weber (ann-0003), Accepted unchanged, 20 Oct, 22:09",
-      "Annotation: Tom Reis (ann-0004), Round 1, 1 finding, 21 Oct, 22:15",
-      "Annotation: Luc Martin (ann-0005), Round 1, In progress",
       "Final: chosen by you, 20 Oct, 22:20",
+      "Annotation: Luc Martin (ann-0005), Round 1, In progress, assigned by Project Lead (lead-0002), 21 Oct, 08:00",
+      "Annotation: Tom Reis (ann-0004), Round 1, 1 finding, 21 Oct, 22:15",
     ]);
   });
 
@@ -43,7 +44,7 @@ describe("historyLines", () => {
       work: [work({ assignment_id: 7, document_id: "case-202-de", status, author_label: "ann-0004", person: tom, assigned_by, unreviewed_translation: true })],
     });
     const open = historyLines(flagged("in_progress"), null, { now });
-    expect(open.find(entry => entry.key === "unreviewed-7")).toEqual({ key: "unreviewed-7", stage: "annotation", text: line });
+    expect(open.find(entry => entry.key === "unreviewed-7")).toEqual({ key: "unreviewed-7", stage: "annotation", at: null, text: line });
     const submitted = historyLines(flagged("submitted"), [submission({ submission_id: "s-7", document_id: "case-202-de", author_label: "ann-0004", author: tom, recorded_at: "2026-10-21T22:15:00" })], { now });
     expect(submitted.map(entry => entry.text)).toContain(line);
     expect(historyLines(flagged("in_progress", null), null, { now }).map(entry => entry.text))
@@ -52,16 +53,16 @@ describe("historyLines", () => {
 
   it("tags every line with its stage for the row panel's Activity filter", () => {
     const lines = historyLines(walkthroughRow(), [tomSubmission], { me: "lead-0002", now });
-    expect(lines.map(line => line.stage)).toEqual(["review", "annotation", "annotation", "final"]);
+    expect(lines.map(line => line.stage)).toEqual(["review", "final", "annotation", "annotation"]);
   });
 
   it("names another lead and falls back to the work items while submissions load", () => {
     const lines = historyLines(walkthroughRow(), null, { me: "lead-0009", now });
     expect(lines.map(line => line.text)).toEqual([
+      "Annotation: Tom Reis (ann-0004), Round 1, Submitted, assigned by Project Lead (lead-0002), 20 Oct, 21:00",
       "Review: Ana Weber (ann-0003), Accepted unchanged, 20 Oct, 22:09",
-      "Annotation: Tom Reis (ann-0004), Round 1, Submitted",
-      "Annotation: Luc Martin (ann-0005), Round 1, In progress",
       "Final: chosen by lead-0002, 20 Oct, 22:20",
+      "Annotation: Luc Martin (ann-0005), Round 1, In progress, assigned by Project Lead (lead-0002), 21 Oct, 08:00",
     ]);
   });
 
@@ -82,17 +83,18 @@ describe("historyLines", () => {
     });
     const consolidation = submission({ submission_id: "s-c", document_id: "c-de-v2", version: 2, kind: "consolidation", author_label: "ann-0003", author: ana, round_ordinal: null, finding_count: 3, recorded_at: "2026-10-21T09:00:00" });
     const lines = historyLines(target, [consolidation], { now });
+    // Lines without a time stand first (oldest), in the order they are written.
     expect(lines.map(line => line.text)).toEqual([
       "Review: Ana Weber (ann-0003), Accepted with corrections, v1 → v2",
       "Review: Accepted: reviewed outside Ontotator, Checked",
-      "Consolidation: Ana Weber (ann-0003), 3 findings, v2, 21 Oct, 09:00",
       "Consolidation: Ana Weber (ann-0003), Open, Paused",
       "Annotation: Luc Martin (ann-0005), moved to v2",
       "Task paused: ann-0003",
+      "Consolidation: Ana Weber (ann-0003), 3 findings, v2, 21 Oct, 09:00",
     ]);
-    expect(lines.at(-1)?.reportId).toBe("rep-3");
+    expect(lines.find(line => line.key === "hold-hold-3")?.reportId).toBe("rep-3");
     // A consolidation is Finalization work (review 2, F2): its lines are not filed under Annotation.
-    expect(lines.map(line => line.stage)).toEqual(["review", "review", "final", "final", "annotation", "annotation"]);
+    expect(lines.map(line => line.stage)).toEqual(["review", "review", "final", "annotation", "annotation", "final"]);
   });
 
   it("is empty for a row without work, records or final", () => {
@@ -252,6 +254,91 @@ describe("reassignments and mode changes", () => {
     expect(lines.map(line => [line.stage, line.text])).toEqual([
       ["review", "Review: correction requested from Anna Early (ann-1) by you, 30 Oct, 09:00: Check the dose."],
       ["review", "Review: addition to the correction request for Anna Early (ann-1) by Carla Diaz (lead-1), 30 Oct, 09:30: Paragraph 3 as well."],
+    ]);
+  });
+});
+
+describe("time order, times and authors (issue 545)", () => {
+  const now = new Date("2026-11-20T18:00:00");
+  const me = { pseudonym: "lead-1", display_name: "Demo Lead", is_me: true };
+  const reviewer = { pseudonym: "rev-1", display_name: "Rita Rev", is_me: false };
+
+  it("U2-02: a query, its decision, a correction request and the corrected review stand in time order, each with its time", () => {
+    const target = row({
+      case_id: "synthetic-ready", language: "de",
+      versions: [
+        version({ document_id: "r-v1", origin: "machine_translation", translation_status: "reviewed", latest_review_decision: "query", is_newest_in_chain: false }),
+        version({ document_id: "r-v2", version: 2, origin: "correction", derived_from: "r-v1", translation_status: "reviewed", latest_review_decision: "accepted_corrected", is_newest_in_chain: false,
+          query_decision: { kind: "reviewer_text", decided_document_id: "r-v1", reviewed_document_id: "r-v1", reviewer_assignment_id: 1, answer: null, edited: false, decided_at: "2026-11-20T15:57:00", decided_by: me } }),
+        version({ document_id: "r-v3", version: 3, origin: "correction", derived_from: "r-v2", translation_status: "accepted" }),
+      ],
+      work: [
+        work({ assignment_id: 1, document_id: "r-v1", task: "translation_review", status: "submitted", author_label: "rev-1", person: reviewer, submitted_at: "2026-11-20T15:55:00" }),
+        work({ assignment_id: 2, document_id: "r-v2", task: "translation_review", status: "submitted", author_label: "rev-1", person: reviewer, submitted_at: "2026-11-20T16:03:00" }),
+      ],
+    });
+    const lines = historyLines(target, [], { now, changes: [
+      { kind: "correction_requested", at: "2026-11-20T16:02:00", task: "translation_review", assignment_id: 2, by: me, to_person: reviewer, reason: "Check the dose." },
+      { kind: "correction_reason_added", at: "2026-11-20T16:02:30", task: "translation_review", assignment_id: 2, by: me, to_person: reviewer, reason: "Paragraph 3 too." },
+    ] });
+    expect(lines.map(line => line.text)).toEqual([
+      "Review: Rita Rev (rev-1), Query, 20 Nov, 15:55",
+      "Review: query decided by you, the reviewer’s text taken, v1 → v2, 20 Nov, 15:57",
+      "Review: correction requested from Rita Rev (rev-1) by you, 20 Nov, 16:02: Check the dose.",
+      "Review: addition to the correction request for Rita Rev (rev-1) by you, 20 Nov, 16:02: Paragraph 3 too.",
+      "Review: Rita Rev (rev-1), Accepted with corrections, v2 → v3, 20 Nov, 16:03",
+    ]);
+  });
+
+  it("U3-05: an open consolidation names who started it and when; a reopening stands before later submissions", () => {
+    const ben = { pseudonym: "ann-2", display_name: "Ben Clausen", is_me: false };
+    const cara = { pseudonym: "ann-7", display_name: "Cara Dietz", is_me: false };
+    const target = row({
+      case_id: "u3-case-05", language: "de",
+      versions: [version({ document_id: "u3-de", origin: "machine_translation", translation_status: "accepted" })],
+      work: [
+        work({ assignment_id: 4, document_id: "u3-de", status: "submitted", author_label: "ann-2", person: ben, round_ordinal: 2 }),
+        work({ assignment_id: 5, document_id: "u3-de", task: "review", status: "open", author_label: "ann-7", person: cara, round_ordinal: 1, assigned_at: "2026-11-20T16:13:00", assigned_by: me }),
+      ],
+    });
+    const submitted = submission({ submission_id: "s-ben-2", document_id: "u3-de", author_label: "ann-2", author: ben, round_ordinal: 2, finding_count: 2, recorded_at: "2026-11-20T16:12:00" });
+    const lines = historyLines(target, [submitted], { now, changes: [
+      { kind: "reopened", at: "2026-11-20T16:10:00", task: "annotate", assignment_id: 4, by: me, to_person: ben, reason: null },
+      { kind: "text_paused", at: "2026-11-20T16:14:00", by: me, reason: "Source is checked" },
+      { kind: "text_released", at: "2026-11-20T16:16:00", by: me, reason: null },
+    ] });
+    expect(lines.map(line => line.text)).toEqual([
+      "Annotation: task of Ben Clausen (ann-2) reopened by you, 20 Nov, 16:10",
+      "Annotation: Ben Clausen (ann-2), Round 2, 2 findings, 20 Nov, 16:12",
+      "Consolidation: Cara Dietz (ann-7), Round 1, Open, started by you, 20 Nov, 16:13",
+      "Text: paused by you, 20 Nov, 16:14: Source is checked",
+      "Text: released by you, 20 Nov, 16:16",
+    ]);
+  });
+
+  it("U4-09: the mode change, the typo fix and the annotations it moved stand in time order; the copies are no lines of their own", () => {
+    const anna = { pseudonym: "ann-4", display_name: "Anna Kühn", is_me: false };
+    const fix = { reason: "Typo", previous_document_id: "t-v1", inserted_characters: 1, deleted_characters: 0, corrected_at: "2026-11-20T15:58:00", corrected_by: me };
+    const target = row({
+      case_id: "synthetic-accepted", language: "de",
+      versions: [
+        version({ document_id: "t-v1", origin: "machine_translation", translation_status: "accepted", is_newest_in_chain: false }),
+        version({ document_id: "t-v2", version: 2, origin: "correction", derived_from: "t-v1", translation_status: "accepted", editorial_correction: fix }),
+      ],
+      work: [work({ assignment_id: 9, document_id: "t-v2", version: 2, status: "submitted", author_label: "ann-4", person: anna, round_ordinal: 1 })],
+    });
+    const own = submission({ submission_id: "s-anna", document_id: "t-v1", author_label: "ann-4", author: anna, round_ordinal: 1, finding_count: 3, recorded_at: "2026-11-20T15:56:00" });
+    const copy = submission({ submission_id: "s-anna-v2", document_id: "t-v2", version: 2, kind: "carry_forward", author_label: "ann-4", author: anna, round_ordinal: 1, finding_count: 3,
+      recorded_at: "2026-11-20T15:58:00", moved_by_typo_fix: true });
+    const lines = historyLines(target, [copy, own], { now, changes: [
+      { kind: "mode_changed", at: "2026-11-20T15:55:00", from_mode: "proposals", to_mode: "scratch", reason: "No proposals", by: me },
+      { kind: "carried_by_typo_fix", at: "2026-11-20T15:58:00", task: "annotate", assignment_id: 9, by: null, to_person: anna, from_version: 1, to_version: 2 },
+    ] });
+    expect(lines.map(line => line.text)).toEqual([
+      "Annotation: mode changed by you, now annotated from scratch, 20 Nov, 15:55: No proposals",
+      "Annotation: Anna Kühn (ann-4), Round 1, 3 findings, v1, 20 Nov, 15:56",
+      "Review: typos fixed in v2 by you, 20 Nov, 15:58: Typo",
+      "Annotation: annotation of Anna Kühn (ann-4) moved to v2 by itself after the typo fix, 20 Nov, 15:58",
     ]);
   });
 });
