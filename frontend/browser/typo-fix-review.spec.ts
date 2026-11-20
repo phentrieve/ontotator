@@ -10,7 +10,7 @@
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { activityLines, documentsReady, documentsTab, openTextCard, rowAction, textCard, textNamePattern, textRow, textVersionItems } from "./documentsHelpers";
+import { activityLines, documentsReady, documentsTab, editTranslation, openTextCard, rowAction, textCard, textNamePattern, textRow, textVersionItems } from "./documentsHelpers";
 import { loginThroughForm } from "./helpers";
 import { leadScenario, type LeadPerson, type LeadScenario } from "./leadWorkflowHelpers";
 
@@ -59,11 +59,15 @@ async function openCard(page: Page, caseId: string) {
 const documentRow = (page: Page, caseId: string) => ((page.viewportSize()?.width ?? 1440) >= 700 ? textRow(page, caseId, "de")
   : page.locator("article.document-card").filter({ has: page.getByRole("button", { name: new RegExp(`^Details, ${esc(caseId)}\\s*de`) }) }));
 
-/** The lead: "Fix typos…" on the newest version in the card; the fixed word is the proof the reviewer reads. */
-async function fixTypos(page: Page, caseId: string, reviewNote: string) {
+/**
+ * The lead fixes typos on the newest version in the card; the fixed word is the proof the reviewer reads. An accepted
+ * version has "Edit the translation…" with the choice inside (issue 555); another one "Fix typos (no review)…".
+ */
+async function fixTypos(page: Page, caseId: string, reviewNote: string, accepted = false) {
   const card = await openCard(page, caseId);
   const [v1] = await (await textVersionItems(card, 1)).all();
-  await v1.getByRole("button", { name: `Fix typos in v1 of ${caseId} de…`, exact: true }).click();
+  if (accepted) await editTranslation(page, v1, caseId, "typos");
+  else await v1.getByRole("button", { name: `Fix typos (no review) in v1 of ${caseId} de…`, exact: true }).click();
   const dialog = page.getByRole("dialog", { name: `Fix typos, ${caseId} de v1`, exact: true });
   const editor = dialog.getByRole("textbox", { name: "Corrected text", exact: true });
   await editor.fill((await editor.inputValue()).replace("hypotonia", "Hypotonie"));
@@ -83,17 +87,19 @@ for (const [name, viewport] of sizes) {
     const s = await leadScenario(page, "REJECTED_TRANSLATION_FOR_LEAD");
     const caseId = s.cases!.queried;
     await login(page, s, "lead");
-    await fixTypos(page, caseId, "A submitted translation review stays with the version it reviewed. To have v2 reviewed, use Resolve… › Assign a new review… on this row after saving.");
+    await fixTypos(page, caseId, "A submitted translation review stays with the version it reviewed. To have v2 reviewed, use Resolve… › Other ways… › Assign a new review… on this row after saving.");
     await expect(page.locator(".ui-toast .ui-toast-message")).toHaveText(`Typos fixed: v2 of ${caseId} de saved. It stays Queried.`);
     await textCard(page, caseId, "de").getByRole("button", { name: "Close", exact: true }).click();
 
     // Resolve…: the reviewer's question is still shown; her review of v1 is not reopened, the fix is reviewed.
     await rowAction(page, "Resolve…", caseId, "de").click();
-    const options = page.getByRole("group", { name: textNamePattern("Resolve queried translation, ", caseId, "de") });
+    const options = page.getByRole("dialog", { name: textNamePattern("Resolve queried translation, ", caseId, "de") });
     await expect(options).toContainText("Ana Weber asked a question about this translation.");
-    await expect(options.getByRole("button")).toHaveText(["Accept the reviewer’s text…", "Answer and accept the version as it is…", "Assign a new review…", "Correct the translation…", "Discard the de translation…", "Cancel"]);
+    await expect(options.locator(".modal-actions").getByRole("button")).toHaveText(["Other ways…", "Cancel", "Accept v2 as it is…", "Accept the reviewer’s text as v3…"]);
+    await options.getByRole("button", { name: textNamePattern("Other ways to resolve ", caseId, "de") }).click();
+    await expect(page.getByRole("menuitem")).toHaveText([/^Assign a new review…/, /^Correct it myself \(counts as accepted\)…/, /^Discard the de translation…/]);
     await shot(page, `f1-resolve-${name}`);
-    await options.getByRole("button", { name: "Assign a new review…", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Assign a new review…", exact: true }).click();
     const assign = page.getByRole("dialog", { name: "Assign translation review", exact: true });
     await expect(assign.locator(".assign-context strong").first()).toHaveText(new RegExp(`^${esc(caseId)}\\s*de\\s*v2$`));
     // Issue 547, U2-07: Ana's review of v1 is named as such, not as an assignment of v2; "assigned" once.
@@ -153,7 +159,7 @@ for (const [name, viewport] of sizes) {
     const s = await leadScenario(page, "ACCEPTED_TRANSLATION_FOR_LEAD");
     const caseId = s.cases!.accepted;
     await login(page, s, "lead");
-    await fixTypos(page, caseId, "A submitted translation review stays with the version it reviewed.");
+    await fixTypos(page, caseId, "A submitted translation review stays with the version it reviewed.", true);
     await textCard(page, caseId, "de").getByRole("button", { name: "Close", exact: true }).click();
     const row = documentRow(page, caseId);
     if (name === "390") {

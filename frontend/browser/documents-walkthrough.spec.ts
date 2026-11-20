@@ -166,14 +166,15 @@ test("step 5: Tom submits (Luc keeps a draft)", async () => {
 });
 
 test("step 6: the lead requests a correction, Ana corrects → v2", async () => {
-  // The text card's Translation part: "Ask a reviewer to correct…" opens the correction dialog.
+  // The text card's Translation part: Other ways… › "Ask a reviewer to correct…" opens the correction dialog (issue 556).
   // A double click on the text name opens the card (R-4); one activation.
   await clicks.count(textName(page, CASE, "de"), { clickCount: 2 });
   const area = textCard(page, CASE, "de");
   await expect(area).toBeVisible();
   const translation = area.getByRole("navigation", { name: "Text path", exact: true }).getByRole("button", { name: /^Translation / });
   if ((await translation.getAttribute("aria-current")) !== "step") await clicks.count(translation);
-  await clicks.count(area.getByRole("button", { name: /^Ask a reviewer to correct / }).first());
+  await clicks.count(area.getByRole("button", { name: /^Other ways to change / }).first());
+  await clicks.count(page.getByRole("menuitem", { name: "Ask a reviewer to correct…", exact: true }));
   const correction = page.getByRole("dialog", { name: /^Ask a reviewer to correct, / });
   const form = correction.getByRole("region", { name: "Ask a reviewer to correct", exact: true });
   const reviewer = form.getByLabel("Translation reviewer", { exact: true });

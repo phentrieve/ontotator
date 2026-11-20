@@ -1,8 +1,8 @@
 /**
  * The lead decides a translation review submitted as a query (issue 483), from "Resolve…" on the Documents row:
- * - `reviewer_text`, "Accept the reviewer's text…": the reviewer's proposed text, which the lead may still change,
+ * - `reviewer_text`, "Accept the reviewer's text as v2…": the reviewer's proposed text, which the lead may still change,
  *   with its changes against the version; it becomes the next version, accepted. The answer is optional.
- * - `unchanged`, "Answer and accept the version as it is…": the version is accepted unchanged; the answer is required.
+ * - `unchanged`, "Accept v1 as it is…": the version is accepted unchanged; the answer is required.
  * Both are recorded as the lead's decision on the query, and the reviewer reads the answer at the submitted task.
  */
 import { useEffect, useId, useMemo, useRef, useState } from "react";
@@ -18,11 +18,6 @@ import { changedPassages } from "./UploadVersionDialog";
 
 export type QueryDecisionKind = QueryDecisionResult["kind"];
 
-export const QUERY_ACTIONS: Readonly<Record<QueryDecisionKind, string>> = {
-  reviewer_text: "Accept the reviewer’s text…",
-  unchanged: "Answer and accept the version as it is…",
-};
-
 /** Why the query cannot be decided here (`QUERY_DECISION_NOT_AVAILABLE` reasons). */
 export function queryRefusal(reason: string | null | undefined, short: string): string | null {
   switch (reason) {
@@ -31,7 +26,7 @@ export function queryRefusal(reason: string | null | undefined, short: string): 
     case "review_open": return "A translation review of this version is open. Withdraw it with Remove… in the reviewer’s row of the Translation part before you decide the query.";
     case "not_newest": return "A newer version of this translation exists. Reload the row to see it.";
     case "discarded": return "This translation was discarded. Reload the row to see its current state.";
-    case "unchanged": return `This text is the same as ${short}. To accept ${short} without changes, use Answer and accept the version as it is….`;
+    case "unchanged": return `This text is the same as ${short}. To accept ${short} without changes, use Accept ${short} as it is….`;
     case "answer_required": return "Enter the answer to the reviewer.";
     default: return null;
   }
@@ -92,7 +87,8 @@ export function QueryDecisionDialog({ kind, row, documentId, projectKey, reviewe
   const short = `v${state?.version ?? row.versions.find(entry => entry.document_id === documentId)?.version ?? 1}`;
   const next = `v${state?.next_version ?? 2}`;
   const taking = kind === "reviewer_text";
-  const title = `${taking ? "Accept the reviewer’s text" : "Answer and accept the version as it is"}, ${textLabel(row)} ${short}`;
+  // Issue 554: the title repeats the label of the button that opened it (named by its consequence).
+  const title = taking ? `Accept the reviewer’s text as ${next}, ${textLabel(row)} ${short}` : `Accept ${short} as it is, ${textLabel(row)}`;
   const value = text ?? "";
   const original = state?.text ?? "";
   const changed = state !== null && value !== original;

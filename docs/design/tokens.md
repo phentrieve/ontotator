@@ -478,3 +478,4 @@ Group "Finding" (own editable findings and the new finding only; never proposals
 - Don't introduce a new UI library or CDN fonts; assets must work offline.
 - Don't use emoji as icons; use the inline SVG icon system with a labelled control.
 - Don't distinguish mark states or workflow status by colour alone.
+- Don't put explanatory text under buttons or offer a row of equal actions; rank them (one primary, the rest under "Other ways…") and name the consequence in the label. See [Panels and actions](../design.md#panels-and-actions).

@@ -11,7 +11,7 @@
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { documentsReady, openTextCard, textCard, textVersionItems } from "./documentsHelpers";
+import { documentsReady, openTextCard, otherVersionAction, textCard, textVersionItems } from "./documentsHelpers";
 import { loginThroughForm } from "./helpers";
 import { leadScenario, type LeadScenario } from "./leadWorkflowHelpers";
 
@@ -67,11 +67,10 @@ test("a pasted machine translation becomes v2, a correction that is ready for re
   const card = await openTextCard(page, caseId, "de");
   const [v1] = await (await textVersionItems(card, 1)).all();
   // 341a-A: next to the other version actions of the newest version.
-  await expect(v1.getByRole("button", { name: `Correct v1 of ${caseId} de myself…`, exact: true })).toBeVisible();
-  const open = v1.getByRole("button", { name: `Upload a corrected text for v1 of ${caseId} de…`, exact: true });
-  await expect(open).toHaveText("Upload a corrected text…");
+  // Issue 556: on an accepted version it sits under Other ways…, next to Ask a reviewer to correct….
+  await expect(v1.getByRole("button", { name: `Edit the translation v1 of ${caseId} de…`, exact: true })).toBeVisible();
   await evidence(page, "341a-row-before");
-  await open.click();
+  await otherVersionAction(page, v1, `v1 of ${caseId} de`, "Upload a corrected text…");
 
   const dialog = uploadDialog(page, caseId);
   await expect(dialog.getByText("The text becomes v2, a correction of v1.", { exact: true })).toBeVisible();
