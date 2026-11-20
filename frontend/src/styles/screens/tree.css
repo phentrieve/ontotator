@@ -324,10 +324,11 @@
   color: var(--text-muted);
 }
 
-/* "Show in tree", under the term name of an annotation */
+/* "Show in tree": an icon in the action row next to the term (issue 540); its name and tooltip say "Show in tree".
+   A reference keeps it next to its heading. */
 
 .annotation-tree-button {
-  margin-top: 2px;
+  flex: none;
 }
 
 .tree-id {

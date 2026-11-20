@@ -55,7 +55,7 @@ describe("what the tree may do for a selection (issue 523)", () => {
     expect(treeModeNote("look")).toBe("Only looking: nothing can be changed from here.");
     expect(treeModeNote("proposal")).toBe("Only looking: nothing changes until you choose a term and confirm.");
     expect(treeModeNote("new")).toBe(treeModeNote("proposal"));
-    expect(takeEffect("proposal", "Seizure", "HP:0001250")).toBe("Proposal: decide as Changed with Seizure (HP:0001250)");
+    expect(takeEffect("proposal", "Seizure", "HP:0001250")).toBe("Proposal: decide as Replaced with Seizure (HP:0001250)");
     expect(takeEffect("new", "Seizure", "HP:0001250")).toBe("New finding: choose Seizure (HP:0001250)");
   });
 });
