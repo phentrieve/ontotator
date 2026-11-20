@@ -198,10 +198,11 @@ test.describe("copy the marked text", () => {
     // Nothing overflows the page because of the extra button.
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
 
-    // At phone width it is an icon, so the quote keeps its room; it copies the same.
+    // It is an icon at every width, so the quote keeps its room; at phone width it copies the same.
     await page.setViewportSize({ width: 375, height: 800 });
-    const icon = bar.getByRole("button", { name: "Copy text" });
+    const icon = bar.getByRole("button", { name: /^(Copy text|Copied)$/ });
     await expect(icon).toHaveText("");
+    await expect(icon).toHaveAccessibleName("Copy text", { timeout: 4000 });
     await resetClipboard(page);
     await icon.click();
     await expect.poll(() => clipboard(page)).toBe("Hypotonia");

@@ -1629,19 +1629,10 @@
   line-height: var(--leading-reading);
   overflow-wrap: anywhere;
 }
-/* "Copy text" under the quote keeps the panel's gap to the hint below it. */
-.pending-quote + .btn {
-  margin-bottom: var(--space-2);
-}
-/* "Copy text", "Copied", "Copy failed" share one cell: the button is as wide as the longest. */
-.copy-text__labels {
-  display: inline-grid;
-}
-.copy-text__labels > span {
-  grid-area: 1 / 1;
-}
-.copy-text__label--off {
-  visibility: hidden;
+/* "Copy text" right after the quote: a margin, not a space, keeps the quote's text exact. */
+.pending-quote > .btn {
+  margin-inline-start: var(--space-2);
+  vertical-align: middle;
 }
 
 @media (forced-colors: active) {
