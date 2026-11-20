@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-BYrduXdx.js";import{n as a,t as o}from"./lib-CQPhvUV4.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-Cvgu3ddR.js";import{n as a,t as o}from"./lib-CggqrCtD.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -229,7 +229,7 @@ What for: check what was changed on an account and by whom.
 
 1. On **Users**, click **More…** in the row and choose **History**. For anonymised accounts, click the **History** button in the row.
 2. Read the table: **When**, **By**, **What**, **Whom**, **Project**, **Details**. **What** names the change in plain words, for example *Project settings changed*, *Final result withdrawn*, *Final export created* or *Phenopackets created*. Research exports are listed too, for example *Edit log exported* or *Working time exported*. A text given its own number of annotators reads *Annotators per text changed for one text*, with the text, the old and new value and the project value under **Details**. *Languages changed* says which languages were added and removed (*Added: fr. Removed: es.*). *Project settings changed* names each setting as the settings page does, with the old and the new value (*Hide annotator names during consolidation: off → on*); the description, the prefilled values and the values annotators can choose are named without values. Entries from before these values were recorded show the names only. On a phone, scroll the table sideways to read **Details**.
-3. Changes made with an API token name it under **Details** (*Via API token*); the single requests a token made are left out here. The dialog shows the newest 200 entries. For the whole trail, use the command \`ontotator admin audit\`, see [Server operations](../operations.md#users-ontologies-and-projects). An editorial correction of a translation is recorded as *Typo fix in a translation*; its details carry the reason and the changed passages. A submitted annotation that such a fix moved to the new version by itself is recorded as *Annotation moved to a typo fix automatically*, naming the submission it came from; the system made that change, so it names no person who did it. A lead's decision on a queried translation review is recorded as *Query on a translation decided*, with the kind of decision and the answer to the reviewer. A lead's addition to the reason of a correction request is recorded as *Added to the reason of a translation correction*, with the text added.
+3. Changes made with an API token name it under **Details** (*Via API token*); the single requests a token made are left out here. The dialog shows the newest 200 entries. For the whole trail, use the command \`ontotator admin audit\`, see [Server operations](../operations.md#users-ontologies-and-projects). An editorial correction of a translation is recorded as *Typo fix in a translation*; its details carry the reason and the changed passages. A submitted annotation that such a fix moved to the new version by itself is recorded as *Annotation moved to a typo fix automatically*, naming the submission it came from; the system made that change, so it names no person who did it. A lead's decision on a queried translation review is recorded as *Query on a translation decided*, with the kind of decision and the answer to the reviewer. A lead's addition to the reason of a correction request is recorded as *Added to the reason of a translation correction*, with the text added. A question sent with **Ask the lead** is recorded as *Asked the lead*, a lead's answer as *Answered a question*.
 
 ## Anonymise a deactivated account
 
@@ -413,7 +413,7 @@ New here? Start with [Your first task, start to finish](first-task.md). How to l
 - Findings: [Mark text and add a finding](#mark-text-and-add-a-finding), [Search a term](#search-a-term), [Browse the ontology tree](#browse-the-ontology-tree), [Set values and confirm defaults](#set-values-and-confirm-defaults), [Manage mentions](#manage-mentions-of-a-finding), [Add a finding without a text span](#add-a-finding-without-a-text-span), [Change term, note or delete a finding](#change-term-note-or-delete-a-finding), [Add modifiers](#add-modifiers-to-a-finding), [Undo, redo and reset](#undo-redo-and-reset-your-changes), [Turn a finding into a modifier](#turn-a-standalone-modifier-finding-into-a-modifier), [Work in several layers](#work-in-several-layers)
 - Special tasks: [Review tool proposals](#review-tool-proposals), [Review carried findings](#review-carried-findings), [Re-create findings after a text correction](#re-create-findings-after-a-text-correction)
 - Finishing: [Submit the text](#submit-the-text), [Confirm values and acknowledge warnings](#confirm-values-and-acknowledge-warnings-in-the-submit-dialog), [View your submissions](#view-your-submissions), [Start a new work round](#start-a-new-work-round)
-- Problems: [Report a text problem](#report-a-text-problem), [Resume a paused task or withdraw a report](#resume-a-paused-task-or-withdraw-a-report)
+- Problems: [Ask the lead](#ask-the-lead), [Report a text problem](#report-a-text-problem), [Resume a paused task or withdraw a report](#resume-a-paused-task-or-withdraw-a-report)
 - [Review a translation](#review-a-translation)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 
@@ -795,9 +795,21 @@ What happens to your earlier work:
 - While your submission is being consolidated, you cannot continue from it. The dialog then shows no choice and no button under **Start a new round**, only: *Your submission is being consolidated, so you cannot continue from it now. Ask your project lead.* The lead can finish the consolidation or withdraw it; after that the dialog offers your submission again.
 - In a task from tool proposals you cannot continue from a submission yourself. The dialog says: *In a task from tool proposals you cannot continue from a submission yourself. Ask your project lead to start a new round.*
 
+## Ask the lead
+
+What for: ask the project lead a question about the task you are working on, for example whether a translated term is right. Today this is offered in a translation review. Your task stays open: you keep working and decide yourself once the lead answers.
+
+1. Optional: select the passage you ask about in the translation.
+2. Click **Ask the lead** in the header, or **Ask the lead…** under **Questions to the lead** in **Your review**.
+3. Write **Your question**. **Passage you ask about (optional)** holds the passage you selected. In **Your wording for this passage (optional)**, write how you would put it; the lead can take it into your text with the answer.
+4. Optional: tick **Pause my task until the lead answers** if you cannot go on without the answer.
+5. Click **Send question**.
+
+**Questions to the lead** lists your questions: *Waiting for the lead's answer*, then *Answered by the lead* with **Answer from the lead**. If the lead took your wording, it reads *The lead put your wording into your text.*; click **Show it in my text** to load it. Check it and submit your review as usual.
+
 ## Report a text problem
 
-What for: tell the lead that the text cannot be annotated as it is, for example cut off or the wrong text. For questions about the rules, ask your lead directly instead. For an error message, a crash or something that does not load, use [Report a technical problem](getting-started.md#report-a-technical-problem): it goes to the administrators and does not pause your task.
+What for: tell the lead that the text cannot be annotated as it is, for example cut off or the wrong text. For a question about the translation, use [Ask the lead](#ask-the-lead): it does not pause your task. For questions about the rules, ask your lead directly instead. For an error message, a crash or something that does not load, use [Report a technical problem](getting-started.md#report-a-technical-problem): it goes to the administrators and does not pause your task.
 
 Before you start: a report pauses your task. You cannot save or submit until the pause is released. Your saved work stays.
 
@@ -853,30 +865,31 @@ Then decide:
 | --- | --- | --- |
 | **Accepted unchanged** | The translation is right as it stands. | It becomes available for annotation. Annotation tasks already assigned open by themselves. |
 | **Accepted with corrections** | You corrected it and it is now right. Editing chooses this for you. | Your corrected text is saved as a new text version, which is accepted for annotation. |
-| **Query** | The meaning may differ clinically and you are not sure. | Not accepted. The lead reads your rationale and decides: they take the text you proposed, or accept the translation as it is, and answer you. Annotation tasks already assigned keep waiting until then. |
 | **Rejected** | The translation changes the clinical meaning. | Not accepted. The lead decides: a new review, a correction or discarding it. Annotation tasks already assigned keep waiting. |
 
-A problem in the source that does not affect the translation is no reason for a **Query**. Examples: a dose that looks too low but is what the source says, a footnote digit stuck to a year, a word broken by a hyphen at a line end. If the translation gives the source correctly, accept it (**Accepted unchanged**, or **Accepted with corrections** if you corrected something else) and put your remark in the **Rationale**. It is kept with your review. The lead reads the **Rationale** of every review, also of an accepted one, under **Translation reviews** in the text card and in the list of all translation reviews. A **Query** holds the annotation of the text until the lead decides; keep it for a translation you are not sure about.
+Not sure? Use [Ask the lead](#ask-the-lead) before you decide; your review stays open. **Query** is no longer a decision. Reviews submitted as **Query** before stay readable, with the lead's decision.
+
+A problem in the source that does not affect the translation needs no question. Examples: a dose that looks too low but is what the source says, a footnote digit stuck to a year, a word broken by a hyphen at a line end. If the translation gives the source correctly, accept it (**Accepted unchanged**, or **Accepted with corrections** if you corrected something else) and put your remark in the **Rationale**. It is kept with your review. The lead reads the **Rationale** of every review, also of an accepted one, under **Translation reviews** in the text card and in the list of all translation reviews.
 
 Steps:
 
 1. Open the task. The **Source** is on the left, the **Translation** on the right.
 2. Read the automatic checks band at the top. Click **Details** to see which checks failed and why.
-   - The band may also read *More passages in brackets than in the source: 2 in the translation, 1 in the source*. Ontotator found this itself, on the version you review. A translation sometimes adds a second name in brackets, for example a lay term followed by the Latin or English term; one finding is then named twice. **Details** lists the passages. If the translation added one, remove it; your decision is then **Accepted with corrections**. If you are not sure, choose **Query** with the category **Addition**. If the passages are right, decide as usual: this check asks for no rationale and is not counted in **My tasks**.
+   - The band may also read *More passages in brackets than in the source: 2 in the translation, 1 in the source*. Ontotator found this itself, on the version you review. A translation sometimes adds a second name in brackets, for example a lay term followed by the Latin or English term; one finding is then named twice. **Details** lists the passages. If the translation added one, remove it; your decision is then **Accepted with corrections**. If you are not sure, [ask the lead](#ask-the-lead). If the passages are right, decide as usual: this check asks for no rationale and is not counted in **My tasks**.
 3. Type your corrections directly in the translation column. Your edits are saved as you type, and the decision switches to **Accepted with corrections**. Use **Show changes** to see your edits, also a double space you typed, and **Couple scrolling** to scroll both columns together. **Show matching paragraph** (\`Alt+M\`) jumps to the paired paragraph.
 4. Optional: to compare with another text, click **Compare** above the texts. With several texts to compare, it opens a menu. In the review of a later version (v2, v3, …), the first entry is the previous version ([Review a later version](#review-a-later-version)).
-5. Under **Your review**, choose a **Decision** (or press \`1\` to \`4\`).
+5. Under **Your review**, choose a **Decision** (or press \`1\` to \`3\`).
 6. Fill in what the decision needs:
-   - **Query** and **Rejected** always count as a clinically relevant change: choose at least one category and write a **Rationale**. Put your question for the lead in the rationale.
+   - **Rejected** always counts as a clinically relevant change: choose at least one category and write a **Rationale**.
    - **Accepted with corrections**: tick **Clinically relevant change** if your correction changes the clinical meaning; then a category and a **Rationale** are required.
    - **Accepted unchanged** after a failed automatic check: say in the **Rationale** why the flagged difference is correct.
 7. Click **Submit review…** (or press \`Ctrl+Enter\`), read what will happen, then click **Submit review**.
    - If the text has spacing errors or invisible characters, the confirmation says so, for example *2 typography hints in your text: double space (2).* Click **Show them** to see each place with a little text around it; spaces are drawn as dots. To fix them, click **Keep editing**. The line blocks nothing: you can submit all the same. It names a double space, a space before or a missing space after punctuation, spaces at the end of a line or of the text, tabs, invisible characters and a doubled full stop. It does not find two words run together or a grammar slip; read your corrections once more.
-8. A message confirms the review, with **View result**. Your next open task opens on its own, another translation review first, or **My tasks** if none is left. If you also annotate this text and your review finished its translation, your annotation of the text opens instead and the message adds *Annotate this text now*. Finished means: the translation is accepted (with corrections, on the corrected version), every other translation of the text is accepted too, and no further review or decision of the lead is pending. After **Query** or **Rejected** it does not come first.
+8. A message confirms the review, with **View result**. Your next open task opens on its own, another translation review first, or **My tasks** if none is left. If you also annotate this text and your review finished its translation, your annotation of the text opens instead and the message adds *Annotate this text now*. Finished means: the translation is accepted (with corrections, on the corrected version), every other translation of the text is accepted too, and no further review or decision of the lead is pending. After **Rejected** it does not come first.
 
 On a wide screen, **Your review** is a column on the right. To give the texts more room, drag its left edge (**Resize review panel**), or focus the edge and press \`←\` or \`→\`; \`Enter\` restores the default width. **Collapse review panel** folds it to a narrow strip: the bar at the bottom then shows the decision and **Submit review…**, and **Expand review panel** or **Change ↓** opens it again. Width and folding are remembered in this browser.
 
-After a **Query** the lead decides. **My tasks** then shows *Answer from the lead* at your submitted review (tab **Submitted**). Open the task: above **Submitted review** you read what was decided, for example *The lead decided your query on 18 Nov 2026, 10:12. Your text was accepted as v2.* (or *v1 was accepted as it is.*), and the lead's answer, for example *Answer from the lead: Yes, as proposed.*
+A review submitted as **Query** before this change is decided by the lead. **My tasks** then shows *Answer from the lead* at your submitted review (tab **Submitted**). Open the task: above **Submitted review** you read what was decided, for example *The lead decided your query on 18 Nov 2026, 10:12. Your text was accepted as v2.* (or *v1 was accepted as it is.*), and the lead's answer, for example *Answer from the lead: Yes, as proposed.*
 
 A project lead who corrects a translation themselves sees only **Accepted with corrections**. When the lead corrects a translation that was already accepted, the corrected version is reviewed again: it then appears as a new translation review task, usually for you ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
 
@@ -912,7 +925,7 @@ If the source text was updated after the translation was made, **Source updates 
 
 **Submit review…** alone does not resolve a source update. If you use it with an accepting decision while one is open, the confirmation says so, for example *1 source update is not reviewed.*, and offers **Review source update**, which opens the comparison. **Submit without the source update** accepts the translation against the original source and leaves the update open: the submitted review can then no longer resolve it, and the lead has to assign another review.
 
-![A translation review: the source on the left, the translation on the right, the failed automatic check above them. On the right, Query is chosen with the category Number or unit and a rationale, above Submit review…](images/annotator-translation-review.png)
+![A translation review: the source on the left, the translation on the right, the failed automatic check above them. On the right, Rejected is chosen with the category Number or unit and a rationale, above Submit review…](images/annotator-translation-review.png)
 
 ### Mark checked sentences
 
@@ -1389,6 +1402,14 @@ You assigned a translation review to someone who already reviewed this version, 
 
 **Accept the reviewer’s text…** or **Answer and accept the version as it is…** was refused: the query was already decided, a newer version of the translation arrived, the translation was discarded, or a translation review of the version is open (withdraw it with **Remove…** first). The dialog names the reason. Reload the row to see its current state. See [Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation).
 
+### "This question cannot be answered this way."
+
+The answer to a question was refused. With **Take the proposed wording into the reviewer's text**: the passage is no longer in the reviewer's text exactly once, or the review was submitted. Send the answer without taking the wording. The question may also have been answered already; reload the page. See [Answer a question](lead-results.md#answer-a-question).
+
+### "The question could not be sent."
+
+**Send question** was refused: a wording needs a quoted passage, and passage and wording may have at most 2000 characters each. See [Ask the lead](annotator.md#ask-the-lead).
+
 ### "Nothing can be added to this reason any more."
 
 **Add to the reason…** was refused: the reviewer submitted the review, the task was removed, or the task is no longer the one you asked for with **Ask a reviewer to correct…**. An addition is possible only while the requested review is open. Reload the row to see its current state. See [Add to the reason of a correction request](lead-documents.md#add-to-the-reason-of-a-correction-request).
@@ -1553,7 +1574,7 @@ Details: [Submit the text](annotator.md#submit-the-text).
 
 ## 9. What happens next
 
-- Your task shows **Submitted** in **My tasks**. It is read-only now; click **View** to look at it. A translation review you submitted as a **Query** shows *Answer from the lead* there once the lead decided.
+- Your task shows **Submitted** in **My tasks**. It is read-only now; click **View** to look at it. A translation review submitted as a **Query** before it was retired shows *Answer from the lead* there once the lead decided.
 - The next open task opens on its own, or **My tasks** if none is left.
 - The lead sees your submission next to the other annotators' work on the same text, and accepts one result or starts a consolidation. You do not see other people's work.
 - Your task is done. You do not need to do anything else unless the lead reopens it (**Reopened** in **My tasks**, with the lead's reason under the task name) or you notice a mistake. A translation review the lead asks for a second time names the lead's reason under the task, for example *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.* If the lead adds to that reason later, each addition stands below it with its date (*Added by the lead on …*).
@@ -1692,7 +1713,7 @@ Each row is one task. The **Task** column says what to do, for example **Annotat
 
 - **Reopened**: the lead reopened your submission. The lead's reason stands under the task, for example *Reopened by the lead on 17 Nov 2026, 14:30: The onset in sentence 2 is missing.* (on a narrow screen under the badge). Without a reason, click the badge to read when it was reopened.
 - A **Translation review** the lead asked for a second time shows the lead's reason under the task, for example *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.* What the lead added to it later stands below it, for example *Added by the lead on 17 Nov 2026, 16:05: Paragraph 3 as well.* The translation review and the consolidation show the lead's reason again when you open the task.
-- *Answer from the lead* at a submitted **Translation review**: you submitted it as a **Query** and the lead decided. Open the task to read the decision and the answer ([Review a translation](annotator.md#review-a-translation)).
+- *Answer from the lead* at a submitted **Translation review**: you submitted it as a **Query** (no longer offered) and the lead decided. Open the task to read the decision and the answer ([Review a translation](annotator.md#review-a-translation)).
 - A **Consolidation** task shows the lead's reason under the task, for example *Reason from the lead: Term and assertion differ*, if the lead gave one.
 - **Paused**: the task waits for a decision on a problem report. A long reason is cut off here; the task shows all of it. **Answer to your report** means the lead has replied.
 - **Paused by lead**: the lead paused the work on this text and gives the reason below the mark. You can open and read the task (**View paused task**), but not save it, until the lead releases the text ([A task paused by the lead](annotator.md#a-task-paused-by-the-lead)).
@@ -2708,6 +2729,17 @@ Read the **Rationale** column also for accepted reviews. A reviewer who accepts 
 The **Changes** column counts each changed place once, by words: a replaced wording is one passage. **Show changes** counts added and removed passages separately, so its numbers can be higher. A change of spaces or line breaks only is not counted. *Not counted* means the two texts differ too much to count.
 
 Only leads and system administrators can open the list. To decide a query or a rejection, go on with the next section.
+
+### Answer a question
+
+What for: answer a question a person asked with **Ask the lead** (today in a translation review). Their task stays open while you answer, unless they chose to pause it.
+
+1. In the sidebar, click **Questions**. The count shows the open ones, for example *Questions (2)*.
+2. The **Open** tab lists each question with who asked, the task and text, the question and, if given, the passage with the proposed wording marked as changes.
+3. Click **Answer…**, write **Your answer**, and click **Send answer**.
+4. With a proposed wording, tick **Take the proposed wording into the reviewer's text** to put it into their open review in the same step; the button then reads **Answer and take the wording**. The reviewer still checks the text and submits the review. If the passage is no longer in their text, the answer is refused with the wording; send it without.
+
+The answer appears in the person's task under **Questions to the lead**. Answered questions stay under **Answered**. A question is no problem report: it does not show on **Documents** and does not hold the export.
 
 ### Resolve a rejected or queried translation
 

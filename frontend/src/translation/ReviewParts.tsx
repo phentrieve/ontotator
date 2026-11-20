@@ -3,7 +3,7 @@ import type { BracketCheck, TranslationReviewRecord } from "../api/client";
 import { personLabel } from "../app/identity";
 import { submissionGuidelineLabel } from "../guidelines/submissionLabel";
 import { Button, IconCheck, IconChevronRight, IconWarning, StatusBadge, EmptyValue } from "../ui";
-import { addedBrackets, allChecksLine, calmCheckText, earlierChecksText, sourceUpdatesOpenText, sourceUpdatesOpenTitle, categoryLabels, checkBandText, checkDeviationGuidance, checkExplanation, checkLabel, checkNoLocation, decisionConsequences, decisionLabels, formatReviewDate, translationStatusLabel } from "./labels";
+import { addedBrackets, allChecksLine, calmCheckText, earlierChecksText, sourceUpdatesOpenText, sourceUpdatesOpenTitle, categoryLabels, checkBandText, checkDeviationGuidance, checkExplanation, checkLabel, checkNoLocation, decisionConsequences, decisionLabels, formatReviewDate, retiredQueryHistory, translationStatusLabel } from "./labels";
 import type { ClinicalCategory, ReviewDecisionCode } from "./reviewRules";
 
 type CheckRow = { code: string; passed: boolean; detail: string | null };
@@ -98,7 +98,8 @@ export function ReviewSummary({ record, heading }: { record: TranslationReviewRe
   return <section className="review-summary" aria-labelledby={`review-summary-${record.id}`}>
     <h2 id={`review-summary-${record.id}`} className="translation-section-title">{heading}</h2>
     <dl className="review-summary-list">
-      <div><dt>Decision</dt><dd>{decisionLabels[record.decision] ?? record.decision}</dd></div>
+      <div><dt>Decision</dt><dd>{decisionLabels[record.decision] ?? record.decision}
+        {record.decision === "query" && <span className="review-summary-retired"> ({retiredQueryHistory})</span>}</dd></div>
       <div><dt>Clinically relevant change</dt><dd>{record.clinical_change ? `Yes: ${categoryList(record.categories)}` : "No"}</dd></div>
       <div><dt>Rationale</dt><dd className="review-summary-rationale">{record.rationale?.trim() ? record.rationale : <EmptyValue />}</dd></div>
       <div><dt>Status of the reviewed version</dt><dd>{translationStatusLabel(record.status_after)}</dd></div>

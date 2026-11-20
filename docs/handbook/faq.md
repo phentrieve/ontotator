@@ -202,6 +202,14 @@ You assigned a translation review to someone who already reviewed this version, 
 
 **Accept the reviewer’s text…** or **Answer and accept the version as it is…** was refused: the query was already decided, a newer version of the translation arrived, the translation was discarded, or a translation review of the version is open (withdraw it with **Remove…** first). The dialog names the reason. Reload the row to see its current state. See [Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation).
 
+### "This question cannot be answered this way."
+
+The answer to a question was refused. With **Take the proposed wording into the reviewer's text**: the passage is no longer in the reviewer's text exactly once, or the review was submitted. Send the answer without taking the wording. The question may also have been answered already; reload the page. See [Answer a question](lead-results.md#answer-a-question).
+
+### "The question could not be sent."
+
+**Send question** was refused: a wording needs a quoted passage, and passage and wording may have at most 2000 characters each. See [Ask the lead](annotator.md#ask-the-lead).
+
 ### "Nothing can be added to this reason any more."
 
 **Add to the reason…** was refused: the reviewer submitted the review, the task was removed, or the task is no longer the one you asked for with **Ask a reviewer to correct…**. An addition is possible only while the requested review is open. Reload the row to see its current state. See [Add to the reason of a correction request](lead-documents.md#add-to-the-reason-of-a-correction-request).

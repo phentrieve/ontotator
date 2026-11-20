@@ -1,7 +1,7 @@
 import { useId } from "react";
 import { Checkbox, Kbd, Textarea } from "../ui";
 import { chooseDecision } from "./decisionOrigin";
-import { categoryLabels, clinicalChangeFacts, clinicalChangeHints, decisionDescriptions, decisionLabels, issueMessages, rationaleHint } from "./labels";
+import { categoryLabels, clinicalChangeFacts, clinicalChangeHints, decisionDescriptions, decisionLabels, issueMessages, OFFERED_DECISIONS, rationaleHint, retiredQueryNote } from "./labels";
 import type {
   ClinicalCategory,
   IssueCode,
@@ -20,13 +20,13 @@ export interface ReviewFormProps {
   /** Text of the auto-selection note (autoNoteText), rendered as role="status" under "Accepted with corrections". */
   autoNote?: string | null;
   readOnly?: boolean;
-  /** Offered decisions; default all four with their number keys. A restricted set shows no number keys. */
+  /** Offered decisions; default the three of OFFERED_DECISIONS with their number keys. A restricted set shows no number keys. */
   decisions?: readonly ReviewDecisionCode[];
   /** Hints that replace `decisionDescriptions` (a lead correction of an accepted version, issue 341 b). */
   descriptions?: Partial<Record<ReviewDecisionCode, string>>;
 }
 
-const allDecisions = Object.keys(decisionLabels) as ReviewDecisionCode[];
+const allDecisions = OFFERED_DECISIONS;
 const categories = Object.keys(categoryLabels) as ClinicalCategory[];
 
 /**
@@ -85,7 +85,8 @@ export function ReviewForm({ value, issues, onChange, onChooseDecision, failedCh
           option === "accepted_corrected" && <p key="auto-note" role="status" className="review-auto-note">{autoNote ?? ""}</p>,
         ])}
       </fieldset>
-      {implied && <p className="review-fact">{clinicalChangeFacts[decision]}</p>}
+      {decision === "query" && <p className="review-fact" role="note">{retiredQueryNote}</p>}
+      {implied && decision !== "query" && <p className="review-fact">{clinicalChangeFacts[decision]}</p>}
       {showCheckbox && (
         <Checkbox
           id={`${id}-clinical-change`}

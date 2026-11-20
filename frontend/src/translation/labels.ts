@@ -10,6 +10,16 @@ export const decisionLabels: Readonly<Record<ReviewDecisionCode, string>> = {
   rejected: "Rejected",
 };
 
+/**
+ * Issue 553 (prototype): the decisions a reviewer chooses from. Query is no longer offered: a question goes to the
+ * lead through "Ask the lead" and the review stays open. Reviews submitted as Query keep their label in history.
+ */
+export const OFFERED_DECISIONS: readonly ReviewDecisionCode[] = ["accepted_unchanged", "accepted_corrected", "rejected"];
+/** Under the decisions, while an older draft still holds Query. */
+export const retiredQueryNote = "Query is no longer a decision. Choose one of the decisions above. To ask the lead, use Ask the lead: your review stays open.";
+/** Next to a submitted review that was a Query. */
+export const retiredQueryHistory = "No longer offered. Questions now go to the lead with Ask the lead.";
+
 export const categoryLabels: Readonly<Record<ClinicalCategory, string>> = {
   omission: "Omission",
   addition: "Addition",
@@ -79,7 +89,7 @@ export function rationaleHint(decision: ReviewDecisionCode | undefined, clinical
   return "Optional.";
 }
 
-export const decisionKeyHint = "Ctrl + Enter submits, 1–4 choose a decision outside the text";
+export const decisionKeyHint = "Ctrl + Enter submits, 1–3 choose a decision outside the text";
 
 /** What submitting each decision will do, for the confirmation dialog. */
 export const decisionConsequences: Readonly<Record<ReviewDecisionCode, string>> = {
