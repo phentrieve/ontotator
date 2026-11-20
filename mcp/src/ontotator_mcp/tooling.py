@@ -13,6 +13,8 @@ Two more things hold for every tool because ``register`` sets them:
   default, for example the whole project.
 - A tool with a ``confirm`` argument says in its answer what it acted on
   (``selection``), in the dry run and when applied.
+- The text of an answer is JSON without indentation: the indented form the
+  MCP library writes by default is about a third longer and says no more.
 """
 
 from __future__ import annotations
@@ -20,14 +22,16 @@ from __future__ import annotations
 import difflib
 import functools
 import inspect
+import json
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any, Literal, TypeVar
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.tools import Tool
-from mcp.types import ToolAnnotations
+from mcp.types import CallToolResult, TextContent, ToolAnnotations
 from pydantic import create_model, model_validator
+from pydantic_core import to_jsonable_python
 
 Scope = Literal["read", "import", "export", "project-admin", "admin"]
 Effect = Literal["read", "additive", "changes", "destructive", "local"]
@@ -87,6 +91,56 @@ def tool_message(item: dict[str, Any]) -> Any:
     """Why ``item`` (a kept task or a skipped text) stays as it is, in the
     words of this server's tools; the server's sentence for other reasons."""
     return TOOL_MESSAGES.get(str(item.get("reason")), item.get("message"))
+
+
+# Said in the description of every document_id argument (#471): for a source
+# text the two can be the same string, so a case ID given by mistake silently
+# addresses the source.
+NOT_A_CASE_ID = " A case ID is not a document_id: take it from list_texts."
+
+# The names of one person, the same in every tool result (#471).
+PERSON_FIELDS = ("username", "display_name", "pseudonym")
+
+
+def person(ref: Any) -> dict[str, Any] | None:
+    """One person as every tool returns them: ``username`` (the login name the
+    tools take as an argument), ``display_name`` and ``pseudonym``.
+
+    ``ref`` is what the server returned (a person reference, or a row with
+    these fields); a name it did not return is None, so the token's owner
+    learns nothing here that the route does not tell them. None for no
+    person.
+    """
+    if not isinstance(ref, dict) or not any(ref.get(name) for name in PERSON_FIELDS):
+        return None
+    return {name: ref.get(name) or None for name in PERSON_FIELDS}
+
+
+def people(refs: Iterable[Any]) -> list[dict[str, Any]]:
+    """Each person once, as ``person`` returns them, by pseudonym."""
+    found: dict[str, dict[str, Any]] = {}
+    for ref in refs:
+        one = person(ref)
+        if one is not None:
+            found.setdefault(str(one["pseudonym"] or one["username"]), one)
+    return [found[key] for key in sorted(found)]
+
+
+def listing(items: list[Any]) -> dict[str, Any]:
+    """A list as a tool returns it: ``{"items": [...], "count": n}``, so that
+    an empty list is an answer and not an empty content block (#471)."""
+    return {"items": items, "count": len(items)}
+
+
+# A consolidation is the task 'review' in the API; the tools take both names.
+TASK_NAMES = {"consolidation": "review"}
+
+
+def api_tasks(tasks: Iterable[str] | None) -> list[str] | None:
+    """Task names as the API knows them ('consolidation' is 'review'), each once."""
+    if tasks is None:
+        return None
+    return list(dict.fromkeys(TASK_NAMES.get(name, name) for name in tasks))
 
 
 @dataclass(frozen=True)
@@ -231,6 +285,25 @@ def echo_selection(tool: Tool) -> None:
     tool.fn = with_selection
 
 
+def compact_text(tool: Tool) -> None:
+    """Make ``tool`` write its answer as JSON without indentation; the
+    structured answer is the same object."""
+    fn = tool.fn
+
+    @functools.wraps(fn)
+    async def compact(**arguments: Any) -> Any:
+        result = await fn(**arguments)
+        if not isinstance(result, dict):
+            return result
+        plain = to_jsonable_python(result, fallback=str)
+        text = json.dumps(plain, ensure_ascii=False, separators=(",", ":"))
+        return CallToolResult(
+            content=[TextContent(type="text", text=text)], structured_content=plain
+        )
+
+    tool.fn = compact
+
+
 def register(
     server: MCPServer,
     *,
@@ -273,6 +346,7 @@ def register(
         forbid_unknown_arguments(tool)
         if "confirm" in tool.parameters.get("properties", {}):
             echo_selection(tool)
+        compact_text(tool)
         return fn
 
     return decorator

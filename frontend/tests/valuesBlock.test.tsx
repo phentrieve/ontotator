@@ -335,6 +335,26 @@ describe("Values block", () => {
     expect(document.activeElement).toBe(screen.getByRole("combobox", { name: "Search term" }));
   });
 
+  it("Change term starts with the marked words, as the search of a new finding does (issue 472)", () => {
+    const base = props();
+    const evidence = { mention: { evidence_id: "e1", segments: [{ start: 4, end: 10 }, { start: 15, end: 22 }] } };
+    const current = base.annotation!;
+    const marked: AnnotationPanelProps = { ...base, documentText: "Hat häufig und Krämpfe, sonst nichts.", allEvidence: { e1: evidence } as never,
+      annotation: { ...current, annotation: { ...current.annotation, evidence_refs: [{ evidence_id: "e1", version: "v" }] } } };
+    const { unmount } = render(<AnnotationPanel {...marked} />);
+    fireEvent.click(screen.getByRole("button", { name: /Change term/ }));
+    expect((screen.getByRole("combobox", { name: "Search term" }) as HTMLInputElement).value).toBe("häufig Krämpfe");
+    unmount();
+    // Without marked words, and when the search only reads the ontology, it starts empty.
+    const plain = render(<AnnotationPanel {...props({ documentText: "Hat Krämpfe." })} />);
+    fireEvent.click(screen.getByRole("button", { name: /Change term/ }));
+    expect((screen.getByRole("combobox", { name: "Search term" }) as HTMLInputElement).value).toBe("");
+    plain.unmount();
+    render(<AnnotationPanel {...marked} readOnly />);
+    fireEvent.click(screen.getByRole("button", { name: "Search ontology" }));
+    expect((screen.getByRole("combobox", { name: "Search term" }) as HTMLInputElement).value).toBe("");
+  });
+
   it("hides Confirm defaults when nothing is defaulted or read-only", () => {
     const { unmount } = render(<AnnotationPanel {...props({ onConfirmDefaults: vi.fn() }, [])} />);
     expect(screen.queryByRole("button", { name: /Confirm defaults/ })).toBeNull();

@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { chooseUserMenu } from "./support/userMenu";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { App } from "../src/App";
 import { api, ApiError, type Profile } from "../src/api/client";
@@ -78,11 +79,6 @@ function appReview() {
   const logout = vi.fn(); render(<App user={testUser("alice")} onLogout={logout} />);
   return { save, logout };
 }
-function section(name: string) {
-  const disclosure = document.querySelector<HTMLDetailsElement>(".shell-reading-navigation");
-  if (disclosure && !disclosure.open) fireEvent.click(disclosure.querySelector("summary")!);
-  fireEvent.click(screen.getByRole("link", { name }));
-}
 it("flushes raw review work before following its real qualification profile link", async () => {
   const { save } = appReview();
   let finish!: (value: { revision: number }) => void;
@@ -107,17 +103,17 @@ it("keeps the mounted review and history on cancelled raw-hash leave, then expli
   await waitFor(() => expect(window.history.state.ontotatorRouteIndex).toBe(0));
   expect(screen.getByRole("textbox", { name: "Translation (de)" })).toBe(input);
   expect((input as HTMLTextAreaElement).value).toBe("Keep raw text");
-  section("Profile");
+  chooseUserMenu("Profile");
   fireEvent.click(within(await screen.findByRole("dialog", { name: "Changes not saved" })).getByRole("button", { name: "Discard edits and leave" }));
   await screen.findByRole("heading", { name: "Profile" });
 });
 it("keeps shell logout behind explicit save/discard/cancel and does not call logout after failed save", async () => {
   const { save, logout } = appReview(); save.mockRejectedValue(new TypeError("Offline"));
   fireEvent.change(await screen.findByRole("textbox", { name: "Translation (de)" }), { target: { value: "Not saved" } });
-  fireEvent.click(screen.getByRole("button", { name: "Log out" }));
+  chooseUserMenu("Log out");
   let dialog = await screen.findByRole("dialog", { name: "Unsaved changes" });
   fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" })); expect(logout).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: "Log out" }));
+  chooseUserMenu("Log out");
   dialog = await screen.findByRole("dialog", { name: "Unsaved changes" });
   fireEvent.click(within(dialog).getByRole("button", { name: "Save and log out" }));
   await waitFor(() => expect(save).toHaveBeenCalledTimes(1));

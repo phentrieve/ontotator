@@ -336,6 +336,9 @@ class RowFacts:
     # assignment id -> reason of the correction request of its active round
     # (Review "re_review" line 2, D26)
     correction_reasons: dict[int, str] = field(default_factory=dict)
+    # assignment id -> that request: reason, requested_at and the lead's
+    # additions (issue 483; the reviewer row of the text card)
+    correction_requests: dict[int, dict[str, Any]] = field(default_factory=dict)
     # assignment id -> finding count of its last submission
     findings: dict[int, int] = field(default_factory=dict)
     # (case, language) -> newest event on the row not caused by the viewer
@@ -990,19 +993,23 @@ def _latest_reviews(conn: Connection, pid: int) -> dict[str, ReviewRecord]:
     }
 
 
-def _correction_reasons(
+def _correction_requests(
     conn: Connection, pid: int, assignments: list[rules.AssignmentFact]
-) -> dict[int, str]:
-    """Reason of each correction request (``translation.correction_requested``)
-    whose round is still the assignment's active round."""
+) -> dict[int, dict[str, Any]]:
+    """Each correction request (``translation.correction_requested``) whose
+    round is still the assignment's active round: its reason, when it was
+    sent and the lead's additions to the reason (issue 483), oldest first,
+    with ``added_by`` as a user id."""
+    from ontotator.assignments.service import correction_reason_additions
+
     active = {
         str(item.assignment_id): item.active_round_id
         for item in assignments
         if item.task == "translation_review" and item.active_round_id is not None
     }
-    reasons: dict[int, str] = {}
+    requests: dict[int, dict[str, Any]] = {}
     for row in conn.execute(
-        select(AuditEventRow.target_id, AuditEventRow.details)
+        select(AuditEventRow.target_id, AuditEventRow.at, AuditEventRow.details)
         .where(
             AuditEventRow.project_id == pid,
             AuditEventRow.action == "translation.correction_requested",
@@ -1013,8 +1020,19 @@ def _correction_reasons(
         details = row.details or {}
         round_id = active.get(row.target_id)
         if round_id is not None and details.get("round_id") == round_id:
-            reasons[int(row.target_id)] = str(details.get("reason") or "")
-    return reasons
+            requests[int(row.target_id)] = {
+                "reason": str(details.get("reason") or ""),
+                "requested_at": row.at,
+                "additions": [],
+            }
+    additions = correction_reason_additions(
+        conn, {aid: active[str(aid)] for aid in requests}
+    )
+    for aid, items in additions.items():
+        requests[aid]["additions"] = [
+            {"note": note, "added_at": at, "added_by": by} for at, note, by in items
+        ]
+    return requests
 
 
 def _findings(conn: Connection, pid: int) -> dict[int, int]:
@@ -1296,6 +1314,7 @@ def load_facts(
     latest_reviews = {} if lean else _latest_reviews(conn, pid)
     author_ids = _user_ids(conn, (item.annotator_id for item in selected.values()))
     lead_pauses = paused_texts(conn, pid)
+    correction_requests = {} if lean else _correction_requests(conn, pid, assignments)
     people = (
         {}
         if summary
@@ -1330,9 +1349,16 @@ def load_facts(
                 *(item.reviewer_id for item in latest_reviews.values()),
                 *author_ids.values(),
                 *(item.paused_by for item in lead_pauses.values() if item.paused_by),
+                *(
+                    addition["added_by"]
+                    for request in correction_requests.values()
+                    for addition in request["additions"]
+                    if addition["added_by"]
+                ),
             ],
             viewer_id=viewer_user_id,
             viewer_is_lead=True,  # Documents is lead-only
+            logins_of_project=pid,
         )
     )
     people_fields = {uid: ref.model_dump() for uid, ref in people.items()}
@@ -1384,11 +1410,15 @@ def load_facts(
             conn,
             (item.annotator_id for item in selected.values()),
             viewer_id=viewer_user_id,
+            logins_of_project=pid,
         ),
         author_ids=author_ids,
         decided=_decided(conn, pid),
         latest_reviews=latest_reviews,
-        correction_reasons={} if lean else _correction_reasons(conn, pid, assignments),
+        correction_reasons={
+            aid: request["reason"] for aid, request in correction_requests.items()
+        },
+        correction_requests=correction_requests,
         findings={} if lean else _findings(conn, pid),
         others_activity={} if lean else load_others_activity(conn, pid, viewer_user_id),
         baseline_at=None

@@ -2300,6 +2300,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assignments/{assignment_id}/correction-reason": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Correction Reason
+         * @description Issue 483: the lead adds to the reason of "Ask a reviewer to correct…"
+         *     while the review is open. Append-only: the reason as sent never changes.
+         */
+        post: operations["add_correction_reason_api_v1_assignments__assignment_id__correction_reason_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{key}/documents/{doc}/lead-correction": {
         parameters: {
             query?: never;
@@ -4331,6 +4352,17 @@ export interface components {
         AnnotationTargetPreview: {
             /** Rows Over Target */
             rows_over_target: number;
+            /** Rows */
+            rows?: components["schemas"]["AnnotationTargetRow"][];
+        };
+        /** AnnotationTargetRow */
+        AnnotationTargetRow: {
+            /** Case Id */
+            case_id: string;
+            /** Language */
+            language: string;
+            /** Annotators */
+            annotators: number;
         };
         /**
          * AnnotationTypeDefinition
@@ -5175,7 +5207,7 @@ export interface components {
              * @enum {string}
              */
             status: "open" | "in_progress" | "submitted" | "reopened";
-            person: components["schemas"]["PersonRefView"];
+            person: components["schemas"]["MemberRefView"];
             /** Text Paused */
             text_paused?: boolean;
             /** Reason */
@@ -5436,7 +5468,7 @@ export interface components {
              * @enum {string}
              */
             status: "open" | "in_progress" | "submitted" | "reopened";
-            person: components["schemas"]["PersonRefView"];
+            person: components["schemas"]["MemberRefView"];
             /** Text Paused */
             text_paused?: boolean;
         };
@@ -5499,7 +5531,7 @@ export interface components {
              * @enum {string}
              */
             status: "open" | "in_progress" | "submitted" | "reopened";
-            person: components["schemas"]["PersonRefView"];
+            person: components["schemas"]["MemberRefView"];
         };
         /** BulkUndoTextBlock */
         BulkUndoTextBlock: {
@@ -6030,6 +6062,45 @@ export interface components {
              */
             confirm_language: boolean;
         };
+        /**
+         * CorrectionReasonAdditionRequest
+         * @description Issue 483: what the lead adds to the reason of a correction request.
+         */
+        CorrectionReasonAdditionRequest: {
+            /** Note */
+            note: string;
+        };
+        /**
+         * CorrectionReasonAdditionView
+         * @description One addition to the reason of a correction request, as saved.
+         */
+        CorrectionReasonAdditionView: {
+            /** Assignment Id */
+            assignment_id: number;
+            /** Note */
+            note: string;
+            /**
+             * Added At
+             * Format: date-time
+             */
+            added_at: string;
+        };
+        /**
+         * CorrectionRequestView
+         * @description Why the lead asked for this review with "Ask a reviewer to correct…"
+         *     (issue 483): the reason as sent, and what the lead added to it since.
+         */
+        CorrectionRequestView: {
+            /** Reason */
+            reason: string;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /** Additions */
+            additions?: components["schemas"]["ReasonAdditionView"][];
+        };
         /** CreateProjectRequest */
         CreateProjectRequest: {
             /** Key */
@@ -6243,7 +6314,7 @@ export interface components {
              * Format: date-time
              */
             recorded_at: string;
-            author: components["schemas"]["PersonRefView"];
+            author: components["schemas"]["MemberRefView"];
         };
         /** DistributionContextView */
         DistributionContextView: {
@@ -6757,6 +6828,35 @@ export interface components {
             notes?: string[];
         };
         /**
+         * EditorialCarryPerson
+         * @description Issue 465: one person's started or submitted annotation on the
+         *     corrected version and whether the typo fix moves it to the new version
+         *     by itself (``carried``). ``reason`` says why not: ``number_changed``,
+         *     ``final_result``, ``consolidation``, ``translation_not_accepted``,
+         *     ``from_proposals``, ``task_paused``,
+         *     ``findings_need_check``, ``not_submitted`` (started, not submitted) or
+         *     ``not_carryable``; such work keeps the manual flow.
+         */
+        EditorialCarryPerson: {
+            /** Username */
+            username: string;
+            /** Display Name */
+            display_name: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "submitted" | "started";
+            /** Carried */
+            carried: boolean;
+            /** Reason */
+            reason: ("number_changed" | "final_result" | "consolidation" | "translation_not_accepted" | "from_proposals" | "task_paused" | "findings_need_check" | "not_submitted" | "not_carryable") | null;
+            /** Findings */
+            findings: number;
+            /** Needs Check */
+            needs_check: number;
+        };
+        /**
          * EditorialChange
          * @description A changed passage, in Unicode code points of the old and the new text.
          */
@@ -6826,6 +6926,8 @@ export interface components {
             diff: components["schemas"]["EditorialChange"][] | null;
             findings: components["schemas"]["EditorialFindings"] | null;
             proposals: components["schemas"]["EditorialProposals"] | null;
+            /** Annotation Carry */
+            annotation_carry?: components["schemas"]["EditorialCarryPerson"][] | null;
         };
         /**
          * EditorialCorrectionPreviewRequest
@@ -6876,6 +6978,13 @@ export interface components {
             deleted_characters: number;
             /** Tasks Following */
             tasks_following: number;
+            /**
+             * Annotations Carried
+             * @default 0
+             */
+            annotations_carried: number;
+            /** Annotation Carry */
+            annotation_carry?: components["schemas"]["EditorialCarryPerson"][];
         };
         /** EditorialFindings */
         EditorialFindings: {
@@ -7067,7 +7176,7 @@ export interface components {
             is_latest_in_round: boolean | null;
             /** Finding Count */
             finding_count: number;
-            author?: components["schemas"]["PersonRefView"] | null;
+            author?: components["schemas"]["MemberRefView"] | null;
             /** Guideline Version */
             guideline_version?: number | null;
             /** Guideline Label */
@@ -7158,7 +7267,7 @@ export interface components {
             from_submission_id: string;
             /** From Version */
             from_version?: number | null;
-            selected_by?: components["schemas"]["PersonRefView"] | null;
+            selected_by?: components["schemas"]["MemberRefView"] | null;
             /**
              * Selected At
              * Format: date-time
@@ -7226,7 +7335,7 @@ export interface components {
             is_newest_of_chain: boolean;
             /** Adjudicator Not Annotator */
             adjudicator_not_annotator: boolean | null;
-            author?: components["schemas"]["PersonRefView"] | null;
+            author?: components["schemas"]["MemberRefView"] | null;
         };
         /** FinalSelectionView */
         FinalSelectionView: {
@@ -7865,7 +7974,7 @@ export interface components {
         LeadPauseView: {
             /** Reason */
             reason: string;
-            paused_by?: components["schemas"]["PersonRefView"] | null;
+            paused_by?: components["schemas"]["MemberRefView"] | null;
             /**
              * Paused At
              * Format: date-time
@@ -7920,6 +8029,29 @@ export interface components {
              * @default false
              */
             revoke_assignments: boolean;
+        };
+        /**
+         * MemberRefView
+         * @description A person in a lead's task views (Documents rows, previews of the bulk
+         *     actions), with the login name API clients name a person by (issue 471).
+         *
+         *     ``username`` only for a lead and of a current member of the project, as
+         *     the members list shows it; otherwise None. Every other view uses
+         *     ``PersonRefView``, which has no such field: problem reports, the audit
+         *     and the job list name nobody's login.
+         */
+        MemberRefView: {
+            /** Pseudonym */
+            pseudonym: string;
+            /** Display Name */
+            display_name?: string | null;
+            /**
+             * Is Me
+             * @default false
+             */
+            is_me: boolean;
+            /** Username */
+            username?: string | null;
         };
         /** MissingFinalView */
         MissingFinalView: {
@@ -8340,7 +8472,7 @@ export interface components {
             reviewer_label: string;
             /** Is Me */
             is_me: boolean;
-            reviewer?: components["schemas"]["PersonRefView"] | null;
+            reviewer?: components["schemas"]["MemberRefView"] | null;
         };
         /**
          * OpenWorkspaceRequest
@@ -8552,7 +8684,7 @@ export interface components {
              * @enum {string}
              */
             status: "open" | "in_progress" | "reopened";
-            person: components["schemas"]["PersonRefView"];
+            person: components["schemas"]["MemberRefView"];
             /** Paused By Report */
             paused_by_report: boolean;
         };
@@ -9253,6 +9385,12 @@ export interface components {
              * @default 0
              */
             submitted: number;
+            /** Translation Reviews Submitted */
+            translation_reviews_submitted?: number;
+            /** Annotations Submitted */
+            annotations_submitted?: number;
+            /** Reviews Submitted */
+            reviews_submitted?: number;
         };
         /**
          * ProjectAgreement
@@ -9940,6 +10078,35 @@ export interface components {
             /** Reviewer Id */
             reviewer_id: string;
         };
+        /**
+         * ReasonAddition
+         * @description A lead's addition to the reason of a correction request (issue 483),
+         *     as the reviewer reads it: what and when. The reviewer reads "the lead",
+         *     not the lead's name, as for the reason itself.
+         */
+        ReasonAddition: {
+            /** Note */
+            note: string;
+            /**
+             * Added At
+             * Format: date-time
+             */
+            added_at: string;
+        };
+        /**
+         * ReasonAdditionView
+         * @description A lead's addition to the reason of a correction request (issue 483).
+         */
+        ReasonAdditionView: {
+            /** Note */
+            note: string;
+            /**
+             * Added At
+             * Format: date-time
+             */
+            added_at: string;
+            added_by?: components["schemas"]["MemberRefView"] | null;
+        };
         /** ReasonRequest */
         ReasonRequest: {
             /** Reason */
@@ -10109,7 +10276,7 @@ export interface components {
              * @enum {string}
              */
             task_state: "paused" | "resumed";
-            reporter?: components["schemas"]["PersonRefView"] | null;
+            reporter?: components["schemas"]["MemberRefView"] | null;
         };
         /** ReportSubmissionRef */
         ReportSubmissionRef: {
@@ -10235,6 +10402,8 @@ export interface components {
             second_review_at?: string | null;
             /** Second Review Reason */
             second_review_reason?: string | null;
+            /** Second Review Additions */
+            second_review_additions?: components["schemas"]["ReasonAddition"][] | null;
             /** Reopened At */
             reopened_at?: string | null;
             /** Reopen Reason */
@@ -10255,7 +10424,7 @@ export interface components {
             task: "annotate" | "review";
             /** Status */
             status: string;
-            person: components["schemas"]["PersonRefView"];
+            person: components["schemas"]["MemberRefView"];
         };
         /** RoundInputResolution */
         RoundInputResolution: {
@@ -10356,13 +10525,18 @@ export interface components {
          *     afterwards; null when the submission is no longer among the row's).
          *     ``text_paused`` and ``text_released`` (issue 464) are a lead's pause and
          *     release of the text, with ``by`` and the ``reason`` given.
+         *     ``carried_by_typo_fix`` (issue 465): the submitted annotation of
+         *     ``to_person`` moved to the typo fix's new version by itself.
+         *     ``correction_requested`` is "Ask a reviewer to correct…" and
+         *     ``correction_reason_added`` an addition to its reason (issue 483), the
+         *     task and its person as for ``reopened``, the text in ``reason``.
          */
         RowChangeView: {
             /**
              * Kind
              * @enum {string}
              */
-            kind: "reassigned" | "mode_changed" | "mode_restored" | "final_withdrawn" | "reopened" | "reopen_undone" | "round_started" | "final_chosen" | "final_changed" | "final_restored" | "text_paused" | "text_released";
+            kind: "reassigned" | "mode_changed" | "mode_restored" | "final_withdrawn" | "reopened" | "reopen_undone" | "round_started" | "final_chosen" | "final_changed" | "final_restored" | "text_paused" | "text_released" | "carried_by_typo_fix" | "correction_requested" | "correction_reason_added";
             /**
              * At
              * Format: date-time
@@ -10370,13 +10544,13 @@ export interface components {
             at: string;
             /** Task */
             task?: string | null;
-            by?: components["schemas"]["PersonRefView"] | null;
+            by?: components["schemas"]["MemberRefView"] | null;
             /** Assignment Id */
             assignment_id?: number | null;
             /** Round Ordinal */
             round_ordinal?: number | null;
-            from_person?: components["schemas"]["PersonRefView"] | null;
-            to_person?: components["schemas"]["PersonRefView"] | null;
+            from_person?: components["schemas"]["MemberRefView"] | null;
+            to_person?: components["schemas"]["MemberRefView"] | null;
             /** From Mode */
             from_mode?: string | null;
             /** To Mode */
@@ -10385,6 +10559,10 @@ export interface components {
             to_result?: components["schemas"]["RowResultRefView"] | null;
             /** Reason */
             reason?: string | null;
+            /** From Version */
+            from_version?: number | null;
+            /** To Version */
+            to_version?: number | null;
         };
         /** RowItemView */
         RowItemView: {
@@ -10430,7 +10608,7 @@ export interface components {
             state: "open" | "resolved" | "withdrawn";
             /** Active Hold Count */
             active_hold_count: number;
-            reporter?: components["schemas"]["PersonRefView"] | null;
+            reporter?: components["schemas"]["MemberRefView"] | null;
         };
         /**
          * RowProposalSetView
@@ -10466,7 +10644,7 @@ export interface components {
          *     and whether it is a consolidation.
          */
         RowResultRefView: {
-            author: components["schemas"]["PersonRefView"];
+            author: components["schemas"]["MemberRefView"];
             /**
              * Consolidation
              * @default false
@@ -10501,7 +10679,7 @@ export interface components {
             round_ordinal: number | null;
             /** Submitted */
             submitted: boolean;
-            author?: components["schemas"]["PersonRefView"] | null;
+            author?: components["schemas"]["MemberRefView"] | null;
         };
         /** RowStagesView */
         RowStagesView: {
@@ -10545,7 +10723,7 @@ export interface components {
             is_latest_in_round: boolean | null;
             /** Finding Count */
             finding_count: number;
-            author?: components["schemas"]["PersonRefView"] | null;
+            author?: components["schemas"]["MemberRefView"] | null;
             /** Guideline Version */
             guideline_version?: number | null;
             /** Guideline Label */
@@ -10882,7 +11060,7 @@ export interface components {
          */
         StageCellDetailView: {
             /** People */
-            people?: components["schemas"]["PersonRefView"][];
+            people?: components["schemas"]["MemberRefView"][];
             /** Assigned */
             assigned?: number | null;
             /** Target */
@@ -10997,7 +11175,7 @@ export interface components {
             round_ordinal?: number | null;
             /** Excerpt */
             excerpt?: string | null;
-            reporter?: components["schemas"]["PersonRefView"] | null;
+            reporter?: components["schemas"]["MemberRefView"] | null;
             /**
              * Task Paused
              * @default false
@@ -11011,14 +11189,14 @@ export interface components {
              * @enum {string}
              */
             kind: "you" | "person" | "people" | "none";
-            person?: components["schemas"]["PersonRefView"] | null;
+            person?: components["schemas"]["MemberRefView"] | null;
             /**
              * Count
              * @default 0
              */
             count: number;
             /** People */
-            people?: components["schemas"]["PersonRefView"][];
+            people?: components["schemas"]["MemberRefView"][];
         };
         /**
          * Submission
@@ -11267,6 +11445,8 @@ export interface components {
             second_review_at?: string | null;
             /** Second Review Reason */
             second_review_reason?: string | null;
+            /** Second Review Additions */
+            second_review_additions?: components["schemas"]["ReasonAddition"][] | null;
             /** Query Answered At */
             query_answered_at?: string | null;
             /**
@@ -11676,7 +11856,7 @@ export interface components {
         TextPauseInfoView: {
             /** Reason */
             reason: string;
-            paused_by?: components["schemas"]["PersonRefView"] | null;
+            paused_by?: components["schemas"]["MemberRefView"] | null;
             /**
              * Paused At
              * Format: date-time
@@ -12363,7 +12543,7 @@ export interface components {
             reason?: string | null;
             /** Accepted At */
             accepted_at?: string | null;
-            accepted_by?: components["schemas"]["PersonRefView"] | null;
+            accepted_by?: components["schemas"]["MemberRefView"] | null;
             /** Reviewer */
             reviewer?: string | null;
             /** Reviewed At */
@@ -12378,7 +12558,7 @@ export interface components {
             reason?: string | null;
             /** Discarded At */
             discarded_at?: string | null;
-            discarded_by?: components["schemas"]["PersonRefView"] | null;
+            discarded_by?: components["schemas"]["MemberRefView"] | null;
         };
         /**
          * VersionEditorialCorrectionView
@@ -12395,7 +12575,7 @@ export interface components {
             deleted_characters: number;
             /** Corrected At */
             corrected_at?: string | null;
-            corrected_by?: components["schemas"]["PersonRefView"] | null;
+            corrected_by?: components["schemas"]["MemberRefView"] | null;
         };
         /**
          * VersionMarkerView
@@ -12470,7 +12650,7 @@ export interface components {
             edited: boolean;
             /** Decided At */
             decided_at?: string | null;
-            decided_by?: components["schemas"]["PersonRefView"] | null;
+            decided_by?: components["schemas"]["MemberRefView"] | null;
         };
         /** VersionRef */
         VersionRef: {
@@ -12628,7 +12808,7 @@ export interface components {
             note?: string | null;
             /** Uploaded At */
             uploaded_at?: string | null;
-            uploaded_by?: components["schemas"]["PersonRefView"] | null;
+            uploaded_by?: components["schemas"]["MemberRefView"] | null;
         };
         /** WarningAcknowledgement */
         WarningAcknowledgement: {
@@ -12702,7 +12882,7 @@ export interface components {
             round_ordinal: number | null;
             /** Round State */
             round_state: string | null;
-            person?: components["schemas"]["PersonRefView"] | null;
+            person?: components["schemas"]["MemberRefView"] | null;
             /**
              * Lead Correction
              * @default false
@@ -12712,7 +12892,7 @@ export interface components {
             moved_to_version?: number | null;
             /** Assigned At */
             assigned_at?: string | null;
-            assigned_by?: components["schemas"]["PersonRefView"] | null;
+            assigned_by?: components["schemas"]["MemberRefView"] | null;
             /** Annotation Mode */
             annotation_mode?: ("proposals" | "scratch") | null;
             proposal_set?: components["schemas"]["RowProposalSetView"] | null;
@@ -12733,6 +12913,7 @@ export interface components {
              * @default false
              */
             waiting_for_lead: boolean;
+            correction_request?: components["schemas"]["CorrectionRequestView"] | null;
         };
         /** WorkRoundView */
         WorkRoundView: {
@@ -17054,6 +17235,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AssignmentView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_correction_reason_api_v1_assignments__assignment_id__correction_reason_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assignment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CorrectionReasonAdditionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorrectionReasonAdditionView"];
                 };
             };
             /** @description Validation Error */

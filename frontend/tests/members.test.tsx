@@ -183,6 +183,27 @@ describe("project members", () => {
     expect((await screen.findByRole("alert")).textContent).toContain("There is no user with this username. Check the spelling.");
   });
 
+  it("says a refused username at the field, and names the username when the display name was typed (issue 472)", async () => {
+    vi.mocked(api.listMemberCandidates).mockResolvedValue([{ username: "maria.k", display_name: "Maria Klein", languages: [] }]);
+    vi.mocked(api.setMemberRoles).mockRejectedValue(new ApiError(422, "Invalid username", "USERNAME_INVALID"));
+    render(<MembersSection projectKey="p" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Add member…" }));
+    const field = () => screen.getByLabelText(/^Username/) as HTMLInputElement;
+    fireEvent.change(field(), { target: { value: "Maria Klein" } });
+    await screen.findByRole("option", { name: /^maria\.k Maria Klein/ });
+    fireEvent.click(screen.getByRole("checkbox", { name: "New member: Annotator" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add member" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("This is the person's name. Choose the person from the list, or type the username: maria.k.");
+    // At the field: the field is marked invalid and described by the message; no second notice elsewhere.
+    expect(field().getAttribute("aria-invalid")).toBe("true");
+    expect(field().getAttribute("aria-describedby")?.split(" ")).toContain(alert.id);
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    // Typing again takes the message away.
+    fireEvent.change(field(), { target: { value: "maria.k" } });
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("adds a typed username without loading the whole user list", async () => {
     const view = render(<MembersSection projectKey="p" />);
     // The form stays closed until "Add member…".

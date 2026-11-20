@@ -37,7 +37,7 @@ The toolbar shows the text name, its language and the mode:
 | **Annotate from scratch** | You see neither tool proposals nor other people's work. |
 | **Annotate from proposals** | You see a tool's proposals, never other people's work. See [Review tool proposals](#review-tool-proposals). |
 | **Review carried findings**, or the round name such as *Round 2, continued from Round 1* | Findings were carried over from earlier work. See [Review carried findings](#review-carried-findings). |
-| **Check after text change** | The text was corrected and some findings are marked **Check needed**. See [Re-create findings after a text correction](#re-create-findings-after-a-text-correction). If nothing needs a check, the toolbar shows the round instead, such as *Round 1, continued from an earlier version*. |
+| **Check after text change** | The text was corrected and some findings are marked **Check needed**. See [Re-create findings after a text correction](#re-create-findings-after-a-text-correction). If nothing needs a check, the toolbar shows the round instead, such as *Round 1, carried over from the earlier text version*. |
 
 Next to the mode, the save status tells you whether your work is stored: **Saved**, **Saving...** or **Unsaved changes**. Work is saved automatically; there is no save button. If it reads **Offline** or shows an error, click **Retry**.
 
@@ -60,7 +60,8 @@ If the text was changed elsewhere, a **Revision conflict** notice appears; click
 
 | You see | Meaning |
 | --- | --- |
-| Fill colour of a mark | The term. The same term always has the same colour; the colour says nothing about the state. |
+| Fill colour of a mark | The term. The same term keeps one colour in the text; the colour says nothing about the state. Different terms that overlap or stand close together in a sentence always have different colours. |
+| Bands of colour | Text that belongs to several findings: one band per finding, in its colour. Up to three bands; with four or more findings the top band is striped. |
 | Solid underline | Your own finding. |
 | Dashed underline | A tool proposal under review. |
 | Dotted underline | A read-only reference finding. |
@@ -133,18 +134,32 @@ The search compares the words you type with term names and synonyms, letter by l
 
 ## Browse the ontology tree
 
-What for: pick a broader or narrower term than the one you have.
+What for: pick a broader or narrower term than the one you have, or look at the neighbours of a term before you decide.
 
 1. Select a finding and click **Show in tree**. The **Ontology tree** opens at the current term.
 2. Click a term in the tree. Its **Synonyms**, **Translated names** and other parents (**Also under**) are shown.
 3. Click **Use this term** to give the selected finding this term.
 4. Click **Close tree**.
 
+**Show in tree** is also there where you cannot, or not yet, change a term. The tree then opens only to look: a note under its header says so, and clicking a term only shows its details.
+
+| Where | **Show in tree** opens the tree at | Taking a term |
+| --- | --- | --- |
+| A proposal you have not decided yet | the proposed term | **Use this term instead…**, then **Confirm**: you get a copy with that term, as with **Edit & Replace**, and the proposal reads **Replaced**, for example *Proposal: decide as Changed with Seizure (HP:0001250)* |
+| A hit of the term search of a **New finding** (next to the definition of the highlighted hit) | that hit | **Use this term instead…**, then **Confirm**: the new finding gets the term, as if you had chosen the hit, for example *New finding: choose Seizure (HP:0001250)* |
+| A reference, other people's findings in a consolidation, a decided proposal, or your own finding in a submitted or read-only task | its term | not possible: there is no button |
+
+The confirmation names what happens; **Cancel** or `Esc` closes it and changes nothing. Nothing changes until you click **Confirm**.
+
 In a wide window the tree sits under the annotation panel. To give the tree more or less room, drag the divider between the two (**Resize ontology tree**) up or down, or focus it and press `↑` or `↓`. A double click or `Enter` restores the usual split. The height is kept in this browser.
+
+In a low window (for example 1280 × 600) the open tree takes the whole right column. The annotation panel shrinks to one line above the tree: the marked words and the term of the finding. **Use this term** changes the term in that line too. **Show finding** brings the whole panel back above the tree, with the divider; **Hide finding** gives the tree the column again. When you close the tree, the panel is back as before.
+
+On a tablet or a phone held sideways, the tree stands in place of the annotation panel, beside the text. The selected finding stays marked in the findings list and in the text. Close the tree to bring the panel back.
 
 To give the tree more room, click **Hide details** next to the name of the term below the tree: only its name and code stay, on one line. **Show details** brings the definition, synonyms and other parents back. Your choice is kept in this browser.
 
-The tree follows your work: select another finding and it opens at that finding's term. After **Use this term** it stays open and marks the new term as the current one. While you search a term for a new finding it steps aside and comes back afterwards. Select a proposal or a reference, or clear the selection, and it closes.
+The tree follows your work: select another finding, a proposal or a reference and it opens at its term, with the button that fits there. After **Use this term** it stays open and marks the new term as the current one; after **Confirm** it stays with the finding that now has the term. While you search a term for a new finding it steps aside and comes back afterwards, unless you opened it from a hit of that search. Clear the selection, or select something without a term, and it closes.
 
 ## Set values and confirm defaults
 
@@ -181,7 +196,7 @@ Before you start: the project must allow findings without a text span. Otherwise
 
 1. In the **Findings** header, click **Add finding without a text span**.
 2. In the panel **New finding without a text span**, fill in **Reason for no text span** (if the project requires a reason).
-3. Search and choose the term. If you chose the term first, click **Add annotation**.
+3. Search and choose the term. If you chose the term first, click **Add finding**.
 4. The finding is listed as **Spanless**.
 
 Click **Cancel** to stop. The reason is kept as the finding's note.
@@ -192,7 +207,7 @@ What for: correct a finding you made.
 
 1. Select the finding.
 2. Use the action you need:
-   - **Change term**, then search a new one: changes the term and keeps the mentions.
+   - **Change term**, then search a new one: changes the term and keeps the mentions. The search starts with the words of the first mention, as for a new finding; type over them to search something else.
    - **Note**: type a comment. It is saved with the finding and the lead can read it.
    - **Delete finding**, then **Yes, delete**: deletes the finding and all its mentions. The message that follows offers **Undo**. Undo puts the finding back with its mentions, values, note and modifiers.
 
@@ -254,7 +269,7 @@ Tools make mistakes. Check every proposal as if you had marked it yourself: the 
 
 1. The list **Review Proposals** shows every proposal. Your additions are under **Your own findings**.
 2. Select a proposal, or move with `j` and `k`. The text shows where it was found. On a phone, where the details replace the text, the details show the sentence around the quoted passage, with the passage marked.
-3. Check the marked text, the term and each value. To look the passage up elsewhere, click **Copy text** next to the quoted passage in the details, or press `Ctrl+C` (`Cmd+C` on a Mac): both copy the passage of the selected proposal, as for a finding ([Mark text and add a finding](#mark-text-and-add-a-finding)). A proposal with several mentions has **Copy text** at each.
+3. Check the marked text, the term and each value. To see the broader and narrower terms of the proposed term, click **Show in tree** under it; to replace the term with one from the tree, click **Use this term instead…** and **Confirm** (see [Browse the ontology tree](#browse-the-ontology-tree)). To look the passage up elsewhere, click **Copy text** next to the quoted passage in the details, or press `Ctrl+C` (`Cmd+C` on a Mac): both copy the passage of the selected proposal, as for a finding ([Mark text and add a finding](#mark-text-and-add-a-finding)). A proposal with several mentions has **Copy text** at each.
 4. Decide:
    - **Confirm**: the passage, term and all values are right. Values tagged **Defaulted** were not set by the tool but prefilled; Confirm accepts them as shown, so check them too.
    - **Reject**: the proposal is wrong and nothing should replace it.
@@ -313,6 +328,10 @@ What for: move your findings to the corrected text after the text got a new vers
 If the finding no longer fits, click **Dismiss with reason**, fill in **Reason for dismissal** and click **Save dismissal**.
 
 To see which passages the correction changed, tick **Show changes since** v1 above the text ([See what changed since the earlier version](#see-what-changed-since-the-earlier-version)).
+
+### After a typo fix by the lead
+
+When the lead fixes only spacing or a typo in a text you already submitted (**Fix typos…**), your annotation can move to the new version by itself: when every one of your findings is placed on the new text without doubt and no number in the text changed. You do nothing. In **My tasks** the text then shows its new version, for example *case-0465 de v2 corrected*, as **Submitted**; the task on the old version is gone. **View** shows the corrected text with your findings, placed on it. It is still your annotation: nothing was added or removed. If a finding marked words the lead changed, or a number changed, your annotation stays on the old version and the lead moves it the usual way; you then check the carried findings ([Review carried findings](#review-carried-findings)).
 
 ## Submit the text
 
@@ -383,7 +402,7 @@ Before you start: a report pauses your task. You cannot save or submit until the
 2. Describe the problem under **What is the problem?**. Only you and project leads can read it.
 3. Click **Report and pause my task**.
 
-The menu item reads **Text problems** when there is something to see, for example your earlier reports. The dialog is named after the text, for example *Problems with CASE-1 de*. It lists **Your reports** and offers **New report**.
+While your task is paused, and after you submitted it, the menu item reads **Text problems**, for example *Text problems (Paused, 1 open)*. The dialog is named after the text, for example *Problems with CASE-1 de*. It lists **Your reports** and offers **New report**.
 
 ## Resume a paused task or withdraw a report
 
@@ -463,6 +482,7 @@ A project lead who corrects a translation themselves sees only **Accepted with c
 When the lead asked for the review with **Ask a reviewer to correct…**, or reopened a review you had submitted, the lead's words stand above **Decision**:
 
 - *Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2.* The same line is under the task name in **My tasks**.
+- *Added by the lead on 17 Nov 2026, 16:05: Paragraph 3 as well.* The lead can add to the reason while your review is open; each addition stands below the reason, with its date, here and in **My tasks**.
 - *Reopened by the lead on 18 Nov 2026, 10:00: The unit is mg in my copy.* In **My tasks** it stands under the task name, as the reason for a second review does; on a narrow screen it stands under the **Reopened** badge. Without a reason from the lead it ends with *No reason given.*
 
 A reopened review starts again from the text of its version; your earlier decision is listed under **Previous reviews**.
@@ -515,7 +535,7 @@ On a touch-only device such as a phone or tablet, **Mark checked sentences** is 
 
 What for: see spacing errors and characters you cannot see otherwise, such as a double space, a tab or a non-breaking space.
 
-1. Tick **Show invisible characters** above the texts. Your choice is remembered in this browser.
+1. Tick **Show invisible characters** above the texts. Your choice is remembered in this browser. While the box is ticked, a line below it names the marks: *Marks: · space, ° non-breaking space, → tab, ¶ line end, ¬ soft hyphen, | zero-width character*.
 2. Read the marks in all texts:
 
    | Mark | Character |

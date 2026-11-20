@@ -7768,6 +7768,61 @@
         "x-ontotator-project-token": true
       }
     },
+    "/api/v1/assignments/{assignment_id}/correction-reason": {
+      "post": {
+        "tags": [
+          "translation-workflow"
+        ],
+        "summary": "Add Correction Reason",
+        "description": "Issue 483: the lead adds to the reason of \"Ask a reviewer to correct\u2026\"\nwhile the review is open. Append-only: the reason as sent never changes.",
+        "operationId": "add_correction_reason_api_v1_assignments__assignment_id__correction_reason_post",
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Assignment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectionReasonAdditionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorrectionReasonAdditionView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "project-admin",
+        "x-ontotator-project-token": true
+      }
+    },
     "/api/v1/projects/{key}/documents/{doc}/lead-correction": {
       "post": {
         "tags": [
@@ -13414,6 +13469,13 @@
           "rows_over_target": {
             "type": "integer",
             "title": "Rows Over Target"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/AnnotationTargetRow"
+            },
+            "type": "array",
+            "title": "Rows"
           }
         },
         "type": "object",
@@ -13421,6 +13483,29 @@
           "rows_over_target"
         ],
         "title": "AnnotationTargetPreview"
+      },
+      "AnnotationTargetRow": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "annotators": {
+            "type": "integer",
+            "title": "Annotators"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_id",
+          "language",
+          "annotators"
+        ],
+        "title": "AnnotationTargetRow"
       },
       "AnnotationTypeDefinition": {
         "properties": {
@@ -15646,7 +15731,7 @@
             "title": "Status"
           },
           "person": {
-            "$ref": "#/components/schemas/PersonRefView"
+            "$ref": "#/components/schemas/MemberRefView"
           },
           "text_paused": {
             "type": "boolean",
@@ -16396,7 +16481,7 @@
             "title": "Status"
           },
           "person": {
-            "$ref": "#/components/schemas/PersonRefView"
+            "$ref": "#/components/schemas/MemberRefView"
           },
           "text_paused": {
             "type": "boolean",
@@ -16583,7 +16668,7 @@
             "title": "Status"
           },
           "person": {
-            "$ref": "#/components/schemas/PersonRefView"
+            "$ref": "#/components/schemas/MemberRefView"
           }
         },
         "type": "object",
@@ -17956,6 +18041,76 @@
         ],
         "title": "CorrectionAssignmentRequest"
       },
+      "CorrectionReasonAdditionRequest": {
+        "properties": {
+          "note": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "note"
+        ],
+        "title": "CorrectionReasonAdditionRequest",
+        "description": "Issue 483: what the lead adds to the reason of a correction request."
+      },
+      "CorrectionReasonAdditionView": {
+        "properties": {
+          "assignment_id": {
+            "type": "integer",
+            "title": "Assignment Id"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          },
+          "added_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Added At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "assignment_id",
+          "note",
+          "added_at"
+        ],
+        "title": "CorrectionReasonAdditionView",
+        "description": "One addition to the reason of a correction request, as saved."
+      },
+      "CorrectionRequestView": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Requested At"
+          },
+          "additions": {
+            "items": {
+              "$ref": "#/components/schemas/ReasonAdditionView"
+            },
+            "type": "array",
+            "title": "Additions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason",
+          "requested_at"
+        ],
+        "title": "CorrectionRequestView",
+        "description": "Why the lead asked for this review with \"Ask a reviewer to correct\u2026\"\n(issue 483): the reason as sent, and what the lead added to it since."
+      },
       "CreateProjectRequest": {
         "properties": {
           "key": {
@@ -18439,7 +18594,7 @@
             "title": "Recorded At"
           },
           "author": {
-            "$ref": "#/components/schemas/PersonRefView"
+            "$ref": "#/components/schemas/MemberRefView"
           }
         },
         "type": "object",
@@ -20314,6 +20469,72 @@
         "title": "EditorProposal",
         "description": "Editor projection; producer metadata never changes snapshot hashes."
       },
+      "EditorialCarryPerson": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "submitted",
+              "started"
+            ],
+            "title": "Status"
+          },
+          "carried": {
+            "type": "boolean",
+            "title": "Carried"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "number_changed",
+                  "final_result",
+                  "consolidation",
+                  "translation_not_accepted",
+                  "from_proposals",
+                  "task_paused",
+                  "findings_need_check",
+                  "not_submitted",
+                  "not_carryable"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "findings": {
+            "type": "integer",
+            "title": "Findings"
+          },
+          "needs_check": {
+            "type": "integer",
+            "title": "Needs Check"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "display_name",
+          "status",
+          "carried",
+          "reason",
+          "findings",
+          "needs_check"
+        ],
+        "title": "EditorialCarryPerson",
+        "description": "Issue 465: one person's started or submitted annotation on the\ncorrected version and whether the typo fix moves it to the new version\nby itself (``carried``). ``reason`` says why not: ``number_changed``,\n``final_result``, ``consolidation``, ``translation_not_accepted``,\n``from_proposals``, ``task_paused``,\n``findings_need_check``, ``not_submitted`` (started, not submitted) or\n``not_carryable``; such work keeps the manual flow."
+      },
       "EditorialChange": {
         "properties": {
           "old_start": {
@@ -20541,6 +20762,20 @@
                 "type": "null"
               }
             ]
+          },
+          "annotation_carry": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EditorialCarryPerson"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annotation Carry"
           }
         },
         "type": "object",
@@ -20715,6 +20950,18 @@
           "tasks_following": {
             "type": "integer",
             "title": "Tasks Following"
+          },
+          "annotations_carried": {
+            "type": "integer",
+            "title": "Annotations Carried",
+            "default": 0
+          },
+          "annotation_carry": {
+            "items": {
+              "$ref": "#/components/schemas/EditorialCarryPerson"
+            },
+            "type": "array",
+            "title": "Annotation Carry"
           }
         },
         "type": "object",
@@ -21230,7 +21477,7 @@
           "author": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -21510,7 +21757,7 @@
           "selected_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -21754,7 +22001,7 @@
           "author": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -23397,7 +23644,7 @@
           "paused_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -23547,6 +23794,47 @@
           "roles"
         ],
         "title": "MemberChange"
+      },
+      "MemberRefView": {
+        "properties": {
+          "pseudonym": {
+            "type": "string",
+            "title": "Pseudonym"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "is_me": {
+            "type": "boolean",
+            "title": "Is Me",
+            "default": false
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pseudonym"
+        ],
+        "title": "MemberRefView",
+        "description": "A person in a lead's task views (Documents rows, previews of the bulk\nactions), with the login name API clients name a person by (issue 471).\n\n``username`` only for a lead and of a current member of the project, as\nthe members list shows it; otherwise None. Every other view uses\n``PersonRefView``, which has no such field: problem reports, the audit\nand the job list name nobody's login."
       },
       "MissingFinalView": {
         "properties": {
@@ -24728,7 +25016,7 @@
           "reviewer": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -25282,7 +25570,7 @@
             "title": "Status"
           },
           "person": {
-            "$ref": "#/components/schemas/PersonRefView"
+            "$ref": "#/components/schemas/MemberRefView"
           },
           "paused_by_report": {
             "type": "boolean",
@@ -27104,6 +27392,18 @@
             "type": "integer",
             "title": "Submitted",
             "default": 0
+          },
+          "translation_reviews_submitted": {
+            "type": "integer",
+            "title": "Translation Reviews Submitted"
+          },
+          "annotations_submitted": {
+            "type": "integer",
+            "title": "Annotations Submitted"
+          },
+          "reviews_submitted": {
+            "type": "integer",
+            "title": "Reviews Submitted"
           }
         },
         "type": "object",
@@ -28878,6 +29178,57 @@
         ],
         "title": "ReanchorResolution"
       },
+      "ReasonAddition": {
+        "properties": {
+          "note": {
+            "type": "string",
+            "title": "Note"
+          },
+          "added_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Added At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "note",
+          "added_at"
+        ],
+        "title": "ReasonAddition",
+        "description": "A lead's addition to the reason of a correction request (issue 483),\nas the reviewer reads it: what and when. The reviewer reads \"the lead\",\nnot the lead's name, as for the reason itself."
+      },
+      "ReasonAdditionView": {
+        "properties": {
+          "note": {
+            "type": "string",
+            "title": "Note"
+          },
+          "added_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Added At"
+          },
+          "added_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MemberRefView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "note",
+          "added_at"
+        ],
+        "title": "ReasonAdditionView",
+        "description": "A lead's addition to the reason of a correction request (issue 483)."
+      },
       "ReasonRequest": {
         "properties": {
           "reason": {
@@ -29363,7 +29714,7 @@
           "reporter": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -29740,6 +30091,20 @@
             ],
             "title": "Second Review Reason"
           },
+          "second_review_additions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReasonAddition"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Second Review Additions"
+          },
           "reopened_at": {
             "anyOf": [
               {
@@ -29824,7 +30189,7 @@
             "title": "Status"
           },
           "person": {
-            "$ref": "#/components/schemas/PersonRefView"
+            "$ref": "#/components/schemas/MemberRefView"
           }
         },
         "type": "object",
@@ -30142,7 +30507,10 @@
               "final_changed",
               "final_restored",
               "text_paused",
-              "text_released"
+              "text_released",
+              "carried_by_typo_fix",
+              "correction_requested",
+              "correction_reason_added"
             ],
             "title": "Kind"
           },
@@ -30165,7 +30533,7 @@
           "by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -30197,7 +30565,7 @@
           "from_person": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -30207,7 +30575,7 @@
           "to_person": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -30266,6 +30634,28 @@
               }
             ],
             "title": "Reason"
+          },
+          "from_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Version"
+          },
+          "to_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Version"
           }
         },
         "additionalProperties": false,
@@ -30275,7 +30665,7 @@
           "at"
         ],
         "title": "RowChangeView",
-        "description": "A change of who works on a row, how, or of its final result: its\nHistory line, with who did it, when and (where one was given) why.\n\n``by`` is the person who made the change; a withdrawn final result\n(#343) names the lead in ``from_person`` instead. ``reopened``,\n``reopen_undone`` and ``round_started`` name the task and its person\n(``assignment_id``, ``to_person``); the ``final_*`` kinds name the\nresults (``from_result`` the one replaced, ``to_result`` the one final\nafterwards; null when the submission is no longer among the row's).\n``text_paused`` and ``text_released`` (issue 464) are a lead's pause and\nrelease of the text, with ``by`` and the ``reason`` given."
+        "description": "A change of who works on a row, how, or of its final result: its\nHistory line, with who did it, when and (where one was given) why.\n\n``by`` is the person who made the change; a withdrawn final result\n(#343) names the lead in ``from_person`` instead. ``reopened``,\n``reopen_undone`` and ``round_started`` name the task and its person\n(``assignment_id``, ``to_person``); the ``final_*`` kinds name the\nresults (``from_result`` the one replaced, ``to_result`` the one final\nafterwards; null when the submission is no longer among the row's).\n``text_paused`` and ``text_released`` (issue 464) are a lead's pause and\nrelease of the text, with ``by`` and the ``reason`` given.\n``carried_by_typo_fix`` (issue 465): the submitted annotation of\n``to_person`` moved to the typo fix's new version by itself.\n``correction_requested`` is \"Ask a reviewer to correct\u2026\" and\n``correction_reason_added`` an addition to its reason (issue 483), the\ntask and its person as for ``reopened``, the text in ``reason``."
       },
       "RowItemView": {
         "properties": {
@@ -30437,7 +30827,7 @@
           "reporter": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -30533,7 +30923,7 @@
       "RowResultRefView": {
         "properties": {
           "author": {
-            "$ref": "#/components/schemas/PersonRefView"
+            "$ref": "#/components/schemas/MemberRefView"
           },
           "consolidation": {
             "type": "boolean",
@@ -30627,7 +31017,7 @@
           "author": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -30778,7 +31168,7 @@
           "author": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -31593,7 +31983,7 @@
         "properties": {
           "people": {
             "items": {
-              "$ref": "#/components/schemas/PersonRefView"
+              "$ref": "#/components/schemas/MemberRefView"
             },
             "type": "array",
             "title": "People"
@@ -32090,7 +32480,7 @@
           "reporter": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -32126,7 +32516,7 @@
           "person": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -32140,7 +32530,7 @@
           },
           "people": {
             "items": {
-              "$ref": "#/components/schemas/PersonRefView"
+              "$ref": "#/components/schemas/MemberRefView"
             },
             "type": "array",
             "title": "People"
@@ -32838,6 +33228,20 @@
               }
             ],
             "title": "Second Review Reason"
+          },
+          "second_review_additions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReasonAddition"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Second Review Additions"
           },
           "query_answered_at": {
             "anyOf": [
@@ -33993,7 +34397,7 @@
           "paused_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -35955,7 +36359,7 @@
           "accepted_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -36021,7 +36425,7 @@
           "discarded_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -36067,7 +36471,7 @@
           "corrected_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -36269,7 +36673,7 @@
           "decided_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -36745,7 +37149,7 @@
           "uploaded_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -36952,7 +37356,7 @@
           "person": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -36990,7 +37394,7 @@
           "assigned_by": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PersonRefView"
+                "$ref": "#/components/schemas/MemberRefView"
               },
               {
                 "type": "null"
@@ -37040,6 +37444,16 @@
             "type": "boolean",
             "title": "Waiting For Lead",
             "default": false
+          },
+          "correction_request": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CorrectionRequestView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,

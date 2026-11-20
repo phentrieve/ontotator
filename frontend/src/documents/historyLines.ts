@@ -163,6 +163,13 @@ export function historyLines(row: DocumentRowView, submissions: readonly RowSubm
       case "reopened":
         push(stage, `${prefix}: ${changeText(`task of ${named(change.to_person)} reopened${byText(change.by)}`, when, change.reason)}`);
         break;
+      // "Ask a reviewer to correct…" and each addition to its reason (issue 483): the reason as sent stays.
+      case "correction_requested":
+        push(stage, `${prefix}: ${changeText(`correction requested from ${named(change.to_person)}${byText(change.by)}`, when, change.reason)}`);
+        break;
+      case "correction_reason_added":
+        push(stage, `${prefix}: ${changeText(`addition to the correction request for ${named(change.to_person)}${byText(change.by)}`, when, change.reason)}`);
+        break;
       case "reopen_undone":
         push(stage, `${prefix}: ${changeText(`reopening of the task of ${named(change.to_person)} undone${byText(change.by)}`, when)}`);
         break;
@@ -187,6 +194,10 @@ export function historyLines(row: DocumentRowView, submissions: readonly RowSubm
         break;
       case "text_released":
         push("text", `Text: ${changeText(`released${byText(change.by)}`, when, change.reason)}`);
+        break;
+      // Issue 465: a submitted annotation moved to a typo fix by itself (nobody clicked).
+      case "carried_by_typo_fix":
+        push(stage, `${prefix}: ${changeText(`annotation of ${named(change.to_person)} moved to v${change.to_version ?? "?"} by itself after the typo fix`, when)}`);
         break;
       case "final_withdrawn":
         push("final", `Final: ${changeText(`withdrawn${byText(change.from_person)}`, when, change.reason)}`);

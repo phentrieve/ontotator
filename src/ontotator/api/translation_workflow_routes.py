@@ -35,6 +35,21 @@ class CorrectionAssignmentRequest(BaseModel):
     confirm_language: bool = False
 
 
+class CorrectionReasonAdditionRequest(BaseModel):
+    """Issue 483: what the lead adds to the reason of a correction request."""
+
+    model_config = ConfigDict(extra="forbid")
+    note: str = Field(min_length=1, max_length=2000)
+
+
+class CorrectionReasonAdditionView(BaseModel):
+    """One addition to the reason of a correction request, as saved."""
+
+    assignment_id: int
+    note: str
+    added_at: datetime
+
+
 class LeadCorrectionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_text_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
@@ -213,6 +228,39 @@ class EditorialProposals(BaseModel):
     needs_check: int
 
 
+class EditorialCarryPerson(BaseModel):
+    """Issue 465: one person's started or submitted annotation on the
+    corrected version and whether the typo fix moves it to the new version
+    by itself (``carried``). ``reason`` says why not: ``number_changed``,
+    ``final_result``, ``consolidation``, ``translation_not_accepted``,
+    ``from_proposals``, ``task_paused``,
+    ``findings_need_check``, ``not_submitted`` (started, not submitted) or
+    ``not_carryable``; such work keeps the manual flow."""
+
+    username: str
+    display_name: str
+    status: Literal["submitted", "started"]
+    carried: bool
+    reason: (
+        Literal[
+            "number_changed",
+            "final_result",
+            "consolidation",
+            "translation_not_accepted",
+            "from_proposals",
+            "task_paused",
+            "findings_need_check",
+            "not_submitted",
+            "not_carryable",
+        ]
+        | None
+    )
+    # Findings of the submission (editable layers) and how many of them
+    # cannot be placed on the new text.
+    findings: int
+    needs_check: int
+
+
 class EditorialCorrectionPreview(BaseModel):
     """What an editorial correction of this version would do (read only)."""
 
@@ -248,6 +296,9 @@ class EditorialCorrectionPreview(BaseModel):
     diff: list[EditorialChange] | None
     findings: EditorialFindings | None
     proposals: EditorialProposals | None
+    # With a text or replacements: per person, whether the annotation moves
+    # to the new version by itself (issue 465).
+    annotation_carry: list[EditorialCarryPerson] | None = None
 
 
 class EditorialCorrectionResult(BaseModel):
@@ -262,6 +313,10 @@ class EditorialCorrectionResult(BaseModel):
     inserted_characters: int
     deleted_characters: int
     tasks_following: int
+    # Issue 465: submitted annotations the fix moved to the new version, and
+    # per person what happened to their work.
+    annotations_carried: int = 0
+    annotation_carry: list[EditorialCarryPerson] = Field(default_factory=list)
 
 
 class QueriedReviewView(BaseModel):
@@ -377,6 +432,24 @@ def assign_correction(
         Actor.user(principal.user_id, principal.username), key, doc, **body.model_dump()
     )
     return _views(request, [row])[0]
+
+
+@router.post("/assignments/{assignment_id}/correction-reason")
+def add_correction_reason(
+    assignment_id: int,
+    body: CorrectionReasonAdditionRequest,
+    request: Request,
+    principal: PrincipalDep,
+) -> CorrectionReasonAdditionView:
+    """Issue 483: the lead adds to the reason of "Ask a reviewer to correct…"
+    while the review is open. Append-only: the reason as sent never changes."""
+    return CorrectionReasonAdditionView.model_validate(
+        _service(request).add_correction_reason(
+            Actor.user(principal.user_id, principal.username),
+            assignment_id,
+            body.note,
+        )
+    )
 
 
 @router.post("/projects/{key}/documents/{doc:path}/lead-correction")

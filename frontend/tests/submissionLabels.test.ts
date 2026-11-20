@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { formatTime, fullTimestamp, kindLabels, personLabel, roundCell, submissionLabel } from "../src/app/submissionLabels";
+import { formatTime, fullTimestamp, kindLabels, personLabel, roundCell, submissionLabel, versionRefLabel } from "../src/app/submissionLabels";
 
 const now = new Date("2026-10-19T12:00:00");
 
@@ -52,4 +52,11 @@ it("uses the display name and pseudonym when a person ref carries a display name
   expect(roundCell({ ordinal: null, author: "ann-0004", isMe: false, name: "Consolidation" })).toBe("Consolidation (ann-0004)");
   const base = { kind: "annotation" as const, ordinal: 2, author: "ann-0004", isMe: false, language: "de", version: "v1", recordedAt: "2026-10-19T00:57:00" };
   expect(submissionLabel({ ...base, person: ana }, { now })).toBe("Annotation, from scratch, Round 2, Ana Weber (ann-0004), de v1, 19 Oct, 00:57");
+});
+
+it("adds the local time to a submission's layer label, never a raw timestamp (issue 472)", () => {
+  const created_at = "2026-11-17T13:39:13.222074";
+  expect(versionRefLabel({ kind: "own", label: "My annotation, from scratch", created_at }, { now: new Date("2026-11-18T09:00:00") })).toBe("My annotation, from scratch, 17 Nov, 13:39");
+  expect(versionRefLabel({ kind: "submission", label: "ann-0004", created_at }, { now: new Date("2026-11-18T09:00:00") })).toBe("ann-0004 · 17 Nov, 13:39");
+  expect(versionRefLabel({ kind: "proposals", label: "Tool proposals", created_at })).toBe("Tool proposals");
 });

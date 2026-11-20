@@ -546,6 +546,53 @@ def accepted_translation_for_lead(app: FastAPI) -> dict[str, Any]:
     )
 
 
+TYPO_FIX_CASE = "case-0465"
+# A typo in the hypotonia passage; the seizure passage stays as it is.
+TYPO_FIX_TEXT = SYNTHETIC.replace("generalized hypotonia", "generalized hypotnia")
+
+
+def typo_fix_carry(app: FastAPI) -> dict[str, Any]:
+    """Issue 465: an accepted de translation of case-0465 with a typo in
+    "hypotnia" and two submitted annotations: Cy Annotator marked
+    "seizures" (a passage the fix leaves as it is), Ben marked "hypotnia"
+    (the word the fix corrects). After "Fix typos…" Cy's annotation moves
+    to v2 by itself; Ben's needs a check and stays on v1."""
+    from browser_carry_fixture import HYPOTONIA, SEIZURE, _create, _span
+    from browser_documents_scenarios import finish_round, start_round
+    from t1_builders import native_unit, translation_unit
+
+    scenario = lead_project(app, "TYPO_FIX_CARRY")
+    source = native_unit(TYPO_FIX_CASE, "en", SYNTHETIC, case_id=TYPO_FIX_CASE)
+    docs = import_units(
+        scenario,
+        [source, translation_unit(TYPO_FIX_CASE, "de", TYPO_FIX_TEXT, source=source)],
+    )
+    plan(scenario, [TYPO_FIX_CASE], {"de": REVIEW_AND_ANNOTATE})
+    document_id = docs[(TYPO_FIX_CASE, "de")]
+    review_translation(scenario, document_id, "ana", "accepted_unchanged")
+    for name, term, part in (
+        ("annotator", SEIZURE, "seizures"),
+        ("ben", HYPOTONIA, "hypotnia"),
+    ):
+        started = start_round(
+            scenario, assign(scenario, document_id, name, "annotate"), name
+        )
+        _create(
+            scenario,
+            name,
+            started.workspace_key,
+            term,
+            span=_span(TYPO_FIX_TEXT, part),
+        )
+        finish_round(scenario, name, started.workspace_key)
+    return result(
+        scenario,
+        all_rows([TYPO_FIX_CASE], ("de",)),
+        case_ids={"de": [TYPO_FIX_CASE]},
+        documents={"de": document_id},
+    )
+
+
 UPLOAD_DIALOG_CASES = cases(301, 62)
 
 
@@ -626,6 +673,7 @@ BUILDERS: dict[str, Builder] = {
     "QUERIED_TRANSLATION_FOR_LEAD": queried_translation_for_lead,
     "ACCEPTED_TRANSLATION_FOR_LEAD": accepted_translation_for_lead,
     "UPLOAD_DIALOG": build_upload_dialog,
+    "TYPO_FIX_CARRY": typo_fix_carry,
 }
 
 

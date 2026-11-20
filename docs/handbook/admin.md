@@ -24,17 +24,18 @@ Try it with the demo project: the [demo project guide](../../examples/demo-proje
 What for: find the pages only system administrators see.
 
 1. Log in. Your role line in the header reads **System administrator**.
-2. In the sidebar, open the group **Administration**.
-3. Click **Users**, **Ontologies**, **Technical reports**, **New project** or **Server settings**.
+2. Click the gear at the top right. It opens **Administration** on the **Users** page.
+3. In the sidebar of this area, click **Users**, **Ontologies**, **Technical reports** or **Server settings**.
+4. Click **Back to Projects** to return to your work.
 
-Other users do not see this group. If they open such a page by its address, they get a short explanation instead.
+Other users do not see the gear. If they open such a page by its address, they get a short explanation instead. **New project** is a button on the **Projects** page; see [Create a project](#create-a-project).
 
 ## Find and review user accounts
 
 What for: check who has an account, whether they finished setup and when they last logged in.
 
-1. In the sidebar, open **Administration** › **Users**.
-2. Type a username or display name into **Filter users**.
+1. Click the gear at the top right and open **Users**.
+2. Type a username or display name into **Filter users**. With more than 100 accounts, the table shows the first 100; **Show all** shows the rest.
 3. Read the table. **Setup** shows **Pending** until the person has set a password. **Last login** shows **Never** if they have not logged in yet. **Active** reads **Yes**, **No** or **Anonymised**. **Projects** shows how many projects the person belongs to; click it to see the projects and the person's roles in each.
 4. Click a row to highlight it. Click it again to clear the highlight.
 5. Click **Refresh users** to reload the list.
@@ -48,7 +49,7 @@ What for: give a new person access to Ontotator.
    - **Qualification**, for example *physician*, is needed before the person can submit a translation review.
    - **Languages** are the languages the person reads. Leads see them when they assign work, and **Distribute evenly…** proposes only people who read a text's languages. Leave them empty if you do not know them: no languages count as unknown, not as "reads nothing", and such a person is proposed only where nobody who lists the language is left.
 3. Tick **System administrator** only if the person should manage the whole server.
-4. Optional: under **Add to projects (optional)**, tick a role per project: **Lead**, **Annotator** or **Consolidator**. With many projects, type into **Find project** to narrow the list.
+4. Optional: under **Add to projects (optional)**, tick a role per project: **Lead**, **Annotator** or **Consolidator**. With many projects, type into **Find project** to narrow the list. Projects with the same name also show their project key, for example *Study One (study-one-2026)*.
 5. Click **Create user**.
 6. The setup-code dialog opens. [Hand over the code](#hand-over-a-setup-or-reset-code).
 
@@ -111,7 +112,7 @@ What for: check what was changed on an account and by whom.
 
 1. On **Users**, click **More…** in the row and choose **History**. For anonymised accounts, click the **History** button in the row.
 2. Read the table: **When**, **By**, **What**, **Whom**, **Project**, **Details**. **What** names the change in plain words, for example *Project settings changed*, *Final result withdrawn*, *Final export created* or *Phenopackets created*. Research exports are listed too, for example *Edit log exported* or *Working time exported*. A text given its own number of annotators reads *Annotators per text changed for one text*, with the text, the old and new value and the project value under **Details**. *Languages changed* says which languages were added and removed (*Added: fr. Removed: es.*). *Project settings changed* names each setting as the settings page does, with the old and the new value (*Hide annotator names during consolidation: off → on*); the description, the prefilled values and the values annotators can choose are named without values. Entries from before these values were recorded show the names only. On a phone, scroll the table sideways to read **Details**.
-3. Changes made with an API token name it under **Details** (*Via API token*); the single requests a token made are left out here. The dialog shows the newest 200 entries. For the whole trail, use the command `ontotator admin audit`, see [Server operations](../operations.md#users-ontologies-and-projects). An editorial correction of a translation is recorded as *Typo fix in a translation*; its details carry the reason and the changed passages. A lead's decision on a queried translation review is recorded as *Query on a translation decided*, with the kind of decision and the answer to the reviewer.
+3. Changes made with an API token name it under **Details** (*Via API token*); the single requests a token made are left out here. The dialog shows the newest 200 entries. For the whole trail, use the command `ontotator admin audit`, see [Server operations](../operations.md#users-ontologies-and-projects). An editorial correction of a translation is recorded as *Typo fix in a translation*; its details carry the reason and the changed passages. A submitted annotation that such a fix moved to the new version by itself is recorded as *Annotation moved to a typo fix automatically*, naming the submission it came from; the system made that change, so it names no person who did it. A lead's decision on a queried translation review is recorded as *Query on a translation decided*, with the kind of decision and the answer to the reviewer. A lead's addition to the reason of a correction request is recorded as *Added to the reason of a translation correction*, with the text added.
 
 ## Anonymise a deactivated account
 
@@ -130,12 +131,12 @@ Before you start: [deactivate the account](#deactivate-or-activate-an-account).
 
 What for: read what users report about error messages, pages that do not load, crashes and the app in general, and keep track of what is handled.
 
-1. In the sidebar, open **Administration** › **Technical reports**. The number after it counts the open reports.
+1. Click the gear at the top right and open **Technical reports**. The number after it, and on the gear, counts the open reports.
 2. **Show** lists the **Open** reports. Choose **Done** or **All** to see the others.
 3. Read a report. It shows its reference (for example *TR-12*), the user's text, who sent it and when. Below are the details Ontotator added: app version, the task if it was sent from one (its kind, for example *Annotation, from proposals*, the project and the text; for a practice task only *A practice task*, as practice projects are private), screen, browser, window size, the last error the app received and, from the crash message, the error.
 4. Click **Mark as done** when the report is handled. Click **Reopen** to open it again.
 
-Users send reports with **Technical problem…** in the sidebar or **Report a technical problem…** in the editor; see [Report a technical problem](getting-started.md#report-a-technical-problem). Their task is not paused, and project leads do not see these reports. Each user sees their own reports and their status (*Open* or *Done*) under **Profile** › **My technical reports**, but not your name or the added details. A user can send at most 20 reports per hour.
+Users send reports with **Technical problem…** in the user menu or **Report a technical problem…** in the editor; see [Report a technical problem](getting-started.md#report-a-technical-problem). Their task is not paused, and project leads do not see these reports. Each user sees their own reports and their status (*Open* or *Done*) under **Profile** › **My technical reports**, but not your name or the added details. A user can send at most 20 reports per hour.
 
 Reports stay inside Ontotator. Nothing goes out by e-mail or to GitHub. To open an issue, click **Copy report** and paste the text by hand. Remove clinical content and patient details first.
 
@@ -145,7 +146,7 @@ Sending, closing and reopening a report are recorded in the audit trail, with th
 
 What for: make a new ontology release (for example a newer HPO) or a translation file available to projects.
 
-1. In the sidebar, open **Administration** › **Ontologies**.
+1. Click the gear at the top right and open **Ontologies**.
 2. In **Ontology files**, choose one or more files: OBO Graph JSON ontologies (`.json`) or Babelon translation files (`.tsv`).
 3. Click **Upload files**.
 4. Read **Upload results**: **Added** or **Already present** per file.
@@ -180,7 +181,7 @@ What for: start a new project with its ontology and annotation scheme. Only syst
 
 Before you start: [upload the ontology release](#upload-ontology-releases-and-translation-files) the project needs.
 
-1. In the sidebar, open **Administration** › **New project**.
+1. Click **Projects** in the sidebar, then **New project** above the list.
 2. Fill **Project key** (2–63 lower-case letters, digits or hyphens) and **Name**. **Description** and **Languages of the texts** are optional.
 3. Under **Profile source**, keep **Built-in template** and choose a template. Or choose **Upload profile JSON** and pick a task profile file. Which one you need: see [Task profiles](lead-settings.md#task-profiles).
 4. For each ontology, choose the release in its ontology file field. With an uploaded profile, choose the file whose checksum the profile names. Optionally limit the allowed branches and choose the annotation scheme. With the template, HPO starts with the branch `HP:0000118` and the scheme **HPO phenotype (fixed qualifiers, modifiers)**; with an uploaded profile, the branches and the scheme start with what the file sets ([`allowed_roots`, `t1_profile`](lead-settings.md#what-a-profile-file-looks-like)), and the branches start empty (every term) if it sets none. The hint under an empty field says *Whole ontology*. A field that still shows the value from the file says *Loaded from the profile.*; the note goes once you change the field. What you enter here wins over the file.
@@ -263,7 +264,7 @@ A practice project is also deleted after 30 days without activity, and when its 
 
 To switch the offer off:
 
-1. Click **Server settings** under **Administration**.
+1. Click the gear at the top right and open **Server settings**.
 2. Under **Practice projects**, clear **Offer practice projects to annotators and translation reviewers**.
 3. Click **Save changes**.
 
@@ -275,7 +276,7 @@ A practice project freezes its translations like any project. A translation file
 
 What for: see every API token of the server, stop one, or create a system token for administration scripts.
 
-1. Click **Server settings** under **Administration**.
+1. Click the gear at the top right and open **Server settings**.
 2. Go to **API tokens**. The table shows each token's **Kind** (*Personal*, *Project* or *System*), **Owner**, **Project**, **Scopes**, expiry, last use and **Status**.
 3. To stop a token, click **Revoke…** in its row, then **Revoke token**. A token the server revoked by itself says why next to **Revoked**, for example *project role removed* or *password changed*.
 4. To create a system token, click **New system token…**, enter a **Token name**, tick its scopes and click **Create token**. Copy the token from the dialog with **Copy token**; it is shown only once. Tick **I have stored the token**, then click **Close**; the dialog cannot be closed before.

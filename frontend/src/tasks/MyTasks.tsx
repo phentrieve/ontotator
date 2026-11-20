@@ -15,7 +15,7 @@ import { annotationTaskName } from "../editor/modes";
 import { PracticeCard, PracticeGroup } from "../practice/PracticeOnMyTasks";
 import { usePractice } from "../practice/usePractice";
 import { notifyTasksChanged } from "./tasksEvents";
-import { reopenedText, secondReviewText } from "./LeadReason";
+import { reasonAdditionLines, reopenedText, secondReviewText } from "./LeadReason";
 import { pauseMarks } from "./pauseLabels";
 
 export interface MyTasksProps {
@@ -210,6 +210,7 @@ export function MyTasks({ project, status, projects, onNavigate, username }: MyT
       {failedChecks(task) > 0 && <span className="task-check-flag"><IconWarning /> {failedChecksTitle(failedChecks(task))}</span>}
       {task.consolidation_reason && <p className="cell-secondary task-consolidation-reason">{consolidationReasonText(task.consolidation_reason)}</p>}
       {secondReviewText(task) && <p className="cell-secondary task-lead-reason">{secondReviewText(task)}</p>}
+      {reasonAdditionLines(task).map(line => <p key={line} className="cell-secondary task-lead-reason">{line}</p>)}
       {/* The lead's reason for reopening is written out like the one for a second review (review 2, F7 c); on a narrow
           screen the notice under the "Reopened" badge already says it. */}
       {!narrow && task.reopen_reason?.trim() && reopenedText(task) && <p className="cell-secondary task-lead-reason">{reopenedText(task)}</p>}

@@ -5,6 +5,7 @@
 
 import type { components, operations } from "./generated";
 import { attachmentFilename, type DownloadPayload } from "./download";
+import { versionRefLabel } from "../app/submissionLabels";
 import { lastApiError, recordApiError, type LastApiError } from "./lastError";
 export type { DownloadPayload } from "./download";
 
@@ -255,6 +256,7 @@ export type LeadCorrectionPreview = components["schemas"]["LeadCorrectionPreview
 export type QueryDecisionPreview = components["schemas"]["QueryDecisionPreview"];
 export type QueryDecisionRequest = components["schemas"]["QueryDecisionRequest"];
 export type QueryDecisionResult = components["schemas"]["QueryDecisionResult"];
+export type CorrectionReasonAdditionView = components["schemas"]["CorrectionReasonAdditionView"];
 export type ResolveSourceObligationRequest = components["schemas"]["ResolveSourceObligationRequest"];
 export type ProblemReportRequest = components["schemas"]["ProblemReportRequest"];
 export type ProblemActionRequest = components["schemas"]["ProblemActionRequest"];
@@ -983,12 +985,14 @@ export class ApiClient {
   async listAnnotationVersions(projectKey: string, documentId: string, assignmentId?: number): Promise<VersionRef[]> {
     const query = new URLSearchParams();
     if (assignmentId !== undefined) query.set("assignment", String(assignmentId));
-    return this.request<VersionRef[]>(`/api/v1/projects/${encodeURIComponent(projectKey)}/documents/${encodeURIComponent(documentId)}/annotation-versions${query.size ? `?${query}` : ""}`, { method: "GET" });
+    const refs = await this.request<VersionRef[]>(`/api/v1/projects/${encodeURIComponent(projectKey)}/documents/${encodeURIComponent(documentId)}/annotation-versions${query.size ? `?${query}` : ""}`, { method: "GET" });
+    return refs.map(ref => ({ ...ref, label: versionRefLabel(ref) }));
   }
 
   async listTextLayers(key: string, documentId: string): Promise<TextLayerEntry[]> {
     const body = await this.request<components["schemas"]["TextLayers"]>(`/api/v1/projects/${encodeURIComponent(key)}/documents/${encodeURIComponent(documentId)}/layers`, { method: "GET" });
-    return body.entries;
+    // An own submission's entry carries its ref's label: both get the local time.
+    return body.entries.map(entry => entry.ref ? { ...entry, label: entry.kind === "own" ? versionRefLabel(entry.ref) : entry.label, ref: { ...entry.ref, label: versionRefLabel(entry.ref) } } : entry);
   }
 
   async finalExportPreflight(projectKey: string): Promise<FinalPreflight> {
@@ -1462,6 +1466,11 @@ export class ApiClient {
   /** Issue 483: the lead takes the reviewer's text as the next version, or accepts the version as it is, with an answer. */
   async decideQuery(projectKey: string, documentId: string, body: QueryDecisionRequest): Promise<QueryDecisionResult> {
     return this.request(`/api/v1/projects/${encodeURIComponent(projectKey)}/documents/${encodeURIComponent(documentId)}/query-decision`, { method: "POST", body: JSON.stringify(body) });
+  }
+
+  /** Issue 483: the lead adds to the reason of "Ask a reviewer to correct…" while the review is open (append-only). */
+  async addCorrectionReason(assignmentId: number, note: string): Promise<CorrectionReasonAdditionView> {
+    return this.request(`/api/v1/assignments/${assignmentId}/correction-reason`, { method: "POST", body: JSON.stringify({ note }) });
   }
 
   /** Issue 341 b: whether a lead correction is available and the annotation work that stays on the version. */

@@ -71,11 +71,16 @@ export interface EditorialConsequences {
  * What happens to the work on the version, in plain words. Quiet when nothing needs the lead afterwards
  * ("Nobody has worked on v1 yet.", "2 waiting tasks continue on v2."); when started or submitted work stays,
  * what stays and what to do next ("2 annotations stay on v1. After saving, use Handle text change… and
- * Carry to v2… on this row to move them.").
+ * Carry to v2… on this row to move them."). With a changed text, per person: whose submitted annotation moves
+ * to the new version by itself (issue 465) and whose does not, and why.
  */
 export function editorialConsequences(preview: EditorialCorrectionPreview): EditorialConsequences {
   const old = `v${preview.version}`, next = `v${preview.next_version}`, moving = preview.tasks_following;
-  const started = Math.max(0, preview.annotations.open - moving), submitted = preview.annotations.submitted;
+  // Issue 465: submitted annotations whose findings all re-anchor move by themselves when no number changes.
+  const carry = preview.annotation_carry ?? [];
+  const carried = carry.filter(item => item.carried);
+  const kept = carry.filter(item => !item.carried && item.status === "submitted");
+  const started = Math.max(0, preview.annotations.open - moving), submitted = Math.max(0, preview.annotations.submitted - carried.length);
   const staying = submitted + started;
   // The row's own next steps: started work is moved with "Handle text change…", submitted work with "Carry to v2…".
   const steps = [started ? "Handle text change…" : null, submitted ? `Carry to ${next}…` : null].filter(Boolean).join(" and ");
@@ -85,6 +90,8 @@ export function editorialConsequences(preview: EditorialCorrectionPreview): Edit
   const waits = preview.annotate_accepted_only && preview.translation_status !== "accepted";
   const others = [count ? plural(count, "open consolidation") : null, preview.final_result ? "the final result" : null].filter(Boolean).join(" and ");
   const lines = [
+    carried.length ? `${carried.length === 1 ? "Moves" : "Move"} to ${next} by ${carried.length === 1 ? "itself" : "themselves"}, nobody submits again: the ${carried.length === 1 ? "annotation" : "annotations"} of ${names(carried)}.` : null,
+    ...keptLines(kept),
     staying ? `${plural(staying, "annotation")} ${staying === 1 ? "stays" : "stay"} on ${old}. ${waits ? `Once ${next} is accepted` : "After saving"}, use ${steps} on this row to move ${staying === 1 ? "it" : "them"}.` : null,
     others ? `${others.charAt(0).toUpperCase()}${others.slice(1)} ${count + (preview.final_result ? 1 : 0) === 1 ? "stays" : "stay"} on ${old}${staying ? " as well" : ""}.` : null,
     findings?.needs_check ? `${findings.needs_check} of ${plural(findings.submitted, "finding")} ${findings.needs_check === 1 ? "marks" : "mark"} words you changed and will need a check when moved.` : null,
@@ -94,6 +101,34 @@ export function editorialConsequences(preview: EditorialCorrectionPreview): Edit
       : null,
   ].filter((line): line is string => line !== null);
   return { attention, lines: lines.length ? lines : [`Nobody has worked on ${old} yet.`] };
+}
+
+type CarryPerson = NonNullable<EditorialCorrectionPreview["annotation_carry"]>[number];
+const names = (people: readonly CarryPerson[]) => {
+  const all = people.map(item => item.display_name || item.username);
+  return all.length > 1 ? `${all.slice(0, -1).join(", ")} and ${all[all.length - 1]}` : all.join("");
+};
+
+/** Why a submitted annotation does not move by itself (`annotation_carry` reasons); it keeps the manual flow. */
+export const CARRY_REASONS: Readonly<Record<string, string>> = {
+  number_changed: "the fix changes a number",
+  final_result: "the text has a final result",
+  consolidation: "the text has a consolidation",
+  translation_not_accepted: "the translation is not accepted yet",
+  from_proposals: "annotated from tool proposals, which reach the new version later",
+  task_paused: "the task is paused",
+  findings_need_check: "a finding marks words you changed",
+  not_carryable: "it cannot be moved automatically",
+};
+
+/** One line per reason: "Not moved by itself, the fix changes a number: Tom Reis and Ana Weber." */
+function keptLines(kept: readonly CarryPerson[]): string[] {
+  const byReason = new Map<string, CarryPerson[]>();
+  for (const item of kept) {
+    const reason = item.reason ?? "not_carryable";
+    byReason.set(reason, [...(byReason.get(reason) ?? []), item]);
+  }
+  return [...byReason].map(([reason, people]) => `Not moved by ${people.length === 1 ? "itself" : "themselves"}, ${CARRY_REASONS[reason] ?? CARRY_REASONS.not_carryable}: ${names(people)}.`);
 }
 
 export interface EditorialCorrectionDialogProps {
@@ -165,7 +200,8 @@ export function EditorialCorrectionDialog({ row, version, projectKey, onCorrecte
     writing.current = true; setBusy(true); setError(undefined);
     try {
       const saved = await api.editorialCorrection(projectKey, version.document_id, { text: value, expected_text_sha256: state.text_sha256, reason });
-      onCorrected(`Typos fixed: v${saved.version} of ${textLabel(row)} saved.${status ? ` It stays ${status}.` : ""}`);
+      const moved = saved.annotations_carried ?? 0;
+      onCorrected(`Typos fixed: v${saved.version} of ${textLabel(row)} saved.${status ? ` It stays ${status}.` : ""}${moved ? ` ${plural(moved, "annotation")} moved to v${saved.version}.` : ""}`);
     } catch (failure: unknown) {
       setError(failure);
     } finally { writing.current = false; setBusy(false); }

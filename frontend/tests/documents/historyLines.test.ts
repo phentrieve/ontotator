@@ -148,6 +148,14 @@ describe("reassignments and mode changes", () => {
     expect(historyLines(paused, [], { now, changes: changes.slice(0, 1) }).map(line => line.text)).toEqual(["Text: paused by you, 30 Oct, 09:00: Source is checked"]);
     expect(historyLines(paused, null, { now }).map(line => [line.stage, line.text])).toEqual([["text", "Text: paused by you, 30 Oct, 09:00: Source is checked"]]);
   });
+  it("names an annotation that moved to a typo fix by itself (issue 465)", () => {
+    const lines = historyLines(emptyRow, [], { now, changes: [
+      { kind: "carried_by_typo_fix", at: "2026-10-30T09:00:00", task: "annotate", assignment_id: 9, by: null, to_person: ben, from_version: 1, to_version: 2 },
+    ] });
+    expect(lines.map(line => [line.stage, line.text])).toEqual([
+      ["annotation", "Annotation: annotation of Ben Roth (ann-2) moved to v2 by itself after the typo fix, 30 Oct, 09:00"],
+    ]);
+  });
   it("names who reopened a task or started a round, when and why", () => {
     const lead = { pseudonym: "lead-1", display_name: "Carla Diaz", is_me: true };
     const lines = historyLines(emptyRow, [], { now, changes: [
@@ -233,5 +241,17 @@ describe("reassignments and mode changes", () => {
     ]);
     const edited = { ...taken, versions: [taken.versions[0], { ...taken.versions[1], query_decision: { ...decision, kind: "reviewer_text" as const, answer: null, edited: true } }] };
     expect(historyLines(edited, [], { now }).at(-1)?.text).toBe("Review: query decided by you, the reviewer’s text taken with changes, v1 → v2, 21 Oct, 17:24");
+  });
+
+  it("issue 483: a correction request and each addition to its reason are lines of their own", () => {
+    const lead = { pseudonym: "lead-1", display_name: "Carla Diaz", is_me: true };
+    const lines = historyLines(emptyRow, [], { now, changes: [
+      { kind: "correction_requested", at: "2026-10-30T09:00:00", task: "translation_review", assignment_id: 8, by: lead, to_person: anna, reason: "Check the dose." },
+      { kind: "correction_reason_added", at: "2026-10-30T09:30:00", task: "translation_review", assignment_id: 8, by: { ...lead, is_me: false }, to_person: anna, reason: "Paragraph 3 as well." },
+    ] });
+    expect(lines.map(line => [line.stage, line.text])).toEqual([
+      ["review", "Review: correction requested from Anna Early (ann-1) by you, 30 Oct, 09:00: Check the dose."],
+      ["review", "Review: addition to the correction request for Anna Early (ann-1) by Carla Diaz (lead-1), 30 Oct, 09:30: Paragraph 3 as well."],
+    ]);
   });
 });

@@ -102,6 +102,51 @@ class TextChangeResolutionRow(Base):
     decided_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
+class TypoFixCarryRow(Base):
+    """A submission the system made on a typo fix's new version (issue 465).
+
+    Append-only, one row per carried copy. After "Fix typos…" the person's
+    submitted annotation (``source_submission_id`` on ``from_document_id``)
+    is moved to the new version without anyone's click: the copy
+    (``submission_id`` on ``to_document_id``) has the same author and the
+    same findings, placed on the new text. This row is the copy's origin:
+    it is not a second annotation of that person (exports, counts) and it
+    names the correction (``correction_id``) that caused it.
+    """
+
+    __tablename__ = "typo_fix_carries"
+    __table_args__ = (
+        _document_fk("from_document_id"),
+        _document_fk("to_document_id"),
+        ForeignKeyConstraint(
+            ["project_id", "submission_id"],
+            [f"{SCHEMA}.submissions.project_id", f"{SCHEMA}.submissions.submission_id"],
+        ),
+        ForeignKeyConstraint(
+            ["project_id", "source_submission_id"],
+            [f"{SCHEMA}.submissions.project_id", f"{SCHEMA}.submissions.submission_id"],
+        ),
+        UniqueConstraint("project_id", "submission_id"),
+        Index(
+            "ix_typo_fix_carries_source",
+            "project_id",
+            "source_submission_id",
+        ),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.projects.id")
+    )
+    submission_id: Mapped[str]
+    source_submission_id: Mapped[str]
+    correction_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(f"{SCHEMA}.translation_editorial_corrections.id")
+    )
+    from_document_id: Mapped[str]
+    to_document_id: Mapped[str]
+    carried_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
 class DraftSnapshotRow(Base):
     """A frozen copy of an assignment's draft (append-only, spec I1)."""
 

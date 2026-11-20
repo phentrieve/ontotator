@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from ontotator.api.document_projection import AssignmentFilter, AssignmentStatus
 from ontotator.api.encoded_routes import EncodedParameterRoute
 from ontotator.api.identity import PrincipalDep
-from ontotator.api.person_views import PersonRefView
+from ontotator.api.person_views import MemberRefView
 from ontotator.api.routes import get_access, get_ontology
 from ontotator.api.work_plan_routes import (
     MAX_SELECTED_ROWS,
@@ -74,7 +74,7 @@ class VersionAcceptanceView(_View):
     source: Literal["package", "lead", "override"]
     reason: str | None = None
     accepted_at: datetime | None = None
-    accepted_by: PersonRefView | None = None
+    accepted_by: MemberRefView | None = None
     # Package metadata (``translation.review``), kept only as given.
     reviewer: str | None = None
     reviewed_at: str | None = None
@@ -85,7 +85,7 @@ class VersionDiscardView(_View):
 
     reason: str | None = None
     discarded_at: datetime | None = None
-    discarded_by: PersonRefView | None = None
+    discarded_by: MemberRefView | None = None
 
 
 class VersionUploadView(_View):
@@ -98,7 +98,7 @@ class VersionUploadView(_View):
     made_by: str | None = None
     note: str | None = None
     uploaded_at: datetime | None = None
-    uploaded_by: PersonRefView | None = None
+    uploaded_by: MemberRefView | None = None
 
 
 class VersionEditorialCorrectionView(_View):
@@ -110,7 +110,7 @@ class VersionEditorialCorrectionView(_View):
     inserted_characters: int
     deleted_characters: int
     corrected_at: datetime | None = None
-    corrected_by: PersonRefView | None = None
+    corrected_by: MemberRefView | None = None
 
 
 class VersionQueryDecisionView(_View):
@@ -129,7 +129,7 @@ class VersionQueryDecisionView(_View):
     # The lead changed the reviewer's text before saving it.
     edited: bool = False
     decided_at: datetime | None = None
-    decided_by: PersonRefView | None = None
+    decided_by: MemberRefView | None = None
 
 
 class DocumentVersionView(_View):
@@ -176,6 +176,24 @@ class AnnotationsPerTextView(_View):
     override: int | None = None
 
 
+class ReasonAdditionView(_View):
+    """A lead's addition to the reason of a correction request (issue 483)."""
+
+    note: str
+    added_at: datetime
+    # None: added through an API token, or by an account since erased.
+    added_by: MemberRefView | None = None
+
+
+class CorrectionRequestView(_View):
+    """Why the lead asked for this review with "Ask a reviewer to correct…"
+    (issue 483): the reason as sent, and what the lead added to it since."""
+
+    reason: str
+    requested_at: datetime
+    additions: list[ReasonAdditionView] = Field(default_factory=list)
+
+
 class WorkItemView(_View):
     assignment_id: int
     document_id: str
@@ -191,7 +209,7 @@ class WorkItemView(_View):
     round_ordinal: int | None
     round_state: str | None
     # Lead workflow (D1): the assignee as a person reference.
-    person: PersonRefView | None = None
+    person: MemberRefView | None = None
     # F1 (FD1): the lead's own correction of a rejected or queried version.
     lead_correction: bool = False
     # Text changes (V5): version this (revoked) work was moved to.
@@ -199,7 +217,7 @@ class WorkItemView(_View):
     # Spec 2026-10-23 §2: assignment date, assigner and the annotation mode
     # fixed at assignment time (annotate only).
     assigned_at: datetime | None = None
-    assigned_by: PersonRefView | None = None
+    assigned_by: MemberRefView | None = None
     annotation_mode: AnnotationMode | None = None
     # Issue 337: the proposal set an annotation task works on (its round's,
     # or the newest one for a task from proposals not started yet); None:
@@ -214,6 +232,9 @@ class WorkItemView(_View):
     waiting_for_translation_review: bool = False
     # Closed on a version the text moved on from: the lead decides.
     waiting_for_lead: bool = False
+    # A translation review the lead asked for with "Ask a reviewer to
+    # correct…": the reason and its additions; None for other work.
+    correction_request: CorrectionRequestView | None = None
 
 
 class ReportIssueView(_View):
@@ -222,7 +243,7 @@ class ReportIssueView(_View):
     reporter_label: str
     created_at: datetime
     task_state: Literal["paused", "resumed"]
-    reporter: PersonRefView | None = None
+    reporter: MemberRefView | None = None
 
 
 class RowItemView(_View):
@@ -258,7 +279,7 @@ class FinalSelectionSummary(_View):
     is_newest_of_chain: bool
     # Snapshot at selection time; the current rule is on the page.
     adjudicator_not_annotator: bool | None
-    author: PersonRefView | None = None
+    author: MemberRefView | None = None
 
 
 class MissingFinalView(_View):
@@ -284,22 +305,22 @@ class RowProblemReport(_View):
     created_at: datetime
     state: Literal["open", "resolved", "withdrawn"]
     active_hold_count: int
-    reporter: PersonRefView | None = None
+    reporter: MemberRefView | None = None
 
 
 class StepOwnerView(_View):
     kind: Literal["you", "person", "people", "none"]
-    person: PersonRefView | None = None
+    person: MemberRefView | None = None
     count: int = 0
     # Waiting on (VD8): every person of the step; for an in-progress step the
     # people of every in-progress step of the row.
-    people: list[PersonRefView] = Field(default_factory=list)
+    people: list[MemberRefView] = Field(default_factory=list)
 
 
 class StageCellDetailView(_View):
     """Muted second line of a stage cell (documents overview "Stage cells")."""
 
-    people: list[PersonRefView] = Field(default_factory=list)
+    people: list[MemberRefView] = Field(default_factory=list)
     assigned: int | None = None
     target: int | None = None
     submitted: int | None = None
@@ -370,7 +391,7 @@ class StepDetailView(_View):
     total: int | None = None
     round_ordinal: int | None = None
     excerpt: str | None = None
-    reporter: PersonRefView | None = None
+    reporter: MemberRefView | None = None
     task_paused: bool = False
 
 
@@ -433,7 +454,7 @@ class LeadPauseView(_View):
 
     reason: str
     # None: paused through an API token or by an account since erased.
-    paused_by: PersonRefView | None = None
+    paused_by: MemberRefView | None = None
     paused_at: datetime
 
 
@@ -621,7 +642,7 @@ class RowSubmissionView(_View):
     round_state: str | None
     is_latest_in_round: bool | None
     finding_count: int
-    author: PersonRefView | None = None
+    author: MemberRefView | None = None
     guideline_version: int | None = None
     # The project's own name of that version ("3.1"), if it has one.
     guideline_label: str | None = None
@@ -646,7 +667,7 @@ class RowRoundView(_View):
     is_me: bool
     round_ordinal: int | None
     submitted: bool
-    author: PersonRefView | None = None
+    author: MemberRefView | None = None
 
 
 class OpenTranslationReviewView(_View):
@@ -656,14 +677,14 @@ class OpenTranslationReviewView(_View):
     chain_name: str | None
     reviewer_label: str
     is_me: bool
-    reviewer: PersonRefView | None = None
+    reviewer: MemberRefView | None = None
 
 
 class RowResultRefView(_View):
     """A submission named as a final result in a History line: its author,
     and whether it is a consolidation."""
 
-    author: PersonRefView
+    author: MemberRefView
     consolidation: bool = False
 
 
@@ -678,7 +699,12 @@ class RowChangeView(_View):
     results (``from_result`` the one replaced, ``to_result`` the one final
     afterwards; null when the submission is no longer among the row's).
     ``text_paused`` and ``text_released`` (issue 464) are a lead's pause and
-    release of the text, with ``by`` and the ``reason`` given."""
+    release of the text, with ``by`` and the ``reason`` given.
+    ``carried_by_typo_fix`` (issue 465): the submitted annotation of
+    ``to_person`` moved to the typo fix's new version by itself.
+    ``correction_requested`` is "Ask a reviewer to correct…" and
+    ``correction_reason_added`` an addition to its reason (issue 483), the
+    task and its person as for ``reopened``, the text in ``reason``."""
 
     kind: Literal[
         "reassigned",
@@ -693,19 +719,26 @@ class RowChangeView(_View):
         "final_restored",
         "text_paused",
         "text_released",
+        "carried_by_typo_fix",
+        "correction_requested",
+        "correction_reason_added",
     ]
     at: datetime
     task: str | None = None
-    by: PersonRefView | None = None
+    by: MemberRefView | None = None
     assignment_id: int | None = None
     round_ordinal: int | None = None
-    from_person: PersonRefView | None = None
-    to_person: PersonRefView | None = None
+    from_person: MemberRefView | None = None
+    to_person: MemberRefView | None = None
     from_mode: str | None = None
     to_mode: str | None = None
     from_result: RowResultRefView | None = None
     to_result: RowResultRefView | None = None
     reason: str | None = None
+    # ``carried_by_typo_fix`` (issue 465): the versions the annotation of
+    # ``to_person`` moved between, by the system (``by`` is null).
+    from_version: int | None = None
+    to_version: int | None = None
 
 
 class RowSubmissions(_View):

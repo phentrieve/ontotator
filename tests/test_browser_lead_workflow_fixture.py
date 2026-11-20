@@ -113,7 +113,7 @@ def codes(row: dict[str, Any]) -> list[str]:
     return [step["code"] for step in row["steps"]]
 
 
-def test_registry_has_ten_scenarios_and_unknown_is_404(client):
+def test_registry_has_eleven_scenarios_and_unknown_is_404(client):
     assert set(BUILDERS) == {
         "D15",
         "DEFAULT_IMPORT",
@@ -125,6 +125,7 @@ def test_registry_has_ten_scenarios_and_unknown_is_404(client):
         "QUERIED_TRANSLATION_FOR_LEAD",
         "ACCEPTED_TRANSLATION_FOR_LEAD",
         "UPLOAD_DIALOG",
+        "TYPO_FIX_CARRY",
     }
     response = client.post("/__test_lead_workflow__", params={"scenario": "S99"})
     assert response.status_code == 404
@@ -315,3 +316,70 @@ def test_rejected_translation_for_lead_builds(client):
     lead = accounts.get_by_username(built["users"]["lead"])
     assert lead.qualification
     assert "de" in accounts.languages_of([lead.id])[lead.id]
+
+
+def test_typo_fix_carry_builds_and_its_fix_moves_one_annotation(client):
+    """Issue 465: two submitted annotations on an accepted de text with a typo.
+    Through the API, the preview of the fix names per person whose annotation
+    moves by itself (Cy's: its passage stays as it is) and whose does not
+    (Ben's marks the corrected word; and everyone's when a number changes);
+    the save moves Cy's annotation to v2."""
+    built = scenario(client, "TYPO_FIX_CARRY")
+    document_id = built["documents"]["de"]
+    _, rows = lead_rows(client, built)
+    work = rows[("case-0465", "de")]["work"]
+    assert sorted(
+        (w["task"], w["status"]) for w in work if w["task"] == "annotate"
+    ) == [
+        ("annotate", "submitted"),
+        ("annotate", "submitted"),
+    ]
+    origin = str(client.base_url).rstrip("/")
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"username": built["users"]["lead"], "password": TEST_PASSWORD},
+        headers={"Origin": origin},
+    )
+    assert login.status_code == 200, login.text
+    headers = {"Origin": origin, "X-CSRF-Token": login.json()["csrf_token"]}
+    base = f"/api/v1/projects/{built['project']}/documents/{document_id}"
+    names = {username: name for name, username in built["users"].items()}
+
+    def carry(body: dict[str, Any]) -> dict[str, tuple[bool, str | None]]:
+        return {
+            names[item["username"]]: (item["carried"], item["reason"])
+            for item in body["annotation_carry"]
+        }
+
+    fix = [{"old": "hypotnia", "new": "hypotonia"}]
+    preview = client.post(
+        f"{base}/editorial-correction/preview",
+        json={"replacements": [*fix, {"old": "14-month", "new": "15-month"}]},
+        headers=headers,
+    )
+    assert preview.status_code == 200, preview.text
+    assert carry(preview.json()) == {
+        "annotator": (False, "number_changed"),
+        "ben": (False, "number_changed"),
+    }
+    preview = client.post(
+        f"{base}/editorial-correction/preview",
+        json={"replacements": fix},
+        headers=headers,
+    )
+    assert carry(preview.json()) == {
+        "annotator": (True, None),
+        "ben": (False, "findings_need_check"),
+    }
+    saved = client.post(
+        f"{base}/editorial-correction",
+        json={
+            "replacements": fix,
+            "reason": "Typo",
+            "expected_text_sha256": preview.json()["text_sha256"],
+        },
+        headers=headers,
+    )
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["annotations_carried"] == 1
+    assert carry(saved.json()) == carry(preview.json())

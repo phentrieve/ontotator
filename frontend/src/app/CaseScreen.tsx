@@ -100,6 +100,7 @@ import { TermName } from "../editor/TermName";
 import { TextPane } from "../editor/TextPane";
 import { Kbd } from "../ui/Kbd";
 import { TreeBrowser } from "../editor/TreeBrowser";
+import { annotationKey, treeContextOf, treeFollow, walkMode, type TreeContext, type TreeSelection } from "../editor/treeMode";
 import { CopyTextButton } from "../editor/CopyTextButton";
 import { useTermLabels } from "../editor/useTermLabels";
 import { ModifiersSection } from "../editor/ModifiersSection";
@@ -109,7 +110,7 @@ import { useModifierCommands } from "../editor/useModifierCommands";
 import { attachCandidates, findingDescription, modifierDisplayId, modifierMarks, parseModifierDisplayId, quoteOf, type AttachFinding, type Seg } from "../editor/modifiers";
 import { Toast } from "../ui/Toast";
 import { type MentionDisplay, type SelectionPayload } from "../spans/adapter";
-import { markColourSlot } from "../editor/markColours";
+import { markColour } from "../editor/markColours";
 import { IconCheck, IconClose, IconLock, IconMore, IconPencil, IconQuestion, IconRedo, IconRetry, IconUndo } from "../ui/icons";
 import { historyControls, stepText, type LastHistoryCommand } from "../editor/history";
 import { MenuButton, type MenuItem } from "../ui/MenuButton";
@@ -453,6 +454,9 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   // is one walk; a new nonce starts a new one.
   const [treeWalk, setTreeWalk] = useState<{
     nonce: number;
+    /** The selection the walk belongs to (treeMode.ts): it follows while this key stays. */
+    key: string;
+    /** The annotation the walk is logged for; a term taken from it is set on this annotation. */
     annotationId: string;
     layerId: string;
     termId: string;
@@ -460,6 +464,10 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     focus: boolean;
   } | null>(null);
   const treeNonce = useRef(0);
+  // Issue 521: whether the open tree has taken the annotation panel's place (a low window), and whether
+  // the focus goes to "Show in tree" once the tree is closed and the panel is back.
+  const panelGivenToTreeRef = useRef(false);
+  const focusAfterTreeRef = useRef(false);
 
   // Issue 320: the undo and redo steps of the current round (their terms are named in the tooltips).
   const [history, setHistory] = useState<DraftHistoryView | null>(null);
@@ -604,7 +612,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
           evidence_id: ev.mention.evidence_id,
           segments: ev.mention.segments.map((s) => ({ start: s.start, end: s.end })),
           kind: "own" as const,
-          colorIndex: markColourSlot({ termId, layerId: owner?.annotation.layer_id, kind: "own" }),
+          ...markColour({ termId, layerId: owner?.annotation.layer_id, kind: "own" }),
           negated: owner ? isNegated(owner.annotation) : false,
         };
       });
@@ -717,7 +725,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
         (s) => s.annotation.annotation_id === target.annotation_id && s.version === target.version
       );
       if (!snap) continue;
-      const colorIdx = markColourSlot({
+      const colour = markColour({
         termId: target.term_id ?? target.annotation_id,
         layerId: target.layer_id,
         kind: "target",
@@ -727,7 +735,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
           evidence_id: `target:${target.annotation_id}:${target.version}:${ev.mention.evidence_id}:${ev.version}`,
           segments: ev.mention.segments,
           kind: "target" as const,
-          colorIndex: colorIdx,
+          ...colour,
           negated: isNegated(snap.annotation),
         });
       }
@@ -779,7 +787,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     sourceId: sourceKey(s),
     segments: ev.mention.segments,
     kind: "source" as const,
-    colorIndex: markColourSlot({ termId: s.annotation.term_id, layerId: s.annotation.layer_id, kind: "source" }),
+    ...markColour({ termId: s.annotation.term_id, layerId: s.annotation.layer_id, kind: "source" }),
     negated: isNegated(s.annotation),
   }))), [visibleSources]);
   const selectSource = (id: string) => {
@@ -2235,70 +2243,136 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   };
 
   // --- Ontology tree -----------------------------------------------------------
-  // The annotation the inspector shows as editable right now (same precedence as the pane itself).
-  const treeAnnotation =
-    !selectedSource && !pendingAnnotation && !(isReviewLike(view.key.mode) && selectedTarget)
-      ? selectedAnnotation
-      : null;
-  // While the term of a new annotation is being searched there is nothing for the tree to
-  // show, and the candidates need the room: the tree steps aside (same walk, out of sight)
-  // and the search has the whole column. It is back once a term is chosen or the search is
-  // given up.
-  const treeCollapsed = !!treeWalk && !!pendingAnnotation;
+  // What the tree can show for the selection, in the precedence of the inspector itself (issue 523): a
+  // reference, a new finding, a proposal or an own finding. Only some of them can take a term (treeMode.ts).
+  const treeEditableLayerIds = view.scope?.editable_layer_ids ?? (view.layers ? view.layers.map(l => l.layer_id) : []);
+  const treeSelection: TreeSelection | null = selectedSource
+    ? { kind: "reference", key: sourceKey(selectedSource), layerId: selectedSource.annotation.layer_id, termId: selectedSource.annotation.term_id || null }
+    : pendingAnnotation
+      ? { kind: "pending", annotationId: pendingAnnotation.annotationId, layerId: pendingAnnotation.layerId, editable: !readOnly }
+      : isReviewLike(view.key.mode) && selectedTarget
+        ? {
+          kind: "proposal", key: refKey(selectedTarget),
+          layerId: selectedTarget.layer_id ?? targetSnapshot?.annotation.layer_id ?? null, termId: selectedTarget.term_id ?? null,
+          // Other people's submitted findings in a consolidation are decided on the consolidation screen.
+          open: !readOnly && !consolidationEditor && !decisionsMap[refKey(selectedTarget)],
+          copyId: (draft.annotations ?? []).find(a => { const src = sourceTargetOf(a); return src !== null && refKey(src) === refKey(selectedTarget); })
+            ?.annotation.annotation_id ?? null,
+        }
+        : selectedAnnotation
+          ? {
+            kind: "annotation", annotationId: selectedAnnotation.annotation.annotation_id, layerId: selectedAnnotation.annotation.layer_id,
+            termId: selectedAnnotation.annotation.term_id || null,
+            editable: !readOnly && treeEditableLayerIds.includes(selectedAnnotation.annotation.layer_id),
+          }
+          : null;
+  const treeContext = treeContextOf(treeSelection);
+  // While the term of a new annotation is being searched, a walk of another selection steps aside (same walk,
+  // out of sight) and the search has the whole column. It is back once a term is chosen or the search is given
+  // up. A walk opened from a hit of that search stays.
+  const treeCollapsed = !!treeWalk && !!pendingAnnotation && treeWalk.key !== annotationKey(pendingAnnotation.annotationId);
   // The annotation the open walk belongs to, as it is in the draft now.
   const treeWalkAnnotation = treeWalk
     ? (draft.annotations ?? []).find((a) => a.annotation.annotation_id === treeWalk.annotationId) ?? null
     : null;
+  const treeMode = treeWalk ? walkMode(treeWalk.key, treeContext) : "look";
+  // The term the walk's selection carries: the annotation's, else the proposal's or the reference's.
+  const treeCurrentTermId = treeWalkAnnotation?.annotation.term_id
+    ?? (treeWalk && treeContext?.key === treeWalk.key ? treeContext.termId : null);
 
-  const startTreeWalk = (annotation: AnnotationSnapshot, focus: boolean) => {
+  const startTreeWalk = (context: TreeContext, termId: string, focus: boolean) => {
     treeNonce.current += 1;
     setTreeWalk({
       nonce: treeNonce.current,
-      annotationId: annotation.annotation.annotation_id,
-      layerId: annotation.annotation.layer_id,
-      termId: annotation.annotation.term_id,
+      key: context.key,
+      // A proposal without a copy reserves the id its copy will get; a walk only to look gets one of its own.
+      annotationId: context.annotationId ?? `${context.mode === "proposal" ? "ann" : "look"}-${crypto.randomUUID()}`,
+      layerId: context.layerId,
+      termId,
       focus,
     });
   };
 
   const handleShowInTree = () => {
-    if (!treeAnnotation || !treeAnnotation.annotation.term_id) return;
-    startTreeWalk(treeAnnotation, true);
+    if (!treeContext?.termId) return;
+    startTreeWalk(treeContext, treeContext.termId, true);
     revealWorkspace();
   };
 
-  // "Use this term": the same set_term as a search selection, bound to the walk's event.
+  // A hit of the term search for a new finding: the tree opens there, only to look.
+  const handleShowHitInTree = (termId: string) => {
+    if (!treeContext || !pendingAnnotation) return;
+    startTreeWalk(treeContext, termId, true);
+    revealWorkspace();
+  };
+
+  // The term chosen for a new finding, from a search hit or from the tree: the same path for both.
+  const choosePendingTerm = async (termId: string, searchId?: string, label?: string) => {
+    if (!pendingAnnotation) return;
+    if (pendingAnnotation.selectedTerm) setPendingAnnotation({ ...pendingAnnotation, selectedTerm: { termId, searchId, label } });
+    else await createPendingAnnotation(termId, searchId, label);
+  };
+
+  // A term from the tree. On an own finding ("Use this term") the same set_term as a search selection, bound
+  // to the walk's event. For a new finding or a proposal it comes after the confirmation and records what the
+  // existing controls record: the new finding's term, or Edit & Replace with that term (decision Changed).
   // A failure is thrown to the tree, which shows it where the term was chosen. The tree stays open.
-  const handleUseTreeTerm = async (termId: string, browseId: string) => {
+  const handleUseTreeTerm = async (termId: string, browseId: string, label?: string) => {
     if (readOnlyRef.current) return;
     if (!treeWalk) return;
-    await setTermOf(treeWalk.annotationId, termId, browseId);
+    if (treeMode === "assign") { await setTermOf(treeWalk.annotationId, termId, browseId); return; }
+    if (treeMode === "new") { await choosePendingTerm(termId, browseId, label); return; }
+    if (treeMode !== "proposal" || !selectedTarget) return;
+    const walk = treeWalk;
+    // The copy takes the walk's id: the tree stays with it, and the term passes the walk's check.
+    setTreeWalk(current => current && current.nonce === walk.nonce ? { ...current, key: annotationKey(walk.annotationId) } : current);
+    const copyId = await handleAdoptAndEditTarget(selectedTarget, undefined, undefined, { annotationId: walk.annotationId });
+    if (!copyId) {
+      setTreeWalk(current => current && current.nonce === walk.nonce ? { ...current, key: walk.key } : current);
+      throw new Error("Nothing was changed.");
+    }
+    await setTermOf(copyId, termId, copyId === walk.annotationId ? browseId : undefined);
   };
 
   // Closing changes nothing else: the tree is gone until "Show in tree" is used again. A
   // keyboard focus that was in the tree goes back to that button instead of getting lost.
+  const focusTreeButton = () => {
+    const button = inspectorRef.current?.querySelector<HTMLElement>(".annotation-tree-button");
+    // Closed because the selection was cleared (Escape on a tree button), the button is gone: the text takes the focus.
+    if (button) { tabs.showDetailsNow(); button.focus(); } else leftTextElement?.focus();
+  };
   const handleCloseTree = () => {
     const active = document.activeElement;
-    if (active instanceof HTMLElement && active.closest(".tree-host")) {
-      const button = inspectorRef.current?.querySelector<HTMLElement>(".annotation-tree-button");
-      // Closed because the selection was cleared (Escape on a tree button), the button is gone: the text takes the focus.
-      if (button) { tabs.showDetailsNow(); button.focus(); } else leftTextElement?.focus();
+    if (active instanceof HTMLElement && (active.closest(".tree-host") || active.closest(".finding-bar"))) {
+      // In a low window the panel is folded away while the tree is open: the button is back after the next render.
+      if (panelGivenToTreeRef.current) focusAfterTreeRef.current = true;
+      else focusTreeButton();
     }
     setTreeWalk(null);
   };
+  useLayoutEffect(() => {
+    if (treeWalk || !focusAfterTreeRef.current) return;
+    focusAfterTreeRef.current = false;
+    focusTreeButton();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the closing of the tree moves the focus
+  }, [treeWalk]);
 
-  // An open tree follows the selection: another own annotation with a term starts a new
-  // walk there. Anything else (a proposal, a reference, nothing) closes it: there it could
-  // assign nothing. While a new finding's term is searched it only steps aside (see above).
-  const followAnnotationId = treeAnnotation?.annotation.term_id ? treeAnnotation.annotation.annotation_id : null;
+  // An open tree follows the selection: another selection with a term (an own finding, a proposal, a
+  // reference) starts a new walk there. A selection without a term, or nothing, closes it. While a new
+  // finding's term is searched, another walk only steps aside (see above).
+  const followKey = treeContext?.key ?? null;
+  // Whether the walk was out of sight in the last render (read by the effect below before it is updated).
+  const treeSteppedAside = useRef(false);
   useEffect(() => {
-    if (!treeWalk || pendingAnnotation) return;
-    if (!treeAnnotation || !followAnnotationId) { handleCloseTree(); return; }
-    if (followAnnotationId === treeWalk.annotationId) return;
-    startTreeWalk(treeAnnotation, false);
-    // Only a change of the selected annotation moves the tree, not an edit of it.
+    if (!treeWalk) return;
+    const follow = treeFollow(treeWalk.key, treeContext, !!pendingAnnotation, treeSteppedAside.current);
+    if (follow === "close") handleCloseTree();
+    else if (follow === "restart" && treeContext?.termId) startTreeWalk(treeContext, treeContext.termId, false);
+    // Only a change of the selection moves the tree, not an edit of it. The end of a new finding's search
+    // counts too: the finding it became has the same key as the search had.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [followAnnotationId]);
+  }, [followKey, !!pendingAnnotation]);
+  useEffect(() => { treeSteppedAside.current = treeCollapsed; });
 
   // Ctrl+C (Cmd+C) with nothing else selected copies the active passage, to look it up elsewhere: the marked
   // text of a new finding, else the selected (or first) mention of the selected finding or, in a task from
@@ -2586,7 +2660,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   // The "changed" decision is recorded only once the copy actually differs.
   // Resolves with the copy's id once it is open (null when nothing was copied).
   const handleAdoptAndEditTarget = (target: TargetProposal, reason?: string, supportingSegments?: SelectionPayload["segments"],
-    { implicit = false }: { implicit?: boolean } = {}): Promise<string | null> => inStep(async () => {
+    { implicit = false, annotationId }: { implicit?: boolean; annotationId?: string } = {}): Promise<string | null> => inStep(async () => {
     if (readOnlyRef.current) return null;
     setActionError(null);
     const key = targetKeyOf(target);
@@ -2652,7 +2726,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
       ? (rawAxes as Record<string, string | null>)
       : initialAxisValues(typeDef?.axes ?? view.axes_config ?? [], targetTerm);
 
-    const newAnnId = `ann-${crypto.randomUUID()}`;
+    // A walk of the tree reserved this id for the copy (issue 523): its term then passes the walk's check.
+    const newAnnId = annotationId ?? `ann-${crypto.randomUUID()}`;
     const evidenceList = snap?.evidence ?? [];
     const firstEvidence = evidenceList[0];
     const firstSegments = supportingSegments ?? firstEvidence?.mention.segments ?? [];
@@ -3089,7 +3164,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     if (!snap?.annotation.modifiers?.length || !layerSelection.visibleLayerIds.includes(snap.annotation.layer_id)
       || outcome === "changed" || outcome === "rejected") return [];
     return modifierMarks([{ annotationId: t.annotation_id, term: findingNameOf(snap), termId: snap.annotation.term_id,
-      colorIndex: markColourSlot({ termId: snap.annotation.term_id, layerId: snap.annotation.layer_id, kind: "target" }),
+      ...markColour({ termId: snap.annotation.term_id, layerId: snap.annotation.layer_id, kind: "target" }),
       modifiers: snap.annotation.modifiers }], view.document.text, infoFor(snap.annotation.layer_id))
       // The "target:" prefix makes a click select the proposal (handlePickMention).
       .map(mark => ({ ...mark, evidence_id: `target:${t.annotation_id}:${t.version}:${mark.evidence_id}` }));
@@ -3527,6 +3602,33 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const sidebarWidth = useSidebarWidth(versionContext?.username, { inspectorWithGuidelines: tabs.hosted });
   // The ontology tree's height under the inspector, set by dragging the divider above it.
   const treeHeight = useTreeHeight(versionContext?.username, treeWalk && !treeCollapsed ? treeWalk.nonce : null);
+  // Issue 521, a low window: the open tree takes the whole right column and the annotation panel shrinks to one
+  // line (the marked words and the term), where "Show finding" brings it back until the tree is closed. On a phone in
+  // landscape the tree stands in place of the panel beside the text.
+  const [findingShown, setFindingShown] = useState(false);
+  if (!treeWalk && findingShown) setFindingShown(false);
+  const treeShown = !!treeWalk && !treeCollapsed;
+  const findingBarShown = treeShown && treeHeight.low === "column" && !!treeWalkAnnotation;
+  const panelGivenToTree: "column" | "beside" | null = !treeShown ? null
+    : treeHeight.low === "beside" ? "beside" : findingBarShown && !findingShown ? "column" : null;
+  panelGivenToTreeRef.current = panelGivenToTree !== null;
+  const findingToggleRef = useRef<HTMLButtonElement | null>(null);
+  const panelGivenBefore = useRef<typeof panelGivenToTree>(null);
+  useLayoutEffect(() => {
+    const before = panelGivenBefore.current;
+    panelGivenBefore.current = panelGivenToTree;
+    if (!panelGivenToTree || before === panelGivenToTree) return;
+    // A focus in the panel that is folded away now (most often "Show in tree") goes to what is left of it: the
+    // "Show finding" button, or the tree beside the text. The tree moves it to its row once it has loaded.
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && inspectorRef.current?.contains(active) && !active.closest(".finding-bar")) {
+      if (panelGivenToTree === "column") findingToggleRef.current?.focus();
+      else document.getElementById("ontology-tree")?.querySelector<HTMLElement>('[role="treeitem"][tabindex="0"], button')?.focus();
+    }
+    if (before === null) announceCarried(panelGivenToTree === "column"
+      ? "The ontology tree takes the column. The finding is shown in one line above it."
+      : "The ontology tree stands in place of the annotation panel. Close the tree to bring the panel back.");
+  }, [panelGivenToTree]);
   useLayoutEffect(() => {
     tabs.resetDetailsScroll();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new inspector subject resets its scroll
@@ -3839,7 +3941,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
       const ann = snapshot.annotation;
       if (!ann.modifiers?.length) return [];
       return modifierMarks([{ annotationId: ann.annotation_id, term: findingNameOf(snapshot), termId: ann.term_id,
-        colorIndex: markColourSlot({ termId: ann.term_id, layerId: ann.layer_id, kind: "own" }), modifiers: ann.modifiers }],
+        ...markColour({ termId: ann.term_id, layerId: ann.layer_id, kind: "own" }), modifiers: ann.modifiers }],
       view.document.text, infoFor(ann.layer_id));
     }),
     ...proposalModifierMarks,
@@ -4037,8 +4139,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
         ))}
       </nav>
       {/* Main Workspace Layout */}
-      <div className={`app-layout mobile-pane-${mobilePane}${treeWalk && !treeCollapsed ? " tree-open" : ""}${treeHeight.height !== null ? " tree-sized" : ""}${tabs.hosted ? " inspector-with-guidelines" : ""}`}
-        style={{ "--sidebar-width": `${sidebarWidth.width}px`, ...(treeHeight.height !== null ? { "--tree-height": `${treeHeight.height}px` } : {}) } as CSSProperties}>
+      <div className={`app-layout mobile-pane-${mobilePane}${treeShown ? " tree-open" : ""}${treeHeight.height !== null && !panelGivenToTree ? " tree-sized" : ""}${panelGivenToTree ? ` panel-given-to-tree panel-given-to-tree--${panelGivenToTree}` : ""}${tabs.hosted ? " inspector-with-guidelines" : ""}`}
+        style={{ "--sidebar-width": `${sidebarWidth.width}px`, ...(treeHeight.height !== null && !panelGivenToTree ? { "--tree-height": `${treeHeight.height}px` } : {}) } as CSSProperties}>
         {/* Left: Sidebar (Annotations & Review Targets) */}
         <aside className="sidebar density-compact" id="findings-column">
           {/* Narrow layout: attach mode opens on Findings, where the text pane's banner and its Cancel are out of sight. */}
@@ -4299,6 +4401,17 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
 
         {/* Right: Annotation & Search Panel + Review Actions */}
         <div className="inspector-pane density-compact" ref={inspectorRef}>
+          {/* A low window with the tree open (issue 521): the finding in one line, and the way back to the whole panel. */}
+          {findingBarShown && treeWalkAnnotation && <div className="finding-bar" role="group" aria-label="Finding">
+            <p className="finding-bar__summary">
+              <span className="finding-bar__quote">{firstQuote(treeWalkAnnotation) ? `“${firstQuote(treeWalkAnnotation)}”` : "No text span"}</span>
+              <span className="finding-bar__term"><TermName termId={treeWalkAnnotation.annotation.term_id}
+                label={termLabel(treeWalkAnnotation.annotation.layer_id, treeWalkAnnotation.annotation.term_id)} /></span>
+            </p>
+            <Button ref={findingToggleRef} size="sm" aria-expanded={findingShown} onClick={() => setFindingShown(shown => !shown)}>
+              {findingShown ? "Hide finding" : "Show finding"}
+            </Button>
+          </div>}
           {/* With the guidelines open (from 1060 px): "Details | Guidelines vN" at the top; Details stays mounted while hidden. */}
           {tabs.hosted && guidelines && <InspectorTabList idBase={inspectorIdBase} tab={tabs.tab}
             version={guidelines.versionName} onSelect={tabs.select} onClose={guidelines.close} />}
@@ -4325,6 +4438,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
               <ProposalSource source={selectedSource} />
               <div className="detail-section">
                 <h2><TermName termId={selectedSource.annotation.term_id} label={termLabel(selectedSource.annotation.layer_id, selectedSource.annotation.term_id)} /></h2>
+                {selectedSource.annotation.term_id && <Button type="button" variant="secondary" size="sm" className="annotation-tree-button"
+                  title="Show this term in the ontology tree, only to look: broader and narrower terms" onClick={handleShowInTree}>Show in tree</Button>}
                 <p>{view.layers?.find(l => l.layer_id === selectedSource.annotation.layer_id)?.label}, Read-only</p>
                 <p>
                   <AiBadge provenance={selectedSource.annotation.provenance} source={selectedSource} />{" "}
@@ -4401,12 +4516,12 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
                 </>}
                 {pendingAnnotation.isSpanless && <Textarea id="spanless-reason" label="Reason for no text span"
                   readOnly={readOnly} required={spanlessNotesRequired} hint={legacySubmissionHint ?? (!spanlessNotesRequired ? "Optional context for this finding." : undefined)} value={spanlessReason}
-                  error={spanlessReasonError && !spanlessReason.trim() ? "A reason is required before adding this annotation." : undefined}
+                  error={spanlessReasonError && !spanlessReason.trim() ? "A reason is required before adding this finding." : undefined}
                   onChange={event => { setSpanlessReason(event.target.value); setSpanlessReasonError(false); }} />}
                 {pendingAnnotation.selectedTerm && <div className="pending-term-continuation">
                   <p>Selected term: <TermName termId={pendingAnnotation.selectedTerm.termId} label={termLabel(pendingAnnotation.layerId, pendingAnnotation.selectedTerm.termId) ?? pendingAnnotation.selectedTerm.label} /></p>
                   <Button disabled={readOnly || queueState === "saving" || (spanlessNotesRequired && !spanlessReason.trim())}
-                    onClick={() => { void createPendingAnnotation(pendingAnnotation.selectedTerm!.termId, pendingAnnotation.selectedTerm!.searchId, pendingAnnotation.selectedTerm!.label); }}>Add annotation</Button>
+                    onClick={() => { void createPendingAnnotation(pendingAnnotation.selectedTerm!.termId, pendingAnnotation.selectedTerm!.searchId, pendingAnnotation.selectedTerm!.label); }}>Add finding</Button>
                 </div>}
                 {!readOnly && !savedPendingReanchor && !pendingAnnotation.carriedInput && <SearchPanel key={pendingAnnotation.annotationId} searchManager={searchManager}
                   annotationId={pendingAnnotation.annotationId} workspaceKey={view.key} layerId={pendingAnnotation.layerId}
@@ -4414,10 +4529,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
                   {...pendingSearchProps(pendingAnnotation)}
                   onPickModifier={pendingIsMarkedSpan && modifierLayerIds.has(pendingAnnotation.layerId) ? startAttach : undefined}
                   modifierFilter={modifierLayerIds.has(pendingAnnotation.layerId)}
-                  onSelectCandidate={(candidate, searchId) => {
-                    if (pendingAnnotation.selectedTerm) setPendingAnnotation({ ...pendingAnnotation, selectedTerm: { termId: candidate.term_id, searchId, label: candidate.label ?? undefined } });
-                    else void createPendingAnnotation(candidate.term_id, searchId, candidate.label ?? undefined);
-                  }} />}
+                  onSelectCandidate={(candidate, searchId) => { void choosePendingTerm(candidate.term_id, searchId, candidate.label ?? undefined); }}
+                  onShowInTree={candidate => handleShowHitInTree(candidate.term_id)} />}
                 {!pendingIsMarkedSpan && <Button type="button" variant="secondary" disabled={queueState === "saving"} onClick={cancelPending}>Cancel</Button>}
               </div>
             </section>
@@ -4485,6 +4598,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
               }}
               onAdoptAndEdit={() => { void handleAdoptAndEditTarget(selectedTarget); }}
               modifierControls={proposalModifierControls(selectedTarget)}
+              onShowInTree={handleShowInTree}
               hasCopy={proposalHasCopy(selectedTarget)}
               onDiscardCopy={() => { void discardCopy(selectedTarget); }}
               onEditReplacement={(repId) => {
@@ -4652,8 +4766,10 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
             annotationId={treeWalk.annotationId}
             layerId={treeWalk.layerId}
             startTermId={treeWalk.termId}
-            currentTermId={treeWalkAnnotation?.annotation.term_id ?? null}
-            canAssign={!readOnly && !!treeAnnotation && treeAnnotation.annotation.annotation_id === treeWalk.annotationId}
+            currentTermId={treeCurrentTermId}
+            canAssign={!readOnly && treeMode !== "look"}
+            mode={treeMode}
+            currentHint={treeMode === "proposal" ? "This is the proposed term." : undefined}
             focusOnOpen={treeWalk.focus}
             onClose={handleCloseTree}
             onUseTerm={handleUseTreeTerm}
@@ -4663,7 +4779,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
         )}
         {/* The divider drawn above the tree sets its height (three columns only, editor.css); after it in the
             focus order, as the findings column's divider follows that column. */}
-        {treeWalk && !treeCollapsed && (
+        {treeShown && !panelGivenToTree && (
           <SidebarResizer orientation="horizontal" side="start" width={treeHeight.value} limits={treeHeight.limits} controls="ontology-tree"
             onChange={treeHeight.setHeight} onReset={treeHeight.reset} onCommit={treeHeight.commit}
             label="Resize ontology tree" hint="Resize the ontology tree (focus the divider)" measure={treeHeight.measure} />

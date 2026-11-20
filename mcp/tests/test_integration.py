@@ -169,7 +169,7 @@ async def test_setup_import_status_and_export(
         )
         assert created["name"] == "MCP smoke"
         assert PROJECT in {
-            p["project_key"] for p in await call(client, "list_projects", {})
+            p["project_key"] for p in (await call(client, "list_projects", {}))["items"]
         }
 
         check = await call(
@@ -200,7 +200,7 @@ async def test_setup_import_status_and_export(
             "set_member_roles",
             {"project": PROJECT, "username": "ann1", "roles": ["annotator"]},
         )
-        people = await call(client, "list_people", {"project": PROJECT})
+        people = (await call(client, "list_people", {"project": PROJECT}))["items"]
         assert "ann1" in {p["username"] for p in people}
 
         # Taking a role away is a dry run until confirmed.
@@ -208,11 +208,11 @@ async def test_setup_import_status_and_export(
         dry = await call(client, "set_member_roles", remove)
         assert dry["applied"] is False
         assert dry["plan"]["removed_roles"] == ["annotator"]
-        people = await call(client, "list_people", {"project": PROJECT})
+        people = (await call(client, "list_people", {"project": PROJECT}))["items"]
         assert "ann1" in {p["username"] for p in people}
         done = await call(client, "set_member_roles", remove | {"confirm": True})
         assert done["applied"] is True
-        people = await call(client, "list_people", {"project": PROJECT})
+        people = (await call(client, "list_people", {"project": PROJECT}))["items"]
         assert "ann1" not in {p["username"] for p in people}
         await call(
             client,
@@ -359,7 +359,7 @@ async def test_setup_import_status_and_export(
         # Nothing is submitted (that needs the browser): only the imported
         # tool proposals are offered. Their passages are offsets; with
         # include_text each carries the text it marks.
-        [offered] = await call(reader, "list_annotation_versions", about)
+        [offered] = (await call(reader, "list_annotation_versions", about))["items"]
         assert offered["kind"] == "proposals"
         one = about | {"kind": "proposals", "version_id": offered["id"]}
         plain = await call(reader, "get_annotation_version", one)
@@ -441,7 +441,9 @@ async def test_no_default_tool_returns_text_of_a_project(
                     content, "get_text_version", about | {"include_text": True}
                 )
                 needles += _needles(version["text"])
-                for offered in await call(content, "list_annotation_versions", about):
+                for offered in (await call(content, "list_annotation_versions", about))[
+                    "items"
+                ]:
                     found = await call(
                         content,
                         "get_annotation_version",
@@ -458,11 +460,13 @@ async def test_no_default_tool_returns_text_of_a_project(
                         for segment in evidence["mention"]["segments"]
                         if " " in segment["text"]
                     ]
-            reviews = await call(
-                content,
-                "list_translation_reviews",
-                {"project": project, "include_text": True},
-            )
+            reviews = (
+                await call(
+                    content,
+                    "list_translation_reviews",
+                    {"project": project, "include_text": True},
+                )
+            )["items"]
             needles += [n for r in reviews for n in _needles(r["proposed_text"])]
         needles = sorted(set(needles))
         assert len(needles) >= 3, needles
@@ -570,7 +574,10 @@ async def test_a_bulk_reopen_and_a_withdrawal_can_be_undone(
         assert sorted(t["assignment_id"] for t in would["would_restore"]) == sorted(
             changed
         )
-        assert {t["person"] for t in would["would_restore"]} == {"Tom Reis", "R. Roe"}
+        restored = [t["person"] for t in would["would_restore"]]
+        assert {p["display_name"] for p in restored} == {"Tom Reis", "R. Roe"}
+        # One person, three names (#471): the login name comes with them.
+        assert all(p["username"] and p["pseudonym"] for p in restored)
         # The dry run changed nothing.
         assert await _statuses(client, project) == reopened
         undone = await call(client, "undo_reopen_or_withdraw", undo | {"confirm": True})
@@ -745,11 +752,13 @@ async def test_a_version_is_uploaded_from_a_reviews_proposed_text(
     project = made["project"]
     document_id = f"{made['cases']['take_text']}~de~v1"
     async with Client(_server(live, made["token"])) as client:
-        [review] = await call(
-            client,
-            "list_translation_reviews",
-            {"project": project, "document_id": document_id},
-        )
+        [review] = (
+            await call(
+                client,
+                "list_translation_reviews",
+                {"project": project, "document_id": document_id},
+            )
+        )["items"]
         fixes = [{"old": "muscular hypotonia", "new": "low muscle tone"}]
         upload = {
             "project": project,
@@ -855,3 +864,76 @@ async def test_wrong_input_is_named_not_ignored(live: dict[str, str]) -> None:
         )
         assert done["applied"] is True and done["unknown_texts"] == wrong
         assert done["selection"] == f"4 texts of project '{project}'"
+
+
+@pytest.mark.anyio
+async def test_a_blinded_consolidator_reads_the_inputs_of_their_task(
+    live: dict[str, str],
+) -> None:
+    """Issue 471 point 7: with annotator names hidden, the consolidator's
+    personal token finds their consolidation task, reads its inputs and
+    each input's submission, under the opaque IDs and "Annotator A" of the
+    web interface; an annotator of the inputs reads none of it."""
+    made = _scenario(live, "blind-consolidation")
+    project = made["project"]
+    # Who must not be named, and the real IDs that must not come back.
+    hidden = [
+        value
+        for person in ("ann-0001", "ann-0002")
+        for value in (made["users"][person], made["pseudonyms"][person])
+    ] + list(made["submissions"])
+    async with Client(
+        _server(live, made["tokens"]["adj"], read_content=True)
+    ) as consolidator:
+        tasks = await call(consolidator, "list_my_tasks", {})
+        [task] = [
+            t
+            for t in tasks["items"]
+            if t["project_key"] == project and t["task"] == "review"
+        ]
+        found = await call(
+            consolidator,
+            "get_consolidation_inputs",
+            {"assignment_id": task["assignment_id"], "include_text": True},
+        )
+        [round_] = found["rounds"]
+        assert round_["kind"] == "consolidation"
+        inputs = round_["inputs"]
+        assert len(inputs) > 10
+        authors = {
+            i["source_snapshot"]["annotation"]["provenance"]["actor"]["actor_id"]
+            for i in inputs
+        }
+        assert authors == {"annotator-a", "annotator-b"}
+        # Each passage with its text, on request.
+        segment = inputs[0]["source_snapshot"]["evidence"][0]["mention"]["segments"][0]
+        assert segment["text"] == made["text"][segment["start"] : segment["end"]]
+        sources = sorted({i["source_submission_id"] for i in inputs})
+        assert len(sources) == 2
+        assert all(s.startswith("sub-z") for s in sources)
+        # get_submission takes the opaque IDs as they are.
+        labels = set()
+        whole = json.dumps(found)
+        for sid in sources:
+            submission = await call(
+                consolidator,
+                "get_submission",
+                {
+                    "project": project,
+                    "document_id": found["document_id"],
+                    "submission_id": sid,
+                },
+            )
+            labels.add(submission["summary"]["author_label"])
+            whole += json.dumps(submission)
+        assert labels == {"Annotator A", "Annotator B"}
+        assert [value for value in hidden if value in whole] == []
+    async with Client(
+        _server(live, made["tokens"]["ann-0001"], read_content=True)
+    ) as annotator:
+        with pytest.raises(ToolFailed, match="ASSIGNMENT_NOT_FOUND"):
+            await call(
+                annotator,
+                "get_consolidation_inputs",
+                {"assignment_id": task["assignment_id"]},
+            )

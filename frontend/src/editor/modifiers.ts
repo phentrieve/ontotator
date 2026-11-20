@@ -140,6 +140,8 @@ export function modifierMarks(
     term: string;
     termId: string;
     colorIndex: number;
+    /** The finding's colour key (`markColour`): a modifier segment keeps its finding's colour. */
+    colourKey?: string;
     modifiers: readonly ModifierLike[];
   }[],
   text: string,
@@ -156,6 +158,7 @@ export function modifierMarks(
         segments,
         kind: "modifier" as const,
         colorIndex: finding.colorIndex,
+        colourKey: finding.colourKey,
         label: `${info(modifier.term_id)?.label ?? modifier.term_id}, modifier of ${finding.term}`,
       }];
     }),

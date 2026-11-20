@@ -586,6 +586,57 @@ async def test_editorial_correction_confirms_with_the_dry_runs_text_hash(
     }
 
 
+async def test_editorial_correction_dry_run_says_per_person_what_moves(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    """Issue 465: the dry run names per person whether the submitted
+    annotation moves to the new version by itself, and why not."""
+    route = f"{P}/documents/{{doc}}/editorial-correction"
+    carry = [
+        build(
+            "EditorialCarryPerson",
+            username="tom",
+            display_name="Tom Reis",
+            status="submitted",
+            carried=True,
+            reason=None,
+            findings=2,
+            needs_check=0,
+        ),
+        build(
+            "EditorialCarryPerson",
+            username="ana",
+            display_name="Ana Weber",
+            status="submitted",
+            carried=False,
+            reason="findings_need_check",
+            findings=3,
+            needs_check=1,
+        ),
+    ]
+    fake.on(
+        "POST",
+        f"{route}/preview",
+        build(
+            "EditorialCorrectionPreview",
+            available=True,
+            reason=None,
+            annotation_carry=carry,
+        ),
+    )
+    dry = await call(
+        mcp_client,
+        "editorial_correction",
+        {
+            "project": "p",
+            "document_id": "d",
+            "replacements": [{"old": "Pat ient", "new": "Patient"}],
+            "reason": "Spacing",
+        },
+    )
+    assert dry["plan"]["annotation_carry"] == carry
+
+
 async def test_editorial_correction_passes_a_refusal_on_and_shows_number_changes(
     fake: FakeApi, mcp_client: Client
 ) -> None:
@@ -896,10 +947,18 @@ async def test_change_annotation_modes_dry_run_confirm_and_stale_token(
             "language": "en",
             "from_mode": "proposals",
             "discarded_submissions": 1,
-            "authors": ["Tom Reis"],
-            "withdrawn_unsubmitted_tasks": ["ann-2"],
+            "authors": [
+                {"username": None, "display_name": "Tom Reis", "pseudonym": "ann-1"}
+            ],
+            "withdrawn_tasks": 2,
+            "withdrawn_unsubmitted_tasks": [
+                {"username": None, "display_name": None, "pseudonym": "ann-2"}
+            ],
         }
     ]
+    # Issue 472: the counts say what they count, beside the lists of people.
+    assert dry["withdrawn_task_count"] == 2
+    assert dry["withdrawn_unsubmitted_task_count"] == 1
     assert dry["skipped_texts"][0]["message"].startswith("Final result chosen")
     [post] = fake.calls_to("POST", bulk)
     assert post.json() == {"rows": texts, "mode": "scratch", "preview": True}

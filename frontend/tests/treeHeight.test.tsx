@@ -3,7 +3,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SidebarResizer } from "../src/editor/SidebarResizer";
-import { INSPECTOR_MIN_HEIGHT, TREE_HOST_ID, TREE_MIN_HEIGHT, treeHeightKey, treeHeightLimits, useTreeHeight } from "../src/editor/treeHeight";
+import {
+  BESIDE_MEDIA, INSPECTOR_MIN_HEIGHT, LOW_LAYOUT_BELOW, LOW_LAYOUT_HYSTERESIS, TREE_HOST_ID, TREE_MIN_HEIGHT, isLowLayout, treeHeightKey,
+  treeHeightLimits, useTreeHeight,
+} from "../src/editor/treeHeight";
 
 const editorCss = readFileSync(resolve(__dirname, "../src/styles/screens/editor.css"), "utf8");
 
@@ -265,5 +268,80 @@ describe("the divider above the tree", () => {
     fireEvent.pointerDown(sep, { clientY: 480, pointerId: 2 });
     fireEvent.pointerUp(sep, { clientY: 480, pointerId: 2 });
     expect(height()).toBe("300");
+  });
+});
+
+/** The case screen around the layout, this wide, and the media queries the window matches. */
+function mountScreen(width: number, matches: { wide: boolean; beside: boolean }, comparing = false) {
+  const screenElement = document.createElement("div");
+  screenElement.className = comparing ? "case-screen case-comparing" : "case-screen";
+  screenElement.getBoundingClientRect = () => ({ ...rect(600)(), width });
+  document.body.append(screenElement);
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: query === BESIDE_MEDIA ? matches.beside : query === "(min-width: 1025px)" ? matches.wide : false,
+  }));
+}
+
+describe("a low window (issue 521)", () => {
+  it("is a layout lower than the panel's least and the tree's useful height together, with hysteresis", () => {
+    expect(LOW_LAYOUT_BELOW).toBe(INSPECTOR_MIN_HEIGHT + 420);
+    // Measured layouts: 1440 x 900 is 792 px, 1440 x 700 592 px, 1280 x 600 492 px.
+    expect(isLowLayout(792, false)).toBe(false);
+    expect(isLowLayout(592, false)).toBe(false);
+    expect(isLowLayout(492, false)).toBe(true);
+    expect(isLowLayout(LOW_LAYOUT_BELOW - 1, false)).toBe(true);
+    expect(isLowLayout(LOW_LAYOUT_BELOW, false)).toBe(false);
+    // Once low, it stays low a little higher up: no switching back and forth at the threshold.
+    expect(isLowLayout(LOW_LAYOUT_BELOW + LOW_LAYOUT_HYSTERESIS - 1, true)).toBe(true);
+    expect(isLowLayout(LOW_LAYOUT_BELOW + LOW_LAYOUT_HYSTERESIS, true)).toBe(false);
+    // Nothing measured: as before.
+    expect(isLowLayout(0, true)).toBe(true);
+    expect(isLowLayout(0, false)).toBe(false);
+  });
+
+  it("three columns: low below the threshold, the same as before within the hysteresis", () => {
+    const size = mountLayout(492, 295);
+    mountScreen(1280, { wide: true, beside: false });
+    const { result } = renderHook(() => useTreeHeight("anna", 1));
+    expect(result.current.low).toBe("column");
+    size.column = LOW_LAYOUT_BELOW + 10;
+    act(() => { window.dispatchEvent(new Event("resize")); });
+    expect(result.current.low).toBe("column");
+    size.column = 792;
+    act(() => { window.dispatchEvent(new Event("resize")); });
+    expect(result.current.low).toBeNull();
+    size.column = LOW_LAYOUT_BELOW + 10;
+    act(() => { window.dispatchEvent(new Event("resize")); });
+    expect(result.current.low).toBeNull();
+  });
+
+  it("a phone in landscape is always 'beside'; two stacked columns, one pane and the comparison never change", () => {
+    mountLayout(227, 227);
+    mountScreen(844, { wide: false, beside: true });
+    expect(renderHook(() => useTreeHeight("anna", 1)).result.current.low).toBe("beside");
+    document.body.innerHTML = "";
+
+    // The editor narrower than 1060 px in a wide window: the panel is under the text.
+    mountLayout(492, 295);
+    mountScreen(1040, { wide: true, beside: false });
+    expect(renderHook(() => useTreeHeight("anna", 1)).result.current.low).toBeNull();
+    document.body.innerHTML = "";
+
+    mountLayout(492, 295);
+    mountScreen(1280, { wide: true, beside: false }, true);
+    expect(renderHook(() => useTreeHeight("anna", 1)).result.current.low).toBeNull();
+    document.body.innerHTML = "";
+
+    mountLayout(400, 295);
+    mountScreen(600, { wide: false, beside: false });
+    expect(renderHook(() => useTreeHeight("anna", 1)).result.current.low).toBeNull();
+  });
+
+  it("editor.css gives the tree the column and folds the panel to its bar only in those two layouts", () => {
+    expect(editorCss).toContain(".case-screen:not(.case-comparing) .app-layout.tree-open.panel-given-to-tree--column {\n      grid-template-rows: auto minmax(0, 1fr);");
+    expect(editorCss).toContain(".case-screen:not(.case-comparing) .app-layout.panel-given-to-tree--column > .inspector-pane > :not(.finding-bar)");
+    expect(editorCss).toContain(".app-layout.tree-open.panel-given-to-tree--beside > .inspector-pane { display: none; }");
+    expect(editorCss).toContain(".app-layout:not(.tree-open),\n  .app-layout.tree-open.panel-given-to-tree--beside {\n    grid-template-columns: var(--sidebar-width)");
+    expect(editorCss).toContain(`@media ${BESIDE_MEDIA} {`);
   });
 });

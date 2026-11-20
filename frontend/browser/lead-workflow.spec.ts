@@ -13,7 +13,7 @@ import {
   documentsReady, documentsTab, moreMarker, notInPlanSwitch, openDecisionBlock, rowBox, openFilters, openTextCard, rowAction, rowCell, textCard, textName, textNamePattern,
   textRow, textVersionItems,
 } from "./documentsHelpers";
-import { authenticatedRequest, loginThroughForm } from "./helpers";
+import { authenticatedRequest, clickLogOut, loginThroughForm } from "./helpers";
 import { leadScenario, pasteCaseIds, type LeadPerson, type LeadScenario } from "./leadWorkflowHelpers";
 
 test.setTimeout(240_000);
@@ -566,7 +566,7 @@ test("lead lands on the last-used project, else on Projects (F8, D4)", async ({ 
   // Open b's Documents, log out and in again: the last-used project.
   await page.goto(`/#/projects/${encodeURIComponent(b)}/documents`);
   await expect(page.getByRole("heading", { name: "Documents", level: 1 })).toBeVisible();
-  await page.getByRole("button", { name: "Log out", exact: true }).click();
+  await clickLogOut(page);
   await expect(page.getByRole("form", { name: "Log in to Ontotator" })).toBeVisible();
   await loginDana();
   await expect(page).toHaveURL(new RegExp(`#/projects/${esc(b)}/documents`));

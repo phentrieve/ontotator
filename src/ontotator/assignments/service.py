@@ -21,6 +21,7 @@ from sqlalchemy import (
     Connection,
     RowMapping,
     Select,
+    and_,
     case,
     func,
     insert,
@@ -144,6 +145,51 @@ def second_review_requests(
     return found
 
 
+@dataclass(frozen=True)
+class ReasonAddition:
+    """A lead's addition to the reason of a correction request (issue 483),
+    as the reviewer reads it: what and when. The reviewer reads "the lead",
+    not the lead's name, as for the reason itself."""
+
+    note: str
+    added_at: datetime
+
+
+def correction_reason_additions(
+    conn: Connection, rounds: Mapping[int, str | None]
+) -> dict[int, list[tuple[datetime, str, int | None]]]:
+    """The additions to the reason of each assignment's correction request,
+    oldest first, as (added_at, note, added_by) (``rounds``: assignment id ->
+    active round id). Additions to the request of an earlier round of the
+    task are not the current request's."""
+    from ontotator.storage.plan_tables import CorrectionReasonAdditionRow as Row
+
+    wanted = {aid: rid for aid, rid in rounds.items() if rid}
+    if not wanted:
+        return {}
+    found: dict[int, list[tuple[datetime, str, int | None]]] = {}
+    for row in conn.execute(
+        select(Row.assignment_id, Row.round_id, Row.note, Row.added_by, Row.added_at)
+        .where(Row.assignment_id.in_(sorted(wanted)))
+        .order_by(Row.id)
+    ):
+        if row.round_id == wanted[row.assignment_id]:
+            found.setdefault(row.assignment_id, []).append(
+                (row.added_at, row.note, row.added_by)
+            )
+    return found
+
+
+def reason_additions(
+    conn: Connection, rounds: Mapping[int, str | None]
+) -> dict[int, tuple[ReasonAddition, ...]]:
+    """``correction_reason_additions`` as the reviewer reads them."""
+    return {
+        aid: tuple(ReasonAddition(note, at) for at, note, _ in items)
+        for aid, items in correction_reason_additions(conn, rounds).items()
+    }
+
+
 def query_answer_times(
     conn: Connection, assignment_ids: Sequence[int]
 ) -> dict[int, datetime]:
@@ -233,6 +279,9 @@ class TaskSummary:
     # task's current round); None for other tasks.
     second_review_at: datetime | None = None
     second_review_reason: str | None = None
+    # What the lead added to that reason afterwards (issue 483), oldest first;
+    # None without an addition.
+    second_review_additions: tuple[ReasonAddition, ...] | None = None
     # A submitted translation review that asked a query: when the lead decided
     # it (issue 483; the answer is in the review's workspace); None otherwise.
     query_answered_at: datetime | None = None
@@ -417,6 +466,50 @@ def _paused(row: RowMapping) -> dict[str, Any]:
     values["pause_causes"] = tuple(pause_causes(values))
     del values["report_held"], values["lead_paused"]
     return values
+
+
+def _last_saves(
+    conn: Connection, user_id: int, assignment_ids: List[int]
+) -> dict[int, datetime]:
+    """When the person last saved the draft of each of their tasks: the
+    annotation or consolidation draft, or the translation review draft. A
+    draft that was only created (revision 0) is not a save."""
+    from ontotator.storage.tables import DraftRow
+
+    if not assignment_ids:
+        return {}
+    result: dict[int, datetime] = {}
+    modes = case(
+        {mode: task for mode, task in TASK_FOR_MODE.items()}, value=DraftRow.mode
+    )
+    for assignment_id, at in conn.execute(
+        select(AssignmentRow.id, func.max(DraftRow.updated_at))
+        .join(UserRow, UserRow.id == AssignmentRow.user_id)
+        .join(
+            DraftRow,
+            and_(
+                DraftRow.project_id == AssignmentRow.project_id,
+                DraftRow.document_id == AssignmentRow.document_id,
+                DraftRow.annotator_id == UserRow.pseudonym,
+                modes == AssignmentRow.task,
+                DraftRow.revision > 0,
+            ),
+        )
+        .where(AssignmentRow.id.in_(assignment_ids), AssignmentRow.user_id == user_id)
+        .group_by(AssignmentRow.id)
+    ).tuples():
+        result[assignment_id] = at
+    for assignment_id, at in conn.execute(
+        select(
+            TranslationReviewDraftRow.assignment_id,
+            TranslationReviewDraftRow.updated_at,
+        ).where(
+            TranslationReviewDraftRow.assignment_id.in_(assignment_ids),
+            TranslationReviewDraftRow.revision > 0,
+        )
+    ).tuples():
+        result[assignment_id] = at
+    return result
 
 
 def _assignment(row: RowMapping) -> Assignment:
@@ -1621,6 +1714,14 @@ class AssignmentService:
                     if r["task"] == "translation_review"
                 },
             )
+            additions = reason_additions(
+                conn,
+                {
+                    r["assignment_id"]: r["active_round_id"]
+                    for r in rows
+                    if r["assignment_id"] in second_reviews
+                },
+            )
             query_answers = query_answer_times(
                 conn,
                 [
@@ -1734,6 +1835,7 @@ class AssignmentService:
                             },
                         )
                     }
+            saved = _last_saves(conn, user_id, [r["assignment_id"] for r in rows])
             result = []
             for row in rows:
                 source = target = None
@@ -1759,7 +1861,15 @@ class AssignmentService:
                 second = second_reviews.get(row["assignment_id"])
                 result.append(
                     TaskSummary(
-                        **_paused(row),
+                        # "Last change" in My tasks: also the person's last
+                        # save, which leaves the assignment row as it is.
+                        **{
+                            **_paused(row),
+                            "updated_at": max(
+                                row["updated_at"],
+                                saved.get(row["assignment_id"], row["updated_at"]),
+                            ),
+                        },
                         waiting_for_translation_review=waiting and not for_lead,
                         waiting_for_lead=waiting and for_lead,
                         translation_finished=row["task"] == "annotate"
@@ -1783,6 +1893,7 @@ class AssignmentService:
                         ),
                         second_review_at=second[0] if second else None,
                         second_review_reason=second[1] if second else None,
+                        second_review_additions=additions.get(row["assignment_id"]),
                         query_answered_at=query_answers.get(row["assignment_id"]),
                     )
                 )

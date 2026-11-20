@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
 import { formatDateTime } from "../src/app/labels";
-import { LeadReason, leadReasonLines, QueryAnswer, queryOutcomeText, reopenedText, secondReviewText } from "../src/tasks/LeadReason";
+import { LeadReason, leadReasonLines, QueryAnswer, queryOutcomeText, reasonAdditionLines, reopenedText, secondReviewText } from "../src/tasks/LeadReason";
 
 afterEach(cleanup);
 
@@ -48,4 +48,18 @@ it("issue 483: the reviewer reads the lead's decision on a query and the answer"
   rerender(<QueryAnswer answer={{ kind: "reviewer_text", accepted_version: 2, decided_at: decided, answer: null }} />);
   expect(screen.getByRole("note", { name: "Answer from the lead" }).textContent)
     .toBe(`The lead decided your query on ${formatDateTime(decided)}. Your text was accepted as v2.The lead wrote no answer.`);
+});
+
+it("issue 483: the lead's additions stand below the reason, each with its date", () => {
+  const added = "2026-11-17T11:00:00Z";
+  const task = { status: "open", second_review_at: requested, second_review_reason: "Check the dose.", second_review_additions: [{ note: "Paragraph 3 as well.", added_at: added }] };
+  expect(reasonAdditionLines(task)).toEqual([`Added by the lead on ${formatDateTime(added)}: Paragraph 3 as well.`]);
+  expect(leadReasonLines(task)).toEqual([
+    `Second review requested by the lead on ${formatDateTime(requested)}: Check the dose.`,
+    `Added by the lead on ${formatDateTime(added)}: Paragraph 3 as well.`,
+  ]);
+  // Without the request they are not shown on their own.
+  expect(reasonAdditionLines({ status: "open", second_review_additions: task.second_review_additions })).toEqual([]);
+  render(<LeadReason task={task} />);
+  expect(screen.getByRole("note", { name: "From the lead" }).querySelectorAll("p")).toHaveLength(2);
 });

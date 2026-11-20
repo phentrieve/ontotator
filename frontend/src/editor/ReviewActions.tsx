@@ -98,6 +98,8 @@ export interface ReviewActionsProps {
    * Edit & Replace and goes to the copy; absent: read-only rows.
    */
   modifierControls?: Pick<ModifiersSectionProps, "onAdd" | "onRemove" | "onLinkSpan" | "onRemoveSpan" | "searchProps">;
+  /** Issue 523: opens the ontology tree at the proposed term, to look before deciding. */
+  onShowInTree?: () => void;
 }
 
 type NoteSaveSession = {
@@ -158,6 +160,7 @@ export const ReviewActions: React.FC<ReviewActionsProps> = ({
   onDraftUnresolved,
   termInfo,
   modifierControls,
+  onShowInTree,
 }) => {
   const targetIdentity = JSON.stringify([target.annotation_id, target.version]);
   const { metadata: sourceMetadata, label: sourceLabel } = useProposalMetadata(source);
@@ -247,6 +250,8 @@ export const ReviewActions: React.FC<ReviewActionsProps> = ({
 
       <div className="detail-section review-actions__proposal" aria-label="Proposal details" tabIndex={-1}>
         <strong className="review-actions__term"><TermName termId={target.term_id ?? target.annotation_id} label={termLabel} /></strong>
+        {onShowInTree && target.term_id && <>{" "}<Button type="button" variant="secondary" size="sm" className="annotation-tree-button"
+          title="Show this term in the ontology tree: broader and narrower terms" onClick={onShowInTree}>Show in tree</Button></>}
         {/* #20: the evidence and its source right under the term, before the values and modifiers. */}
         {evidence.length ? evidence.map((ev, index) => {
           const quote = quoteOf(documentText, ev.mention.segments);

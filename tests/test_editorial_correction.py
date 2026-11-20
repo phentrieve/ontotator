@@ -142,6 +142,20 @@ def test_an_accepted_text_stays_accepted_without_a_review(accepted):
         "inserted_characters": 1,
         "deleted_characters": 0,
         "tasks_following": 1,
+        # Issue 465: the submitted annotation (a bare submission without a
+        # round, made by the fixture) cannot be moved by itself.
+        "annotations_carried": 0,
+        "annotation_carry": [
+            {
+                "username": "root",
+                "display_name": "root",
+                "status": "submitted",
+                "carried": False,
+                "reason": "not_carryable",
+                "findings": 0,
+                "needs_check": 0,
+            }
+        ],
     }
     assert (child.origin, child.derived_from, child.version, child.translation) == (
         "correction",
@@ -228,6 +242,7 @@ def test_an_accepted_text_stays_accepted_without_a_review(accepted):
         ],
         "number_changes": [],
         "tasks_following": 1,
+        "annotations_carried": 0,
     }
     (moved,) = audits(env, "assignment.follow_correction")
     assert moved == {"from_document_id": "target", "to": child.document_id}
@@ -417,6 +432,7 @@ def test_preview_is_a_dry_run_with_the_diff_and_the_consequences(accepted):
         "diff": None,
         "findings": None,
         "proposals": None,
+        "annotation_carry": None,
     }
     checked = service(env).preview(
         lead(env), "proj", "target", replacements=[{"old": "setzt", "new": "setzt."}]
