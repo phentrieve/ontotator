@@ -54,7 +54,7 @@ describe("FindingRow modifier lines (E-b)", () => {
 
   it("names the modifiers in one grey line, in label order (B3-4)", () => {
     const { container } = renderRow([{ term_id: "HP:0031796" }, { term_id: "HP:0012828", segments: [{ start: 11, end: 18 }] }]);
-    expect(container.querySelector(".mod-lines")!.textContent).toBe("Modifiers: Recurrent, Severe");
+    expect(container.querySelector(".mod-lines")!.textContent).toBe("Modifiers: Recurrent · HP:0031796, Severe · HP:0012828");
   });
 
   it("has no modifier list without modifiers", () => {

@@ -199,6 +199,18 @@ describe("ComparisonTable, Modifiers row", () => {
 
   it("agreed modifiers are one grey line", () => {
     render(<Harness group={seizure("g", ["match"], [[ANA, [severe("schwere")]], [BEN, [severe("schwere")]]])} people={PEOPLE} text={MOD_TEXT} />);
-    expect(screen.getByText("Severe “schwere” (all agree)").closest("td")?.getAttribute("colspan")).toBe("2");
+    const once = [...document.querySelectorAll<HTMLElement>(".cons-agreed-once")].find(cell => cell.textContent!.startsWith("Severe"))!;
+    expect(once.textContent).toBe("Severe HP:0012828 “schwere” (all agree)");
+    expect(once.getAttribute("colspan")).toBe("2");
+  });
+
+  it("names each modifier's code after its label, muted, without \"·\" (issue 525)", () => {
+    render(<Harness group={s16()} people={PEOPLE} text={MOD_TEXT} />);
+    const ana = screen.getByRole("list", { name: "Modifiers of Ana Weber" });
+    const code = ana.querySelector(".cons-muted")!;
+    expect(code.textContent).toMatch(/^HP:\d{7}$/);
+    expect(ana.textContent).not.toContain("·");
+    // The toggle's name stays as before.
+    expect(within(ana).getAllByRole("button")[0].getAttribute("aria-label")).toMatch(/^Take [A-Z][a-z]+/);
   });
 });

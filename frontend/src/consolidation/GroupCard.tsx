@@ -133,7 +133,7 @@ function EditValues({ group, workspace, text, busy, onKeep, onCancel }: { group:
   };
   return <div className="cons-edit-values" role="group" aria-label="Edit values">
     <AxisFields id={id} axes={axes} values={values} onChange={(axis, value) => setValues(current => ({ ...current, [axis]: value }))} />
-    {withModifiers && <ModifiersSection finding={base.term_label || base.term_id} text={text} termInfo={termInfo} chipText={consolidationChip}
+    {withModifiers && <ModifiersSection finding={base.term_label || base.term_id} text={text} termInfo={termInfo} chipText={consolidationChip} codeSeparator=" "
       modifiers={modifiers.map(value => ({ term_id: value.term_id, segments: value.segments.map(([start, end]) => ({ start, end })) }))}
       onAdd={async (termId, label, role) => { setRemoved(""); setModifiers(current => current.some(value => value.term_id === termId) ? current
         : [...current, { term_id: termId, term_label: label, kind: role === "cohort" ? "cohort" : "modifier", exclusive_class: null, segments: [] }]); }}

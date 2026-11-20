@@ -8,6 +8,8 @@ on "Krampfanfälle" through ``create_annotation``; ``standalone=1`` writes a
 standalone Severe finding on "schwere" past the editing commands (old data);
 ``proposal=1`` imports a tool proposal Seizure on "Krampfanfälle"; the project
 default "from proposals" makes the round a proposal check (M2 M-5).
+``proposal_modifiers=1`` (with ``proposal=1``) gives that proposal Severe on
+"schwere" and a spanless Recurrent (issue 525).
 It returns the values scenarios' shape plus ``round_id`` and
 ``workspace_key``. Test server only, never shipped.
 """
@@ -128,10 +130,11 @@ def build_modifiers(
     with_finding: bool = False,
     standalone: bool = False,
     proposal: bool = False,
+    proposal_modifiers: bool = False,
 ) -> dict[str, Any]:
     from modifier_fixtures import MOD_DE, MOD_PATH, MOD_PIN, MOD_SHA, modifier_profile
     from t1_builders import native_unit
-    from t1_fixtures import ADMIN_ACCESS, OPERATOR, annotation
+    from t1_fixtures import ADMIN_ACCESS, OPERATOR, annotation, seg
 
     db = app.state.repo.db
     key = f"modifiers-{uuid4().hex[:8]}"
@@ -162,6 +165,15 @@ def build_modifiers(
 
     seizure = span("Krampfanfälle")
     tool = [annotation("p-seizure", (seizure.start, seizure.end), text=TEXT)]
+    if proposal_modifiers:
+        severe = span("schwere")
+        tool[0]["modifiers"] = [
+            {
+                "term_id": "HP:0012828",
+                "segments": [seg(TEXT, severe.start, severe.end)],
+            },
+            {"term_id": "HP:0031796", "segments": []},
+        ]
     unit = native_unit(
         CASE, "de", TEXT, case_id=CASE, annotations=tool if proposal else ()
     )
@@ -219,12 +231,14 @@ def register_modifier_scenario_route(app: FastAPI) -> None:
         with_finding: int = Query(0),
         standalone: int = Query(0),
         proposal: int = Query(0),
+        proposal_modifiers: int = Query(0),
     ) -> dict[str, Any]:
         return build_modifiers(
             app,
             with_finding=bool(with_finding),
             standalone=bool(standalone),
             proposal=bool(proposal),
+            proposal_modifiers=bool(proposal_modifiers),
         )
 
     app.router.routes.insert(0, app.router.routes.pop())

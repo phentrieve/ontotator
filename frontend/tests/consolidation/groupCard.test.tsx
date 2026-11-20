@@ -549,14 +549,14 @@ describe("GroupCard, modifiers", () => {
       editValues();
       const section = document.querySelector("[data-modifiers-section]") as HTMLElement;
       expect(within(section).getByRole("heading", { name: "Modifiers" })).toBeTruthy();
-      // No "·" on the consolidation screen (DN-10).
-      expect(chips()).toEqual(["Severe “schwere”"]);
+      // No "·" on the consolidation screen (DN-10); the code after the name (issue 525).
+      expect(chips()).toEqual(["Severe HP:0012828 “schwere”"]);
       fireEvent.click(screen.getByRole("button", { name: "+ Add modifier…" }));
       fireEvent.change(screen.getByRole("combobox", { name: "Search modifier" }), { target: { value: "rec" } });
       await waitFor(() => expect(within(screen.getByRole("group", { name: "Add modifier to Seizure" })).getAllByRole("option")).toHaveLength(1), { timeout: 3000 });
       expect(search.mock.calls[0][0].within).toEqual(["HP:0012823", "HP:0040279"]);
       fireEvent.keyDown(screen.getByRole("combobox", { name: "Search modifier" }), { key: "Enter" });
-      await waitFor(() => expect(chips()).toEqual(["Recurrent", "Severe “schwere”"]));
+      await waitFor(() => expect(chips()).toEqual(["Recurrent HP:0031796", "Severe HP:0012828 “schwere”"]));
       fireEvent.click(screen.getByRole("button", { name: "Keep with these values" }));
       expect(props.onResolve).toHaveBeenCalledWith({ input_ids: ["g-s1-0", "g-s1-1"], action: "choose", choice: {
         term_id: "HP:0001250", span_from_input_id: "g-s1-0", axes: { assertion: "present", experiencer: "patient", temporality: "current" },
@@ -602,7 +602,7 @@ describe("GroupCard, modifiers", () => {
         fireEvent.keyDown(screen.getByRole("combobox", { name: "Search modifier" }), { key: "Enter" });
       };
       await add("freq");
-      await waitFor(() => expect(chips()).toContain("Frequent Cohort term"));
+      await waitFor(() => expect(chips()).toContain("Frequent HP:0040282 Cohort term"));
       expect(screen.queryByText("Two severities")).toBeNull();
       await add("mild");
       await waitFor(() => expect(screen.getByText("Two severities")).toBeTruthy());
