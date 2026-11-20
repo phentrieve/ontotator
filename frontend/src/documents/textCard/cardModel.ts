@@ -2,6 +2,7 @@
 import type { DocumentRowView, NextStepView } from "../../api/client";
 import type { ProjectDocumentsQuery, Route } from "../../app/router";
 import { relativeDay } from "../../app/assignedDate";
+import { plural } from "../../app/labels";
 import type { PathSegment, PathTone } from "../../ui/StagePath";
 import { earlyFinal } from "../finalPanelText";
 import { submissionVersion } from "../SubmissionsTable";
@@ -124,6 +125,34 @@ export function personVersion(row: Pick<DocumentRowView, "versions" | "parallel_
   if (versions.length <= 1) return null;
   const chainName = versions.find(entry => entry.document_id === item.document_id)?.chain_name ?? null;
   return submissionVersion(item.version, chainName, row.parallel_roots);
+}
+
+/**
+ * Annotate work on an older version whose person already holds annotate work on a newer version of the same chain
+ * (issue 543): the work was carried there ("Carry to v2…"), so it no longer waits on the old version.
+ */
+export function carriedOnward(row: Pick<DocumentRowView, "versions" | "work">, item: CardWorkItem): boolean {
+  if (item.task !== "annotate") return false;
+  const chainOf = (documentId: string) => row.versions.find(entry => entry.document_id === documentId)?.chain_id;
+  const person = (entry: CardWorkItem) => entry.person?.pseudonym ?? entry.author_label;
+  return row.work.some(other => other.task === "annotate" && other.version > item.version && person(other) === person(item)
+    && chainOf(other.document_id) === chainOf(item.document_id));
+}
+
+/**
+ * "v2", plus ", newer than the annotations" when all annotate work sits on an older version, or ", 1 annotator still
+ * on v1" when only some does (issue 543: the others moved with a typo fix or were carried); null with one version.
+ * Work a person already carried to a newer version does not count.
+ */
+export function versionWarning(row: Pick<DocumentRowView, "versions" | "work">): string | null {
+  if (row.versions.length <= 1) return null;
+  const newest = Math.max(...row.versions.map(version => version.version));
+  const annotating = row.work.filter(item => item.task === "annotate");
+  const older = annotating.filter(item => item.version < newest && !carriedOnward(row, item));
+  if (!older.length) return `v${newest}`;
+  if (older.length === annotating.filter(item => !carriedOnward(row, item)).length) return `v${newest}, newer than the annotations`;
+  const versions = [...new Set(older.map(item => item.version))];
+  return `v${newest}, ${plural(older.length, "annotator")} still on ${versions.length === 1 ? `v${versions[0]}` : "older versions"}`;
 }
 
 /** "18 Oct" of an ISO time; null when there is none. */

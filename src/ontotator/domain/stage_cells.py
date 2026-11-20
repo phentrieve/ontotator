@@ -510,14 +510,20 @@ def _annotation(facts: StageFacts, codes: frozenset[str]) -> StageCell:
                 version=newest,
             )
         if step.old_submitted and not step.has_final:
+            # Issue 543: annotations already on the new version (moved by a
+            # typo fix, or carried) are counted: "3 on v2, 1 waiting on v1".
+            on_new = facts.submissions
             return _cell(
                 "old_text_submitted",
                 "decision",
                 people=_people(step.old_submitted),
                 from_version=step.old_submitted[0].from_version,
                 version=newest,
+                submitted=on_new or None,
                 note="no_target_proposals"
                 if all(item.blocked for item in step.old_submitted)
+                else None
+                if on_new
                 else "v2_not_annotated",
             )
     per_text = step.per_text

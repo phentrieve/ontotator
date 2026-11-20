@@ -232,6 +232,9 @@ def enrich_rounds(
         }
         submissions = _counts(conn, pid, RoundSubmissionBindingRow.round_id, round_ids)
         inputs = _counts(conn, pid, RoundInputRow.round_id, round_ids)
+        from ontotator.application.typo_fix_carry import typo_fix_moves
+
+        moved = {move.round_id for move in typo_fix_moves(conn, pid).values()}
 
     result = []
     for view in views:
@@ -253,6 +256,7 @@ def enrich_rounds(
                 if stored is not None
                 else inputs.get(view.round_id, 0)
             ),
+            "moved_by_typo_fix": view.round_id in moved,
         }
         if view.kind in CARRY_ROUND_KINDS and view.input_submission_ids:
             sid = view.input_submission_ids[0]

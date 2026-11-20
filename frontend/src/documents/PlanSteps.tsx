@@ -242,10 +242,14 @@ export function CardPlanSelect({ row, step, groupRevision, saves, modeChange }: 
   const annotations = row.work.filter(item => item.task === "annotate" && item.moved_to_version == null);
   const submittedWork = annotations.find(item => item.status === "submitted");
   const starter = submittedWork ?? annotations[0];
-  const starterName = starter ? (starter.person ? shortName(starter.person) : starter.author_label) : "an annotator";
+  const nameOf = (item: typeof annotations[number]) => (item.person ? shortName(item.person) : item.author_label);
+  const starterName = starter ? nameOf(starter) : "an annotator";
+  // Issue 543: everyone whose submitted work a mode change would discard, also annotations moved by a typo fix.
+  const submitters = [...new Set(annotations.filter(item => item.status === "submitted").map(nameOf))];
+  const submitterNames = submitters.length > 1 ? `${submitters.slice(0, -1).join(", ")} and ${submitters[submitters.length - 1]}` : starterName;
   const modeWords = textMode?.mode === "scratch" ? "from scratch" : "from proposals";
   const lockLine = !locked ? null : submittedWork
-    ? `Fixed: ${starterName} has submitted work started ${modeWords}. Changing the mode discards that work.`
+    ? `Fixed: ${submitterNames} ${submitters.length > 1 ? "have" : "has"} submitted work started ${modeWords}. Changing the mode discards that work.`
     : `Fixed: ${starterName} ${starter?.status === "open" ? "is assigned to annotate" : "has started"} ${modeWords}. Remove the unsubmitted assignment below to change it.`;
   const choices = step === "review"
     ? [{ value: "on", label: "On" }, { value: "off", label: "Off" }]

@@ -103,6 +103,8 @@ describe("Annotation cell", () => {
   it("old_text_open", () => expect(text("annotation", cell("old_text_open", "decision", { people: [tom], from_version: 1, version: 2 }))).toEqual(["⚠ In progress on old text", "Tom Reis works on v1"]));
   it("old_text_submitted", () => expect(text("annotation", cell("old_text_submitted", "decision", { people: [ana], from_version: 1, version: 2, note: "v2_not_annotated" })))
     .toEqual(["⚠ Submitted on v1", "Ana Weber, v2 not annotated"]));
+  it("old_text_submitted with annotations already on the new version (issue 543)", () => expect(text("annotation", cell("old_text_submitted", "decision", { people: [ana], from_version: 1, version: 2, submitted: 3 })))
+    .toEqual(["⚠ 3 on v2, 1 waiting on v1", "Ana Weber"]));
   it("old_text_submitted waiting for proposals", () => expect(text("annotation", cell("old_text_submitted", "decision", { people: [ana], from_version: 1, version: 2, note: "no_target_proposals" })))
     .toEqual(["○ v1 work waits", "Ana Weber, v2 has no proposals yet"]));
   it("finishing_on_old", () => expect(text("annotation", cell("finishing_on_old", "running", { people: [tom], from_version: 1, version: 2, note: "carried_on_submit" })))
@@ -166,6 +168,8 @@ describe("narrow table states (issue 248)", () => {
     // The pause stays in words beside the pause icon (issue 549).
     "consolidating · paused (2 of 3 groups open)": "paused",
     "consolidating · paused": "paused",
+    // Issue 543: some annotations moved to the new version, some wait on the old one.
+    "3 on v2, 1 waiting on v1": "1 left on v1",
   };
   it.each(Object.entries(states))("%s", (state, short) => expect(narrowStageState(state)).toBe(short));
   it("a state stays only when it fits the narrow cell (15 characters); short forms have at most 13", () => {

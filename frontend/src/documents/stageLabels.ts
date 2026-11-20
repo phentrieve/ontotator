@@ -99,6 +99,7 @@ const NARROW_STATES: readonly (readonly [RegExp, string])[] = [
   [/^not reviewed, optional$/, "not reviewed"],
   [/^(?:Final is|In progress|Submitted|Finishing) on old text$/, "on old text"],
   [/^Submitted on (v\d+)$/, "$1 submitted"],
+  [/^\d+ on v\d+, (\d+) waiting on (v\d+)$/, "$1 left on $2"],
   [/^Finishing on (v\d+)$/, "finishing $1"],
   [/^ready to compare$/, "to compare"],
   // What changed ("newer result", "text corrected") stays in the title.
@@ -247,6 +248,11 @@ function annotationText(cell: StageCellView): StageText {
       // Issue 414: work from proposals waits until the new version has its own proposals.
       if (detail.note === "no_target_proposals") {
         return { symbol: "○", word: `${version(detail.from_version) ?? "Old"} work waits`, detail: join(people, `${version(detail.version) ?? "the new text"} has no proposals yet`) };
+      }
+      // Issue 543: some annotations are on the new version already (moved by a typo fix, or carried).
+      if (detail.submitted) {
+        const waiting = detail.people?.length ?? 0;
+        return { symbol: "⚠", word: `${detail.submitted} on ${version(detail.version) ?? "new text"}, ${waiting} waiting on ${version(detail.from_version) ?? "old text"}`, detail: people };
       }
       return { symbol: "⚠", word: `Submitted on ${version(detail.from_version) ?? "old text"}`, detail: join(people, `${version(detail.version) ?? "new text"} not annotated`) };
     case "finishing_on_old":

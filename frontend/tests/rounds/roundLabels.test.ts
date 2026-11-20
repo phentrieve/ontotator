@@ -53,3 +53,13 @@ describe("a carry to a new text version", () => {
     expect(roundBadge({ kind: "text_change", round_ordinal: 1, source_round_ordinal: null })).toBe("Round 1, carried over from the earlier text version");
   });
 });
+
+describe("an annotation a typo fix moved (issue 543)", () => {
+  it("reads as moved, never as carried over or checked", () => {
+    const moved = r({ kind: "carry_forward", state: "submitted", round_ordinal: 1, source_round_ordinal: 1, document_version: 2, moved_by_typo_fix: true,
+      source_submission_recorded_at: "2026-10-19T00:57:00" });
+    expect(roundBadge(moved)).toBe("Round 1, moved to v2 after a typo fix");
+    expect(roundIdentity(moved, { now })).toBe("Round 1, moved to v2 after a typo fix, submitted 19 Oct, 00:57");
+    expect(roundStartingPoint(moved)).toBe("moved after a typo fix");
+  });
+});

@@ -194,6 +194,19 @@ class CorrectionRequestView(_View):
     additions: list[ReasonAdditionView] = Field(default_factory=list)
 
 
+class TypoFixMoveView(_View):
+    """The annotation a typo fix moved to this task's version by itself
+    (issue 543): the copy it made, the version it came from, and the
+    person's own work (when they were given it and submitted it)."""
+
+    submission_id: str
+    from_version: int | None = None
+    moved_at: datetime
+    submitted_at: datetime
+    assigned_at: datetime | None = None
+    assigned_by: MemberRefView | None = None
+
+
 class WorkItemView(_View):
     assignment_id: int
     document_id: str
@@ -235,6 +248,10 @@ class WorkItemView(_View):
     # A translation review the lead asked for with "Ask a reviewer to
     # correct…": the reason and its additions; None for other work.
     correction_request: CorrectionRequestView | None = None
+    # Translation review: when it was last submitted (the History line).
+    submitted_at: datetime | None = None
+    # Issue 543: a task a typo fix made for a moved annotation.
+    moved_by_typo_fix: TypoFixMoveView | None = None
 
 
 class ReportIssueView(_View):
@@ -651,6 +668,9 @@ class RowSubmissionView(_View):
     # A factory default keeps it optional in the generated types: the
     # submission history builds own rows without it.
     kept_automatically: int = Field(default_factory=int)
+    # Issue 543: the system's copy of the person's submission, made when a
+    # typo fix moved it to this version (not a second annotation).
+    moved_by_typo_fix: bool = Field(default_factory=bool)
 
 
 class RowRoundView(_View):
