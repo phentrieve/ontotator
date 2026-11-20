@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api, ApiError, type EditorialCorrectionPreview, type EditorialCorrectionResult, type VariantText } from "../../src/api/client";
-import { CARRY_REASONS, editorialConsequences, EditorialCorrectionDialog, editorialRefusal, numberNotice, PREVIEW_DELAY_MS, reasonText } from "../../src/documents/EditorialCorrectionDialog";
+import { CARRY_REASONS, editorialConsequences, EditorialCorrectionDialog, editorialRefusal, numberNotice, PREVIEW_DELAY_MS, reasonText, reviewNote } from "../../src/documents/EditorialCorrectionDialog";
 import { planRow, stepOf, version } from "./fixtures";
 
 const v2 = version({ document_id: "case-0101-de-v2", version: 2, chain_name: "DeepL", origin: "correction", derived_from: "case-0101-de", translation_status: "accepted" });
@@ -58,8 +58,10 @@ it("one page: edit the text, see the changes below it, choose the reason by clic
   expect(within(dialog).queryByRole("region", { name: "Text changes" })).toBeNull();
   expect(within(dialog).queryByRole("button", { name: "Check changes" })).toBeNull();
   // Quiet: nothing on v2, one plain sentence and no highlighted block.
-  expect(within(dialog).getByText("Nobody has worked on v2 yet.")).toBeTruthy();
+  expect(within(dialog).getByText("Nobody has annotated v2 yet.")).toBeTruthy();
   expect(within(dialog).queryByText("Work stays on v2")).toBeNull();
+  // Not reviewed: nothing about a review.
+  expect(within(dialog).queryByText(/translation review stays/)).toBeNull();
   expect(within(dialog).getByText("v3 keeps the status of v2: Accepted. No translation review is started.")).toBeTruthy();
   const save = within(dialog).getByRole("button", { name: "Save as v3" });
   fireEvent.click(save);
@@ -139,10 +141,19 @@ it("keeps the status of a rejected version", async () => {
   const rejected = version({ document_id: "case-0101-de-v2", version: 2, chain_name: "DeepL", origin: "correction", derived_from: "case-0101-de", translation_status: "reviewed", latest_review_decision: "rejected" });
   const { props, dialog, editor } = await renderDialog(rejected);
   expect(within(dialog).getByText("v3 keeps the status of v2: Rejected in review. No translation review is started.")).toBeTruthy();
+  // Issue 547, U2-06: the review is not "nobody worked on it"; it stays with the version it reviewed, and v3 needs its own.
+  expect(within(dialog).getByText("Nobody has annotated v2 yet.")).toBeTruthy();
+  expect(within(dialog).getByText("A submitted translation review stays with the version it reviewed. To have v3 reviewed, use Resolve… › Assign a new review… on this row after saving.")).toBeTruthy();
   fireEvent.change(editor, { target: { value: NEW } });
   fireEvent.click(within(dialog).getByRole("button", { name: "Grammar" }));
   fireEvent.click(within(dialog).getByRole("button", { name: "Save as v3" }));
   await waitFor(() => expect(props.onCorrected).toHaveBeenCalledWith("Typos fixed: v3 of case-0101 de saved. It stays Rejected in review."));
+});
+
+it("names a submitted review by what happens to it (issue 547, U2-06)", () => {
+  expect(reviewNote(null, 3)).toBeNull();
+  expect(reviewNote("accepted", 3)).toBe("A submitted translation review stays with the version it reviewed.");
+  expect(reviewNote("query", 3)).toBe("A submitted translation review stays with the version it reviewed. To have v3 reviewed, use Resolve… › Assign a new review… on this row after saving.");
 });
 
 it("says in words why a version cannot be corrected, without the editor", async () => {
@@ -171,7 +182,7 @@ it("shows a refusal at saving in place", async () => {
 
 it("consequences: quiet unless work stays on the version", async () => {
   // Nothing to do afterwards: plain sentences, no block.
-  expect(editorialConsequences(checkedPreview(NEW))).toEqual({ attention: false, moving: [], lines: ["Nobody has worked on v2 yet."] });
+  expect(editorialConsequences(checkedPreview(NEW))).toEqual({ attention: false, moving: [], lines: ["Nobody has annotated v2 yet."] });
   expect(editorialConsequences(checkedPreview(NEW, { annotations: { submitted: 0, open: 2 }, tasks_following: 2 }))).toEqual({ attention: false, moving: ["2 waiting tasks continue on v3."], lines: [] });
   expect(editorialConsequences(checkedPreview(NEW, { annotations: { submitted: 0, open: 1 }, tasks_following: 1, proposals: { sets: 1, carried: 3, needs_check: 1 } })))
     .toEqual({ attention: false, moving: ["1 waiting task continues on v3.", "Tool proposals move to v3; 1 marks words you changed and waits for a check."], lines: [] });

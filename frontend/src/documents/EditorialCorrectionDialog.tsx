@@ -72,7 +72,7 @@ export interface EditorialConsequences {
 
 /**
  * What happens to the work on the version, in plain words. Quiet when nothing needs the lead afterwards
- * ("Nobody has worked on v1 yet.", "2 waiting tasks continue on v2."); when started or submitted work stays,
+ * ("Nobody has annotated v1 yet.", "2 waiting tasks continue on v2."); when started or submitted work stays,
  * what stays and what to do next ("2 annotations stay on v1. After saving, use Handle text change… and
  * Carry to v2… on this row to move them."). With a changed text, per person: whose submitted annotation moves
  * to the new version by itself (issue 465) and whose does not, and why.
@@ -110,8 +110,19 @@ export function editorialConsequences(preview: EditorialCorrectionPreview): Edit
     others ? `${others.charAt(0).toUpperCase()}${others.slice(1)} ${count + (preview.final_result ? 1 : 0) === 1 ? "stays" : "stay"} on ${old}${staying ? " as well" : ""}.` : null,
     findings?.needs_check ? `${findings.needs_check} of ${plural(findings.submitted, "finding")} ${findings.needs_check === 1 ? "marks" : "mark"} words you changed and will need a check when moved.` : null,
   ].filter(present);
-  if (!moves.length && !stays.length) return { attention: false, moving: [], lines: [`Nobody has worked on ${old} yet.`] };
+  if (!moves.length && !stays.length) return { attention: false, moving: [], lines: [`Nobody has annotated ${old} yet.`] };
   return { attention, moving: moves, lines: stays };
+}
+
+/**
+ * A version with a submitted translation review (issue 547, U2-06): the review stays with the version it reviewed, and the
+ * new version is not reviewed. A rejected or queried one stays to resolve, so its next review is assigned under Resolve….
+ * Null for a version without a review.
+ */
+export function reviewNote(decision: string | null | undefined, next: number): string | null {
+  if (!decision) return null;
+  const stays = "A submitted translation review stays with the version it reviewed.";
+  return decision === "rejected" || decision === "query" ? `${stays} To have v${next} reviewed, use Resolve… › Assign a new review… on this row after saving.` : stays;
 }
 
 type CarryPerson = NonNullable<EditorialCorrectionPreview["annotation_carry"]>[number];
@@ -204,6 +215,7 @@ export function EditorialCorrectionDialog({ row, version, projectKey, onCorrecte
   const numbers = current ? numberNotice(current.number_changes) : null;
   const consequences = current ?? state;
   const work = consequences ? editorialConsequences(consequences) : null;
+  const review = reviewNote(version.latest_review_decision, next);
 
   const save = async () => {
     setTried(true);
@@ -273,6 +285,7 @@ export function EditorialCorrectionDialog({ row, version, projectKey, onCorrecte
             </>
             : <p className="editorial-correction-work">{[...work.moving, ...work.lines].join(" ")}</p>)}
           <p className="field-hint">{`v${next} keeps the status of ${short}${status ? `: ${status}` : ""}. No translation review is started.`}</p>
+          {review !== null && <p className="field-hint">{review}</p>}
         </>}
       {failure}
       {invalid && tried && <p id={`${id}-missing`} className="action-reason">{!changed ? "Change the text and say what you fixed." : "Say what you fixed."}</p>}

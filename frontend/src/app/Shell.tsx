@@ -36,15 +36,21 @@ const inApp = (destination: Route, onNavigate: ShellProps["onNavigate"]) => (eve
   onNavigate(destination);
 };
 
+/** Pages without a sidebar entry of their own, and the entry they belong to. */
+const WITHIN: Partial<Record<Route["name"], Route["name"]>> = { task: "tasks", projectTranslationReviews: "projectProgress" };
+
 function NavigationLink({ destination, current, onNavigate, label, children }: {
   destination: Route; current: Route; onNavigate: ShellProps["onNavigate"]; label?: string; children: ReactNode;
 }): JSX.Element {
   const active = current.name === destination.name && (
     !("key" in destination) || ("key" in current && current.key === destination.key)
   );
-  const inTasks = destination.name === "tasks" && current.name === "task";
+  // A page opened from a section marks that section as where the reader is: a task in My tasks, the Translation reviews
+  // list in Progress (issue 547, U2-09).
+  const within = WITHIN[current.name];
+  const inside = within === destination.name && (!("key" in destination) || ("key" in current && current.key === destination.key));
   return <a href={routeHref(destination)} className="shell-nav-link" aria-label={label}
-    aria-current={active ? "page" : inTasks ? "location" : undefined}
+    aria-current={active ? "page" : inside ? "location" : undefined}
     onClick={inApp(destination, onNavigate)}>{children}</a>;
 }
 

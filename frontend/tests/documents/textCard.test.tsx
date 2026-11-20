@@ -550,7 +550,10 @@ describe("translation part", () => {
     const dialog = screen.getByRole("dialog", { name: "Add to the reason" });
     const confirm = within(dialog).getAllByRole("button", { name: "Add to the reason" }).at(-1)!;
     expect((confirm as HTMLButtonElement).disabled).toBe(true);
+    // Issue 547, U2-08: the grey button says why.
+    expect(document.getElementById(confirm.getAttribute("aria-describedby") ?? "")?.textContent).toBe("Enter an addition first.");
     fireEvent.change(within(dialog).getByLabelText("Addition to the reason"), { target: { value: "  And the footnote. " } });
+    expect(within(dialog).queryByText("Enter an addition first.")).toBeNull();
     fireEvent.click(confirm);
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
     expect(add).toHaveBeenCalledWith(5, "And the footnote.");

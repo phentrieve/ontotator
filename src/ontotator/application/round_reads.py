@@ -26,8 +26,9 @@ from ontotator.domain.work_rounds import (
     WorkRoundView,
     unresolved_note,
 )
+from ontotator.packages.models import PackageManifest
 from ontotator.storage.repository import Repository
-from ontotator.storage.tables import SubmissionRow
+from ontotator.storage.tables import ProjectRow, SubmissionRow
 from ontotator.storage.workflow_tables import (
     RoundInputRow,
     RoundSubmissionBindingRow,
@@ -61,6 +62,62 @@ def _ordinals(
         if rid not in known and item["round"].get("assignment_id") in wanted
     )
     return round_ordinals(pairs)
+
+
+def round_labels(
+    conn: Any, pid: int, round_ids: Iterable[str]
+) -> dict[str, tuple[str | None, int]]:
+    """round_id -> (round kind, round number) as Documents names them.
+
+    The number is the round's place along its ``predecessor_round_id`` chain,
+    the rule of the Documents submissions table (issue 547, U4-07: the text
+    view of a consolidator who is not the lead says "Round 1", as the lead's
+    does). Predecessors are followed by id, so a chain that spans text
+    versions counts the same way. Rounds kept only in the imported workflow
+    history are read from the manifest.
+    """
+    pairs: dict[str, str | None] = {}
+    kinds: dict[str, str | None] = {}
+    wanted = set(round_ids)
+    missing: set[str] = set()
+    while wanted:
+        rows = conn.execute(
+            select(
+                WorkRoundRow.round_id,
+                WorkRoundRow.predecessor_round_id,
+                WorkRoundRow.kind,
+            ).where(
+                WorkRoundRow.project_id == pid,
+                WorkRoundRow.round_id.in_(sorted(wanted)),
+            )
+        ).all()
+        for row in rows:
+            pairs[row.round_id] = row.predecessor_round_id
+            kinds[row.round_id] = row.kind
+        missing |= wanted - {row.round_id for row in rows}
+        wanted = {rid for rid in pairs.values() if rid and rid not in pairs} - missing
+    if missing:
+        history = (
+            PackageManifest.model_validate(
+                conn.execute(
+                    select(ProjectRow.manifest).where(ProjectRow.id == pid)
+                ).scalar_one()
+            ).workflow_history
+            or {}
+        )
+        found = [rid for rid in sorted(missing) if rid in history]
+        while found:
+            for rid in found:
+                stored = history[rid].get("round", {})
+                pairs[rid] = stored.get("predecessor_round_id")
+                kinds[rid] = stored.get("kind")
+            found = [
+                rid
+                for rid in {p for p in pairs.values() if p and p not in pairs}
+                if rid in history
+            ]
+    ordinals = round_ordinals(pairs.items())
+    return {rid: (kinds[rid], ordinals[rid]) for rid in pairs}
 
 
 def _round_of_submission(

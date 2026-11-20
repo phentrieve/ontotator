@@ -152,7 +152,7 @@ test("at 390 px: an unreviewed translation is corrected and stays ready for revi
   const editor = dialog.getByRole("textbox", { name: "Corrected text", exact: true });
   await expect(editor).toHaveValue(oldText(caseId));
   // Nothing on v1: one quiet sentence, no highlighted block.
-  await expect(dialog.getByText("Nobody has worked on v1 yet.", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("Nobody has annotated v1 yet.", { exact: true })).toBeVisible();
   await expect(dialog.getByText("Work stays on v1", { exact: true })).toHaveCount(0);
   await expect(dialog.getByText("v2 keeps the status of v1: Ready for review. No translation review is started.", { exact: true })).toBeVisible();
   await noHorizontalScroll(page, "dialog");

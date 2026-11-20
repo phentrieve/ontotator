@@ -67,6 +67,8 @@ it('offers no Text card link to someone who does not lead the project', async ()
   await viewer();
   const toolbar = screen.getByRole('group', { name: 'Text view' });
   expect(within(toolbar).queryByRole('link', { name: 'Text card' })).toBeNull();
+  // Issue 547, U4-07: nor a way to Documents, which says "Documents is for project leads".
+  expect(within(toolbar).queryByRole('link', { name: /Documents/ })).toBeNull();
   expect(within(toolbar).getByRole('button', { name: 'Submissions' })).toBeTruthy();
 });
 

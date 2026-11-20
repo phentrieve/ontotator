@@ -108,6 +108,34 @@ test("someone else's running consolidation: the lead's card shows who and the pr
   await expect(consolidator.getByRole("button", { name: /^Remove Ali.*’s consolidation assignment$/ })).toBeVisible();
 });
 
+test("390 px: the path of a text under consolidation breaks between words, never inside one (issue 548, U4-08)", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const s = await proposalCheckScenario(page, "CONSOLIDATING_ALI");
+  await loginScenarioUser(page, s, "lead");
+  await openDocuments(page, s, `?panel=${encodeURIComponent(`${CASE}:en`)}`);
+  const card = textCard(page, CASE, "en");
+  const path = card.getByRole("navigation", { name: "Text path", exact: true });
+  await expect(path).toContainText(/consolidating/);
+  // A word on two lines has two client rects.
+  const broken = await path.evaluate(element => {
+    const out: string[] = [];
+    for (const node of element.querySelectorAll(".stage-path-title, .stage-path-state")) {
+      const text = node.firstChild;
+      if (!text || text.nodeType !== Node.TEXT_NODE) continue;
+      const value = text.textContent ?? "";
+      for (const match of value.matchAll(/\S+/g)) {
+        const range = document.createRange();
+        range.setStart(text, match.index); range.setEnd(text, match.index + match[0].length);
+        if (new Set([...range.getClientRects()].map(rect => Math.round(rect.top))).size > 1) out.push(match[0]);
+      }
+    }
+    return out;
+  });
+  expect(broken).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: test.info().outputPath("card-path-phone.png") });
+});
+
 test("the lead assigns themselves in the assign dialog; the consolidator rule is said there", async ({ page }) => {
   const s = await proposalCheckScenario(page, "FRESH");
   await loginScenarioUser(page, s, "lead");

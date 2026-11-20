@@ -113,7 +113,7 @@ test.describe("admin.md", () => {
     await create.getByLabel(/^Display name/).fill("Lena Demo");
     await create.getByLabel("Languages", { exact: true }).fill("en");
     await create.getByLabel("Languages", { exact: true }).press("Enter");
-    await create.getByRole("button", { name: "Create user", exact: true }).click();
+    await page.getByRole("dialog", { name: "New user", exact: true }).getByRole("button", { name: "Create user", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Setup code for lena.demo", exact: true });
     await expect(dialog.locator("code")).not.toBeEmpty();
     const close = dialog.locator(".modal-actions").getByRole("button", { name: "Close", exact: true });
