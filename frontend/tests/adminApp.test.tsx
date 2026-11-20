@@ -181,6 +181,8 @@ it.each([403, 404])("retains the server's managed-route denial (%s) without inve
 it("sends actual Users writes with CSRF and keeps its form through the existing session recovery", async () => {
   vi.spyOn(api, "me").mockImplementation(async () => { api.setCsrfToken("csrf-admin"); return user; });
   vi.spyOn(api, "login").mockImplementation(async () => { api.setCsrfToken("csrf-renewed"); return user; });
+  // The header bell has its own endpoint; the fetch stub below serves only the Users write.
+  vi.spyOn(api, "notificationSummary").mockResolvedValue({ unread: 0 });
   const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({ code: "NOT_AUTHENTICATED" }) });
   vi.stubGlobal("fetch", fetchMock);
   render(<AuthGate />);

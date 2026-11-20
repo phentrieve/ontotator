@@ -10,6 +10,8 @@ import { projectDestination, ProjectSwitcher } from "./ProjectPicker";
 import { rememberedProject } from "./lastProject";
 import { useDocumentsSummary } from "../documents/useDocumentsSummary";
 import { TASKS_CHANGED } from "../tasks/tasksEvents";
+import { NotificationBell } from "../notifications/NotificationBell";
+import { useNotifications } from "../notifications/useNotifications";
 import { TechnicalReportHost } from "../reports/TechnicalReportDialog";
 import { TECHNICAL_REPORTS_CHANGED } from "../reports/TechnicalReportsPage";
 import { openTechnicalReport, REPORT_NAV_LABEL, SHOW_MY_TECHNICAL_REPORTS } from "../reports/technicalReport";
@@ -142,6 +144,7 @@ export function Shell({ user, projects, route, onNavigate, onLogout, breadcrumb,
   const current = projects.find(project => project.project_key === currentKey);
   const openTasks = useOpenTaskCount(user.username, navigation);
   const openReports = useOpenReportCount(user.is_system_admin, navigation);
+  const notifications = useNotifications(user.username);
   // "Documents (n)": rows needing the lead's decision (V3); the summary is lead only.
   const needsDecision = useDocumentsSummary(current?.project_key, !!current?.can_manage && current.roles.includes("lead"));
   const switcher = projects.length > 0 && <ProjectSwitcher projects={projects} current={current} route={route}
@@ -207,9 +210,11 @@ export function Shell({ user, projects, route, onNavigate, onLogout, breadcrumb,
     aria-current={inAdmin ? "location" : undefined} onClick={inApp(ADMIN_START, onNavigate)}>
     <IconGear />{!!openReports && <span className="shell-admin-count" aria-hidden="true">{openReports > 99 ? "99+" : openReports}</span>}
   </a>;
+  // The bell (issue 557) sits next to the user menu, after the gear.
+  const actions = <>{gear}<NotificationBell state={notifications} onNavigate={onNavigate} /></>;
   // The logo's start page: the current project's landing (Documents for leads, its My tasks otherwise), else My tasks.
   const home = current ? projectDestination(current) : MY_TASKS;
-  return <AppShell user={user} userMenu={userMenu} actions={gear} breadcrumb={breadcrumb} nav={inAdmin ? adminNav : workNav}
+  return <AppShell user={user} userMenu={userMenu} actions={actions} breadcrumb={breadcrumb} nav={inAdmin ? adminNav : workNav}
     navLabel={inAdmin ? "Administration" : "Sections"} role={shellRole(user, projects, current, route.name === "task" ? taskKind : undefined)}
     homeHref={routeHref(home)} onHome={() => onNavigate(home)}
     density={(route.name === "task" || route.name === "projectCase") ? "reading" : "compact"}>{children}<TechnicalReportHost /></AppShell>;

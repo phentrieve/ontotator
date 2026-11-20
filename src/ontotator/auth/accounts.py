@@ -64,6 +64,7 @@ from ontotator.auth.tokens import (
 from ontotator.domain.errors import DomainError
 from ontotator.settings import setup_code_hours
 from ontotator.storage.database import Database, advisory_lock_id
+from ontotator.storage.notification_tables import NotificationRow
 from ontotator.storage.report_tables import TechnicalReportRow
 from ontotator.storage.tables import (
     SCHEMA,
@@ -1010,6 +1011,11 @@ class AccountService:
                 update(SessionRow)
                 .where(SessionRow.user_id == row.id)
                 .values(client_ip=None, user_agent=None)
+            )
+            # Issue 557: the person's own notifications go; those that name
+            # them as the actor show the pseudonym from now on.
+            conn.execute(
+                delete(NotificationRow).where(NotificationRow.recipient_id == row.id)
             )
             # Technical reports stay (the pseudonym); their browser goes too.
             conn.execute(

@@ -184,6 +184,10 @@ export const IconMore = (p: IconProps) => (
 );
 
 // Lucide "settings" (ISC, https://lucide.dev, see THIRD_PARTY_NOTICES.md); scaled from its 24 px grid, paths verbatim.
+/** A bell: the header's notifications (issue 557). */
+export const IconBell = (p: IconProps) => (
+  <Icon {...p}><path d="M4 11.5V7a4 4 0 0 1 8 0v4.5l1 1H3z" /><path d="M6.5 14.5a1.5 1.5 0 0 0 3 0" /></Icon>
+);
 export const IconGear = (p: IconProps) => (
   <Icon {...p}>
     <g transform="scale(0.6667)" strokeWidth="2.25">
