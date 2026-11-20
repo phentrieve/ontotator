@@ -81,9 +81,11 @@ test("a comma added to an accepted translation becomes an accepted v2 on one pag
   const editor = dialog.getByRole("textbox", { name: "Corrected text", exact: true });
   await expect(editor).toHaveValue(oldText(caseId));
   await expect(dialog.getByRole("button", { name: "Check changes", exact: true })).toHaveCount(0);
-  // Started and submitted annotations stay on v1: the highlighted block says what to do next.
+  // The started annotation stays on v1: the highlighted block says what to do next. Whether the submitted one moves
+  // by itself is known once the text changes (issue 543, U4-04).
   await expect(dialog.getByText("Work stays on v1", { exact: true })).toBeVisible();
-  await expect(dialog).toContainText("2 annotations stay on v1. After saving, use Handle text change… and Carry to v2… on this row to move them.");
+  await expect(dialog).toContainText("1 annotation stays on v1. After saving, use Handle text change… on this row to move it.");
+  await expect(dialog).toContainText("Once you change the text, this says whether the submitted annotation moves to v2 by itself.");
   await expect(dialog.getByText("v2 keeps the status of v1: Accepted. No translation review is started.", { exact: true })).toBeVisible();
   await evidence(page, "453-dialog-open");
 

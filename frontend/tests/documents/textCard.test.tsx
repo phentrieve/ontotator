@@ -105,6 +105,21 @@ describe("header", () => {
     expect(within(card()).getByText("v2")).toBeTruthy();
   });
 
+  it("issue 543: after a typo fix the header names who is still on the old version; carried work does not count", () => {
+    const versions = [
+      version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de" }),
+    ];
+    const onV2 = (id: number, person: typeof tom, label: string) => annotateItem({ assignment_id: id, person, author_label: label, version: 2, document_id: "case-200-de-v2", status: "submitted" });
+    const onV1 = (id: number, person: typeof tom, label: string) => annotateItem({ assignment_id: id, person, author_label: label, version: 1, status: "submitted" });
+    renderCard({ row: assignRow({ versions, work: [onV2(1, tom, "ann-0004"), onV2(2, luc, "ann-0005"), onV1(3, ana, "ann-0003")] }) });
+    expect(within(card()).getByText("v2, 1 annotator still on v1")).toBeTruthy();
+    cleanup();
+    // Ana carried her v1 work to v2 ("Carry to v2…"): her v1 task stays, but nothing waits on v1 any more.
+    renderCard({ row: assignRow({ versions, work: [onV2(1, tom, "ann-0004"), onV1(3, ana, "ann-0003"), onV2(4, ana, "ann-0003")] }) });
+    expect(within(card()).getByText("v2")).toBeTruthy();
+  });
+
   it("‹ › step through the table order", () => {
     const { onStep } = renderCard();
     fireEvent.click(within(card()).getByRole("button", { name: "Next text" }));
@@ -161,6 +176,43 @@ describe("annotation part", () => {
     const tomRow = within(people).getByText("Tom Reis").closest("li")!;
     expect(tomRow.textContent).toBe("Tom Reis ann-0004Assigned yesterday, from proposalsNot startedRemove…");
     expect(within(tomRow).getByText("Assigned yesterday").tagName).toBe("TIME");
+  });
+
+  it("issue 543: an annotation a typo fix moved shows the person's submission and assignment, the move and Open annotation", async () => {
+    const versions = [
+      version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de" }),
+    ];
+    const moved = { submission_id: "s-tom-v2", from_version: 1, moved_at: "2026-10-21T11:00:00", submitted_at: "2026-10-15T10:00:00", assigned_at: "2026-10-14T09:00:00", assigned_by: null };
+    vi.mocked(api.getRowSubmissions).mockResolvedValue(submissions("case-200", "de", { submissions: [
+      submission({ submission_id: "s-tom", document_id: "case-200-de", author_label: "ann-0004", author: tom, finding_count: 2, recorded_at: "2026-10-15T10:00:00" }),
+      submission({ submission_id: "s-tom-v2", document_id: "case-200-de-v2", version: 2, kind: "carry_forward", author_label: "ann-0004", author: tom, finding_count: 2,
+        recorded_at: "2026-10-21T11:00:00", moved_by_typo_fix: true }),
+      // Luc carried his v1 annotation with "Carry to v2…" and submitted it there.
+      submission({ submission_id: "s-luc", document_id: "case-200-de", author_label: "ann-0005", author: luc, finding_count: 1, recorded_at: "2026-10-16T10:00:00" }),
+      submission({ submission_id: "s-luc-v2", document_id: "case-200-de-v2", version: 2, kind: "carry_forward", author_label: "ann-0005", author: luc, finding_count: 1, recorded_at: "2026-10-20T10:00:00" }),
+    ] }));
+    renderCard({ row: assignRow({ versions, work: [
+      annotateItem({ assignment_id: 1, person: tom, author_label: "ann-0004", version: 2, document_id: "case-200-de-v2", status: "submitted", assigned_at: "2026-10-21T11:00:00", moved_by_typo_fix: moved }),
+      annotateItem({ assignment_id: 2, person: luc, author_label: "ann-0005", version: 1, status: "submitted", assigned_at: "2026-10-14T09:00:00" }),
+      annotateItem({ assignment_id: 3, person: luc, author_label: "ann-0005", version: 2, document_id: "case-200-de-v2", status: "submitted", assigned_at: "2026-10-20T09:00:00" }),
+    ] }) });
+    const people = within(card()).getByRole("list", { name: "Annotators" });
+    const tomRow = await waitFor(() => {
+      const found = within(people).getByText("Tom Reis").closest("li")!;
+      expect(found.textContent).toContain("Submitted");
+      return found;
+    });
+    expect(tomRow.querySelector(".person-row-details")!.textContent)
+      .toBe(`Submitted ${rowDay("2026-10-15T10:00:00", now)}, 2 findings · moved from v1 by the typo fix ${rowDay("2026-10-21T11:00:00", now)} · assigned ${rowDay("2026-10-14T09:00:00", now)} · v2`);
+    expect(within(tomRow).getByRole("link", { name: "Open annotation of Tom Reis" })).toBeTruthy();
+    // Luc once, on v2, with his carried annotation.
+    const lucRows = within(people).getAllByText("Luc Martin");
+    expect(lucRows).toHaveLength(1);
+    const lucRow = lucRows[0].closest("li")!;
+    expect(lucRow.textContent).toContain("Submitted");
+    expect(lucRow.textContent).toContain("1 finding");
+    expect(within(lucRow).getByRole("link", { name: "Open annotation of Luc Martin" })).toBeTruthy();
   });
 
   it("says why a text without proposals is annotated from scratch; Open text shows no proposals", () => {

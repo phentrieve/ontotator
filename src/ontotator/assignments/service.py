@@ -468,6 +468,28 @@ def _paused(row: RowMapping) -> dict[str, Any]:
     return values
 
 
+def _first_assigned(conn: Connection, rows: list[RowMapping]) -> dict[int, datetime]:
+    """Assignment id -> when the person was given the work, for each task a
+    typo fix made for a moved annotation (issue 543)."""
+    from ontotator.application.typo_fix_carry import typo_fix_moves
+
+    keys = {
+        r["project_key"]
+        for r in rows
+        if r["task"] == "annotate" and r["status"] == "submitted"
+    }
+    if not keys:
+        return {}
+    found: dict[int, datetime] = {}
+    for pid in conn.execute(
+        select(ProjectRow.id).where(ProjectRow.project_key.in_(keys))
+    ).scalars():
+        for move in typo_fix_moves(conn, int(pid)).values():
+            if move.first_assigned_at is not None:
+                found[move.assignment_id] = move.first_assigned_at
+    return found
+
+
 def _last_saves(
     conn: Connection, user_id: int, assignment_ids: List[int]
 ) -> dict[int, datetime]:
@@ -1836,6 +1858,7 @@ class AssignmentService:
                         )
                     }
             saved = _last_saves(conn, user_id, [r["assignment_id"] for r in rows])
+            first_assigned = _first_assigned(conn, rows)
             result = []
             for row in rows:
                 source = target = None
@@ -1868,6 +1891,12 @@ class AssignmentService:
                             "updated_at": max(
                                 row["updated_at"],
                                 saved.get(row["assignment_id"], row["updated_at"]),
+                            ),
+                            # Issue 543: a task a typo fix made for the
+                            # person's annotation keeps the day they were
+                            # given the work.
+                            "assigned_at": first_assigned.get(
+                                row["assignment_id"], row["assigned_at"]
                             ),
                         },
                         waiting_for_translation_review=waiting and not for_lead,

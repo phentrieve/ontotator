@@ -431,3 +431,24 @@ def test_a_typo_fix_of_a_queried_version_is_decided_with_its_query(
     ).json()
     assert opened["query_answer"]["kind"] == "unchanged"
     assert opened["query_answer"]["accepted_version"] == 2
+
+
+def test_the_decision_is_the_rows_last_activity(
+    client: TestClient, built: dict[str, Any]
+) -> None:
+    """Issue 545 (U2-03): "Last activity" moves to the lead's decision; the
+    History has the time of the reviewer's query on its review line."""
+    lead = decider(client, built, "answer_only")
+    v1 = f"{lead.case}~de~v1"
+    before = lead.row()
+    (review,) = [
+        item for item in before["work"] if item["task"] == "translation_review"
+    ]
+    assert review["submitted_at"] is not None
+    assert before["last_activity_at"] >= review["submitted_at"]
+    assert lead.decide(v1, "unchanged", answer=ANSWER).status_code == 200
+    row = lead.row()
+    (version,) = row["versions"]
+    decided_at = version["query_decision"]["decided_at"]
+    assert decided_at > before["last_activity_at"]
+    assert row["last_activity_at"] == decided_at
