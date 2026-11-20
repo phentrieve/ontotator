@@ -521,8 +521,6 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const rootRef = useRef<HTMLDivElement>(null);
   // At ≤700 px the editor shows one pane at a time; marking text does not switch panes on its own.
   const panesLayout = useMediaQuery("(max-width: 700px)");
-  // At phone widths the "New finding" bar's quote needs the room: its "Copy text" is an icon.
-  const narrowBar = useMediaQuery("(max-width: 420px)");
   // Below 1024 px the header keeps one bar: "Next open item" moves into "More", the mode text hides.
   const narrowHeader = useMediaQuery("(max-width: 1023px)");
   // Back to the text after a cancelled new finding: runs after the text pane re-rendered its runs,
@@ -4500,8 +4498,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
                 </InlineMessage>}
                 {pendingIsMarkedSpan
                   ? <>
-                    <p className="pending-quote">“{quoteSegments(view.document.text, pendingAnnotation.segments)}”</p>
-                    <CopyTextButton text={passageRef.current} onAnnounce={announceCarried} />
+                    <p className="pending-quote">“{quoteSegments(view.document.text, pendingAnnotation.segments)}”{" "}
+                      <CopyTextButton text={passageRef.current} onAnnounce={announceCarried} /></p>
                     <p className="form-hint">Adjust the marked text with its edge handles, or mark new text to replace it.</p>
                   </>
                   : <p>
@@ -4797,7 +4795,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
           <span className="pending-bar__text">New finding “{quoteSegments(view.document.text, pendingAnnotation!.segments, 80)}”</span>
           <Button type="button" variant="primary" size="sm" onClick={chooseTerm}>Choose term</Button>
           <Button type="button" variant="secondary" size="sm" onClick={discardPending}>Discard</Button>
-          <CopyTextButton text={passageRef.current} onAnnounce={announceCarried} compact={narrowBar} />
+          <CopyTextButton text={passageRef.current} onAnnounce={announceCarried} />
         </div>
       )}
       </div>

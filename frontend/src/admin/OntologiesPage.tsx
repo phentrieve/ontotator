@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError, type AdminOntology, type OntologyUploadResult } from "../api/client";
 import { routeHref, type Route } from "../app/router";
-import { Button, DataTable, EmptyState, Field, InlineMessage, Toolbar, type Column, EmptyValue } from "../ui";
+import { Button, DataTable, EmptyState, Field, IconButton, InlineMessage, Toolbar, type Column, EmptyValue } from "../ui";
+import { IconCopy } from "../ui/icons";
 import { ErrorNotice } from "./ErrorNotice";
 import { formatDateTime } from "../app/labels";
 
@@ -97,7 +98,7 @@ export function OntologiesPage({ onNavigate }: OntologiesPageProps): JSX.Element
     { id: "prefix", header: "Prefix", cell: item => item.prefix },
     { id: "release", header: "Release", cell: item => item.release ?? <EmptyValue /> },
     { id: "language", header: "Language", cell: item => item.language ?? <EmptyValue /> },
-    { id: "sha", header: "SHA-256", cell: item => <><code title={item.sha256}>{item.sha256.slice(0, 12)}</code>{" "}<Button size="sm" aria-label={`Copy SHA-256 for ${item.filename}`} disabled={copying !== null} onClick={() => { void copy(item); }}>Copy</Button></> },
+    { id: "sha", header: "SHA-256", cell: item => <><code title={item.sha256}>{item.sha256.slice(0, 12)}</code>{" "}<IconButton size="sm" label={`Copy SHA-256 for ${item.filename}`} title="Copy the full SHA-256" icon={<IconCopy />} disabled={copying !== null} onClick={() => { void copy(item); }} /></> },
     { id: "uploaded", header: "Uploaded at", cell: item => <time dateTime={item.uploaded_at}>{formatDateTime(item.uploaded_at)}</time> },
     { id: "projects", header: "Pinned by", cell: item => item.projects.length ? projectLinks(item.projects) : "Not pinned" },
     // Projects whose translations froze at first use without this file (issue 254).
