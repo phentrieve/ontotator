@@ -134,7 +134,7 @@ for (const [width, height] of [[1440, 900], [390, 844]] as const) test(`marks at
   expect(errors).toEqual([]);
 });
 
-test('marks with Mark checked sentences: the text keeps its marks, the markers stand beside it', async ({ page }) => {
+test('marks with Mark checked sentences: the text keeps its marks, the circles stand before the sentences', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   const s = await open(page);
   await toggle(page).check();

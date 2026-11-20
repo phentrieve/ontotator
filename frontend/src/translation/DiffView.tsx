@@ -33,14 +33,14 @@ export function paragraphNodes(after: string, parts: readonly TextDiffPart[], { 
   return nodes;
 }
 
-/** With `gutter`, the checked-sentence markers stand in the pane's margin (issue 256). */
-export const DiffView = forwardRef<HTMLDivElement, { before: string; after: string; parts?: readonly TextDiffPart[]; lang?: string; showInvisibles?: boolean; label?: string; gutter?: ReactNode }>(function DiffView({ before, after, parts, lang, showInvisibles = false, label = "Text changes", gutter }, ref) {
+/** With `markers`, the checked-sentence markers stand before the sentences, over the text (issue 256). */
+export const DiffView = forwardRef<HTMLDivElement, { before: string; after: string; parts?: readonly TextDiffPart[]; lang?: string; showInvisibles?: boolean; label?: string; markers?: ReactNode }>(function DiffView({ before, after, parts, lang, showInvisibles = false, label = "Text changes", markers }, ref) {
   const content = useMemo(() => paragraphNodes(after, parts ?? diffText(before, after), { invisibles: showInvisibles }), [before, after, parts, showInvisibles]);
-  return <div ref={ref} className={`translation-diff${showInvisibles ? " show-invisibles" : ""}${gutter ? " has-gutter" : ""}`} role="region" aria-label={label} tabIndex={0} lang={lang}>{gutter}{content}</div>;
+  return <div ref={ref} className={`translation-diff${showInvisibles ? " show-invisibles" : ""}${markers ? " has-markers" : ""}`} role="region" aria-label={label} tabIndex={0} lang={lang}>{content}{markers}</div>;
 });
 
-/** Read-only reading text with paragraph markers, without any editing affordance; `gutter` as in DiffView. */
-export const TextView = forwardRef<HTMLDivElement, { text: string; label: string; lang?: string; showInvisibles?: boolean; gutter?: ReactNode }>(function TextView({ text, label, lang, showInvisibles = false, gutter }, ref) {
+/** Read-only reading text with paragraph markers, without any editing affordance; `markers` as in DiffView. */
+export const TextView = forwardRef<HTMLDivElement, { text: string; label: string; lang?: string; showInvisibles?: boolean; markers?: ReactNode }>(function TextView({ text, label, lang, showInvisibles = false, markers }, ref) {
   const content = useMemo(() => paragraphNodes(text, [{ op: "equal", text }], { invisibles: showInvisibles }), [text, showInvisibles]);
-  return <div ref={ref} className={`translation-text${showInvisibles ? " show-invisibles" : ""}${gutter ? " has-gutter" : ""}`} role="region" aria-label={label} tabIndex={0} lang={lang}>{gutter}{content}</div>;
+  return <div ref={ref} className={`translation-text${showInvisibles ? " show-invisibles" : ""}${markers ? " has-markers" : ""}`} role="region" aria-label={label} tabIndex={0} lang={lang}>{content}{markers}</div>;
 });

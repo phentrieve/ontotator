@@ -25,7 +25,7 @@ import { autoNoteText, chooseDecision, reactToTextEdit, USER_ORIGIN, type Decisi
 import { acceptedCorrection, annotateThisTextLabel, categoryLabels, comparisonCountsDiffer, couplingEditingNote, couplingNote, decisionConsequence, decisionKeyHint, decisionLabels, decisionOutcomes, formatReviewDate, issueMessages, languageName, leadCorrectionKeyHint, leadCorrectionNote, matchingParagraphStatus, nextTaskLabel, paragraphCountChanged, paragraphCountsDiffer, remainingTasksText, reviewIssueMessage, showMatchingLabel, showMatchingShortcut, showMatchingTitle, translationNote, versionOriginRows } from "./labels";
 import { checkReview, type ClinicalCategory, type ReviewDecisionCode, type ReviewForm as FormValue } from "./reviewRules";
 import { LanguageTag } from "../ui/LanguageTag";
-import { SentenceCount, SentenceGutter } from "./SentenceMarks";
+import { SentenceCount, SentenceLines, SentenceMarkers } from "./SentenceMarks";
 import { FindBar, type FindBarHandle, type FindHit } from "./FindBar";
 import { InvisiblesKey } from "./invisibles";
 import { isChecked, rebaseMarks, resolveMarks, splitSentences, storedMarks, toggled, withRange, type MarkState, type Sentence, type Side, type StoredMarks } from "./sentences";
@@ -220,6 +220,13 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     setMarkingOn(on);
     try { window.localStorage.setItem(markingKey, on ? "1" : "0"); } catch { /* Blocked storage: not remembered. */ }
   };
+  // "One sentence per line" (issue 533), offered while marking: starts off, remembered per user in this browser.
+  const linesKey = `ontotator.translationReview.sentencePerLine.v1:${props.username}`;
+  const [linesOn, setLinesOn] = useState(() => { try { return window.localStorage.getItem(linesKey) === "1"; } catch { return false; } });
+  const chooseLines = (on: boolean) => {
+    setLinesOn(on);
+    try { window.localStorage.setItem(linesKey, on ? "1" : "0"); } catch { /* Blocked storage: not remembered. */ }
+  };
   // "Show invisible characters" (issue 454) starts off; on or off is remembered per user in this browser. It only changes how the texts are drawn.
   const invisiblesKey = `ontotator.translationReview.showInvisibles.v1:${props.username}`;
   const [showInvisibles, setShowInvisibles] = useState(() => { try { return window.localStorage.getItem(invisiblesKey) === "1"; } catch { return false; } });
@@ -304,7 +311,9 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   const form = typedForm(rawForm), issues = form ? checkReview(form, workspace.text, text, workspace.failed_checks.length > 0) : [];
   const comparison = comparisonOpen ? comparisons.find(row => row.id === comparisonId) : undefined;
   /** The editable translation is shown: it is the fixed leader and its pairing waits for a recompute (spec 2.2, 2.3). Marking keeps it editable. */
-  const editing = !readOnly && !showChanges;
+  /** One sentence per line: both texts as lists of sentences, for reading and marking only; the translation is edited in the flowing text. */
+  const lineView = marking && linesOn;
+  const editing = !readOnly && !showChanges && !lineView;
   const sourceStarts = useMemo(() => paragraphStarts(workspace.source.text), [workspace.source.text]);
   const comparisonStarts = useMemo(() => paragraphStarts(comparison?.text ?? ""), [comparison?.text]);
   /** Translation starts lag the text while editing: 300 ms after the last edit, at once on blur, never during composition. */
@@ -711,14 +720,14 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     root.querySelectorAll(".translation-review > .notice, .translation-review-bar, .translation-checks, .translation-tools, .translation-pinned-bar, .translation-column-head, .translation-column-note, .translation-column-hint")
       .forEach(element => observer.observe(element));
     return () => observer.disconnect();
-  }, [wide, railOpen, readOnly, showChanges, comparisonId, comparisonOpen, coupled, marking]);
+  }, [wide, railOpen, readOnly, showChanges, comparisonId, comparisonOpen, coupled, marking, lineView]);
   const closeDetails = (event: KeyboardEvent<HTMLDetailsElement>) => {
     if (event.key !== "Escape" || !event.currentTarget.open) return;
     event.preventDefault(); event.stopPropagation();
     event.currentTarget.open = false; detailsSummary.current?.focus({ preventScroll: true });
   };
-  /** The translation's markers: beside the editor, or beside the changes with Show changes. */
-  const translationGutter = marking && <SentenceGutter owner="translation" sentences={targetSentences} states={targetStates} label="Checked sentences: Translation"
+  /** The translation's markers: in the editor, or in the changes with Show changes. */
+  const translationMarkers = marking && <SentenceMarkers owner="translation" sentences={targetSentences} states={targetStates} label="Checked sentences: Translation"
     disabled={busy} layoutKey={`${showInvisibles}:${showChanges}`} onToggle={index => applyMarks("translation", states => toggled(states, index))}
     onRange={(from, to, checked) => applyMarks("translation", states => withRange(states, from, to, checked))} />;
   /** Next unchecked: the first translation sentence not (or no longer) checked. */
@@ -820,8 +829,10 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
       <div className="translation-texts">
         <div className="translation-tools" role="group" aria-label="Text view">
           {!readOnly && !touchOnly && <Checkbox id="review-mark-checked" label="Mark checked sentences" checked={marking} onChange={event => chooseMarking(event.target.checked)} />}
+          {marking && <Checkbox id="review-sentence-lines" label="One sentence per line" checked={linesOn} onChange={event => chooseLines(event.target.checked)} />}
           {!readOnly && !touchOnly && <span className="translation-tools-divider" aria-hidden="true" />}
-          <Checkbox id="review-show-changes" label="Show changes" checked={showChanges} onChange={event => setShowChanges(event.target.checked)} />
+          <Checkbox id="review-show-changes" label="Show changes" checked={showChanges && !lineView} disabled={lineView}
+            title={lineView ? "Turn off One sentence per line to show changes." : undefined} onChange={event => setShowChanges(event.target.checked)} />
           {pairing.available && <Checkbox id="review-couple" label="Couple scrolling" checked={coupled} onChange={event => setRequestedCoupling(event.target.checked ? couplingIdentity : null)} />}
           <Checkbox id="review-show-invisibles" label="Show invisible characters" checked={showInvisibles} onChange={event => chooseInvisibles(event.target.checked)} />
           <div className="translation-tools-end">
@@ -845,10 +856,14 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
           <div className="translation-column">
             <div className="translation-column-head density-compact"><h2 className="translation-column-title">Source <LanguageTag code={sourceLanguage} /></h2>
               {marking && <SentenceCount name="Source" count={sideCount(sourceStates)} />}</div>
-            <TextView ref={setSourceElement} text={workspace.source.text} label={`Source (${sourceLanguage})`} lang={sourceLanguage} showInvisibles={showInvisibles}
-              gutter={marking && <SentenceGutter owner="source" sentences={sourceSentences} states={sourceStates} label="Checked sentences: Source" disabled={busy} layoutKey={showInvisibles}
-                onToggle={index => applyMarks("source", states => toggled(states, index))}
-                onRange={(from, to, checked) => applyMarks("source", states => withRange(states, from, to, checked))} />} />
+            {lineView
+              ? <SentenceLines ref={setSourceElement} text={workspace.source.text} lang={sourceLanguage} showInvisibles={showInvisibles} sentences={sourceSentences} states={sourceStates}
+                  label="Checked sentences: Source" disabled={busy} onToggle={index => applyMarks("source", states => toggled(states, index))}
+                  onRange={(from, to, checked) => applyMarks("source", states => withRange(states, from, to, checked))} />
+              : <TextView ref={setSourceElement} text={workspace.source.text} label={`Source (${sourceLanguage})`} lang={sourceLanguage} showInvisibles={showInvisibles}
+                  markers={marking && <SentenceMarkers owner="source" sentences={sourceSentences} states={sourceStates} label="Checked sentences: Source" disabled={busy} layoutKey={showInvisibles}
+                    onToggle={index => applyMarks("source", states => toggled(states, index))}
+                    onRange={(from, to, checked) => applyMarks("source", states => withRange(states, from, to, checked))} />} />}
           </div>
           <div className="translation-column">
             <div className="translation-column-head density-compact">
@@ -859,16 +874,22 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
               {/* The text box keeps its full name; the visible title shows the flag instead of the code in brackets. */}
               <label id="review-translation-label" htmlFor="review-translation" className="visually-hidden">{`Translation (${targetLanguage})`}</label>
             </div>
-            {showChanges
-              ? <DiffView ref={setTargetElement} before={workspace.text} after={text} lang={targetLanguage} showInvisibles={showInvisibles} gutter={translationGutter} />
+            {lineView
+              ? <SentenceLines ref={setTargetElement} text={text} lang={targetLanguage} showInvisibles={showInvisibles} sentences={targetSentences} states={targetStates}
+                  label="Checked sentences: Translation" disabled={busy} onToggle={index => applyMarks("translation", states => toggled(states, index))}
+                  onRange={(from, to, checked) => applyMarks("translation", states => withRange(states, from, to, checked))} />
+              : showChanges
+              ? <DiffView ref={setTargetElement} before={workspace.text} after={text} lang={targetLanguage} showInvisibles={showInvisibles} markers={translationMarkers} />
               : <TranslationEditor ref={setTargetElement} id="review-translation" labelledBy="review-translation-label" describedBy="review-translation-note"
-                  machineText={workspace.text} value={text} lang={targetLanguage} readOnly={readOnly} disabled={busy} showInvisibles={showInvisibles} gutter={translationGutter}
+                  machineText={workspace.text} value={text} lang={targetLanguage} readOnly={readOnly} disabled={busy} showInvisibles={showInvisibles} markers={translationMarkers}
                   onChange={event => editText(event.target.value)}
                   onBlur={() => { composing.current = false; commitStarts(); }}
                   onCompositionStart={() => { composing.current = true; window.clearTimeout(startsTimer.current); }}
                   onCompositionEnd={() => { composing.current = false; scheduleStarts(); }} />}
-            <p id="review-translation-note" className="translation-column-note">{marking
-              ? `Click a box in the margin to mark its sentence as checked. Shift+click marks a range. ${showChanges ? "Turn off Show changes to edit." : "The text stays editable."}`
+            <p id="review-translation-note" className="translation-column-note">{lineView
+              ? "Click a box to mark its sentence as checked. Shift+click marks a range. To edit, turn off One sentence per line."
+              : marking
+              ? `Click the circle before a sentence to mark it as checked. Shift+click marks a range. ${showChanges ? "Turn off Show changes to edit." : "The text stays editable."}`
               : translationNote(workspace.variant, showChanges ? "changes" : changed ? "edited" : "same", previousVersion?.variant.version)}</p>
           </div>
           {comparison && <div className="translation-column">

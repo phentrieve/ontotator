@@ -5,6 +5,8 @@ import type { RouteLeaveGuard } from "../src/app/router";
 import { DiffView } from "../src/translation/DiffView";
 import { findMatches } from "../src/translation/FindBar";
 import { setHighlight } from "../src/translation/highlights";
+import { SentenceLines, SentenceMarkers } from "../src/translation/SentenceMarks";
+import { splitSentences } from "../src/translation/sentences";
 import { indexText, rangeAt } from "../src/translation/textRanges";
 import { TranslationReviewScreen } from "../src/translation/TranslationReviewScreen";
 import { reviewWorkspace } from "./translationFixtures";
@@ -35,6 +37,23 @@ describe("text ranges", () => {
     expect(index.length).toBe("Dosis 10 mg".length);
     expect(rangeAt(index, 6, 11)!.toString()).toBe("10 mg");
     expect(rangeAt(index, 0, 99)).toBeNull();
+  });
+
+  it("map text offsets in the views with sentence marks: the circles and boxes are no part of the text", () => {
+    const text = "Kopf\n\nDie Dosis ist 5 mg.  Abends 5 mg geben.\nEnde";
+    const sentences = splitSentences(text, "de"), states = sentences.map(() => null);
+    const lines = render(<SentenceLines text={text} sentences={sentences} states={states} label="Lines" onToggle={vi.fn()} onRange={vi.fn()} />);
+    const index = indexText(lines.container.firstElementChild!);
+    expect(index.length).toBe(text.length);
+    const at = text.indexOf("Abends");
+    expect(rangeAt(index, at, at + 11)!.toString()).toBe("Abends 5 mg");
+    // A paragraph marker for coupled scrolling stands in the first row of each paragraph.
+    expect([...lines.container.querySelectorAll("[data-paragraph]")].map(row => row.closest("li")!.textContent!.trim().slice(0, 4))).toEqual(["Kopf", "Die "]);
+    cleanup();
+    const flowing = render(<DiffView before={text} after={text} markers={<SentenceMarkers owner="source" sentences={sentences} states={states} label="Markers" onToggle={vi.fn()} onRange={vi.fn()} />} />);
+    expect(flowing.container.querySelectorAll("[data-sentence]")).toHaveLength(sentences.length);
+    expect(indexText(flowing.container.firstElementChild!).length).toBe(text.length);
+    expect(flowing.container.firstElementChild!.textContent).toBe(text);
   });
 
   it("find matches ignore case and give UTF-16 offsets", () => {

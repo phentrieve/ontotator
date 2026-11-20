@@ -631,7 +631,7 @@ test('axe has no violations in the column head with coupling on', async ({ page 
   expect(results.violations.flatMap(v => v.nodes.map(n => `${v.id} ${n.target.join(' ')}: ${n.failureSummary ?? ''}`))).toEqual([]);
 });
 
-test('Mark checked sentences: markers per side beside a text that stays editable and selectable, kept on reload, task stays open', async ({ page }) => {
+test('Mark checked sentences: a circle before each sentence in a text that stays editable and selectable, kept on reload, task stays open', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 }); const s = await scenario(page, 'target'); await openReview(page, s);
   const toggle = page.getByRole('checkbox', { name: 'Mark checked sentences', exact: true });
   await expect(toggle).not.toBeChecked();
@@ -647,22 +647,40 @@ test('Mark checked sentences: markers per side beside a text that stays editable
   await expect(marker(source, 0)).toHaveAttribute('aria-pressed', 'false');
   await marker(translation, 2).click({ modifiers: ['Shift'] });
   for (const index of [0, 1, 2]) await expect(marker(translation, index)).toHaveAttribute('aria-pressed', 'true');
-  // Each marker stands beside the first line of its sentence (the first sentence starting with the emoji is unique).
+  // Each circle stands right before the first letter of its sentence, on its line, also after the editor scrolled.
   const label = (await marker(translation, 1).getAttribute('aria-label'))!;
   expect(label).toMatch(/^Sentence 2: A😀/u);
-  const line = await page.locator('.translation-editor-mirror').evaluate(mirror => {
-    const nodes: Text[] = []; const walker = document.createTreeWalker(mirror, NodeFilter.SHOW_TEXT);
-    for (let node = walker.nextNode(); node; node = walker.nextNode()) nodes.push(node as Text);
-    let offset = nodes.map(node => node.data).join('').indexOf('A\u{1F600}');
-    for (const node of nodes) {
-      if (offset < node.data.length) { const r = document.createRange(); r.setStart(node, offset); r.setEnd(node, offset + 1); const rect = r.getClientRects()[0]; return { top: rect.top, bottom: rect.bottom }; }
-      offset -= node.data.length;
-    }
-    return null;
+  /** The box of the first character of translation sentence `index`, read from the mirror at the sentence's offset. */
+  const firstLetter = async (index: number) => {
+    const start = Number(await marker(translation, index).getAttribute('data-start'));
+    return page.locator('.translation-editor-mirror').evaluate((mirror, start) => {
+      const nodes: Text[] = []; const walker = document.createTreeWalker(mirror, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) nodes.push(node as Text);
+      let offset = start;
+      for (const node of nodes) {
+        if (offset < node.data.length) { const r = document.createRange(); r.setStart(node, offset); r.setEnd(node, offset + 1); const rect = r.getClientRects()[0]; return { top: rect.top, bottom: rect.bottom, left: rect.left }; }
+        offset -= node.data.length;
+      }
+      return null;
+    }, start);
+  };
+  const standsBefore = async (index: number) => {
+    const box = (await marker(translation, index).boundingBox())!, line = (await firstLetter(index))!;
+    expect(box.y + box.height / 2).toBeGreaterThan(line.top);
+    expect(box.y + box.height / 2).toBeLessThan(line.bottom);
+    expect(box.x + box.width).toBeLessThanOrEqual(line.left + 0.5);
+    expect(box.x + box.width).toBeGreaterThan(line.left - 16);
+  };
+  await standsBefore(1);
+  await standsBefore(2);
+  await page.locator('.translation-editor').evaluate(editor => { editor.scrollTop = 900; });
+  await standsBefore(30);
+  await page.locator('.translation-editor').evaluate(editor => { editor.scrollTop = 0; });
+  // The circles are no part of the text: selecting the whole source gives only the source text.
+  const sourceText = await page.getByRole('region', { name: 'Source (en)', exact: true }).evaluate(region => {
+    const range = document.createRange(); range.selectNodeContents(region); return range.toString();
   });
-  const markerBox = (await marker(translation, 1).boundingBox())!;
-  expect(markerBox.y + markerBox.height / 2).toBeGreaterThan(line!.top);
-  expect(markerBox.y + markerBox.height / 2).toBeLessThan(line!.bottom);
+  expect(sourceText).toBe(s.texts.source);
   // Keyboard: Enter on the source's first marker, Shift+Enter on the third.
   await marker(source, 0).focus(); await page.keyboard.press('Enter');
   await marker(source, 2).focus();
@@ -688,7 +706,7 @@ test('Mark checked sentences: markers per side beside a text that stays editable
   await expect(page.locator('.sentence-count').last()).toContainText('1 changed');
   await page.getByRole('button', { name: 'Next unchecked', exact: true }).click();
   await expect(marker(translation, 1)).toBeFocused();
-  const results = await new AxeBuilder({ page }).include('.translation-tools').include('.sentence-gutter').analyze();
+  const results = await new AxeBuilder({ page }).include('.translation-tools').include('.sentence-markers').analyze();
   expect(results.violations.flatMap(v => v.nodes.map(n => `${v.id} ${n.target.join(' ')}: ${n.failureSummary ?? ''}`))).toEqual([]);
   await expect(review(page).locator('.translation-save-status')).toHaveText('Saved');
   await page.reload();
@@ -696,11 +714,31 @@ test('Mark checked sentences: markers per side beside a text that stays editable
   for (const index of [0, 2]) await expect(marker(translation, index)).toHaveAttribute('aria-pressed', 'true');
   await expect(marker(translation, 1)).toHaveClass(/is-stale/);
   await expect(marker(translation, 3)).toHaveAttribute('aria-pressed', 'false');
-  // Show changes keeps the markers beside the changes.
+  // Show changes keeps the circles before the sentences of the changes.
   await page.getByRole('checkbox', { name: 'Show changes', exact: true }).check();
   await expect(page.getByRole('region', { name: 'Text changes', exact: true }).locator('ins')).toContainText('Heute');
   await marker(translation, 3).click();
   await expect(marker(translation, 3)).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('checkbox', { name: 'Show changes', exact: true }).uncheck();
+  // One sentence per line: each side's own sentences in rows with a box, for reading and marking only; remembered.
+  await page.getByRole('checkbox', { name: 'One sentence per line', exact: true }).check();
+  await expect(target(page)).toHaveCount(0);
+  await expect(page.getByText(/To edit, turn off One sentence per line\./)).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: 'Show changes', exact: true })).toBeDisabled();
+  await expect(translation.locator('li').first()).toContainText('Absatz 1.');
+  await expect(marker(translation, 3)).toHaveAttribute('aria-pressed', 'true');
+  const rowsSaved = saved();
+  await marker(translation, 4).click();
+  await expect(marker(translation, 4)).toHaveAttribute('aria-pressed', 'true');
+  expect((await rowsSaved).ok()).toBe(true);
+  const listAxe = await new AxeBuilder({ page }).include('.sentence-lines').analyze();
+  expect(listAxe.violations.flatMap(v => v.nodes.map(n => `${v.id} ${n.target.join(' ')}: ${n.failureSummary ?? ''}`))).toEqual([]);
+  await expect(review(page).locator('.translation-save-status')).toHaveText('Saved');
+  await page.reload();
+  await expect(page.getByRole('checkbox', { name: 'One sentence per line', exact: true })).toBeChecked();
+  await expect(marker(translation, 4)).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('checkbox', { name: 'One sentence per line', exact: true }).uncheck();
+  await expect(target(page)).toBeVisible();
 });
 
 test('Find in the texts: Ctrl+F searches every shown column, also inside the editor, and scrolls the hit into its pane', async ({ page }) => {

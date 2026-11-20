@@ -270,23 +270,46 @@
 .translation-next-task { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
 .translation-next-task [role="status"] { flex-basis: 100%; }
 
-/* Mark checked sentences (issue 256): markers in the margin beside a text that stays editable and selectable;
-   checked and changed sentences are tinted over the text. The marks are the reviewer's aid only. */
+/* Mark checked sentences (issue 256): a small circle before each sentence, drawn over a text that stays editable
+   and selectable; checked and changed sentences are also tinted over the text. The marks are the reviewer's aid only. */
 .sentence-count { margin: 0; color: var(--text-muted); font-size: var(--size-sm); line-height: var(--leading-sm); font-variant-numeric: tabular-nums; }
 .sentence-count strong { color: var(--text); font-weight: var(--weight-strong); }
 .sentence-next { margin-left: auto; }
 .sentence-save-error { display: flex; align-items: center; gap: var(--space-2); flex-basis: 100%; margin: 0; color: var(--text); }
-.translation-text.has-gutter, .translation-diff.has-gutter, .translation-editor.has-gutter .translation-editor-sizer { position: relative; }
-.translation-texts .translation-text.has-gutter, .translation-texts .translation-diff.has-gutter,
-.translation-editor.has-gutter .translation-editor-mirror, .translation-editor.has-gutter .translation-editor-input { padding-inline-start: 3.5rem; }
-.sentence-gutter { position: absolute; z-index: 2; top: 0; left: 0; width: 3.25rem; height: 0; }
-.sentence-marker { position: absolute; top: 0; left: 2px; display: grid; place-items: center; box-sizing: border-box; width: 14px; height: 14px; padding: 0; border: 1.5px solid var(--border-strong); border-radius: 3px; background: var(--surface-raised); color: var(--surface-raised); cursor: pointer; }
-.sentence-marker svg { width: 11px; height: 11px; }
+.translation-text.has-markers, .translation-diff.has-markers, .translation-editor.has-markers .translation-editor-sizer { position: relative; }
+/* The circles take no room of their own: a wider space between words, the same in the textarea and its mirror,
+   leaves room for a circle in the space before each sentence. Above the textarea, so they can be clicked. */
+.translation-text.has-markers, .translation-diff.has-markers,
+.translation-editor.has-markers .translation-editor-mirror, .translation-editor.has-markers .translation-editor-input { word-spacing: 0.3em; }
+.sentence-markers { position: absolute; z-index: 2; top: 0; left: 0; width: 0; height: 0; }
+.sentence-marker { position: absolute; top: 0; left: 0; box-sizing: border-box; width: 8px; height: 8px; padding: 0; border: 1.5px solid var(--text-muted); border-radius: 50%; background: var(--surface-raised); box-shadow: 0 0 0 1.5px var(--surface-raised); cursor: pointer; user-select: none; -webkit-user-select: none; }
+/* A larger target to the left, up and down; not to the right, where the sentence's first letter is. */
+.sentence-marker::before { content: ""; position: absolute; inset: -6px -2px; border-radius: 4px; }
 .sentence-marker:hover { border-color: var(--accent); }
-.sentence-marker:focus-visible { outline: var(--focus-width) solid var(--focus-ring); outline-offset: 1px; }
+.sentence-marker:focus-visible { outline: var(--focus-width) solid var(--focus-ring); outline-offset: 2px; }
 .sentence-marker.is-checked { border-color: var(--success); background: var(--success); }
-.sentence-marker.is-stale { border-color: var(--warning); border-style: dashed; background: var(--warning-light); }
+/* Changed since checked: half filled, the left half amber. */
+.sentence-marker.is-stale { border-color: var(--warning); background: linear-gradient(90deg, var(--warning) 50%, var(--surface-raised) 50%); }
+.sentence-marker.is-unplaced { opacity: 0; }
 .sentence-marker[aria-disabled="true"] { cursor: default; }
+/* One sentence per line: a list with a box before each sentence; the text is shown, not edited. */
+.translation-text.sentence-lines { padding-inline-start: var(--space-3); white-space: normal; }
+.sentence-lines > ol { margin: 0; padding: 0; list-style: none; }
+.sentence-line { display: flex; align-items: flex-start; gap: var(--space-2); padding: 2px var(--space-1); border-radius: 2px; }
+.sentence-line + .sentence-line { border-top: 1px solid var(--border); }
+.sentence-line.starts-paragraph { margin-top: var(--space-3); }
+.sentence-line.is-checked .sentence-line-text { background: var(--success-light); }
+.sentence-line.is-stale .sentence-line-text { background: var(--warning-light); }
+.sentence-line-text { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* The white space after a sentence stays in the row for find, but adds no line. */
+.sentence-line-gap { white-space: normal; }
+.sentence-box { display: grid; flex: none; place-items: center; box-sizing: border-box; width: 16px; height: 16px; margin-top: 7px; padding: 0; border: 1.5px solid var(--border-strong); border-radius: 3px; background: var(--surface-raised); color: var(--surface-raised); cursor: pointer; }
+.sentence-box svg { width: 12px; height: 12px; }
+.sentence-box:hover { border-color: var(--accent); }
+.sentence-box:focus-visible { outline: var(--focus-width) solid var(--focus-ring); outline-offset: 1px; }
+.sentence-box.is-checked { border-color: var(--success); background: var(--success); }
+.sentence-box.is-stale { border-color: var(--warning); border-style: dashed; background: var(--warning-light); }
+.sentence-box[aria-disabled="true"] { cursor: default; }
 ::highlight(review-checked) { background-color: var(--success-light); }
 ::highlight(review-stale) { background-color: var(--warning-light); }
 /* Find in the texts (Ctrl+F): one row under the text tools; hits painted like the browser's own find. */

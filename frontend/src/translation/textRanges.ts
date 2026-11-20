@@ -56,3 +56,11 @@ export function firstLine(range: Range, origin: Element): { top: number; left: n
   const box = origin.getBoundingClientRect(), first = rects[0];
   return { top: first.top - box.top, left: first.left - box.left, height: first.height };
 }
+
+/** Where a range's last line box stands, relative to `origin`, with its width; null where layout gives no boxes. */
+export function lastLine(range: Range, origin: Element): { top: number; left: number; width: number } | null {
+  const rects = typeof range.getClientRects === "function" ? Array.from(range.getClientRects()).filter(rect => rect.width > 0 || rect.height > 0) : [];
+  if (!rects.length) return null;
+  const box = origin.getBoundingClientRect(), last = rects[rects.length - 1];
+  return { top: last.top - box.top, left: last.left - box.left, width: last.width };
+}

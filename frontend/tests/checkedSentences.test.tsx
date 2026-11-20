@@ -282,6 +282,71 @@ describe("Mark checked sentences", () => {
     expect(screen.getByText(/Turn off Show changes to edit\./)).toBeDefined();
   });
 
+  it("the circles are not part of the text: not in the textarea, not in the text nodes, no text of their own", async () => {
+    setup();
+    await screen.findByRole("button", { name: "Next unchecked" });
+    fireEvent.click(sentences("Translation (de)")[0]);
+    const textbox = screen.getByRole("textbox", { name: "Translation (de)" }) as HTMLTextAreaElement;
+    expect(textbox.value).toBe(TRANSLATION);
+    // Each sentence has one circle, with no text and no icon: the text reads as without them.
+    for (const name of ["Source (en)", "Translation (de)"]) for (const marker of sentences(name)) {
+      expect(marker.className).toContain("sentence-marker");
+      expect(marker.textContent).toBe("");
+      expect(marker.childElementCount).toBe(0);
+    }
+    expect(region("Source (en)").textContent).toBe(SOURCE);
+    expect(sentences("Translation (de)")[0].className).toContain("is-checked");
+  });
+
+  it("One sentence per line is offered while marking, remembered, lists each side's own sentences and only shows them", async () => {
+    const LINES = "ontotator.translationReview.sentencePerLine.v1:alice";
+    setup({}, false);
+    const marking = await screen.findByRole("checkbox", { name: "Mark checked sentences" });
+    expect(screen.queryByRole("checkbox", { name: "One sentence per line" })).toBeNull();
+    fireEvent.click(marking);
+    const lines = screen.getByRole("checkbox", { name: "One sentence per line" }) as HTMLInputElement;
+    expect(lines.checked).toBe(false);
+    fireEvent.click(sentences("Translation (de)")[1]);
+    fireEvent.click(lines);
+    expect(window.localStorage.getItem(LINES)).toBe("1");
+    // Each side on its own: 3 source rows, 4 translation rows, no pairing.
+    const rows = (name: string) => [...screen.getByRole("group", { name: `Checked sentences: ${name}` }).querySelectorAll("li")].map(row => row.querySelector(".sentence-line-text")!.textContent!.trim());
+    expect(rows("Source")).toEqual(["First source.", "Second source!", "Third source?"]);
+    expect(rows("Translation")).toEqual(["Erster Satz.", "Zweiter Satz.", "Dritter Satz.", "Vierter Satz."]);
+    expect(pressed("Translation (de)")).toEqual([false, true, false, false]);
+    // Display only: no editor, no Show changes, a note on where to edit.
+    expect(screen.queryByRole("textbox", { name: "Translation (de)" })).toBeNull();
+    expect((screen.getByRole("checkbox", { name: "Show changes" }) as HTMLInputElement).disabled).toBe(true);
+    expect(screen.getByText(/To edit, turn off One sentence per line\./)).toBeDefined();
+    // The rows hold exactly the text, the boxes none of it.
+    const group = screen.getByRole("group", { name: "Checked sentences: Translation" });
+    const clone = group.cloneNode(true) as HTMLElement;
+    clone.querySelectorAll("[data-sentence]").forEach(box => box.remove());
+    expect(clone.textContent).toBe(TRANSLATION);
+    // The boxes toggle, Shift+click marks a range, the keys move between them.
+    fireEvent.click(sentences("Translation (de)")[3], { shiftKey: false });
+    fireEvent.click(sentences("Source (en)")[0]);
+    fireEvent.click(sentences("Source (en)")[2], { shiftKey: true });
+    expect(pressed("Source (en)")).toEqual([true, true, true]);
+    expect(pressed("Translation (de)")).toEqual([false, true, false, true]);
+    fireEvent.keyDown(sentences("Translation (de)")[3], { key: "ArrowUp" });
+    expect(document.activeElement).toBe(sentences("Translation (de)")[2]);
+    fireEvent.keyDown(sentences("Translation (de)")[2], { key: " " });
+    expect(pressed("Translation (de)")).toEqual([false, true, true, true]);
+    // Off again: the editable flowing text with its circles, the marks kept.
+    fireEvent.click(lines);
+    expect(window.localStorage.getItem(LINES)).toBe("0");
+    expect(screen.getByRole("textbox", { name: "Translation (de)" })).toBeDefined();
+    expect(pressed("Translation (de)")).toEqual([false, true, true, true]);
+    // Marking off hides the choice; marking on again brings the remembered view back.
+    fireEvent.click(lines);
+    fireEvent.click(marking);
+    expect(screen.queryByRole("checkbox", { name: "One sentence per line" })).toBeNull();
+    expect(screen.getByRole("textbox", { name: "Translation (de)" })).toBeDefined();
+    fireEvent.click(marking);
+    expect(screen.queryByRole("textbox", { name: "Translation (de)" })).toBeNull();
+  });
+
   it("is not offered on a touch-only device", async () => {
     setup();
     vi.stubGlobal("matchMedia", vi.fn((query: string) => ({ matches: /min-width|pointer: coarse/.test(query), media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
