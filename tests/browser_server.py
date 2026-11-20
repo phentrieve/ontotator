@@ -387,6 +387,30 @@ def copy_tree_follow_package() -> ValidatedPackage:
     return pkg
 
 
+# copy-tree-follow.spec.ts: a passage over a line break, longer than the search prefill (80 codepoints).
+COPY_PASSAGE_TEXT = (
+    "Mild weakness\nof both legs, worse in the evening and after long walks,"
+    " with frequent falls since the spring."
+)
+
+
+def copy_passage_package() -> ValidatedPackage:
+    """copy-tree-follow.spec.ts's own project: one text of COPY_PASSAGE_TEXT, no proposals."""
+    pkg = fixture_package(project_key="pkg-copy-passage")
+    doc = pkg.documents["browser-doc"].model_copy(
+        update={
+            "text": COPY_PASSAGE_TEXT,
+            "text_sha256": hashlib.sha256(
+                COPY_PASSAGE_TEXT.encode("utf-8")
+            ).hexdigest(),
+        }
+    )
+    pkg.documents = {doc.document_id: doc}
+    pkg.annotations = {}
+    pkg.evidence = {}
+    return pkg
+
+
 def seed_packages() -> list[ValidatedPackage]:
     """Every project the specs use, oldest first."""
     return [
@@ -411,6 +435,7 @@ def seed_packages() -> list[ValidatedPackage]:
         ),
         decision_scenario_package(),
         copy_tree_follow_package(),
+        copy_passage_package(),
     ]
 
 
