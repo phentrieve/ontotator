@@ -121,7 +121,16 @@ const bandFills = (locator: Locator) => locator.evaluate(node => {
 });
 const slotClasses = (locator: Locator) => locator.evaluate(node =>
   [...node.classList].filter(name => /^run--(?:color|band|bands)-/.test(name)).sort());
-const box = async (locator: Locator) => (await locator.boundingBox())!;
+/**
+ * A run's box. The text pane redraws all its runs when the selection or the drag handles' names change (the names
+ * follow the term labels, which can arrive after a click): a run read in that moment is detached and has no box.
+ * Read it again until it has one.
+ */
+const box = async (locator: Locator) => {
+  const read: { box: Awaited<ReturnType<Locator["boundingBox"]>> } = { box: null };
+  await expect.poll(async () => (read.box = await locator.boundingBox()) !== null, { message: "the piece has a box" }).toBe(true);
+  return read.box!;
+};
 const noSidewaysScroll = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
 
 async function openExample(page: Page, example: Example, size: { width: number; height: number }) {
@@ -190,7 +199,8 @@ for (const scheme of ["light", "dark"] as const) {
         if (size.width < 700) await page.getByRole("navigation", { name: "Select view" }).getByRole("button", { name: "Document" }).click();
         await expect(oedema).toHaveClass(/\brun--hot\b/);
         expect(await slotClasses(oedema)).toEqual(["run--band-0-2", "run--band-1-3", "run--bands-2", "run--color-2"]);
-        expect(await inText()).toEqual(before);
+        // The selection redraws the runs (handles); the piece stays where it was once they are in place.
+        await expect.poll(inText).toEqual(before);
         expect(await noSidewaysScroll(page)).toBe(true);
         await shot(page, `overlap-two-selected-${size.width}-${scheme}`);
         expect(writes).toEqual([]);
