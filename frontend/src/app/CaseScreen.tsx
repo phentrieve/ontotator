@@ -111,6 +111,8 @@ import { AttachModePanel, attachCopy } from "../editor/AttachModePanel";
 import { ModifierAsFindingNotice } from "../editor/ModifierAsFindingNotice";
 import { useModifierCommands } from "../editor/useModifierCommands";
 import { attachCandidates, findingDescription, modifierDisplayId, modifierMarks, parseModifierDisplayId, quoteOf, type AttachFinding, type Seg } from "../editor/modifiers";
+import { exclusionOffer, type SpanExclusion } from "../editor/spanExclusion";
+import { SpanExclusionOffer, exclusionCopy } from "../editor/SpanExclusionOffer";
 import { Toast } from "../ui/Toast";
 import { type MentionDisplay, type SelectionPayload } from "../spans/adapter";
 import { markColour } from "../editor/markColours";
@@ -259,6 +261,11 @@ export interface CaseScreenProps {
   documentVersion?: number | null;
   /** `WorkRoundView.round_ordinal` of the open round; My submissions names it while it has no submission. */
   roundOrdinal?: number | null;
+  /**
+   * The round's latest submission with the time the server names for it: for an annotation a typo fix moved, when the
+   * person submitted (issue 575). The "Submitted" status shows that time while it is the shown submission.
+   */
+  roundSubmission?: { submissionId: string; recordedAt: string } | null;
   /** The working time control (issue 298), shown before the save status. */
   headerTimer?: React.ReactNode;
   /** Called whenever an edit is sent; the working time resumes on it. */
@@ -283,7 +290,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   onSubmitted,
   annotatorName,
   leaveGuardRef,
-  readOnly: serverReadOnly = false, routeLeaveRef, assignmentNavigation, onReadonlyRequired, versionContext, menuItems = [], userPseudonym, guidelineNotice, guidelines = null, held = false, holdReason, holdTitle, holdKept, onTaskHeld, saveBeforeReportRef, roundInputs = NO_ROUND_INPUTS, roundKind, roundActive = true, roundBadge, roundTitle, documentVersion, roundOrdinal, headerTimer, onEdit, changesSource,
+  readOnly: serverReadOnly = false, routeLeaveRef, assignmentNavigation, onReadonlyRequired, versionContext, menuItems = [], userPseudonym, guidelineNotice, guidelines = null, held = false, holdReason, holdTitle, holdKept, onTaskHeld, saveBeforeReportRef, roundInputs = NO_ROUND_INPUTS, roundKind, roundActive = true, roundBadge, roundTitle, documentVersion, roundOrdinal, roundSubmission, headerTimer, onEdit, changesSource,
 }) => {
   const versionIdentity = JSON.stringify([versionContext?.username, versionContext?.assignmentId, versionContext?.canBrowseVersions, workspaceId, view.key]);
   const [acceptedSubmission, setAcceptedSubmission] = useState<{ identity: string; value: Submission } | null>(null);
@@ -368,6 +375,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const [attachFocusId, setAttachFocusId] = useState<string | null>(null);
   /** A target chosen by click or Enter that already has the term with another span: the inspector offers "Replace text span". */
   const [attachReplaceId, setAttachReplaceId] = useState<string | null>(null);
+  const [spanOffer, setSpanOffer] = useState<(SpanExclusion & { annotationId: string; termId: string; modifier: Seg[]; fromRow?: boolean }) | null>(null);
   /** The finding under the pointer or with focus (row or mark): its marks and modifier segments are framed. */
   const [hoverFrameId, setHoverFrameId] = useState<string | null>(null);
   const [textResyncToken, setTextResyncToken] = useState(0);
@@ -1548,7 +1556,9 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     deriveCarriedStates(carriedInputs, latestDraft.current.round_input_resolutions ?? [], latestDraft.current.annotations ?? [])
       .find(state => state.input.input_id === inputId);
   const carriedReadOnly: CarriedReadOnly = !readOnly ? false : display !== null ? "older" : held ? "paused" : "submitted";
-  const submittedAt = carriedReadOnly === "submitted" ? submissions.at(-1)?.created_at : undefined;
+  const lastSubmission = submissions.at(-1);
+  const submittedAt = carriedReadOnly !== "submitted" ? undefined
+    : lastSubmission && roundSubmission?.submissionId === lastSubmission.submission_id ? roundSubmission.recordedAt : lastSubmission?.created_at;
   const showCarriedOriginal = (state: CarriedState) =>
     setOriginalRoundInput(carriedInputs.find(input => input.input_id === state.input.input_id) ?? null);
 
@@ -1921,13 +1931,18 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
       modifierCommands.setLinkSpan(null);
       setMobilePane("details");
       // Issue 525: an open proposal's modifier: Edit & Replace, and the span goes to the copy (one step).
+      // The offer to exclude the words from the span then applies to the copy (as after attaching, M-5).
       if (linkSpan.proposal) {
         const { proposal, termId } = linkSpan;
-        await changeProposalModifier(proposal, copyId => modifierCommands.setSegments(copyId, termId, payload.segments));
+        const copied: { saved?: Draft; copyId?: string } = {};
+        await changeProposalModifier(proposal, async copyId => { copied.saved = await modifierCommands.setSegments(copyId, termId, payload.segments); copied.copyId = copyId; });
+        if (copied.saved && copied.copyId) offerExclusion(copied.saved, copied.copyId, termId);
         return;
       }
-      try { await modifierCommands.setSegments(linkSpan.annotationId, linkSpan.termId, payload.segments); } catch { return; }
+      let saved: Draft;
+      try { saved = await modifierCommands.setSegments(linkSpan.annotationId, linkSpan.termId, payload.segments); } catch { return; }
       announceCarried(`Linked “${quoteSegments(view.document.text, payload.segments, 40)}” to ${linkSpan.term}.`);
+      offerExclusion(saved, linkSpan.annotationId, linkSpan.termId);
       setFocusRequest({ key: `annotation:${linkSpan.annotationId}`, find: root => chipIn(root, linkSpan.termId) });
       return;
     }
@@ -3045,7 +3060,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
       // convert_to_modifier refuses another span (DUPLICATE_MODIFIER): set the source's span first (the same span passes),
       // so a failure leaves the source finding in place.
       if (conflict) await modifierCommands.setSegments(annotationId, termId, mark);
-      await modifierCommands.convert(sourceId, annotationId, true);
+      offerExclusion(await modifierCommands.convert(sourceId, annotationId, true), annotationId, termId);
     } catch { return; } finally { creatingPending.current = false; }
     setAttachModifier(null); setAttachFocusId(null); setAttachReplaceId(null);
     setSelectedTargetId(null); setSelectedSourceId(null); setSelectedInputId(null);
@@ -3089,9 +3104,10 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
       return;
     }
     creatingPending.current = true;
+    let saved: Draft;
     try {
-      if (existing?.segments?.length) await modifierCommands.setSegments(annotationId, termId, segments);
-      else await modifierCommands.add(annotationId, termId, segments);
+      saved = existing?.segments?.length ? await modifierCommands.setSegments(annotationId, termId, segments)
+        : await modifierCommands.add(annotationId, termId, segments);
     } catch { return; } finally { creatingPending.current = false; }
     const finding = findingNameOf(target);
     const end = Math.max(...segments.map(segment => segment.end));
@@ -3107,6 +3123,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
       announceCarried(line);
       setAdvanceStatus({ listKey: `annotation:${annotationId}`, text: line, decidedKey: "" });
     } else announceCarried(existing && !replace ? attachCopy.linked(quoteSegments(view.document.text, segments, 40), term, finding) : attachCopy.attached(term, finding));
+    offerExclusion(saved, annotationId, termId);
     setFocusRequest({ key: `annotation:${annotationId}`, find: root => {
       const chip = chipIn(root, termId);
       if (!chip) setTextFocusRequest({ offset: end });
@@ -3159,6 +3176,70 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
       : linkSpan.annotationId !== selectedAnnotationId)) modifierCommands.setLinkSpan(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only a selection change ends the link mode
   }, [selectedAnnotationId, selectedTargetId]);
+
+  /**
+   * A modifier marked inside its finding's span: the offer to exclude its words from that span (SpanExclusionOffer).
+   * Made after the modifier's span is saved (attach, link, convert); shown while the finding is selected and neither
+   * its mention nor the modifier's span has changed since.
+   */
+  const exclusionFor = (source: Draft, annotationId: string, termId: string) => {
+    const snapshot = source.annotations?.find(a => a.annotation.annotation_id === annotationId);
+    const modifier = snapshot?.annotation.modifiers?.find(m => m.term_id === termId)?.segments ?? [];
+    if (!snapshot || readOnlyRef.current || !editableLayerIds.includes(snapshot.annotation.layer_id)) return null;
+    const evidence = new Map((source.evidence ?? []).map(ev => [ev.mention.evidence_id, ev.mention]));
+    const mentions = (snapshot.annotation.evidence_refs ?? []).flatMap(ref => {
+      const mention = evidence.get(ref.evidence_id);
+      return mention ? [{ evidenceId: mention.evidence_id, segments: mention.segments, cueSegments: mention.cue_segments }] : [];
+    });
+    const offer = exclusionOffer(view.document.text, mentions, modifier);
+    return offer ? { ...offer, annotationId, termId, modifier: modifier.map(s => ({ start: s.start, end: s.end })) } : null;
+  };
+  const offerExclusion = (saved: Draft, annotationId: string, termId: string) => setSpanOffer(exclusionFor(saved, annotationId, termId));
+  /** Issue 535: from the modifier's row (its menu, or "In span · Exclude"); the box takes the focus. */
+  const openExclusion = (annotationId: string, termId: string) => {
+    const offer = exclusionFor(latestDraft.current, annotationId, termId);
+    setSpanOffer(offer ? { ...offer, fromRow: true } : null);
+  };
+  const sameSegments = (a: readonly Seg[] | undefined, b: readonly Seg[]) =>
+    !!a && a.length === b.length && a.every((s, index) => s.start === b[index].start && s.end === b[index].end);
+  const liveSpanOffer = spanOffer && !readOnly && selectedAnnotation?.annotation.annotation_id === spanOffer.annotationId
+    && (selectedAnnotation.annotation.evidence_refs ?? []).some(ref => ref.evidence_id === spanOffer.evidenceId)
+    && sameSegments(allEvidenceMap[spanOffer.evidenceId]?.mention.segments, spanOffer.before)
+    && sameSegments(selectedAnnotation.annotation.modifiers?.find(m => m.term_id === spanOffer.termId)?.segments, spanOffer.modifier)
+    ? spanOffer : null;
+  // Another finding selected: the offer ends (Keep span).
+  useEffect(() => {
+    setSpanOffer(previous => previous && previous.annotationId === selectedAnnotationId ? previous : null);
+  }, [selectedAnnotationId]);
+  /** Accept: one edit_mention gives the finding's mention the remaining segments; the toast and Ctrl+Z take it back. */
+  const acceptSpanOffer = async () => {
+    const offer = liveSpanOffer;
+    if (!offer || readOnlyRef.current) return;
+    setSpanOffer(null);
+    const { annotationId, evidenceId, termId, before, after } = offer;
+    const snapshot = latestDraft.current.annotations?.find(a => a.annotation.annotation_id === annotationId);
+    if (!snapshot) return;
+    const line = exclusionCopy.done(quoteOf(view.document.text, offer.removed), findingNameOf(snapshot));
+    const editTo = (id: string, segments: readonly Seg[]) => mutateAnnotationAndSyncDecision(annotationId, () =>
+      enqueueMutation({ command: "edit_mention", evidence_id: id, annotation_id: annotationId, segments: segments.map(s => ({ start: s.start, end: s.end })) }));
+    let saved: Draft;
+    try { saved = await editTo(evidenceId, after); } catch (error) { reportError(error); return; }
+    modifierCommands.showToast({ message: line, actionLabel: "Undo", undo: true, onAction: () => {
+      void undoFromToast(saved.revision, async () => {
+        // A shared mention was copied for this finding (copy-on-write): the one that holds `after` now goes back.
+        const current = latestDraft.current.annotations?.find(a => a.annotation.annotation_id === annotationId)?.annotation.evidence_refs
+          ?.map(ref => latestDraft.current.evidence?.find(ev => ev.mention.evidence_id === ref.evidence_id)?.mention)
+          .find(mention => mention && sameSegments(mention.segments, after));
+        if (current) await editTo(current.evidence_id, before).catch(error => reportError(error));
+      });
+    } });
+    setFocusRequest({ key: `annotation:${annotationId}`, find: root => chipIn(root, termId) });
+  };
+  const dismissSpanOffer = () => {
+    const offer = spanOffer;
+    setSpanOffer(null);
+    if (offer) setFocusRequest({ key: `annotation:${offer.annotationId}`, find: root => chipIn(root, offer.termId) });
+  };
 
   /** Mention ids (`mentions`) and modifier display ids of a finding, for `run--framed`. */
   const framingIds = (annotationId: string, mentions: boolean): string[] => {
@@ -3639,13 +3720,14 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const [findingShown, setFindingShown] = useState(false);
   if (!treeWalk && findingShown) setFindingShown(false);
   const treeShown = !!treeWalk && !treeCollapsed;
-  // What the one-line bar shows: the walk's own finding, else the proposal or reference the open walk is on (issue 542,
-  // U1-01: "Show in tree" on a proposal is the main path of a task from proposals). A new finding keeps its search.
-  const treeBarSubject: AnnotationSnapshot | null = treeWalkAnnotation
+  // What the one-line bar names: the walk's own finding, else the proposal or reference the walk was opened from
+  // (issue 542: a proposal without a copy has no finding in the draft yet, but its tree needs the column as much).
+  const treeWalkSubject: AnnotationSnapshot | null = treeWalkAnnotation
     ?? (treeWalk && treeContext?.key === treeWalk.key
-      ? treeSelection?.kind === "proposal" ? targetSnapshot ?? null : treeSelection?.kind === "reference" ? selectedSource ?? null : null
+      ? (treeContext.key.startsWith("target:") ? targetSnapshot ?? null
+        : treeContext.key.startsWith("source:") ? selectedSource ?? null : null)
       : null);
-  const findingBarShown = treeShown && treeHeight.low === "column" && !!treeBarSubject;
+  const findingBarShown = treeShown && treeHeight.low === "column" && !!treeWalkSubject;
   const panelGivenToTree: "column" | "beside" | null = !treeShown ? null
     : treeHeight.low === "beside" ? "beside" : findingBarShown && !findingShown ? "column" : null;
   panelGivenToTreeRef.current = panelGivenToTree !== null;
@@ -4455,11 +4537,11 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
         {/* Right: Annotation & Search Panel + Review Actions */}
         <div className="inspector-pane density-compact" id="details-column" ref={inspectorRef}>
           {/* A low window with the tree open (issue 521): the finding in one line, and the way back to the whole panel. */}
-          {findingBarShown && treeBarSubject && <div className="finding-bar" role="group" aria-label="Finding">
+          {findingBarShown && treeWalkSubject && <div className="finding-bar" role="group" aria-label="Finding">
             <p className="finding-bar__summary">
-              <span className="finding-bar__quote">{firstQuote(treeBarSubject) ? `“${firstQuote(treeBarSubject)}”` : "No text span"}</span>
-              <span className="finding-bar__term"><TermName termId={treeBarSubject.annotation.term_id}
-                label={termLabel(treeBarSubject.annotation.layer_id, treeBarSubject.annotation.term_id)} /></span>
+              <span className="finding-bar__quote">{firstQuote(treeWalkSubject) ? `“${firstQuote(treeWalkSubject)}”` : "No text span"}</span>
+              <span className="finding-bar__term"><TermName termId={treeWalkSubject.annotation.term_id}
+                label={termLabel(treeWalkSubject.annotation.layer_id, treeWalkSubject.annotation.term_id)} /></span>
             </p>
             <Button ref={findingToggleRef} size="sm" aria-expanded={findingShown} onClick={() => setFindingShown(shown => !shown)}>
               {findingShown ? "Hide finding" : "Show finding"}
@@ -4734,6 +4816,10 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
                   onAdd={termId => modifierCommands.add(id, termId)}
                   onLinkSpan={termId => startLinkSpan(id, termId)}
                   onRemoveSpan={termId => { void modifierCommands.removeSpan(id, termId, label(termId)).catch(() => undefined); }}
+                  // Issue 535: a modifier inside the finding's span offers the exclusion from its row too.
+                  canExcludeFromSpan={termId => !!exclusionFor(draft, id, termId)}
+                  onExcludeFromSpan={termId => openExclusion(id, termId)}
+                  exclusionTermId={liveSpanOffer?.annotationId === id ? liveSpanOffer.termId : null}
                   onRemove={termId => {
                     void modifierCommands.remove(id, termId, label(termId), finding).then(
                       // The chip is gone: focus stays in the section.
@@ -4743,6 +4829,10 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
                   searchProps={{ searchManager: modifierSearchManager, annotationId: id, workspaceKey: view.key, layerId: ann.layer_id,
                     languages: searchLanguagesFor(ann.layer_id) }} />;
               })() : undefined}
+              spanExclusion={liveSpanOffer && selectedAnnotation ? <SpanExclusionOffer finding={findingNameOf(selectedAnnotation)}
+                modifier={termLabel.info(selectedAnnotation.annotation.layer_id, liveSpanOffer.termId)?.label ?? liveSpanOffer.termId}
+                text={view.document.text} offer={liveSpanOffer} autoFocus={!!liveSpanOffer.fromRow}
+                onAccept={() => { void acceptSpanOffer(); }} onDismiss={dismissSpanOffer} /> : undefined}
               termLabel={selectedAnnotation ? termLabel(selectedAnnotation.annotation.layer_id, selectedAnnotation.annotation.term_id) : null}
               axesConfig={currentAxesConfig}
               noteValue={selectedAnnotation ? annotationNoteDrafts[selectedAnnotation.annotation.annotation_id] ?? selectedAnnotation.annotation.note ?? "" : ""}

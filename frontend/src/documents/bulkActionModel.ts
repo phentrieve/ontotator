@@ -172,14 +172,56 @@ export function appliedText(result: BulkTaskActionView): string {
   return `${result.action === "reopen" ? "Reopened" : "Withdrew"} ${plural(result.changes.length, "task")} in ${texts}.`;
 }
 
-/** A menu entry that does nothing for the selection gives its reason (decision 336-C); null when it acts. Reads the counts only (`summary_only`). */
+/** A whole text skipped, in the menu's words: "has an open consolidation". */
+const SKIP_HAS: Readonly<Record<string, string>> = {
+  final_chosen: "a final result: use Change final… first",
+  final_result: "a final result",
+  consolidation_open: "an open consolidation",
+};
+/** An open task kept by Withdraw, in the menu's words (the noun and what to do), by the dialog's reasons (KEEP). */
+const WITHDRAW_KEPT: Readonly<Record<string, readonly [string, string]>> = {
+  paused_by_lead: ["paused by a lead", "release the {texts} first"],
+  paused: ["paused by a problem report", "decide the report first"],
+  lead_correction_task: ["lead corrections", "remove them in the text card"],
+};
+
+/** "1 text has an open consolidation, 1 has a final result" / "The selected texts have a final result or an open consolidation". */
+function skippedPart(preview: BulkTaskActionView): string | null {
+  const reasons = Object.entries(preview.skipped_by_reason ?? {}).filter(([reason, count]) => count > 0 && SKIP_HAS[reason]);
+  const count = preview.skipped_count;
+  if (!count || !reasons.length || reasons.reduce((sum, [, n]) => sum + n, 0) !== count) return null;
+  if (count >= preview.texts) return `The selected ${preview.texts === 1 ? "text has" : "texts have"} ${reasons.map(([reason]) => SKIP_HAS[reason]).join(" or ")}`;
+  return reasons.map(([reason, n], index) => `${index === 0 ? plural(n, "text") : n} ${n === 1 ? "has" : "have"} ${SKIP_HAS[reason]}`).join(", ");
+}
+
+/**
+ * A menu entry that does nothing for the selection gives its reason (decision 336-C); null when it acts. Reads the
+ * counts only (`summary_only`): the counts by reason name what keeps each text or task as it is (issue 576), e.g.
+ * "1 text has an open consolidation; the other has no submitted annotations." An older server without them gets the
+ * general reason.
+ */
 export function unavailableReason(action: BulkAction, preview: BulkTaskActionView | null | undefined): string | null {
   if (!preview || preview.change_count) return null;
-  if (action === "start_round") return preview.skipped_count && preview.skipped_count >= preview.texts
+  const kept = preview.kept_by_reason;
+  if (action === "withdraw") {
+    const reasons = Object.keys(kept ?? {}).filter(reason => reason !== "submitted");
+    const words = reasons.map(reason => WITHDRAW_KEPT[reason]).filter(Boolean);
+    if (!words.length || words.length < reasons.length) return "No open tasks in the selected texts.";
+    const texts = preview.texts === 1 ? "text" : "texts";
+    if (words.length === 1) return `The open tasks are ${words[0][0]}: ${words[0][1].replace("{texts}", texts)}.`;
+    return `The open tasks are ${words.map(([noun]) => noun).join(" or ")}.`;
+  }
+  // Submitted work that stays for a reason other than "not submitted" (paused, an older version …).
+  const blocked = Object.keys(kept ?? {}).some(reason => reason !== "not_submitted");
+  const rest = action === "start_round"
+    ? (blocked ? "no submitted annotation that can start a round" : "no submitted annotations")
+    : (blocked ? "no submitted task that can be reopened" : "no submitted tasks");
+  const skipped = skippedPart(preview);
+  if (skipped && preview.skipped_count >= preview.texts) return `${skipped}.`;
+  if (skipped) return `${skipped}; the ${preview.texts - preview.skipped_count === 1 ? "other has" : "others have"} ${rest}.`;
+  if (preview.skipped_count && preview.skipped_count >= preview.texts) return action === "start_round"
     ? "The selected texts have a final result or an open consolidation."
-    : "No submitted annotations in the selected texts.";
-  if (action === "reopen") return preview.skipped_count && preview.skipped_count >= preview.texts
-    ? "The selected texts have a final result: use Change final… first."
-    : "No submitted tasks in the selected texts.";
-  return "No open tasks in the selected texts.";
+    : "The selected texts have a final result: use Change final… first.";
+  if (action === "start_round") return blocked ? "No submitted annotation in the selected texts can start a round." : "No submitted annotations in the selected texts.";
+  return blocked ? "No submitted task in the selected texts can be reopened." : "No submitted tasks in the selected texts.";
 }

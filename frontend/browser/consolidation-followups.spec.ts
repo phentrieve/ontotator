@@ -141,6 +141,27 @@ test.describe("at 1440 px", () => {
   });
 });
 
+// Issue 548, U4-08: on a phone the title wraps inside the page gutter; the version at its end stays readable.
+test.describe("the title at 390 px", () => {
+  test.use({ viewport: PHONE });
+
+  test("a long title wraps inside the page instead of running out of it", async ({ page }) => {
+    const s = await scenario(page);
+    await openTask(page, s, s.users.lead);
+    const title = page.getByRole("heading", { level: 1 });
+    // A case id as long as the reported one ("synthetic-accepted"); the layout is what is checked.
+    await title.evaluate(element => { element.firstChild!.textContent = "Consolidate synthetic-accepted-case-0107-long "; });
+    const box = (await title.boundingBox())!;
+    // Inside the page's gutter on both sides.
+    expect(box.x).toBeGreaterThan(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(PHONE.width - box.x + 1);
+    expect(await title.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await expect(title).toContainText(/en v1$/);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: test.info().outputPath("cons-title-phone.png") });
+  });
+});
+
 // Issue 470, point 2: 20 annotators; the fixture hides their names, so the table and the line show letters only.
 for (const [viewport, label] of [[WIDE, "1440 px"], [PHONE, "390 px"]] as const) {
   test.describe(`20 annotators at ${label}`, () => {

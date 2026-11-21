@@ -136,7 +136,7 @@ export function QueryDecisionDialog({ kind, row, documentId, projectKey, reviewe
     footer={<>
       <Button disabled={busy} onClick={onClose}>Cancel</Button>
       <Button variant="primary" loading={busy} aria-disabled={state === null || invalid || busy ? true : undefined}
-        aria-describedby={invalid && tried ? `${id}-missing` : undefined} onClick={() => { void save(); }}>{taking ? `Accept as ${next}` : `Accept ${short}`}</Button>
+        aria-describedby={invalid && tried ? (taking ? `${id}-missing` : `${id}-answer-error`) : undefined} onClick={() => { void save(); }}>{taking ? `Accept as ${next}` : `Accept ${short}`}</Button>
     </>}>
     <div className="editorial-correction query-decision">
       {state === null
@@ -175,7 +175,8 @@ export function QueryDecisionDialog({ kind, row, documentId, projectKey, reviewe
             onChange={event => { setAnswer(event.target.value); setError(undefined); }} />
         </>}
       {failure}
-      {invalid && tried && <p id={`${id}-missing`} className="action-reason">{taking ? "Change the text, or accept the version as it is." : "Enter the answer to the reviewer."}</p>}
+      {/* Without an answer the field says so itself; the button points there, not to a second copy (issue 547, U2-05). */}
+      {invalid && tried && taking && <p id={`${id}-missing`} className="action-reason">Change the text, or accept the version as it is.</p>}
     </div>
   </Dialog>;
 }

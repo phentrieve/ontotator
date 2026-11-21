@@ -54,6 +54,9 @@ function afterSubmit({ onNavigate, showToast }: Pick<TaskEditorProps, "onNavigat
   };
 }
 
+/** A round a typo fix moved (issue 543) has no carried findings to check: the person checked nothing. */
+const NO_INPUTS: RoundInputView[] = [];
+
 export function TaskEditor(props: TaskEditorProps): JSX.Element {
   const identity = JSON.stringify([props.user.username, props.assignmentId]);
   const [state, setState] = useState<{ identity: string; assignment?: AssignmentView; error?: unknown } | null>(null);
@@ -223,6 +226,7 @@ function AnnotationTaskEditor({ assignmentId, user, onNavigate, routeLeaveRef, l
   // Toolbar identity (spec section 7): short badge, full identity line as its title.
   const roundBadge = roundBadgeOf(roundInfo);
   const helpScreen: HelpScreen = roundInfo?.kind === "text_change" ? "editorTextChange"
+    : roundInfo?.moved_by_typo_fix ? "editorScratch"
     : roundInfo?.kind === "carry_forward" || roundInfo?.kind === "handover" ? "editorCarried"
     : workspace.view.key.mode === "review" ? "consolidationEditor"
     : workspace.view.key.mode === "proposal_check" ? "editorProposals" : "editorScratch";
@@ -241,8 +245,10 @@ function AnnotationTaskEditor({ assignmentId, user, onNavigate, routeLeaveRef, l
       } }, problemItem, { id: "technical-report", label: REPORT_ENTRY_LABEL, onSelect: openTechnicalReport },
         ...(guidelines.item ? [guidelines.item] : []),
         { id: "help", label: "Help for this screen", onSelect: () => window.open(helpHref(helpScreen), "_blank", "noopener,noreferrer") }]}
-      roundInputs={roundInputs} roundKind={roundInfo?.kind} roundActive={roundInfo?.active} roundBadge={roundBadge} roundTitle={roundTitle}
+      roundInputs={roundInfo?.moved_by_typo_fix ? NO_INPUTS : roundInputs} roundKind={roundInfo?.kind} roundActive={roundInfo?.active} roundBadge={roundBadge} roundTitle={roundTitle}
       roundOrdinal={roundInfo?.round_ordinal} documentVersion={roundInfo?.document_version} changesSource={changesSource}
+      roundSubmission={roundInfo?.moved_by_typo_fix && roundInfo.latest_submission_id && roundInfo.latest_submission_recorded_at
+        ? { submissionId: roundInfo.latest_submission_id, recordedAt: roundInfo.latest_submission_recorded_at } : null}
       held={assignment.held} holdReason={pauseNotice(assignment).reason} holdTitle={pauseNotice(assignment).title} holdKept={pauseNotice(assignment).kept} saveBeforeReportRef={saveBeforeReportRef}
       onTaskHeld={refreshAssignment}
       headerTimer={<WorkTimerControl timer={workTimer} />} onEdit={workTimer.edit}

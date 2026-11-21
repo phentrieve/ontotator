@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { api, ApiError, type UploadStatus, type UploadView } from "../api/client";
-import { formatDateTime, labelFor, plural, uploadKindLabels, uploadStatusLabels } from "../app/labels";
+import { labelFor, plural, uploadKindLabels, uploadStatusLabels } from "../app/labels";
+import { formatTime } from "../app/submissionLabels";
 import { Button, Dialog, IconButton, IconClose, Select, SuggestInput } from "../ui";
 import { ErrorNotice } from "./ErrorNotice";
 import { commonLanguageCodes } from "./LanguagesField";
@@ -312,7 +313,7 @@ function UnfinishedUploads({ uploads, error, open, onToggle, busy, onOpen }: { u
     {open && <ul className="upload-unfinished-list">{uploads.map(item => {
       const describedBy = `${ids}-${item.id}`;
       return <li key={item.id}>
-        <span id={describedBy} className="upload-unfinished-text">Started {formatDateTime(item.created_at)}: {item.files.map(file => file.filename).join(", ")}<span className="upload-muted"> · {labelFor(uploadKindLabels, item.kind)}{item.language ? `, ${item.language}` : ""} · {labelFor(uploadStatusLabels, item.status)}</span></span>
+        <span id={describedBy} className="upload-unfinished-text">Started {formatTime(item.created_at)}: {item.files.map(file => file.filename).join(", ")}<span className="upload-muted"> · {labelFor(uploadKindLabels, item.kind)}{item.language ? `, ${item.language}` : ""} · {labelFor(uploadStatusLabels, item.status)}</span></span>
         <Button size="sm" disabled={busy} aria-describedby={describedBy} onClick={() => onOpen(item.id)}>{item.status === "committing" ? "Show progress" : "Open preview"}</Button>
       </li>;
     })}</ul>}

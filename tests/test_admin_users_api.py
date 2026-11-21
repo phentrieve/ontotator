@@ -162,6 +162,28 @@ def test_a_language_change_records_the_languages_before_and_after(app):
     ]
 
 
+def test_no_language_event_without_a_change(app):
+    """A new account without languages, and a save that keeps them, write no
+    "Languages changed" entry with nothing in it (#576)."""
+    admin = logged_in(app, "root", system_admin=True)
+    created = admin.post(
+        "/api/v1/admin/users/", json={"username": "delta", "display_name": "Delta"}
+    )
+    assert created.status_code == 200, created.text
+    path = "/api/v1/admin/users/delta"
+    admin.patch(path, json={"languages": ["en"]})
+    admin.patch(path, json={"languages": ["EN"]})
+
+    actions = [event["action"] for event in admin.get(f"{path}/audit").json()]
+
+    assert actions.count("user.create") == 1
+    assert [
+        event["details"]
+        for event in admin.get(f"{path}/audit").json()
+        if event["action"] == "user.languages"
+    ] == [{"before": [], "after": ["en"]}]
+
+
 def test_anonymising_takes_the_languages_out_of_the_history(app):
     """Anonymise erases the languages: also where the trail names them (#467)."""
     admin = logged_in(app, "root", system_admin=True)

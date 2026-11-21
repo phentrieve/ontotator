@@ -774,7 +774,24 @@ def build_submissions(
         for sid in item.get("submission_ids", []):
             archived_owner.setdefault(sid, rid)
 
-    rows = _submissions(conn, pid, documents)
+    # Issue 543: a typo-fix copy stands where the person's own submission
+    # stood (the comparisons and consolidations take this order), right
+    # after it; issue 575: it shows the time the person submitted.
+    from ontotator.application.typo_fix_carry import submitted_times, typo_fix_moves
+
+    found = _submissions(conn, pid, documents)
+    moved = typo_fix_moves(conn, pid) if found else {}
+    submitted_at = submitted_times(
+        moved, {row.submission_id: row.recorded_at for row in found}
+    )
+    rows = sorted(
+        found,
+        key=lambda row: (
+            submitted_at[row.submission_id],
+            row.recorded_at,
+            row.submission_id,
+        ),
+    )
     open_reviews = _open_translation_reviews(conn, pid, documents)
     people = lead_pseudonym_refs(
         conn,
@@ -822,7 +839,7 @@ def build_submissions(
                 "chain_name": chain_name[row.document_id],
                 "author_label": row.annotator_id,
                 "is_me": row.annotator_id == viewer,
-                "recorded_at": row.recorded_at,
+                "recorded_at": submitted_at[row.submission_id],
                 "mode": row.mode,
                 "kind": submission_kind(kind, row.mode),
                 "round_id": owned,
@@ -842,6 +859,7 @@ def build_submissions(
                 "guideline_withdrawn": row.guideline_version is not None
                 and facts[row.guideline_version].withdrawn,
                 "kept_automatically": kept.get(row.submission_id, 0),
+                "moved_by_typo_fix": row.submission_id in moved,
             }
         )
 

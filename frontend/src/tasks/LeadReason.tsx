@@ -1,4 +1,4 @@
-import { formatDateTime } from "../app/labels";
+import { formatTime } from "../app/submissionLabels";
 
 /** What a task carries about why the lead asked for it: `TaskSummary` and the translation review's workspace both do. */
 export interface LeadReasonFacts {
@@ -11,7 +11,7 @@ export interface LeadReasonFacts {
   second_review_additions?: readonly { note: string; added_at: string }[] | null;
 }
 
-const on = (at: string | null | undefined) => at ? ` on ${formatDateTime(at)}` : "";
+const on = (at: string | null | undefined) => at ? ` on ${formatTime(at)}` : "";
 
 /** "Second review requested by the lead on 17 Nov 2026, 14:30: Check the dose in paragraph 2."; null without such a request. */
 export function secondReviewText(task: LeadReasonFacts): string | null {

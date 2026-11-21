@@ -1314,6 +1314,10 @@ test.describe("ontology tree in a low window (issue 521)", () => {
   test("844x390, a phone in landscape: the tree stands in place of the panel beside the text, and is usable", async ({ page }) => {
     await openWithSeizure(page, "tree-low-landscape");
     await page.setViewportSize({ width: 844, height: 390 });
+    // The findings column takes its width at 844 px a render after the resize; measure only then, or the text
+    // is measured beside the old 260 px column and the panel beside the new one (20 px apart).
+    const limits = sidebarLimits({ viewport: 844, inspector: inspectorWidth(844) });
+    await expect(layout(page)).toHaveCSS("--sidebar-width", `${clampSidebarWidth(limits.fallback, limits)}px`);
     const textBefore = await box(page.locator(".center-pane"));
     const inspectorBefore = await box(page.locator(".inspector-pane"));
     // Without the tree the panel stands beside the text (issue 466).

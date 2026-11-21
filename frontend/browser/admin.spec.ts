@@ -39,13 +39,13 @@ async function createUser(page: Page, username: string): Promise<Actor> {
   await form.getByLabel(/^Display name/).fill(username);
   await form.getByLabel("Languages", { exact: true }).fill("en");
   await form.getByLabel("Languages", { exact: true }).press("Enter");
-  await form.getByRole("button", { name: "Create user", exact: true }).click();
+  await page.getByRole("dialog", { name: "New user", exact: true }).getByRole("button", { name: "Create user", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Setup code for " + username, exact: true });
   await expect(dialog).toBeVisible();
   const code = await dialog.locator("code").innerText();
   expect(code.length).toBeGreaterThan(0);
   // The expiry comes from the server: 7 days by default (ONTOTATOR_SETUP_CODE_HOURS), not a fixed 24 hours.
-  await expect(dialog.getByText(/^This code works once and expires in 7 days, on \d{1,2} \w{3} \d{4}, \d{2}:\d{2} \(local time\)\.$/)).toBeVisible();
+  await expect(dialog.getByText(/^This code works once and expires in 7 days, on \d{1,2} \w{3}(?: \d{4})?, \d{2}:\d{2} \(local time\)\.$/)).toBeVisible();
   const expires = Date.parse(await dialog.locator("time").getAttribute("datetime") ?? "");
   expect(Math.abs(expires - Date.now() - 7 * 86_400_000)).toBeLessThan(120_000);
   await dialog.locator("summary").click();

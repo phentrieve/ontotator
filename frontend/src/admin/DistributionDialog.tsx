@@ -72,7 +72,7 @@ function DistributionEditor({ projectKey, documents, cases, task, confirmUnrevie
     <form onSubmit={event => { event.preventDefault(); if (event.currentTarget.reportValidity()) void propose(); }}>
       <p>Task: {labelFor(taskLabels, task)}</p>
       {context.notice}
-      <TextInput id="distribution-count" label="People per document" type="number" min={1} step={1} required value={count} disabled={busy || batch.busy} onChange={event => { setCount(event.target.value); clear(); }} />
+      <TextInput id="distribution-count" label="People per text" type="number" min={1} step={1} required value={count} disabled={busy || batch.busy} onChange={event => { setCount(event.target.value); clear(); }} />
       {notice}<Button type="submit" disabled={!members || !documents.length || batch.busy || (task === "translation_review" && !reviewAllowed)} loading={busy}>{proposal || stale ? "Propose again" : "Propose"}</Button>
     </form>
     {error !== undefined && <ErrorNotice error={error} />}
@@ -80,13 +80,13 @@ function DistributionEditor({ projectKey, documents, cases, task, confirmUnrevie
       <h3>Proposal</h3>
       {/* Issue 488 */}
       <p>The tasks are assigned in the order of this table. My tasks lists a person's tasks by status, then in the order of assignment.</p>
-      <table className="data-table density-compact"><caption className="visually-hidden">Proposed assignments</caption><thead><tr><th>Document</th><th>Languages</th><th>Person</th></tr></thead><tbody>{slots.map((slot, index) => <tr key={JSON.stringify([slot.document_id, slot.place])}><td>{textName(slot.document_id)}</td><td>{languages.get(slot.document_id)?.join(", ") || "Required languages unavailable"}</td><td>
+      <table className="data-table density-compact"><caption className="visually-hidden">Proposed assignments</caption><thead><tr><th>Text</th><th>Languages</th><th>Person</th></tr></thead><tbody>{slots.map((slot, index) => <tr key={JSON.stringify([slot.document_id, slot.place])}><td>{textName(slot.document_id)}</td><td>{languages.get(slot.document_id)?.join(", ") || "Required languages unavailable"}</td><td>
         <select id={`distribution-slot-${index}`} className="form-select" aria-label={`${textName(slot.document_id)}, person ${slot.place + 1}`} value={slot.username} disabled={batch.busy || batch.attempted || stale || busy} onChange={event => setSlots(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, username: event.target.value } : item))}>
           <option value="">Nobody</option>{slot.username && !eligible.some(member => member.username === slot.username) && <option value={slot.username}>{proposal.rows.find(row => row.username === slot.username)?.display_name || "Former member"}</option>}
           {eligible.map(member => <option key={member.username} value={member.username} disabled={slots.some((other, otherIndex) => index !== otherIndex && other.document_id === slot.document_id && other.username === member.username)}>{memberOptionLabel(member)}</option>)}
         </select></td></tr>)}</tbody></table>
-      {duplicate && <InlineMessage tone="warning">Choose each person only once per document.</InlineMessage>}
-      <section aria-label="Unassignable documents"><h3>Unassignable documents</h3>{proposal.unassignable.length ? <ul>{proposal.unassignable.map(row => <li key={row.document_id}>{textName(row.document_id)}: {unassignableLabel(row, proposal.per_document, languages.get(row.document_id))}</li>)}</ul> : <p>Every document has a proposal.</p>}</section>
+      {duplicate && <InlineMessage tone="warning">Choose each person only once per text.</InlineMessage>}
+      <section aria-label="Texts nobody can take"><h3>Texts nobody can take</h3>{proposal.unassignable.length ? <ul>{proposal.unassignable.map(row => <li key={row.document_id}>{textName(row.document_id)}: {unassignableLabel(row, proposal.per_document, languages.get(row.document_id))}</li>)}</ul> : <p>Every text has a proposal.</p>}</section>
       <section aria-label="Resulting load"><h3>Resulting load</h3><p>Open, in progress and reopened work across this project, before and after the selected rows.</p><ul>{eligible.map(member => <li key={member.username}>{personLabel(member)}: {loadBefore.has(member.username) || inventory !== null ? `${loadBefore.get(member.username) ?? 0} now, ${(loadBefore.get(member.username) ?? 0) + newRows.filter(row => row.username === member.username).length} after` : "Load unavailable"}</li>)}</ul></section>
       <Button variant="primary" disabled={busy || batch.busy || batch.attempted || stale || duplicate} onClick={() => confirm(false)}>Confirm</Button>
     </>}

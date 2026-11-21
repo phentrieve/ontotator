@@ -9,6 +9,7 @@ import tempfile
 import time
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import ExitStack
+from contextvars import ContextVar
 from pathlib import Path
 from typing import IO, Any
 from urllib.parse import quote
@@ -26,6 +27,35 @@ CHUNK = 1024 * 1024
 # A server that refuses an upload as too large (413) may close the connection
 # while the body is still being sent; the client then sees one of these.
 UPLOAD_CUT = (httpx.ReadError, httpx.WriteError, httpx.RemoteProtocolError)
+
+# Set by preview_change (#485) to the tool whose dry run it runs: while set,
+# the client sends only requests that change nothing (see ``changes_nothing``).
+_DRY_RUN_OF: ContextVar[str | None] = ContextVar("ontotator_dry_run_of", default=None)
+
+
+class WriteStopped(OntotatorError):
+    """A request that would change data, stopped during a preview_change."""
+
+
+@contextlib.contextmanager
+def dry_run_only(tool: str) -> Iterator[None]:
+    """While inside, every request that could change data is stopped before
+    it is sent: a preview of ``tool`` never applies anything."""
+    token = _DRY_RUN_OF.set(tool)
+    try:
+        yield
+    finally:
+        _DRY_RUN_OF.reset(token)
+
+
+def changes_nothing(method: str, path: str, body: Any) -> bool:
+    """Whether a request only reads or asks for a dry run: a GET, a route
+    that ends in ``/preview``, or a body with ``"preview": true``."""
+    if method.upper() in ("GET", "HEAD"):
+        return True
+    if path.split("?", 1)[0].rstrip("/").endswith("/preview"):
+        return True
+    return isinstance(body, dict) and body.get("preview") is True
 
 
 def _megabytes(size: int) -> str:
@@ -147,6 +177,14 @@ class OntotatorClient:
         data: Mapping[str, Any] | None = None,
         upload_bytes: int | None = None,
     ) -> httpx.Response:
+        previewed = _DRY_RUN_OF.get()
+        if previewed and (files is not None or not changes_nothing(method, path, json)):
+            raise WriteStopped(
+                f"preview_change stopped {previewed}: without confirm it would"
+                f" still change data ({method} {path}). Nothing was sent. Call"
+                f" {previewed} itself; its description says what it does without"
+                " confirm."
+            )
         try:
             response = await self._http.request(
                 method,
@@ -292,6 +330,12 @@ class OntotatorClient:
         An existing file is replaced only with ``overwrite``, and never by a
         download that failed or does not match.
         """
+        previewed = _DRY_RUN_OF.get()
+        if previewed:
+            raise WriteStopped(
+                f"preview_change stopped {previewed}: it would write a file on"
+                " this computer. Nothing was written."
+            )
         if target.exists() and not overwrite:
             raise OntotatorError(
                 f"{target} exists already. Choose another path or pass overwrite."

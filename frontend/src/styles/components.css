@@ -598,6 +598,8 @@ textarea.form-control {
 .shortcut-help-note { margin: var(--space-5) 0 0; color: var(--text-muted); font-size: var(--size-sm); }
 
 .data-table-scroll { max-width: 100%; overflow-x: auto; }
+/* "The first 100 of N…" below a limited table (issue 550, U5-02): it wraps in the page width, never in the sideways scroll. */
+.data-table-more { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border); }
 .data-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .data-table th, .data-table td { padding: var(--cell-pad-y) var(--cell-pad-x); border-bottom: 1px solid var(--border); vertical-align: top; }
 .data-table th { font-weight: var(--weight-strong); background: var(--surface-sunken); text-align: start; }
@@ -872,6 +874,22 @@ ul.task-counts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space
   .shell-reading .shell-user-initials { display: inline; }
   /* As high as the other small buttons of this row, so the text below starts where it did. */
   .shell-reading .shell-user-menu { padding: 5px 8px; }
+  /* Touch targets (issue 550, U5-03; WCAG 2.5.5): every control of the header and of the sidebar or Administration
+     navigation is at least 44 × 44 px on a phone: the product name, the gear, the user menu, Handbook, Sections, the
+     project pages and the Administration pages. */
+  .shell-header :is(.shell-admin, .shell-user-menu, .shell-help),
+  .shell-reading-navigation > summary {
+    min-width: var(--touch-target);
+    min-height: var(--touch-target);
+  }
+  a.shell-product { display: inline-flex; align-items: center; min-height: var(--touch-target); }
+  /* The breadcrumb's links and buttons too, as "Progress" on Translation reviews (issue 574 F3); the editor's
+     one header row keeps its small breadcrumb. */
+  .shell:not(.shell-reading) .shell-breadcrumb :is(a, button) { display: inline-flex; align-items: center; min-width: var(--touch-target); min-height: var(--touch-target); }
+  /* A summary keeps its display (and so its marker): the text is centred by padding instead. */
+  .shell-reading-navigation > summary { padding-block: calc((var(--touch-target) - 2px - var(--leading-md)) / 2); line-height: var(--leading-md); }
+  .app-nav .shell-nav-link,
+  .shell-body > .app-nav .shell-nav-link { display: flex; align-items: center; min-height: var(--touch-target); }
 }
 
 /* Documents table primitives (Documents U1): disclosure, final marker, inline confirmation, segments. */
@@ -1213,7 +1231,8 @@ ul.task-counts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space
 
 /* Stage path: arrow segments of a text's path; the tone is also given in words (visually hidden). */
 /* Equal steps; a column only grows past its share when a word would not fit (labels wrap, never cut). */
-.stage-path { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; margin: 0; padding: 0; list-style: none; }
+/* The track's floor is its longest word (issue 548, U4-08): "1fr" alone let a narrow card break "consolidating" mid-word. */
+.stage-path { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(min-content, 1fr); gap: 2px; margin: 0; padding: 0; list-style: none; }
 .stage-path > li { display: flex; min-width: 0; }
 .stage-path-seg {
   display: flex;
