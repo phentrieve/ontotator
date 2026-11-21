@@ -64,10 +64,11 @@ def _insert(conn, kind: str = "task_assigned") -> None:
     )
 
 
-def test_one_head_and_0057_follows_0052() -> None:
+def test_one_head_and_0057_follows_0055() -> None:
+    # Integration branch: 0055 (task questions) and 0057 are chained linearly.
     scripts = ScriptDirectory.from_config(alembic_config())
     assert scripts.get_heads() == [head_revision()]
-    assert _previous() == "0052"
+    assert _previous() == "0055"
 
 
 def test_existing_rows_stay_and_the_table_starts_empty(migrated):
