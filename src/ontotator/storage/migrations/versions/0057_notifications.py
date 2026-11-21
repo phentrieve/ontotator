@@ -6,7 +6,7 @@ released task, a text problem for the lead) and holds identifiers only, no
 text. Unlike the history tables it is not append-only: reading a
 notification sets ``read_at``, and old rows are deleted (retention).
 
-No existing table, column or row changes. Follows 0052 (typo fix carries).
+No existing table, column or row changes. Follows 0055 (task questions).
 """
 
 from typing import Any
@@ -15,7 +15,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "0057"
-down_revision = "0052"
+down_revision = "0055"
 branch_labels = None
 depends_on = None
 SCHEMA = "ontotator"

@@ -1,8 +1,7 @@
 """Migration 0057 (issue 557): ``notifications``, purely additive, on a
 database that holds data; one head, up and down.
 
-It follows 0052. Draft PR 561 ("Ask the lead") holds 0055, also on 0052; the
-order of the two is set when they are merged."""
+It follows 0055 (task questions, "Ask the lead")."""
 
 from __future__ import annotations
 
@@ -64,10 +63,10 @@ def _insert(conn, kind: str = "task_assigned") -> None:
     )
 
 
-def test_one_head_and_0057_follows_0052() -> None:
+def test_one_head_and_0057_follows_0055() -> None:
     scripts = ScriptDirectory.from_config(alembic_config())
     assert scripts.get_heads() == [head_revision()]
-    assert _previous() == "0052"
+    assert _previous() == "0055"
 
 
 def test_existing_rows_stay_and_the_table_starts_empty(migrated):
