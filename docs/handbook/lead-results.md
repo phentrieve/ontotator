@@ -152,6 +152,17 @@ The **Changes** column counts each changed place once, by words: a replaced word
 
 Only leads and system administrators can open the list. To decide a query or a rejection, go on with the next section.
 
+### Answer a question
+
+What for: answer a question a person asked with **Ask the lead** (today in a translation review). Their task stays open while you answer, unless they chose to pause it.
+
+1. In the sidebar, click **Questions**. The count shows the open ones, for example *Questions (2)*.
+2. The **Open** tab lists each question with who asked, the task and text, the question and, if given, the passage with the proposed wording marked as changes.
+3. Click **Answer…**, write **Your answer**, and click **Send answer**.
+4. With a proposed wording, tick **Take the proposed wording into the reviewer's text** to put it into their open review in the same step; the button then reads **Answer and take the wording**. The reviewer still checks the text and submits the review. If the passage is no longer in their text, the answer is refused with the wording; send it without.
+
+The answer appears in the person's task under **Questions to the lead**. Answered questions stay under **Answered**. A question is no problem report: it does not show on **Documents** and does not hold the export.
+
 ### Resolve a rejected or queried translation
 
 What for: decide what happens after a reviewer rejected or queried a translation. The row's next step is **Resolve rejected translation** or **Resolve queried translation**. It always concerns the newest version that was rejected or queried. For example, after you took the reviewer's text as v2 and asked a reviewer to correct v2, a query on v2 is decided at v2: the dialogs name *v2* and the button reads *Accept v2*.

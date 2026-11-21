@@ -1,5 +1,7 @@
 """Owner reports and lead hold handling, scoped to exact assignments."""
 
+from typing import Literal
+
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -12,6 +14,7 @@ from ontotator.application.problem_reports import (
     ReportAction,
 )
 from ontotator.auth.audit import Actor
+from ontotator.domain.problem_reports import ReportKind
 
 router = APIRouter(prefix="/api/v1", tags=["problem-reports"])
 
@@ -23,6 +26,12 @@ class ProblemReportRequest(BaseModel):
     round_id: str | None = None
     submission_id: str | None = None
     reason: str = Field(min_length=1)
+    # Issue 553: "question" for Ask the lead. A question pauses only with
+    # ``pause``; a problem report always pauses.
+    kind: ReportKind = "problem"
+    quote: str | None = None
+    proposed_text: str | None = None
+    pause: bool | None = None
 
 
 class ProblemActionRequest(BaseModel):
@@ -32,6 +41,8 @@ class ProblemActionRequest(BaseModel):
     action: ReportAction
     reason: str = Field(min_length=1)
     assignment_ids: list[int] = Field(default_factory=list)
+    # Issue 553, with ``action: answer``: take the proposed wording.
+    take_proposed_text: bool = False
 
 
 @router.post("/assignments/{assignment_id}/problem-reports")
@@ -58,9 +69,18 @@ def reports(
     assignment_id: int | None = None,
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
+    kind: ReportKind = "problem",
+    state: Literal["open", "resolved", "withdrawn"] | None = None,
 ) -> list[ProblemReportView]:
     return ProblemReportService(request.app.state.repo.db).list(
-        get_access(request), key, document_id, assignment_id, limit, offset
+        get_access(request),
+        key,
+        document_id,
+        assignment_id,
+        limit,
+        offset,
+        kind=kind,
+        state=state,
     )
 
 

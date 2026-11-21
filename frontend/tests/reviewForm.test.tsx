@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ReviewForm } from "../src/translation/ReviewForm";
 import type { ReviewForm as ReviewFormValue } from "../src/translation/reviewRules";
-import { clinicalChangeFacts, clinicalChangeHints, decisionDescriptions, issueMessages, reviewIssueMessage } from "../src/translation/labels";
+import { clinicalChangeFacts, clinicalChangeHints, decisionDescriptions, issueMessages, OFFERED_DECISIONS, retiredQueryNote, reviewIssueMessage } from "../src/translation/labels";
 
 afterEach(cleanup);
 
@@ -13,10 +13,10 @@ describe("ReviewForm", () => {
     const onChange = vi.fn();
     render(<ReviewForm value={{}} issues={[]} onChange={onChange} />);
     const radios = screen.getAllByRole("radio") as HTMLInputElement[];
-    expect(radios).toHaveLength(4);
+    expect(radios).toHaveLength(3);
     expect(radios.every((radio) => !radio.checked)).toBe(true);
     expect(radios.map((radio) => radio.getAttribute("aria-describedby") && document.getElementById(radio.getAttribute("aria-describedby")!)?.textContent))
-      .toEqual(Object.values(decisionDescriptions));
+      .toEqual(OFFERED_DECISIONS.map(code => decisionDescriptions[code]));
     // Follow-up fields only appear once a decision makes them relevant.
     expect(screen.queryByRole("checkbox")).toBeNull();
     expect(screen.queryByRole("group", { name: "Clinical change categories" })).toBeNull();
@@ -25,11 +25,11 @@ describe("ReviewForm", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it("chooses through chooseDecision: query implies a clinical change, accepted unchanged clears it", () => {
+  it("chooses through chooseDecision: rejected implies a clinical change, accepted unchanged clears it", () => {
     const onChange = vi.fn();
     const view = render(<ReviewForm value={{ rationale: "r" }} issues={[]} onChange={onChange} />);
-    fireEvent.click(screen.getByRole("radio", { name: "Query" }));
-    expect(onChange).toHaveBeenLastCalledWith({ rationale: "r", decision: "query", clinical_change: true });
+    fireEvent.click(screen.getByRole("radio", { name: "Rejected" }));
+    expect(onChange).toHaveBeenLastCalledWith({ rationale: "r", decision: "rejected", clinical_change: true });
     const value = Object.freeze({ decision: "rejected" as const, clinical_change: true, categories: Object.freeze(["source" as const]), rationale: "Needs clarification" });
     view.rerender(<ReviewForm value={value} issues={[]} onChange={onChange} />);
     fireEvent.click(screen.getByRole("radio", { name: "Accepted unchanged" }));
@@ -51,18 +51,18 @@ describe("ReviewForm", () => {
     expect(screen.getByText("Required: an automatic check failed. Say why the flagged difference is correct.")).toBeDefined();
     view.rerender(<ReviewForm value={{ decision: "accepted_unchanged", clinical_change: false }} failedCheckCount={0} issues={[]} onChange={vi.fn()} />);
     expect(screen.getByText("Optional.")).toBeDefined();
-    view.rerender(<ReviewForm value={{ decision: "query", clinical_change: true }} failedCheckCount={1} issues={[]} onChange={vi.fn()} />);
+    view.rerender(<ReviewForm value={{ decision: "rejected", clinical_change: true }} failedCheckCount={1} issues={[]} onChange={vi.fn()} />);
     expect(screen.getByText("Required for a clinically relevant change.")).toBeDefined();
   });
 
   it("shows the short decision hints and a number key per option outside the accessible name", () => {
     const view = render(<ReviewForm value={{}} issues={[]} onChange={vi.fn()} />);
     expect([...view.container.querySelectorAll(".review-decision-hint")].map((hint) => hint.textContent)).toEqual([
-      "Correct as it stands. No edits.", "Your corrected version is accepted.",
-      "Meaning may differ clinically. Not accepted.", "Changes clinical meaning. Not accepted.",
+      "Correct as it stands. No edits.", "Your corrected version is accepted.", "Changes clinical meaning. Not accepted.",
     ]);
-    expect([...view.container.querySelectorAll(".review-decision")].map((option) => option.querySelector("kbd")?.textContent)).toEqual(["1", "2", "3", "4"]);
-    expect(screen.getByRole("radio", { name: "Query" })).toBeDefined();
+    expect([...view.container.querySelectorAll(".review-decision")].map((option) => option.querySelector("kbd")?.textContent)).toEqual(["1", "2", "3"]);
+    // Issue 553: Query is no longer offered.
+    expect(screen.queryByRole("radio", { name: "Query" })).toBeNull();
     expect(screen.getByRole("radio", { name: "Accepted unchanged" })).toBeDefined();
   });
 
@@ -73,7 +73,7 @@ describe("ReviewForm", () => {
     expect(status.getAttribute("role")).toBe("status");
     const option = screen.getByRole("radio", { name: "Accepted with corrections" }).closest(".review-decision")!;
     expect(option.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    const next = screen.getByRole("radio", { name: "Query" }).closest(".review-decision")!;
+    const next = screen.getByRole("radio", { name: "Rejected" }).closest(".review-decision")!;
     expect(status.compareDocumentPosition(next) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     view.rerender(<ReviewForm value={{ decision: "accepted_corrected", clinical_change: false }} autoNote={null} issues={[]} onChange={vi.fn()} />);
     expect(screen.queryByText(note)).toBeNull();
@@ -112,7 +112,8 @@ describe("ReviewForm", () => {
     [{}, false, null, false, false],
     [{ decision: "accepted_unchanged" as const }, false, null, false, true],
     [{ decision: "accepted_corrected" as const }, true, null, false, true],
-    [{ decision: "query" as const }, false, "Clinically relevant change: yes, always for a query.", true, true],
+    // Issue 553: an older draft's Query is no longer offered; the note asks for another decision.
+    [{ decision: "query" as const }, false, retiredQueryNote, true, true],
     [{ decision: "rejected" as const }, false, "Clinically relevant change: yes, always for a rejection.", true, true],
     // Stored values a rule still judges stay visible, so a blocking value can always be cleared.
     [{ decision: "accepted_unchanged" as const, clinical_change: true }, true, null, true, true],
@@ -125,18 +126,18 @@ describe("ReviewForm", () => {
     expect(screen.queryByRole("textbox", { name: "Rationale" }) !== null).toBe(rationale);
   });
 
-  it("enables categories at once for query and rejected without a checkbox", () => {
+  it("enables categories at once for rejected without a checkbox", () => {
     const onChange = vi.fn();
-    render(<ReviewForm value={{ decision: "query" }} issues={[]} onChange={onChange} />);
+    render(<ReviewForm value={{ decision: "rejected" }} issues={[]} onChange={onChange} />);
     expect(screen.queryByRole("checkbox", { name: "Clinically relevant change" })).toBeNull();
     fireEvent.click(screen.getByRole("checkbox", { name: "Number or unit" }));
-    expect(onChange).toHaveBeenLastCalledWith({ decision: "query", categories: ["value"] });
+    expect(onChange).toHaveBeenLastCalledWith({ decision: "rejected", categories: ["value"] });
     expect(screen.getByText("Required for a clinically relevant change.")).toBeDefined();
   });
 
   it("names the rule for a clinical change under each decision", () => {
     const view = render(<ReviewForm value={{ decision: "query" }} issues={[]} onChange={vi.fn()} />);
-    expect(screen.getByText(clinicalChangeFacts.query)).toBeDefined();
+    expect(screen.getByText(retiredQueryNote)).toBeDefined();
     view.rerender(<ReviewForm value={{ decision: "rejected" }} issues={[]} onChange={vi.fn()} />);
     expect(screen.getByText(clinicalChangeFacts.rejected)).toBeDefined();
     view.rerender(<ReviewForm value={{ decision: "accepted_corrected" }} issues={[]} onChange={vi.fn()} />);
@@ -190,14 +191,14 @@ describe("ReviewForm", () => {
     const view = render(<><ReviewForm value={{}} issues={[]} onChange={first} /><ReviewForm value={{}} issues={[]} onChange={second} /></>);
     const inputs = [...view.container.querySelectorAll("input, textarea")];
     expect(new Set(inputs.map((input) => input.id)).size).toBe(inputs.length);
-    const radios = screen.getAllByRole("radio", { name: "Query" }) as HTMLInputElement[];
+    const radios = screen.getAllByRole("radio", { name: "Rejected" }) as HTMLInputElement[];
     expect(radios[0].name).not.toBe(radios[1].name);
     await userEvent.setup().click(radios[1].labels![0]);
-    expect(second).toHaveBeenCalledWith({ decision: "query", clinical_change: true });
+    expect(second).toHaveBeenCalledWith({ decision: "rejected", clinical_change: true });
     expect(first).not.toHaveBeenCalled();
     radios[0].focus();
     await userEvent.setup().keyboard(" ");
-    expect(first).toHaveBeenCalledWith({ decision: "query", clinical_change: true });
+    expect(first).toHaveBeenCalledWith({ decision: "rejected", clinical_change: true });
   });
   it("issue list is not a live region", () => {
     render(<ReviewForm value={{ decision: "query", clinical_change: true }} issues={["CATEGORY_REQUIRED", "RATIONALE_REQUIRED"]} onChange={vi.fn()} />);

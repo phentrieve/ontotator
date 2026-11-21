@@ -88,3 +88,5 @@ async def test_the_sentence_comes_back_with_the_opt_in(
     answers = await _answers(fake, replace(settings, read_content=True), tmp_path)
     leaking = {name for (name, _), answer in answers.items() if SENTENCE in answer}
     assert {"get_text_version", "get_submission", "list_translation_reviews"} <= leaking
+    # Issue 553: a question's quoted passage and proposed wording.
+    assert {"get_problem_report", "list_problem_reports"} <= leaking

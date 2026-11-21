@@ -38,6 +38,18 @@ def without_review_content(reviews: list[dict[str, Any]]) -> list[dict[str, Any]
     ]
 
 
+# What a question to the lead (issue 553) quotes from the text and the wording
+# its asker proposes for that passage: text of the document. Returned only by
+# an MCP server started with ONTOTATOR_MCP_READ_CONTENT=1. The question itself
+# ('reason') is the asker's own words, as the reason of a problem report.
+REPORT_CONTENT = ("quote", "proposed_text")
+
+
+def without_report_content(report: dict[str, Any]) -> dict[str, Any]:
+    """The problem report or question without the passage and the wording."""
+    return {name: value for name, value in report.items() if name not in REPORT_CONTENT}
+
+
 # Words, runs of white space and single other characters: joined, the text.
 _TOKEN = re.compile(r"\w+|\s+|[^\w\s]")
 # Code points of unchanged text shown on each side of a changed passage.
@@ -111,7 +123,7 @@ def register_monitoring(
         report: dict[str, Any] = await api.get(
             f"/api/v1/problem-reports/{seg(report_id)}"
         )
-        return report
+        return report if read_content else without_report_content(report)
 
     @register(server, scopes="read", effect="read")
     async def list_guidelines(project: Project) -> dict[str, Any]:
