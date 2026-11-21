@@ -36,7 +36,7 @@ function setup({ source = SOURCE, translation = TRANSLATION, marks, stored, touc
 const settle = () => act(async () => { await new Promise(resolve => setTimeout(resolve, 700)); });
 const note = () => document.querySelector(".translation-pairs-fallback")?.textContent ?? null;
 /** Marks for every sentence of both texts, as Mark checked sentences stores them. */
-const allMarked = (source = SOURCE, translation = TRANSLATION): CheckedSentences => ({
+const allMarked = (source = SOURCE, translation = TRANSLATION): Required<CheckedSentences> => ({
   source: splitSentences(source, "en").map(sentence => ({ index: sentence.index, hash: sentence.hash })),
   translation: splitSentences(translation, "de").map(sentence => ({ index: sentence.index, hash: sentence.hash })),
 });
@@ -145,8 +145,8 @@ describe("checked sentences of issue 256", () => {
     await settle();
     const sent = saveMarks.mock.calls.at(-1)![1];
     expect(sent.source).toEqual(marks.source);
-    expect(sent.translation.map(mark => mark.hash)).toEqual(marks.translation.map(mark => mark.hash));
-    expect(sent.translation.map(mark => mark.index)).toEqual(marks.translation.map(mark => mark.index === 0 ? 0 : mark.index + 1));
+    expect(sent.translation!.map(mark => mark.hash)).toEqual(marks.translation.map(mark => mark.hash));
+    expect(sent.translation!.map(mark => mark.index)).toEqual(marks.translation.map(mark => mark.index === 0 ? 0 : mark.index + 1));
   });
 });
 
