@@ -1,0 +1,30 @@
+/* The offer to exclude a modifier's words from its finding's span (SpanExclusionOffer.tsx). Tokens only. */
+.mod-exclude {
+  margin: 0 var(--space-4) var(--space-3);
+}
+.mod-exclude .notice p {
+  margin: 0 0 var(--space-1);
+}
+.mod-exclude-preview {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px var(--space-2);
+  margin: 0 0 var(--space-2);
+  font-size: var(--size-sm);
+}
+.mod-exclude-preview dt {
+  color: var(--text-muted);
+}
+.mod-exclude-preview dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.mod-exclude-preview del {
+  color: var(--text-muted);
+  text-decoration-thickness: 2px;
+}
+.mod-exclude-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
