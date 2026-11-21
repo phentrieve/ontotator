@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { api, type TechnicalReportStatus, type TechnicalReportView } from "../api/client";
 import { ErrorNotice } from "../admin/ErrorNotice";
-import { formatDateTime, taskLabels } from "../app/labels";
+import { taskLabels } from "../app/labels";
+import { formatTime } from "../app/submissionLabels";
 import { personLabel, taskText } from "../app/identity";
 import { annotationTaskName } from "../editor/modes";
 import { Button, EmptyState, InlineMessage, Select, Toolbar } from "../ui";
@@ -20,7 +21,7 @@ const STATUS_LABEL: Record<TechnicalReportStatus, string> = { open: "Open", done
 export function reportFacts(report: TechnicalReportView): [string, string][] {
   const task = report.task;
   const facts: [string, string][] = [
-    ["Sent", formatDateTime(report.created_at)],
+    ["Sent", formatTime(report.created_at)],
     ["By", `${personLabel(report.reporter)}, ${report.reporter_username}`],
     ...(task ? [
       ["Task", task.task === "annotate" ? annotationTaskName(task.annotation_mode) : taskLabels[task.task]],
@@ -36,10 +37,10 @@ export function reportFacts(report: TechnicalReportView): [string, string][] {
   if (report.viewport) facts.push(["Window size", report.viewport]);
   if (report.last_error_status !== null || report.last_error_code) {
     const what = [report.last_error_code, report.last_error_status ? `HTTP ${report.last_error_status}` : "no answer"].filter(Boolean).join(", ");
-    facts.push(["Last error", report.last_error_at ? `${what}, ${formatDateTime(report.last_error_at)}` : what]);
+    facts.push(["Last error", report.last_error_at ? `${what}, ${formatTime(report.last_error_at)}` : what]);
   }
   if (report.crash_message) facts.push(["Error message", report.crash_message]);
-  if (report.closed_at) facts.push(["Done", `${formatDateTime(report.closed_at)}${report.closed_by ? `, ${report.closed_by}` : ""}`]);
+  if (report.closed_at) facts.push(["Done", `${formatTime(report.closed_at)}${report.closed_by ? `, ${report.closed_by}` : ""}`]);
   return facts;
 }
 

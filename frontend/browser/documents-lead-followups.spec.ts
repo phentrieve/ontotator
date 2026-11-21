@@ -175,3 +175,26 @@ for (const [width, height] of [[1440, 900], [390, 844]] as const) {
     expect(errors).toEqual([]);
   });
 }
+
+test("Assign… in the selection bar on a fully staffed text says the limit is reached and offers Change…, never Loading… (issue 549, U3-03; 1440 px)", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const s = await documentsScenario(page, "S336");
+  await loginExisting(page, s.users.lead);
+  await page.goto(`/#/projects/${encodeURIComponent(s.project)}/documents`);
+  await documentsReady(page);
+  // EN100024 en holds two annotators with the limit lowered to 1: nothing in the selection needs a task.
+  await rowCell(textRow(page, "EN100024", "en"), "select").getByRole("checkbox").check();
+  const bar = page.getByRole("region", { name: "Selection" });
+  await bar.getByRole("button", { name: /^Assign/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Assign tasks", exact: true });
+  await expect(dialog.locator(".assign-limit-hint")).toContainText("Limit reached: 2 assigned, limit 1.");
+  await expect(dialog.getByRole("button", { name: "Change… (limit: 1 annotator per text)", exact: true })).toBeVisible();
+  await expect(dialog.getByRole("table", { name: "Members" })).toBeVisible();
+  // Nothing loads any more: no "Loading…" beside the Assign button, which points to the reason instead.
+  await page.waitForTimeout(1500);
+  await expect(dialog.getByText("Loading…", { exact: true })).toHaveCount(0);
+  const assign = dialog.getByRole("button", { name: "Assign", exact: true });
+  await expect(assign).toHaveAttribute("aria-disabled", "true");
+  await expect(assign).toHaveAccessibleDescription("Limit reached: 2 assigned, limit 1.");
+  expect(await noHorizontalScroll(page)).toBe(true);
+});

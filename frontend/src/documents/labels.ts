@@ -1,6 +1,6 @@
 /** Documents-only label rules. Shared submission and time helpers are re-exported for convenience. */
-import { formatDateTime, labelFor } from "../app/labels";
-import { personLabel } from "../app/submissionLabels";
+import { labelFor } from "../app/labels";
+import { personLabel, formatTime } from "../app/submissionLabels";
 import { originLabels, translationStatusLabels } from "../admin/variantMetadata";
 
 export { formatTime, fullTimestamp, kindLabels, personLabel, roundCell, submissionLabel } from "../app/submissionLabels";
@@ -104,10 +104,23 @@ export function pausedWord(item: { held?: boolean; pause_causes?: readonly ("rep
   return causes.includes("report") ? "Paused by a problem report and by lead" : "Paused by lead";
 }
 
-/** The lead pause of a text (issue 464): "Carla Diaz, 17 Nov 2026, 14:02: Source text is being clarified"; "you, …" for the viewer. */
-export function leadPauseLine(pause: { reason: string; paused_by?: { pseudonym: string; display_name?: string | null; is_me?: boolean } | null; paused_at: string }): string {
+type LeadPause = { reason: string; paused_by?: { pseudonym: string; display_name?: string | null; is_me?: boolean } | null; paused_at: string };
+/** "Carla Diaz, 17 Nov 2026, 14:02": who paused and when; "you" for the viewer. */
+const pausedWhen = (pause: LeadPause): string => {
   const who = !pause.paused_by ? null : pause.paused_by.is_me ? "you" : pause.paused_by.display_name?.trim() || pause.paused_by.pseudonym;
-  return `${[who, formatDateTime(pause.paused_at)].filter(Boolean).join(", ")}: ${pause.reason}`;
+  return [who, formatTime(pause.paused_at)].filter(Boolean).join(", ");
+};
+/** The lead pause of a text (issue 464): "Carla Diaz, 17 Nov 2026, 14:02: Source text is being clarified". */
+export function leadPauseLine(pause: LeadPause): string {
+  return `${pausedWhen(pause)}: ${pause.reason}`;
+}
+
+/**
+ * Title of the "Paused by lead" flag of a row: "Paused by lead (you, 20 Nov, 22:08): Clinic is checking the source
+ * text". It names the mark, as a table short of room shows the pause icon alone (issue 576, F3).
+ */
+export function leadPauseTitle(pause: LeadPause): string {
+  return `Paused by lead (${pausedWhen(pause)}): ${pause.reason}`;
 }
 
 /** Title of the "Typography hints" flag of a row (issue 484). */

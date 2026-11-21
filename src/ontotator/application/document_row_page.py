@@ -915,6 +915,31 @@ def _work_item(
         and item.assignment_id not in ctx.waiting_for_lead,
         "waiting_for_lead": item.assignment_id in ctx.waiting_for_lead,
         "correction_request": _correction_request(ctx, item),
+        "submitted_at": ctx.facts.review_submitted_at.get(item.assignment_id)
+        if item.task == "translation_review"
+        else None,
+        "moved_by_typo_fix": _typo_fix_move(ctx, item),
+    }
+
+
+def _typo_fix_move(ctx: _Context, item: rules.AssignmentFact) -> dict[str, Any] | None:
+    """The annotation behind a task a typo fix made (issue 543): the version
+    it moved from, and when the person was given the work and submitted it."""
+    move = ctx.facts.typo_fix_moves.get(item.assignment_id)
+    if move is None:
+        return None
+    moved_from = ctx.version_by_id.get(move.from_document_id)
+    return {
+        "submission_id": move.submission_id,
+        "from_version": moved_from.version if moved_from is not None else None,
+        "moved_at": move.moved_at,
+        "submitted_at": move.first_recorded_at,
+        "assigned_at": move.first_assigned_at,
+        "assigned_by": (
+            ctx.person_of(move.first_assigned_by)
+            if move.first_assigned_by is not None
+            else None
+        ),
     }
 
 
@@ -1377,7 +1402,18 @@ def _row_steps(
                 round_ordinal=final["round_ordinal"] if final else None,
             )
         elif code in ("resolve_rejected", "resolve_queried"):
-            version = first(lambda v: v.translation_status == "reviewed")
+            # Rule 4 looks at each chain's literal newest version: a queried
+            # correction is not newer (issue 574), so a target can be the
+            # older version whose query the lead already decided.
+            version = next(
+                (
+                    c.newest
+                    for c in live
+                    if c.newest.translation_status == "reviewed"
+                    and c.newest.latest_decision in steps_rules.NOT_ACCEPTED_DECISIONS
+                ),
+                None,
+            ) or first(lambda v: v.translation_status == "reviewed")
             detail = _version_detail("version", version)
         elif code == "assign_translation_review":
             version = needs_reviewer or version

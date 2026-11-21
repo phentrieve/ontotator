@@ -35,17 +35,23 @@ it("row_props_select_and_handle_events", () => {
   expect(selected.getAttribute("aria-selected")).toBe("true"); expect(selected.className).toContain("is-selected"); expect(selected.className).toContain("custom");
   expect(selected.hasAttribute("selected")).toBe(false); fireEvent.click(selected); expect(click).toHaveBeenCalledOnce();
 });
-it("row_limit_shows_the_first_sorted_rows_then_the_more_row", () => {
+it("row_limit_shows_the_first_sorted_rows_then_the_more_line_below_the_table", () => {
+  const more = () => document.querySelector(".data-table-more");
   const { rerender } = render(<DataTable label="Cases" columns={columns} rows={rows} rowKey={(row) => row.id} rowLimit={{ count: 2, more: (total) => `2 of ${total}` }} />);
-  expect(names()).toEqual(["Alpha", "Beta", "2 of 3"]);
-  expect(screen.getAllByRole("row").at(-1)?.querySelector("td")?.getAttribute("colspan")).toBe("2");
+  expect(names()).toEqual(["Alpha", "Beta"]);
+  expect(more()?.textContent).toBe("2 of 3");
+  // Issue 550, U5-02: outside the table and its sideways scroll, so it wraps in the page width on a phone.
+  expect(more()?.closest("table, .data-table-scroll")).toBeNull();
+  expect(more()?.previousElementSibling?.classList.contains("data-table-scroll")).toBe(true);
   // The limit applies after sorting: the first rows of the sorted order are shown.
   fireEvent.click(screen.getByRole("button", { name: "Count" })); fireEvent.click(screen.getByRole("button", { name: "Count" }));
-  expect(names()).toEqual(["Alpha", "Gamma", "2 of 3"]);
+  expect(names()).toEqual(["Alpha", "Gamma"]);
   rerender(<DataTable label="Cases" columns={columns} rows={rows} rowKey={(row) => row.id} rowLimit={{ count: 1, more: () => "more", keep: (row) => row.id === "b" }} />);
-  expect(names()).toEqual(["Alpha", "Beta", "more"]);
+  expect(names()).toEqual(["Alpha", "Beta"]);
+  expect(more()?.textContent).toBe("more");
   rerender(<DataTable label="Cases" columns={columns} rows={rows} rowKey={(row) => row.id} rowLimit={{ count: 3, more: () => "more" }} />);
   expect(names()).toEqual(["Alpha", "Gamma", "Beta"]);
+  expect(more()).toBeNull();
 });
 describe("groups_expansion_and_row_headers", () => {
   type Row = { id: string; group: string; name: string; n: number };

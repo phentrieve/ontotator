@@ -58,7 +58,7 @@ If the project hides annotator names, the screen says *Annotator names are hidde
 
 If the lead gave a reason when starting the consolidation, it shows above the groups, for example *Reason from the lead: Term and assertion differ*, and under the task in **My tasks**.
 
-If the lead reopened a consolidation you had submitted, a line above the groups says when and why, for example *Reopened by the lead on 18 Nov 2026, 10:00: The onset is still open.* In **My tasks**, click the **Reopened** badge to read it. A consolidation the lead withdrew is no longer in **My tasks**; ask the lead why.
+If the lead reopened a consolidation you had submitted, a line above the groups says when and why, for example *Reopened by the lead on 18 Nov, 10:00: The onset is still open.* In **My tasks**, click the **Reopened** badge to read it. A consolidation the lead withdrew is no longer in **My tasks**; ask the lead why.
 
 The header holds **Open in full editor**, **Report a text problem** and, if the project has guidelines, a button such as *Guidelines v2*. **More…** appears once you decided a group.
 
@@ -200,6 +200,6 @@ Groups you changed here are tagged **edited in editor** on the consolidation scr
 
 If you also lead the project, you can open the text view of a text you consolidate to read each person's findings side by side. See [Read a text and other people's work in the text view](lead-documents.md#read-a-text-and-other-peoples-work-in-the-text-view).
 
-If you do not lead the project, read the other people's findings on the consolidation screen and in the [full editor](#work-in-the-full-editor). The text view shows you the text and your own submitted results only. Its **Submissions** list also names the submissions you consolidate, as plain rows without a link; only your own rows are marked *(you)* and open in the viewer. The **Text card** belongs to **Documents**, which is for project leads, so the text view offers it to leads only.
+If you do not lead the project, read the other people's findings on the consolidation screen and in the [full editor](#work-in-the-full-editor). The text view shows you the text and your own submitted results only. Its **Submissions** list also names the submissions you consolidate, as plain rows without a link; only your own rows are marked *(you)* and open in the viewer. **Round** and **Kind** read as they do for the lead, for example *Round 1* and *Carried annotation*. The **Text card** and the link back to **Documents** at the top left belong to **Documents**, which is for project leads, so the text view offers them to leads only.
 
 For a lead: when a submission was carried over from an earlier version of the text, the text view of it offers **Show changes since** v1 (with the number of that version). It marks the changed passages as described for annotators in [See what changed since the earlier version](annotator.md#see-what-changed-since-the-earlier-version); the consolidation screen itself does not show them. On a phone, the text view lists the findings of the shown work below the text, which keeps the full width.

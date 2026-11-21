@@ -49,6 +49,7 @@ since, what blocks it; it changes nothing.
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -477,6 +478,10 @@ class BulkTaskActionService:
             "change_count": len(changes),
             "kept_count": len(kept),
             "skipped_count": len(skipped),
+            # Why, by reason, also with ``summary_only``: the menu says why an
+            # entry does nothing for the selection (#576).
+            "kept_by_reason": dict(Counter(reason for _, reason in kept)),
+            "skipped_by_reason": dict(Counter(reason for _, reason in skipped)),
             "changes": [],
             "kept": [],
             "skipped": [],

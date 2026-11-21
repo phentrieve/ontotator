@@ -5,7 +5,7 @@ import { routeHref } from '../app/router';
 import { Button, Checkbox, InlineMessage, Select, Textarea } from '../ui';
 import { ErrorNotice } from '../admin/ErrorNotice';
 import { unreadLanguages } from '../admin/assignmentUI';
-import { formatDateTime } from '../app/labels';
+import { formatTime } from '../app/submissionLabels';
 import { onSpaceActivate } from '../ui/spaceActivates';
 import { notifyFinalSelectionChanged } from './finalSelectionState';
 
@@ -126,7 +126,7 @@ function ConsolidationContent(props: Props): JSX.Element {
     {!current && loadError == null && <InlineMessage tone="info">Loading consolidators and tasks…</InlineMessage>}
     {current && <>
       <fieldset disabled={busy}><legend>Submissions to merge</legend>{eligibleRows.map(row => <Checkbox key={row.submission_id}
-        id={`${fieldId}-${encodeURIComponent(row.submission_id)}`} label={row.label ?? `${row.author_label}, ${formatDateTime(row.created_at)}`}
+        id={`${fieldId}-${encodeURIComponent(row.submission_id)}`} label={row.label ?? `${row.author_label}, ${formatTime(row.created_at)}`}
         data-submission-id={row.submission_id} checked={selected.has(row.submission_id)} onChange={event => setSelected(previous => {
           const next = new Set(previous); if (event.target.checked) next.add(row.submission_id); else next.delete(row.submission_id); return next;
         })} />)}</fieldset>

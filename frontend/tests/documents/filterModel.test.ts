@@ -27,7 +27,7 @@ describe("filter model", () => {
     ["Owner → chip", { owner: "me" }, { owner: "me" }, ["Waiting on: You"]],
     ["Assignee → chip", { assignee: "ann-0001" }, { assignee: "ann-0001" }, ["Assigned to: ann-0001"]],
     ["Paused → chip", { paused: "yes" }, { paused: "yes" }, ["Paused tasks"]],
-    ["Review facet", { review_state: "in_progress,re_review,check_failed" }, { review_state: ["in_progress", "re_review", "check_failed"] }, ["Translation review: In progress", "Translation review: Check failed"]],
+    ["Review facet", { review_state: "in_progress,re_review,check_failed" }, { review_state: ["in_progress", "re_review", "check_failed"] }, ["Translation review: In review", "Translation review: Check failed"]],
     ["Annotation facet", { annotation_state: "old_text_open" }, { annotation_state: "old_text_open" }, ["Annotation: On old text"]],
     ["Final facet", { final_state: "none,after_annotation,after_review,choose" }, { final_state: ["none", "after_annotation", "after_review", "choose"] }, ["Final: No final yet"]],
     ["Waiting on facet", { waiting_on: "me,ann-0001" }, { waiting_on: ["me", "ann-0001"] }, ["Waiting on: You", "Waiting on: ann-0001"]],
@@ -138,7 +138,7 @@ describe("filter model", () => {
   });
 
   it("toggles grouped options and counts their values", () => {
-    const inProgress = optionOf("In progress");
+    const inProgress = optionOf("In review");
     expect(inProgress.values).toEqual(["in_progress", "re_review"]);
     expect(toggleOption({ review_state: "accepted" }, inProgress, true)).toEqual({ review_state: "accepted,in_progress,re_review" });
     expect(toggleOption({ review_state: "accepted,re_review" }, inProgress, false)).toEqual({ review_state: "accepted" });

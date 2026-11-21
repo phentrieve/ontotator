@@ -63,6 +63,20 @@ describe("My tasks component", () => {
     expect(within(rows[1]).queryByText("Answer from the lead")).toBeNull();
   });
 
+  it("a submitted translation review names the reviewer's decision (issue 472)", async () => {
+    vi.mocked(api.listMyTasks).mockResolvedValue([
+      { ...task(3, "submitted"), task: "translation_review", review_decision: "rejected" },
+      { ...task(5, "submitted"), task: "translation_review", review_decision: "accepted_corrected" },
+      task(1, "submitted"),
+    ]);
+    render(<MyTasks projects={[]} onNavigate={vi.fn()} />);
+    await screen.findAllByTestId("task-row");
+    expect(screen.getByText("Your decision: Rejected")).toBeDefined();
+    expect(screen.getByText("Your decision: Accepted with corrections")).toBeDefined();
+    // The annotation task has no decision line.
+    expect(screen.getAllByText(/^Your decision:/)).toHaveLength(2);
+  });
+
   it("links the answer badge to the answered report (#18)", async () => {
     const onNavigate = vi.fn();
     vi.mocked(api.listMyTasks).mockResolvedValue([{ ...task(3, "open"), report_answered: true, answered_report_id: "r-7" }]);
@@ -102,6 +116,23 @@ describe("My tasks component", () => {
       expect(within(rows[0]).getByText("assigned today 10:40")).toBeDefined();
       expect(within(rows[1]).getByText("Annotation, from scratch")).toBeDefined();
       expect(within(rows[2]).getByText("Consolidation")).toBeDefined();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("Last change follows the rule of assigned in the same row (issue 546)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 23, 15, 0));
+    const at = new Date(2026, 9, 23, 10, 40).toISOString();
+    vi.mocked(api.listMyTasks).mockResolvedValue([{ ...task(7, "open"), assigned_at: at, updated_at: new Date(2026, 9, 23, 11, 5).toISOString() },
+      { ...task(8, "open"), assigned_at: at, updated_at: new Date(2026, 9, 22, 9, 0).toISOString() }]);
+    try {
+      render(<MyTasks projects={[]} onNavigate={vi.fn()} />);
+      const rows = await screen.findAllByTestId("task-row");
+      expect(within(rows[0]).getByText("assigned today 10:40")).toBeDefined();
+      const changed = within(rows[0]).getByText("today 11:05");
+      expect(changed.tagName).toBe("TIME");
+      expect(changed.getAttribute("title")).toMatch(/2026/);
+      expect(within(rows[1]).getByText("yesterday")).toBeDefined();
     } finally { vi.useRealTimers(); }
   });
 

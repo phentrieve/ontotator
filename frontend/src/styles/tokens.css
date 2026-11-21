@@ -120,6 +120,8 @@
   --cell-pad-y: 10px;
   --cell-pad-x: 16px;
   --control-height: 36px;
+  /* Smallest touch target on a phone: 44 × 44 CSS px (WCAG 2.5.5 Target Size, issue 550). */
+  --touch-target: 44px;
   /* Existing component colours, centralised without changing their values. */
   --review-badge-fill: #f3e8ff;
   --review-badge-text: #7e22ce;

@@ -330,3 +330,86 @@ test.describe("dark, emulated", () => {
     });
   }
 });
+
+// Issue 550, U5-04: the browser's Back closes the user menu, as a click elsewhere does.
+for (const size of SIZES) {
+  test(`${size.name} px: the user menu closes on the browser's Back and stays closed on Forward`, async ({ page }) => {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    await loginAdministrator(page);
+    await page.goto("/#/projects");
+    await expect(page.getByRole("heading", { name: "Projects", level: 1 })).toBeVisible();
+    await page.goto("/#/me");
+    await expect(page.getByRole("heading", { name: "Profile", level: 1 })).toBeVisible();
+    const menu = await openUserMenu(page);
+    await page.goBack();
+    await expect(page).toHaveURL(/#\/projects$/);
+    await expect(menu).toHaveCount(0);
+    await expect(userMenuButton(page)).toHaveAttribute("aria-expanded", "false");
+    await page.goForward();
+    await expect(page).toHaveURL(/#\/me$/);
+    await expect(menu).toHaveCount(0);
+  });
+}
+
+// Issue 547, U2-09: the Translation reviews list belongs to Progress: Progress stays marked, and the header leads back.
+for (const size of SIZES) {
+  test(`${size.name} px: Translation reviews marks Progress and leads back to it`, async ({ page }) => {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    const s = await guidelineScenario(page, "PUBLISHED");
+    await loginGuidelineUser(page, s, "lead");
+    await page.goto(`/#/projects/${encodeURIComponent(s.project)}/progress`);
+    await page.getByRole("link", { name: "Translation reviews", exact: true }).click();
+    await expect(page).toHaveURL(/\/translation-reviews$/);
+    await expect(workSidebar(page).getByRole("link", { name: "Progress", exact: true })).toHaveAttribute("aria-current", "location");
+    const crumbs = page.getByRole("navigation", { name: "Breadcrumb", exact: true });
+    await expect(crumbs).toContainText("Translation reviews");
+    expect(await fitsWindow(page)).toBe(true);
+    if (size === PHONE) await evidence(page, "translation-reviews-progress-phone");
+    else await evidence(page, "translation-reviews-progress-wide");
+    await crumbs.getByRole("button", { name: "Progress", exact: true }).click();
+    await expect(page).toHaveURL(/\/progress$/);
+    await expect(workSidebar(page).getByRole("link", { name: "Progress", exact: true })).toHaveAttribute("aria-current", "page");
+  });
+}
+
+// Issue 550, U5-03 (WCAG 2.5.5): on a phone every control of the header and of the navigation is at least 44 × 44 px.
+test.describe("touch targets at 390 px", () => {
+  test.use({ viewport: { width: PHONE.width, height: PHONE.height } });
+
+  const small = async (controls: Locator) => {
+    const out: string[] = [];
+    for (const control of await controls.all()) {
+      if (!await control.isVisible()) continue;
+      const box = (await control.boundingBox())!;
+      if (box.width < 44 - 0.5 || box.height < 44 - 0.5) out.push(`${(await control.innerText()).trim() || await control.getAttribute("aria-label")}: ${Math.round(box.width)}×${Math.round(box.height)}`);
+    }
+    return out;
+  };
+
+  test("the gear, the user menu, Handbook and the Administration sidebar; a lead's project pages; Sections in the editor", async ({ page }) => {
+    const s = await guidelineScenario(page, "PUBLISHED");
+    await loginAdministrator(page);
+    await openAdministration(page);
+    const header = page.locator(".shell-header");
+    expect(await small(header.locator("a, button"))).toEqual([]);
+    expect(await small(adminSidebar(page).getByRole("link"))).toEqual([]);
+    expect(await fitsWindow(page)).toBe(true);
+    await evidence(page, "touch-admin-phone");
+    await clickLogOut(page);
+    await loginGuidelineUser(page, s, "lead");
+    await page.goto(`/#/projects/${encodeURIComponent(s.project)}/progress`);
+    expect(await small(header.locator("a, button"))).toEqual([]);
+    expect(await small(workSidebar(page).getByRole("link"))).toEqual([]);
+    expect(await fitsWindow(page)).toBe(true);
+    // Issue 574 F3: the breadcrumb "Progress" of Translation reviews.
+    await page.getByRole("link", { name: "Translation reviews", exact: true }).click();
+    await expect(header.getByRole("navigation", { name: "Breadcrumb", exact: true }).getByRole("button", { name: "Progress", exact: true })).toBeVisible();
+    expect(await small(header.locator("a, button"))).toEqual([]);
+    expect(await fitsWindow(page)).toBe(true);
+    // The editor's one header row: Sections and the user menu.
+    await page.goto(await caseAddress(page, s.project));
+    await expect(page.locator(".shell.shell-reading")).toBeVisible();
+    expect(await small(page.locator(".shell-header").locator("summary, a, button"))).toEqual([]);
+    expect(await fitsWindow(page)).toBe(true);
+  });
+});

@@ -279,6 +279,9 @@ def test_every_reason_a_task_is_kept_or_a_text_is_skipped(env):
         2,
     )
     assert final not in [k["assignment_id"] for k in found["kept"]]
+    # By reason, as the menu reads them with ``summary_only`` (#576).
+    assert found["skipped_by_reason"] == {"final_result": 1, "consolidation_open": 1}
+    assert sum(found["kept_by_reason"].values()) == 4
 
     applied = env.lead.post(
         START,
@@ -494,3 +497,45 @@ def test_texts_the_project_does_not_have_are_named(env):
     assert found.status_code == 200, found.text
     assert found.json()["texts"] == 1
     assert found.json()["unknown_rows"] == wrong
+
+
+def test_history_names_a_carried_round_as_the_lead_reads_it(env):
+    """Issue 547 (U4-07): the text view of a person who is not the lead
+    gives a submission of a carried round its round number and kind, as the
+    lead's submissions table does ("Round 1", "Carried annotation")."""
+    from urllib.parse import quote
+
+    from auth_harness import logged_in
+
+    from ontotator.storage.workflow_tables import RoundSubmissionBindingRow
+
+    task = _submitted(env, "c1", "anno", "s1")
+    preview = _post(env, kind="carry_forward", preview=True).json()
+    done = _post(env, kind="carry_forward", preview_token=preview["preview_token"])
+    assert done.status_code == 200, done.text
+    with env.db.transaction() as conn:
+        carried = conn.execute(
+            select(WorkRoundRow.round_id).where(WorkRoundRow.assignment_id == task)
+        ).scalar_one()
+    submit(env, task, "s1-carried")
+    with env.db.transaction() as conn:
+        conn.execute(
+            insert(RoundSubmissionBindingRow).values(
+                project_id=env.pid, submission_id="s1-carried", round_id=carried
+            )
+        )
+    lead = env.lead.get(f"{BASE}/document-rows/c1/en/submissions")
+    assert lead.status_code == 200, lead.text
+    expected = {
+        row["submission_id"]: (row["round_ordinal"], row["kind"])
+        for row in lead.json()["submissions"]
+    }
+    assert expected["s1-carried"] == (1, "carry_forward")
+    history = logged_in(env.app, "anno").get(
+        f"{BASE}/documents/{quote(doc('c1', 'en'), safe='')}/submissions"
+    )
+    assert history.status_code == 200, history.text
+    assert {
+        row["submission_id"]: (row["round_ordinal"], row["kind"])
+        for row in history.json()
+    } == expected

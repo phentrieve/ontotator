@@ -462,12 +462,21 @@ QUERY_OLD, QUERY_NEW = "hypotonia", "muscular hypotonia"
 QUERY_RATIONALE = "The source says muscular hypotonia. Is the short form meant?"
 
 
-def queried_translation_for_lead(app: FastAPI) -> dict[str, Any]:
+def queried_translation_for_lead(
+    app: FastAPI, *, requery: bool = False
+) -> dict[str, Any]:
     """Issue 483: rule on, 3 cases with de review + annotate. Ana queried the
     de translations of case-0101 and case-0102, each with a proposed text
     ("hypotonia" became "muscular hypotonia") and a question; she rejected
-    case-0103. The lead decides the queries under "Resolve…"."""
+    case-0103. The lead decides the queries under "Resolve…".
+
+    With ``requery`` (issue 574 F1) the lead has taken Ana's text of
+    case-0101 as v2, accepted, asked Ben to correct v2, and Ben queried v2."""
+    from ontotator.application.query_decisions import QueryDecisionService
     from ontotator.application.translation_reviews import TranslationReviewService
+    from ontotator.application.translation_workflow import (
+        TranslationWorkflowService,
+    )
 
     scenario = lead_project(app, "QUERIED_TRANSLATION_FOR_LEAD")
     scenario.app.state.accounts.update_profile(
@@ -498,12 +507,60 @@ def queried_translation_for_lead(app: FastAPI) -> dict[str, Any]:
     review_translation(
         scenario, docs[(QUERIED_CASES["rejected"], "de")], "ana", "rejected"
     )
+    if requery:
+        _lead_access, lead = identity(scenario, "lead")
+        v1 = docs[(QUERIED_CASES["take_text"], "de")]
+        decisions = QueryDecisionService(scenario.db, scenario.app.state.jobs)
+        shown = decisions.preview(lead, scenario.key, v1)
+        v2 = decisions.decide(
+            lead,
+            scenario.key,
+            v1,
+            kind="reviewer_text",
+            expected_text_sha256=shown["text_sha256"],
+            expected_review_id=shown["review"]["id"],
+            text=shown["review"]["proposed_text"],
+        )["document_id"]
+        again = TranslationWorkflowService(scenario.db, scenario.app.state.jobs)
+        asked = again.assign_correction(
+            lead,
+            scenario.key,
+            v2,
+            scenario.users["ben"],
+            expected_text_sha256=decisions.preview(lead, scenario.key, v2)[
+                "text_sha256"
+            ],
+            reason="Check the dose.",
+            confirm_language=True,
+        )
+        access, _actor = identity(scenario, "ben")
+        opened = review.open(access, asked.id)
+        revision = review.save_draft(
+            access,
+            asked.id,
+            expected_revision=opened.draft.revision,
+            text=opened.text,
+            form={
+                "decision": "query",
+                "clinical_change": True,
+                "categories": ["terminology"],
+                "rationale": REQUERY_RATIONALE,
+            },
+        )
+        review.submit(access, asked.id, expected_revision=revision)
     return result(
         scenario,
         all_rows(case_ids, ("de",)),
         case_ids={"de": list(case_ids)},
         cases=dict(QUERIED_CASES),
     )
+
+
+REQUERY_RATIONALE = "Is the dose in v2 per day or per dose?"
+
+
+def queried_correction_for_lead(app: FastAPI) -> dict[str, Any]:
+    return queried_translation_for_lead(app, requery=True)
 
 
 ACCEPTED_FOR_LEAD_CASES = {
@@ -593,6 +650,69 @@ def typo_fix_carry(app: FastAPI) -> dict[str, Any]:
     )
 
 
+TYPO_FIX_PROPOSALS_CASE = "case-0509"
+
+
+def typo_fix_proposals(app: FastAPI) -> dict[str, Any]:
+    """Issue 509: an accepted de translation of case-0509 with the typo
+    "hypotnia" and two tool proposals, on "seizures" and on "hypotnia". Ben's
+    task is from proposals and nobody opened it; Cy Annotator opened a task
+    from scratch. Fixing "hypotnia" leaves a proposal for a check, so Ben's
+    task stays; a fix elsewhere carries both proposals, so it follows."""
+    from browser_carry_fixture import HYPOTONIA, _span
+    from browser_documents_scenarios import start_round
+    from t1_builders import native_unit, translation_unit
+    from t1_fixtures import annotation
+
+    from ontotator.storage.tables import AssignmentRow
+
+    scenario = lead_project(app, "TYPO_FIX_PROPOSALS")
+    case = TYPO_FIX_PROPOSALS_CASE
+    source = native_unit(case, "en", SYNTHETIC, case_id=case)
+    seizures, hypotnia = (
+        _span(TYPO_FIX_TEXT, "seizures"),
+        _span(TYPO_FIX_TEXT, "hypotnia"),
+    )
+    proposals = native_unit(
+        case,
+        "de",
+        TYPO_FIX_TEXT,
+        case_id=case,
+        annotations=[
+            annotation("p1", (seizures["start"], seizures["end"]), text=TYPO_FIX_TEXT),
+            annotation(
+                "p2",
+                (hypotnia["start"], hypotnia["end"]),
+                text=TYPO_FIX_TEXT,
+                term_id=HYPOTONIA,
+            ),
+        ],
+    )
+    translation = translation_unit(case, "de", TYPO_FIX_TEXT, source=source).model_copy(
+        update={"annotation_set": proposals.annotation_set}
+    )
+    docs = import_units(scenario, [source, translation])
+    plan(scenario, [case], {"de": REVIEW_AND_ANNOTATE})
+    document_id = docs[(case, "de")]
+    review_translation(scenario, document_id, "ana", "accepted_unchanged")
+    waiting = assign(scenario, document_id, "ben", "annotate")
+    opened = assign(scenario, document_id, "annotator", "annotate")
+    with app.state.repo.db.transaction() as conn:
+        for task, mode in ((waiting, "proposals"), (opened, "scratch")):
+            conn.execute(
+                update(AssignmentRow)
+                .where(AssignmentRow.id == task)
+                .values(annotation_mode=mode)
+            )
+    start_round(scenario, opened, "annotator")
+    return result(
+        scenario,
+        all_rows([case], ("de",)),
+        case_ids={"de": [case]},
+        documents={"de": document_id},
+    )
+
+
 UPLOAD_DIALOG_CASES = cases(301, 62)
 
 
@@ -671,9 +791,11 @@ BUILDERS: dict[str, Builder] = {
     "ROWS": build_rows,
     "REJECTED_TRANSLATION_FOR_LEAD": rejected_translation_for_lead,
     "QUERIED_TRANSLATION_FOR_LEAD": queried_translation_for_lead,
+    "QUERIED_CORRECTION_FOR_LEAD": queried_correction_for_lead,
     "ACCEPTED_TRANSLATION_FOR_LEAD": accepted_translation_for_lead,
     "UPLOAD_DIALOG": build_upload_dialog,
     "TYPO_FIX_CARRY": typo_fix_carry,
+    "TYPO_FIX_PROPOSALS": typo_fix_proposals,
 }
 
 

@@ -253,8 +253,8 @@ describe("ConsolidationScreen", () => {
 
   it("shows the guidelines notice inside the screen, right under its header (R-14)", async () => {
     load(exampleView());
-    await renderScreen({ notice: <p>This project has guidelines (v1)</p> });
-    const notice = screen.getByText("This project has guidelines (v1)");
+    await renderScreen({ notice: <p>This project has guidelines v1</p> });
+    const notice = screen.getByText("This project has guidelines v1");
     expect(notice.closest(".cons-screen")).toBeTruthy();
     expect(document.querySelector(".cons-header")?.nextElementSibling).toBe(notice);
   });

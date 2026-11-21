@@ -31,7 +31,7 @@ from browser_documents_scenarios import (
 from browser_server import ONTOLOGY
 from fastapi.testclient import TestClient
 from pg_harness import database_url_for
-from sqlalchemy import select
+from sqlalchemy import select, update
 from t1_builders import native_unit, translation_unit
 from t1_fixtures import HP_PATH, annotation
 
@@ -128,13 +128,17 @@ def _hash(scenario: Scenario, document_id: str) -> str:
     )
 
 
-def _correct(scenario: Scenario, document_id: str) -> dict[str, Any]:
+def _correct(
+    scenario: Scenario,
+    document_id: str,
+    replacements: list[dict[str, str]] = REPLACEMENTS,
+) -> dict[str, Any]:
     _access, actor = identity(scenario, "lead")
     result = _service(scenario).correct(
         actor,
         scenario.key,
         document_id,
-        replacements=REPLACEMENTS,
+        replacements=replacements,
         expected_text_sha256=_hash(scenario, document_id),
         reason=REASON,
     )
@@ -374,3 +378,173 @@ def test_the_exported_bundle_names_a_correction_of_the_accepted_text(
     assert german[1].variant.origin == "machine_translation"
     assert german[1].translation is not None
     assert _hash(scenario, result["document_id"]) == corrected.text_sha256
+
+
+# Issue 509: tasks from proposals after an editorial correction.
+# The space fix only: both proposals are carried, none needs a check.
+SPACE_ONLY = REPLACEMENTS[:1]
+
+
+def _from_proposals(scenario: Scenario, assignment_id: int, **values: Any) -> None:
+    """Make the task one from proposals (as a text annotated from proposals
+    gets them), with further column ``values``."""
+    with scenario.db.transaction() as conn:
+        conn.execute(
+            update(AssignmentRow)
+            .where(AssignmentRow.id == assignment_id)
+            .values(annotation_mode="proposals", **values)
+        )
+
+
+def _set(scenario: Scenario, assignment_id: int, **values: Any) -> None:
+    with scenario.db.transaction() as conn:
+        conn.execute(
+            update(AssignmentRow)
+            .where(AssignmentRow.id == assignment_id)
+            .values(**values)
+        )
+
+
+def _short(scenario: Scenario, items: list[dict[str, Any]]) -> list[tuple[str, str]]:
+    names = {username: name for name, username in scenario.users.items()}
+    return [(names[item["username"]], item["reason"]) for item in items]
+
+
+def test_an_unopened_task_from_proposals_follows_when_no_proposal_needs_a_check(
+    app: Any,
+) -> None:
+    """Issue 509: a task from proposals nobody opened follows the new version
+    when the dry run reports no proposal for a check. It moves once the
+    re-anchoring has stored the new version's proposals, keeps its id and
+    opens there from the carried proposals."""
+    scenario, document_id = _project(app, proposals=True)
+    task = assign(scenario, document_id, "ana", "annotate")
+    _from_proposals(scenario, task)
+    _access, actor = identity(scenario, "lead")
+    preview = _service(scenario).preview(
+        actor, scenario.key, document_id, replacements=SPACE_ONLY
+    )
+    assert preview["proposals"] == {"sets": 1, "carried": 2, "needs_check": 0}
+    assert preview["tasks_following"] == 1
+    assert (preview["tasks_staying"], preview["annotation_carry"]) == ([], [])
+
+    result = _correct(scenario, document_id, SPACE_ONLY)
+
+    assert _tasks(scenario) == {"ana": (result["document_id"], "open")}
+    assert (result["tasks_following"], result["tasks_staying"]) == (1, [])
+    with scenario.db.transaction() as conn:
+        moved = conn.execute(
+            select(AssignmentRow.document_id).where(AssignmentRow.id == task)
+        ).scalar_one()
+    assert moved == result["document_id"]
+    # Ana works on the corrected text from its own, carried proposals.
+    started = start_round(scenario, task, "ana")
+    assert started.workspace_key
+
+
+def test_a_task_from_proposals_stays_when_a_proposal_needs_a_check(
+    app: Any,
+) -> None:
+    """Issue 509: with a proposal left for a check the task from proposals
+    stays on the corrected version, as before; the dry run says so."""
+    scenario, document_id = _project(app, proposals=True)
+    task = assign(scenario, document_id, "ana", "annotate")
+    _from_proposals(scenario, task)
+    _access, actor = identity(scenario, "lead")
+    preview = _service(scenario).preview(
+        actor, scenario.key, document_id, replacements=REPLACEMENTS
+    )
+    assert preview["proposals"] == {"sets": 1, "carried": 1, "needs_check": 1}
+    assert preview["tasks_following"] == 0
+    assert _short(scenario, preview["tasks_staying"]) == [
+        ("ana", "from_proposals_needs_check")
+    ]
+    assert preview["tasks_staying"][0]["assignment_id"] == task
+
+    result = _correct(scenario, document_id)
+
+    assert result["tasks_following"] == 0
+    assert _short(scenario, result["tasks_staying"]) == [
+        ("ana", "from_proposals_needs_check")
+    ]
+    assert _tasks(scenario) == {"ana": (document_id, "open")}
+
+
+def test_the_dry_run_names_each_task_that_stays_and_why(app: Any) -> None:
+    """Issue 509: an opened task, a paused one and a paused task from
+    proposals stay with their reason; before the text is known a task from
+    proposals is named as such. Only the unopened task from proposals
+    follows, once the proposals are carried."""
+    scenario, document_id = _project(app, proposals=True)
+    opened = assign(scenario, document_id, "eva", "annotate")
+    start_round(scenario, opened, "eva")
+    paused = assign(scenario, document_id, "tom", "annotate")
+    _set(scenario, paused, held=True, hold_reason="problem_report")
+    waiting = assign(scenario, document_id, "ana", "annotate")
+    _from_proposals(scenario, waiting)
+    _access, actor = identity(scenario, "lead")
+    before = _service(scenario).preview(actor, scenario.key, document_id)
+    assert before["tasks_following"] == 0
+    assert sorted(_short(scenario, before["tasks_staying"])) == [
+        ("ana", "from_proposals"),
+        ("eva", "opened"),
+        ("tom", "paused"),
+    ]
+    preview = _service(scenario).preview(
+        actor, scenario.key, document_id, replacements=SPACE_ONLY
+    )
+    assert preview["tasks_following"] == 1
+    assert sorted(_short(scenario, preview["tasks_staying"])) == [
+        ("eva", "opened"),
+        ("tom", "paused"),
+    ]
+    # The paused task that nobody opened is not named as started work.
+    assert [item["username"] for item in preview["annotation_carry"]] == [
+        scenario.users["eva"]
+    ]
+
+    result = _correct(scenario, document_id, SPACE_ONLY)
+
+    assert _tasks(scenario) == {
+        "eva": (document_id, "open"),
+        "tom": (document_id, "open"),
+        "ana": (result["document_id"], "open"),
+    }
+
+
+def test_a_paused_task_from_proposals_stays(app: Any) -> None:
+    """Issue 509: a paused task from proposals stays, also when every
+    proposal is carried."""
+    scenario, document_id = _project(app, proposals=True)
+    task = assign(scenario, document_id, "ana", "annotate")
+    _from_proposals(scenario, task, held=True, hold_reason="problem_report")
+    _access, actor = identity(scenario, "lead")
+    preview = _service(scenario).preview(
+        actor, scenario.key, document_id, replacements=SPACE_ONLY
+    )
+    assert preview["tasks_following"] == 0
+    assert _short(scenario, preview["tasks_staying"]) == [("ana", "paused")]
+
+    _correct(scenario, document_id, SPACE_ONLY)
+
+    assert _tasks(scenario) == {"ana": (document_id, "open")}
+
+
+def test_a_task_from_proposals_stays_when_no_proposal_is_carried(app: Any) -> None:
+    """Issue 509: without proposals on the corrected version nothing reaches
+    the new one, so a task from proposals stays there."""
+    scenario, document_id = _project(app)
+    task = assign(scenario, document_id, "ana", "annotate")
+    _from_proposals(scenario, task)
+    _access, actor = identity(scenario, "lead")
+    preview = _service(scenario).preview(
+        actor, scenario.key, document_id, replacements=SPACE_ONLY
+    )
+    assert preview["proposals"] == {"sets": 0, "carried": 0, "needs_check": 0}
+    assert _short(scenario, preview["tasks_staying"]) == [
+        ("ana", "from_proposals_none_carried")
+    ]
+    result = _correct(scenario, document_id, SPACE_ONLY)
+
+    assert result["tasks_following"] == 0
+    assert _tasks(scenario) == {"ana": (document_id, "open")}
