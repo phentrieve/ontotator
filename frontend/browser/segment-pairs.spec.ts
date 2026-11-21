@@ -203,6 +203,20 @@ test('screenshots for the pull request', async ({ browser }) => {
     await page.keyboard.press('Control+f');
     await page.getByRole('searchbox', { name: 'Find in the texts', exact: true }).fill('mmHg');
   });
+  // The fallback: a translation without punctuation keeps the usual view with the note.
+  {
+    const context = await browser.newContext({ baseURL: test.info().project.use.baseURL, viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
+    const page = await context.newPage();
+    const letter = texts(ALIGNMENT_SAMPLE.slice(0, 1));
+    const s = await scenario(page, { source: letter.source, target: letter.target.replace(/[.;:!?]/g, '') });
+    await loginExisting(page, s.users.reviewer);
+    await page.locator(`a[href="#/tasks/${s.assignment_id}"]`).click();
+    await page.getByRole('checkbox', { name: 'Check by segment pairs', exact: true }).check();
+    await expect(page.locator('.translation-pairs-fallback')).toBeVisible();
+    await page.mouse.move(0, 0);
+    await page.screenshot({ path: resolve(folder, '7-fallback-1440.png') });
+    await context.close();
+  }
   const long = texts([...ALIGNMENT_SAMPLE, ...ALIGNMENT_HELD_OUT], 4);
   await shoot('5-long-text-1440', long, async page => {
     await expect(rows(page).first()).toBeVisible();
