@@ -475,17 +475,19 @@ test("ROWS: row actions within three clicks", async ({ page }) => {
   await expect(card).toHaveCount(0);
   await expect(rowCell(row(page, cases.choose_final, "de"), "finalization")).toContainText("accepted");
 
-  // Resolve…: the options exactly, inline under the row (Change 13); discarding takes 3 (+ typing the reason).
+  // Resolve…: a dialog with one primary action, the rest under Other ways… (issue 554); discarding takes 4 (+ typing the reason).
   clicks = counter(page);
   await clicks.click(rowAction(page, "Resolve…", cases.rejected, "de"));
-  const resolve = page.getByRole("group", { name: textNamePattern("Resolve rejected translation, ", cases.rejected, "de") });
-  await expect(resolve.getByRole("heading", { name: textNamePattern("Resolve rejected translation, ", cases.rejected, "de") })).toBeFocused();
-  await expect(resolve.getByRole("button")).toHaveText(["Reopen Ana Weber's review…", "Assign a new review…", "Correct the translation…", "Discard the de translation…", "Cancel"]);
-  await clicks.click(resolve.getByRole("button", { name: "Discard the de translation…", exact: true }));
+  const resolve = page.getByRole("dialog", { name: textNamePattern("Resolve rejected translation, ", cases.rejected, "de") });
+  await expect(resolve.getByRole("button", { name: "Correct it myself (counts as accepted)…", exact: true })).toBeFocused();
+  await expect(resolve.locator(".modal-actions").getByRole("button")).toHaveText(["Other ways…", "Cancel", "Correct it myself (counts as accepted)…"]);
+  await clicks.click(resolve.getByRole("button", { name: textNamePattern("Other ways to resolve ", cases.rejected, "de") }));
+  await expect(page.getByRole("menuitem")).toHaveText([/^Reopen Ana Weber's review…/, /^Assign a new review…/, /^Discard the de translation…/]);
+  await clicks.click(page.getByRole("menuitem", { name: "Discard the de translation…", exact: true }));
   const discard = page.getByRole("group", { name: `Discard the de translation of ${cases.rejected}`, exact: true });
   await discard.getByRole("textbox", { name: "Reason (required)" }).fill("The translation used the wrong source.");
   await clicks.click(discard.getByRole("button", { name: "Discard", exact: true }));
-  expect(clicks.total).toBe(3);
+  expect(clicks.total).toBe(4);
   await expect(live(page)).toHaveText(`The de translation of ${cases.rejected} was discarded.`);
 
   // Decide on report…: lands on Decide with focus: 3 (+ typing the outcome).
@@ -650,22 +652,22 @@ test("lead corrects a rejected translation and annotation becomes assignable", a
   const caseId = s.cases!.rejected;
   await loginLead(page, s);
 
-  // Resolve… opens the options inline under the row (Change 13); their heading takes focus (F5).
+  // Resolve… opens a dialog (issue 554); the primary action takes focus.
   await rowAction(page, "Resolve…", caseId, "de").click();
-  const area = page.locator(".documents-row-notice-slot");
-  const resolve = area.getByRole("group", { name: textNamePattern("Resolve rejected translation, ", caseId, "de") });
-  await expect(resolve.getByRole("heading", { name: textNamePattern("Resolve rejected translation, ", caseId, "de") })).toBeFocused();
-  await expect(resolve.getByRole("button")).toHaveText(["Reopen Ana Weber's review…", "Assign a new review…", "Correct the translation…", "Discard the de translation…", "Cancel"]);
+  const area = page.getByRole("dialog", { name: textNamePattern("Resolve rejected translation, ", caseId, "de") });
+  const resolve = area;
+  await expect(resolve.getByRole("button", { name: "Correct it myself (counts as accepted)…", exact: true })).toBeFocused();
+  await expect(resolve.locator(".modal-actions").getByRole("button")).toHaveText(["Other ways…", "Cancel", "Correct it myself (counts as accepted)…"]);
 
-  // Correct the translation…: the panel explains the outcome; its heading takes focus.
-  await resolve.getByRole("button", { name: "Correct the translation…", exact: true }).click();
+  // Correct it myself…: the panel explains the outcome; its heading takes focus.
+  await resolve.getByRole("button", { name: "Correct it myself (counts as accepted)…", exact: true }).click();
   const panel = area.getByRole("group", { name: textNamePattern("Correct the translation, ", caseId, "de") });
   await expect(panel.getByRole("heading", { name: textNamePattern("Correct the translation, ", caseId, "de") })).toBeFocused();
   await expect(panel).toContainText("You review v1 yourself and submit it as Accepted with corrections. The corrected text becomes v2 and counts as accepted.");
   // No language confirmation: the lead reads de and has a qualification.
   await expect(panel.getByRole("checkbox")).toHaveCount(0);
-  // The inline panel's h3 follows the hidden h2 "Texts" (heading order checked too).
-  expect(await axeViolations(page, ".documents-resolve"), "Correct the translation panel").toEqual([]);
+  // The panel's h3 follows the dialog's h2 (heading order checked too).
+  expect(await axeViolations(page, ".ui-dialog"), "Correct the translation panel").toEqual([]);
   await evidence(page, "lead-correction-panel", panel);
 
   // Open translation review: the ordinary review screen of v1, in lead-correction mode.
@@ -707,8 +709,9 @@ test("the same reviewer reviews a rejected translation again: Reopen, not a dead
 
   // Resolve… › Assign a new review…: Ana already reviewed it; her row offers Reopen their review…, no choice.
   await rowAction(page, "Resolve…", caseId, "de").click();
-  const resolve = page.locator(".documents-row-notice-slot").getByRole("group", { name: textNamePattern("Resolve rejected translation, ", caseId, "de") });
-  await resolve.getByRole("button", { name: "Assign a new review…", exact: true }).click();
+  const resolve = page.getByRole("dialog", { name: textNamePattern("Resolve rejected translation, ", caseId, "de") });
+  await resolve.getByRole("button", { name: textNamePattern("Other ways to resolve ", caseId, "de") }).click();
+  await page.getByRole("menuitem", { name: "Assign a new review…", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Assign translation review", exact: true });
   const ana = dialog.getByRole("table", { name: "Members" }).getByRole("row").filter({ hasText: person(s, "ana") });
   await expect(ana).toContainText("Review submitted");

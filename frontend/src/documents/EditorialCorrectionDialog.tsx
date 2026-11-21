@@ -129,7 +129,7 @@ export function editorialConsequences(preview: EditorialCorrectionPreview): Edit
 export function reviewNote(decision: string | null | undefined, next: number): string | null {
   if (!decision) return null;
   const stays = "A submitted translation review stays with the version it reviewed.";
-  return decision === "rejected" || decision === "query" ? `${stays} To have v${next} reviewed, use Resolve… › Assign a new review… on this row after saving.` : stays;
+  return decision === "rejected" || decision === "query" ? `${stays} To have v${next} reviewed, use Resolve… › Other ways… › Assign a new review… on this row after saving.` : stays;
 }
 
 type CarryPerson = NonNullable<EditorialCorrectionPreview["annotation_carry"]>[number];

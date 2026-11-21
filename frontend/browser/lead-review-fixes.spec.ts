@@ -12,7 +12,7 @@
  * Each test builds a fresh project through a scenario route.
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { activityLines, cardPath, documentsReady, documentsScenario, documentsTab, personRow, rowAction, rowCell, showSegment, textRow } from "./documentsHelpers";
+import { activityLines, cardPath, documentsReady, documentsScenario, documentsTab, otherVersionAction, personRow, rowAction, rowCell, showSegment, textRow } from "./documentsHelpers";
 import { loginExisting } from "./helpers";
 
 test.setTimeout(240_000);
@@ -210,7 +210,7 @@ for (const [width, height, suffix] of SIZES) {
     expect(errors).toEqual([]);
   });
 
-  test(`F8: the translation actions say who does the work, with a hint line; the dialogs follow (${width} px)`, async ({ page }) => {
+  test(`F8: the translation actions name their consequence, the other ways in a menu, no hint line; the dialogs follow (${width} px)`, async ({ page }) => {
     const errors = watchErrors(page);
     await page.setViewportSize({ width, height });
     const built = await page.request.post("/__test_lead_workflow__?scenario=ACCEPTED_TRANSLATION_FOR_LEAD");
@@ -225,23 +225,26 @@ for (const [width, height, suffix] of SIZES) {
       return card;
     };
 
-    // case-0101 de v1 is accepted: all four actions, each named by who does the work, and one hint line under them.
+    // case-0101 de v1 is accepted (issues 555, 556): one edit action, the other ways in a menu, no hint line under the buttons.
     const card = await open("case-0101");
     const v1 = card.locator("li.text-version").first();
-    await expect(v1.locator(".text-version-actions").getByRole("button")).toHaveText(["Ask a reviewer to correct…", "Correct it myself…", "Fix typos…", "Upload a corrected text…", "Translation reviews"]);
-    const hint = v1.locator(".text-version-hint");
-    await expect(hint).toHaveText("Ask a reviewer: a reviewer corrects it in a new review. Correct it myself: you edit it here; it is reviewed again. Fix typos: spacing, typos, grammar; the status stays, no review. Upload: a text made elsewhere becomes the next version.");
-    await expect(hint).toBeVisible();
-    // Under the buttons, inside the card.
-    const [actionsBox, hintBox] = [(await v1.locator(".text-version-actions").boundingBox())!, (await hint.boundingBox())!];
-    expect(hintBox.y).toBeGreaterThanOrEqual(actionsBox.y + actionsBox.height - 1);
-    expect(hintBox.x + hintBox.width).toBeLessThanOrEqual(width);
+    await expect(v1.locator(".text-version-actions").getByRole("button")).toHaveText(["Edit the translation…", "Other ways…", "Translation reviews"]);
+    await expect(v1.locator(".text-version-hint")).toHaveCount(0);
     expect(await noHorizontalScroll(page)).toBe(true);
-    await hint.scrollIntoViewIfNeeded();
+    await v1.scrollIntoViewIfNeeded();
     await shot(page, `f8-version-actions-after${suffix}`);
+    await v1.getByRole("button", { name: "Other ways to change v1 of case-0101 de", exact: true }).click();
+    const menu = page.getByRole("menu", { name: "Other ways to change v1 of case-0101 de", exact: true });
+    await expect(menu.getByRole("menuitem", { name: "Ask a reviewer to correct…", exact: true })).toHaveAccessibleDescription("A reviewer corrects it in a new review.");
+    await expect(menu.getByRole("menuitem", { name: "Upload a corrected text…", exact: true })).toHaveAccessibleDescription("A text made elsewhere becomes the next version.");
+    // The open menu stays inside the window.
+    const box = (await menu.boundingBox())!;
+    expect(box.x + box.width).toBeLessThanOrEqual(width);
+    await shot(page, `f8-other-ways-after${suffix}`);
+    await page.keyboard.press("Escape");
 
     // "Ask a reviewer to correct…": the title names the action; "Cancel" until the reviewer is asked, then "Close".
-    await v1.getByRole("button", { name: "Ask a reviewer to correct v1 of case-0101 de…", exact: true }).click();
+    await otherVersionAction(page, v1, "v1 of case-0101 de", "Ask a reviewer to correct…");
     const ask = page.getByRole("dialog", { name: "Ask a reviewer to correct, case-0101 de", exact: true });
     await expect(ask.getByRole("button", { name: "Cancel", exact: true })).toBeVisible();
     await expect(ask.getByRole("button", { name: "Close", exact: true }).and(ask.locator(".modal-actions button"))).toHaveCount(0);
@@ -253,7 +256,7 @@ for (const [width, height, suffix] of SIZES) {
     await ask.locator(".modal-actions").getByRole("button", { name: "Close", exact: true }).click();
     await expect(ask).toBeHidden();
 
-    // "Correct it myself…" and "Upload a corrected text…" open dialogs with the same names (case-0102: no open review).
+    // "Upload a corrected text…" opens a dialog with the same name (case-0102: no open review; the one other way is a button).
     const other = await open("case-0102");
     const version = other.locator("li.text-version").first();
     await version.getByRole("button", { name: "Upload a corrected text for v1 of case-0102 de…", exact: true }).click();

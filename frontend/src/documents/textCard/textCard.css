@@ -177,8 +177,6 @@
 .text-version-origin { min-width: 0; overflow-wrap: anywhere; }
 .text-version-actions a { white-space: nowrap; }
 /* What tells the correction actions apart, under the buttons (visible on a phone too; never a tooltip only). */
-.text-version-hint { margin: 0; color: var(--text-muted); font-size: var(--size-sm); line-height: var(--leading-sm); overflow-wrap: anywhere; }
-.text-version-hint-name { color: var(--text); }
 .text-version-older > details > summary { color: var(--text-muted); cursor: pointer; }
 .text-version-older > details > .text-versions,
 .text-version-group { margin-top: var(--space-3); }
@@ -244,3 +242,8 @@ dl.technical-details dd { margin: 0; overflow-wrap: anywhere; font-family: var(-
 /* Issue 337: the proposal set line; the "Newer set available" pill and its help link wrap below it on narrow cards. */
 .text-card-proposal-set { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }
 .text-card-proposal-set .text-card-label { font-weight: var(--weight-strong); color: var(--text); }
+/* "Edit the translation…" (issue 555): the question first, each answer with its consequence on the next line. */
+.edit-translation-choice { display: grid; gap: var(--space-3); margin: 0; padding: 0; border: 0; }
+.edit-translation-option { align-items: flex-start; }
+.edit-translation-label { display: block; font-weight: var(--weight-strong); }
+.edit-translation-consequence { display: block; color: var(--text-muted); font-size: var(--size-sm); line-height: var(--leading-sm); }
