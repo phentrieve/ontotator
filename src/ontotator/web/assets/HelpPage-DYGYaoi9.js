@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-DL2_YqWB.js";import{n as a,t as o}from"./lib-CU_D-Hv6.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-CXWKB-du.js";import{n as a,t as o}from"./lib-DYxZoS0_.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -1684,12 +1684,13 @@ The bell at the top right, next to the user menu, tells you about:
 
 - a new task for you (*New task: annotation of case-0102 de*);
 - a task of yours that the lead reopened (*Task reopened: …*) or released after a pause (*Task released: …*);
-- for leads: a text problem that someone reported in your project (*Text problem from Ana Weber (ann-0004): case-0042 de*).
+- the lead's answer to a question you asked with **Ask the lead** (*Answer from the lead on case-0102 de*);
+- for leads: a text problem that someone reported in your project (*Text problem from Ana Weber (ann-0004): case-0042 de*), or a question to the lead (*Question from Ana Weber (ann-0004): case-0102 de*).
 
 A number on the bell counts the unread notifications. It updates every minute and when you come back to the window.
 
 1. Click the bell. A short list opens with the newest notifications first. Unread ones have a dot and bold text. Each one names the project and the time.
-2. Click a notification to open its place: the task, or the problem report. It is then marked as read.
+2. Click a notification to open its place: the task, the problem report, or **Questions** for a question to the lead. It is then marked as read.
 3. To mark one as read without opening it, click **Mark as read** next to it. **Mark all as read** below the list marks all of them.
 
 With the keyboard, Tab to the bell and press Enter; Tab moves through the list and Escape closes it. On a phone the list opens as a full screen sheet.

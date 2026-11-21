@@ -248,3 +248,37 @@ def test_a_question_to_the_lead_has_its_own_kind(team):
     assert asked.status_code == 200, asked.text
     kinds = _kinds(team.lead)
     assert "question_received" in kinds and "text_problem_received" not in kinds
+
+
+def test_the_answer_to_a_question_tells_the_asker(team):
+    # Issue 557 with issue 553: the lead's answer rings the asker's bell and
+    # leads to the task; the answer text stays in the question.
+    current = team.bob.get(f"/api/v1/assignments/{team.bob_task.id}").json()
+    asked = team.bob.post(
+        f"/api/v1/assignments/{team.bob_task.id}/problem-reports",
+        json={
+            "request_id": f"ask-answer-{team.bob_task.id}",
+            "expected_workflow_revision": current["workflow_revision"],
+            "round_id": current["active_round_id"],
+            "reason": "Is the short form meant?",
+            "kind": "question",
+        },
+    )
+    assert asked.status_code == 200, asked.text
+    question = asked.json()
+    assert "answer_received" not in _kinds(team.bob)
+    act(
+        team.lead,
+        question["report_id"],
+        question["revision"],
+        "answer",
+        "Yes, the short form.",
+    )
+    answers = [item for item in _items(team.bob) if item["kind"] == "answer_received"]
+    assert len(answers) == 1
+    [item] = answers
+    assert item["assignment_id"] == team.bob_task.id
+    assert item["target_id"] == question["report_id"]
+    assert "Yes, the short form." not in str(item)
+    # The lead answered; the lead's own bell does not hear of it.
+    assert "answer_received" not in _kinds(team.lead)

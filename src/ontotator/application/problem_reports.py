@@ -686,6 +686,18 @@ class ProblemReportService:
                         release_action="resume",
                         event_id=event_id,
                     )
+                # Issue 557: the asker's bell names the answer and opens the
+                # task; the answer itself stays in the question.
+                notify(
+                    conn,
+                    raw["reporter_id"],
+                    pid,
+                    "answer_received",
+                    actor_id=fresh.user_id,
+                    assignment_id=own,
+                    target_id=report_id,
+                    at=now,
+                )
             elif action == "extend_hold":
                 if not selected:
                     raise DomainError("HOLD_TARGET_REQUIRED")
