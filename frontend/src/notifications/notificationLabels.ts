@@ -34,11 +34,12 @@ export function notificationText(item: NotificationView): string {
   }
 }
 
-/** Where an entry leads: the task, the problem report, or Documents' Needs your decision. */
+/** Where an entry leads: the task, the problem report, the lead's Questions, or Documents' Needs your decision. */
 export function notificationRoute(item: NotificationView): Route {
   if (item.kind === "text_problem_received" && item.target_id) {
     return { name: "projectProblemReport", key: item.project_key, reportId: item.target_id };
   }
+  if (item.kind === "question_received") return { name: "projectQuestions", key: item.project_key };
   if (item.kind === "submission_waiting") return { name: "projectDocuments", key: item.project_key, segment: "decision" };
   if (item.assignment_id !== null) return { name: "task", assignmentId: item.assignment_id };
   return { name: "tasks", project: item.project_key, status: "all" };

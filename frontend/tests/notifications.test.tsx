@@ -37,6 +37,8 @@ describe("notification texts (issue 557)", () => {
     expect(notificationRoute(entry(2))).toEqual({ name: "task", assignmentId: 102 });
     expect(notificationRoute(entry(2, { kind: "text_problem_received", target_id: "report-1" })))
       .toEqual({ name: "projectProblemReport", key: "synthetic-ready", reportId: "report-1" });
+    expect(notificationRoute(entry(2, { kind: "question_received", target_id: "report-2" })))
+      .toEqual({ name: "projectQuestions", key: "synthetic-ready" });
     expect(notificationRoute(entry(2, { kind: "submission_waiting", assignment_id: null })))
       .toEqual({ name: "projectDocuments", key: "synthetic-ready", segment: "decision" });
     expect(bellLabel(3)).toBe("Notifications, 3 unread");

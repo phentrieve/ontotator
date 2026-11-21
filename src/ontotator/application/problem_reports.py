@@ -454,11 +454,12 @@ class ProblemReportService:
                 else {"assignment_id": assignment_id},
                 at=now,
             )
-            # Issue 557: the leads' bell; the reason stays in the report.
+            # Issue 557: the leads' bell; the reason stays in the report. A
+            # question to the lead (issue 553) has its own kind.
             notify_leads(
                 conn,
                 pid,
-                "text_problem_received",
+                "question_received" if kind == "question" else "text_problem_received",
                 actor_id=fresh.user_id,
                 assignment_id=assignment_id,
                 target_id=rid,

@@ -229,3 +229,22 @@ def test_the_routes_are_for_browser_sessions_only():
         ("POST", f"{URL}/read-all"),
     ):
         assert ROUTE_SCOPES[(method, path)] == SESSION
+
+
+def test_a_question_to_the_lead_has_its_own_kind(team):
+    # Integration of issue 553 (Ask the lead) with issue 557: a question is no
+    # text problem, so the leads' bell names it as a question.
+    current = team.bob.get(f"/api/v1/assignments/{team.bob_task.id}").json()
+    asked = team.bob.post(
+        f"/api/v1/assignments/{team.bob_task.id}/problem-reports",
+        json={
+            "request_id": f"ask-{team.bob_task.id}",
+            "expected_workflow_revision": current["workflow_revision"],
+            "round_id": current["active_round_id"],
+            "reason": "Is the short form meant?",
+            "kind": "question",
+        },
+    )
+    assert asked.status_code == 200, asked.text
+    kinds = _kinds(team.lead)
+    assert "question_received" in kinds and "text_problem_received" not in kinds
