@@ -9,7 +9,7 @@
  *   390 px for horizontal scroll.
  */
 import { expect, test, type Page } from "@playwright/test";
-import { documentsReady, openTextCard, textVersionItems } from "./documentsHelpers";
+import { documentsReady, editTranslation, openTextCard, textVersionItems } from "./documentsHelpers";
 import { loginThroughForm } from "./helpers";
 import { leadScenario } from "./leadWorkflowHelpers";
 
@@ -37,7 +37,8 @@ test("the typo fix dialog names each task that stays and why, and lets an unopen
   await expect(page).toHaveURL(new RegExp(`#/projects/${esc(s.project)}/documents`));
   await documentsReady(page);
   const [v1] = await (await textVersionItems(await openTextCard(page, CASE, "de"), 1)).all();
-  await v1.getByRole("button", { name: `Fix typos in v1 of ${CASE} de…`, exact: true }).click();
+  // The version is accepted: "Edit the translation…" holds the typo fix (issue 555, #571).
+  await editTranslation(page, v1, CASE, "typos");
   const dialog = page.getByRole("dialog", { name: `Fix typos, ${CASE} de v1`, exact: true });
   const editor = dialog.getByRole("textbox", { name: "Corrected text", exact: true });
   const original = await editor.inputValue();
