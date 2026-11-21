@@ -384,6 +384,72 @@ def test_review_http_round_trip_qualification_history_reopen_and_current_metadat
     )
 
 
+@pytest.mark.parametrize(
+    "form",
+    [
+        {
+            "decision": "rejected",
+            "clinical_change": True,
+            "categories": ["omission"],
+            "rationale": "A sentence is missing.",
+        },
+        {"decision": "accepted_unchanged", "clinical_change": False},
+        {
+            "decision": "query",
+            "clinical_change": True,
+            "categories": ["source"],
+            "rationale": "Is the dose in the source right?",
+        },
+    ],
+)
+def test_my_tasks_names_the_decision_of_a_submitted_review(case_env, form):
+    """Issue 472: My tasks said "Submitted" whatever the reviewer decided."""
+    env = case_env
+    row = assigned(env)
+    assert (
+        env.alice.patch(
+            "/api/v1/me/profile", json={"qualification": "Clinical reviewer"}
+        ).status_code
+        == 200
+    )
+
+    def mine() -> dict:
+        tasks = env.alice.get("/api/v1/me/tasks").json()
+        found: dict = next(t for t in tasks if t["assignment_id"] == row["id"])
+        return found
+
+    assert mine()["review_decision"] is None
+    url = f"/api/v1/translation-reviews/{row['id']}"
+    workspace = env.alice.get(url).json()
+    body = {
+        "expected_revision": 0,
+        "text": workspace["text"],
+        "form": form,
+    }
+    assert env.alice.put(url + "/draft", json=body).status_code == 200
+    # A draft is no decision yet.
+    assert mine()["review_decision"] is None
+    submitted = env.alice.post(url + "/submit", json={"expected_revision": 1})
+    assert submitted.status_code == 200, submitted.text
+    assert (mine()["status"], mine()["review_decision"]) == (
+        "submitted",
+        form["decision"],
+    )
+    # Other tasks carry none.
+    others = [
+        t
+        for t in env.alice.get("/api/v1/me/tasks").json()
+        if t["assignment_id"] != row["id"]
+    ]
+    assert others and all(t["review_decision"] is None for t in others)
+    # Reopened, the task's decision is not shown until it is submitted again.
+    assert (
+        env.lead.post(f"/api/v1/assignments/{row['id']}/reopen", json={}).status_code
+        == 200
+    )
+    assert mine()["review_decision"] is None
+
+
 @pytest.mark.parametrize("value", [None, "", "   ", "x" * 200])
 def test_nullable_qualification_own_admin_and_omission(case_env, value):
     env = case_env

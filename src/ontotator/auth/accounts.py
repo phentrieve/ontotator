@@ -425,6 +425,10 @@ class AccountService:
                         for value in sorted(normalized)
                     ],
                 )
+            # No event without a change: a new account without languages
+            # read "Languages changed: No change." (#576).
+            if before == sorted(normalized):
+                return
             record_audit(
                 conn,
                 actor,

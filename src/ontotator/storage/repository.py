@@ -711,6 +711,8 @@ class Repository:
             .where(
                 ProblemReportRow.project_id == project_id,
                 ProblemReportStateRow.state == "open",
+                # Issue 553: an open question does not block the export.
+                ProblemReportRow.kind == "problem",
             )
         ).all()
         for row in reports:

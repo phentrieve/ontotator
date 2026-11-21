@@ -516,7 +516,7 @@ for (const size of SIZES) {
     test.beforeEach(async ({ page }) => { await page.setViewportSize({ width: size.width, height: size.height }); });
     const take = (page: Page) => treePanel(page).getByRole("button", { name: "Use this term instead…" });
 
-    test("an undecided proposal: look at its neighbours, then confirm another term: decided as Changed", async ({ page }) => {
+    test("an undecided proposal: look at its neighbours, then confirm another term: decided as Replaced", async ({ page }) => {
       const errors = consoleErrors(page);
       await importPackage(page, "", FIXTURE, `look-proposal-${size.name}`, { proposals: true });
       await openCase(page, { task: "annotate" });
@@ -536,7 +536,7 @@ for (const size of SIZES) {
 
       // The confirmation says what happens, takes the focus, and Cancel changes nothing.
       await take(page).click();
-      const confirm = treePanel(page).getByRole("group", { name: `Proposal: decide as Changed with Areflexia (${AREFLEXIA})` });
+      const confirm = treePanel(page).getByRole("group", { name: `Proposal: decide as Replaced with Areflexia (${AREFLEXIA})` });
       await expect(confirm).toBeVisible();
       await expect(confirm.getByRole("button", { name: "Confirm" })).toBeFocused();
       await shot(page, `${size.name}-look-proposal-confirm`);
@@ -646,3 +646,21 @@ for (const size of SIZES) {
     });
   });
 }
+
+test("1280x600: the tree of a proposal takes the column too, the proposal stays in one line (issue 542)", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 600 });
+  await importPackage(page, "", FIXTURE, "low-proposal", { proposals: true });
+  await openCase(page, { task: "annotate" });
+  await page.locator(".sidebar .doc-item").filter({ hasText: HYPOTONIA }).click();
+  await page.getByLabel(/Proposal details/i).getByRole("button", { name: "Show in tree" }).click();
+  await expect(treeItem(page, HYPOTONIA)).toHaveAttribute("aria-current", "true");
+  // As for an own finding: the column is the tree's, the proposal is named in one line above it.
+  await expect(page.locator(".panel-given-to-tree--column")).toHaveCount(1);
+  const bar = page.getByRole("group", { name: "Finding", exact: true });
+  await expect(bar).toContainText(HYPOTONIA);
+  await expect(page.getByLabel(/Proposal details/i)).toBeHidden();
+  await expect(treePanel(page).getByRole("button", { name: "Use this term instead…" })).toBeInViewport({ ratio: 1 });
+  // "Show finding" brings the proposal and its decisions back.
+  await bar.getByRole("button", { name: "Show finding" }).click();
+  await expect(page.getByLabel(/Proposal details/i)).toBeVisible();
+});

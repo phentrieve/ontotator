@@ -20,12 +20,12 @@ colors:
   danger: "#a23b2a"
   danger-light: "#f6e2dd"
   focus-ring: "#1d4e89"
-  mark-0-fill: "#f8f1a6"
-  mark-1-fill: "#d0edc4"
-  mark-2-fill: "#f9cba8"
-  mark-3-fill: "#cad6fd"
-  mark-4-fill: "#ecd0d6"
-  mark-5-fill: "#b8e8ec"
+  mark-0-fill: "#f4da8f"
+  mark-1-fill: "#bff5c7"
+  mark-2-fill: "#fab9a1"
+  mark-3-fill: "#b7c9fe"
+  mark-4-fill: "#ffc8eb"
+  mark-5-fill: "#9df2ff"
   mark-line: "#3b342b"
   mark-selected: "#1d4e89"
   mark-negated-hatch: "#8c8170"
@@ -173,7 +173,7 @@ The frontmatter records the exact colour values from `frontend/src/styles/tokens
 
 ### Marks
 
-The six fills and their exact values are `colors.mark-0-fill` through `colors.mark-5-fill` above. They paint the lower half of the line with a feathered upper edge. `editor/markColours.ts` is the sole meaning-to-slot mapping (`MARK_COLOUR_MEANING = "term"`): a stable hash gives the same term the same slot. These are not annotation-layer colours; `LayerControls` identifies layers.
+The six fills and their exact values are `colors.mark-0-fill` through `colors.mark-5-fill` above. They paint the lower half of the line with a feathered upper edge. Where findings overlap, one band per finding fills the run from 12% of its height (two bands: the lower one keeps 54% to 100%; three: thirds), parted by a 1 px gap in `mark-band-separator` (the sheet). `editor/markColours.ts` is the sole meaning-to-slot mapping (`MARK_COLOUR_MEANING = "term"`): a stable hash gives the same term the same slot. These are not annotation-layer colours; `LayerControls` identifies layers.
 
 | State                      | Class and visible treatment                                                                                                               |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
@@ -188,7 +188,7 @@ The six fills and their exact values are `colors.mark-0-fill` through `colors.ma
 
 No horizontal padding or margin may move text when a mark is selected or resized. New mark states need a distinct line style or pattern and a passing `tokens.test.ts`, plus browser verification of the rendered treatment.
 
-The approved tests require text on every mark ≥ 4.5:1; state lines and selection ≥ 3:1 against marks and the sheet; CIEDE2000 pairwise fill separation ≥ 10 and fill-to-sheet ≥ 10 for normal vision; and pairwise separation ≥ 4 under Machado 2009 severity-1 protan, deutan and tritan simulations. These soft-fill thresholds are intentional; line styles carry meaning.
+The approved tests require text on every mark ≥ 4.5:1; state lines and selection ≥ 3:1 against marks and the sheet; CIEDE2000 pairwise fill separation ≥ 20 (any two slots can be stacked as bands, issue 551) and fill-to-sheet ≥ 10 for normal vision, in light and dark; and pairwise separation ≥ 4 under Machado 2009 severity-1 protan, deutan and tritan simulations. These soft-fill thresholds are intentional; line styles carry meaning.
 
 ### Axis values
 

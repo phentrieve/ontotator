@@ -36,7 +36,11 @@ from ontotator.application.final_causes import (
     latest_review_decisions,
 )
 from ontotator.application.people import person_refs
-from ontotator.application.typo_fix_carry import TypoFixMove, typo_fix_moves
+from ontotator.application.typo_fix_carry import (
+    TypoFixMove,
+    submission_order_times,
+    typo_fix_moves,
+)
 from ontotator.application.typography_counts import typography_hint_counts
 from ontotator.auth.audit import Actor
 from ontotator.authz.policy import Access
@@ -887,40 +891,45 @@ def _submission_counts(conn: Connection, pid: int) -> dict[str, int]:
 
 
 def _selected_submissions(conn: Connection, pid: int) -> dict[str, SubmissionFact]:
+    """The final results' submissions; a typo-fix copy with the time the
+    person submitted (issue 575)."""
     named = select(FinalSelectionRow.submission_id).where(
         FinalSelectionRow.project_id == pid
+    )
+    rows = conn.execute(
+        select(
+            SubmissionRow.submission_id,
+            SubmissionRow.document_id,
+            SubmissionRow.annotator_id,
+            SubmissionRow.recorded_at,
+            SubmissionRow.mode,
+            RoundSubmissionBindingRow.round_id,
+        )
+        .outerjoin(
+            RoundSubmissionBindingRow,
+            and_(
+                RoundSubmissionBindingRow.project_id == SubmissionRow.project_id,
+                RoundSubmissionBindingRow.submission_id == SubmissionRow.submission_id,
+            ),
+        )
+        .where(
+            SubmissionRow.project_id == pid,
+            SubmissionRow.submission_id.in_(named),
+        )
+    ).all()
+    submitted_at = submission_order_times(
+        conn, pid, {row.submission_id: row.recorded_at for row in rows}
     )
     return {
         row.submission_id: SubmissionFact(
             submission_id=row.submission_id,
             document_id=row.document_id,
             annotator_id=row.annotator_id,
-            recorded_at=row.recorded_at,
+            recorded_at=submitted_at[row.submission_id],
             mode=row.mode,
             round_id=row.round_id,
         )
-        for row in conn.execute(
-            select(
-                SubmissionRow.submission_id,
-                SubmissionRow.document_id,
-                SubmissionRow.annotator_id,
-                SubmissionRow.recorded_at,
-                SubmissionRow.mode,
-                RoundSubmissionBindingRow.round_id,
-            )
-            .outerjoin(
-                RoundSubmissionBindingRow,
-                and_(
-                    RoundSubmissionBindingRow.project_id == SubmissionRow.project_id,
-                    RoundSubmissionBindingRow.submission_id
-                    == SubmissionRow.submission_id,
-                ),
-            )
-            .where(
-                SubmissionRow.project_id == pid,
-                SubmissionRow.submission_id.in_(named),
-            )
-        )
+        for row in rows
     }
 
 
@@ -977,7 +986,10 @@ def _reports(conn: Connection, pid: int) -> dict[str, ReportFact]:
                 ProblemReportStateRow.report_id == ProblemReportRow.report_id,
             )
             .join(UserRow, UserRow.id == ProblemReportRow.reporter_id)
-            .where(ProblemReportRow.project_id == pid)
+            # Issue 553: questions to the lead are not text problems.
+            .where(
+                ProblemReportRow.project_id == pid, ProblemReportRow.kind == "problem"
+            )
         )
     }
 

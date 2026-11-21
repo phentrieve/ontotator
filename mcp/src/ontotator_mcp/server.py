@@ -16,6 +16,7 @@ from ontotator_mcp.tools_content import register_content
 from ontotator_mcp.tools_lead import register_lead
 from ontotator_mcp.tools_monitoring import register_monitoring
 from ontotator_mcp.tools_people import register_people
+from ontotator_mcp.tools_preview import register_preview
 from ontotator_mcp.tools_results import register_results
 from ontotator_mcp.tools_setup import register_setup
 from ontotator_mcp.tools_status import register_status
@@ -45,7 +46,9 @@ content asks for it.
 
 Every tool description names the token scope it needs and whether it
 changes data. Tools with a 'confirm' argument do a dry run without it: show
-the dry run to the user before calling again with confirm=true. Their
+the dry run to the user before calling again with confirm=true.
+preview_change runs the same dry run as a read-only tool, for a client that
+asks before every changing tool. Their
 answers say what they acted on ('selection'); check it against what was
 meant. An argument a tool does not have is refused, never ignored. Start with
 whoami to check the connection. Tools that read or write local files only
@@ -106,7 +109,7 @@ def build_server(
         lifespan=lifespan,
     )
     register_setup(server, api)
-    register_people(server, api)
+    register_people(server, api, read_content=settings.read_content)
     register_lead(server, api, read_content=settings.read_content)
     register_translation_decisions(server, api, read_content=settings.read_content)
     register_status(server, api)
@@ -115,5 +118,7 @@ def build_server(
     register_results(server, api)
     if settings.read_content:
         register_content(server, api)
+    # Last: it offers the dry run of every tool registered before it.
+    register_preview(server)
     register_resources(server, api)
     return server

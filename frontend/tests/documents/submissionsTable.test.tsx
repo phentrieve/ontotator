@@ -78,6 +78,19 @@ it("collapses more than 10 rows to the newest 10 and keeps the Final row", () =>
   expect(screen.queryByRole("button", { name: /Show all/ })).toBeNull();
 });
 
+it("keeps the server's order for equal times: a moved copy after the person's own submission (issue 575)", () => {
+  const at = (minute: number) => `2026-10-18T10:0${minute}:00Z`;
+  const rows = [
+    submission({ submission_id: "sub-9", document_id: "d1", author_label: "ann-0005", recorded_at: at(3) }),
+    submission({ submission_id: "sub-2", document_id: "d2", version: 2, author_label: "ann-0005", recorded_at: at(3), moved_by_typo_fix: true }),
+    submission({ submission_id: "sub-3", document_id: "d1", author_label: "ann-0006", recorded_at: at(4) }),
+    submission({ submission_id: "sub-1", document_id: "d2", version: 2, author_label: "ann-0006", recorded_at: at(4), moved_by_typo_fix: true }),
+  ];
+  renderTable({ rows: [rows[2], rows[3], rows[0], rows[1]] });
+  expect(screen.getAllByRole("link").map(link => /(ann-\d+), de (v\d)/.exec(link.getAttribute("aria-label") ?? "")?.slice(1).join(" ")))
+    .toEqual(["ann-0005 v1", "ann-0005 v2", "ann-0006 v1", "ann-0006 v2"]);
+});
+
 it("lists unsubmitted rounds as muted last lines without counting them", () => {
   const { submissions } = scenarioS0();
   const data = submissions["synthetic-accepted:de"];

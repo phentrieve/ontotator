@@ -15,7 +15,7 @@ import { onSpaceActivate } from "../ui/spaceActivates";
 import { StatusBadge } from "../ui/StatusBadge";
 import {
   middleEllipsis,
-  leadPauseLine,
+  leadPauseTitle,
   typographyHintsTitle,
   personLabel,
   submissionLabel,
@@ -35,6 +35,26 @@ export const rowKeyOf = (row: Pick<DocumentRowView, "case_id" | "language">): st
 
 /** "{text ID} {language}" as used in accessible names. */
 export const rowName = (row: Pick<DocumentRowView, "case_id" | "language">): string => `${row.case_id} ${row.language}`;
+
+/**
+ * Longest case ID the Documents table keeps whole in each of its forms (tableFit.ts `IdForm`): in full, then 18 and
+ * 11 characters with a middle ellipsis, so IDs that share a long start still read apart.
+ */
+export const ID_FORMS: readonly number[] = [Infinity, 18, 11];
+
+/**
+ * The case ID in the Text cell of the table: in full while the table has room, else with a middle ellipsis
+ * (tableFit.ts, issue 576). Each distinct form is one span that names the table forms it shows in (`data-forms`);
+ * the full value is in `title`.
+ */
+export function TableCaseId({ value }: { value: string }): JSX.Element {
+  const forms = ID_FORMS.map(max => middleEllipsis(value, max));
+  if (forms.every(form => form === value)) return <span className="documents-id" title={value}>{value}</span>;
+  const shown = [...new Set(forms)];
+  return <span className="documents-id" title={value}>{shown.map((form, index) =>
+    <span key={form} className="documents-id-form" data-forms={forms.flatMap((other, level) => (other === form ? [level] : [])).join(" ")}
+      aria-hidden={index > 0 || undefined}>{form}</span>)}</span>;
+}
 
 /** A long ID with a middle ellipsis; the full value is in `title`. */
 export function ShortId({ value, max = ID_DISPLAY_MAX }: { value: string; max?: number }): JSX.Element {
@@ -194,12 +214,12 @@ export function VersionMarker({ row }: { row: DocumentRowView }): JSX.Element | 
 }
 
 /**
- * "Paused by lead" on a text a lead paused (issue 464); the title says who, when and why. A table short of room shows
+ * "Paused by lead" on a text a lead paused (issue 464); the title repeats the mark and says who, when and why. A table short of room shows
  * the pause icon alone, with the words for screen readers (issue 544, tableFit.ts).
  */
 export function LeadPausedBadge({ row }: { row: Pick<DocumentRowView, "lead_pause"> }): JSX.Element | null {
   if (!row.lead_pause) return null;
-  return <span className="documents-lead-paused documents-flag" title={leadPauseLine(row.lead_pause)}><StatusBadge tone="warning">
+  return <span className="documents-lead-paused documents-flag" title={leadPauseTitle(row.lead_pause)}><StatusBadge tone="warning">
     <IconPause className="documents-flag-icon" /><span className="documents-flag-label">Paused by lead</span></StatusBadge></span>;
 }
 
@@ -248,7 +268,7 @@ export interface RowHeaderCellProps {
 export function RowHeaderCell({ row, badge, onOpenCard, showCaseId = false, more = 0, onShowMore, sibling = false, selected }: RowHeaderCellProps): JSX.Element {
   const active = isActiveRow(row);
   const nameId = documentsRowId(row.case_id, row.language, "header");
-  const caseId = showCaseId ? <><span className="documents-row-case"><ShortId value={row.case_id} /></span>{" "}</> : <span className="visually-hidden">{`${row.case_id} `}</span>;
+  const caseId = showCaseId ? <><span className="documents-row-case"><TableCaseId value={row.case_id} /></span>{" "}</> : <span className="visually-hidden">{`${row.case_id} `}</span>;
   const nameContent = <>{caseId}<span className="documents-language"><LanguageFlag code={row.language} />{row.language}</span></>;
   return (
     <span className="documents-row-header documents-text-cell">

@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { createContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { CurrentUser } from "../api/client";
 import { personLabel } from "../app/identity";
 import { Button } from "./Button";
@@ -33,6 +33,12 @@ export interface AppShellProps {
   children: ReactNode;
 }
 
+/**
+ * Issue 539: while a case is open in a wide window, its toolbar joins the app header in one bar. The header holds
+ * this place for it after its own controls, so the Tab order stays: the header's controls, then the case's.
+ */
+export const ShellCaseBarSlot = createContext<HTMLElement | null>(null);
+
 /** "Maria Demo" gives "MD", one word its first two letters; shown where the header has no room for the name. */
 export function initials(name: string): string {
   const words = name.trim().split(/[\s._-]+/u).filter(Boolean);
@@ -42,6 +48,7 @@ export function initials(name: string): string {
 
 export function AppShell({ user, userMenu, breadcrumb, actions, nav, navLabel = "Sections", density = "compact", role, homeHref, onHome, children }: AppShellProps): JSX.Element {
   const mainRef = useRef<HTMLElement>(null);
+  const [caseBar, setCaseBar] = useState<HTMLDivElement | null>(null);
   const sectionsRef = useRef<HTMLDetailsElement>(null);
   const hasNav = nav != null && nav !== false;
   // The open Sections panel lies over the page: a press anywhere else closes it.
@@ -64,7 +71,8 @@ export function AppShell({ user, userMenu, breadcrumb, actions, nav, navLabel = 
   return <div className={`shell${density === "reading" ? " shell-reading" : ""}`}>
     <a className="skip-link" href="#main" onClick={(event) => {
       event.preventDefault();
-      mainRef.current?.focus();
+      // The case's toolbar starts the content, wherever it is shown: the first Tab reaches it, as before it joined the header.
+      if (caseBar?.firstElementChild) caseBar.focus(); else mainRef.current?.focus();
     }}>Skip to content</a>
     <header className="app-header shell-header">
       <div className="shell-heading">
@@ -106,11 +114,12 @@ export function AppShell({ user, userMenu, breadcrumb, actions, nav, navLabel = 
             <IconSortDown />
           </>} />}
       </div>
+      {density === "reading" && <div ref={setCaseBar} className="shell-case-bar" tabIndex={-1} />}
     </header>
     <div className="shell-body">
       {density !== "reading" && navigation}
       <main ref={mainRef} id="main" tabIndex={-1} className={`shell-main density-${density}`}>
-        {density === "reading" ? children : <div className="shell-page">{children}</div>}
+        {density === "reading" ? <ShellCaseBarSlot.Provider value={caseBar}>{children}</ShellCaseBarSlot.Provider> : <div className="shell-page">{children}</div>}
       </main>
     </div>
     <ShortcutHelpHost />

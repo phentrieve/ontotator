@@ -7,7 +7,7 @@ import { assignmentStatusLabels, consolidationReasonText, reopenNotice, roleLabe
 import { fullTimestamp } from "../app/submissionLabels";
 import { relativeDay } from "../app/assignedDate";
 import { taskText } from "../app/identity";
-import { failedChecksTitle } from "../translation/labels";
+import { decisionLabels, failedChecksTitle } from "../translation/labels";
 import { IconInfo, IconWarning } from "../ui/icons";
 import { Button, DataTable, EmptyState, InlineMessage, Popover, Select, StatusBadge, tabId, Tabs, useMediaQuery, type Column } from "../ui";
 import { LanguageText } from "../ui/LanguageTag";
@@ -29,6 +29,9 @@ export interface MyTasksProps {
   /** The signed-in user: the last chosen project filter is remembered per user in this browser (F22). */
   username?: string;
 }
+
+/** The decision of a submitted translation review, as My tasks shows it under the status. */
+export const reviewDecisionText = (decision: NonNullable<TaskSummary["review_decision"]>): string => `Your decision: ${decisionLabels[decision]}`;
 
 const projectFilterKey = (username: string) => `ontotator.myTasks.project.v1:${username}`;
 
@@ -225,6 +228,8 @@ export function MyTasks({ project, status, projects, onNavigate, username }: MyT
         if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
         event.preventDefault(); onNavigate(answerRoute(task, task.answered_report_id!));
       }}><StatusBadge tone="info">Answer to your report</StatusBadge></a> : <StatusBadge tone="info">Answer to your report</StatusBadge>)}
+      {/* Issue 472: a submitted translation review says what the reviewer decided, not only "Submitted". */}
+      {task.status === "submitted" && task.review_decision && <p className="cell-secondary">{reviewDecisionText(task.review_decision)}</p>}
       {task.query_answered_at && <StatusBadge tone="info">Answer from the lead</StatusBadge>}
       {task.held && pauseMarks(task).map(mark => <Fragment key={mark.cause}><StatusBadge tone="warning">{mark.badge}</StatusBadge><p className="task-hold-reason" title={mark.reason}>{mark.reason}</p></Fragment>)}
     </> },

@@ -330,6 +330,18 @@ def test_withdraw_keeps_started_submitted_and_within_limit_tasks(env):
         (started, "started"),
         (done, "submitted"),
     }
+    # The counts by reason come also with ``summary_only``: the menu names
+    # why an entry does nothing (#576).
+    summary = _post(env, WITHDRAW, preview=True, summary_only=True).json()
+    assert summary["kept"] == [] and summary["skipped_by_reason"] == {}
+    assert (
+        summary["kept_by_reason"]
+        == found["kept_by_reason"]
+        == {
+            "started": 1,
+            "submitted": 1,
+        }
+    )
     # Started tasks and other tasks on request.
     wider = _post(
         env, WITHDRAW, preview=True, include_started=True, tasks=["annotate", "review"]

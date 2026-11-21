@@ -118,14 +118,12 @@ button.documents-text-name { min-height: 24px; padding: 0; border: 0; background
 .documents-table--compact .documents-flag-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 /* The last resort (tableFit.ts): a crowded Text cell wraps rather than pushing the table past the page. */
 .documents-table--wrap .documents-row-header { flex-wrap: wrap; }
-@media (max-width: 1599px) {
-  /* It makes room by cutting a long case ID (full ID in its title and the name). */
-  .documents-table .documents-row-case .documents-id { display: inline-block; max-width: 5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
-}
-/* From 1400 px the table has room for typical case IDs (measured: a 126 px ID fits at 1440 without sideways scroll). */
-@media (min-width: 1400px) and (max-width: 1599px) {
-  .documents-table .documents-row-case .documents-id { max-width: 8rem; }
-}
+/* A long case ID shows in full while the table has room; short of room it keeps its start and end around one "…"
+   (tableFit.ts, issue 576: a fixed width cap cut IDs with room to spare), in two steps. The full ID is its title. */
+.documents-id-form { display: none; }
+:is(.documents-table:not([data-ids]), .documents-table[data-ids="0"]) .documents-id-form[data-forms~="0"],
+.documents-table[data-ids="1"] .documents-id-form[data-forms~="1"],
+.documents-table[data-ids="2"] .documents-id-form[data-forms~="2"] { display: inline; }
 /* Below 1440 px the navigation beside the page has grown (clamp(11rem, 9rem + 4vw, 14rem), about 195 px at 1280):
    tighter cell insets, as in the Users table, keep the one-line table within the page at 1280 px. */
 @media (max-width: 1439px) { .documents-table { --cell-pad-x: var(--space-2); } }

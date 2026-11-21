@@ -128,7 +128,7 @@ test("1440×900: both texts show at least 15 lines and the rail shows four decis
     test.info().annotations.push({ type: "lines", description: `${name}: ${count.toFixed(1)} lines in ${Math.round(rect.height)} px` });
     expect(count, `${name} visible lines`).toBeGreaterThanOrEqual(15);
   }
-  for (const name of ["Accepted unchanged", "Accepted with corrections", "Query", "Rejected"]) await expect(radio(page, name)).toBeInViewport({ ratio: 1 });
+  for (const name of ["Accepted unchanged", "Accepted with corrections", "Rejected"]) await expect(radio(page, name)).toBeInViewport({ ratio: 1 });
   await expect(submitButton(page)).toBeInViewport({ ratio: 1 });
   expect(await page.evaluate(() => [document.documentElement.scrollTop, document.querySelector(".translation-review")!.scrollTop])).toEqual([0, 0]);
   const crumb = page.getByRole("navigation", { name: "Breadcrumb" }).locator('[aria-current="page"]');
@@ -219,8 +219,8 @@ test("800×900: texts side by side and Submit always visible", async ({ page }) 
   await evidence(page, "800x900-end");
   // At most the known double announcement below 1100 px: the form's issue list and the bar's reason line.
   await page.keyboard.press("3");
-  await expect(radio(page, "Query")).toBeChecked();
-  await expect(pinnedBar(page)).toContainText("Decision: Query");
+  await expect(radio(page, "Rejected")).toBeChecked();
+  await expect(pinnedBar(page)).toContainText("Decision: Rejected");
   const announcements = await liveRegionsContaining(page, "A clinical change needs a category.");
   test.info().annotations.push({ type: "live regions with the first issue (800 px)", description: String(announcements) });
   expect(announcements).toBeLessThanOrEqual(2);
@@ -295,18 +295,18 @@ test("editing selects Accepted with corrections and undoing reverts it", async (
   await evidence(page, "1440x900-auto-selected");
   await page.keyboard.press("Backspace");
   await expect(target(page)).toHaveValue(s.texts["failed-translation"]);
-  for (const name of ["Accepted unchanged", "Accepted with corrections", "Query", "Rejected"]) await expect(radio(page, name)).not.toBeChecked();
+  for (const name of ["Accepted unchanged", "Accepted with corrections", "Rejected"]) await expect(radio(page, name)).not.toBeChecked();
   await expect(note).toHaveText("Your edits are undone, so the decision is back to not chosen.");
   await expect(page.locator("#review-submit-reason")).toHaveText("Choose a decision to submit.");
 });
 
-test("Query never asks for the clinical checkbox", async ({ page }) => {
+test("Rejected never asks for the clinical checkbox", async ({ page }) => {
   const s = await start(page);
   await openReview(page, s);
   await expectFocusOutsideTextFields(page);
   await page.keyboard.press("3");
-  await expect(radio(page, "Query")).toBeChecked();
-  await expect(page.getByText("Clinically relevant change: yes, always for a query.", { exact: true })).toBeVisible();
+  await expect(radio(page, "Rejected")).toBeChecked();
+  await expect(page.getByText("Clinically relevant change: yes, always for a rejection.", { exact: true })).toBeVisible();
   await expect(page.getByRole("checkbox", { name: "Clinically relevant change", exact: true })).toHaveCount(0);
   await expect(page.getByRole("group", { name: "Clinical change categories", exact: true })).toBeVisible();
   const rationale = page.getByRole("textbox", { name: "Rationale", exact: true });
@@ -317,6 +317,7 @@ test("Query never asks for the clinical checkbox", async ({ page }) => {
   // At 1440 px the issues are listed once, in the rail footer, and announced once.
   await expect(page.getByRole("list", { name: "Review issues", exact: true })).toHaveCount(1);
   expect(await liveRegionsContaining(page, "A clinical change needs a category.")).toBe(1);
+  // Issue 553: 4 chose Query and chooses nothing now.
   await page.keyboard.press("4");
   await expect(radio(page, "Rejected")).toBeChecked();
   await expect(page.getByText("Clinically relevant change: yes, always for a rejection.", { exact: true })).toBeVisible();
@@ -358,8 +359,8 @@ test("axe has no violations on the review at 1440 and 800 px, with Details open 
   await expect(pinnedBar(page)).toBeVisible();
   expect(await axeViolations(page)).toEqual([]);
   await page.keyboard.press("3");
-  await expect(radio(page, "Query")).toBeChecked();
-  await expect(pinnedBar(page)).toContainText("Decision: Query");
+  await expect(radio(page, "Rejected")).toBeChecked();
+  await expect(pinnedBar(page)).toContainText("Decision: Rejected");
   expect(await axeViolations(page)).toEqual([]);
 });
 

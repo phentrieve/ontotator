@@ -149,7 +149,7 @@ for (const size of SIZES) {
       await page.goto(`/#/projects/${encodeURIComponent(s.project)}/progress`);
       const nav = workSidebar(page);
       await expect(nav.getByRole("link", { name: "Progress", exact: true })).toHaveAttribute("aria-current", "page");
-      expect((await entries(nav)).map(text => text.replace(/ \(\d+\)$/, ""))).toEqual(["My tasks", "Projects", "Documents", "Progress", "Settings", "Export"]);
+      expect((await entries(nav)).map(text => text.replace(/ \(\d+\)$/, ""))).toEqual(["My tasks", "Projects", "Documents", "Questions", "Progress", "Settings", "Export"]);
       await expect(administrationGear(page)).toHaveCount(0);
       expect(await menuEntries(page)).toEqual(MENU);
       await page.keyboard.press("Escape");
@@ -400,6 +400,11 @@ test.describe("touch targets at 390 px", () => {
     await page.goto(`/#/projects/${encodeURIComponent(s.project)}/progress`);
     expect(await small(header.locator("a, button"))).toEqual([]);
     expect(await small(workSidebar(page).getByRole("link"))).toEqual([]);
+    expect(await fitsWindow(page)).toBe(true);
+    // Issue 574 F3: the breadcrumb "Progress" of Translation reviews.
+    await page.getByRole("link", { name: "Translation reviews", exact: true }).click();
+    await expect(header.getByRole("navigation", { name: "Breadcrumb", exact: true }).getByRole("button", { name: "Progress", exact: true })).toBeVisible();
+    expect(await small(header.locator("a, button"))).toEqual([]);
     expect(await fitsWindow(page)).toBe(true);
     // The editor's one header row: Sections and the user menu.
     await page.goto(await caseAddress(page, s.project));

@@ -19,6 +19,7 @@ from ontotator.application.round_reads import (
     round_labels,
     round_source_text,
 )
+from ontotator.application.typo_fix_carry import submitted_times, typo_fix_moves
 from ontotator.authz.visibility import current_access, require_case_text
 from ontotator.authz.workflow import may_read_human_submission
 from ontotator.domain.annotations import AnnotationSnapshot
@@ -188,13 +189,19 @@ def _history(
             sid: labels.get(rid, unnumbered) if rid else unnumbered
             for sid, rid in owners.items()
         }
+        # Issue 575: a typo-fix copy is the person's own submission: their
+        # submission time, and no carried findings (as in their editor).
+        moves = typo_fix_moves(conn, pid) if rows else {}
+        submitted_at = submitted_times(
+            moves, {row["submission_id"]: row["created_at"] for row in rows}
+        )
         summaries = [
             SubmissionHistorySummary(
                 submission_id=row["submission_id"],
                 document_id=doc,
                 author_label=_author(row, blindings[row["submission_id"]]),
                 is_me=row["annotator_id"] == access.pseudonym,
-                created_at=row["created_at"],
+                created_at=submitted_at[row["submission_id"]],
                 mode=row["mode"],
                 round_id=owners[row["submission_id"]],
                 round_ordinal=label_of[row["submission_id"]][1],
@@ -209,7 +216,13 @@ def _history(
             for row in rows
         ]
         if sid is None:
-            return summaries
+            # Newest first, as the rows; a copy stands where the person's
+            # own submission stands.
+            return sorted(
+                summaries,
+                key=lambda summary: summary.created_at,
+                reverse=True,
+            )
         if not rows:
             raise DomainError("VERSION_NOT_FOUND")
         submission = Submission.model_validate(rows[0]["payload"])
@@ -220,7 +233,11 @@ def _history(
         }
     summary = summaries[0]
     blinding = blindings[summary.submission_id]
-    round_inputs = _carried_inputs(repo, key, summary.round_id)
+    round_inputs = (
+        []
+        if summary.submission_id in moves
+        else _carried_inputs(repo, key, summary.round_id)
+    )
     carried_from = _carried_from(repo, key, summary.round_id)
     if blinding is not None:
         return SubmissionHistoryDetail(
