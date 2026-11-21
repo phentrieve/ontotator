@@ -203,6 +203,19 @@ def visible_annotation_versions(
                 .order_by(SubmissionRow.recorded_at, SubmissionRow.submission_id)
             )
         )
+    if result:
+        # Issue 575: a typo-fix copy is the person's own submission and
+        # names when they submitted it. Local import: the application layer
+        # imports authz modules.
+        from ontotator.application.typo_fix_carry import typo_fix_moves
+
+        moves = typo_fix_moves(conn, project_id)
+        result = [
+            ref.model_copy(update={"created_at": moves[ref.id].first_recorded_at})
+            if ref.id in moves
+            else ref
+            for ref in result
+        ]
     if can(fresh, Action.BROWSE_VERSIONS, key) and may_read_proposals(
         conn, fresh, project_id, key, document_id
     ):

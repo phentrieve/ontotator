@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Fixed
 
 - My tasks: a submitted translation review names the reviewer's decision under **Submitted**, for example *Your decision: Rejected* (#472); before, every submitted review read the same. The task's **Submitted review** says what the review made of the version: *Reviewed, not accepted* after **Rejected** or **Query**, *Reviewed; the corrected text was accepted as the next version* after **Accepted with corrections**, where it read *Reviewed* for all three. `GET /api/v1/me/tasks` returns `review_decision` for a submitted translation review (the decision of its current submission; null for other tasks). No migration.
+- **Fix typos…**: an annotation that moved to the new version keeps the time the person submitted (#575). **Finalization**, **Consolidate…**, the text view's **Submissions** and **Show** menu, a final result, the person's *Submitted* status, **My submissions** and **Work rounds** showed the time of the fix instead; in **Submissions** the moved copies now keep the people's order, each right after the person's own submission. Opened by the lead in the text view, a moved annotation shows no *Carried findings* (as in the person's editor). **Finalization** no longer lists the old-version original of a moved annotation under *On v1 (old text)* with a second **Use as final**. In the dialog, the block *Work stays on v1* counts only the findings of the annotations that stay, for example *1 of 2 findings* instead of *1 of 6*.
 
 ## [0.12.0] - 2026-11-20
 
