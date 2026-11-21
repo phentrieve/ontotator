@@ -311,3 +311,60 @@
 /* Submit confirmation while a source update is open: a warning with the way to the source update dialog. */
 .review-confirm-source-update { display: grid; gap: var(--space-2); justify-items: start; margin: 0 0 var(--space-3); padding: var(--space-2) var(--space-3); border: 1px solid var(--notice-warning-border); border-radius: var(--radius); background: var(--notice-warning-fill); color: var(--notice-warning-text); }
 .review-confirm-source-update p { margin: 0; }
+
+/* Find in the texts (Ctrl+F, from the prototype of issue 533): one row under the text tools; hits painted like the browser's own find. */
+.find-bar { display: flex; flex-basis: 100%; align-items: center; gap: var(--space-2); min-width: 0; }
+.find-bar-input { flex: 0 1 18rem; min-width: 8rem; }
+.find-bar-status { display: flex; flex-wrap: wrap; column-gap: var(--space-3); min-width: 0; color: var(--text-muted); font-size: var(--size-sm); line-height: var(--leading-sm); font-variant-numeric: tabular-nums; }
+.find-bar-panes { color: var(--text-muted); }
+::highlight(review-find) { background-color: var(--mark-0-fill); }
+::highlight(review-find-current) { background-color: var(--mark-2-fill); }
+
+/* Segment pairs (issue 560, prototype): one scrolling table in place of the text columns, one row per pair. */
+.translation-pairs-view { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.segment-pairs { height: min(70vh, 48rem); min-height: 16rem; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-raised); }
+.segment-pairs-head,
+.segment-pair { display: grid; grid-template-columns: 2.25rem minmax(0, 1fr) minmax(0, 1fr) auto; column-gap: var(--space-4); align-items: start; padding-inline: var(--space-3) var(--space-3); }
+.segment-pairs-head { position: sticky; top: 0; z-index: 2; padding-block: var(--space-2); border-bottom: 1px solid var(--border); background: var(--surface-raised); color: var(--text-muted); font-size: var(--size-sm); line-height: var(--leading-sm); font-weight: var(--weight-strong); }
+.segment-pair { padding-block: var(--space-2); border-bottom: 1px solid var(--border); border-left: 3px solid transparent; }
+.segment-pair:last-child { border-bottom: 0; }
+/* A new paragraph in either text: a wider gap above the row. */
+.segment-pair.starts-paragraph { margin-top: var(--space-3); border-top: 1px solid var(--border); }
+.segment-pair.is-checked { border-left-color: var(--success); background: var(--success-light); }
+.segment-pair.is-stale { border-left-color: var(--warning); background: var(--warning-light); }
+.segment-pairs-number { padding-top: 0.35rem; color: var(--text-muted); font-size: var(--size-sm); line-height: var(--leading-sm); font-variant-numeric: tabular-nums; text-align: right; }
+.segment-pairs-head .segment-pairs-number { padding-top: 0; }
+.segment-cell { min-width: 0; padding: var(--space-1) var(--space-2); white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-serif); font-size: var(--size-reading); line-height: var(--leading-reading); color: var(--text); border-radius: 2px; }
+.segment-cell.is-editable { cursor: text; }
+.segment-cell.is-editable:hover { box-shadow: inset 0 0 0 1px var(--border-strong); }
+.segment-cell:focus-visible { outline: var(--focus-width) solid var(--focus-ring); outline-offset: 1px; }
+.segment-cell ins { background: var(--success-light); text-decoration: underline 2px var(--success); text-underline-offset: 4px; }
+.segment-cell del { background: var(--danger-light); text-decoration: line-through var(--danger); }
+.segment-empty { color: var(--text-muted); font-family: var(--font-sans); font-size: var(--size-sm); font-style: italic; }
+.segment-cell-wrap { min-width: 0; }
+.pair-editor { display: block; width: 100%; padding: var(--space-1) var(--space-2); overflow: hidden; resize: none; border: 1px solid var(--focus-ring); border-radius: 2px; background: var(--surface-raised); color: var(--text);
+  font-family: var(--font-serif); font-size: var(--size-reading); line-height: var(--leading-reading); }
+.pair-editor:focus-visible { outline: var(--focus-width) solid var(--focus-ring); outline-offset: 1px; }
+.segment-pair-actions { display: flex; align-items: center; gap: var(--space-1); padding-top: 0.2rem; }
+/* The pair's check: a square box, 28 px, at the end of the row. */
+.pair-check { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 2px solid var(--border-strong); border-radius: var(--radius); background: var(--surface-raised); color: var(--on-accent); cursor: pointer; }
+.pair-check:hover { border-color: var(--success); }
+.pair-check:focus-visible { outline: var(--focus-width) solid var(--focus-ring); outline-offset: var(--focus-offset); }
+.pair-check.is-checked { border-color: var(--success); background: var(--success); }
+.pair-check.is-stale { border-color: var(--warning); border-style: dashed; background: var(--surface-raised); color: var(--warning); }
+.pair-check svg { width: 18px; height: 18px; }
+.pair-check:disabled { cursor: default; opacity: 0.6; }
+.pair-more { min-width: 28px; padding-inline: var(--space-1); }
+@media (min-width: 1100px) {
+  .translation-texts .translation-pairs-view { flex: 1; min-height: 0; }
+  .translation-texts .translation-pairs-view > .segment-pairs { flex: 1; height: auto; min-height: 0; }
+}
+@media (max-width: 699px) {
+  /* Phones: the source above its translation, the check beside the number. */
+  .segment-pairs-head { display: none; }
+  .segment-pair { grid-template-columns: minmax(0, 1fr) auto; row-gap: var(--space-1); }
+  .segment-pairs-number { grid-column: 1; grid-row: 1; text-align: left; }
+  .segment-pair-actions { grid-column: 2; grid-row: 1; }
+  .segment-pair > .segment-cell--source, .segment-pair > .segment-cell-wrap { grid-column: 1 / -1; }
+  .segment-pairs { height: auto; max-height: 70vh; max-height: 70dvh; }
+}

@@ -13,6 +13,7 @@ from ontotator.application.translation_reviews import (
     CheckedSentences,
     CheckedSentencesSave,
     ReviewWorkspace,
+    SegmentPairs,
     TranslationReviewRecord,
     TranslationReviewService,
 )
@@ -105,6 +106,19 @@ def save_checked_sentences(
     """
     return _service(request).save_checked_sentences(
         get_access(request), assignment_id, body, base=body.base
+    )
+
+
+@router.put("/translation-reviews/{assignment_id}/segment-pairs")
+def save_segment_pairs(
+    assignment_id: int,
+    body: SegmentPairs,
+    request: Request,
+    principal: PrincipalDep,
+) -> SegmentPairs:
+    """The reviewer's own segment pairs and their checks; not part of the review."""
+    return _service(request).save_segment_pairs(
+        get_access(request), assignment_id, body
     )
 
 

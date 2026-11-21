@@ -310,6 +310,7 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
         "/api/v1/translation-reviews/{assignment_id}/draft/typography-hints",
     ): "read",
     ("PUT", "/api/v1/translation-reviews/{assignment_id}/checked-sentences"): SESSION,
+    ("PUT", "/api/v1/translation-reviews/{assignment_id}/segment-pairs"): SESSION,
     ("POST", "/api/v1/translation-reviews/{assignment_id}/submit"): SESSION,
     ("GET", "/api/v1/translation-reviews/{assignment_id}/source-obligations"): "read",
     (

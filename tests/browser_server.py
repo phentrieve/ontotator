@@ -23,6 +23,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Query, Request
 from ontospan import AnnotatedDocument
 from pg_harness import database_url_for
+from pydantic import BaseModel
 from sqlalchemy import select
 
 from ontotator.api.app import create_app
@@ -77,6 +78,13 @@ PORT = int(os.environ.get("HPO_E2E_PORT", "18765"))
 BROWSER_KEEP_ALIVE_SECONDS = 600
 # The password of every user that ``/__test_user__`` sets up (frontend/browser/helpers.ts).
 TEST_PASSWORD = "browser test passphrase"
+
+
+class ReviewScenarioTexts(BaseModel):
+    """Source and translation of a translation review scenario, set by the spec."""
+
+    source: str
+    target: str
 
 
 def fixture_package(
@@ -881,6 +889,7 @@ def register_translation_review_scenario_route(app: FastAPI) -> None:
         single: bool = False,
         waiting_proposal_task: bool = False,
         reviewer_annotates: bool = False,
+        texts: ReviewScenarioTexts | None = None,
     ) -> dict[str, object]:
         from t1_builders import bundle as variant_bundle
         from t1_builders import correction_unit, native_unit, translation_unit
@@ -919,6 +928,9 @@ def register_translation_review_scenario_route(app: FastAPI) -> None:
                     paragraphs[3][900:],
                 ]
             )
+        if texts is not None:
+            # Texts of the spec's own (segment pairs, issue 560).
+            source_text, target_text = texts.source, texts.target
         if workflow:
             source_text = "Hypotonia. " + source_text
         source = native_unit(external_id, "en", source_text, case_id=case_id)

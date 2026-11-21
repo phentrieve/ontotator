@@ -325,6 +325,7 @@ export type TranslationReviewSubmitRequest = components["schemas"]["SubmitReques
 /** The reviewer's checked-sentence marks (issue 256); a working aid, not part of the review. */
 export type CheckedSentences = components["schemas"]["CheckedSentences"];
 export type CheckedSentencesSave = components["schemas"]["CheckedSentencesSave"];
+export type SegmentPairsView = components["schemas"]["SegmentPairs"];
 export type CaseFilters = NonNullable<operations["list_cases_api_v1_projects__key__cases_get"]["parameters"]["query"]>;
 /** The logged-in user; `csrf_token` goes back in `X-CSRF-Token` with every write. */
 export type CurrentUser = components["schemas"]["CurrentUser"];
@@ -1079,6 +1080,12 @@ export class ApiClient {
     const body: CheckedSentencesSave = { source: marks.source, translation: marks.translation, ...(base ? { base } : {}) };
     return this.request<CheckedSentences>(`/api/v1/translation-reviews/${assignmentId}/checked-sentences`, {
       method: "PUT", body: JSON.stringify(body), ...(options.keepalive ? { keepalive: true } : {}) });
+  }
+
+  /** Issue 560 (prototype): the reviewer's segment pairs and their checks; the last save wins. */
+  async saveSegmentPairs(assignmentId: number, pairs: SegmentPairsView, options: { keepalive?: boolean } = {}): Promise<SegmentPairsView> {
+    return this.request<SegmentPairsView>(`/api/v1/translation-reviews/${assignmentId}/segment-pairs`, {
+      method: "PUT", body: JSON.stringify(pairs), ...(options.keepalive ? { keepalive: true } : {}) });
   }
 
   /** Issue 298: whether the task records working time, and the owner's total on it. */

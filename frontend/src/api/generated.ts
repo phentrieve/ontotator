@@ -981,6 +981,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/translation-reviews/{assignment_id}/segment-pairs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save Segment Pairs
+         * @description The reviewer's own segment pairs and their checks; not part of the review.
+         */
+        put: operations["save_segment_pairs_api_v1_translation_reviews__assignment_id__segment_pairs_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/translation-reviews/{assignment_id}/submit": {
         parameters: {
             query?: never;
@@ -10616,6 +10636,7 @@ export interface components {
              */
             reviewed_again: boolean;
             checked_sentences?: components["schemas"]["CheckedSentences"];
+            segment_pairs?: components["schemas"]["SegmentPairs"] | null;
             version_origin?: components["schemas"]["VersionOrigin"] | null;
             previous_version?: components["schemas"]["ReviewText"] | null;
             /** Second Review At */
@@ -11155,6 +11176,50 @@ export interface components {
          * @description Zero-based Unicode codepoint interval [start, end).
          */
         Segment: {
+            /** Start */
+            start: number;
+            /** End */
+            end: number;
+        };
+        /**
+         * SegmentPair
+         * @description One aligned pair: a passage of the source and the passage of the translation.
+         *
+         *     ``checked`` is the hash of the pair's translation when the reviewer checked it,
+         *     or ``stale`` for a pair joined from a partly checked one; the client compares it
+         *     with the hash of the passage now. ``manual``: made by a merge or a split.
+         */
+        SegmentPair: {
+            source: components["schemas"]["SegmentSpan"];
+            translation: components["schemas"]["SegmentSpan"];
+            /**
+             * Manual
+             * @default false
+             */
+            manual: boolean;
+            /** Checked */
+            checked?: string | null;
+        };
+        /**
+         * SegmentPairs
+         * @description The reviewer's alignment of the source and the draft text, with its checks.
+         *
+         *     ``source_hash`` and ``text_hash`` name the texts the passages refer to; a client
+         *     that finds other texts aligns them anew.
+         */
+        SegmentPairs: {
+            /** Source Hash */
+            source_hash: string;
+            /** Text Hash */
+            text_hash: string;
+            /** Pairs */
+            pairs?: components["schemas"]["SegmentPair"][];
+        };
+        /**
+         * SegmentSpan
+         * @description A passage of one text, in UTF-16 code units as the browser counts them.
+         */
+        SegmentSpan: {
             /** Start */
             start: number;
             /** End */
@@ -15149,6 +15214,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CheckedSentences"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_segment_pairs_api_v1_translation_reviews__assignment_id__segment_pairs_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assignment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SegmentPairs"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SegmentPairs"];
                 };
             };
             /** @description Validation Error */
