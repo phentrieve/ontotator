@@ -155,6 +155,10 @@ EXCLUDED: dict[str, str] = {
     "imported_people": (
         "server record of the pseudonym-only people an archive import created"
     ),
+    "notifications": (
+        "each person's in-app notifications on the source server; they hold"
+        " no work and point at the source server's task numbers"
+    ),
     "api_tokens": (
         "credentials of the source server (project tokens); a credential never"
         " travels in an archive"

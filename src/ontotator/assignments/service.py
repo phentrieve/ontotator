@@ -1195,6 +1195,18 @@ class AssignmentService:
             details={"document_id": document_id, "user_id": target, "task": task},
             at=now,
         )
+        # Issue 557: the bell of the person who got the task.
+        from ontotator.application.notifications import notify
+
+        notify(
+            conn,
+            target,
+            project["id"],
+            "task_assigned",
+            actor_id=actor.user_id,
+            assignment_id=assignment_id,
+            at=now,
+        )
         return self._get(conn, assignment_id)
 
     def assign(
@@ -1584,6 +1596,17 @@ class AssignmentService:
             target_id=assignment_id,
             project_id=project["id"],
             details=details,
+            at=now,
+        )
+        from ontotator.application.notifications import notify
+
+        notify(
+            conn,
+            old["user_id"],
+            project["id"],
+            "task_reopened",
+            actor_id=actor.user_id,
+            assignment_id=assignment_id,
             at=now,
         )
 

@@ -2500,6 +2500,163 @@
         "x-ontotator-scope": "admin"
       }
     },
+    "/api/v1/me/notifications": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "List Notifications",
+        "description": "The caller's newest notifications and the number of unread ones.",
+        "operationId": "list_notifications_api_v1_me_notifications_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "session"
+      }
+    },
+    "/api/v1/me/notifications/summary": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Notification Summary",
+        "description": "The number of unread notifications (the bell's count).",
+        "operationId": "notification_summary_api_v1_me_notifications_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationSummary"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "session"
+      }
+    },
+    "/api/v1/me/notifications/{notification_id}/read": {
+      "post": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Mark Notification Read",
+        "description": "Mark one notification read; another person's id changes nothing.",
+        "operationId": "mark_notification_read_api_v1_me_notifications__notification_id__read_post",
+        "parameters": [
+          {
+            "name": "notification_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Notification Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "session"
+      }
+    },
+    "/api/v1/me/notifications/read-all": {
+      "post": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Mark All Notifications Read",
+        "description": "Mark every notification read, up to ``up_to`` when given.",
+        "operationId": "mark_all_notifications_read_api_v1_me_notifications_read_all_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkAllReadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "session"
+      }
+    },
     "/api/v1/translation-reviews/{assignment_id}": {
       "get": {
         "tags": [
@@ -23778,6 +23935,25 @@
         ],
         "title": "LoginRequest"
       },
+      "MarkAllReadRequest": {
+        "properties": {
+          "up_to": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Up To"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "MarkAllReadRequest"
+      },
       "Member": {
         "properties": {
           "username": {
@@ -24719,6 +24895,178 @@
           "owner"
         ],
         "title": "NextStepView"
+      },
+      "NotificationList": {
+        "properties": {
+          "unread": {
+            "type": "integer",
+            "title": "Unread"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationView"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "unread",
+          "items"
+        ],
+        "title": "NotificationList"
+      },
+      "NotificationSummary": {
+        "properties": {
+          "unread": {
+            "type": "integer",
+            "title": "Unread"
+          }
+        },
+        "type": "object",
+        "required": [
+          "unread"
+        ],
+        "title": "NotificationSummary",
+        "description": "The bell's count."
+      },
+      "NotificationView": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "task_assigned",
+              "task_reopened",
+              "task_released",
+              "text_problem_received",
+              "question_received",
+              "answer_received",
+              "submission_waiting"
+            ],
+            "title": "Kind"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "read": {
+            "type": "boolean",
+            "title": "Read"
+          },
+          "project_key": {
+            "type": "string",
+            "title": "Project Key"
+          },
+          "project_name": {
+            "type": "string",
+            "title": "Project Name"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonRefView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "assignment_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignment Id"
+          },
+          "task": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "annotate",
+                  "review",
+                  "translation_review"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task"
+          },
+          "case_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Id"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "target_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "created_at",
+          "read",
+          "project_key",
+          "project_name",
+          "actor",
+          "assignment_id",
+          "task",
+          "case_id",
+          "language",
+          "version",
+          "target_id"
+        ],
+        "title": "NotificationView",
+        "description": "One entry of the bell's list. The app words it from these fields."
       },
       "OldMentionView": {
         "properties": {
