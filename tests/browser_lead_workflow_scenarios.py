@@ -650,6 +650,69 @@ def typo_fix_carry(app: FastAPI) -> dict[str, Any]:
     )
 
 
+TYPO_FIX_PROPOSALS_CASE = "case-0509"
+
+
+def typo_fix_proposals(app: FastAPI) -> dict[str, Any]:
+    """Issue 509: an accepted de translation of case-0509 with the typo
+    "hypotnia" and two tool proposals, on "seizures" and on "hypotnia". Ben's
+    task is from proposals and nobody opened it; Cy Annotator opened a task
+    from scratch. Fixing "hypotnia" leaves a proposal for a check, so Ben's
+    task stays; a fix elsewhere carries both proposals, so it follows."""
+    from browser_carry_fixture import HYPOTONIA, _span
+    from browser_documents_scenarios import start_round
+    from t1_builders import native_unit, translation_unit
+    from t1_fixtures import annotation
+
+    from ontotator.storage.tables import AssignmentRow
+
+    scenario = lead_project(app, "TYPO_FIX_PROPOSALS")
+    case = TYPO_FIX_PROPOSALS_CASE
+    source = native_unit(case, "en", SYNTHETIC, case_id=case)
+    seizures, hypotnia = (
+        _span(TYPO_FIX_TEXT, "seizures"),
+        _span(TYPO_FIX_TEXT, "hypotnia"),
+    )
+    proposals = native_unit(
+        case,
+        "de",
+        TYPO_FIX_TEXT,
+        case_id=case,
+        annotations=[
+            annotation("p1", (seizures["start"], seizures["end"]), text=TYPO_FIX_TEXT),
+            annotation(
+                "p2",
+                (hypotnia["start"], hypotnia["end"]),
+                text=TYPO_FIX_TEXT,
+                term_id=HYPOTONIA,
+            ),
+        ],
+    )
+    translation = translation_unit(case, "de", TYPO_FIX_TEXT, source=source).model_copy(
+        update={"annotation_set": proposals.annotation_set}
+    )
+    docs = import_units(scenario, [source, translation])
+    plan(scenario, [case], {"de": REVIEW_AND_ANNOTATE})
+    document_id = docs[(case, "de")]
+    review_translation(scenario, document_id, "ana", "accepted_unchanged")
+    waiting = assign(scenario, document_id, "ben", "annotate")
+    opened = assign(scenario, document_id, "annotator", "annotate")
+    with app.state.repo.db.transaction() as conn:
+        for task, mode in ((waiting, "proposals"), (opened, "scratch")):
+            conn.execute(
+                update(AssignmentRow)
+                .where(AssignmentRow.id == task)
+                .values(annotation_mode=mode)
+            )
+    start_round(scenario, opened, "annotator")
+    return result(
+        scenario,
+        all_rows([case], ("de",)),
+        case_ids={"de": [case]},
+        documents={"de": document_id},
+    )
+
+
 UPLOAD_DIALOG_CASES = cases(301, 62)
 
 
@@ -732,6 +795,7 @@ BUILDERS: dict[str, Builder] = {
     "ACCEPTED_TRANSLATION_FOR_LEAD": accepted_translation_for_lead,
     "UPLOAD_DIALOG": build_upload_dialog,
     "TYPO_FIX_CARRY": typo_fix_carry,
+    "TYPO_FIX_PROPOSALS": typo_fix_proposals,
 }
 
 
