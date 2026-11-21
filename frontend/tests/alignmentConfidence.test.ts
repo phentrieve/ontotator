@@ -111,6 +111,24 @@ describe("unsure pairs", () => {
     for (const index of wrong) expect(unsure.has(index)).toBe(true);
   });
 
+  it("each sentence of the letters left out in turn: most alignments stay right, few show an unmarked wrong pair", () => {
+    // Measured with "Not in the translation" at cost 4 (at cost 6: 64 right, 32 with an unmarked wrong pair).
+    let rightCount = 0, unmarked = 0, total = 0;
+    for (const document of DOCUMENTS) for (let at = 0; at < document.pairs.length; at++) {
+      const cut = { ...document, pairs: document.pairs.map((pair, i) => i === at ? { ...pair, de: pair.de.startsWith("¶ ") ? "¶ " : "" } : pair) };
+      const en = sampleText(cut, "en"), de = sampleText(cut, "de"), result = judge(en.text, de.text);
+      total++;
+      if (!result.usable) continue;
+      const unsure = unsurePairs(en.text, de.text, result.pairs!, options);
+      const wrong = result.pairs!.map((pair, i) => [pair, i] as const).filter(([pair]) => !right(pair, en.spans, de.spans));
+      if (wrong.length === 0) rightCount++;
+      else if (wrong.some(([, i]) => !unsure.has(i))) unmarked++;
+    }
+    expect(total).toBe(101);
+    expect(rightCount).toBeGreaterThanOrEqual(75);
+    expect(unmarked).toBeLessThanOrEqual(22);
+  });
+
   it("no pair of the realistic samples is unsure", () => {
     const pairs = securePairs(EN, DE, alignTexts(EN, DE, options), options);
     expect(unsurePairs(EN, DE, pairs, options).size).toBe(0);

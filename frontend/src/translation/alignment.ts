@@ -4,7 +4,7 @@
  * Both texts are split into segments: sentences, and clauses where a sentence has a semicolon, or is long and has
  * commas. Segments are then grouped into pairs across the texts, n:m and in order, by a dynamic program in the style
  * of Gale and Church: a pair costs more the less its lengths fit the length ratio of the whole texts, the more its
- * numbers, terms and punctuation differ, and the rarer its shape (1:1 is cheapest, 1:0 and 0:1 the dearest). The
+ * numbers, terms and punctuation differ, and the rarer its shape (1:1 is cheapest; 1:0 and 0:1 cost about as much as 2:2). The
  * aligner is rule-based and runs in the browser: no model, no network.
  *
  * A pair keeps its own checked mark: the hash of its translation when the reviewer checked it. An edit inside a pair
@@ -146,9 +146,13 @@ function lengthCost(ls: number, lt: number, ratio: number): number {
   const tail = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429)))) * Math.exp(-delta * delta / 2);
   return -Math.log(Math.max(tail, 1e-12));
 }
+/** The shape cost of a pair with one empty side (1:0, 0:1). */
+export const ONE_SIDED_COST = 4;
 /** The shape of a pair by the sentences it touches on each side. */
 function shapeCost(a: number, b: number): number {
-  if (a === 0 || b === 0) return 6;
+  // A part without a partner ("Not in the translation"): 4, so a left-out sentence gets a row of its own instead of
+  // hiding in a 2:1 pair with a wrong cut next to it (measured on the samples, issue 560).
+  if (a === 0 || b === 0) return ONE_SIDED_COST;
   const [low, high] = a < b ? [a, b] : [b, a];
   if (low === 1 && high === 1) return 0;
   if (low === 1 && high === 2) return 2.3;
