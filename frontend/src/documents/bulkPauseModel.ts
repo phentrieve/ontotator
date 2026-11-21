@@ -65,10 +65,16 @@ export function pauseGroups(preview: TextPauseActionView): PreviewGroup[] {
   return groups;
 }
 
-/** "the work on 12 texts", or why nothing changes. */
-export function pauseSummaryText(preview: TextPauseActionView): string {
+/** "the work on 12 texts", or why nothing changes; `count` selected texts, one gets the singular (issue 585). */
+export function pauseSummaryText(preview: TextPauseActionView, count: number): string {
   if (preview.changes.length) return `${preview.action === "pause" ? "the work on" : "the pause of"} ${plural(preview.changes.length, "text")}`;
-  return preview.action === "pause" ? "The selected texts are already paused." : "None of the selected texts is paused by a lead.";
+  return nothingText(preview.action, count);
+}
+
+/** Why pausing or releasing changes nothing for the selection: the dialog's summary and the menu's reason. */
+function nothingText(action: PauseAction, count: number): string {
+  if (count === 1) return action === "pause" ? "The selected text is already paused." : "The selected text is not paused by a lead.";
+  return action === "pause" ? "The selected texts are already paused." : "None of the selected texts is paused by a lead.";
 }
 
 /** The dialog's action button: "Pause 12 texts", "Release 3 texts". */
@@ -112,6 +118,5 @@ export function pauseAppliedText(result: TextPauseActionView): string {
  */
 export function pauseUnavailableReason(action: PauseAction, preview: TextPauseActionView | null | undefined, count: number): string | null {
   if (!preview || preview.change_count) return null;
-  if (count === 1) return action === "pause" ? "The selected text is already paused." : "The selected text is not paused by a lead.";
-  return action === "pause" ? "The selected texts are already paused." : "None of the selected texts is paused by a lead.";
+  return nothingText(action, count);
 }

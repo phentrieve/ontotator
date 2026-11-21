@@ -89,11 +89,14 @@ export function finalSummaryLabel(action: FinalAction): string {
   return action === "accept" ? "Will become final:" : "Will change:";
 }
 
-/** "38 texts" / "the final result of 8 texts", or why nothing changes. */
-export function finalSummaryText(preview: FinalPreview): string {
+/** "38 texts" / "the final result of 8 texts", or why nothing changes; `selected` texts, one gets the singular (issue 585). */
+export function finalSummaryText(preview: FinalPreview, selected: number): string {
   const count = finalCount(preview);
-  if (preview.action === "accept") return count ? plural(count, "text") : "No selected text has annotations that agree in full.";
-  return count ? `the final result of ${plural(count, "text")}` : "No selected text has a newer submission than its final result.";
+  const one = selected === 1;
+  if (preview.action === "accept") return count ? plural(count, "text")
+    : one ? "The selected text has no annotations that agree in full." : "No selected text has annotations that agree in full.";
+  return count ? `the final result of ${plural(count, "text")}`
+    : one ? "The selected text has no newer submission than its final result." : "No selected text has a newer submission than its final result.";
 }
 
 /** The dialog's action button: "Accept 38 results", "Change 8 final results". */

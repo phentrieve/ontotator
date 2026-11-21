@@ -89,6 +89,11 @@ it("with one text selected, the menu reasons speak of one text (issue 585)", () 
   expect(unavailableReason("reopen", one("reopen"))).toBe("No submitted tasks in the selected text.");
   expect(unavailableReason("start_round", one("start_round"))).toBe("No submitted annotations in the selected text.");
   expect(unavailableReason("start_round", one("start_round", final))).toBe("The selected text has a final result or an open consolidation.");
+  // The dialog's summary when nothing changes.
+  expect(willChangeText(one("reopen"))).toBe("Nothing to reopen in the selected text.");
+  expect(willChangeText(one("withdraw"))).toBe("No open tasks to withdraw in the selected text.");
+  expect(willChangeText(one("start_round"))).toBe("No submitted annotation in the selected text can start a round.");
+  expect(willChangeText(reopenPreview({ changes: [] }))).toBe("Nothing to reopen in the selected texts.");
 });
 
 it("the menu reasons follow the counts by reason: paused tasks, an open consolidation beside an empty text (issue 576, F6)", () => {

@@ -99,9 +99,10 @@ export function affectedLine(person: AffectedPerson): string {
   return `${person.name}: ${parts.join("; ")}.`;
 }
 
-/** "the annotation mode of 5 texts", or why nothing changes. */
-export function modeSummaryText(preview: BulkModeChangeView): string {
-  return preview.changes.length ? `the annotation mode of ${plural(preview.changes.length, "text")}` : `No selected text can change to annotation ${MODE_WORDS[preview.mode]}.`;
+/** "the annotation mode of 5 texts", or why nothing changes; `count` selected texts, one gets the singular (issue 585). */
+export function modeSummaryText(preview: BulkModeChangeView, count: number): string {
+  if (preview.changes.length) return `the annotation mode of ${plural(preview.changes.length, "text")}`;
+  return `${count === 1 ? "The selected text cannot" : "No selected text can"} change to annotation ${MODE_WORDS[preview.mode]}.`;
 }
 
 /** The dialog's action button: "Change mode of 5 texts"; "Change mode" before a preview. */

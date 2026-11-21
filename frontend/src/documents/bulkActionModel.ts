@@ -107,8 +107,10 @@ export function previewGroups(preview: BulkTaskActionView): PreviewGroup[] {
 /** "Will change: 14 tasks in 12 texts" (mockup 336-A), or why nothing changes. */
 export function willChangeText(preview: BulkTaskActionView): string {
   const tasks = preview.changes.length;
-  if (!tasks && preview.action === "start_round") return "No submitted annotation in the selected texts can start a round.";
-  if (!tasks) return preview.action === "reopen" ? "Nothing to reopen in the selected texts." : "No open tasks to withdraw in the selected texts.";
+  // One selected text gets the singular (issue 585).
+  const texts = preview.texts === 1 ? "text" : "texts";
+  if (!tasks && preview.action === "start_round") return `No submitted annotation in the selected ${texts} can start a round.`;
+  if (!tasks) return preview.action === "reopen" ? `Nothing to reopen in the selected ${texts}.` : `No open tasks to withdraw in the selected ${texts}.`;
   return `${plural(tasks, "task")} in ${plural(textsOf(preview.changes).length, "text")}`;
 }
 
