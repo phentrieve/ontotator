@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-D585j8YE.js";import{n as a,t as o}from"./lib-DmmFpHat.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-JNvxnslV.js";import{n as a,t as o}from"./lib-BTnjMQw0.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -229,7 +229,7 @@ What for: check what was changed on an account and by whom.
 
 1. On **Users**, click **More…** in the row and choose **History**. For anonymised accounts, click the **History** button in the row.
 2. Read the table: **When**, **By**, **What**, **Whom**, **Project**, **Details**. **What** names the change in plain words, for example *Project settings changed*, *Final result withdrawn*, *Final export created* or *Phenopackets created*. Research exports are listed too, for example *Edit log exported* or *Working time exported*. A text given its own number of annotators reads *Annotators per text changed for one text*, with the text, the old and new value and the project value under **Details**. *Languages changed* says which languages were added and removed (*Added: fr. Removed: es.*). *Project settings changed* names each setting as the settings page does, with the old and the new value (*Hide annotator names during consolidation: off → on*); an empty list of languages reads *any language*, as on the settings page (*Languages of the texts: any language → de, en*); the description, the prefilled values and the values annotators can choose are named without values. Entries from before these values were recorded show the names only. On a phone, scroll the table sideways to read **Details**.
-3. Changes made with an API token name it under **Details** (*Via API token*); the single requests a token made are left out here. The dialog shows the newest 200 entries. For the whole trail, use the command \`ontotator admin audit\`, see [Server operations](../operations.md#users-ontologies-and-projects). An editorial correction of a translation is recorded as *Typo fix in a translation*; its details carry the reason and the changed passages. A submitted annotation that such a fix moved to the new version by itself is recorded as *Annotation moved to a typo fix automatically*, naming the submission it came from; the system made that change, so it names no person who did it. A lead's decision on a queried translation review is recorded as *Query on a translation decided*, with the kind of decision and the answer to the reviewer. A lead's addition to the reason of a correction request is recorded as *Added to the reason of a translation correction*, with the text added.
+3. Changes made with an API token name it under **Details** (*Via API token*); the single requests a token made are left out here. The dialog shows the newest 200 entries. For the whole trail, use the command \`ontotator admin audit\`, see [Server operations](../operations.md#users-ontologies-and-projects). An editorial correction of a translation is recorded as *Typo fix in a translation*; its details carry the reason and the changed passages. A submitted annotation that such a fix moved to the new version by itself is recorded as *Annotation moved to a typo fix automatically*, naming the submission it came from; the system made that change, so it names no person who did it. A lead's decision on a queried translation review is recorded as *Query on a translation decided*, with the kind of decision and the answer to the reviewer. A lead's addition to the reason of a correction request is recorded as *Added to the reason of a translation correction*, with the text added. A question sent with **Ask the lead** is recorded as *Asked the lead*, a lead's answer as *Answered a question*.
 
 ## Anonymise a deactivated account
 
@@ -413,7 +413,7 @@ New here? Start with [Your first task, start to finish](first-task.md). How to l
 - Findings: [Mark text and add a finding](#mark-text-and-add-a-finding), [Search a term](#search-a-term), [Browse the ontology tree](#browse-the-ontology-tree), [Set values and confirm defaults](#set-values-and-confirm-defaults), [Manage mentions](#manage-mentions-of-a-finding), [Add a finding without a text span](#add-a-finding-without-a-text-span), [Change term, note or delete a finding](#change-term-note-or-delete-a-finding), [Add modifiers](#add-modifiers-to-a-finding), [Undo, redo and reset](#undo-redo-and-reset-your-changes), [Turn a finding into a modifier](#turn-a-standalone-modifier-finding-into-a-modifier), [Work in several layers](#work-in-several-layers)
 - Special tasks: [Review tool proposals](#review-tool-proposals), [Review carried findings](#review-carried-findings), [Re-create findings after a text correction](#re-create-findings-after-a-text-correction)
 - Finishing: [Submit the text](#submit-the-text), [Confirm values and acknowledge warnings](#confirm-values-and-acknowledge-warnings-in-the-submit-dialog), [View your submissions](#view-your-submissions), [Start a new work round](#start-a-new-work-round)
-- Problems: [Report a text problem](#report-a-text-problem), [Resume a paused task or withdraw a report](#resume-a-paused-task-or-withdraw-a-report)
+- Problems: [Ask the lead](#ask-the-lead), [Report a text problem](#report-a-text-problem), [Resume a paused task or withdraw a report](#resume-a-paused-task-or-withdraw-a-report)
 - [Review a translation](#review-a-translation)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 
@@ -427,11 +427,21 @@ The editor has three columns:
 | --- | --- |
 | Left: **Findings** | The list of your findings. In a task from proposals: **Review Proposals** and **Your own findings**. |
 | Middle: the text | The text you annotate. Marked passages are highlighted. |
-| Right: details | The selected finding: **Values**, **Modifiers**, **Note**, its mentions and the term search. With nothing selected, the **New finding** panel opens here when you mark text. |
+| Right: details | The selected finding: **Values**, **Modifiers**, its mentions, **Note** and the term search. With nothing selected, the **New finding** panel opens here when you mark text. |
 
 The findings in the list follow the text: a finding stands where its first marked passage begins, so a finding you add in the middle of the text appears between its neighbours, not at the end. Findings without a text span come last. Carried findings stay at the top of the list, in the order of the earlier round.
 
-To make the findings list wider or narrower, drag the divider between the findings list and the text (**Resize findings column**), or focus it and press \`←\` or \`→\`. On a narrow screen, the tabs **Findings**, **Document** and **Details** switch between the columns; **Back to text** returns to the text.
+To make the findings list wider or narrower, drag the divider between the findings list and the text (**Resize findings column**), or focus it and press \`←\` or \`→\`.
+
+The right column works the same way on a wide screen (three columns): drag its left edge (**Resize details panel**), or focus it and press \`←\` or \`→\`; \`Home\` and \`End\` go to the least and the most, a double click or \`Enter\` restores the usual width. The round button on that edge, **Collapse details panel**, folds the column, with the ontology tree, to a narrow strip, so the text gets the room. Click the strip (**Expand details panel**) to bring it back. When you mark text, the column opens again by itself, for the term search. Width and folding are kept in this browser, for you.
+
+The small actions of a finding sit next to it as icons: **Show in tree** next to the term's name, **Copy text**, **Add segment** and **Move to a new finding** at each mention. Point at an icon to see its name.
+
+Some hints have a small close icon (**Hide this hint**). A hidden hint stays hidden in this browser; **More** › **Show hints again** brings all of them back.
+
+On a narrow screen, the tabs **Findings**, **Document** and **Details** switch between the columns; **Back to text** returns to the text.
+
+From a width of 1025 pixels, the toolbar of the text shares one line with the app header: **Sections**, the product name, **My tasks**, **Handbook** and your user menu (with your initials) come first, then the text's controls. The text and the tree get the height of a whole bar. In the one bar, **Next open item** is an arrow icon with that name. On a narrower screen the toolbar has its own line under the header, as before.
 
 The toolbar shows the text name, its language and the mode:
 
@@ -464,7 +474,7 @@ If the text was changed elsewhere, a **Revision conflict** notice appears; click
 | You see | Meaning |
 | --- | --- |
 | Fill colour of a mark | The term. The same term keeps one colour in the text; the colour says nothing about the state. Different terms that overlap or stand close together in a sentence always have different colours. |
-| Bands of colour | Text that belongs to several findings: one band per finding, in its colour. Up to three bands; with four or more findings the top band is striped. |
+| Bands of colour | Text that belongs to several findings: one band per finding, in its colour, stacked over the words with a thin gap between them. Up to three bands; with four or more findings the top band is striped. |
 | Solid underline | Your own finding. |
 | Dashed underline | A tool proposal under review. |
 | Dotted underline | A read-only reference finding. |
@@ -539,7 +549,7 @@ The search compares the words you type with term names and synonyms, letter by l
 
 What for: pick a broader or narrower term than the one you have, or look at the neighbours of a term before you decide.
 
-1. Select a finding and click **Show in tree**. The **Ontology tree** opens at the current term.
+1. Select a finding and click **Show in tree** (the tree icon next to the term's name). The **Ontology tree** opens at the current term.
 2. Click a term in the tree. Its **Synonyms**, **Translated names** and other parents (**Also under**) are shown.
 3. Click **Use this term** to give the selected finding this term.
 4. Click **Close tree**.
@@ -548,11 +558,11 @@ What for: pick a broader or narrower term than the one you have, or look at the 
 
 | Where | **Show in tree** opens the tree at | Taking a term |
 | --- | --- | --- |
-| A proposal you have not decided yet | the proposed term | **Use this term instead…**, then **Confirm**: you get a copy with that term, as with **Edit & Replace**, and the proposal reads **Replaced**, for example *Proposal: decide as Changed with Seizure (HP:0001250)* |
+| A proposal you have not decided yet | the proposed term | **Use this term instead…**, then **Confirm**: you get a copy with that term, as with **Edit & Replace**, and the proposal reads **Replaced**; the confirmation says so, for example *Proposal: decide as Replaced with Seizure (HP:0001250)* |
 | A hit of the term search of a **New finding** (next to the definition of the highlighted hit) | that hit | **Use this term instead…**, then **Confirm**: the new finding gets the term, as if you had chosen the hit, for example *New finding: choose Seizure (HP:0001250)* |
 | A reference, other people's findings in a consolidation, a decided proposal, or your own finding in a submitted or read-only task | its term | not possible: there is no button |
 
-The confirmation names what happens; **Cancel** or \`Esc\` closes it and changes nothing. Nothing changes until you click **Confirm**.
+The confirmation names what happens; **Cancel** or \`Esc\` closes it and changes nothing. Nothing changes until you click **Confirm**. On a proposal, the confirmed term is one change: one **Undo** takes back the copy and its term, and the proposal is open again.
 
 In a wide window the tree sits under the annotation panel. To give the tree more or less room, drag the divider between the two (**Resize ontology tree**) up or down, or focus it and press \`↑\` or \`↓\`. A double click or \`Enter\` restores the usual split. The height is kept in this browser.
 
@@ -589,7 +599,7 @@ What for: link a finding to every place in the text that supports it.
    - **Move to a new finding**: gives one mention its own finding with the same term and values. The new finding is selected, so you can change it right away; modifiers stay with the original finding.
    - **Remove**, then **Yes, remove**: detaches the mention.
 
-You cannot remove the last mention when the project requires a text span. If the project allows findings without a span, enter a reason in the note first.
+You cannot remove the last mention when the project requires a text span. If the project allows findings without a span, enter a reason in the note first. In a submitted or read-only task nothing can be changed: the greyed-out buttons say so when you point at them, and the note is shown on a grey band, not as a field to type in.
 
 ## Add a finding without a text span
 
@@ -633,7 +643,11 @@ You can also start from the text:
 2. The panel asks which finding it belongs to. Click the finding in the list or in the text. The nearest ones are listed under **Nearest in this sentence:**.
 3. If the modifier names the finding itself, choose the option to use it as the finding instead.
 
-To change a modifier later, open its row menu: **Link a text span…**, **Remove text span** or **Remove modifier**. A removal can be undone with **Undo** in the message or in the header.
+If the modifier's words lie inside the finding's text span, for example "severe" in "severe periorbital oedema", a box under **Modifiers** offers to take them out of the span. It shows the span now, with the words that go struck through, and the span after. Click **Exclude from span** to apply it; the finding then marks the remaining words, in two parts if the modifier was in the middle. Click **Keep span** to leave the span as it is. **Undo** in the message or in the header takes the change back.
+
+You can take up the offer later. When you open a finding and one of its modifiers still lies inside its span, that modifier's row shows a small link *In span · Exclude*. Click **Exclude**, or choose **Exclude from finding's span** in the row menu: the same box opens. There is no link and no menu item when the modifier covers the whole span, would cut a word in half, or the mention has imported negation cues. A tool proposal's span is never changed: once your change makes the copy, the offer is for the copy.
+
+To change a modifier later, open its row menu: **Link a text span…**, **Remove text span**, **Exclude from finding's span** or **Remove modifier**. A removal can be undone with **Undo** in the message or in the header.
 
 A tool proposal's modifiers change the same way while the proposal is open; see [Review tool proposals](#review-tool-proposals).
 
@@ -672,7 +686,7 @@ Tools make mistakes. Check every proposal as if you had marked it yourself: the 
 
 1. The list **Review Proposals** shows every proposal. Your additions are under **Your own findings**.
 2. Select a proposal, or move with \`j\` and \`k\`. The text shows where it was found. On a phone, where the details replace the text, the details show the sentence around the quoted passage, with the passage marked.
-3. Check the marked text, the term and each value. To see the broader and narrower terms of the proposed term, click **Show in tree** under it; to replace the term with one from the tree, click **Use this term instead…** and **Confirm** (see [Browse the ontology tree](#browse-the-ontology-tree)). To look the passage up elsewhere, click the copy icon (**Copy text**) next to the quoted passage in the details, or press \`Ctrl+C\` (\`Cmd+C\` on a Mac): both copy the passage of the selected proposal, as for a finding ([Mark text and add a finding](#mark-text-and-add-a-finding)). A proposal with several mentions has the copy icon at each.
+3. Check the marked text, the term and each value. To see the broader and narrower terms of the proposed term, click **Show in tree** (the tree icon) next to it; to replace the term with one from the tree, click **Use this term instead…** and **Confirm** (see [Browse the ontology tree](#browse-the-ontology-tree)). To look the passage up elsewhere, click the copy icon (**Copy text**) next to the quoted passage in the details, or press \`Ctrl+C\` (\`Cmd+C\` on a Mac): both copy the passage of the selected proposal, as for a finding ([Mark text and add a finding](#mark-text-and-add-a-finding)). A proposal with several mentions has the copy icon at each.
 4. Decide:
    - **Confirm**: the passage, term and all values are right. Values tagged **Defaulted** were not set by the tool but prefilled; Confirm accepts them as shown, so check them too.
    - **Reject**: the proposal is wrong and nothing should replace it.
@@ -734,7 +748,7 @@ To see which passages the correction changed, tick **Show changes since** v1 abo
 
 ### After a typo fix by the lead
 
-When the lead fixes only spacing or a typo in a text you already submitted (**Fix typos…**), your annotation can move to the new version by itself: when every one of your findings is placed on the new text without doubt and no number in the text changed. You do nothing. In **My tasks** the text then shows its new version, for example *case-0465 de v2 corrected*, as **Submitted**, with the day you were assigned; the task on the old version is gone. **View** shows the corrected text with your findings, placed on it, and the round reads *Round 1, moved to v2 after a typo fix*; your findings are not shown as carried findings to check, as you checked nothing. **Show changes since** v1 shows what the lead changed. It is still your annotation: nothing was added or removed. If a finding marked words the lead changed, or a number changed, your annotation stays on the old version and the lead moves it the usual way; you then check the carried findings ([Review carried findings](#review-carried-findings)).
+When the lead fixes only spacing or a typo in a text you already submitted (a typo fix, without a review), your annotation can move to the new version by itself: when every one of your findings is placed on the new text without doubt and no number in the text changed. You do nothing. In **My tasks** the text then shows its new version, for example *case-0465 de v2 corrected*, as **Submitted**, with the day you were assigned; the task on the old version is gone. **View** shows the corrected text with your findings, placed on it, and the round reads *Round 1, moved to v2 after a typo fix*; your findings are not shown as carried findings to check, as you checked nothing. **Show changes since** v1 shows what the lead changed. It is still your annotation: nothing was added or removed. If a finding marked words the lead changed, or a number changed, your annotation stays on the old version and the lead moves it the usual way; you then check the carried findings ([Review carried findings](#review-carried-findings)).
 
 ## Submit the text
 
@@ -795,9 +809,21 @@ What happens to your earlier work:
 - While your submission is being consolidated, you cannot continue from it. The dialog then shows no choice and no button under **Start a new round**, only: *Your submission is being consolidated, so you cannot continue from it now. Ask your project lead.* The lead can finish the consolidation or withdraw it; after that the dialog offers your submission again.
 - In a task from tool proposals you cannot continue from a submission yourself. The dialog says: *In a task from tool proposals you cannot continue from a submission yourself. Ask your project lead to start a new round.*
 
+## Ask the lead
+
+What for: ask the project lead a question about the task you are working on, for example whether a translated term is right. Today this is offered in a translation review. Your task stays open: you keep working and decide yourself once the lead answers.
+
+1. Optional: select the passage you ask about in the translation.
+2. Click **Ask the lead** in the header, or **Ask the lead…** under **Questions to the lead** in **Your review**.
+3. Write **Your question**. **Passage you ask about (optional)** holds the passage you selected. In **Your wording for this passage (optional)**, write how you would put it; the lead can take it into your text with the answer.
+4. Optional: tick **Pause my task until the lead answers** if you cannot go on without the answer.
+5. Click **Send question**.
+
+**Questions to the lead** lists your questions: *Waiting for the lead's answer*, then *Answered by the lead* with **Answer from the lead**. If the lead took your wording, it reads *The lead put your wording into your text.*; click **Show it in my text** to load it. Check it and submit your review as usual.
+
 ## Report a text problem
 
-What for: tell the lead that the text cannot be annotated as it is, for example cut off or the wrong text. For questions about the rules, ask your lead directly instead. For an error message, a crash or something that does not load, use [Report a technical problem](getting-started.md#report-a-technical-problem): it goes to the administrators and does not pause your task.
+What for: tell the lead that the text cannot be annotated as it is, for example cut off or the wrong text. For a question about the translation, use [Ask the lead](#ask-the-lead): it does not pause your task. For questions about the rules, ask your lead directly instead. For an error message, a crash or something that does not load, use [Report a technical problem](getting-started.md#report-a-technical-problem): it goes to the administrators and does not pause your task.
 
 Before you start: a report pauses your task. You cannot save or submit until the pause is released. Your saved work stays.
 
@@ -853,32 +879,33 @@ Then decide:
 | --- | --- | --- |
 | **Accepted unchanged** | The translation is right as it stands. | It becomes available for annotation. Annotation tasks already assigned open by themselves. |
 | **Accepted with corrections** | You corrected it and it is now right. Editing chooses this for you. | Your corrected text is saved as a new text version, which is accepted for annotation. |
-| **Query** | The meaning may differ clinically and you are not sure. | Not accepted. The lead reads your rationale and decides: they take the text you proposed, or accept the translation as it is, and answer you. Annotation tasks already assigned keep waiting until then. |
 | **Rejected** | The translation changes the clinical meaning. | Not accepted. The lead decides: a new review, a correction or discarding it. Annotation tasks already assigned keep waiting. |
 
-A problem in the source that does not affect the translation is no reason for a **Query**. Examples: a dose that looks too low but is what the source says, a footnote digit stuck to a year, a word broken by a hyphen at a line end. If the translation gives the source correctly, accept it (**Accepted unchanged**, or **Accepted with corrections** if you corrected something else) and put your remark in the **Rationale**. It is kept with your review. The lead reads the **Rationale** of every review, also of an accepted one, under **Translation reviews** in the text card and in the list of all translation reviews. A **Query** holds the annotation of the text until the lead decides; keep it for a translation you are not sure about.
+Not sure? Use [Ask the lead](#ask-the-lead) before you decide; your review stays open. **Query** is no longer a decision. Reviews submitted as **Query** before stay readable, with the lead's decision.
+
+A problem in the source that does not affect the translation needs no question. Examples: a dose that looks too low but is what the source says, a footnote digit stuck to a year, a word broken by a hyphen at a line end. If the translation gives the source correctly, accept it (**Accepted unchanged**, or **Accepted with corrections** if you corrected something else) and put your remark in the **Rationale**. It is kept with your review. The lead reads the **Rationale** of every review, also of an accepted one, under **Translation reviews** in the text card and in the list of all translation reviews.
 
 Steps:
 
 1. Open the task. The **Source** is on the left, the **Translation** on the right.
 2. Read the automatic checks band at the top. Click **Details** to see which checks failed and why.
-   - The band may also read *More passages in brackets than in the source: 2 in the translation, 1 in the source*. Ontotator found this itself, on the version you review. A translation sometimes adds a second name in brackets, for example a lay term followed by the Latin or English term; one finding is then named twice. **Details** lists the passages. If the translation added one, remove it; your decision is then **Accepted with corrections**. If you are not sure, choose **Query** with the category **Addition**. If the passages are right, decide as usual: this check asks for no rationale and is not counted in **My tasks**.
+   - The band may also read *More passages in brackets than in the source: 2 in the translation, 1 in the source*. Ontotator found this itself, on the version you review. A translation sometimes adds a second name in brackets, for example a lay term followed by the Latin or English term; one finding is then named twice. **Details** lists the passages. If the translation added one, remove it; your decision is then **Accepted with corrections**. If you are not sure, [ask the lead](#ask-the-lead). If the passages are right, decide as usual: this check asks for no rationale and is not counted in **My tasks**.
 3. Type your corrections directly in the translation column. Your edits are saved as you type, and the decision switches to **Accepted with corrections**. Use **Show changes** to see your edits, also a double space you typed, and **Couple scrolling** to scroll both columns together. **Show matching paragraph** (\`Alt+M\`) jumps to the paired paragraph.
 4. Optional: to compare with another text, click **Compare** above the texts. With several texts to compare, it opens a menu. In the review of a later version (v2, v3, …), the first entry is the previous version ([Review a later version](#review-a-later-version)).
-5. Under **Your review**, choose a **Decision** (or press \`1\` to \`4\`).
+5. Under **Your review**, choose a **Decision** (or press \`1\` to \`3\`).
 6. Fill in what the decision needs:
-   - **Query** and **Rejected** always count as a clinically relevant change: choose at least one category and write a **Rationale**. Put your question for the lead in the rationale.
+   - **Rejected** always counts as a clinically relevant change: choose at least one category and write a **Rationale**.
    - **Accepted with corrections**: tick **Clinically relevant change** if your correction changes the clinical meaning; then a category and a **Rationale** are required.
    - **Accepted unchanged** after a failed automatic check: say in the **Rationale** why the flagged difference is correct.
 7. Click **Submit review…** (or press \`Ctrl+Enter\`), read what will happen, then click **Submit review**.
    - If the text has spacing errors or invisible characters, the confirmation says so, for example *2 typography hints in your text: double space (2).* Click **Show them** to see each place with a little text around it; spaces are drawn as dots. To fix them, click **Keep editing**. The line blocks nothing: you can submit all the same. It names a double space, a space before or a missing space after punctuation, spaces at the end of a line or of the text, tabs, invisible characters and a doubled full stop. It does not find two words run together or a grammar slip; read your corrections once more.
-8. A message confirms the review, with **View result**. Your next open task opens on its own, another translation review first, or **My tasks** if none is left. If you also annotate this text and your review finished its translation, your annotation of the text opens instead and the message adds *Annotate this text now*. Finished means: the translation is accepted (with corrections, on the corrected version), every other translation of the text is accepted too, and no further review or decision of the lead is pending. After **Query** or **Rejected** it does not come first.
+8. A message confirms the review, with **View result**. Your next open task opens on its own, another translation review first, or **My tasks** if none is left. If you also annotate this text and your review finished its translation, your annotation of the text opens instead and the message adds *Annotate this text now*. Finished means: the translation is accepted (with corrections, on the corrected version), every other translation of the text is accepted too, and no further review or decision of the lead is pending. After **Rejected** it does not come first.
 
 On a wide screen, **Your review** is a column on the right. To give the texts more room, drag its left edge (**Resize review panel**), or focus the edge and press \`←\` or \`→\`; \`Enter\` restores the default width. **Collapse review panel** folds it to a narrow strip: the bar at the bottom then shows the decision and **Submit review…**, and **Expand review panel** or **Change ↓** opens it again. Width and folding are remembered in this browser.
 
 In **My tasks** a submitted review names your decision under **Submitted**, for example *Your decision: Rejected*. When you open it, **Submitted review** lists the decision and **Status after this review**: *Accepted* after **Accepted unchanged**, *Reviewed; the corrected text was accepted as the next version* after **Accepted with corrections**, and *Reviewed, not accepted* after **Rejected** or **Query**. That is the status your review gave the version, not necessarily its status today: the lead may have decided since.
 
-After a **Query** the lead decides. **My tasks** then shows *Answer from the lead* at your submitted review (tab **Submitted**). Open the task: above **Submitted review** you read what was decided, for example *The lead decided your query on 18 Nov, 10:12. Your text was accepted as v2.* (or *v1 was accepted as it is.*), and the lead's answer, for example *Answer from the lead: Yes, as proposed.*
+A review submitted as **Query** before this change is decided by the lead. **My tasks** then shows *Answer from the lead* at your submitted review (tab **Submitted**). Open the task: above **Submitted review** you read what was decided, for example *The lead decided your query on 18 Nov, 10:12. Your text was accepted as v2.* (or *v1 was accepted as it is.*), and the lead's answer, for example *Answer from the lead: Yes, as proposed.*
 
 A project lead who corrects a translation themselves sees only **Accepted with corrections**. When the lead corrects a translation that was already accepted, the corrected version is reviewed again: it then appears as a new translation review task, usually for you ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
 
@@ -898,7 +925,7 @@ What for: review a translation that already has an earlier version, for example 
 
 The task shows the version you were given, not the first one:
 
-- **Translation details** says how this version was made: **This version** (for example *Human translation*, *Machine translation, DeepL, deepl-2026-10*, *Corrected by hand*, *Corrected by the project lead*, *Corrected in a translation review* or, after **Fix typos…**, *Typos fixed by the project lead on 17 Nov, 10:12* with **What was fixed**), when it was uploaded or corrected, the **Version before** and, for an uploaded text, what the lead recorded about who made it and when. The machine translation run of the first version is listed separately, for example *Translation run of v1*. On a phone the details open below the bar across the width of the screen.
+- **Translation details** says how this version was made: **This version** (for example *Human translation*, *Machine translation, DeepL, deepl-2026-10*, *Corrected by hand*, *Corrected by the project lead*, *Corrected in a translation review* or, after a typo fix, *Typos fixed by the project lead on 17 Nov, 10:12* with **What was fixed**), when it was uploaded or corrected, the **Version before** and, for an uploaded text, what the lead recorded about who made it and when. The machine translation run of the first version is listed separately, for example *Translation run of v1*. On a phone the details open below the bar across the width of the screen.
 - The line under the translation reads *Same as the version you were given (v2).* Your own edits are underlined against that version, and **Show changes** shows them.
 - **Compare** shows what changed since the version before. Click **Compare** (with several texts to compare, choose *The previous version (v1)*): the third column, *Changes from v1 to v2*, shows this version with the removed passages struck through and the added ones underlined. **Close** hides it again.
 - The automatic checks ran on the first version only. The band says so, for example *The automatic checks ran on v1, not on this version (v2). 1 automatic check failed on v1: Units added in translation.* **Details** lists the checks of v1. A check that failed on v1 is not counted in **My tasks** for this task, and **Accepted unchanged** needs no rationale because of it. Check yourself whether the passage is right in this version. Only the check for passages in brackets is made on this version itself.
@@ -914,7 +941,7 @@ If the source text was updated after the translation was made, **Source updates 
 
 **Submit review…** alone does not resolve a source update. If you use it with an accepting decision while one is open, the confirmation says so, for example *1 source update is not reviewed.*, and offers **Review source update**, which opens the comparison. **Submit without the source update** accepts the translation against the original source and leaves the update open: the submitted review can then no longer resolve it, and the lead has to assign another review.
 
-![A translation review: the source on the left, the translation on the right, the failed automatic check above them. On the right, Query is chosen with the category Number or unit and a rationale, above Submit review…](images/annotator-translation-review.png)
+![A translation review: the source on the left, the translation on the right, the failed automatic check above them. On the right, Rejected is chosen with the category Number or unit and a rationale, above Submit review…](images/annotator-translation-review.png)
 
 ### Mark checked sentences
 
@@ -935,6 +962,35 @@ The marks are only for you. They are saved with your review, so they are kept wh
 With the keyboard: Tab to a sentence, then press Enter or Space to mark it. Shift+Enter marks the range from the last sentence you marked.
 
 On a touch-only device such as a phone or tablet, **Mark checked sentences** is not offered, because a swipe on the text has to scroll. A review you can only read does not offer it either.
+
+### Check by segment pairs
+
+What for: see which part of the source belongs to which part of the translation, and check them together. *Prototype: this view is still being tested and may change.*
+
+1. Tick **Check by segment pairs** above the texts. The source and the translation are now shown as rows. Each row is one pair: a sentence or a part of a sentence of the source on the left, and its translation on the right. One source sentence can have two translation sentences in one row, and the other way round. Your choice is remembered in this browser.
+2. Read the row, then click the box at the end of the row to mark the pair as checked. The row turns green. Click the box again to remove the mark.
+3. Click a translation to edit it. It becomes a text box for that pair. Press Esc or click elsewhere when you are done. If the pair was checked, it turns amber, and the head counts it as *changed*. Read it again, then click its box to check it again. Pairs you did not edit keep their marks.
+4. If a pair is wrong, click **⋯** at the end of its row: **Merge with the pair above**, **Merge with the pair below** or **Split this pair**. A pair that joins a checked and an unchecked pair turns amber.
+5. **Next unchecked** jumps to the first pair that is not checked. **Align again** pairs the texts anew, for example after many edits. Checked pairs and pairs you merged or split stay as they are.
+
+The head above the rows shows how many pairs are checked, for example *12 of 55 pairs checked · 1 changed*. A row that reads *Not in the translation* has a source part without a translation; read it carefully.
+
+**Show changes** also works in this view: the changed words are marked in the translation cells. You cannot edit while it is on. **Find in the texts** (\`Ctrl+F\`, on a Mac \`Cmd+F\`) searches both columns. **Couple scrolling** and **Show matching paragraph** are not shown here, because the rows already line up.
+
+Ontotator pairs the texts by itself, from sentence ends, semicolons, numbers, units and similar words. It can be wrong; correct it with **⋯**. The pairs and your marks are only for you. They are saved with your review, so they are kept when you reload. They do not change your decision, and the lead and the exports never see them. When you first turn the view on, sentences you had marked with **Mark checked sentences** are taken over: a pair is checked when all its sentences were checked.
+
+With the keyboard: Tab to the box of a row and press Space. \`↓\` and \`↑\` move to the box of the next or previous row. Enter on a translation opens it for editing.
+
+### Find in the texts
+
+What for: find a word in the source and the translation at once.
+
+1. Press \`Ctrl+F\` (on a Mac \`Cmd+F\`). A search field opens above the texts. Selected words are filled in.
+2. Type. The field shows the number of hits, for example *1 of 6 · Source 3 · Translation 3*. All hits are marked, the current one in orange.
+3. Press Enter for the next hit, Shift+Enter for the previous one.
+4. Press Esc to close it. If the current hit is in the translation, it is selected there, ready to change.
+
+Press \`Ctrl+F\` again in the field to use the browser's own find.
 
 ### Show invisible characters
 
@@ -981,7 +1037,7 @@ What for: work without the mouse. Shortcuts are off while you type in a field or
 | \`Alt+←\` / \`Alt+→\` | Previous / next text |
 | \`Alt+P\` | Switch project |
 
-In a translation review: \`1\` to \`4\` choose a decision (outside the text), \`Ctrl+Enter\` submits (with a confirmation), \`Alt+M\` shows the matching paragraph. With **Mark checked sentences** on, Enter or Space marks the focused sentence and Shift+Enter marks a range.
+In a translation review: \`1\` to \`4\` choose a decision (outside the text), \`Ctrl+Enter\` submits (with a confirmation), \`Alt+M\` shows the matching paragraph. With **Mark checked sentences** on, Enter or Space marks the focused sentence and Shift+Enter marks a range. \`Ctrl+F\` (macOS: \`Cmd+F\`) finds in the texts. With **Check by segment pairs** on, Space on a row's box marks the pair, and \`↓\` / \`↑\` move between the boxes.
 `,te=`# Consolidator
 
 This chapter is for consolidators. A consolidation merges two or more submissions on one text into one result: findings that everyone agrees on are taken over, and you decide the rest. Back to the [handbook overview](README.md).
@@ -1059,7 +1115,7 @@ If the pause arrives while you have the consolidation open, the next decision is
 
 What for: see who marked what and work through the differences in order.
 
-1. The **Clinical text** shows one underline per person. The legend below says which line style belongs to whom. There are four line styles: with more than four people, the fourth (double) line stands for everyone from the fourth person on, and the legend lists them, for example *Line 4 (double): +5: …*. The table of a group still has every person. Kept findings are shaded; the selected group is framed.
+1. The **Clinical text** shows one underline per person. The legend below says which line style belongs to whom. There are four line styles: with more than four people, the fourth (double) line stands for everyone from the fourth person on, and the legend lists them, for example *Line 4 (double): +5: …*. The table of a group still has every person. Kept findings are shaded; the selected group is framed, with one frame per line around its whole passage, also where other findings overlap it.
 2. Beside it, the list **Groups** holds the groups in text order, each with its passage and [its state](#groups-and-their-states).
 3. One group is open at a time. Click a group, or a marked passage in the text, to open it.
 4. Press \`j\` for the next open group and \`k\` for the previous one, or click **Next open group** on the progress card.
@@ -1373,7 +1429,7 @@ The text is not in the work plan. Plan it first. See [Add a text to the plan](le
 
 ### "This person already submitted this review. To let them review it again, use Reopen."
 
-You assigned a translation review to someone who already reviewed this version, for example after they rejected it. A second assignment is not possible; reopen their review instead: **Resolve…**, then the reopen item, for example *Reopen Ana Weber's review…*. See [Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation).
+You assigned a translation review to someone who already reviewed this version, for example after they rejected it. A second assignment is not possible; reopen their review instead: **Resolve…**, then **Other ways…** and the reopen item, for example *Reopen Ana Weber's review…*. See [Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation).
 
 ### "This version can no longer be accepted here."
 
@@ -1383,21 +1439,29 @@ You assigned a translation review to someone who already reviewed this version, 
 
 **Upload a corrected text…** was refused when you saved: a newer version of the translation arrived meanwhile, the translation was discarded, or a translation review of the version was assigned. The dialog names the reason. Close it and look at the version list again; your text is not saved, so keep it. See [Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation).
 
-### "Fix typos…" did not save
+### "Fix typos" did not save
 
-**Fix typos…** did not save: a newer version arrived, a translation review of the version is open, it was discarded, or the text is the same as before. The dialog names the reason; your text stays in the dialog until you close it. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
+The typo fix (**Edit the translation…** › **Only spelling, spacing or grammar**, or **Fix typos (no review)…**) did not save: a newer version arrived, a translation review of the version is open, it was discarded, or the text is the same as before. The dialog names the reason; your text stays in the dialog until you close it. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
 
 ### "This query can no longer be decided here."
 
-**Accept the reviewer’s text…** or **Answer and accept the version as it is…** was refused: the query was already decided, a newer version of the translation arrived, the translation was discarded, or a translation review of the version is open (withdraw it with **Remove…** first). The dialog names the reason. Reload the row to see its current state. See [Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation).
+**Accept the reviewer’s text as v2…** or **Accept v1 as it is…** was refused: the query was already decided, a newer version of the translation arrived, the translation was discarded, or a translation review of the version is open (withdraw it with **Remove…** first). The dialog names the reason. Reload the row to see its current state. See [Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation).
+
+### "This question cannot be answered this way."
+
+The answer to a question was refused. With **Take the proposed wording into the reviewer's text**: the passage is no longer in the reviewer's text exactly once, or the review was submitted. Send the answer without taking the wording. The question may also have been answered already; reload the page. See [Answer a question](lead-results.md#answer-a-question).
+
+### "The question could not be sent."
+
+**Send question** was refused: a wording needs a quoted passage, and passage and wording may have at most 2000 characters each. See [Ask the lead](annotator.md#ask-the-lead).
 
 ### "Nothing can be added to this reason any more."
 
 **Add to the reason…** was refused: the reviewer submitted the review, the task was removed, or the task is no longer the one you asked for with **Ask a reviewer to correct…**. An addition is possible only while the requested review is open. Reload the row to see its current state. See [Add to the reason of a correction request](lead-documents.md#add-to-the-reason-of-a-correction-request).
 
-### A review of a version cannot be reopened or assigned after "Fix typos…"
+### A review of a version cannot be reopened or assigned after a typo fix
 
-*A lead fixed typos in this version: v2 is the text to review. Assign a review of the newest version.* A translation review always reviews the corrected text. In the row, use **Assign review…** or **Resolve…** › **Assign a new review…**; the person who reviewed the earlier version can be chosen again. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
+*A lead fixed typos in this version: v2 is the text to review. Assign a review of the newest version.* A translation review always reviews the corrected text. In the row, use **Assign review…** or **Resolve…** › **Other ways…** › **Assign a new review…**; the person who reviewed the earlier version can be chosen again. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
 
 ### A task is still paused after I closed the report
 
@@ -1504,7 +1568,7 @@ The guidelines tell you what to mark and how: which findings count, how much tex
 
 ## 4. Get to know the screen
 
-The editor has three columns: the list of **Findings** on the left, in the order of the text, the text in the middle and the details of the selected finding on the right. The toolbar shows the mode, for example **Annotate from scratch**, and the save status. Everything is saved automatically; **Saved** means your work is stored. In a project that records working time, the toolbar also shows a timer with **Pause timer**; see [Working time](annotator.md#working-time). The dividers between the columns, and the one above the ontology tree when it is open, can be dragged to share out the room. See [The editor screen](annotator.md#the-editor-screen).
+The editor has three columns: the list of **Findings** on the left, in the order of the text, the text in the middle and the details of the selected finding on the right. The toolbar shows the mode, for example **Annotate from scratch**, and the save status. Everything is saved automatically; **Saved** means your work is stored. In a project that records working time, the toolbar also shows a timer with **Pause timer**; see [Working time](annotator.md#working-time). The dividers between the columns, and the one above the ontology tree when it is open, can be dragged to share out the room. On a wide screen the round button on the right column's edge folds that column to a strip, so the text gets the room; marking text opens it again. See [The editor screen](annotator.md#the-editor-screen).
 
 ## 5. Mark a finding
 
@@ -1531,7 +1595,7 @@ Repeat steps 5 and 6 for every finding in the text.
 In a task *Annotation, from proposals*, the column **Review Proposals** lists findings a tool suggested. Tools make mistakes, especially with negations: a tool may propose "Keine Krampfanfälle" (no seizures) as **Present**.
 
 1. Select the first proposal. The text shows where it was found, and the line *Source* names the tool that made it.
-2. Check three things: the marked text, the term and every value. To see broader and narrower terms of the proposed term, click **Show in tree**; the tree only shows terms until you confirm one.
+2. Check three things: the marked text, the term and every value. To see broader and narrower terms of the proposed term, click **Show in tree** (the tree icon next to the term); the tree only shows terms until you confirm one.
 3. Click **Confirm** if all three are right, **Reject** if the proposal is wrong, or **Edit & Replace** to correct it in a copy, listed under the proposal, then click **Done, back to the proposal**. Changing a value or the text span in the copy replaces the proposal; confirming a default alone does not. Changed your mind? Click **Discard copy**: the copy is removed and the proposal is open again. A changed copy asks first. Only if you really cannot decide, click **Unresolved** and write a **Reviewer note** saying why.
 4. The next open proposal is selected. Go on until every proposal is decided.
 5. Then read the whole text for findings the tool missed. Mark text that has no proposal and add the finding as in step 5. It appears under **Your own findings**, next to the proposals.
@@ -1555,7 +1619,7 @@ Details: [Submit the text](annotator.md#submit-the-text).
 
 ## 9. What happens next
 
-- Your task shows **Submitted** in **My tasks**. It is read-only now; click **View** to look at it. A translation review names your decision below, for example *Your decision: Rejected*; one you submitted as a **Query** shows *Answer from the lead* there once the lead decided.
+- Your task shows **Submitted** in **My tasks**. It is read-only now; click **View** to look at it. A translation review names your decision below, for example *Your decision: Rejected*; one you submitted as a **Query** before it was retired shows *Answer from the lead* there once the lead decided.
 - The next open task opens on its own, or **My tasks** if none is left.
 - The lead sees your submission next to the other annotators' work on the same text, and accepts one result or starts a consolidation. You do not see other people's work.
 - Your task is done. You do not need to do anything else unless the lead reopens it (**Reopened** in **My tasks**, with the lead's reason under the task name) or you notice a mistake. A translation review the lead asks for a second time names the lead's reason under the task, for example *Second review requested by the lead on 17 Nov, 14:30: Check the dose in paragraph 2.* If the lead adds to that reason later, each addition stands below it with its date (*Added by the lead on …*).
@@ -1630,15 +1694,36 @@ What for: know where things are.
 The header is the same on every page:
 
 - **Ontotator** on the left takes you to the start page.
-- The breadcrumb shows where you are, for example **My tasks** or **Documents**.
-- At the top right is the user menu: a button with your display name, your pseudonym and your roles. It holds **Profile**, **My technical reports**, **Technical problem…**, the **Theme** (**System**, **Light** or **Dark**) and **Log out**. Open it with a click, or with Enter or the arrow keys; Escape closes it. On a phone the button in the editor shows your initials.
+- The breadcrumb shows where you are, for example **My tasks** or **Documents**. In the editor on a wide screen the text's name is in the toolbar next to it, not again in the breadcrumb.
+- At the top right is the user menu: a button with your display name, your pseudonym and your roles. It holds **Profile**, **My technical reports**, **Technical problem…**, the **Theme** (**System**, **Light** or **Dark**) and **Log out**. Open it with a click, or with Enter or the arrow keys; Escape closes it. In the editor the button shows your initials: on a phone, and on a wide screen, where the header and the text's toolbar share one bar.
 - System administrators also see a gear next to it. It opens **Administration** (see [Administration](admin.md)). A number on the gear counts the open technical reports.
+- The bell next to the user menu shows your notifications. A number on it counts the unread ones. See [Notifications](#notifications).
 - **Handbook** in the header opens this handbook inside the app. On the Documents, consolidation and translation review screens, **Help** opens the handbook section about that screen; in the editor it is **More** > **Help for this screen**. On the project forms, a link next to the task profile opens the section that explains it. In the text card, **How to use it** next to *Newer set available* opens the section on new tool proposals. Click a screenshot in the handbook to open it at full size in a new tab.
 - Below the chapter list, the handbook shows the app's version and commit, for example \`Ontotator 0.3.0 · commit cc65cea\`. Quote it when you report a problem.
 
 ![The user menu, open at the top right: Profile, My technical reports, Technical problem…, the theme choice and Log out](images/getting-started-user-menu.png)
 
-The sidebar is for your work. It lists the project switcher, **My tasks** and **Projects**. The number after **My tasks** counts your open tasks, the same tasks as the **To do** tab; it updates as soon as you submit a text. Clicking **My tasks** or **Projects** loads your projects and the count again, so a project you were just added to shows up without reloading the page. Leads also see their project's pages (**Documents**, **Progress**, **Settings**, **Export**); the list **Translation reviews** opens from **Progress**, which stays marked while the list is open. In the editor, the sidebar folds into **Sections**; click it to open it. The user menu and the gear stay at the top right there too.
+The sidebar is for your work. It lists the project switcher, **My tasks** and **Projects**. The number after **My tasks** counts your open tasks, the same tasks as the **To do** tab; it updates as soon as you submit a text. Clicking **My tasks** or **Projects** loads your projects and the count again, so a project you were just added to shows up without reloading the page. Leads also see their project's pages (**Documents**, **Questions**, **Progress**, **Settings**, **Export**); the number after **Questions** counts the open questions to the lead; the list **Translation reviews** opens from **Progress**, which stays marked while the list is open. In the editor, the sidebar folds into **Sections**; click it to open it. The user menu and the gear stay at the top right there too.
+
+## Notifications
+
+What for: learn about new work without looking for it.
+
+The bell at the top right, next to the user menu, tells you about:
+
+- a new task for you (*New task: annotation of case-0102 de*);
+- a task of yours that the lead reopened (*Task reopened: …*) or released after a pause (*Task released: …*);
+- for leads: a text problem that someone reported in your project (*Text problem from Ana Weber (ann-0004): case-0042 de*).
+
+A number on the bell counts the unread notifications. It updates every minute and when you come back to the window.
+
+1. Click the bell. A short list opens with the newest notifications first. Unread ones have a dot and bold text. Each one names the project and the time.
+2. Click a notification to open its place: the task, or the problem report. It is then marked as read.
+3. To mark one as read without opening it, click **Mark as read** next to it. **Mark all as read** below the list marks all of them.
+
+With the keyboard, Tab to the bell and press Enter; Tab moves through the list and Escape closes it. On a phone the list opens as a full screen sheet.
+
+Notifications never contain the text of a case, a reason or a comment: only the names of the task, the text and the person. They are kept for 30 days once read and for 180 days at most; you keep the newest 200. A notification about a task that is no longer yours, or from a project you left, is not shown.
 
 ## Report a technical problem
 
@@ -1695,7 +1780,7 @@ Each row is one task. The **Task** column says what to do, for example **Annotat
 - **Reopened**: the lead reopened your submission. The lead's reason stands under the task, for example *Reopened by the lead on 17 Nov, 14:30: The onset in sentence 2 is missing.* (on a narrow screen under the badge). Without a reason, click the badge to read when it was reopened.
 - A **Translation review** the lead asked for a second time shows the lead's reason under the task, for example *Second review requested by the lead on 17 Nov, 14:30: Check the dose in paragraph 2.* What the lead added to it later stands below it, for example *Added by the lead on 17 Nov, 16:05: Paragraph 3 as well.* The translation review and the consolidation show the lead's reason again when you open the task.
 - *Your decision: …* under a submitted **Translation review**: what you decided in it, for example *Your decision: Accepted with corrections*.
-- *Answer from the lead* at a submitted **Translation review**: you submitted it as a **Query** and the lead decided. Open the task to read the decision and the answer ([Review a translation](annotator.md#review-a-translation)).
+- *Answer from the lead* at a submitted **Translation review**: you submitted it as a **Query** (no longer offered) and the lead decided. Open the task to read the decision and the answer ([Review a translation](annotator.md#review-a-translation)).
 - A **Consolidation** task shows the lead's reason under the task, for example *Reason from the lead: Term and assertion differ*, if the lead gave one.
 - **Paused**: the task waits for a decision on a problem report. A long reason is cut off here; the task shows all of it. **Answer to your report** means the lead has replied.
 - **Paused by lead**: the lead paused the work on this text and gives the reason below the mark. You can open and read the task (**View paused task**), but not save it, until the lead releases the text ([A task paused by the lead](annotator.md#a-task-paused-by-the-lead)).
@@ -1876,11 +1961,11 @@ This works without building a bundle. You upload the new text at the version, or
 
 1. Open the text card and click **Translation**.
 2. If the current version is accepted: at the version, click **Ask a reviewer to correct…**, choose the **Translation reviewer**, enter the **Reason for another review** (say where the new text comes from) and click **Ask the reviewer**. The reviewer replaces the text, writes the origin into the **Rationale** and submits **Accepted with corrections** ([Request a translation correction](lead-documents.md#request-a-translation-correction)). The corrected text becomes the next version and counts as accepted.
-3. Or, if the current version is accepted, paste the new text yourself: at the version, click **Correct it myself…**. The dialog lists the annotation work that stays on the accepted version. Your corrected text becomes the next version and starts as a correction with review On, so it is reviewed again ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
-4. If the current version was rejected or queried: click **Resolve…**, then **Correct the translation…**, paste the new text yourself and submit. The corrected text becomes the next version and counts as accepted. If the reviewer proposed the new text with a query, **Accept the reviewer’s text…** under **Resolve…** takes it without retyping ([Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation)).
+3. Or, if the current version is accepted, paste the new text yourself: at the version, click **Edit the translation…**, choose **The meaning changes** and click **Continue**. The dialog lists the annotation work that stays on the accepted version. Your corrected text becomes the next version and starts as a correction with review On, so it is reviewed again ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
+4. If the current version was rejected or queried: click **Resolve…**, then **Correct it myself (counts as accepted)…** (for a query under **Other ways…**), paste the new text yourself and submit. The corrected text becomes the next version and counts as accepted. If the reviewer proposed the new text with a query, **Accept the reviewer’s text as v2…** under **Resolve…** takes it without retyping ([Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation)).
 5. Or, whatever the state of the current version, upload the new text: at the newest version, click **Upload a corrected text…**, paste the text or choose a .txt file, say how the text was made (for a machine translation with its provider and model), check the changes and save. The text becomes the next version, a correction that starts as *Ready for review*; accept it with **Accept this version…** if it was reviewed outside Ontotator ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)).
 
-**Ask a reviewer to correct…** is offered only at an accepted version that is the newest of its translation, **Correct it myself…** at the newest accepted version (for a rejected or queried one it is **Correct the translation…** under **Resolve…**), and **Upload a corrected text…** at the newest version of every translation that has no open translation review. Only **Upload a corrected text…** has fields for the provider and model of the new text; in a translation review they can only be named in the **Rationale**. A typo, a missing space or a grammar slip needs none of these steps: **Fix typos…** at the newest version fixes it without a review and keeps the status of the text ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
+**Ask a reviewer to correct…** is offered only at an accepted version that is the newest of its translation, **Edit the translation…** at the newest accepted version (for a rejected or queried one it is **Correct it myself (counts as accepted)…** under **Resolve…**), and **Upload a corrected text…** at the newest version of every translation that has no open translation review. Only **Upload a corrected text…** has fields for the provider and model of the new text; in a translation review they can only be named in the **Rationale**. A typo, a missing space or a grammar slip needs none of these steps: **Edit the translation…** › **Only spelling, spacing or grammar** (or **Fix typos (no review)…** where the version is not accepted) fixes it without a review and keeps the status of the text ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
 
 ### Replace or add a translation by file
 
@@ -1898,7 +1983,7 @@ This works without building a bundle. You upload the new text at the version, or
 
 The checkbox **These translations were reviewed outside Ontotator — accept them as they are** in the upload applies only to texts new to the project. A correction of an existing text is accepted with step 5.
 
-To drop a translation, it must first be rejected or queried in a review: the discard item is offered only under **Resolve…** ([Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation)).
+To drop a translation, it must first be rejected or queried in a review: the discard item is offered only under **Resolve…** › **Other ways…** ([Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation)).
 
 ## Annotate texts again
 
@@ -2161,7 +2246,7 @@ In the card:
 - Your steps stand where they act. An open problem report is a notice above the path with **Open** and **Decide on report…**. Other steps stand at the top of their part under *Next step*, for example **Resolve…** in **Translation** or **Carry to v2…** in **Annotation**. A part's other actions share its action row, for example **Open result**, **Change final…** and **Withdraw final…** in **Finalization**.
 - Every person's remove action is **Remove…**. Its dialog says what happens: an unsubmitted annotation is removed with its draft; other work is revoked and stays in the history.
 - In **Annotation**, a text with tool proposals names the proposal set its annotators work on, for example *Proposals set 2026-10-02 (phentrieve 1.4), 24 proposals*. When a newer set was imported for the text and a task still works on an older one, the line names the older set and *Newer set available: 2026-11-10* follows, with **How to use it** ([Work from new tool proposals](lead-change-course.md#work-from-new-tool-proposals)); it goes away once every task of the text is on the newest set. Tasks that started before sets were recorded show *set not recorded*. A person's row names the set only when it differs from the text's, for example *newest set*.
-- When a text has more than one version (for example after a translation correction), each person's row in **Annotation** ends with the version their task or submission is on, for example *Submitted 22 Oct, 14 findings · assigned 15 Oct · v1* and *Assigned 18 Oct by you, from proposals · v2*; the row of a running consolidation in **Finalization** names it the same way. With parallel versions the row names the version chain too, for example *DeepL v2*. A text with one version shows no version in these rows. A translation reviewer's row always says *Review of v2*. An annotation that moved to the new version after **Fix typos…** keeps the person's submission day and assignment and says so, for example *Submitted 22 Oct, 14 findings · moved from v1 by the typo fix today 15:58 · assigned 15 Oct · v2*, with **Open annotation**. A person who carried their work to the new version with **Carry to v2…** is listed once, with their work on the new version. When only some annotations moved, the card header says who is still on the old version, for example *v2, 1 annotator still on v1*, and **Annotation** reads for example *3 on v2, 1 waiting on v1* (narrow table: *1 left on v1*); **Carry to v2…** moves the rest.
+- When a text has more than one version (for example after a translation correction), each person's row in **Annotation** ends with the version their task or submission is on, for example *Submitted 22 Oct, 14 findings · assigned 15 Oct · v1* and *Assigned 18 Oct by you, from proposals · v2*; the row of a running consolidation in **Finalization** names it the same way. With parallel versions the row names the version chain too, for example *DeepL v2*. A text with one version shows no version in these rows. A translation reviewer's row always says *Review of v2*. An annotation that moved to the new version after a typo fix keeps the person's submission day and assignment and says so, for example *Submitted 22 Oct, 14 findings · moved from v1 by the typo fix today 15:58 · assigned 15 Oct · v2*, with **Open annotation**. A person who carried their work to the new version with **Carry to v2…** is listed once, with their work on the new version. When only some annotations moved, the card header says who is still on the old version, for example *v2, 1 annotator still on v1*, and **Annotation** reads for example *3 on v2, 1 waiting on v1* (narrow table: *1 left on v1*); **Carry to v2…** moves the rest.
 - The days in a person's row follow one rule, for *Submitted*, *assigned* and *Removed* alike: *today 14:02*, *yesterday*, the weekday within the last week (*Mon*), else the date (*22 Oct*). Hover over the assignment day for the full date. When two proposal sets were imported on the same day, the **Proposals** line names them with their time, for example *set 2026-11-17 09:12* and *Newer set available: 2026-11-17 13:40*.
 - In **Finalization**, **Open consolidation** opens your own running consolidation as your task; a submitted one opens read-only.
 - In **Finalization**, when submissions differ, the agreement line is followed by the findings that differ in detail; a term and its parent or child on the same passage are named as *Related terms: …* (see [Accept a result or compare results](lead-results.md#accept-a-result-or-compare-results)).
@@ -2176,8 +2261,8 @@ What for: see what happened to a text and its technical IDs.
      - *task of R. Roe (ann-0295) reopened by you, 17 Nov, 13:37: Guideline changed* (**Reopen…**, single or for several texts; an Undo adds *reopening of the task of R. Roe (ann-0295) undone by you, …*),
      - *Round 2 for Tom Reis (ann-0004) started by you, 17 Nov, 13:39: Second pass* (**Start a round…**),
      - *the result of Tom Reis (ann-0004) chosen by you, …*, *changed from the result of Tom Reis (ann-0004) to the result of R. Roe (ann-0295) by you, …* and, after an Undo, *change undone by you, the result of Tom Reis (ann-0004) is final again, …* (the final result; a consolidation reads *the consolidation by …*),
-     - *typos fixed in v2 by you, 17 Nov, 17:24: Typo; Grammar* (**Fix typos…**), and *annotation of Tom Reis (ann-0004) moved to v2 by itself after the typo fix, 17 Nov, 17:24* for each submitted annotation that moved with it ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)),
-     - *query decided by you, the reviewer’s text taken, v1 → v2, 18 Nov, 10:12: Yes, as proposed.* or *query decided by you, v1 accepted as it is, …* (**Accept the reviewer’s text…** and **Answer and accept the version as it is…** under **Resolve…**; the text after the colon is your answer to the reviewer),
+     - *typos fixed in v2 by you, 17 Nov, 17:24: Typo; Grammar* (a typo fix), and *annotation of Tom Reis (ann-0004) moved to v2 by itself after the typo fix, 17 Nov, 17:24* for each submitted annotation that moved with it ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)),
+     - *query decided by you, the reviewer’s text taken, v1 → v2, 18 Nov, 10:12: Yes, as proposed.* or *query decided by you, v1 accepted as it is, …* (**Accept the reviewer’s text as v2…** and **Accept v1 as it is…** under **Resolve…**; the text after the colon is your answer to the reviewer),
      - *withdrawn by you, 17 Nov, 14:02: Wrong text* (**Withdraw final…**), reassignments, and *mode changed by you, now annotated from scratch, …: reason*.
      - A translation review names when it was submitted; a task not submitted yet names who assigned it and when, for example *Annotation: Tom Reis (ann-0004), Round 1, In progress, assigned by you, 17 Nov, 09:12*; an open consolidation names who started it, *Consolidation: Cara Dietz (ann-0007), Round 1, Open, started by you, 20 Nov, 16:13*.
      - An annotation that moved with a typo fix has its *moved to v2 by itself* line; its copy on the new version is not listed as a second submission.
@@ -2205,7 +2290,7 @@ What for: see each version of a translation, its reviews and its origin.
 1. Open the text card and click **Translation**.
 2. The list shows each version with its origin and status, then one row per person who worked on it: the name, the task and the status. Older ones are under **Older versions**; with parallel versions they are grouped by version chain.
 3. Click **View text** to read a version, or **Translation reviews** to see every review decision, each with the guideline version it was made under (*Guidelines v2*, or *Guidelines 3.1 (v2)* with your own version). In a reviewer's row, **Reopen…** lets them review the version again and **Remove…** removes their assignment. A review of a version you fixed typos in has no **Reopen…**: assign a review of the corrected version instead.
-   The buttons that change the text of a version say who does the work, and a grey line under them says the difference in a few words, for example *Ask a reviewer: a reviewer corrects it in a new review. Correct it myself: you edit it here; it is reviewed again. Fix typos: spacing, typos, grammar; the status stays, no review. Upload: a text made elsewhere becomes the next version.* At an accepted version, **Ask a reviewer to correct…** gives the correction to a translation reviewer ([Request a translation correction](#request-a-translation-correction)). At the newest accepted version, **Correct it myself…** lets you correct it yourself ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)). At the newest version of a translation, **Upload a corrected text…** brings in a text made elsewhere as the next version ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)). **Fix typos…** at the newest version fixes spacing, typos or grammar without a review and keeps the status of the text; a version made this way says *Typo fix* under its name, with the lead and the reason ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
+   The buttons that change the text of a version name what follows; there is no hint line under them. At the newest accepted version, **Edit the translation…** is the one button for your own change. It asks **What changes?**: **Only spelling, spacing or grammar** (the meaning stays; no review, submitted annotations move to the new version; [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)) or **The meaning changes** (the new version is reviewed again, annotations stay on the old one; [Correct a translation yourself](lead-results.md#correct-a-translation-yourself)). Click **Continue** to open that dialog. At a newest version that is not accepted, the button is **Fix typos (no review)…**. A version made by a typo fix says *Typo fix* under its name, with the lead and the reason. At the newest version that is neither reviewed nor accepted, **Accept this version…** accepts exactly that version ([Accept one translation version](lead-results.md#accept-one-translation-version)). **Other ways…** holds what someone else does, each with one line: **Ask a reviewer to correct…** at an accepted version gives the correction to a translation reviewer ([Request a translation correction](#request-a-translation-correction)), and **Upload a corrected text…** at the newest version brings in a text made elsewhere as the next version ([Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation)). When only one of them is offered, it is a button of its own.
 4. Click **Compare with source** to compare the translation with the source text.
 
 ### Find spacing errors and invisible characters
@@ -2326,7 +2411,7 @@ What for: switch one text between from proposals, from scratch and not annotated
 1. Open the text card and click **Annotation**.
 2. Under **Annotation**, choose **From proposals**, **From scratch** or **Off**. It saves at once.
 
-Once someone is assigned, started or submitted work, a line *Fixed: …* says who fixes the mode. With submitted work it names everyone whose work a change would discard, also annotations that moved to a new version after **Fix typos…**, for example *Fixed: Tom Reis and Ana Weber have submitted work started from scratch.*:
+Once someone is assigned, started or submitted work, a line *Fixed: …* says who fixes the mode. With submitted work it names everyone whose work a change would discard, also annotations that moved to a new version after a typo fix, for example *Fixed: Tom Reis and Ana Weber have submitted work started from scratch.*:
 
 - While the work is not submitted, remove the assignment ([Remove, reassign or reopen an assignment](#remove-reassign-or-reopen-an-assignment)), then choose.
 - To change it anyway, click **Change mode…** next to the line. The dialog names whose work is affected. Enter the **Reason**, then click **Change mode**, or **Discard work and change mode** if submitted work is discarded. Their assignments are removed. Discarded work is kept, not deleted: it no longer counts for progress, consolidation, the final result or exports.
@@ -2487,7 +2572,7 @@ The other actions on paused texts:
 - **Reopen…** and **Start a round…** work for submitted tasks; the dialog says how many of them are on paused texts and stay paused until you release the texts.
 - **Withdraw open tasks…** keeps a paused task, *Keep 1 paused task · paused by a lead: release the text first*. **Remove…** in the text card removes a single one.
 - **Change mode…**, **Accept agreeing results…** and **Change final…** work as on any other text.
-- **Fix typos…** and **Upload a corrected text…** on a version of a paused text work: they are your own actions and change nobody's work in progress. The pause covers every version, so tasks that follow a correction to the new version are still paused there.
+- A typo fix and **Upload a corrected text…** on a version of a paused text work: they are your own actions and change nobody's work in progress. The pause covers every version, so tasks that follow a correction to the new version are still paused there.
 - Correcting a translation yourself is refused while your own earlier review of that version is open and the text is paused: release the text first.
 - **Agree clean restart…** on a problem report is refused while the text is paused: release the text first.
 
@@ -2719,28 +2804,41 @@ The **Changes** column counts each changed place once, by words: a replaced word
 
 Only leads and system administrators can open the list. To decide a query or a rejection, go on with the next section.
 
+### Answer a question
+
+What for: answer a question a person asked with **Ask the lead** (today in a translation review). Their task stays open while you answer, unless they chose to pause it.
+
+1. In the sidebar, click **Questions**. The count shows the open ones, for example *Questions (2)*.
+2. The **Open** tab lists each question with who asked, the task and text, the question and, if given, the passage with the proposed wording marked as changes.
+3. Click **Answer…**, write **Your answer**, and click **Send answer**.
+4. With a proposed wording, tick **Take the proposed wording into the reviewer's text** to put it into their open review in the same step; the button then reads **Answer and take the wording**. The reviewer still checks the text and submits the review. If the passage is no longer in their text, the answer is refused with the wording; send it without.
+
+The answer appears in the person's task under **Questions to the lead**. Answered questions stay under **Answered**. A question is no problem report: it does not show on **Documents** and does not hold the export.
+
 ### Resolve a rejected or queried translation
 
 What for: decide what happens after a reviewer rejected or queried a translation. The row's next step is **Resolve rejected translation** or **Resolve queried translation**.
 
-1. In the row, click **Resolve…**. The options open below the row with the reviewer's rationale. When someone holds an annotation that waits for this translation, a line names them, for example *Ana Weber is waiting for this decision to start the annotation.*
-2. For a query, decide it yourself with one of the first two items. Each closes the query as your decision, and the reviewer reads your answer at their submitted task (**My tasks**, *Answer from the lead*):
-   - **Accept the reviewer’s text…**: the dialog shows the reviewer's question and, under **Reviewer’s text**, the text they proposed; you can still change it. Below it the changes against the version are marked, for example *Changes to v1 · 2 passages changed*, with added words underlined and removed words struck through. **Answer to the reviewer** is optional here. Click the button that names the new version, for example *Accept as v2*: the text becomes the next version, a correction of the queried one, and is accepted. If people annotated the queried version, the dialog says so before you save, as in [Correct a translation yourself](#correct-a-translation-yourself).
-   - **Answer and accept the version as it is…**: the translation is right and the reviewer asked about something else, for example the source. Write the **Answer to the reviewer** (required) and click the button that names the version, for example *Accept v1*: the version is accepted without changes. A text the reviewer proposed is not taken.
-3. Or choose one of the other items:
+1. In the row, click **Resolve…**. A dialog opens. First it shows what the reviewer said: who rejected or queried the version, the reason and the categories. For a query, **Show the proposed text** shows the text the reviewer proposed, with the changes marked, for example *Show the proposed text (2 passages changed)*. When someone holds an annotation that waits for this translation, a line names them, for example *Ana Weber is waiting for this decision to start the annotation.*
+2. For a rejected translation the main button is **Correct it myself (counts as accepted)…**: you correct it yourself ([Correct a translation yourself](#correct-a-translation-yourself)). If the version is itself a correction of an accepted version, it reads **Correct it myself (reviewed again)…**. While you hold a correction, it reads **Continue your correction**.
+3. For a query (queries come from reviews made before **Ask the lead**), decide it yourself with one of the two buttons. Each closes the query as your decision, and the reviewer reads your answer at their submitted task (**My tasks**, *Answer from the lead*):
+   - **Accept the reviewer’s text as v2…** (the main button): the dialog shows the reviewer's question and, under **Reviewer’s text**, the text they proposed; you can still change it. Below it the changes against the version are marked, for example *Changes to v1 · 2 passages changed*, with added words underlined and removed words struck through. **Answer to the reviewer** is optional here. Click the button that names the new version, for example *Accept as v2*: the text becomes the next version, a correction of the queried one, and is accepted. If people annotated the queried version, the dialog says so before you save, as in [Correct a translation yourself](#correct-a-translation-yourself). If the reviewer proposed no change, this button is not offered and the dialog says *Ana Weber proposed no change to the text.*
+   - **Accept v1 as it is…**: the translation is right and the reviewer asked about something else, for example the source. Write the **Answer to the reviewer** (required) and click the button that names the version, for example *Accept v1*: the version is accepted without changes. A text the reviewer proposed is not taken.
+4. Or click **Other ways…** and choose one of its items. Each item says in one line when to use it:
    - The reopen item, for example *Reopen Ana Weber's review…*: the same person reviews it again. Enter an optional **Reason (optional)** and click **Reopen review**. Their task shows **Reopened** with your reason (in **My tasks** behind the badge, in the review above **Decision**) and starts from the version's current text; their earlier decision stays in the history. If they then accept it with corrections, the corrected text becomes the next version.
-   - **Assign a new review…**: someone else reviews it. The person who already reviewed it shows *Review submitted* with **Reopen their review…**; a new assignment for them is not possible, reopen their review instead. After **Fix typos…** on the rejected or queried version the review is a review of the corrected version, there is no reopen item, and the person who reviewed the earlier version can be assigned again ([Fix a typo in a translation without a review](#fix-a-typo-in-a-translation-without-a-review)).
-   - **Correct the translation…**: you correct it yourself ([Correct a translation yourself](#correct-a-translation-yourself)). The correction starts from the text of the version, not from a text the reviewer proposed with a query; to start from the reviewer's text, use **Accept the reviewer’s text…**.
+   - **Assign a new review…**: someone else reviews it. The person who already reviewed it shows *Review submitted* with **Reopen their review…**; a new assignment for them is not possible, reopen their review instead. After **Fix typos (no review)…** on the rejected or queried version the review is a review of the corrected version, there is no reopen item, and the person who reviewed the earlier version can be assigned again ([Fix a typo in a translation without a review](#fix-a-typo-in-a-translation-without-a-review)).
+   - For a query, **Correct it myself (counts as accepted)…**: you correct it yourself ([Correct a translation yourself](#correct-a-translation-yourself)). The correction starts from the text of the version, not from a text the reviewer proposed; to start from the reviewer's text, use **Accept the reviewer’s text as v2…**.
    - The discard item, for example *Discard the de translation…*: enter a **Reason** and click **Discard**. Nothing is deleted; the versions are marked as discarded.
-4. Or click **Cancel**. Changing a filter, the tab, the order or the page also closes the options; nothing is saved until you choose.
+   **Cancel** in a step brings you back to the choice.
+5. Or click **Cancel** (or press \`Escape\`). Changing a filter, the tab, the order or the page also closes the dialog; nothing is saved until you choose.
 
-After a decided query the row goes on with the accepted version, for example **Assign annotation…**, and people who waited for the decision can start. The version row names the decision, for example *Accepted: decision on the query of Ana Weber (ann-0003), the reviewer’s text taken, Project lead (ann-0002), 18 Nov, 10:12 · Answer: Yes, as proposed.* (*the version kept as it is* after **Answer and accept the version as it is…**; *taken with changes* when you changed the reviewer's text). **History** has a line for it, for example *query decided by you, the reviewer’s text taken, v1 → v2, 18 Nov, 10:12: Yes, as proposed.*, and the audit log records the decision with the answer. The decision is refused, and the dialog says so, while a translation review of the version is open, when a newer version exists, when the translation was discarded and when the query was already decided. After **Fix typos…** on a queried version you decide the query at the fixed version: its text is compared with the reviewer's text.
+After a decided query the row goes on with the accepted version, for example **Assign annotation…**, and people who waited for the decision can start. The version row names the decision, for example *Accepted: decision on the query of Ana Weber (ann-0003), the reviewer’s text taken, Project lead (ann-0002), 18 Nov, 10:12 · Answer: Yes, as proposed.* (*the version kept as it is* after **Accept v1 as it is…**; *taken with changes* when you changed the reviewer's text). **History** has a line for it, for example *query decided by you, the reviewer’s text taken, v1 → v2, 18 Nov, 10:12: Yes, as proposed.*, and the audit log records the decision with the answer. The decision is refused, and the dialog says so, while a translation review of the version is open, when a newer version exists, when the translation was discarded and when the query was already decided. After **Fix typos (no review)…** on a queried version you decide the query at the fixed version: its text is compared with the reviewer's text.
 
 ### Correct a translation yourself
 
 What for: fix a queried, rejected or accepted translation without assigning another review.
 
-1. For a queried or rejected translation: in the row, click **Resolve…**, then **Correct the translation…** (or **Continue your correction**). For an accepted translation: open the text card, click **Translation** and, at the newest accepted version, click **Correct it myself…**.
+1. For a queried or rejected translation: in the row, click **Resolve…**, then **Correct it myself (counts as accepted)…** (for a query under **Other ways…**; or **Continue your correction**). For an accepted translation: open the text card, click **Translation** and, at the newest accepted version, click **Edit the translation…**, choose **The meaning changes** and click **Continue**.
 2. Read the panel: you review the version yourself, and your corrected text becomes the next text version. After a rejection or a query, it counts as accepted. A correction of an accepted version starts as a correction with review On: it is reviewed again before annotation moves to it. If people annotated the accepted version, the dialog says so before you start, for example *Annotation has work on v1. 3 annotations (2 submitted, 1 open) stay on v1. After saving, the row offers Handle text change…*. The dialog also names open consolidations and a final result on that version; they stay on it too. Nothing is carried automatically. If the reviewer rejects or queries your corrected version and you correct it once more, that next version is reviewed again as well; to take it without a review, use **Accept this version…** ([Accept one translation version](#accept-one-translation-version)). If your profile lists languages but not this one, tick *Correct despite missing de in your profile*. Without a qualification in your profile, the panel links to **Add your qualification in your profile**; after saving, **Back to Documents** returns you to the texts.
 3. Click **Open translation review**. The screen says **You are correcting this translation as project lead.** (for an accepted version: **You are correcting this accepted translation as project lead.**)
 4. Correct the translation as described in [Review a translation](annotator.md#review-a-translation). Only **Accepted with corrections** is offered.
@@ -2768,7 +2866,7 @@ What for: accept exactly one version, for example an imported correction that wa
 
 1. Open the text card and click **Translation**.
 2. At the version, click **Accept this version…**. It is offered at the newest version of a translation that is neither reviewed nor accepted.
-3. Enter a **Reason**, for example *Checked against the DeepL output*. The dialog says how the acceptance will read: *It is recorded as “Accepted: reviewed outside Ontotator”, with your name, the reason and the time: no translation review in Ontotator stands behind this version. Say in the reason how it was checked.* Do not use this to decide a query: under **Resolve…**, **Accept the reviewer’s text…** and **Answer and accept the version as it is…** record your decision on the query and tell the reviewer ([Resolve a rejected or queried translation](#resolve-a-rejected-or-queried-translation)).
+3. Enter a **Reason**, for example *Checked against the DeepL output*. The dialog says how the acceptance will read: *It is recorded as “Accepted: reviewed outside Ontotator”, with your name, the reason and the time: no translation review in Ontotator stands behind this version. Say in the reason how it was checked.* Do not use this to decide a query: under **Resolve…**, **Accept the reviewer’s text as v2…** and **Accept v1 as it is…** record your decision on the query and tell the reviewer ([Resolve a rejected or queried translation](#resolve-a-rejected-or-queried-translation)).
 4. Click the button that names the version, for example *Accept v2*.
 
 The version then reads like other acceptances, for example *Accepted: reviewed outside Ontotator, Project lead (ann-0002), 14 Nov, 19:40, Checked against the DeepL output*. While a translation review of the version is open, the acceptance is refused: withdraw the review with **Remove…** first.
@@ -2801,7 +2899,7 @@ A source text has no **Upload a corrected text…**: a corrected source text com
 What for: correct spacing, a typo or grammar in a translation without a translation review. The content of the text stays as it is, and an accepted text stays accepted. Ontotator calls this an editorial correction; the API, the MCP tool and the name of the action in the audit trail use that term.
 
 1. Open the text card and click **Translation**.
-2. At the newest version of the translation, click **Fix typos…**. Unlike **Correct it myself…** and **Upload a corrected text…**, it keeps the status of the text and starts no review.
+2. At the newest version of the translation, click **Edit the translation…**, choose **Only spelling, spacing or grammar** and click **Continue**. Where the version is not accepted, the button is **Fix typos (no review)…** and opens the dialog at once. Unlike **The meaning changes** and **Upload a corrected text…**, it keeps the status of the text and starts no review.
 3. Correct the text under **Corrected text**. It starts with the text of the version. The words you change are marked while you type, and the changes appear below the field with removed text struck through and a count, for example *Changes to v2 · 1 character changed*.
 4. Under **What did you fix?**, click **Spacing**, **Typo**, **Grammar** or **Removed addition** (words the machine added that the source does not have, for example a synonym in brackets); you can choose several. **Note** is optional, for example the word you corrected. One of the two is required and is kept with the version.
 5. Read what happens to the work on the version (see below) and the status line, for example *v3 keeps the status of v2: Accepted. No translation review is started.*
@@ -2814,7 +2912,7 @@ The corrected text becomes the next version of the translation, a correction of 
 What happens to work on the corrected version:
 
 - If nobody annotated it, the dialog says so: *Nobody has annotated v2 yet.*
-- If the version has a submitted translation review, the dialog says that the review stays with the version it reviewed: *A submitted translation review stays with the version it reviewed.* For a rejected or queried version it adds how the new version gets its review, for example *To have v3 reviewed, use Resolve… › Assign a new review… on this row after saving.*
+- If the version has a submitted translation review, the dialog says that the review stays with the version it reviewed: *A submitted translation review stays with the version it reviewed.* For a rejected or queried version it adds how the new version gets its review, for example *To have v3 reviewed, use Resolve… › Other ways… › Assign a new review… on this row after saving.*
 - Annotation tasks nobody opened move to the new version: *2 waiting tasks continue on v3.* A task from tool proposals moves only when no tool proposal waits for a check after the fix; it moves a few seconds after you save, once the proposals are on the new version. The dialog names the rule: *A task from tool proposals continues on v3 only when nobody opened it and no proposal waits for a check.*
 - A task that stays is named with the reason, for example *Task not moved, already opened: Eva Lang.*, *Task not moved, the task is paused: Tom Reis.* or *Task not moved, from tool proposals, and a proposal waits for a check: Ana Weber.* Before you change the text, the dialog says that it will name whether a task from tool proposals continues. Move such a task afterwards with **Handle text change…**, choosing to move it to the new version ([Handle a text change for open annotation work](#handle-a-text-change-for-open-annotation-work)); decide the report of a paused task first.
 - A submitted annotation moves to the new version by itself when every finding is placed on the new text without doubt and the fix changes no number: nobody clicks, and the person does not submit again. Under the changes, the dialog says per person whose annotation moves and whose does not, and why, for example *Moves to v3 by itself, nobody submits again: the annotation of Tom Reis.* and *Not moved by itself, a finding marks words you changed: Ana Weber.* What moves stands above the highlighted block *Work stays on v2*, which names only what stays. Before you change the text, the dialog says that it will name who moves once you do. An annotation does not move by itself when the fix changes a number (a digit added, removed or changed anywhere in the text; *0.5* → *0,5* or *12.03.* → *12. 03.* is no change of a number, *12* → *1 2* is one), when the text has a final result or a consolidation, when the translation is not accepted yet, when it was annotated from tool proposals (they reach the new version later), when the task is paused, or when a finding marks words you changed. The moved annotation is the same person's annotation: same findings and guideline version, placed on the new text, and the task on the old version goes away. It is not a second annotation: agreement, the comparison of the findings (also *Related terms*), consolidation groups, the counts on Documents and Progress and the work export are the same as before the fix, and it adds no working time. **History** has a line for it, for example *annotation of Tom Reis (ann-0004) moved to v3 by itself after the typo fix, 17 Nov, 10:12*, and the audit log records it with the submission it came from. To let the person look at it again, reopen the task on the new version as usual. After saving, the message says how many moved, for example *1 annotation moved to v3.*
@@ -2827,7 +2925,7 @@ The correction is refused in these cases, and the dialog says so in place:
 - The version is not the newest of its translation or it was discarded.
 - The text is unchanged: *No changes to v2. Nothing is saved.*
 
-A source text has no **Fix typos…**; a corrected source text comes in as an Ontospan bundle. A change of content, for example a different finding or a rewritten sentence, belongs in a translation review ([Correct a translation yourself](#correct-a-translation-yourself)).
+A source text has no **Fix typos (no review)…**; a corrected source text comes in as an Ontospan bundle. A change of content, for example a different finding or a rewritten sentence, belongs in a translation review ([Correct a translation yourself](#correct-a-translation-yourself)).
 
 The same correction can be made without the browser: the MCP tool \`editorial_correction\` ([MCP server guide](../../mcp/README.md)) and \`POST /api/v1/projects/{key}/documents/{document_id}/editorial-correction\` take the passages to replace, each with its replacement, and the reason, with a project token of a lead that has the scope *Project administration*. Without \`confirm\` the tool changes nothing and returns the changed passages and what would follow. It lists the tasks that stay in \`tasks_staying\`, each with its reason, and names \`move_task_to_version\` as the next step for them.
 
@@ -3317,7 +3415,7 @@ Warning: the text of the withdrawn version is deleted for good. The version numb
 
 This chapter is for project leads. A lead sets up the project, uploads texts, plans and assigns the work, accepts the results and exports them. Back to the [handbook overview](README.md).
 
-As a lead you see an extra group in the sidebar with the name of the current project: **Documents**, **Progress**, **Settings** and **Export**. System administrators see the same pages for every project ([Open and manage any project](admin.md#open-and-manage-any-project)). How annotators and consolidators do their tasks is in the [annotator reference](annotator.md) and the [consolidator chapter](consolidator.md).
+As a lead you see an extra group in the sidebar with the name of the current project: **Documents**, **Questions**, **Progress**, **Settings** and **Export**. System administrators see the same pages for every project ([Open and manage any project](admin.md#open-and-manage-any-project)). How annotators and consolidators do their tasks is in the [annotator reference](annotator.md) and the [consolidator chapter](consolidator.md).
 
 The lead's tasks are in four chapters:
 
@@ -3325,7 +3423,7 @@ The lead's tasks are in four chapters:
 | --- | --- | --- |
 | [Lead: project settings](lead-settings.md) | **Settings** | Name, languages, ontology, submission rules, workflow, people, guidelines |
 | [Lead: texts, work plans and progress](lead-documents.md) | **Documents**, **Progress** | Upload, the Documents table, the text card, work plans, assigning, progress |
-| [Lead: results, decisions and export](lead-results.md) | **Documents** (Finalization), **Export** | Accept results, consolidations, translation and text-change decisions, problem reports, export |
+| [Lead: results, decisions and export](lead-results.md) | **Documents** (Finalization), **Questions**, **Export** | Accept results, consolidations, translation and text-change decisions, questions, problem reports, export |
 | [Lead: change course in a running project](lead-change-course.md) | **Documents**, **Settings** | Use another translation, annotate texts again, narrow the scope, the command line |
 
 ## Typical project, start to finish
