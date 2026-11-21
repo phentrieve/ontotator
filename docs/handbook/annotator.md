@@ -547,22 +547,24 @@ What for: see which part of the source belongs to which part of the translation,
 4. If a pair is wrong, click **⋯** at the end of its row: **Merge with the pair above**, **Merge with the pair below** or **Split this pair**. A pair that joins a checked and an unchecked pair turns amber.
 5. **Next unchecked** jumps to the first pair that is not checked. **Align again** pairs the texts anew, for example after many edits. Checked pairs and pairs you merged or split stay as they are.
 
-The head above the rows shows how many pairs are checked, for example *12 of 55 pairs checked · 1 changed*. A row that reads *Not in the translation* has a source part without a translation; read it carefully.
+The head above the rows shows how many pairs are checked, for example *12 of 55 pairs checked · 1 changed*. A row that reads *Not in the translation* has a source part without a translation; read it carefully. A row that reads *Pairing unsure* may be paired wrongly, often next to a sentence the translation left out: compare it with the rows around it, and merge or split with **⋯** if it is wrong.
 
-**Show changes** also works in this view: the changed words are marked in the translation cells. You cannot edit while it is on. **Find in the texts** (`Ctrl+F`, on a Mac `Cmd+F`) searches both columns. **Couple scrolling** and **Show matching paragraph** are not shown here, because the rows already line up.
+If the texts cannot be paired: some texts cannot be paired with confidence: an empty translation, a translation without sentence ends, very different numbers of sentences, a translation that misses a whole section or most of the source's numbers, or a very long text. Then the texts are shown as usual, with a note such as *These texts cannot be shown as pairs: the texts have very different numbers of sentences.* The box stays ticked, but nothing is paired and nothing is saved for pairs. Check the texts as usual; to tick what you checked, use **Mark checked sentences**. Pairs and marks saved earlier are kept. **Align again** never replaces your pairs with unsure ones: it says *Aligning again would give unsure pairs, so your pairs were kept.*
 
-Ontotator pairs the texts by itself, from sentence ends, semicolons, numbers, units and similar words. It can be wrong; correct it with **⋯**. The pairs and your marks are only for you. They are saved with your review, so they are kept when you reload. They do not change your decision, and the lead and the exports never see them. When you first turn the view on, sentences you had marked with **Mark checked sentences** are taken over: a pair is checked when all its sentences were checked.
+**Show changes** also works in this view: the changed words are marked in the translation cells. You cannot edit while it is on. **Find in the texts** (`Ctrl+F`, on a Mac `Cmd+F`) searches both columns. **Couple scrolling** and **Show matching paragraph** are not shown here, because the rows already line up. **Mark checked sentences** is hidden while the rows are shown.
+
+Ontotator pairs the texts by itself, from sentence ends, semicolons, numbers, units and similar words. It can be wrong; correct it with **⋯**. The pairs and your marks are only for you. They are saved with your review, so they are kept when you reload. They do not change your decision, and the lead and the exports never see them. When you first turn the view on, sentences you had marked with **Mark checked sentences** are taken over: a pair is checked when all its sentences were checked. Your sentence marks stay as they are: untick **Check by segment pairs**, and they are all there. If the review is open in two tabs, a pair you check in one tab does not undo a pair checked in the other.
 
 With the keyboard: Tab to the box of a row and press Space. `↓` and `↑` move to the box of the next or previous row. Enter on a translation opens it for editing.
 
 ### Find in the texts
 
-What for: find a word in the source and the translation at once.
+What for: find a word in the source and the translation at once. It is part of **Check by segment pairs**; without it, `Ctrl+F` is the browser's own find, as before.
 
-1. Press `Ctrl+F` (on a Mac `Cmd+F`). A search field opens above the texts. Selected words are filled in.
+1. With **Check by segment pairs** on, press `Ctrl+F` (on a Mac `Cmd+F`). A search field opens above the texts. Selected words are filled in.
 2. Type. The field shows the number of hits, for example *1 of 6 · Source 3 · Translation 3*. All hits are marked, the current one in orange.
 3. Press Enter for the next hit, Shift+Enter for the previous one.
-4. Press Esc to close it. If the current hit is in the translation, it is selected there, ready to change.
+4. Press Esc to close it.
 
 Press `Ctrl+F` again in the field to use the browser's own find.
 
@@ -611,4 +613,4 @@ What for: work without the mouse. Shortcuts are off while you type in a field or
 | `Alt+←` / `Alt+→` | Previous / next text |
 | `Alt+P` | Switch project |
 
-In a translation review: `1` to `4` choose a decision (outside the text), `Ctrl+Enter` submits (with a confirmation), `Alt+M` shows the matching paragraph. With **Mark checked sentences** on, Enter or Space marks the focused sentence and Shift+Enter marks a range. `Ctrl+F` (macOS: `Cmd+F`) finds in the texts. With **Check by segment pairs** on, Space on a row's box marks the pair, and `↓` / `↑` move between the boxes.
+In a translation review: `1` to `4` choose a decision (outside the text), `Ctrl+Enter` submits (with a confirmation), `Alt+M` shows the matching paragraph. With **Mark checked sentences** on, Enter or Space marks the focused sentence and Shift+Enter marks a range. With **Check by segment pairs** on, `Ctrl+F` (macOS: `Cmd+F`) finds in the texts, Space on a row's box marks the pair, and `↓` / `↑` move between the boxes.

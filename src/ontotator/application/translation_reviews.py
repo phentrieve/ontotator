@@ -194,6 +194,69 @@ class SegmentPairs(BaseModel):
         return self
 
 
+class SegmentPairsSave(SegmentPairs):
+    """New pairs, optionally with the pairs they were made from.
+
+    With ``base``, a save does not undo what another tab saved meanwhile: when both
+    tabs refer to the same texts, the checks this tab changed since ``base`` are
+    applied, and the checks the other tab changed are kept (see
+    ``merged_segment_pairs``). Without ``base``, the new pairs replace the stored ones.
+    """
+
+    base: SegmentPairs | None = None
+
+
+_PairKey = tuple[int, int, int, int]
+
+
+def _pair_key(pair: SegmentPair) -> _PairKey:
+    return (
+        pair.source.start,
+        pair.source.end,
+        pair.translation.start,
+        pair.translation.end,
+    )
+
+
+def merged_segment_pairs(
+    stored: SegmentPairs | None, base: SegmentPairs | None, mine: SegmentPairs
+) -> SegmentPairs:
+    """The pairs to store when ``mine`` was made from ``base`` and ``stored`` is now.
+
+    Nothing saved meanwhile, or pairs of other texts: ``mine``. Else the pairs are
+    those of the tab that changed them (``mine`` when both did), and each pair's
+    check is the one a tab changed since ``base`` (``mine`` first), else as stored.
+    """
+    if (
+        stored is None
+        or base is None
+        or stored == base
+        or (stored.source_hash, stored.text_hash) != (mine.source_hash, mine.text_hash)
+        or (base.source_hash, base.text_hash) != (mine.source_hash, mine.text_hash)
+    ):
+        return mine
+    before = {_pair_key(pair): pair.checked for pair in base.pairs}
+    ours = {_pair_key(pair): pair.checked for pair in mine.pairs}
+    theirs = {_pair_key(pair): pair.checked for pair in stored.pairs}
+    shape = stored if set(ours) == set(before) else mine
+
+    def check(key: _PairKey, own: str | None) -> str | None:
+        if key in ours and (key not in before or ours[key] != before[key]):
+            return ours[key]
+        if key in theirs and (key not in before or theirs[key] != before[key]):
+            return theirs[key]
+        return own
+
+    return SegmentPairs(
+        source_hash=mine.source_hash,
+        text_hash=mine.text_hash,
+        pairs=[
+            pair.model_copy(update={"checked": check(_pair_key(pair), pair.checked)})
+            for pair in shape.pairs
+        ],
+    )
+
+
 def stored_segment_pairs(form: dict[str, Any] | None) -> SegmentPairs | None:
     """The stored pairs; pairs that do not fit today's rules read as none."""
     raw = (form or {}).get(SEGMENT_PAIRS_KEY)
@@ -977,28 +1040,32 @@ class TranslationReviewService:
     def save_segment_pairs(
         self, access: Access, assignment_id: int, pairs: SegmentPairs
     ) -> SegmentPairs:
-        """Store the reviewer's segment pairs (issue 560) and return them.
+        """Store the reviewer's segment pairs (issue 560) and return what is stored.
 
         A working aid like the checked-sentence marks: the draft revision, its time
-        stamp and the assignment status stay as they are. The last save wins
-        (prototype: no merge of two tabs).
+        stamp and the assignment status stay as they are, and nothing is audited.
+        With ``base``, checks another tab saved meanwhile stay (see
+        ``merged_segment_pairs``).
         """
         with self.db.transaction() as conn:
             assignment, pid, _ = self._authority(conn, access, assignment_id)
             self._editable(assignment)
             variant, _, _, _ = self._context(assignment)
             draft = self._draft(conn, assignment, pid, variant)
+            base = pairs.base if isinstance(pairs, SegmentPairsSave) else None
+            mine = SegmentPairs.model_validate(pairs.model_dump(exclude={"base"}))
+            result = merged_segment_pairs(stored_segment_pairs(draft.form), base, mine)
             conn.execute(
                 update(TranslationReviewDraftRow)
                 .where(TranslationReviewDraftRow.assignment_id == assignment.id)
                 .values(
                     form={
                         **draft.form,
-                        SEGMENT_PAIRS_KEY: pairs.model_dump(mode="json"),
+                        SEGMENT_PAIRS_KEY: result.model_dump(mode="json"),
                     }
                 )
             )
-            return pairs
+            return result
 
     def submit(
         self, access: Access, assignment_id: int, *, expected_revision: int

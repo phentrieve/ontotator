@@ -43,22 +43,33 @@ describe("text ranges", () => {
     expect(findMatches("text", "")).toEqual([]);
   });
 
-  it("the editor's layout mirror is inert, so the browser's own find counts a passage once", async () => {
-    setup();
-    const textbox = await screen.findByRole("textbox", { name: "Translation (de)" });
-    expect(textbox.closest(".translation-editor")!.querySelector(".translation-editor-mirror")!.hasAttribute("inert")).toBe(true);
-  });
-
   it("highlights do nothing where the browser has no highlight registry", () => {
     expect(() => setHighlight("review-find", "test", [document.createRange()])).not.toThrow();
   });
 });
 
 describe("Find in the texts", () => {
-  it("Ctrl+F opens the bar, counts the hits of every column, steps with Enter and selects the hit in the translation on Escape", async () => {
+  it("is not there without Check by segment pairs: Ctrl+F stays the browser's own find, as before", async () => {
     setup();
-    const textbox = await screen.findByRole("textbox", { name: "Translation (de)" }) as HTMLTextAreaElement;
-    fireEvent.keyDown(textbox, { key: "f", ctrlKey: true });
+    const textbox = await screen.findByRole("textbox", { name: "Translation (de)" });
+    const press = new KeyboardEvent("keydown", { key: "f", ctrlKey: true, bubbles: true, cancelable: true });
+    textbox.dispatchEvent(press);
+    await frame();
+    expect(press.defaultPrevented).toBe(false);
+    expect(screen.queryByRole("search", { name: "Find in the texts" })).toBeNull();
+    // The editor's layout mirror is as before: aria-hidden, not inert.
+    const mirror = textbox.closest(".translation-editor")!.querySelector(".translation-editor-mirror")!;
+    expect(mirror.getAttribute("aria-hidden")).toBe("true");
+    expect(mirror.hasAttribute("inert")).toBe(false);
+  });
+
+  it("with segment pairs, Ctrl+F opens the bar, counts the hits of both columns, steps with Enter and closes with Escape", async () => {
+    window.localStorage.setItem("ontotator.translationReview.segmentPairs.v1:alice", "1");
+    vi.spyOn(api, "saveSegmentPairs").mockImplementation(async (_id, view) => view);
+    setup();
+    const check = await screen.findByRole("button", { name: "Pair 1: Not checked" });
+    check.focus();
+    fireEvent.keyDown(check, { key: "f", ctrlKey: true });
     await frame();
     const input = screen.getByRole("searchbox", { name: "Find in the texts" });
     expect(document.activeElement).toBe(input);
@@ -68,24 +79,19 @@ describe("Find in the texts", () => {
     fireEvent.keyDown(input, { key: "Enter" });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(status()).toMatch(/^3 of 4/);
-    fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
-    fireEvent.keyDown(input, { key: "Enter" });
     fireEvent.keyDown(input, { key: "Escape" });
     expect(screen.queryByRole("search", { name: "Find in the texts" })).toBeNull();
-    // The third hit is the first "5 mg" of the translation: closing selects it, ready to edit.
-    expect(document.activeElement).toBe(textbox);
-    expect([textbox.selectionStart, textbox.selectionEnd]).toEqual([TRANSLATION.indexOf("5 mg"), TRANSLATION.indexOf("5 mg") + 4]);
+    expect(document.activeElement).toBe(check);
   });
 
-  it("starts with the selected words and leaves a second Ctrl+F to the browser", async () => {
+  it("with segment pairs, a second Ctrl+F is left to the browser", async () => {
+    window.localStorage.setItem("ontotator.translationReview.segmentPairs.v1:alice", "1");
+    vi.spyOn(api, "saveSegmentPairs").mockImplementation(async (_id, view) => view);
     setup();
-    const textbox = await screen.findByRole("textbox", { name: "Translation (de)" }) as HTMLTextAreaElement;
-    textbox.focus(); textbox.setSelectionRange(4, 9);
-    fireEvent.keyDown(textbox, { key: "f", metaKey: true });
+    const check = await screen.findByRole("button", { name: "Pair 1: Not checked" });
+    fireEvent.keyDown(check, { key: "f", metaKey: true });
     await frame();
     const input = screen.getByRole("searchbox", { name: "Find in the texts" }) as HTMLInputElement;
-    expect(input.value).toBe("Dosis");
-    expect(document.querySelector(".find-bar-status")!.textContent).toBe("1 of 1Source 0 · Translation 1");
     const again = new KeyboardEvent("keydown", { key: "f", ctrlKey: true, bubbles: true, cancelable: true });
     input.dispatchEvent(again);
     expect(again.defaultPrevented).toBe(false);

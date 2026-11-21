@@ -449,3 +449,159 @@ export function carryChecks(fresh: readonly SegmentPair[], stored: readonly Segm
     return { ...pair, checked };
   });
 }
+
+// ---- Confidence: when the pairs would mislead, the view is not offered (owner's condition on issue 560). ----
+
+/** The longest text, in segments on either side, that the browser aligns; longer texts would freeze the page. */
+export const MAX_ALIGN_SEGMENTS = 1500;
+/** Why texts are not shown as pairs. */
+export type LowConfidenceReason = "empty" | "too-long" | "one-block" | "counts-differ" | "unrelated" | "gap" | "weak";
+/** How well pairs fit, as shares of the visible text of both sides. */
+export interface AlignmentMetrics {
+  /** In pairs of more than three segments on a side, with a length far from the texts' ratio, or numbers and codes the sides do not share. */
+  weak: number;
+  /** In pairs with one empty side. */
+  unmatched: number;
+  /** The longest run of segments in consecutive pairs with one empty side. */
+  gap: number;
+  /** Of the numbers and codes of the source, the share the translation has too (1 when the source has fewer than 6). */
+  anchorRecall: number;
+}
+export type AlignmentAssessment = { usable: true; metrics?: AlignmentMetrics } | { usable: false; reason: LowConfidenceReason; metrics?: AlignmentMetrics };
+/** Above this share of weak text, pairs mislead. */
+export const WEAK_SHARE = 0.15;
+/** Above this share of text without a partner, the texts do not belong together. */
+export const UNMATCHED_SHARE = 0.15;
+/** A run of this many segments without a partner is a missing section; the pairs around it are unsure. */
+export const GAP_SEGMENTS = 3;
+/** Below this share of the source's numbers and codes found in the translation, the texts are not a translation of each other. */
+export const ANCHOR_RECALL = 0.5;
+/** The length cost (Gale–Church, -log of the chance) above which a pair's lengths do not fit: about 1 in 400. */
+export const MISFIT_COST = 6;
+/** Sentence counts of the two texts further apart than this (and by at least 4) do not belong together. */
+export const COUNT_RATIO = 1.6;
+
+/**
+ * Whether texts can be aligned at all, before the aligner runs: both have text, neither is too long, and both are
+ * split into sentences of a similar count. Cheap: it only splits the texts.
+ */
+export function precheckAlignment(source: string, target: string, options: AlignOptions = {}): AlignmentAssessment {
+  if (visibleLength(source) === 0 || visibleLength(target) === 0) return { usable: false, reason: "empty" };
+  const n = splitSegments(source, options.sourceLang).length, m = splitSegments(target, options.targetLang).length;
+  if (Math.max(n, m) > MAX_ALIGN_SEGMENTS) return { usable: false, reason: "too-long" };
+  // A text without sentence ends (no punctuation, a script whose full stop the splitter does not know) is one block.
+  const low = Math.min(n, m), high = Math.max(n, m);
+  if (low <= 1 && high >= 4) return { usable: false, reason: "one-block" };
+  if (high - low >= 4 && high / low > COUNT_RATIO) return { usable: false, reason: "counts-differ" };
+  return { usable: true };
+}
+
+/** What a pair is judged by: the texts' length ratio and the strong anchors (numbers, codes). */
+interface PairJudge { ratio: number; options: AlignOptions }
+const strongAnchor = (key: string) => key[0] === "n" || key[0] === "c";
+function judgeOf(source: string, target: string, options: AlignOptions): PairJudge {
+  return { ratio: Math.max(0.3, Math.min(3, (visibleLength(target) || 1) / (visibleLength(source) || 1))), options };
+}
+
+/**
+ * Why a pair is unsure, or null: more than three segments on a side; lengths that do not fit the texts' ratio
+ * (about 1 in 400); or numbers and codes on the sides that none of the other side's match, with three or more on one
+ * side ("182/96 mmHg, 88/min" beside a sentence without a number), or three or more on one side that the other
+ * side lacks. A pair with an empty side is not judged here.
+ */
+function pairDoubt(source: string, target: string, pair: SegmentPair, judge: PairJudge): "size" | "length" | "anchors" | null {
+  const sourceText = slice(source, pair.source), targetText = slice(target, pair.translation);
+  const a = visibleLength(sourceText), b = visibleLength(targetText);
+  if (a === 0 || b === 0) return null;
+  const size = Math.max(splitSegments(source, judge.options.sourceLang, pair.source.start, pair.source.end).length,
+    splitSegments(target, judge.options.targetLang, pair.translation.start, pair.translation.end).length);
+  if (size > 3) return "size";
+  // Short pairs ("Unauffällig." / "Normal.") vary a lot in length; only longer ones count for the fit.
+  if (a + b >= 40 && lengthCost(a, b, judge.ratio) > MISFIT_COST) return "length";
+  const count = (text: string) => {
+    const map = new Map<string, number>();
+    for (const key of rawAnchors(text)) if (strongAnchor(key)) map.set(key, (map.get(key) ?? 0) + 1);
+    return map;
+  };
+  const ka = count(sourceText), kb = count(targetText);
+  let both = 0, na = 0, nb = 0;
+  for (const [key, value] of ka) { na += value; both += Math.min(value, kb.get(key) ?? 0); }
+  for (const value of kb.values()) nb += value;
+  return (both === 0 && Math.max(na, nb) >= 3) || na - both >= 3 || nb - both >= 3 ? "anchors" : null;
+}
+
+/**
+ * The indexes of the pairs that are unsure, for the view to mark: each pair with a doubt (see `pairDoubt`), and the
+ * pairs next to it that the aligner made, because a wrong cut lies on one of its two borders. A pair the reviewer
+ * merged, split or checked is taken as it is.
+ */
+export function unsurePairs(source: string, target: string, pairs: readonly SegmentPair[], options: AlignOptions = {}): Set<number> {
+  const judge = judgeOf(source, target, options), result = new Set<number>();
+  const free = (pair: SegmentPair | undefined) => pair !== undefined && !pair.manual && pair.checked === undefined;
+  pairs.forEach((pair, index) => {
+    if (!free(pair) || !pairDoubt(source, target, pair, judge)) return;
+    result.add(index);
+    for (const next of [index - 1, index + 1]) if (free(pairs[next]) && visibleLength(slice(target, pairs[next].translation)) > 0) result.add(next);
+  });
+  return result;
+}
+
+/**
+ * Fresh pairs made safe: an unsure pair is joined with the pair before or after it (or both) when that joined pair
+ * is sure. A cut in the wrong place, typically next to a sentence the translation left out, then disappears into
+ * one larger pair that is right, instead of two pairs that are both wrong. Manual and checked pairs stay as they are.
+ */
+export function securePairs(source: string, target: string, pairs: readonly SegmentPair[], options: AlignOptions = {}): SegmentPair[] {
+  const judge = judgeOf(source, target, options);
+  const free = (pair: SegmentPair | undefined) => pair !== undefined && !pair.manual && pair.checked === undefined;
+  const join = (parts: readonly SegmentPair[]): SegmentPair => ({ source: { start: parts[0].source.start, end: parts[parts.length - 1].source.end },
+    translation: { start: parts[0].translation.start, end: parts[parts.length - 1].translation.end } });
+  const result = [...pairs];
+  const unsure = (pair: SegmentPair) => pairDoubt(source, target, pair, judge) !== null;
+  for (let i = 0; i < result.length; i++) {
+    if (!free(result[i]) || !unsure(result[i])) continue;
+    const candidates = ([[i, i + 1], [i - 1, i], [i - 1, i + 1]] as const).filter(([from, to]) => from >= 0 && to < result.length && result.slice(from, to + 1).every(free));
+    // A join that is sure is best; else one that leaves one unsure pair where there were several (the cut was wrong).
+    const choice = candidates.find(([from, to]) => !unsure(join(result.slice(from, to + 1))))
+      ?? candidates.find(([from, to]) => result.slice(from, to + 1).filter(unsure).length >= 2);
+    if (!choice) continue;
+    const [from, to] = choice;
+    result.splice(from, to - from + 1, join(result.slice(from, to + 1)));
+    i = from - 1;
+  }
+  return result;
+}
+
+/**
+ * Whether pairs of two texts can be trusted (see `AlignmentMetrics`). Low confidence when the texts share too few
+ * numbers and codes to be a translation of each other, when a whole section has no partner (the pairs around such a
+ * gap are often wrong), or when much of the text has no partner or is in unsure pairs. Shown pairs would then
+ * mislead, so the review falls back to the flowing texts.
+ */
+export function assessAlignment(source: string, target: string, pairs: readonly SegmentPair[], options: AlignOptions = {}): AlignmentAssessment {
+  const pre = precheckAlignment(source, target, options);
+  if (!pre.usable) return pre;
+  const judge = judgeOf(source, target, options);
+  const sourceKeys = rawAnchors(source).filter(strongAnchor), targetKeys = new Set(rawAnchors(target).filter(strongAnchor));
+  const anchorRecall = sourceKeys.length < 6 ? 1 : sourceKeys.filter(key => targetKeys.has(key)).length / sourceKeys.length;
+  let total = 0, weak = 0, unmatched = 0, gap = 0, run = 0;
+  for (const pair of pairs) {
+    const a = visibleLength(slice(source, pair.source)), b = visibleLength(slice(target, pair.translation));
+    total += a + b;
+    if (a === 0 || b === 0) {
+      unmatched += a + b;
+      run += a === 0 ? splitSegments(target, options.targetLang, pair.translation.start, pair.translation.end).length
+        : splitSegments(source, options.sourceLang, pair.source.start, pair.source.end).length;
+      gap = Math.max(gap, run);
+      continue;
+    }
+    run = 0;
+    if (pairDoubt(source, target, pair, judge)) weak += a + b;
+  }
+  const metrics: AlignmentMetrics = { weak: total ? weak / total : 1, unmatched: total ? unmatched / total : 1, gap, anchorRecall };
+  if (total === 0) return { usable: false, reason: "empty", metrics };
+  if (anchorRecall < ANCHOR_RECALL) return { usable: false, reason: "unrelated", metrics };
+  if (gap >= GAP_SEGMENTS) return { usable: false, reason: "gap", metrics };
+  if (metrics.unmatched > UNMATCHED_SHARE || metrics.weak > WEAK_SHARE) return { usable: false, reason: "weak", metrics };
+  return { usable: true, metrics };
+}

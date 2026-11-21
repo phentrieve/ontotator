@@ -912,6 +912,9 @@ export interface paths {
         /**
          * Save Segment Pairs
          * @description The reviewer's own segment pairs and their checks; not part of the review.
+         *
+         *     With ``base`` (the pairs this tab last had), checks saved meanwhile in another
+         *     tab stay. The answer is what is stored.
          */
         put: operations["save_segment_pairs_api_v1_translation_reviews__assignment_id__segment_pairs_put"];
         post?: never;
@@ -11032,6 +11035,24 @@ export interface components {
             pairs?: components["schemas"]["SegmentPair"][];
         };
         /**
+         * SegmentPairsSave
+         * @description New pairs, optionally with the pairs they were made from.
+         *
+         *     With ``base``, a save does not undo what another tab saved meanwhile: when both
+         *     tabs refer to the same texts, the checks this tab changed since ``base`` are
+         *     applied, and the checks the other tab changed are kept (see
+         *     ``merged_segment_pairs``). Without ``base``, the new pairs replace the stored ones.
+         */
+        SegmentPairsSave: {
+            /** Source Hash */
+            source_hash: string;
+            /** Text Hash */
+            text_hash: string;
+            /** Pairs */
+            pairs?: components["schemas"]["SegmentPair"][];
+            base?: components["schemas"]["SegmentPairs"] | null;
+        };
+        /**
          * SegmentSpan
          * @description A passage of one text, in UTF-16 code units as the browser counts them.
          */
@@ -14937,7 +14958,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SegmentPairs"];
+                "application/json": components["schemas"]["SegmentPairsSave"];
             };
         };
         responses: {

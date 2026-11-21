@@ -323,6 +323,7 @@ export type TranslationReviewSubmitRequest = components["schemas"]["SubmitReques
 export type CheckedSentences = components["schemas"]["CheckedSentences"];
 export type CheckedSentencesSave = components["schemas"]["CheckedSentencesSave"];
 export type SegmentPairsView = components["schemas"]["SegmentPairs"];
+export type SegmentPairsSave = components["schemas"]["SegmentPairsSave"];
 export type CaseFilters = NonNullable<operations["list_cases_api_v1_projects__key__cases_get"]["parameters"]["query"]>;
 /** The logged-in user; `csrf_token` goes back in `X-CSRF-Token` with every write. */
 export type CurrentUser = components["schemas"]["CurrentUser"];
@@ -1058,10 +1059,14 @@ export class ApiClient {
       method: "PUT", body: JSON.stringify(body), ...(options.keepalive ? { keepalive: true } : {}) });
   }
 
-  /** Issue 560 (prototype): the reviewer's segment pairs and their checks; the last save wins. */
-  async saveSegmentPairs(assignmentId: number, pairs: SegmentPairsView, options: { keepalive?: boolean } = {}): Promise<SegmentPairsView> {
+  /**
+   * Issue 560 (prototype): the reviewer's segment pairs and their checks. With `base` (the pairs this tab last had
+   * from the server), checks saved meanwhile in another tab stay; the answer is what is stored.
+   */
+  async saveSegmentPairs(assignmentId: number, pairs: SegmentPairsView, base?: SegmentPairsView | null, options: { keepalive?: boolean } = {}): Promise<SegmentPairsView> {
+    const body: SegmentPairsSave = { ...pairs, ...(base ? { base } : {}) };
     return this.request<SegmentPairsView>(`/api/v1/translation-reviews/${assignmentId}/segment-pairs`, {
-      method: "PUT", body: JSON.stringify(pairs), ...(options.keepalive ? { keepalive: true } : {}) });
+      method: "PUT", body: JSON.stringify(body), ...(options.keepalive ? { keepalive: true } : {}) });
   }
 
   /** Issue 298: whether the task records working time, and the owner's total on it. */

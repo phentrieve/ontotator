@@ -26,6 +26,8 @@ export interface SegmentPairsProps {
   onToggle: (index: number) => void;
   onMerge: (index: number) => void;
   onSplit: (index: number) => void;
+  /** Pairs the aligner is not sure about: they are marked, for the reviewer to look at the pairing itself. */
+  unsure?: ReadonlySet<number>;
   /** Whether a pair can be split (it has more than one segment, or a clause, on a side). */
   canSplit: (index: number) => boolean;
 }
@@ -76,7 +78,7 @@ function CellEditor({ value, label, lang, onChange, onDone }: { value: string; l
  * find can map text offsets to the cells (`data-side`, `data-start`). A translation cell becomes a text box on click.
  */
 export const SegmentPairs = forwardRef<HTMLDivElement, SegmentPairsProps>(function SegmentPairs(props, ref) {
-  const { source, target, pairs, sourceLang, targetLang, changes, editable, disabled = false, showInvisibles = false, editing } = props;
+  const { source, target, pairs, sourceLang, targetLang, changes, editable, disabled = false, showInvisibles = false, editing, unsure } = props;
   const perPair = useMemo(() => changes ? partsPerPair(pairs, changes) : null, [pairs, changes]);
   const text = (value: string, key: string): ReactNode => showInvisibles ? invisibleNodes(value, key) : value;
   const moveFocus = (event: KeyboardEvent<HTMLElement>, index: number) => {
@@ -94,7 +96,7 @@ export const SegmentPairs = forwardRef<HTMLDivElement, SegmentPairsProps>(functi
       const sourceText = source.slice(pair.source.start, pair.source.end), targetText = target.slice(pair.translation.start, pair.translation.end);
       const previous = pairs[index - 1];
       const paragraph = previous && (source.slice(previous.source.end, pair.source.start).includes("\n") || target.slice(previous.translation.end, pair.translation.start).includes("\n"));
-      const number = index + 1;
+      const number = index + 1, doubtful = unsure?.has(index) === true;
       const cell = editing === index
         ? <CellEditor value={targetText} label={`Translation of pair ${number}`} lang={targetLang} onChange={value => props.onEditPair(index, value)} onDone={props.onEditEnd} />
         : <div className={`segment-cell segment-cell--translation${editable ? " is-editable" : ""}`} data-side="translation" data-start={pair.translation.start} lang={targetLang}
@@ -107,12 +109,13 @@ export const SegmentPairs = forwardRef<HTMLDivElement, SegmentPairsProps>(functi
               : text(targetText, `t${index}`)}
           </div>;
       return <div key={`${pair.source.start}:${pair.translation.start}:${index}`} role="row" aria-rowindex={number + 1}
-        className={`segment-pair is-${state}${paragraph ? " starts-paragraph" : ""}${pair.manual ? " is-manual" : ""}`} data-pair={index}>
+        className={`segment-pair is-${state}${paragraph ? " starts-paragraph" : ""}${pair.manual ? " is-manual" : ""}${doubtful ? " is-unsure" : ""}`} data-pair={index}>
         <span role="cell" className="segment-pairs-number" aria-hidden="true">{number}</span>
         <div role="cell" className="segment-cell segment-cell--source" data-side="source" data-start={pair.source.start} lang={sourceLang}>
           {sourceText === "" ? <span className="segment-empty" data-gutter="">Not in the source</span> : text(sourceText, `s${index}`)}
         </div>
-        <div role="cell" className="segment-cell-wrap">{cell}</div>
+        <div role="cell" className="segment-cell-wrap">{cell}
+          {doubtful && <p className="segment-unsure">Pairing unsure: compare this row with the rows around it, and merge or split with ⋯ if it is wrong.</p>}</div>
         <div role="cell" className="segment-pair-actions">
           <button type="button" className={`pair-check is-${state}`} data-pair-check={index} aria-pressed={state === "checked"} disabled={disabled}
             aria-label={`Pair ${number}: ${STATE_LABEL[state]}`} title={state === "stale" ? "Changed since checked: click to check again" : state === "checked" ? "Checked: click to undo" : "Mark this pair as checked"}

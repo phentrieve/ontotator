@@ -275,6 +275,8 @@
 .sentence-count { margin: 0; color: var(--text-muted); font-size: var(--size-sm); line-height: var(--leading-sm); font-variant-numeric: tabular-nums; }
 .sentence-count strong { color: var(--text); font-weight: var(--weight-strong); }
 .sentence-next { margin-left: auto; }
+/* Check by segment pairs could not pair these texts (issue 560): the usual view with this note. */
+.translation-pairs-fallback { flex-basis: 100%; margin: 0; color: var(--text); }
 .sentence-save-error { display: flex; align-items: center; gap: var(--space-2); flex-basis: 100%; margin: 0; color: var(--text); }
 .translation-sentences { user-select: none; -webkit-user-select: none; }
 /* Touch drags mark sentences instead of scrolling the text; the gaps and the scroll bar still scroll. */
@@ -342,6 +344,8 @@
 .segment-cell del { background: var(--danger-light); text-decoration: line-through var(--danger); }
 .segment-empty { color: var(--text-muted); font-family: var(--font-sans); font-size: var(--size-sm); font-style: italic; }
 .segment-cell-wrap { min-width: 0; }
+/* A pair the aligner is not sure about (issue 560): a quiet line under the translation. */
+.segment-unsure { margin: var(--space-1) 0 0; padding-inline: var(--space-2); color: var(--text-muted); font-size: var(--size-sm); line-height: var(--leading-sm); }
 .pair-editor { display: block; width: 100%; padding: var(--space-1) var(--space-2); overflow: hidden; resize: none; border: 1px solid var(--focus-ring); border-radius: 2px; background: var(--surface-raised); color: var(--text);
   font-family: var(--font-serif); font-size: var(--size-reading); line-height: var(--leading-reading); }
 .pair-editor:focus-visible { outline: var(--focus-width) solid var(--focus-ring); outline-offset: 1px; }

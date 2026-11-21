@@ -2667,7 +2667,7 @@
           "translation-reviews"
         ],
         "summary": "Save Segment Pairs",
-        "description": "The reviewer's own segment pairs and their checks; not part of the review.",
+        "description": "The reviewer's own segment pairs and their checks; not part of the review.\n\nWith ``base`` (the pairs this tab last had), checks saved meanwhile in another\ntab stay. The answer is what is stored.",
         "operationId": "save_segment_pairs_api_v1_translation_reviews__assignment_id__segment_pairs_put",
         "parameters": [
           {
@@ -2685,7 +2685,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SegmentPairs"
+                "$ref": "#/components/schemas/SegmentPairsSave"
               }
             }
           }
@@ -31937,6 +31937,46 @@
         ],
         "title": "SegmentPairs",
         "description": "The reviewer's alignment of the source and the draft text, with its checks.\n\n``source_hash`` and ``text_hash`` name the texts the passages refer to; a client\nthat finds other texts aligns them anew."
+      },
+      "SegmentPairsSave": {
+        "properties": {
+          "source_hash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}$",
+            "title": "Source Hash"
+          },
+          "text_hash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}$",
+            "title": "Text Hash"
+          },
+          "pairs": {
+            "items": {
+              "$ref": "#/components/schemas/SegmentPair"
+            },
+            "type": "array",
+            "maxItems": 5000,
+            "title": "Pairs"
+          },
+          "base": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SegmentPairs"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_hash",
+          "text_hash"
+        ],
+        "title": "SegmentPairsSave",
+        "description": "New pairs, optionally with the pairs they were made from.\n\nWith ``base``, a save does not undo what another tab saved meanwhile: when both\ntabs refer to the same texts, the checks this tab changed since ``base`` are\napplied, and the checks the other tab changed are kept (see\n``merged_segment_pairs``). Without ``base``, the new pairs replace the stored ones."
       },
       "SegmentSpan": {
         "properties": {

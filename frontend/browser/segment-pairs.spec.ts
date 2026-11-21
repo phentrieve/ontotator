@@ -125,6 +125,47 @@ test('on a phone the source stands above its translation', async ({ page }) => {
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
 
+test('without the toggle the review is as before: flowing texts, no find bar of its own, no pairs stored', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const s = await scenario(page, texts(ALIGNMENT_SAMPLE.slice(0, 1)));
+  await loginExisting(page, s.users.reviewer);
+  await page.locator(`a[href="#/tasks/${s.assignment_id}"]`).click();
+  const editor = page.getByRole('textbox', { name: 'Translation (de)', exact: true });
+  await expect(editor).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: 'Check by segment pairs', exact: true })).not.toBeChecked();
+  await expect(page.getByRole('checkbox', { name: 'Mark checked sentences', exact: true })).toBeVisible();
+  await expect(table(page)).toHaveCount(0);
+  await editor.click(); await editor.press('Control+End'); await editor.pressSequentially(' Gute Besserung.');
+  await editor.press('Control+f');
+  await expect(page.getByRole('searchbox', { name: 'Find in the texts', exact: true })).toHaveCount(0);
+  await expect(page.locator('.translation-save-status')).toHaveText('Saved');
+  const stored = await workspace(page, s.assignment_id!);
+  expect(stored.segment_pairs).toBeNull();
+  expect(stored.draft.text).toContain('Gute Besserung.');
+});
+
+for (const width of [1440, 390]) {
+  test(`texts the aligner cannot pair keep the usual view with a note (${width} px)`, async ({ page }) => {
+    await page.setViewportSize({ width, height: width > 400 ? 900 : 844 });
+    const letter = texts(ALIGNMENT_SAMPLE.slice(0, 1));
+    // The translation as one block without punctuation: it splits into far fewer sentences than the source.
+    const s = await scenario(page, { source: letter.source, target: letter.target.replace(/[.;:!?]/g, '') });
+    await loginExisting(page, s.users.reviewer);
+    await page.locator(`a[href="#/tasks/${s.assignment_id}"]`).click();
+    await page.getByRole('checkbox', { name: 'Check by segment pairs', exact: true }).check();
+    const note = page.locator('.translation-pairs-fallback');
+    await expect(note).toContainText('These texts cannot be shown as pairs: the texts have very different numbers of sentences.');
+    await expect(page.getByRole('checkbox', { name: 'Check by segment pairs', exact: true })).toBeChecked();
+    await expect(table(page)).toHaveCount(0);
+    await expect(page.getByRole('textbox', { name: 'Translation (de)', exact: true })).toBeVisible();
+    if (width > 400) await expect(page.getByRole('checkbox', { name: 'Mark checked sentences', exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    // Nothing was stored for the pairs.
+    await page.waitForTimeout(800);
+    expect((await workspace(page, s.assignment_id!)).segment_pairs).toBeNull();
+  });
+}
+
 test('screenshots for the pull request', async ({ browser }) => {
   test.skip(!process.env.SEGMENT_SHOTS, 'Only with SEGMENT_SHOTS=1.');
   const folder = resolve(test.info().config.rootDir, '../../build/segment-pairs'); mkdirSync(folder, { recursive: true });
