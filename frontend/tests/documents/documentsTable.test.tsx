@@ -393,11 +393,11 @@ describe("cells", () => {
     expect(css).toMatch(/\.waiting-more \{ flex: none; \}/);
   });
 
-  it("the robot icon does not cut the short state: the narrow cap is on the state, not the whole cell", () => {
+  it("no fixed cap cuts a status or Waiting on cell: the words follow the room (issue 544)", () => {
     const css = readFileSync(resolve(__dirname, "../../src/styles/screens/documents-table.css"), "utf8");
-    const narrow = css.slice(css.indexOf("@media (max-width: 1599px)"));
-    expect(narrow).toMatch(/\.documents-status-cell \{ max-width: none;/);
-    expect(narrow).toMatch(/\.documents-status\.stage-cell \{ max-width: 7\.5rem; \}/);
+    const rules = css.split("}").filter(rule => /\.documents-(status-cell|status\.stage-cell|waiting-on)\b[^{]*\{/.test(rule));
+    expect(rules.length).toBeGreaterThan(0);
+    for (const rule of rules) expect(rule, rule).not.toMatch(/max-width:\s*\d/);
   });
 
   it("at most one button per row and no +n", () => {

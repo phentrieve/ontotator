@@ -29,8 +29,9 @@ interface HistoryData { rows: RowSubmissionView[]; rounds: RowRoundView[]; final
 function ownRow(row: SubmissionHistorySummary, version: number, findings: number): RowSubmissionView {
   return {
     submission_id: row.submission_id, document_id: row.document_id, version, chain_name: null, author_label: row.author_label,
-    is_me: !!row.is_me, recorded_at: row.created_at, mode: row.mode, kind: row.mode === 'review' ? 'consolidation' : row.mode === 'proposal_check' ? 'proposal_check' : 'annotation',
-    round_id: row.round_id ?? null, round_ordinal: null, round_state: null, is_latest_in_round: null, finding_count: findings,
+    // Issue 547, U4-07: the round number and kind come from the server, by the rule of the lead's table.
+    is_me: !!row.is_me, recorded_at: row.created_at, mode: row.mode, kind: row.kind ?? (row.mode === 'review' ? 'consolidation' : row.mode === 'proposal_check' ? 'proposal_check' : 'annotation'),
+    round_id: row.round_id ?? null, round_ordinal: row.round_ordinal ?? null, round_state: null, is_latest_in_round: null, finding_count: findings,
     guideline_version: row.guideline_version ?? null, guideline_label: row.guideline_label ?? null, guideline_withdrawn: row.guideline_withdrawn,
   };
 }

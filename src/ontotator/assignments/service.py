@@ -60,6 +60,7 @@ from ontotator.authz.project_authority import (
 from ontotator.domain.annotation_modes import AnnotationMode, workspace_mode
 from ontotator.domain.errors import DomainError
 from ontotator.domain.next_steps import translations_accepted
+from ontotator.domain.translation_review import ReviewDecisionCode
 from ontotator.domain.variants import VariantInfo
 from ontotator.domain.workspace import WorkspaceMode
 from ontotator.projects.assignments import revoke_assignments
@@ -216,6 +217,30 @@ def query_answer_times(
     return {row.id: row.decided_at for row in rows}
 
 
+def submitted_review_decisions(
+    conn: Connection, assignment_ids: Sequence[int]
+) -> dict[int, ReviewDecisionCode]:
+    """The decision of each submitted translation review (issue 472): only
+    the task's current submission counts, as for ``query_answer_times``."""
+    if not assignment_ids:
+        return {}
+    from ontotator.storage.tables import TranslationReviewRow
+
+    rows = conn.execute(
+        select(AssignmentRow.id, TranslationReviewRow.decision)
+        .join(
+            TranslationReviewRow,
+            TranslationReviewRow.assignment_id == AssignmentRow.id,
+        )
+        .where(
+            AssignmentRow.id.in_(sorted(assignment_ids)),
+            AssignmentRow.last_submission_id
+            == func.concat("tr-", TranslationReviewRow.id),
+        )
+    )
+    return {row.id: cast(ReviewDecisionCode, row.decision) for row in rows}
+
+
 def latest_reopen(
     conn: Connection, assignment_id: int
 ) -> tuple[datetime, str | None] | None:
@@ -285,6 +310,9 @@ class TaskSummary:
     # A submitted translation review that asked a query: when the lead decided
     # it (issue 483; the answer is in the review's workspace); None otherwise.
     query_answered_at: datetime | None = None
+    # A submitted translation review: the reviewer's decision, so My tasks
+    # says more than "Submitted" (issue 472); None for other tasks.
+    review_decision: ReviewDecisionCode | None = None
     # R-26: a lead answered one of the owner's reports on this task since the
     # owner last opened it.
     report_answered: bool = False
@@ -466,6 +494,28 @@ def _paused(row: RowMapping) -> dict[str, Any]:
     values["pause_causes"] = tuple(pause_causes(values))
     del values["report_held"], values["lead_paused"]
     return values
+
+
+def _first_assigned(conn: Connection, rows: list[RowMapping]) -> dict[int, datetime]:
+    """Assignment id -> when the person was given the work, for each task a
+    typo fix made for a moved annotation (issue 543)."""
+    from ontotator.application.typo_fix_carry import typo_fix_moves
+
+    keys = {
+        r["project_key"]
+        for r in rows
+        if r["task"] == "annotate" and r["status"] == "submitted"
+    }
+    if not keys:
+        return {}
+    found: dict[int, datetime] = {}
+    for pid in conn.execute(
+        select(ProjectRow.id).where(ProjectRow.project_key.in_(keys))
+    ).scalars():
+        for move in typo_fix_moves(conn, int(pid)).values():
+            if move.first_assigned_at is not None:
+                found[move.assignment_id] = move.first_assigned_at
+    return found
 
 
 def _last_saves(
@@ -1722,14 +1772,13 @@ class AssignmentService:
                     if r["assignment_id"] in second_reviews
                 },
             )
-            query_answers = query_answer_times(
-                conn,
-                [
-                    r["assignment_id"]
-                    for r in rows
-                    if r["task"] == "translation_review" and r["status"] == "submitted"
-                ],
-            )
+            submitted_reviews = [
+                r["assignment_id"]
+                for r in rows
+                if r["task"] == "translation_review" and r["status"] == "submitted"
+            ]
+            query_answers = query_answer_times(conn, submitted_reviews)
+            review_decisions = submitted_review_decisions(conn, submitted_reviews)
             reports = {
                 r.report_id: r
                 for r in conn.execute(
@@ -1836,6 +1885,7 @@ class AssignmentService:
                         )
                     }
             saved = _last_saves(conn, user_id, [r["assignment_id"] for r in rows])
+            first_assigned = _first_assigned(conn, rows)
             result = []
             for row in rows:
                 source = target = None
@@ -1869,6 +1919,12 @@ class AssignmentService:
                                 row["updated_at"],
                                 saved.get(row["assignment_id"], row["updated_at"]),
                             ),
+                            # Issue 543: a task a typo fix made for the
+                            # person's annotation keeps the day they were
+                            # given the work.
+                            "assigned_at": first_assigned.get(
+                                row["assignment_id"], row["assigned_at"]
+                            ),
                         },
                         waiting_for_translation_review=waiting and not for_lead,
                         waiting_for_lead=waiting and for_lead,
@@ -1895,6 +1951,7 @@ class AssignmentService:
                         second_review_reason=second[1] if second else None,
                         second_review_additions=additions.get(row["assignment_id"]),
                         query_answered_at=query_answers.get(row["assignment_id"]),
+                        review_decision=review_decisions.get(row["assignment_id"]),
                     )
                 )
             return result

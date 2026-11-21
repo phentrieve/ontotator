@@ -45,7 +45,7 @@ export function menuPosition(trigger: { top: number; bottom: number; right: numb
 /**
  * Menu button pattern: Enter, Space, click or ArrowDown open the menu at the first item, ArrowUp at the last;
  * arrows (wrapping), Home and End move; Enter, Space or click choose; Escape closes; focus returns to the button.
- * Tab and a pointer down outside close the menu without moving focus.
+ * Tab, a pointer down outside and a navigation (the browser's Back) close the menu without moving focus.
  */
 export function MenuButton({ label, items, buttonLabel, icon, content, className, size = "sm" }: MenuButtonProps): JSX.Element {
   const [open, setOpen] = useState<null | "first" | "last">(null);
@@ -79,8 +79,16 @@ export function MenuButton({ label, items, buttonLabel, icon, content, className
       const target = event.target as Node;
       if (!menu.current?.contains(target) && !button.current?.contains(target)) setOpen(null);
     };
+    // The browser's Back and Forward change the page under the menu: it closes, as on a click elsewhere (issue 550, U5-04).
+    const onNavigation = () => setOpen(null);
     document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
+    window.addEventListener("hashchange", onNavigation);
+    window.addEventListener("popstate", onNavigation);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("hashchange", onNavigation);
+      window.removeEventListener("popstate", onNavigation);
+    };
   }, [open]);
 
   const close = () => { setOpen(null); button.current?.focus(); };

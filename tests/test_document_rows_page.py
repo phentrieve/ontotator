@@ -387,6 +387,8 @@ WORK_KEYS = {
     "waiting_for_translation_review",
     "waiting_for_lead",
     "correction_request",
+    "submitted_at",
+    "moved_by_typo_fix",
 }
 FINAL_KEYS = {
     "author",

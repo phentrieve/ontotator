@@ -3685,7 +3685,14 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const [findingShown, setFindingShown] = useState(false);
   if (!treeWalk && findingShown) setFindingShown(false);
   const treeShown = !!treeWalk && !treeCollapsed;
-  const findingBarShown = treeShown && treeHeight.low === "column" && !!treeWalkAnnotation;
+  // What the one-line bar names: the walk's own finding, else the proposal or reference the walk was opened from
+  // (issue 542: a proposal without a copy has no finding in the draft yet, but its tree needs the column as much).
+  const treeWalkSubject: AnnotationSnapshot | null = treeWalkAnnotation
+    ?? (treeWalk && treeContext?.key === treeWalk.key
+      ? (treeContext.key.startsWith("target:") ? targetSnapshot ?? null
+        : treeContext.key.startsWith("source:") ? selectedSource ?? null : null)
+      : null);
+  const findingBarShown = treeShown && treeHeight.low === "column" && !!treeWalkSubject;
   const panelGivenToTree: "column" | "beside" | null = !treeShown ? null
     : treeHeight.low === "beside" ? "beside" : findingBarShown && !findingShown ? "column" : null;
   panelGivenToTreeRef.current = panelGivenToTree !== null;
@@ -4479,11 +4486,11 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
         {/* Right: Annotation & Search Panel + Review Actions */}
         <div className="inspector-pane density-compact" ref={inspectorRef}>
           {/* A low window with the tree open (issue 521): the finding in one line, and the way back to the whole panel. */}
-          {findingBarShown && treeWalkAnnotation && <div className="finding-bar" role="group" aria-label="Finding">
+          {findingBarShown && treeWalkSubject && <div className="finding-bar" role="group" aria-label="Finding">
             <p className="finding-bar__summary">
-              <span className="finding-bar__quote">{firstQuote(treeWalkAnnotation) ? `“${firstQuote(treeWalkAnnotation)}”` : "No text span"}</span>
-              <span className="finding-bar__term"><TermName termId={treeWalkAnnotation.annotation.term_id}
-                label={termLabel(treeWalkAnnotation.annotation.layer_id, treeWalkAnnotation.annotation.term_id)} /></span>
+              <span className="finding-bar__quote">{firstQuote(treeWalkSubject) ? `“${firstQuote(treeWalkSubject)}”` : "No text span"}</span>
+              <span className="finding-bar__term"><TermName termId={treeWalkSubject.annotation.term_id}
+                label={termLabel(treeWalkSubject.annotation.layer_id, treeWalkSubject.annotation.term_id)} /></span>
             </p>
             <Button ref={findingToggleRef} size="sm" aria-expanded={findingShown} onClick={() => setFindingShown(shown => !shown)}>
               {findingShown ? "Hide finding" : "Show finding"}

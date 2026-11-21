@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Ontotator Local API",
-    "version": "0.11.0"
+    "version": "0.12.0"
   },
   "paths": {
     "/api/v1/me/tasks": {
@@ -21515,6 +21515,10 @@
             "type": "integer",
             "title": "Kept Automatically"
           },
+          "moved_by_typo_fix": {
+            "type": "boolean",
+            "title": "Moved By Typo Fix"
+          },
           "eligible": {
             "type": "boolean",
             "title": "Eligible",
@@ -31205,6 +31209,10 @@
           "kept_automatically": {
             "type": "integer",
             "title": "Kept Automatically"
+          },
+          "moved_by_typo_fix": {
+            "type": "boolean",
+            "title": "Moved By Typo Fix"
           }
         },
         "additionalProperties": false,
@@ -32781,6 +32789,34 @@
             ],
             "title": "Round Id"
           },
+          "round_ordinal": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Round Ordinal"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "consolidation",
+                  "carry_forward",
+                  "annotation",
+                  "proposal_check"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
           "guideline_version": {
             "anyOf": [
               {
@@ -33254,6 +33290,23 @@
               }
             ],
             "title": "Query Answered At"
+          },
+          "review_decision": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "accepted_unchanged",
+                  "accepted_corrected",
+                  "query",
+                  "rejected"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Decision"
           },
           "report_answered": {
             "type": "boolean",
@@ -35518,6 +35571,66 @@
         "title": "TreeTermDetail",
         "description": "What the detail pane shows for the selected node."
       },
+      "TypoFixMoveView": {
+        "properties": {
+          "submission_id": {
+            "type": "string",
+            "title": "Submission Id"
+          },
+          "from_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Version"
+          },
+          "moved_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Moved At"
+          },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Submitted At"
+          },
+          "assigned_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned At"
+          },
+          "assigned_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MemberRefView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "submission_id",
+          "moved_at",
+          "submitted_at"
+        ],
+        "title": "TypoFixMoveView",
+        "description": "The annotation a typo fix moved to this task's version by itself\n(issue 543): the copy it made, the version it came from, and the\nperson's own work (when they were given it and submitted it)."
+      },
       "TypographyHintView": {
         "properties": {
           "rule": {
@@ -37454,6 +37567,28 @@
                 "type": "null"
               }
             ]
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At"
+          },
+          "moved_by_typo_fix": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TypoFixMoveView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -37672,6 +37807,10 @@
               }
             ],
             "title": "Document Version"
+          },
+          "moved_by_typo_fix": {
+            "type": "boolean",
+            "title": "Moved By Typo Fix"
           }
         },
         "additionalProperties": false,

@@ -99,13 +99,14 @@ const NARROW_STATES: readonly (readonly [RegExp, string])[] = [
   [/^not reviewed, optional$/, "not reviewed"],
   [/^(?:Final is|In progress|Submitted|Finishing) on old text$/, "on old text"],
   [/^Submitted on (v\d+)$/, "$1 submitted"],
+  [/^\d+ on v\d+, (\d+) waiting on (v\d+)$/, "$1 left on $2"],
   [/^Finishing on (v\d+)$/, "finishing $1"],
   [/^ready to compare$/, "to compare"],
   // What changed ("newer result", "text corrected") stays in the title.
   [/^Check changes, .+$/, "Check changes"],
   [/^consolidating \(.+\)$/, "consolidating"],
-  // The ⏸ glyph (and the row's "Paused by lead" badge) says the pause where "· paused" would be cut.
-  [/^consolidating · paused(?: \(.+\))?$/, "consolidating"],
+  // The pause stays in words beside the pause icon (issue 549); "consolidating" and the progress go to the title.
+  [/^consolidating · paused(?: \(.+\))?$/, "paused"],
 ];
 
 /** The narrow table's short state (`NARROW_STATES`); null when the state fits as it is. */
@@ -247,6 +248,11 @@ function annotationText(cell: StageCellView): StageText {
       // Issue 414: work from proposals waits until the new version has its own proposals.
       if (detail.note === "no_target_proposals") {
         return { symbol: "○", word: `${version(detail.from_version) ?? "Old"} work waits`, detail: join(people, `${version(detail.version) ?? "the new text"} has no proposals yet`) };
+      }
+      // Issue 543: some annotations are on the new version already (moved by a typo fix, or carried).
+      if (detail.submitted) {
+        const waiting = detail.people?.length ?? 0;
+        return { symbol: "⚠", word: `${detail.submitted} on ${version(detail.version) ?? "new text"}, ${waiting} waiting on ${version(detail.from_version) ?? "old text"}`, detail: people };
       }
       return { symbol: "⚠", word: `Submitted on ${version(detail.from_version) ?? "old text"}`, detail: join(people, `${version(detail.version) ?? "new text"} not annotated`) };
     case "finishing_on_old":

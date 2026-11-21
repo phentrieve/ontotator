@@ -7188,6 +7188,8 @@ export interface components {
             guideline_withdrawn: boolean;
             /** Kept Automatically */
             kept_automatically?: number;
+            /** Moved By Typo Fix */
+            moved_by_typo_fix?: boolean;
             /**
              * Eligible
              * @default true
@@ -10735,6 +10737,8 @@ export interface components {
             guideline_withdrawn: boolean;
             /** Kept Automatically */
             kept_automatically?: number;
+            /** Moved By Typo Fix */
+            moved_by_typo_fix?: boolean;
         };
         /** RowSubmissions */
         RowSubmissions: {
@@ -11300,6 +11304,10 @@ export interface components {
             mode: string;
             /** Round Id */
             round_id?: string | null;
+            /** Round Ordinal */
+            round_ordinal?: number | null;
+            /** Kind */
+            kind?: ("consolidation" | "carry_forward" | "annotation" | "proposal_check") | null;
             /** Guideline Version */
             guideline_version?: number | null;
             /** Guideline Label */
@@ -11449,6 +11457,8 @@ export interface components {
             second_review_additions?: components["schemas"]["ReasonAddition"][] | null;
             /** Query Answered At */
             query_answered_at?: string | null;
+            /** Review Decision */
+            review_decision?: ("accepted_unchanged" | "accepted_corrected" | "query" | "rejected") | null;
             /**
              * Report Answered
              * @default false
@@ -12252,6 +12262,31 @@ export interface components {
             /** External Url */
             external_url?: string | null;
         };
+        /**
+         * TypoFixMoveView
+         * @description The annotation a typo fix moved to this task's version by itself
+         *     (issue 543): the copy it made, the version it came from, and the
+         *     person's own work (when they were given it and submitted it).
+         */
+        TypoFixMoveView: {
+            /** Submission Id */
+            submission_id: string;
+            /** From Version */
+            from_version?: number | null;
+            /**
+             * Moved At
+             * Format: date-time
+             */
+            moved_at: string;
+            /**
+             * Submitted At
+             * Format: date-time
+             */
+            submitted_at: string;
+            /** Assigned At */
+            assigned_at?: string | null;
+            assigned_by?: components["schemas"]["MemberRefView"] | null;
+        };
         /** TypographyHintView */
         TypographyHintView: {
             /**
@@ -12914,6 +12949,9 @@ export interface components {
              */
             waiting_for_lead: boolean;
             correction_request?: components["schemas"]["CorrectionRequestView"] | null;
+            /** Submitted At */
+            submitted_at?: string | null;
+            moved_by_typo_fix?: components["schemas"]["TypoFixMoveView"] | null;
         };
         /** WorkRoundView */
         WorkRoundView: {
@@ -12976,6 +13014,8 @@ export interface components {
             document_language?: string | null;
             /** Document Version */
             document_version?: number | null;
+            /** Moved By Typo Fix */
+            moved_by_typo_fix?: boolean;
         };
         /** WorkTimeItemRequest */
         WorkTimeItemRequest: {

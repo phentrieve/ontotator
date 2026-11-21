@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api, ApiError, type EditorialCorrectionPreview, type EditorialCorrectionResult, type VariantText } from "../../src/api/client";
-import { CARRY_REASONS, editorialConsequences, EditorialCorrectionDialog, editorialRefusal, numberNotice, PREVIEW_DELAY_MS, reasonText } from "../../src/documents/EditorialCorrectionDialog";
+import { CARRY_REASONS, editorialConsequences, EditorialCorrectionDialog, editorialRefusal, numberNotice, PREVIEW_DELAY_MS, reasonText, reviewNote } from "../../src/documents/EditorialCorrectionDialog";
 import { planRow, stepOf, version } from "./fixtures";
 
 const v2 = version({ document_id: "case-0101-de-v2", version: 2, chain_name: "DeepL", origin: "correction", derived_from: "case-0101-de", translation_status: "accepted" });
@@ -24,7 +24,7 @@ function preview(overrides: Partial<EditorialCorrectionPreview> = {}): Editorial
 const checkedPreview = (text: string, overrides: Partial<EditorialCorrectionPreview> = {}) => preview({
   text, previous_text: OLD, new_text_sha256: "sha-v3", inserted_characters: 0, deleted_characters: 1, changed_characters: 1, number_changes: [],
   diff: [{ old_start: 29, old_end: 30, new_start: 29, new_end: 29, old_text: " ", new_text: "" }],
-  findings: { submitted: 0, needs_check: 0 }, proposals: { sets: 0, carried: 0, needs_check: 0 }, ...overrides,
+  findings: { submitted: 0, needs_check: 0 }, proposals: { sets: 0, carried: 0, needs_check: 0 }, annotation_carry: [], ...overrides,
 });
 
 beforeEach(() => {
@@ -58,8 +58,10 @@ it("one page: edit the text, see the changes below it, choose the reason by clic
   expect(within(dialog).queryByRole("region", { name: "Text changes" })).toBeNull();
   expect(within(dialog).queryByRole("button", { name: "Check changes" })).toBeNull();
   // Quiet: nothing on v2, one plain sentence and no highlighted block.
-  expect(within(dialog).getByText("Nobody has worked on v2 yet.")).toBeTruthy();
+  expect(within(dialog).getByText("Nobody has annotated v2 yet.")).toBeTruthy();
   expect(within(dialog).queryByText("Work stays on v2")).toBeNull();
+  // Not reviewed: nothing about a review.
+  expect(within(dialog).queryByText(/translation review stays/)).toBeNull();
   expect(within(dialog).getByText("v3 keeps the status of v2: Accepted. No translation review is started.")).toBeTruthy();
   const save = within(dialog).getByRole("button", { name: "Save as v3" });
   fireEvent.click(save);
@@ -139,10 +141,19 @@ it("keeps the status of a rejected version", async () => {
   const rejected = version({ document_id: "case-0101-de-v2", version: 2, chain_name: "DeepL", origin: "correction", derived_from: "case-0101-de", translation_status: "reviewed", latest_review_decision: "rejected" });
   const { props, dialog, editor } = await renderDialog(rejected);
   expect(within(dialog).getByText("v3 keeps the status of v2: Rejected in review. No translation review is started.")).toBeTruthy();
+  // Issue 547, U2-06: the review is not "nobody worked on it"; it stays with the version it reviewed, and v3 needs its own.
+  expect(within(dialog).getByText("Nobody has annotated v2 yet.")).toBeTruthy();
+  expect(within(dialog).getByText("A submitted translation review stays with the version it reviewed. To have v3 reviewed, use Resolve… › Assign a new review… on this row after saving.")).toBeTruthy();
   fireEvent.change(editor, { target: { value: NEW } });
   fireEvent.click(within(dialog).getByRole("button", { name: "Grammar" }));
   fireEvent.click(within(dialog).getByRole("button", { name: "Save as v3" }));
   await waitFor(() => expect(props.onCorrected).toHaveBeenCalledWith("Typos fixed: v3 of case-0101 de saved. It stays Rejected in review."));
+});
+
+it("names a submitted review by what happens to it (issue 547, U2-06)", () => {
+  expect(reviewNote(null, 3)).toBeNull();
+  expect(reviewNote("accepted", 3)).toBe("A submitted translation review stays with the version it reviewed.");
+  expect(reviewNote("query", 3)).toBe("A submitted translation review stays with the version it reviewed. To have v3 reviewed, use Resolve… › Assign a new review… on this row after saving.");
 });
 
 it("says in words why a version cannot be corrected, without the editor", async () => {
@@ -171,35 +182,43 @@ it("shows a refusal at saving in place", async () => {
 
 it("consequences: quiet unless work stays on the version", async () => {
   // Nothing to do afterwards: plain sentences, no block.
-  expect(editorialConsequences(checkedPreview(NEW))).toEqual({ attention: false, lines: ["Nobody has worked on v2 yet."] });
-  expect(editorialConsequences(checkedPreview(NEW, { annotations: { submitted: 0, open: 2 }, tasks_following: 2 }))).toEqual({ attention: false, lines: ["2 waiting tasks continue on v3."] });
+  expect(editorialConsequences(checkedPreview(NEW))).toEqual({ attention: false, moving: [], lines: ["Nobody has annotated v2 yet."] });
+  expect(editorialConsequences(checkedPreview(NEW, { annotations: { submitted: 0, open: 2 }, tasks_following: 2 }))).toEqual({ attention: false, moving: ["2 waiting tasks continue on v3."], lines: [] });
   expect(editorialConsequences(checkedPreview(NEW, { annotations: { submitted: 0, open: 1 }, tasks_following: 1, proposals: { sets: 1, carried: 3, needs_check: 1 } })))
-    .toEqual({ attention: false, lines: ["1 waiting task continues on v3.", "Tool proposals move to v3; 1 marks words you changed and waits for a check."] });
+    .toEqual({ attention: false, moving: ["1 waiting task continues on v3.", "Tool proposals move to v3; 1 marks words you changed and waits for a check."], lines: [] });
   // Started or submitted work stays: what stays and what to do next.
   expect(editorialConsequences(checkedPreview(NEW, {
     annotations: { submitted: 2, open: 3 }, tasks_following: 2, open_consolidations: 1, final_result: true,
     findings: { submitted: 7, needs_check: 1 }, proposals: { sets: 1, carried: 5, needs_check: 0 },
-  }))).toEqual({ attention: true, lines: [
+  }))).toEqual({ attention: true, moving: ["2 waiting tasks continue on v3.", "Tool proposals move to v3."], lines: [
     "3 annotations stay on v2. After saving, use Handle text change… and Carry to v3… on this row to move them.",
     "1 open consolidation and the final result stay on v2 as well.",
     "1 of 7 findings marks words you changed and will need a check when moved.",
-    "2 waiting tasks continue on v3.",
-    "Tool proposals move to v3.",
   ] });
   // With "annotate accepted translations only": an unaccepted correction waits for its acceptance.
   const waiting = { annotate_accepted_only: true, annotations: { submitted: 1, open: 0 } };
   expect(editorialConsequences(checkedPreview(NEW, waiting)).lines).toEqual(["1 annotation stays on v2. After saving, use Carry to v3… on this row to move it."]);
   expect(editorialConsequences(checkedPreview(NEW, { ...waiting, translation_status: "ready_for_review" })).lines)
     .toEqual(["1 annotation stays on v2. Once v3 is accepted, use Carry to v3… on this row to move it."]);
-  expect(editorialConsequences(checkedPreview(NEW, { final_result: true }))).toEqual({ attention: true, lines: ["The final result stays on v2."] });
+  expect(editorialConsequences(checkedPreview(NEW, { final_result: true }))).toEqual({ attention: true, moving: [], lines: ["The final result stays on v2."] });
 
-  vi.mocked(api.previewEditorialCorrection).mockImplementation(async (_key, _id, text) => (text === undefined ? preview({ annotations: { submitted: 1, open: 1 }, tasks_following: 1 })
-    : checkedPreview(text, { annotations: { submitted: 1, open: 1 }, tasks_following: 1 })));
+  vi.mocked(api.previewEditorialCorrection).mockImplementation(async (_key, _id, text) => (text === undefined ? preview({ annotations: { submitted: 1, open: 2 }, tasks_following: 1 })
+    : checkedPreview(text, { annotations: { submitted: 1, open: 2 }, tasks_following: 1 })));
   const { dialog } = await renderDialog();
-  // The highlighted block, already when the dialog opens.
-  expect(await within(dialog).findByText("Work stays on v2")).toBeTruthy();
-  expect(within(dialog).getByText(/1 annotation stays on v2\. After saving, use Carry to v3… on this row to move it\./)).toBeTruthy();
+  // The highlighted block, already when the dialog opens: the started task stays; what moves stands outside it.
+  const block = (await within(dialog).findByText("Work stays on v2")).closest(".notice")!;
+  expect(within(dialog).getByText(/1 annotation stays on v2\. After saving, use Handle text change… on this row to move it\./)).toBeTruthy();
+  expect(block.textContent).not.toContain("continues on v3");
   expect(within(dialog).getByText(/1 waiting task continues on v3\./)).toBeTruthy();
+});
+
+it("U4-04: before the text changes, a submitted annotation is not said to stay", () => {
+  // The preview without a text has no per-person carry yet.
+  expect(editorialConsequences(preview({ annotations: { submitted: 4, open: 0 } }))).toEqual({
+    attention: false,
+    moving: ["Once you change the text, this says which of the 4 submitted annotations move to v3 by themselves."],
+    lines: [],
+  });
 });
 
 it("has words for every refusal reason", () => {
@@ -218,15 +237,16 @@ it("consequences: says per person whose submitted annotation moves by itself and
   // Both move: nothing stays, so the line is quiet.
   expect(editorialConsequences(checkedPreview(NEW, {
     annotations: { submitted: 2, open: 0 }, annotation_carry: [person("Ana Weber", true), person("Tom Reis", true)],
-  }))).toEqual({ attention: false, lines: ["Move to v3 by themselves, nobody submits again: the annotations of Ana Weber and Tom Reis."] });
+  }))).toEqual({ attention: false, moving: ["Move to v3 by themselves, nobody submits again: the annotations of Ana Weber and Tom Reis."], lines: [] });
   // One moves; one stays because a finding needs a check, one because the text has a final result; a started task stays.
   const mixed = editorialConsequences(checkedPreview(NEW, {
     annotations: { submitted: 3, open: 1 },
     annotation_carry: [person("Ana Weber", true), person("Eva Roth", false, "not_submitted", "started"), person("Luc Bauer", false, "findings_need_check"), person("Tom Reis", false, "findings_need_check")],
   }));
   expect(mixed.attention).toBe(true);
+  // U4-04: who moves stands outside the block "Work stays on v2"; the block names only what stays.
+  expect(mixed.moving).toEqual(["Moves to v3 by itself, nobody submits again: the annotation of Ana Weber."]);
   expect(mixed.lines).toEqual([
-    "Moves to v3 by itself, nobody submits again: the annotation of Ana Weber.",
     "Not moved by themselves, a finding marks words you changed: Luc Bauer and Tom Reis.",
     "3 annotations stay on v2. After saving, use Handle text change… and Carry to v3… on this row to move them.",
   ]);

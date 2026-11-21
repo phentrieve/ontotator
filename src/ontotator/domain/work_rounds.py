@@ -279,11 +279,15 @@ class WorkRoundView(BaseModel):
     source_submission_recorded_at: datetime | None = None
     document_language: str | None = None
     document_version: int | None = None
+    # Issue 543: the round a typo fix made when the person's submitted
+    # annotation moved to this version by itself (nobody checked anything).
+    moved_by_typo_fix: bool = Field(default_factory=bool)
 
     # The API-only facts above; package archives leave them out, so older
     # readers (extra="forbid") still accept archived workflow history.
     NOT_ARCHIVED: ClassVar[frozenset[str]] = frozenset(
         {
+            "moved_by_typo_fix",
             "round_ordinal",
             "created_at",
             "submission_count",

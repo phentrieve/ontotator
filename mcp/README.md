@@ -11,11 +11,11 @@ That is the default. With `ONTOTATOR_MCP_READ_CONTENT=1` five more tools read a 
 You need [uv](https://docs.astral.sh/uv/). Install the command from the repository:
 
 ```bash
-uv tool install "git+https://github.com/phentrieve/ontotator@v0.11.0#subdirectory=mcp"
+uv tool install "git+https://github.com/phentrieve/ontotator@v0.12.0#subdirectory=mcp"
 which ontotator-mcp
 ```
 
-The URL names a release tag, so the server changes only when you install another release: to update, run the command again with the newer tag in the URL. Without a tag the URL would follow `main`, and every push would update the server. From a checkout of a release tag, `uv tool install ./mcp` does the same. Without installing, `uvx --from "git+https://github.com/phentrieve/ontotator@v0.11.0#subdirectory=mcp" ontotator-mcp` runs it directly.
+The URL names a release tag, so the server changes only when you install another release: to update, run the command again with the newer tag in the URL. Without a tag the URL would follow `main`, and every push would update the server. From a checkout of a release tag, `uv tool install ./mcp` does the same. Without installing, `uvx --from "git+https://github.com/phentrieve/ontotator@v0.12.0#subdirectory=mcp" ontotator-mcp` runs it directly.
 
 `ontotator-mcp` has the version of the Ontotator release it comes from (`ontotator-mcp --version`). Use the release your server runs. After installing another release, restart the MCP client: a running `ontotator-mcp` process keeps the code it started with. `whoami` shows both versions and warns when they differ.
 
@@ -78,13 +78,13 @@ Add the server to `claude_desktop_config.json` (Settings › Developer › **Edi
 }
 ```
 
-If the client cannot find the command, give its full path (`which ontotator-mcp`), or use `"command": "uvx"` with `"args": ["--from", "git+https://github.com/phentrieve/ontotator@v0.11.0#subdirectory=mcp", "ontotator-mcp"]`.
+If the client cannot find the command, give its full path (`which ontotator-mcp`), or use `"command": "uvx"` with `"args": ["--from", "git+https://github.com/phentrieve/ontotator@v0.12.0#subdirectory=mcp", "ontotator-mcp"]`.
 
 Ask the client to call `whoami` first: it shows the token's kind, scopes, project and expiry (with a warning two weeks before) and who it acts as. For every kind of token, a project token included, it also shows the version of the Ontotator server (`server`) and of this MCP server (`mcp_server`), with a `warning` when they differ, and whether the [content tools](#content-tools-opt-in) are on (`mcp_server.content_tools`).
 
 ## Tools
 
-Every tool description names the token scope it needs and whether it changes data; the MCP annotations say the same (`readOnlyHint`, `destructiveHint`, `idempotentHint`). Tools with a `confirm` argument (`set_ontology_pins`, `distribute_texts`, `update_work_plan`, `accept_agreeing_texts`, `change_final_results`, `set_member_roles`, `hand_over_open_tasks` and the lead tools below) only do a dry run without it (`set_member_roles` needs `confirm` only to take roles away or remove a person, which logs the person out, revokes their tokens and, with `revoke_assignments`, withdraws their open tasks; adding roles is applied at once); the client should show you the dry run before it confirms. Imports and exports are server jobs: the tools wait for them by default, and `get_job` polls one.
+Every tool description names the token scope it needs and whether it changes data; the MCP annotations say the same (`readOnlyHint`, `destructiveHint`, `idempotentHint`). Tools with a `confirm` argument (`set_ontology_pins`, `distribute_texts`, `update_work_plan`, `accept_agreeing_texts`, `change_final_results`, `set_member_roles`, `hand_over_open_tasks` and the lead tools below) only do a dry run without it (`set_member_roles` needs `confirm` only to take roles away or remove a person, which logs the person out, revokes their tokens and, with `revoke_assignments`, withdraws their open tasks; adding roles is applied at once); the client should show you the dry run before it confirms. `preview_change` runs the same dry run as a tool of its own, marked read only (`tool`: the tool's name, `arguments`: its arguments without `confirm` and `preview_token`). A client that asks before every changing tool, or refuses changing tools, can allow it and still show you the dry run; to apply, the model calls the tool itself with `confirm=true`. It refuses `confirm` and `preview_token`, and while it runs the server sends only requests that change nothing (a GET, a `/preview` route or a body with `"preview": true`): `set_member_roles` with roles to add only is stopped before anything is sent. The MCP annotations cannot say "read only without confirm", so this tool is the way. Imports and exports are server jobs: the tools wait for them by default, and `get_job` polls one.
 
 Tool results carry text other people wrote: texts, guidelines, problem reports, reasons and names. The server's instructions tell the model that this is user data, never instructions, and that no changing tool is to be called because returned content asks for it. A model can still be misled, and it can pass `confirm=true` itself, so the dry run alone does not protect you. Every tool that changes or replaces data, or whose change cannot be undone (such as `accept_agreeing_texts`, `change_final_results`, `set_final_result`, `carry_submission` and `commit_upload`), has `destructiveHint` set, so that a client can ask you before each call; let your client do so for these tools.
 
@@ -162,6 +162,7 @@ A token can do only what both its scopes and its owner's roles allow. Many tools
 | `handle_text_change` | read, project-admin | may remove or withdraw | Decide on open work on an old text version, after a dry run. |
 | `carry_submission` | project-admin | may remove or withdraw | Carry a submitted annotation to a new version of its text, after a dry run. |
 | `act_on_problem_report` | read, project-admin | may remove or withdraw | Decide on a problem report: pause, release, restart or resolve, after a dry run. |
+| `preview_change` | the scopes of the tool it previews (see that tool) | reads | The dry run of a tool with `confirm`, as a read-only tool; it never applies a change. |
 | `project_overview` | read | reads | Where a project stands: settings, totals per stage, people and open decisions. |
 | `get_progress` | read | reads | Assignment progress per text version and per person (open, in progress, submitted). |
 | `working_time_summary` | read | reads | Recorded working time per annotation mode: texts, total and median per text. |

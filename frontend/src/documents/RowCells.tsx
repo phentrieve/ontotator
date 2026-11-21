@@ -10,7 +10,7 @@ import { plural } from "../app/labels";
 import { kindLabels, type SubmissionKind } from "../app/submissionLabels";
 import { Time } from "../app/Time";
 import { routeHref, type PanelStage, type ProjectDocumentsQuery, type Route } from "../app/router";
-import { IconBot, IconBotOff } from "../ui/icons";
+import { IconBot, IconBotOff, IconPause, IconPilcrow } from "../ui/icons";
 import { onSpaceActivate } from "../ui/spaceActivates";
 import { StatusBadge } from "../ui/StatusBadge";
 import {
@@ -193,17 +193,25 @@ export function VersionMarker({ row }: { row: DocumentRowView }): JSX.Element | 
   return <span className="documents-version-marker" title={title || undefined}>{text}</span>;
 }
 
-/** "Paused by lead" on a text a lead paused (issue 464); the title says who, when and why. */
+/**
+ * "Paused by lead" on a text a lead paused (issue 464); the title says who, when and why. A table short of room shows
+ * the pause icon alone, with the words for screen readers (issue 544, tableFit.ts).
+ */
 export function LeadPausedBadge({ row }: { row: Pick<DocumentRowView, "lead_pause"> }): JSX.Element | null {
   if (!row.lead_pause) return null;
-  return <span className="documents-lead-paused" title={leadPauseLine(row.lead_pause)}><StatusBadge tone="warning">Paused by lead</StatusBadge></span>;
+  return <span className="documents-lead-paused documents-flag" title={leadPauseLine(row.lead_pause)}><StatusBadge tone="warning">
+    <IconPause className="documents-flag-icon" /><span className="documents-flag-label">Paused by lead</span></StatusBadge></span>;
 }
 
-/** "Typography hints" on a text whose newest version has spacing errors or invisible characters (issue 484); the title says how many. */
+/**
+ * "Typography hints" on a text whose newest version has spacing errors or invisible characters (issue 484); the title
+ * says how many. A table short of room shows a pilcrow icon alone, with the words for screen readers (issue 544).
+ */
 export function TypographyHintsBadge({ row }: { row: Pick<DocumentRowView, "typography_hints"> }): JSX.Element | null {
   const count = row.typography_hints ?? 0;
   if (count === 0) return null;
-  return <span className="documents-typography-hints" title={typographyHintsTitle(count)}><StatusBadge tone="neutral">Typography hints</StatusBadge></span>;
+  return <span className="documents-typography-hints documents-flag" title={typographyHintsTitle(count)}><StatusBadge tone="neutral">
+    <IconPilcrow className="documents-flag-icon" /><span className="documents-flag-label">Typography hints</span></StatusBadge></span>;
 }
 
 /** Small info badge "NEW"; accessible text "New since your last visit". */
@@ -244,6 +252,8 @@ export function RowHeaderCell({ row, badge, onOpenCard, showCaseId = false, more
   const nameContent = <>{caseId}<span className="documents-language"><LanguageFlag code={row.language} />{row.language}</span></>;
   return (
     <span className="documents-row-header documents-text-cell">
+      {/* Two groups: a table short of room puts the flags on a second line, never the name apart from its version. */}
+      <span className="documents-row-lead">
       {onOpenCard
         ? <button type="button" id={nameId} className="documents-text-name" aria-label={`Text ${row.case_id} ${row.language}`}
           aria-pressed={selected} aria-keyshortcuts="Enter" title="Click selects; Enter or double click opens the text card"
@@ -258,10 +268,13 @@ export function RowHeaderCell({ row, badge, onOpenCard, showCaseId = false, more
           <span className="visually-hidden">{`${more} more ${more === 1 ? "text" : "texts"} of this case not in plan`}</span></span>)}
       {sibling && <span className="visually-hidden">Same case as the open text</span>}
       <VersionMarker row={row} />
-      <LeadPausedBadge row={row} />
-      <TypographyHintsBadge row={row} />
-      {active && rowIsNew(row) && <NewBadge />}
-      {badge != null && badge !== false && <span className="documents-row-badge">{badge}</span>}
+      </span>
+      <span className="documents-row-flags">
+        <LeadPausedBadge row={row} />
+        <TypographyHintsBadge row={row} />
+        {active && rowIsNew(row) && <NewBadge />}
+        {badge != null && badge !== false && <span className="documents-row-badge">{badge}</span>}
+      </span>
     </span>
   );
 }
@@ -317,7 +330,7 @@ function rowStageGlyph(row: DocumentRowView, stage: StageName, state: string): {
   const annotation = row.stages?.annotation;
   if (annotation?.state === "consolidating") {
     const { submitted, total } = annotation.detail;
-    // A paused consolidation: "⏸ consolidating · paused", waiting under a lead pause, the lead's decision under a report.
+    // A paused consolidation: "consolidating · paused" after the pause icon, waiting under a lead pause, the lead's decision under a report.
     if (stage === "final") return annotation.detail.note === "lead_pause" || annotation.detail.note === "report_pause" ? { symbol: "⏸", tone: annotation.tone } : { symbol: "◐", tone: "running" };
     if (stage === "annotation" && (submitted == null || total == null || submitted >= total)) return { symbol: "✓", tone: "done" };
   }
@@ -354,7 +367,7 @@ export function RowStageCell({ row, stage }: { row: DocumentRowView; stage: Stag
   // Below 1600 px (issues 248, 279) a shorter state where the full one would be cut.
   const narrow = roomNarrowState(row, stage) ?? narrowStageState(state);
   const className = ["documents-status", "stage-cell", `stage-cell--${tone}`, !isActiveRow(row) && "stage-cell--muted"].filter(Boolean).join(" ");
-  return <span className="documents-status-cell">
+  return <span className="documents-status-cell" data-stage={stage}>
     <span className={className} title={full}>
       {symbol && <><StageSymbol symbol={symbol} />{" "}</>}
       {narrow ? <span className="stage-state-wide">{state}</span> : state}
@@ -369,13 +382,13 @@ export function RowStageCell({ row, stage }: { row: DocumentRowView; stage: Stag
 /** Waiting on: "You" (strong), a person, up to two names and "+n" with the full list (VD8), or "—". */
 export function WaitingOnCell({ row }: { row: DocumentRowView }): JSX.Element {
   const { text, title, you, narrow } = waitingOnText(row);
-  if (you) return <strong className="documents-waiting-on">{text}</strong>;
-  if (!title || title === text) return <span className="documents-waiting-on">{text}</span>;
+  if (you) return <strong className="documents-waiting-on" data-stage="waiting">{text}</strong>;
+  if (!title || title === text) return <span className="documents-waiting-on" data-stage="waiting">{text}</span>;
   // The narrow form ends in " +n": the name alone is cut with an ellipsis, so "+n" stays visible.
   const more = narrow ? narrow.lastIndexOf(" +") : -1;
   const shown = narrow
     ? <><span aria-hidden="true" className="waiting-wide">{text}</span><span aria-hidden="true" className="waiting-narrow">
       <span className="waiting-name">{narrow.slice(0, more)}</span>{" "}<span className="waiting-more">{narrow.slice(more + 1)}</span></span></>
     : <span aria-hidden="true">{text}</span>;
-  return <span className="documents-waiting-on" title={title}>{shown}<span className="visually-hidden">{title}</span></span>;
+  return <span className="documents-waiting-on" data-stage="waiting" title={title}>{shown}<span className="visually-hidden">{title}</span></span>;
 }

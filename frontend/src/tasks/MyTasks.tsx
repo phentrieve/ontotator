@@ -3,9 +3,11 @@ import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { api, onSessionRestored, type ProjectSummary, type TaskSummary } from "../api/client";
 import { routeHref, type NavigateOptions, type Route, type TaskStatusTab } from "../app/router";
 import { ErrorNotice } from "../admin/ErrorNotice";
-import { assignmentStatusLabels, consolidationReasonText, formatDateTime, reopenNotice, roleLabels, taskLabels } from "../app/labels";
+import { assignmentStatusLabels, consolidationReasonText, reopenNotice, roleLabels, taskLabels } from "../app/labels";
+import { fullTimestamp } from "../app/submissionLabels";
+import { relativeDay } from "../app/assignedDate";
 import { taskText } from "../app/identity";
-import { failedChecksTitle } from "../translation/labels";
+import { decisionLabels, failedChecksTitle } from "../translation/labels";
 import { IconInfo, IconWarning } from "../ui/icons";
 import { Button, DataTable, EmptyState, InlineMessage, Popover, Select, StatusBadge, tabId, Tabs, useMediaQuery, type Column } from "../ui";
 import { LanguageText } from "../ui/LanguageTag";
@@ -27,6 +29,9 @@ export interface MyTasksProps {
   /** The signed-in user: the last chosen project filter is remembered per user in this browser (F22). */
   username?: string;
 }
+
+/** The decision of a submitted translation review, as My tasks shows it under the status. */
+export const reviewDecisionText = (decision: NonNullable<TaskSummary["review_decision"]>): string => `Your decision: ${decisionLabels[decision]}`;
 
 const projectFilterKey = (username: string) => `ontotator.myTasks.project.v1:${username}`;
 
@@ -223,11 +228,14 @@ export function MyTasks({ project, status, projects, onNavigate, username }: MyT
         if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
         event.preventDefault(); onNavigate(answerRoute(task, task.answered_report_id!));
       }}><StatusBadge tone="info">Answer to your report</StatusBadge></a> : <StatusBadge tone="info">Answer to your report</StatusBadge>)}
+      {/* Issue 472: a submitted translation review says what the reviewer decided, not only "Submitted". */}
+      {task.status === "submitted" && task.review_decision && <p className="cell-secondary">{reviewDecisionText(task.review_decision)}</p>}
       {task.query_answered_at && <StatusBadge tone="info">Answer from the lead</StatusBadge>}
       {task.held && pauseMarks(task).map(mark => <Fragment key={mark.cause}><StatusBadge tone="warning">{mark.badge}</StatusBadge><p className="task-hold-reason" title={mark.reason}>{mark.reason}</p></Fragment>)}
     </> },
     { id: "assigned", header: "Assigned", cell: task => <AssignedDate at={task.assigned_at} /> },
-    { id: "changed", header: "Last change", cell: task => <time dateTime={task.updated_at}>{formatDateTime(task.updated_at)}</time> },
+    // Issue 546: the rule of "assigned" in the same row ("today 15:53", "yesterday", "Mon", "14 Oct"); the full time in the title.
+    { id: "changed", header: "Last change", cell: task => <time dateTime={task.updated_at} title={fullTimestamp(task.updated_at)}>{relativeDay(new Date(task.updated_at), new Date())}</time> },
     { id: "open", header: "Action", cell: task => task.waiting_for_translation_review ? <span className="cell-secondary">Opens once a translation is accepted</span> : task.waiting_for_lead ? <span className="cell-secondary">The lead decides how it continues</span> : <a className="btn btn-secondary" href={routeHref({ name: "task", assignmentId: task.assignment_id })} onKeyDown={onSpaceActivate} onClick={event => {
       if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
       event.preventDefault(); onNavigate({ name: "task", assignmentId: task.assignment_id });

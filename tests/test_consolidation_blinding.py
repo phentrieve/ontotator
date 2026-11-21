@@ -137,3 +137,20 @@ def test_leads_keep_the_names(cons):
     own = cons.adj.get(url(cons.round.round_id)).json()
     assert own["annotators_hidden"] is True
     assert _leaks(env, own) == []
+
+
+def test_consolidator_history_names_rounds_as_the_lead_reads_them(cons):
+    """Issue 547 (U4-07): the text view of a consolidator who is not the lead
+    gives each submission the round number and kind of the lead's table."""
+    env = cons.env
+    history = cons.adj.get(f"{HISTORY}/submissions").json()
+    lead = env.lead.get("/api/v1/projects/proj/document-rows/c1/en/submissions")
+    assert lead.status_code == 200, lead.text
+    expected = {
+        row["submission_id"]: (row["round_ordinal"], row["kind"])
+        for row in lead.json()["submissions"]
+    }
+    assert {
+        row["submission_id"]: (row["round_ordinal"], row["kind"]) for row in history
+    } == {sid: expected[sid] for sid in ("sub-first-7c1", "sub-second-9d2")}
+    assert {row["kind"] for row in history} == {"annotation"}

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { api, type ProjectSettings } from "../api/client";
 import { personLabel } from "../app/identity";
-import { formatDateTime } from "../app/labels";
+import { formatTime } from "../app/submissionLabels";
 import { Button, ConfirmDialog } from "../ui";
 import { ErrorNotice } from "./ErrorNotice";
 import { SettingsCard } from "./SettingsCard";
@@ -63,14 +63,14 @@ export function FrozenTranslationsCard({ frozen, projectKey, onRefreshed }: Froz
     {frozen.files.length
       ? fileList(frozen.files, "Frozen translations")
       : <p className="settings-card-text">No translations: searches use the English names only.</p>}
-    {updated && <p className="settings-card-text">Translations updated on <time dateTime={updated.at}>{formatDateTime(updated.at)}</time>{byWhom(updated)}.</p>}
+    {updated && <p className="settings-card-text">Translations updated on <time dateTime={updated.at}>{formatTime(updated.at)}</time>{byWhom(updated)}.</p>}
     {notIncluded.length > 0 && <p className="settings-card-text">Uploaded later, not used here: {notIncluded.join(", ")}.</p>}
     {canRefresh && <div className="settings-section-actions">
       <Button onClick={() => { setError(undefined); setConfirming(true); }}>Use the newest translations</Button>
     </div>}
     {history.length > 0 && <details className="settings-advanced"><summary>Earlier translations ({history.length})</summary>
       <ul aria-label="Earlier translations" className="settings-card-list">{history.map(item => <li key={`${item.until}-${item.condition_ids.join("-")}`}>
-        Until <time dateTime={item.until}>{formatDateTime(item.until)}</time> ({item.reason === "refresh" ? "updated" : "ontology changed"}{byWhom(item)}): {item.files.length ? item.files.map(file => file.filename).join(", ") : "English names only"}
+        Until <time dateTime={item.until}>{formatTime(item.until)}</time> ({item.reason === "refresh" ? "updated" : "ontology changed"}{byWhom(item)}): {item.files.length ? item.files.map(file => file.filename).join(", ") : "English names only"}
       </li>)}</ul>
     </details>}
     <ConfirmDialog open={confirming} title="Use the newest translations?" confirmLabel="Use the newest translations" busy={busy}
