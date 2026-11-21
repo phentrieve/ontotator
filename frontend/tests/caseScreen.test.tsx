@@ -1776,6 +1776,22 @@ describe("CaseScreen integration", () => {
     expect(document.querySelector("[role=status].case-status")!.textContent).toMatch(/^Submitted /);
   });
 
+  it("names when the person submitted an annotation a typo fix moved (issue 575)", () => {
+    const view = structuredClone(sampleView);
+    const fixedAt = new Date(2026, 10, 20, 22, 7).toISOString(), submittedAt = new Date(2026, 10, 20, 22, 3).toISOString();
+    view.submissions = [{ format_version: "ontotator-submission/v2", origin_key: view.key, targets: view.targets!,
+      draft_revision: 1, snapshots: [], decisions: [], document_checked: true, created_at: fixedAt, submission_id: "sub-copy" }];
+    const rendered = render(<CaseScreen view={view} workspaceId="moved" onClose={vi.fn()} readOnly
+      roundSubmission={{ submissionId: "sub-copy", recordedAt: submittedAt }} />);
+    const status = () => document.querySelector("[role=status].case-status time")!;
+    expect(status().getAttribute("datetime")).toBe(submittedAt);
+    expect(status().textContent).toContain("22:03");
+    // Another submission than the round's latest keeps its own time.
+    rendered.rerender(<CaseScreen view={view} workspaceId="moved" onClose={vi.fn()} readOnly
+      roundSubmission={{ submissionId: "sub-other", recordedAt: submittedAt }} />);
+    expect(status().getAttribute("datetime")).toBe(fixedAt);
+  });
+
   it("labels every profile axis and opens a finding with the keyboard", () => {
     const view = withEditableFinding(structuredClone(sampleView));
     view.draft.annotations![0].annotation.axes_values = { assertion: null, experiencer: "other", temporality: "historical" };

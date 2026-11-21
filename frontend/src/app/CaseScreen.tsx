@@ -258,6 +258,11 @@ export interface CaseScreenProps {
   documentVersion?: number | null;
   /** `WorkRoundView.round_ordinal` of the open round; My submissions names it while it has no submission. */
   roundOrdinal?: number | null;
+  /**
+   * The round's latest submission with the time the server names for it: for an annotation a typo fix moved, when the
+   * person submitted (issue 575). The "Submitted" status shows that time while it is the shown submission.
+   */
+  roundSubmission?: { submissionId: string; recordedAt: string } | null;
   /** The working time control (issue 298), shown before the save status. */
   headerTimer?: React.ReactNode;
   /** Called whenever an edit is sent; the working time resumes on it. */
@@ -282,7 +287,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   onSubmitted,
   annotatorName,
   leaveGuardRef,
-  readOnly: serverReadOnly = false, routeLeaveRef, assignmentNavigation, onReadonlyRequired, versionContext, menuItems = [], userPseudonym, guidelineNotice, guidelines = null, held = false, holdReason, holdTitle, holdKept, onTaskHeld, saveBeforeReportRef, roundInputs = NO_ROUND_INPUTS, roundKind, roundActive = true, roundBadge, roundTitle, documentVersion, roundOrdinal, headerTimer, onEdit, changesSource,
+  readOnly: serverReadOnly = false, routeLeaveRef, assignmentNavigation, onReadonlyRequired, versionContext, menuItems = [], userPseudonym, guidelineNotice, guidelines = null, held = false, holdReason, holdTitle, holdKept, onTaskHeld, saveBeforeReportRef, roundInputs = NO_ROUND_INPUTS, roundKind, roundActive = true, roundBadge, roundTitle, documentVersion, roundOrdinal, roundSubmission, headerTimer, onEdit, changesSource,
 }) => {
   const versionIdentity = JSON.stringify([versionContext?.username, versionContext?.assignmentId, versionContext?.canBrowseVersions, workspaceId, view.key]);
   const [acceptedSubmission, setAcceptedSubmission] = useState<{ identity: string; value: Submission } | null>(null);
@@ -1543,7 +1548,9 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     deriveCarriedStates(carriedInputs, latestDraft.current.round_input_resolutions ?? [], latestDraft.current.annotations ?? [])
       .find(state => state.input.input_id === inputId);
   const carriedReadOnly: CarriedReadOnly = !readOnly ? false : display !== null ? "older" : held ? "paused" : "submitted";
-  const submittedAt = carriedReadOnly === "submitted" ? submissions.at(-1)?.created_at : undefined;
+  const lastSubmission = submissions.at(-1);
+  const submittedAt = carriedReadOnly !== "submitted" ? undefined
+    : lastSubmission && roundSubmission?.submissionId === lastSubmission.submission_id ? roundSubmission.recordedAt : lastSubmission?.created_at;
   const showCarriedOriginal = (state: CarriedState) =>
     setOriginalRoundInput(carriedInputs.find(input => input.input_id === state.input.input_id) ?? null);
 
