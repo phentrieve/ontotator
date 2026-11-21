@@ -230,7 +230,11 @@ You can also start from the text:
 2. The panel asks which finding it belongs to. Click the finding in the list or in the text. The nearest ones are listed under **Nearest in this sentence:**.
 3. If the modifier names the finding itself, choose the option to use it as the finding instead.
 
-To change a modifier later, open its row menu: **Link a text span…**, **Remove text span** or **Remove modifier**. A removal can be undone with **Undo** in the message or in the header.
+If the modifier's words lie inside the finding's text span, for example "severe" in "severe periorbital oedema", a box under **Modifiers** offers to take them out of the span. It shows the span now, with the words that go struck through, and the span after. Click **Exclude from span** to apply it; the finding then marks the remaining words, in two parts if the modifier was in the middle. Click **Keep span** to leave the span as it is. **Undo** in the message or in the header takes the change back.
+
+You can take up the offer later. When you open a finding and one of its modifiers still lies inside its span, that modifier's row shows a small link *In span · Exclude*. Click **Exclude**, or choose **Exclude from finding's span** in the row menu: the same box opens. There is no link and no menu item when the modifier covers the whole span, would cut a word in half, or the mention has imported negation cues. A tool proposal's span is never changed: once your change makes the copy, the offer is for the copy.
+
+To change a modifier later, open its row menu: **Link a text span…**, **Remove text span**, **Exclude from finding's span** or **Remove modifier**. A removal can be undone with **Undo** in the message or in the header.
 
 A tool proposal's modifiers change the same way while the proposal is open; see [Review tool proposals](#review-tool-proposals).
 
@@ -331,7 +335,7 @@ To see which passages the correction changed, tick **Show changes since** v1 abo
 
 ### After a typo fix by the lead
 
-When the lead fixes only spacing or a typo in a text you already submitted (**Fix typos…**), your annotation can move to the new version by itself: when every one of your findings is placed on the new text without doubt and no number in the text changed. You do nothing. In **My tasks** the text then shows its new version, for example *case-0465 de v2 corrected*, as **Submitted**, with the day you were assigned; the task on the old version is gone. **View** shows the corrected text with your findings, placed on it, and the round reads *Round 1, moved to v2 after a typo fix*; your findings are not shown as carried findings to check, as you checked nothing. **Show changes since** v1 shows what the lead changed. It is still your annotation: nothing was added or removed. If a finding marked words the lead changed, or a number changed, your annotation stays on the old version and the lead moves it the usual way; you then check the carried findings ([Review carried findings](#review-carried-findings)).
+When the lead fixes only spacing or a typo in a text you already submitted (**Fix typos…**), your annotation can move to the new version by itself: when every one of your findings is placed on the new text without doubt and no number in the text changed. You do nothing. In **My tasks** the text then shows its new version, for example *case-0465 de v2 corrected*, as **Submitted**, with the day you were assigned; the task on the old version is gone. The task keeps the time you submitted, in its *Submitted* status and in **My submissions**. **View** shows the corrected text with your findings, placed on it, and the round reads *Round 1, moved to v2 after a typo fix*; your findings are not shown as carried findings to check, as you checked nothing. **Show changes since** v1 shows what the lead changed. It is still your annotation: nothing was added or removed. If a finding marked words the lead changed, or a number changed, your annotation stays on the old version and the lead moves it the usual way; you then check the carried findings ([Review carried findings](#review-carried-findings)).
 
 ## Submit the text
 

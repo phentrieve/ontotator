@@ -86,8 +86,12 @@ function roundSuffixes(row: RowSubmissionView, rows: readonly RowSubmissionView[
   return suffixes;
 }
 
+/**
+ * Oldest first; equal times keep the server's order (issue 575): a copy a typo fix moved has the time the person
+ * submitted and stands right after their own submission, as in Finalization and the consolidation.
+ */
 const byRecorded = (left: RowSubmissionView, right: RowSubmissionView): number =>
-  left.recorded_at.localeCompare(right.recorded_at) || left.submission_id.localeCompare(right.submission_id);
+  Date.parse(left.recorded_at) - Date.parse(right.recorded_at);
 
 /** Rounds shown as muted "in progress, not submitted yet" lines (translation-review rounds are never listed by the API). */
 export function pendingRounds(rounds: readonly RowRoundView[]): RowRoundView[] {

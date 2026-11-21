@@ -214,8 +214,9 @@ class EditorialNumberChange(BaseModel):
 
 
 class EditorialFindings(BaseModel):
-    # Findings of the submitted annotations on the corrected version, and
-    # how many of them the text-change steps cannot place on the new text.
+    # Findings of the submitted annotations that stay on the corrected
+    # version (not of those that move by themselves, issue 575), and how
+    # many of them the text-change steps cannot place on the new text.
     submitted: int
     needs_check: int
 

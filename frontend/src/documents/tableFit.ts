@@ -4,8 +4,14 @@ import { useLayoutEffect, type DependencyList, type RefObject } from "react";
 export const FIT_COLUMNS = ["review", "annotation", "final", "waiting"] as const;
 export type FitColumn = typeof FIT_COLUMNS[number];
 
-/** The words the table shows: columns in their wide form, flags as icons, a crowded Text cell on two lines. */
-export interface Fit { wide: readonly FitColumn[]; compact: boolean; wrap: boolean }
+/**
+ * The words the table shows: columns in their wide form, flags as icons, long case IDs with a middle ellipsis, a
+ * crowded Text cell on two lines.
+ */
+export interface Fit { wide: readonly FitColumn[]; compact: boolean; ids: IdForm; wrap: boolean }
+
+/** How long a case ID may stay: 0 in full, 1 and 2 ever shorter around one "…" (`ID_FORMS` in RowCells.tsx). */
+export type IdForm = 0 | 1 | 2;
 
 /** The cells that must never be cut while a form still fits. */
 const CUTTABLE = ".documents-status, .documents-waiting-on, .waiting-name";
@@ -22,6 +28,7 @@ export function tableFits(scroller: HTMLElement, table: HTMLElement): boolean {
 export function applyFit(table: HTMLElement, fit: Fit): void {
   table.setAttribute("data-wide", fit.wide.join(" "));
   table.classList.toggle("documents-table--compact", fit.compact);
+  table.setAttribute("data-ids", String(fit.ids));
   table.classList.toggle("documents-table--wrap", fit.wrap);
 }
 
@@ -34,21 +41,24 @@ const columnWidth = (table: HTMLElement, column: FitColumn): number =>
  * without a cut status or Waiting on cell. It starts with every column in its wide form (the full states with their
  * people, "assigned, not started (Ana Weber)"; every waiting person) and gives up, one step at a time, until the
  * table fits: first the Text cell's "Paused by lead" and "Typography hints" become icons, then the widest column
- * takes its narrow form ("not started"; one name and "+n"), then the next; last, a crowded Text cell takes a second
- * line. When nothing fits (below 1280 px) the table scrolls sideways with the Text column pinned.
+ * takes its narrow form ("not started"; one name and "+n"), then the next; then a long case ID keeps its start and end
+ * around one "…", in two steps (issue 576: a fixed width cap cut IDs with room to spare, so rows read the same); last, a crowded
+ * Text cell takes a second line. When nothing fits (below 1280 px) the table scrolls sideways with the Text column pinned.
  * The choice follows the content, not a window width: a short page shows every word at 1440 px, a crowded one
  * takes the narrow form at 1920 px. Without layout (unit tests) every column stays wide.
  */
 export function fitTable(scroller: HTMLElement): Fit | null {
   const table = scroller.querySelector<HTMLElement>("table");
   if (!table) return null;
-  let fit: Fit = { wide: FIT_COLUMNS, compact: false, wrap: false };
+  let fit: Fit = { wide: FIT_COLUMNS, compact: false, ids: 0, wrap: false };
   applyFit(table, fit);
   if (!scroller.clientWidth || tableFits(scroller, table)) return fit;
   const widest = [...FIT_COLUMNS].sort((a, b) => columnWidth(table, b) - columnWidth(table, a));
   const steps: ((current: Fit) => Fit)[] = [
     current => ({ ...current, compact: true }),
     ...widest.map(column => (current: Fit) => ({ ...current, wide: current.wide.filter(item => item !== column) })),
+    current => ({ ...current, ids: 1 }),
+    current => ({ ...current, ids: 2 }),
     current => ({ ...current, wrap: true }),
   ];
   for (const step of steps) {

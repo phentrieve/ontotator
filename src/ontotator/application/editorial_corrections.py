@@ -284,8 +284,9 @@ class EditorialCorrectionService:
         new version (from proposals only when no proposal needs a check);
         ``tasks_staying``: the other tasks not submitted, each with why it
         stays (``tasks_on_version``). With a text, ``findings`` counts the findings of the
-        submitted annotations on this version and how many of them the
-        text-change steps could not place (``needs_check``), ``proposals``
+        submitted annotations that stay on this version (not of those that
+        move by themselves, issue 575) and how many of them the text-change
+        steps could not place (``needs_check``), ``proposals``
         the tool proposals that are carried and the ones left for a check,
         and ``annotation_carry`` per person with started or submitted work
         whether the annotation moves to the new version by itself (issue
@@ -327,8 +328,14 @@ class EditorialCorrectionService:
                 AssignmentRow.last_submission_id.is_not(None),
             )
         ).scalars()
+        # Issue 465: per person, whether the annotation moves by itself.
+        carry = plan_carry(conn, repo, key, pid, variant, previous, proposed)
+        # Issue 575: the findings of the annotations that stay on this version.
+        moving = {item.submission_id for item in carry if item.carried}
         total = unplaced = 0
         for submission_id in submitted:
+            if submission_id in moving:
+                continue
             submission = (
                 repo.get_submission(submission_id, key) if submission_id else None
             )
@@ -338,11 +345,7 @@ class EditorialCorrectionService:
             total += len(findings)
             unplaced += len(unplaced_findings(findings, previous, proposed))
         result["findings"] = {"submitted": total, "needs_check": unplaced}
-        # Issue 465: per person, whether the annotation moves by itself.
-        result["annotation_carry"] = [
-            item.view()
-            for item in plan_carry(conn, repo, key, pid, variant, previous, proposed)
-        ]
+        result["annotation_carry"] = [item.view() for item in carry]
         result["proposals"] = proposals
         return result
 

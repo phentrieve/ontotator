@@ -279,6 +279,9 @@ def test_every_reason_a_task_is_kept_or_a_text_is_skipped(env):
         2,
     )
     assert final not in [k["assignment_id"] for k in found["kept"]]
+    # By reason, as the menu reads them with ``summary_only`` (#576).
+    assert found["skipped_by_reason"] == {"final_result": 1, "consolidation_open": 1}
+    assert sum(found["kept_by_reason"].values()) == 4
 
     applied = env.lead.post(
         START,

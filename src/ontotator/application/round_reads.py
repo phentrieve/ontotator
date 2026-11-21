@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import datetime
-from typing import Any
+from typing import Any, NamedTuple
 
 from sqlalchemy import func, select
 from sqlalchemy.engine import Connection
@@ -153,8 +153,19 @@ def _round_of_submission(
     return result
 
 
-def _recorded(conn: Any, pid: int, sids: Iterable[str]) -> dict[str, Any]:
-    """submission_id -> row with ``recorded_at`` and ``findings`` (snapshot count)."""
+class _Recorded(NamedTuple):
+    submission_id: str
+    recorded_at: datetime
+    findings: int
+
+
+def _recorded(conn: Any, pid: int, sids: Iterable[str]) -> dict[str, _Recorded]:
+    """submission_id -> row with ``recorded_at`` and ``findings`` (snapshot count).
+
+    A typo-fix copy has the time the person submitted (issue 575).
+    """
+    from ontotator.application.typo_fix_carry import submission_order_times
+
     wanted = set(sids)
     if not wanted:
         return {}
@@ -170,7 +181,15 @@ def _recorded(conn: Any, pid: int, sids: Iterable[str]) -> dict[str, Any]:
             SubmissionRow.submission_id.in_(sorted(wanted)),
         )
     ).all()
-    return {r.submission_id: r for r in rows}
+    submitted_at = submission_order_times(
+        conn, pid, {r.submission_id: r.recorded_at for r in rows}
+    )
+    return {
+        r.submission_id: _Recorded(
+            r.submission_id, submitted_at[r.submission_id], int(r.findings)
+        )
+        for r in rows
+    }
 
 
 def _counts(conn: Any, pid: int, column: Any, round_ids: list[str]) -> dict[str, int]:
@@ -451,6 +470,7 @@ def assignment_submissions(
     the assignment count; a legacy ``last_submission_id`` without any round
     binding is listed without a round.
     """
+    from ontotator.application.typo_fix_carry import submission_order_times
     from ontotator.storage.tables import AssignmentRow
 
     with repo.db.snapshot() as conn:
@@ -506,8 +526,12 @@ def assignment_submissions(
             )
             .order_by(SubmissionRow.recorded_at, SubmissionRow.submission_id)
         ).all()
+        # Issue 575: a typo-fix copy with the time the person submitted.
+        submitted_at = submission_order_times(
+            conn, pid, {row.submission_id: row.recorded_at for row in rows}
+        )
     result = []
-    for row in rows:
+    for row in sorted(rows, key=lambda row: submitted_at[row.submission_id]):
         variant = variants.get(row.document_id)
         if variant is None:
             continue
@@ -517,7 +541,7 @@ def assignment_submissions(
                 "submission_id": row.submission_id,
                 "round_id": owner,
                 "round_ordinal": ordinals.get(owner) if owner is not None else None,
-                "recorded_at": row.recorded_at,
+                "recorded_at": submitted_at[row.submission_id],
                 "finding_count": int(row.findings),
                 "document_id": row.document_id,
                 "language": variant.language,

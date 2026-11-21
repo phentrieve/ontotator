@@ -16,7 +16,7 @@ import { caseHeaderText, type TableSelection } from "./DocumentsTable";
 import { RowActionCell } from "./RowActions";
 import { documentsGroupId, documentsRowId, LastActivityCell, LeadPausedBadge, NewBadge, RowOpenLinks, rowIsNew, rowKeyOf, rowName, rowNeedsDecision, ShortId, TypographyHintsBadge, VersionMarker, type OpenTextCard } from "./RowCells";
 import { StagePopover } from "./StagePopover";
-import { isActiveRow, stageText, waitingOnText, type StageName } from "./stageLabels";
+import { isActiveRow, rowStageText, waitingOnText, type StageName } from "./stageLabels";
 import { LanguageFlag } from "../ui/LanguageTag";
 import { StageSymbol } from "../ui/StageCell";
 
@@ -81,8 +81,8 @@ function StageLine({ row, stage, title, sourceLanguage, projectKey, onOpenPanel,
   const detailId = useId();
   const contentId = useId();
   const cell = row.stages?.[stage];
-  const text = cell ? stageText(stage, cell, row, { sourceLanguage }) : { symbol: "", word: "—", detail: "" };
-  const tone = cell?.tone ?? "none";
+  // A running consolidation reads under Finalization, as in the table (issue 576).
+  const { tone, ...text } = rowStageText(row, stage, { sourceLanguage }) ?? { symbol: "", word: "—", detail: "", tone: "none" };
   // X5: the Final line's "1 flagged" (findings flagged "guidelines unclear" in the submitted consolidation), as in the table.
   const flagged = stage === "final" ? row.flagged_unclear ?? 0 : 0;
   const flagId = useId();
