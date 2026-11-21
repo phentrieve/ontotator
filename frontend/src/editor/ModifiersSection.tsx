@@ -25,6 +25,15 @@ export interface ModifiersSectionProps {
   onLinkSpan?: (termId: string) => void;
   onRemoveSpan?: (termId: string) => void;
   onRemove?: (termId: string) => void;
+  /**
+   * Issue 535: whether a modifier's words can be excluded from the finding's span (they lie inside it and the cut is
+   * allowed). Such a row gets "Exclude from finding's span" in its menu and the quiet hint "In span · Exclude".
+   */
+  canExcludeFromSpan?: (termId: string) => boolean;
+  /** Opens the offer to exclude the modifier's words from the finding's span (the box under Modifiers). */
+  onExcludeFromSpan?: (termId: string) => void;
+  /** The modifier whose offer is open: its row shows no hint, the box stands for it. */
+  exclusionTermId?: string | null;
   /** The selected modifier (M1 mockup 01 A): its row is marked and a status line names it with its term ID. */
   selectedTermId?: string | null;
   /** A click on a modifier row selects that modifier (its span is marked in the text). */
@@ -38,7 +47,7 @@ export interface ModifiersSectionProps {
  * "Two onsets" warning and "+ Add modifier…". Depends on no editor state, so the consolidation can reuse it.
  */
 export function ModifiersSection({ finding, modifiers, text, termInfo, readOnly = false, chipText = editorChipText, codeSeparator = " · ", hint,
-  onAdd, onLinkSpan, onRemoveSpan, onRemove, selectedTermId = null, onSelectModifier, searchProps }: ModifiersSectionProps): JSX.Element {
+  onAdd, onLinkSpan, onRemoveSpan, onRemove, canExcludeFromSpan, onExcludeFromSpan, exclusionTermId = null, selectedTermId = null, onSelectModifier, searchProps }: ModifiersSectionProps): JSX.Element {
   const headingId = useId();
   const [searching, setSearching] = useState(false);
   const [status, setStatus] = useState<{ text: string; linkTermId?: string } | null>(null);
@@ -59,9 +68,11 @@ export function ModifiersSection({ finding, modifiers, text, termInfo, readOnly 
         const info = termInfo(modifier.term_id);
         const label = info?.label ?? modifier.term_id;
         const linked = !!modifier.segments?.length;
+        const excludable = !readOnly && linked && !!onExcludeFromSpan && !!canExcludeFromSpan?.(modifier.term_id);
         const items: MenuItem[] = readOnly ? [] : [
           ...(onLinkSpan ? [{ id: "link", label: linked ? "Change text span…" : "Link a text span…", onSelect: () => onLinkSpan(modifier.term_id) }] : []),
           ...(onRemoveSpan && linked ? [{ id: "unlink", label: "Remove text span", onSelect: () => onRemoveSpan(modifier.term_id) }] : []),
+          ...(excludable ? [{ id: "exclude", label: "Exclude from finding's span", onSelect: () => onExcludeFromSpan!(modifier.term_id) }] : []),
           ...(onRemove ? [{ id: "remove", label: "Remove modifier", onSelect: () => onRemove(modifier.term_id) }] : []),
         ];
         const content = chipText(label, linked ? quoteOf(text, modifier.segments) : null, info?.role ?? "modifier");
@@ -81,6 +92,9 @@ export function ModifiersSection({ finding, modifiers, text, termInfo, readOnly 
             : <span className="mod-row-main">{body}</span>}
           {!linked && !readOnly && onLinkSpan && <span className="mod-row-nospan">no text span ·{" "}
             <Button size="sm" variant="quiet" className="btn-link" onClick={() => onLinkSpan(modifier.term_id)}>Link a text span</Button></span>}
+          {excludable && exclusionTermId !== modifier.term_id && <span className="mod-row-inspan" data-in-span>In span ·{" "}
+            <Button size="sm" variant="quiet" className="btn-link" aria-label={`Exclude ${label} from the span of ${finding}`}
+              onClick={() => onExcludeFromSpan!(modifier.term_id)}>Exclude</Button></span>}
           {items.length > 0 && <MenuButton label={`Actions, ${label}`} buttonLabel={`Actions, ${label}`} content={<IconMore />} items={items} />}
         </li>;
       })}

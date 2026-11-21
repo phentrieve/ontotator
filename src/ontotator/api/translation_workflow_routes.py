@@ -262,6 +262,26 @@ class EditorialCarryPerson(BaseModel):
     needs_check: int
 
 
+class EditorialStayingTask(BaseModel):
+    """Issue 509: an annotation task on the corrected version, not
+    submitted, that stays there. ``reason``: ``paused``, ``opened``,
+    ``from_proposals_needs_check`` (a tool proposal marks words the fix
+    changes), ``from_proposals_none_carried`` (no proposal reaches the new
+    version) or, before the text is known, ``from_proposals``. Move it with
+    "Handle text change" (MCP ``move_task_to_version``)."""
+
+    assignment_id: int
+    username: str
+    display_name: str
+    reason: Literal[
+        "paused",
+        "opened",
+        "from_proposals",
+        "from_proposals_needs_check",
+        "from_proposals_none_carried",
+    ]
+
+
 class EditorialCorrectionPreview(BaseModel):
     """What an editorial correction of this version would do (read only)."""
 
@@ -283,8 +303,12 @@ class EditorialCorrectionPreview(BaseModel):
     annotations: LeadCorrectionAnnotationsView
     open_consolidations: int
     final_result: bool
-    # Annotation tasks nobody opened: they move to the new version.
+    # Annotation tasks nobody opened: they move to the new version; one from
+    # tool proposals only when every proposal is carried (none needs a
+    # check), once the re-anchoring has carried them (issue 509).
     tasks_following: int
+    # The tasks not submitted that stay on this version, with the reason.
+    tasks_staying: list[EditorialStayingTask]
     # With a text or replacements only.
     text: str | None
     previous_text: str | None
@@ -314,6 +338,7 @@ class EditorialCorrectionResult(BaseModel):
     inserted_characters: int
     deleted_characters: int
     tasks_following: int
+    tasks_staying: list[EditorialStayingTask]
     # Issue 465: submitted annotations the fix moved to the new version, and
     # per person what happened to their work.
     annotations_carried: int = 0
@@ -537,7 +562,13 @@ def preview_editorial_correction(
     principal: PrincipalDep,
 ) -> EditorialCorrectionPreview:
     """Issue 453, read only: whether this version can be corrected and, with
-    a text or replacements, the changes, the guards and what follows."""
+    a text or replacements, the changes, the guards and what follows.
+
+    Annotation tasks nobody opened follow the new version
+    (``tasks_following``); a task from tool proposals only when no proposal
+    needs a check. ``tasks_staying`` names each task that stays and why
+    (opened, paused, from proposals that need a check); move it with
+    "Handle text change" (issue 509)."""
     return EditorialCorrectionPreview.model_validate(
         _editorial(request).preview(
             Actor.user(principal.user_id, principal.username),
@@ -557,7 +588,9 @@ def editorial_correction(
     principal: PrincipalDep,
 ) -> EditorialCorrectionResult:
     """Issue 453: save an editorial fix (spacing, typos, grammar) as the next
-    version of this translation, with this version's status."""
+    version of this translation, with this version's status. Tasks nobody
+    opened follow; a task from tool proposals once its proposals are on the
+    new version, when none needs a check (issue 509)."""
     return EditorialCorrectionResult.model_validate(
         _editorial(request).correct(
             Actor.user(principal.user_id, principal.username),

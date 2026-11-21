@@ -642,19 +642,75 @@ def source_obligation_documents(
     )
 
 
-def unopened_tasks(project_id: int, document_id: str) -> tuple[Any, ...]:
-    """The annotation tasks on a version that ``move_waiting_tasks`` moves:
-    nobody ever opened them, they are not paused and not from proposals."""
+def never_opened_tasks(project_id: int, document_id: str) -> tuple[Any, ...]:
+    """The live annotation tasks on a version that nobody ever opened: no
+    round and nothing submitted, paused or not, from proposals or not."""
     return (
         AssignmentRow.project_id == project_id,
         AssignmentRow.document_id == document_id,
         AssignmentRow.task == "annotate",
         AssignmentRow.revoked_at.is_(None),
         AssignmentRow.status == "open",
-        AssignmentRow.held.is_(False),
         AssignmentRow.active_round_id.is_(None),
+    )
+
+
+def unopened_tasks(project_id: int, document_id: str) -> tuple[Any, ...]:
+    """The annotation tasks on a version that ``move_waiting_tasks`` moves:
+    nobody ever opened them, they are not paused and not from proposals."""
+    return (
+        *never_opened_tasks(project_id, document_id),
+        AssignmentRow.held.is_(False),
         AssignmentRow.annotation_mode != "proposals",
     )
+
+
+def unopened_proposal_tasks(project_id: int, document_id: str) -> tuple[Any, ...]:
+    """The tasks from proposals on a version that nobody opened and that are
+    not paused: after an editorial correction they follow the new version
+    once its proposals are there and none of them needs a check (issue 509,
+    ``move_unopened_proposal_tasks``)."""
+    return (
+        *never_opened_tasks(project_id, document_id),
+        AssignmentRow.held.is_(False),
+        AssignmentRow.annotation_mode == "proposals",
+    )
+
+
+def _move_tasks(
+    conn: Connection,
+    actor: Actor,
+    project_id: int,
+    tasks: tuple[Any, ...],
+    from_document_id: str,
+    to_document_id: str,
+    now: datetime,
+) -> list[int]:
+    """Move the assignments ``tasks`` selects to ``to_document_id``; they keep
+    their ids. Audited per assignment."""
+    moved = conn.execute(
+        update(AssignmentRow)
+        .where(*tasks)
+        .values(
+            document_id=to_document_id,
+            workflow_revision=AssignmentRow.workflow_revision + 1,
+            updated_at=now,
+        )
+        .returning(AssignmentRow.id)
+    ).scalars()
+    ids = list(moved.all())
+    for assignment_id in ids:
+        record_audit(
+            conn,
+            actor,
+            "assignment.follow_correction",
+            target_type="assignment",
+            target_id=assignment_id,
+            project_id=project_id,
+            details={"from_document_id": from_document_id, "to": to_document_id},
+            at=now,
+        )
+    return ids
 
 
 def move_waiting_tasks(
@@ -677,8 +733,11 @@ def move_waiting_tasks(
     Only tasks nobody ever opened: no draft or round exists to carry, so the
     assignment itself moves and keeps its id. Started work, paused tasks and
     tasks from proposals (a new version needs its own proposals, plan review
-    R10) stay with the lead's "Handle text change". The caller holds the
-    project lock and has written the status of ``from_document_id``.
+    R10) stay with the lead's "Handle text change". After an editorial
+    correction, unopened tasks from proposals follow later, once the
+    re-anchoring job has carried every proposal (issue 509,
+    ``move_unopened_proposal_tasks``). The caller holds the project lock and
+    has written the status of ``from_document_id``.
     """
     if waiting_only:
         rule_on = conn.execute(
@@ -691,27 +750,39 @@ def move_waiting_tasks(
             variants[from_document_id], variants.get
         ):
             return
-    moved = conn.execute(
-        update(AssignmentRow)
-        .where(*unopened_tasks(project_id, from_document_id))
-        .values(
-            document_id=to_document_id,
-            workflow_revision=AssignmentRow.workflow_revision + 1,
-            updated_at=now,
-        )
-        .returning(AssignmentRow.id)
-    ).scalars()
-    for assignment_id in moved.all():
-        record_audit(
-            conn,
-            actor,
-            "assignment.follow_correction",
-            target_type="assignment",
-            target_id=assignment_id,
-            project_id=project_id,
-            details={"from_document_id": from_document_id, "to": to_document_id},
-            at=now,
-        )
+    _move_tasks(
+        conn,
+        actor,
+        project_id,
+        unopened_tasks(project_id, from_document_id),
+        from_document_id,
+        to_document_id,
+        now,
+    )
+
+
+def move_unopened_proposal_tasks(
+    conn: Connection,
+    actor: Actor,
+    project_id: int,
+    from_document_id: str,
+    to_document_id: str,
+    now: datetime,
+) -> list[int]:
+    """Issue 509: after an editorial correction, the tasks from proposals
+    nobody opened follow the new version. The re-anchoring job calls this
+    once it has stored the new version's proposals and none of them needed
+    a check; a task opened or paused in the meantime stays. The caller holds
+    the project lock."""
+    return _move_tasks(
+        conn,
+        actor,
+        project_id,
+        unopened_proposal_tasks(project_id, from_document_id),
+        from_document_id,
+        to_document_id,
+        now,
+    )
 
 
 def enable_source_change_review(
