@@ -240,6 +240,20 @@ it("uses the current immutable submitted record without a saver or write control
   const unload = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(unload); expect(unload.defaultPrevented).toBe(false);
 });
 
+it("a rejected review's summary says the version was not accepted (issue 472)", async () => {
+  setup(reviewWorkspace({ read_only: true, submitted_record: reviewRecord({ decision: "rejected", status_after: "reviewed" }) }));
+  const summary = within(await screen.findByRole("region", { name: "Submitted review" }));
+  expect(summary.getByText("Rejected")).toBeDefined();
+  expect(summary.getByText("Reviewed, not accepted")).toBeDefined();
+  expect(summary.queryByText("Reviewed")).toBeNull();
+});
+
+it("a review accepted with corrections says the corrected text was accepted (issue 472)", async () => {
+  setup(reviewWorkspace({ read_only: true, submitted_record: reviewRecord({ decision: "accepted_corrected", status_after: "reviewed" }) }));
+  const summary = within(await screen.findByRole("region", { name: "Submitted review" }));
+  expect(summary.getByText("Reviewed; the corrected text was accepted as the next version")).toBeDefined();
+});
+
 it("drains edits made during a deferred route flush using each actual returned revision", async () => {
   const { save, routeLeaveRef } = setup();
   let finish!: (value: { revision: number }) => void;
@@ -787,7 +801,7 @@ it("summarises decision, categories and a rationale excerpt before submitting, t
   expect(submit).toHaveBeenCalledWith(17, 6);
   expect(screen.getByText(decisionOutcomes.query)).toBeDefined();
   const summary = within(screen.getByRole("region", { name: "Submitted review" }));
-  expect(summary.getByText("Reviewed")).toBeDefined();
+  expect(summary.getByText("Reviewed, not accepted")).toBeDefined();
   expect(screen.queryByText("reviewed")).toBeNull();
 });
 it("names the typography hints of the saved text in the submit confirmation; they block nothing (issue 484)", async () => {

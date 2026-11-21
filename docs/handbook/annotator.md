@@ -230,7 +230,11 @@ You can also start from the text:
 2. The panel asks which finding it belongs to. Click the finding in the list or in the text. The nearest ones are listed under **Nearest in this sentence:**.
 3. If the modifier names the finding itself, choose the option to use it as the finding instead.
 
-To change a modifier later, open its row menu: **Link a text span…**, **Remove text span** or **Remove modifier**. A removal can be undone with **Undo** in the message or in the header.
+If the modifier's words lie inside the finding's text span, for example "severe" in "severe periorbital oedema", a box under **Modifiers** offers to take them out of the span. It shows the span now, with the words that go struck through, and the span after. Click **Exclude from span** to apply it; the finding then marks the remaining words, in two parts if the modifier was in the middle. Click **Keep span** to leave the span as it is. **Undo** in the message or in the header takes the change back.
+
+You can take up the offer later. When you open a finding and one of its modifiers still lies inside its span, that modifier's row shows a small link *In span · Exclude*. Click **Exclude**, or choose **Exclude from finding's span** in the row menu: the same box opens. There is no link and no menu item when the modifier covers the whole span, would cut a word in half, or the mention has imported negation cues. A tool proposal's span is never changed: once your change makes the copy, the offer is for the copy.
+
+To change a modifier later, open its row menu: **Link a text span…**, **Remove text span**, **Exclude from finding's span** or **Remove modifier**. A removal can be undone with **Undo** in the message or in the header.
 
 A tool proposal's modifiers change the same way while the proposal is open; see [Review tool proposals](#review-tool-proposals).
 
@@ -472,6 +476,8 @@ Steps:
 8. A message confirms the review, with **View result**. Your next open task opens on its own, another translation review first, or **My tasks** if none is left. If you also annotate this text and your review finished its translation, your annotation of the text opens instead and the message adds *Annotate this text now*. Finished means: the translation is accepted (with corrections, on the corrected version), every other translation of the text is accepted too, and no further review or decision of the lead is pending. After **Query** or **Rejected** it does not come first.
 
 On a wide screen, **Your review** is a column on the right. To give the texts more room, drag its left edge (**Resize review panel**), or focus the edge and press `←` or `→`; `Enter` restores the default width. **Collapse review panel** folds it to a narrow strip: the bar at the bottom then shows the decision and **Submit review…**, and **Expand review panel** or **Change ↓** opens it again. Width and folding are remembered in this browser.
+
+In **My tasks** a submitted review names your decision under **Submitted**, for example *Your decision: Rejected*. When you open it, **Submitted review** lists the decision and **Status after this review**: *Accepted* after **Accepted unchanged**, *Reviewed; the corrected text was accepted as the next version* after **Accepted with corrections**, and *Reviewed, not accepted* after **Rejected** or **Query**. That is the status your review gave the version, not necessarily its status today: the lead may have decided since.
 
 After a **Query** the lead decides. **My tasks** then shows *Answer from the lead* at your submitted review (tab **Submitted**). Open the task: above **Submitted review** you read what was decided, for example *The lead decided your query on 18 Nov, 10:12. Your text was accepted as v2.* (or *v1 was accepted as it is.*), and the lead's answer, for example *Answer from the lead: Yes, as proposed.*
 

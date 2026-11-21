@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-BZ7DkfcB.js";import{n as a,t as o}from"./lib--8LUxc4M.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-yrTnlwmi.js";import{n as a,t as o}from"./lib-Dk6IUGF0.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -633,7 +633,11 @@ You can also start from the text:
 2. The panel asks which finding it belongs to. Click the finding in the list or in the text. The nearest ones are listed under **Nearest in this sentence:**.
 3. If the modifier names the finding itself, choose the option to use it as the finding instead.
 
-To change a modifier later, open its row menu: **Link a text span…**, **Remove text span** or **Remove modifier**. A removal can be undone with **Undo** in the message or in the header.
+If the modifier's words lie inside the finding's text span, for example "severe" in "severe periorbital oedema", a box under **Modifiers** offers to take them out of the span. It shows the span now, with the words that go struck through, and the span after. Click **Exclude from span** to apply it; the finding then marks the remaining words, in two parts if the modifier was in the middle. Click **Keep span** to leave the span as it is. **Undo** in the message or in the header takes the change back.
+
+You can take up the offer later. When you open a finding and one of its modifiers still lies inside its span, that modifier's row shows a small link *In span · Exclude*. Click **Exclude**, or choose **Exclude from finding's span** in the row menu: the same box opens. There is no link and no menu item when the modifier covers the whole span, would cut a word in half, or the mention has imported negation cues. A tool proposal's span is never changed: once your change makes the copy, the offer is for the copy.
+
+To change a modifier later, open its row menu: **Link a text span…**, **Remove text span**, **Exclude from finding's span** or **Remove modifier**. A removal can be undone with **Undo** in the message or in the header.
 
 A tool proposal's modifiers change the same way while the proposal is open; see [Review tool proposals](#review-tool-proposals).
 
@@ -876,6 +880,8 @@ Steps:
 
 On a wide screen, **Your review** is a column on the right. To give the texts more room, drag its left edge (**Resize review panel**), or focus the edge and press \`←\` or \`→\`; \`Enter\` restores the default width. **Collapse review panel** folds it to a narrow strip: the bar at the bottom then shows the decision and **Submit review…**, and **Expand review panel** or **Change ↓** opens it again. Width and folding are remembered in this browser.
 
+In **My tasks** a submitted review names your decision under **Submitted**, for example *Your decision: Rejected*. When you open it, **Submitted review** lists the decision and **Status after this review**: *Accepted* after **Accepted unchanged**, *Reviewed; the corrected text was accepted as the next version* after **Accepted with corrections**, and *Reviewed, not accepted* after **Rejected** or **Query**. That is the status your review gave the version, not necessarily its status today: the lead may have decided since.
+
 After a **Query** the lead decides. **My tasks** then shows *Answer from the lead* at your submitted review (tab **Submitted**). Open the task: above **Submitted review** you read what was decided, for example *The lead decided your query on 18 Nov, 10:12. Your text was accepted as v2.* (or *v1 was accepted as it is.*), and the lead's answer, for example *Answer from the lead: Yes, as proposed.*
 
 A project lead who corrects a translation themselves sees only **Accepted with corrections**. When the lead corrects a translation that was already accepted, the corrected version is reviewed again: it then appears as a new translation review task, usually for you ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
@@ -934,35 +940,6 @@ With the keyboard: Tab to a sentence, then press Enter or Space to mark it. Shif
 
 On a touch-only device such as a phone or tablet, **Mark checked sentences** is not offered, because a swipe on the text has to scroll. A review you can only read does not offer it either.
 
-### Check by segment pairs
-
-What for: see which part of the source belongs to which part of the translation, and check them together. *Prototype: this view is still being tested and may change.*
-
-1. Tick **Check by segment pairs** above the texts. The source and the translation are now shown as rows. Each row is one pair: a sentence or a part of a sentence of the source on the left, and its translation on the right. One source sentence can have two translation sentences in one row, and the other way round. Your choice is remembered in this browser.
-2. Read the row, then click the box at the end of the row to mark the pair as checked. The row turns green. Click the box again to remove the mark.
-3. Click a translation to edit it. It becomes a text box for that pair. Press Esc or click elsewhere when you are done. If the pair was checked, it turns amber, and the head counts it as *changed*. Read it again, then click its box to check it again. Pairs you did not edit keep their marks.
-4. If a pair is wrong, click **⋯** at the end of its row: **Merge with the pair above**, **Merge with the pair below** or **Split this pair**. A pair that joins a checked and an unchecked pair turns amber.
-5. **Next unchecked** jumps to the first pair that is not checked. **Align again** pairs the texts anew, for example after many edits. Checked pairs and pairs you merged or split stay as they are.
-
-The head above the rows shows how many pairs are checked, for example *12 of 55 pairs checked · 1 changed*. A row that reads *Not in the translation* has a source part without a translation; read it carefully.
-
-**Show changes** also works in this view: the changed words are marked in the translation cells. You cannot edit while it is on. **Find in the texts** (\`Ctrl+F\`, on a Mac \`Cmd+F\`) searches both columns. **Couple scrolling** and **Show matching paragraph** are not shown here, because the rows already line up.
-
-Ontotator pairs the texts by itself, from sentence ends, semicolons, numbers, units and similar words. It can be wrong; correct it with **⋯**. The pairs and your marks are only for you. They are saved with your review, so they are kept when you reload. They do not change your decision, and the lead and the exports never see them. When you first turn the view on, sentences you had marked with **Mark checked sentences** are taken over: a pair is checked when all its sentences were checked.
-
-With the keyboard: Tab to the box of a row and press Space. \`↓\` and \`↑\` move to the box of the next or previous row. Enter on a translation opens it for editing.
-
-### Find in the texts
-
-What for: find a word in the source and the translation at once.
-
-1. Press \`Ctrl+F\` (on a Mac \`Cmd+F\`). A search field opens above the texts. Selected words are filled in.
-2. Type. The field shows the number of hits, for example *1 of 6 · Source 3 · Translation 3*. All hits are marked, the current one in orange.
-3. Press Enter for the next hit, Shift+Enter for the previous one.
-4. Press Esc to close it. If the current hit is in the translation, it is selected there, ready to change.
-
-Press \`Ctrl+F\` again in the field to use the browser's own find.
-
 ### Show invisible characters
 
 What for: see spacing errors and characters you cannot see otherwise, such as a double space, a tab or a non-breaking space.
@@ -1008,7 +985,7 @@ What for: work without the mouse. Shortcuts are off while you type in a field or
 | \`Alt+←\` / \`Alt+→\` | Previous / next text |
 | \`Alt+P\` | Switch project |
 
-In a translation review: \`1\` to \`4\` choose a decision (outside the text), \`Ctrl+Enter\` submits (with a confirmation), \`Alt+M\` shows the matching paragraph. With **Mark checked sentences** on, Enter or Space marks the focused sentence and Shift+Enter marks a range. \`Ctrl+F\` (macOS: \`Cmd+F\`) finds in the texts. With **Check by segment pairs** on, Space on a row's box marks the pair, and \`↓\` / \`↑\` move between the boxes.
+In a translation review: \`1\` to \`4\` choose a decision (outside the text), \`Ctrl+Enter\` submits (with a confirmation), \`Alt+M\` shows the matching paragraph. With **Mark checked sentences** on, Enter or Space marks the focused sentence and Shift+Enter marks a range.
 `,te=`# Consolidator
 
 This chapter is for consolidators. A consolidation merges two or more submissions on one text into one result: findings that everyone agrees on are taken over, and you decide the rest. Back to the [handbook overview](README.md).
@@ -1582,7 +1559,7 @@ Details: [Submit the text](annotator.md#submit-the-text).
 
 ## 9. What happens next
 
-- Your task shows **Submitted** in **My tasks**. It is read-only now; click **View** to look at it. A translation review you submitted as a **Query** shows *Answer from the lead* there once the lead decided.
+- Your task shows **Submitted** in **My tasks**. It is read-only now; click **View** to look at it. A translation review names your decision below, for example *Your decision: Rejected*; one you submitted as a **Query** shows *Answer from the lead* there once the lead decided.
 - The next open task opens on its own, or **My tasks** if none is left.
 - The lead sees your submission next to the other annotators' work on the same text, and accepts one result or starts a consolidation. You do not see other people's work.
 - Your task is done. You do not need to do anything else unless the lead reopens it (**Reopened** in **My tasks**, with the lead's reason under the task name) or you notice a mistake. A translation review the lead asks for a second time names the lead's reason under the task, for example *Second review requested by the lead on 17 Nov, 14:30: Check the dose in paragraph 2.* If the lead adds to that reason later, each addition stands below it with its date (*Added by the lead on …*).
@@ -1721,6 +1698,7 @@ Each row is one task. The **Task** column says what to do, for example **Annotat
 
 - **Reopened**: the lead reopened your submission. The lead's reason stands under the task, for example *Reopened by the lead on 17 Nov, 14:30: The onset in sentence 2 is missing.* (on a narrow screen under the badge). Without a reason, click the badge to read when it was reopened.
 - A **Translation review** the lead asked for a second time shows the lead's reason under the task, for example *Second review requested by the lead on 17 Nov, 14:30: Check the dose in paragraph 2.* What the lead added to it later stands below it, for example *Added by the lead on 17 Nov, 16:05: Paragraph 3 as well.* The translation review and the consolidation show the lead's reason again when you open the task.
+- *Your decision: …* under a submitted **Translation review**: what you decided in it, for example *Your decision: Accepted with corrections*.
 - *Answer from the lead* at a submitted **Translation review**: you submitted it as a **Query** and the lead decided. Open the task to read the decision and the answer ([Review a translation](annotator.md#review-a-translation)).
 - A **Consolidation** task shows the lead's reason under the task, for example *Reason from the lead: Term and assertion differ*, if the lead gave one.
 - **Paused**: the task waits for a decision on a problem report. A long reason is cut off here; the task shows all of it. **Answer to your report** means the lead has replied.
@@ -2394,6 +2372,7 @@ What happens to a waiting task:
 
 - **Rejected** or **Query**: it keeps waiting. Decide on the text as usual.
 - **Accepted with corrections**, a lead correction or an uploaded correction: the task moves to the new version and opens there once that version is accepted. A task from proposals waits on the old version: the annotator sees **Waiting for the project lead**, and once the new version is accepted the text shows **Handle text change…**. There you move the task to the new version, where the decisions on the proposals are carried and only changed passages need a check. If the new version has no proposals yet, moving is not available: wait for them (their automatic transfer may still be running) or import them, click **Retry**, then move the task. A paused task stays too, until you decide its report.
+- **Fix typos…**: tasks nobody opened move to the new version at once. A task from proposals that nobody opened moves too, a few seconds later, when no tool proposal waits for a check after the fix; otherwise it stays, and the dialog names it with the reason ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
 - A task on an uploaded correction that was then **Rejected** or **Query**, with the older version accepted afterwards: the text shows **Handle text change…**; **Withdraw** the task, then assign the accepted version.
 - You remove the review: the task keeps waiting, and the text shows the next step for the review.
 - You turn Review off and accept the translation: the task opens. You turn Annotate off or discard the version: the task is withdrawn, as any open task.
@@ -2840,7 +2819,8 @@ What happens to work on the corrected version:
 
 - If nobody annotated it, the dialog says so: *Nobody has annotated v2 yet.*
 - If the version has a submitted translation review, the dialog says that the review stays with the version it reviewed: *A submitted translation review stays with the version it reviewed.* For a rejected or queried version it adds how the new version gets its review, for example *To have v3 reviewed, use Resolve… › Assign a new review… on this row after saving.*
-- Annotation tasks nobody opened move to the new version: *2 waiting tasks continue on v3.*
+- Annotation tasks nobody opened move to the new version: *2 waiting tasks continue on v3.* A task from tool proposals moves only when no tool proposal waits for a check after the fix; it moves a few seconds after you save, once the proposals are on the new version. The dialog names the rule: *A task from tool proposals continues on v3 only when nobody opened it and no proposal waits for a check.*
+- A task that stays is named with the reason, for example *Task not moved, already opened: Eva Lang.*, *Task not moved, the task is paused: Tom Reis.* or *Task not moved, from tool proposals, and a proposal waits for a check: Ana Weber.* Before you change the text, the dialog says that it will name whether a task from tool proposals continues. Move such a task afterwards with **Handle text change…**, choosing to move it to the new version ([Handle a text change for open annotation work](#handle-a-text-change-for-open-annotation-work)); decide the report of a paused task first.
 - A submitted annotation moves to the new version by itself when every finding is placed on the new text without doubt and the fix changes no number: nobody clicks, and the person does not submit again. Under the changes, the dialog says per person whose annotation moves and whose does not, and why, for example *Moves to v3 by itself, nobody submits again: the annotation of Tom Reis.* and *Not moved by itself, a finding marks words you changed: Ana Weber.* What moves stands above the highlighted block *Work stays on v2*, which names only what stays. Before you change the text, the dialog says that it will name who moves once you do. An annotation does not move by itself when the fix changes a number (a digit added, removed or changed anywhere in the text; *0.5* → *0,5* or *12.03.* → *12. 03.* is no change of a number, *12* → *1 2* is one), when the text has a final result or a consolidation, when the translation is not accepted yet, when it was annotated from tool proposals (they reach the new version later), when the task is paused, or when a finding marks words you changed. The moved annotation is the same person's annotation: same findings and guideline version, placed on the new text, and the task on the old version goes away. It is not a second annotation: agreement, the comparison of the findings (also *Related terms*), consolidation groups, the counts on Documents and Progress and the work export are the same as before the fix, and it adds no working time. **History** has a line for it, for example *annotation of Tom Reis (ann-0004) moved to v3 by itself after the typo fix, 17 Nov, 10:12*, and the audit log records it with the submission it came from. To let the person look at it again, reopen the task on the new version as usual. After saving, the message says how many moved, for example *1 annotation moved to v3.*
 - Other annotations that were opened or submitted, open consolidations and a final result stay on the corrected version. Only then the dialog shows a highlighted block, *Work stays on v2*, with what stays and what to do, for example *2 annotations stay on v2. After saving, use Handle text change… and Carry to v3… on this row to move them.* Move started work with **Handle text change…** ([Handle a text change for open annotation work](#handle-a-text-change-for-open-annotation-work)) and submitted work with *Carry to v3…* ([Carry submitted work to a new text version](#carry-submitted-work-to-a-new-text-version)). The block also says how many findings mark words you changed and will need a check.
 - Tool proposals move to the new text; a proposal whose marked words were changed waits for a check, as after a corrected translation review.
@@ -2853,7 +2833,7 @@ The correction is refused in these cases, and the dialog says so in place:
 
 A source text has no **Fix typos…**; a corrected source text comes in as an Ontospan bundle. A change of content, for example a different finding or a rewritten sentence, belongs in a translation review ([Correct a translation yourself](#correct-a-translation-yourself)).
 
-The same correction can be made without the browser: the MCP tool \`editorial_correction\` ([MCP server guide](../../mcp/README.md)) and \`POST /api/v1/projects/{key}/documents/{document_id}/editorial-correction\` take the passages to replace, each with its replacement, and the reason, with a project token of a lead that has the scope *Project administration*. Without \`confirm\` the tool changes nothing and returns the changed passages and what would follow.
+The same correction can be made without the browser: the MCP tool \`editorial_correction\` ([MCP server guide](../../mcp/README.md)) and \`POST /api/v1/projects/{key}/documents/{document_id}/editorial-correction\` take the passages to replace, each with its replacement, and the reason, with a project token of a lead that has the scope *Project administration*. Without \`confirm\` the tool changes nothing and returns the changed passages and what would follow. It lists the tasks that stay in \`tasks_staying\`, each with its reason, and names \`move_task_to_version\` as the next step for them.
 
 ### Handle a text change for open annotation work
 

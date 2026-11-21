@@ -24,10 +24,14 @@ from ontotator.application.translation_reviews import TranslationReviewService
 from ontotator.application.translation_workflow import work_on_version
 from ontotator.application.typo_fix_carry import carry_after_typo_fix, plan_carry
 from ontotator.application.version_uploads import VersionUploadService
-from ontotator.assignments.service import move_waiting_tasks, unopened_tasks
+from ontotator.assignments.service import (
+    move_waiting_tasks,
+    never_opened_tasks,
+    unopened_tasks,
+)
 from ontotator.auth.audit import Actor, record_audit
 from ontotator.domain.errors import AccessDenied, DomainError
-from ontotator.domain.reanchor import NeedsReview, reanchor_annotation, text_map
+from ontotator.domain.reanchor import text_map
 from ontotator.domain.variants import VariantInfo, variant_document_id
 from ontotator.jobs.queue import JobQueue
 from ontotator.storage.database import Database
@@ -37,6 +41,7 @@ from ontotator.storage.tables import (
     AssignmentRow,
     DocumentRow,
     ProjectMembershipRow,
+    UserRow,
 )
 
 REFUSED = "EDITORIAL_CORRECTION_NOT_AVAILABLE"
@@ -133,6 +138,81 @@ def apply_replacements(text: str, replacements: Sequence[Mapping[str, str]]) -> 
     return "".join([*parts, text[at:]])
 
 
+def tasks_on_version(
+    conn: Connection,
+    pid: int,
+    document_id: str,
+    proposals: Mapping[str, int] | None,
+) -> tuple[int, list[dict[str, Any]]]:
+    """The annotation tasks on the corrected version that are not submitted:
+    how many follow the new version, and the ones that stay with the reason.
+
+    A task nobody opened follows. A task from proposals nobody opened
+    follows once the re-anchoring job has carried the proposals, when every
+    proposal is carried (``proposals``: the counts of ``proposal_counts``;
+    issue 509). The reasons of a task that stays: ``paused``, ``opened``,
+    ``from_proposals_needs_check`` (a proposal marks words the fix changes),
+    ``from_proposals_none_carried`` (no proposal reaches the new version)
+    and, before the text is known, ``from_proposals``. Such a task is moved
+    with "Handle text change" (``move_task_to_version``). Submitted work is
+    in ``annotation_carry``.
+    """
+    following = conn.execute(
+        select(func.count())
+        .select_from(AssignmentRow)
+        .where(*unopened_tasks(pid, document_id))
+    ).scalar_one()
+    never = set(
+        conn.execute(
+            select(AssignmentRow.id).where(*never_opened_tasks(pid, document_id))
+        ).scalars()
+    )
+    rows = conn.execute(
+        select(
+            AssignmentRow.id,
+            AssignmentRow.held,
+            AssignmentRow.annotation_mode,
+            UserRow.username,
+            UserRow.display_name,
+        )
+        .join(UserRow, UserRow.id == AssignmentRow.user_id)
+        .where(
+            AssignmentRow.project_id == pid,
+            AssignmentRow.document_id == document_id,
+            AssignmentRow.task == "annotate",
+            AssignmentRow.revoked_at.is_(None),
+            AssignmentRow.status != "submitted",
+        )
+        .order_by(UserRow.display_name, UserRow.username, AssignmentRow.id)
+    ).all()
+    staying: list[dict[str, Any]] = []
+    for row in rows:
+        if row.held:
+            reason = "paused"
+        elif row.id not in never:
+            reason = "opened"
+        elif row.annotation_mode != "proposals":
+            continue  # counted in ``following``
+        elif proposals is None:
+            reason = "from_proposals"
+        elif proposals["needs_check"]:
+            reason = "from_proposals_needs_check"
+        elif not proposals["carried"]:
+            reason = "from_proposals_none_carried"
+        else:
+            following += 1
+            continue
+        staying.append(
+            {
+                "assignment_id": int(row.id),
+                "username": row.username,
+                "display_name": row.display_name,
+                "reason": reason,
+            }
+        )
+    return following, staying
+
+
 class EditorialCorrectionService:
     def __init__(self, db: Database, jobs: JobQueue):
         self.db = db
@@ -201,7 +281,9 @@ class EditorialCorrectionService:
         """What follows the new version and what stays for a check.
 
         ``tasks_following``: annotation tasks nobody opened, which move to the
-        new version. With a text, ``findings`` counts the findings of the
+        new version (from proposals only when no proposal needs a check);
+        ``tasks_staying``: the other tasks not submitted, each with why it
+        stays (``tasks_on_version``). With a text, ``findings`` counts the findings of the
         submitted annotations on this version and how many of them the
         text-change steps could not place (``needs_check``), ``proposals``
         the tool proposals that are carried and the ones left for a check,
@@ -210,13 +292,17 @@ class EditorialCorrectionService:
         465, ``typo_fix_carry``) and, if not, why.
         """
         pid = project["id"]
-        following = conn.execute(
-            select(func.count())
-            .select_from(AssignmentRow)
-            .where(*unopened_tasks(pid, variant.document_id))
-        ).scalar_one()
+        from ontotator.exchange.reanchor_job import proposal_counts
+
+        proposals = (
+            None
+            if proposed is None
+            else proposal_counts(conn, pid, variant.document_id, previous, proposed)
+        )
+        following, staying = tasks_on_version(conn, pid, variant.document_id, proposals)
         result: dict[str, Any] = {
             "tasks_following": following,
+            "tasks_staying": staying,
             "findings": None,
             "proposals": None,
             "annotation_carry": None,
@@ -227,7 +313,6 @@ class EditorialCorrectionService:
             editable_findings,
             unplaced_findings,
         )
-        from ontotator.exchange.reanchor_job import reanchor_sources
 
         repo = Repository(self.db)
         key = project["project_key"]
@@ -258,21 +343,7 @@ class EditorialCorrectionService:
             item.view()
             for item in plan_carry(conn, repo, key, pid, variant, previous, proposed)
         ]
-        mapping = text_map(previous, proposed)
-        sources = reanchor_sources(conn, pid, variant.document_id)
-        outcomes = [
-            isinstance(
-                reanchor_annotation(item, item.evidence, previous, proposed, mapping),
-                NeedsReview,
-            )
-            for source in sources
-            for item in source.annotations
-        ]
-        result["proposals"] = {
-            "sets": len(sources),
-            "carried": outcomes.count(False),
-            "needs_check": outcomes.count(True),
-        }
+        result["proposals"] = proposals
         return result
 
     def preview(
@@ -355,7 +426,8 @@ class EditorialCorrectionService:
         The new version is a ``correction`` of ``document_id`` with its
         translation status; the corrected version keeps its status, as after
         a lead correction or an upload. Annotation tasks nobody opened follow
-        the new version; a submitted annotation whose findings all re-anchor
+        the new version, those from proposals once the re-anchoring job has
+        carried every proposal (issue 509, none needs a check); a submitted annotation whose findings all re-anchor
         moves there by itself when no number changed (issue 465,
         ``typo_fix_carry``); other started and submitted work, consolidations
         and a final result stay on the corrected version for the text-change
@@ -422,11 +494,16 @@ class EditorialCorrectionService:
                 )
                 .returning(EditorialCorrectionRow.id)
             ).scalar_one()
-            following = conn.execute(
-                select(func.count())
-                .select_from(AssignmentRow)
-                .where(*unopened_tasks(pid, variant.document_id))
-            ).scalar_one()
+            from ontotator.exchange.reanchor_job import proposal_counts
+
+            # Issue 509: tasks from proposals nobody opened follow once the
+            # re-anchoring job has carried every proposal; it moves them.
+            following, staying = tasks_on_version(
+                conn,
+                pid,
+                variant.document_id,
+                proposal_counts(conn, pid, variant.document_id, previous, proposed),
+            )
             move_waiting_tasks(
                 conn,
                 actor,
@@ -476,6 +553,7 @@ class EditorialCorrectionService:
                     "diff": change["diff"],
                     "number_changes": change["number_changes"],
                     "tasks_following": following,
+                    "tasks_staying": staying,
                     "annotations_carried": len(carried),
                 },
                 at=now,
@@ -503,6 +581,7 @@ class EditorialCorrectionService:
                 "inserted_characters": change["inserted_characters"],
                 "deleted_characters": change["deleted_characters"],
                 "tasks_following": following,
+                "tasks_staying": staying,
                 "annotations_carried": len(carried),
                 "annotation_carry": [item.view() for item in carry],
             }

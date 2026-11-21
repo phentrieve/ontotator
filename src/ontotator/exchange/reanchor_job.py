@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
 import ontospan
@@ -764,6 +764,52 @@ def reanchor_sources(
     return result
 
 
+def proposal_counts(
+    conn: Connection, project_id: int, document_id: str, old: str, new: str
+) -> dict[str, int]:
+    """What re-anchoring the tool proposals of ``document_id`` from the text
+    ``old`` to ``new`` does: the proposal ``sets``, the proposals that are
+    ``carried`` and the ones left for a check (``needs_check``). Read only;
+    the editorial correction's dry run and the re-anchoring job agree on it."""
+    mapping = text_map(old, new)
+    sources = reanchor_sources(conn, project_id, document_id)
+    outcomes = [
+        isinstance(
+            reanchor_annotation(item, item.evidence, old, new, mapping), NeedsReview
+        )
+        for source in sources
+        for item in source.annotations
+    ]
+    return {
+        "sets": len(sources),
+        "carried": outcomes.count(False),
+        "needs_check": outcomes.count(True),
+    }
+
+
+def _follow_editorial(
+    conn: Connection, project_id: int, pair: PairJob, old: str, new: str
+) -> None:
+    """Issue 509: after an editorial correction, the tasks from proposals
+    nobody opened follow the new version once its proposals are stored,
+    when every proposal was carried (none needs a check). Otherwise, and
+    for a task opened or paused since, they stay for "Handle text change"
+    (``move_task_to_version``)."""
+    from ontotator.assignments.service import move_unopened_proposal_tasks
+
+    counts = proposal_counts(conn, project_id, pair.payload.old_document_id, old, new)
+    if counts["needs_check"] or not counts["carried"]:
+        return
+    move_unopened_proposal_tasks(
+        conn,
+        pair.actor,
+        project_id,
+        pair.payload.old_document_id,
+        pair.payload.new_document_id,
+        datetime.now(UTC),
+    )
+
+
 def _legacy_form(built: ImportedSet, actors: list[Any]) -> dict[str, Any]:
     """The payload a set re-anchored before #417 holds for this rebuild: the
     job as the one actor and method ``tool`` of every proposal."""
@@ -974,6 +1020,14 @@ def reanchor(job: Job, ctx: JobContext) -> dict[str, Any]:
             added = _process_pair(
                 db, conn, current["project_id"], pair, variants, job.id
             )
+            if isinstance(pair.payload.producer, EditorialProducer):
+                repo = Repository(db)
+                old_doc = repo.get_document(project, pair.payload.old_document_id)
+                new_doc = repo.get_document(project, pair.payload.new_document_id)
+                assert old_doc is not None and new_doc is not None
+                _follow_editorial(
+                    conn, current["project_id"], pair, old_doc.text, new_doc.text
+                )
             for key, value in added.items():
                 totals[key] += value
         return totals

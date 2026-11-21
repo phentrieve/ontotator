@@ -80,7 +80,10 @@ async function reviewerReads(page: Page, s: LeadScenario, caseId: string, lines:
   await page.getByRole("tab", { name: /^Submitted/ }).click();
   const task = page.getByTestId("task-row").filter({ hasText: caseId });
   await expect(task).toContainText("Answer from the lead");
+  // Issue 472: the submitted review names its decision, and its summary says the version was not accepted by it.
+  await expect(task).toContainText("Your decision: Query");
   await task.getByRole("link").first().click();
+  await expect(page.getByRole("region", { name: "Submitted review" })).toContainText("Reviewed, not accepted");
   const note = page.getByRole("note", { name: "Answer from the lead", exact: true });
   for (const line of lines) await expect(note).toContainText(line);
   return note;

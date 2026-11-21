@@ -64,16 +64,19 @@ button.mod-row-main:focus-visible {
   margin: 0 0 var(--space-2);
 }
 /* "no text span · Link a text span" follows the name, as in mockup 01 A. */
-.mod-row-main:has(+ .mod-row-nospan) {
+.mod-row-main:has(+ .mod-row-nospan),
+.mod-row-main:has(+ .mod-row-inspan) {
   flex: 0 1 auto;
 }
-.mod-row-nospan {
+.mod-row-nospan,
+.mod-row-inspan {
   flex: 1 0 auto;
   color: var(--text-muted);
   font-size: var(--size-sm);
   white-space: nowrap;
 }
-.mod-row-nospan .btn-link {
+.mod-row-nospan .btn-link,
+.mod-row-inspan .btn-link {
   min-height: 0;
   padding: 0;
 }

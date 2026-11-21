@@ -63,6 +63,20 @@ describe("My tasks component", () => {
     expect(within(rows[1]).queryByText("Answer from the lead")).toBeNull();
   });
 
+  it("a submitted translation review names the reviewer's decision (issue 472)", async () => {
+    vi.mocked(api.listMyTasks).mockResolvedValue([
+      { ...task(3, "submitted"), task: "translation_review", review_decision: "rejected" },
+      { ...task(5, "submitted"), task: "translation_review", review_decision: "accepted_corrected" },
+      task(1, "submitted"),
+    ]);
+    render(<MyTasks projects={[]} onNavigate={vi.fn()} />);
+    await screen.findAllByTestId("task-row");
+    expect(screen.getByText("Your decision: Rejected")).toBeDefined();
+    expect(screen.getByText("Your decision: Accepted with corrections")).toBeDefined();
+    // The annotation task has no decision line.
+    expect(screen.getAllByText(/^Your decision:/)).toHaveLength(2);
+  });
+
   it("links the answer badge to the answered report (#18)", async () => {
     const onNavigate = vi.fn();
     vi.mocked(api.listMyTasks).mockResolvedValue([{ ...task(3, "open"), report_answered: true, answered_report_id: "r-7" }]);
