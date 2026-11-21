@@ -637,6 +637,77 @@ async def test_editorial_correction_dry_run_says_per_person_what_moves(
     assert dry["plan"]["annotation_carry"] == carry
 
 
+async def test_editorial_correction_names_the_tasks_that_stay_and_the_next_step(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    """Issue 509: the dry run and the result list the tasks that stay with
+    their reason and name move_task_to_version; the description names the
+    rule for tasks from proposals."""
+    route = f"{P}/documents/{{doc}}/editorial-correction"
+    staying = [
+        build(
+            "EditorialStayingTask",
+            assignment_id=7,
+            username="ana",
+            display_name="Ana Weber",
+            reason="from_proposals_needs_check",
+        ),
+        build(
+            "EditorialStayingTask",
+            assignment_id=8,
+            username="eva",
+            display_name="Eva Lang",
+            reason="opened",
+        ),
+    ]
+    fake.on(
+        "POST",
+        f"{route}/preview",
+        build(
+            "EditorialCorrectionPreview",
+            available=True,
+            reason=None,
+            tasks_following=0,
+            tasks_staying=staying,
+            proposals={"sets": 1, "carried": 1, "needs_check": 1},
+        ),
+    )
+    args = {
+        "project": "p",
+        "document_id": "d",
+        "replacements": [{"old": "Hypotnie", "new": "Hypotonie"}],
+        "reason": "Typo",
+    }
+    dry = await call(mcp_client, "editorial_correction", args)
+    assert dry["plan"]["tasks_staying"] == staying
+    assert "move_task_to_version" in dry["plan"]["next_step"]
+    fake.on(
+        "POST",
+        route,
+        build("EditorialCorrectionResult", tasks_following=0, tasks_staying=staying),
+    )
+    done = await call(
+        mcp_client,
+        "editorial_correction",
+        args | {"confirm": True, "expected_text_sha256": "b" * 64},
+    )
+    assert done["result"]["tasks_staying"] == staying
+    assert "move_task_to_version" in done["result"]["next_step"]
+    # Nothing stays: no next step.
+    fake.on(
+        "POST",
+        f"{route}/preview",
+        build("EditorialCorrectionPreview", available=True, tasks_staying=[]),
+    )
+    quiet = await call(mcp_client, "editorial_correction", args)
+    assert "next_step" not in quiet["plan"]
+    tools = {tool.name: tool for tool in (await mcp_client.list_tools()).tools}
+    description = " ".join((tools["editorial_correction"].description or "").split())
+    assert "proposals.needs_check is 0" in description
+    assert "tasks_staying" in description
+    assert "move_task_to_version" in description
+
+
 async def test_editorial_correction_passes_a_refusal_on_and_shows_number_changes(
     fake: FakeApi, mcp_client: Client
 ) -> None:

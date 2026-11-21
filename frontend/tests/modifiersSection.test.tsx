@@ -122,4 +122,31 @@ describe("ModifiersSection", () => {
     expect(unknown.textContent).toBe("HP:9999999");
     expect(unknown.querySelector(".mod-row-code")).toBeNull();
   });
+
+  it("a modifier inside the finding's span: the row hint and the menu item open the exclusion (issue 535)", async () => {
+    const onExcludeFromSpan = vi.fn();
+    renderSection({ modifiers: [SEVERE, { term_id: "HP:0031796" }], canExcludeFromSpan: id => id === "HP:0012828", onExcludeFromSpan });
+    const [recurrent, severe] = chips();
+    expect(severe.querySelector("[data-in-span]")!.textContent).toBe("In span · Exclude");
+    expect(recurrent.querySelector("[data-in-span]")).toBeNull();
+    fireEvent.click(within(severe).getByRole("button", { name: "Exclude Severe from the span of Seizure" }));
+    expect(onExcludeFromSpan).toHaveBeenCalledWith("HP:0012828");
+    expect(await menuItems("Severe")).toEqual(["Change text span…", "Remove text span", "Exclude from finding's span", "Remove modifier"]);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Exclude from finding's span" }));
+    expect(onExcludeFromSpan).toHaveBeenCalledTimes(2);
+    expect(await menuItems("Recurrent")).toEqual(["Link a text span…", "Remove modifier"]);
+  });
+
+  it("no hint or menu item when the cut is not allowed, the box is open for it, or the section is read-only (issue 535)", async () => {
+    renderSection({ canExcludeFromSpan: () => false, onExcludeFromSpan: vi.fn() });
+    expect(document.querySelector("[data-in-span]")).toBeNull();
+    expect(await menuItems("Severe")).not.toContain("Exclude from finding's span");
+    cleanup();
+    renderSection({ canExcludeFromSpan: () => true, onExcludeFromSpan: vi.fn(), exclusionTermId: "HP:0012828" });
+    expect(document.querySelector("[data-in-span]")).toBeNull();
+    expect(await menuItems("Severe")).toContain("Exclude from finding's span");
+    cleanup();
+    renderSection({ readOnly: true, canExcludeFromSpan: () => true, onExcludeFromSpan: vi.fn() });
+    expect(document.querySelector("[data-in-span]")).toBeNull();
+  });
 });

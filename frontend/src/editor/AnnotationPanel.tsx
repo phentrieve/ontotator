@@ -88,6 +88,8 @@ export interface AnnotationPanelProps {
   searchLanguages?: SearchLanguageControl;
   /** The Modifiers section, rendered under Values (only for findings on `hpo-phenotype` layers). */
   modifiersSection?: React.ReactNode;
+  /** The offer to exclude a modifier's words from the finding's span, right under the Modifiers section. */
+  spanExclusion?: React.ReactNode;
   /** A notice above the Values block (R3: "Turn into modifier…" of a modifier used as a finding). */
   modifierNotice?: React.ReactNode;
 }
@@ -133,6 +135,7 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
   isAttachingMention = false,
   searchLanguages,
   modifiersSection,
+  spanExclusion,
   modifierNotice,
 }) => {
   const [showSearch, setShowSearch] = useState(false);
@@ -425,6 +428,7 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
       )}
 
       {modifiersSection}
+      {spanExclusion}
 
       <div className="detail-section">
         <Textarea id={`annotation-note-${ann.annotation_id}`} label={noteRequired ? "Reason for no text span" : "Note"}
