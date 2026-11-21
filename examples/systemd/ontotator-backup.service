@@ -1,0 +1,24 @@
+# /etc/systemd/system/ontotator-backup.service
+# Runs scripts/nightly-backup.sh: a recovery point, its encrypted off-host copy
+# and, on the configured days, a restore drill of that copy. Adapt User,
+# WorkingDirectory (the deployment directory, with backup.sh, offsite-backup.sh,
+# restore-check.sh and nightly-backup.sh next to docker-compose.yml) and the
+# path of the environment file. See docs/operations.md.
+[Unit]
+Description=Ontotator recovery point with encrypted off-host copy
+Wants=network-online.target
+After=network-online.target docker.service
+# Alert on failure, e.g. with a unit of your own that mails or pages:
+# OnFailure=notify-failure@%n.service
+
+[Service]
+Type=oneshot
+User=deploy
+WorkingDirectory=/opt/ontotator
+EnvironmentFile=/etc/ontotator/backup.env
+ExecStart=/bin/bash /opt/ontotator/nightly-backup.sh
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+# A slow dump, upload or drill must not run into the next night.
+TimeoutStartSec=6h
