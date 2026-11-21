@@ -61,7 +61,7 @@ If the text was changed elsewhere, a **Revision conflict** notice appears; click
 | You see | Meaning |
 | --- | --- |
 | Fill colour of a mark | The term. The same term keeps one colour in the text; the colour says nothing about the state. Different terms that overlap or stand close together in a sentence always have different colours. |
-| Bands of colour | Text that belongs to several findings: one band per finding, in its colour. Up to three bands; with four or more findings the top band is striped. |
+| Bands of colour | Text that belongs to several findings: one band per finding, in its colour, stacked over the words with a thin gap between them. Up to three bands; with four or more findings the top band is striped. |
 | Solid underline | Your own finding. |
 | Dashed underline | A tool proposal under review. |
 | Dotted underline | A read-only reference finding. |
