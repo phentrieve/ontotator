@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-nGPJqwIx.js";import{n as a,t as o}from"./lib-VClmdFr_.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-Hy_Yx927.js";import{n as a,t as o}from"./lib-U_uoewJF.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -427,11 +427,21 @@ The editor has three columns:
 | --- | --- |
 | Left: **Findings** | The list of your findings. In a task from proposals: **Review Proposals** and **Your own findings**. |
 | Middle: the text | The text you annotate. Marked passages are highlighted. |
-| Right: details | The selected finding: **Values**, **Modifiers**, **Note**, its mentions and the term search. With nothing selected, the **New finding** panel opens here when you mark text. |
+| Right: details | The selected finding: **Values**, **Modifiers**, its mentions, **Note** and the term search. With nothing selected, the **New finding** panel opens here when you mark text. |
 
 The findings in the list follow the text: a finding stands where its first marked passage begins, so a finding you add in the middle of the text appears between its neighbours, not at the end. Findings without a text span come last. Carried findings stay at the top of the list, in the order of the earlier round.
 
-To make the findings list wider or narrower, drag the divider between the findings list and the text (**Resize findings column**), or focus it and press \`←\` or \`→\`. On a narrow screen, the tabs **Findings**, **Document** and **Details** switch between the columns; **Back to text** returns to the text.
+To make the findings list wider or narrower, drag the divider between the findings list and the text (**Resize findings column**), or focus it and press \`←\` or \`→\`.
+
+The right column works the same way on a wide screen (three columns): drag its left edge (**Resize details panel**), or focus it and press \`←\` or \`→\`; \`Home\` and \`End\` go to the least and the most, a double click or \`Enter\` restores the usual width. The round button on that edge, **Collapse details panel**, folds the column, with the ontology tree, to a narrow strip, so the text gets the room. Click the strip (**Expand details panel**) to bring it back. When you mark text, the column opens again by itself, for the term search. Width and folding are kept in this browser, for you.
+
+The small actions of a finding sit next to it as icons: **Show in tree** next to the term's name, **Copy text**, **Add segment** and **Move to a new finding** at each mention. Point at an icon to see its name.
+
+Some hints have a small close icon (**Hide this hint**). A hidden hint stays hidden in this browser; **More** › **Show hints again** brings all of them back.
+
+On a narrow screen, the tabs **Findings**, **Document** and **Details** switch between the columns; **Back to text** returns to the text.
+
+From a width of 1025 pixels, the toolbar of the text shares one line with the app header: **Sections**, the product name, **My tasks**, **Handbook** and your user menu (with your initials) come first, then the text's controls. The text and the tree get the height of a whole bar. In the one bar, **Next open item** is an arrow icon with that name. On a narrower screen the toolbar has its own line under the header, as before.
 
 The toolbar shows the text name, its language and the mode:
 
@@ -539,7 +549,7 @@ The search compares the words you type with term names and synonyms, letter by l
 
 What for: pick a broader or narrower term than the one you have, or look at the neighbours of a term before you decide.
 
-1. Select a finding and click **Show in tree**. The **Ontology tree** opens at the current term.
+1. Select a finding and click **Show in tree** (the tree icon next to the term's name). The **Ontology tree** opens at the current term.
 2. Click a term in the tree. Its **Synonyms**, **Translated names** and other parents (**Also under**) are shown.
 3. Click **Use this term** to give the selected finding this term.
 4. Click **Close tree**.
@@ -548,11 +558,11 @@ What for: pick a broader or narrower term than the one you have, or look at the 
 
 | Where | **Show in tree** opens the tree at | Taking a term |
 | --- | --- | --- |
-| A proposal you have not decided yet | the proposed term | **Use this term instead…**, then **Confirm**: you get a copy with that term, as with **Edit & Replace**, and the proposal reads **Replaced**, for example *Proposal: decide as Changed with Seizure (HP:0001250)* |
+| A proposal you have not decided yet | the proposed term | **Use this term instead…**, then **Confirm**: you get a copy with that term, as with **Edit & Replace**, and the proposal reads **Replaced**; the confirmation says so, for example *Proposal: decide as Replaced with Seizure (HP:0001250)* |
 | A hit of the term search of a **New finding** (next to the definition of the highlighted hit) | that hit | **Use this term instead…**, then **Confirm**: the new finding gets the term, as if you had chosen the hit, for example *New finding: choose Seizure (HP:0001250)* |
 | A reference, other people's findings in a consolidation, a decided proposal, or your own finding in a submitted or read-only task | its term | not possible: there is no button |
 
-The confirmation names what happens; **Cancel** or \`Esc\` closes it and changes nothing. Nothing changes until you click **Confirm**.
+The confirmation names what happens; **Cancel** or \`Esc\` closes it and changes nothing. Nothing changes until you click **Confirm**. On a proposal, the confirmed term is one change: one **Undo** takes back the copy and its term, and the proposal is open again.
 
 In a wide window the tree sits under the annotation panel. To give the tree more or less room, drag the divider between the two (**Resize ontology tree**) up or down, or focus it and press \`↑\` or \`↓\`. A double click or \`Enter\` restores the usual split. The height is kept in this browser.
 
@@ -589,7 +599,7 @@ What for: link a finding to every place in the text that supports it.
    - **Move to a new finding**: gives one mention its own finding with the same term and values. The new finding is selected, so you can change it right away; modifiers stay with the original finding.
    - **Remove**, then **Yes, remove**: detaches the mention.
 
-You cannot remove the last mention when the project requires a text span. If the project allows findings without a span, enter a reason in the note first.
+You cannot remove the last mention when the project requires a text span. If the project allows findings without a span, enter a reason in the note first. In a submitted or read-only task nothing can be changed: the greyed-out buttons say so when you point at them, and the note is shown on a grey band, not as a field to type in.
 
 ## Add a finding without a text span
 
@@ -676,7 +686,7 @@ Tools make mistakes. Check every proposal as if you had marked it yourself: the 
 
 1. The list **Review Proposals** shows every proposal. Your additions are under **Your own findings**.
 2. Select a proposal, or move with \`j\` and \`k\`. The text shows where it was found. On a phone, where the details replace the text, the details show the sentence around the quoted passage, with the passage marked.
-3. Check the marked text, the term and each value. To see the broader and narrower terms of the proposed term, click **Show in tree** under it; to replace the term with one from the tree, click **Use this term instead…** and **Confirm** (see [Browse the ontology tree](#browse-the-ontology-tree)). To look the passage up elsewhere, click the copy icon (**Copy text**) next to the quoted passage in the details, or press \`Ctrl+C\` (\`Cmd+C\` on a Mac): both copy the passage of the selected proposal, as for a finding ([Mark text and add a finding](#mark-text-and-add-a-finding)). A proposal with several mentions has the copy icon at each.
+3. Check the marked text, the term and each value. To see the broader and narrower terms of the proposed term, click **Show in tree** (the tree icon) next to it; to replace the term with one from the tree, click **Use this term instead…** and **Confirm** (see [Browse the ontology tree](#browse-the-ontology-tree)). To look the passage up elsewhere, click the copy icon (**Copy text**) next to the quoted passage in the details, or press \`Ctrl+C\` (\`Cmd+C\` on a Mac): both copy the passage of the selected proposal, as for a finding ([Mark text and add a finding](#mark-text-and-add-a-finding)). A proposal with several mentions has the copy icon at each.
 4. Decide:
    - **Confirm**: the passage, term and all values are right. Values tagged **Defaulted** were not set by the tool but prefilled; Confirm accepts them as shown, so check them too.
    - **Reject**: the proposal is wrong and nothing should replace it.
@@ -1508,7 +1518,7 @@ The guidelines tell you what to mark and how: which findings count, how much tex
 
 ## 4. Get to know the screen
 
-The editor has three columns: the list of **Findings** on the left, in the order of the text, the text in the middle and the details of the selected finding on the right. The toolbar shows the mode, for example **Annotate from scratch**, and the save status. Everything is saved automatically; **Saved** means your work is stored. In a project that records working time, the toolbar also shows a timer with **Pause timer**; see [Working time](annotator.md#working-time). The dividers between the columns, and the one above the ontology tree when it is open, can be dragged to share out the room. See [The editor screen](annotator.md#the-editor-screen).
+The editor has three columns: the list of **Findings** on the left, in the order of the text, the text in the middle and the details of the selected finding on the right. The toolbar shows the mode, for example **Annotate from scratch**, and the save status. Everything is saved automatically; **Saved** means your work is stored. In a project that records working time, the toolbar also shows a timer with **Pause timer**; see [Working time](annotator.md#working-time). The dividers between the columns, and the one above the ontology tree when it is open, can be dragged to share out the room. On a wide screen the round button on the right column's edge folds that column to a strip, so the text gets the room; marking text opens it again. See [The editor screen](annotator.md#the-editor-screen).
 
 ## 5. Mark a finding
 
@@ -1535,7 +1545,7 @@ Repeat steps 5 and 6 for every finding in the text.
 In a task *Annotation, from proposals*, the column **Review Proposals** lists findings a tool suggested. Tools make mistakes, especially with negations: a tool may propose "Keine Krampfanfälle" (no seizures) as **Present**.
 
 1. Select the first proposal. The text shows where it was found, and the line *Source* names the tool that made it.
-2. Check three things: the marked text, the term and every value. To see broader and narrower terms of the proposed term, click **Show in tree**; the tree only shows terms until you confirm one.
+2. Check three things: the marked text, the term and every value. To see broader and narrower terms of the proposed term, click **Show in tree** (the tree icon next to the term); the tree only shows terms until you confirm one.
 3. Click **Confirm** if all three are right, **Reject** if the proposal is wrong, or **Edit & Replace** to correct it in a copy, listed under the proposal, then click **Done, back to the proposal**. Changing a value or the text span in the copy replaces the proposal; confirming a default alone does not. Changed your mind? Click **Discard copy**: the copy is removed and the proposal is open again. A changed copy asks first. Only if you really cannot decide, click **Unresolved** and write a **Reviewer note** saying why.
 4. The next open proposal is selected. Go on until every proposal is decided.
 5. Then read the whole text for findings the tool missed. Mark text that has no proposal and add the finding as in step 5. It appears under **Your own findings**, next to the proposals.
@@ -1634,8 +1644,8 @@ What for: know where things are.
 The header is the same on every page:
 
 - **Ontotator** on the left takes you to the start page.
-- The breadcrumb shows where you are, for example **My tasks** or **Documents**.
-- At the top right is the user menu: a button with your display name, your pseudonym and your roles. It holds **Profile**, **My technical reports**, **Technical problem…**, the **Theme** (**System**, **Light** or **Dark**) and **Log out**. Open it with a click, or with Enter or the arrow keys; Escape closes it. On a phone the button in the editor shows your initials.
+- The breadcrumb shows where you are, for example **My tasks** or **Documents**. In the editor on a wide screen the text's name is in the toolbar next to it, not again in the breadcrumb.
+- At the top right is the user menu: a button with your display name, your pseudonym and your roles. It holds **Profile**, **My technical reports**, **Technical problem…**, the **Theme** (**System**, **Light** or **Dark**) and **Log out**. Open it with a click, or with Enter or the arrow keys; Escape closes it. In the editor the button shows your initials: on a phone, and on a wide screen, where the header and the text's toolbar share one bar.
 - System administrators also see a gear next to it. It opens **Administration** (see [Administration](admin.md)). A number on the gear counts the open technical reports.
 - **Handbook** in the header opens this handbook inside the app. On the Documents, consolidation and translation review screens, **Help** opens the handbook section about that screen; in the editor it is **More** > **Help for this screen**. On the project forms, a link next to the task profile opens the section that explains it. In the text card, **How to use it** next to *Newer set available* opens the section on new tool proposals. Click a screenshot in the handbook to open it at full size in a new tab.
 - Below the chapter list, the handbook shows the app's version and commit, for example \`Ontotator 0.3.0 · commit cc65cea\`. Quote it when you report a problem.

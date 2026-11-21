@@ -359,6 +359,7 @@ FIXTURE_SPECS = (
     "copy-tree-follow",
     "decision-semantics",
     "design",
+    "editor-room",
     "practice",
     "quick-fixes",
     "spans",
