@@ -187,19 +187,23 @@ def plan_carry(
     """Per person with started or submitted annotation work on ``variant``:
     whether the typo fix to ``proposed`` carries it, and why not.
 
-    Read only. Unopened tasks are not listed: they follow by themselves.
+    Read only. Tasks nobody opened are not listed: they follow by
+    themselves or the dry run names why they stay (``tasks_staying``,
+    issue 509).
     """
     from ontotator.application.text_changes import (
         TextChangeService,
         editable_findings,
         unplaced_findings,
     )
-    from ontotator.assignments.service import unopened_tasks
+    from ontotator.assignments.service import never_opened_tasks
 
     text_reason = _text_reason(conn, pid, variant, previous, proposed)
     waiting = set(
         conn.execute(
-            select(AssignmentRow.id).where(*unopened_tasks(pid, variant.document_id))
+            select(AssignmentRow.id).where(
+                *never_opened_tasks(pid, variant.document_id)
+            )
         ).scalars()
     )
     rows = conn.execute(
