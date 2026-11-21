@@ -12951,6 +12951,11 @@ export interface components {
              * @enum {string}
              */
             status: "open" | "in_progress" | "submitted" | "reopened";
+            /**
+             * Opened
+             * @default false
+             */
+            opened: boolean;
             /** Held */
             held: boolean;
             /** Pause Causes */

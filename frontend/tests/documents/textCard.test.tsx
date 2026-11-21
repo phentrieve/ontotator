@@ -8,6 +8,7 @@ import { formatTime } from "../../src/app/submissionLabels";
 import { TextCard, type TextCardProps } from "../../src/documents/textCard/TextCard";
 import { rowDay, type SegmentId } from "../../src/documents/textCard/cardModel";
 import { proposalSetText, sameDaySets } from "../../src/documents/textCard/AnnotationPart";
+import { workStatus } from "../../src/documents/textCard/WorkPersonRow";
 import { annotateItem, cardRow } from "./cardFixtures";
 import { final, round, stepOf, submission, submissions, version, work } from "./fixtures";
 import { ana, cell, luc, tom } from "./tableFixtures";
@@ -176,6 +177,16 @@ describe("annotation part", () => {
     const tomRow = within(people).getByText("Tom Reis").closest("li")!;
     expect(tomRow.textContent).toBe("Tom Reis ann-0004Assigned yesterday, from proposalsNot startedRemove…");
     expect(within(tomRow).getByText("Assigned yesterday").tagName).toBe("TIME");
+  });
+
+  it("issue 584: a task the person opened but did not save reads Opened, as in the typo fix's Task not moved, already opened", () => {
+    expect(workStatus(annotateItem({ assignment_id: 1, status: "open", opened: false }))).toEqual({ tone: "neutral", label: "Not started" });
+    expect(workStatus(annotateItem({ assignment_id: 1, status: "open", opened: true }))).toEqual({ tone: "info", label: "Opened" });
+    expect(workStatus(annotateItem({ assignment_id: 1, status: "in_progress", opened: false }))).toEqual({ tone: "info", label: "In progress" });
+    renderCard({ row: assignRow({ work: [annotateItem({ assignment_id: 1, person: tom, author_label: "ann-0004", opened: true })] }) });
+    const tomRow = within(within(card()).getByRole("list", { name: "Annotators" })).getByText("Tom Reis").closest("li")!;
+    expect(within(tomRow).getByText("Opened")).toBeTruthy();
+    expect(within(tomRow).queryByText("Not started")).toBeNull();
   });
 
   it("issue 543: an annotation a typo fix moved shows the person's submission and assignment, the move and Open annotation", async () => {
