@@ -122,6 +122,8 @@ for (const [name, viewport] of sizes) {
     await expect(v2).toContainText("Accepted");
     await expect(v2).toContainText(new RegExp(`Accepted: decision on the query of Ana Weber \\(${esc(s.pseudonyms.ana)}\\), the reviewer’s text taken, Project Lead \\(${esc(s.pseudonyms.lead)}, you\\), ${TIME} · Answer: Yes, as you proposed\\.`));
     await expect(card).not.toContainText("reviewed outside Ontotator");
+    // Issue 574 F2: no "Assign review…" on the accepted v2; its dialog could assign nothing.
+    await expect(card.getByRole("button", { name: "Assign review…", exact: true })).toHaveCount(0);
     await shot(page, `take-text-card-${name}`);
     await card.getByRole("button", { name: /^History \(\d+\)$/ }).click();
     await expect(activityLines(card).filter({ hasText: "query decided" })).toHaveText(
@@ -171,6 +173,49 @@ for (const [name, viewport] of sizes) {
 
     await reviewerReads(page, s, caseId, [/The lead decided your query on .+\. v1 was accepted as it is\./, "Answer from the lead: The short form is meant; the source is the same in both places."]);
     await shot(page, `answer-reviewer-${name}`);
+    expect(errors).toEqual([]);
+  });
+}
+
+// Issue 574 F1: Ben queried v2 after the lead took Ana's text as v2: the dialogs decide v2, not the decided v1.
+// F2: the card of the accepted v2 offers no "Assign review…" whose dialog could assign nothing; Reopen… stays.
+for (const [name, viewport] of sizes) {
+  test(`${name} px: a query on a corrected version is decided at that version`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const errors = consoleErrors(page);
+    const s = await leadScenario(page, "QUERIED_CORRECTION_FOR_LEAD");
+    const caseId = s.cases!.take_text;
+    await login(page, s, "lead");
+    await rowAction(page, "Resolve…", caseId, "de").click();
+    const options = page.getByRole("group", { name: textNamePattern("Resolve queried translation, ", caseId, "de") });
+    await expect(options).toContainText("Ben Roth asked a question about this translation.");
+    await expect(options).toContainText("Is the dose in v2 per day or per dose?");
+    await expect(options.getByRole("button", { name: "Reopen Ben Roth's review…", exact: true })).toBeVisible();
+    await options.getByRole("button", { name: "Accept the reviewer’s text…", exact: true }).click();
+    const taking = page.getByRole("dialog", { name: `Accept the reviewer’s text, ${caseId} de v2`, exact: true });
+    await expect(taking).toContainText("Ben Roth asked a question about v2.");
+    await expect(taking).not.toContainText("already decided");
+    await taking.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(taking).toHaveCount(0);
+    await rowAction(page, "Resolve…", caseId, "de").click();
+    await options.getByRole("button", { name: "Answer and accept the version as it is…", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: `Answer and accept the version as it is, ${caseId} de v2`, exact: true });
+    await expect(dialog).toContainText("v2 is accepted without changes. It is recorded as your decision on the query.");
+    await dialog.getByRole("textbox", { name: /^Answer to the reviewer/ }).fill("Per day, as the source says.");
+    await shot(page, `requery-dialog-${name}`);
+    await dialog.getByRole("button", { name: "Accept v2", exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(documentsLive(page)).toHaveText(`${caseId} de v2 was accepted as it is. The reviewer sees your answer at their submitted task.`);
+    await rowGoesOn(page, caseId);
+
+    const card = await openCard(page, caseId);
+    const v2 = (await textVersionItems(card, 2)).filter({ hasText: "Correction of v1" });
+    await expect(v2).toContainText("Accepted");
+    await expect(v2).toContainText(new RegExp(`Accepted: decision on the query of Ben Roth \\(${esc(s.pseudonyms.ben)}\\), the version kept as it is`));
+    // The way to a new review of v2: Ben reviews it again.
+    await expect(v2.getByRole("button", { name: "Reopen Ben Roth’s translation review", exact: true })).toBeVisible();
+    await expect(card.getByRole("button", { name: "Assign review…", exact: true })).toHaveCount(0);
+    await shot(page, `requery-card-${name}`);
     expect(errors).toEqual([]);
   });
 }

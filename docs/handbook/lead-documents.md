@@ -532,7 +532,7 @@ The selected texts now come first, in their earlier order among themselves; the 
 
 What for: assign a single review or annotation.
 
-1. In the row, click **Assign review…** or **Assign annotation…**. In the text card, use **Assign review…** or **Assign annotators…**.
+1. In the row, click **Assign review…** or **Assign annotation…**. In the text card, use **Assign review…** or **Assign annotators…**. The card offers **Assign review…** only while the text needs a reviewer, or under **Resolve…**. An accepted translation has none: to have it reviewed again, use **Ask a reviewer to correct…**, **Reopen…** at its submitted review, or **Assign a new review…** ([Accept a translation that was not reviewed](lead-results.md#accept-a-translation-that-was-not-reviewed)).
 2. Tick the people. To annotate yourself without the Annotator role, click **Add me as annotator**.
 3. Click the assign button, for example *Assign 2 people*.
 

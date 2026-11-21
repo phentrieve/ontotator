@@ -1402,7 +1402,18 @@ def _row_steps(
                 round_ordinal=final["round_ordinal"] if final else None,
             )
         elif code in ("resolve_rejected", "resolve_queried"):
-            version = first(lambda v: v.translation_status == "reviewed")
+            # Rule 4 looks at each chain's literal newest version: a queried
+            # correction is not newer (issue 574), so a target can be the
+            # older version whose query the lead already decided.
+            version = next(
+                (
+                    c.newest
+                    for c in live
+                    if c.newest.translation_status == "reviewed"
+                    and c.newest.latest_decision in steps_rules.NOT_ACCEPTED_DECISIONS
+                ),
+                None,
+            ) or first(lambda v: v.translation_status == "reviewed")
             detail = _version_detail("version", version)
         elif code == "assign_translation_review":
             version = needs_reviewer or version

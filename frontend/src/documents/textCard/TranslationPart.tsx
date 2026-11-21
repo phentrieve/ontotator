@@ -11,6 +11,9 @@ import { PersonList, useFocusAfterRemoval } from "./PersonRow";
 import { CorrectionReasonDialog, CorrectionRequestReason } from "./CorrectionReasonDialog";
 import { assignedLine, workerName, WorkPersonRow } from "./WorkPersonRow";
 
+/** Steps under which the plain review dialog has a version to assign (`assignments/batch.py`). */
+const PLAIN_REVIEW_STEPS: ReadonlySet<string> = new Set(["assign_translation_review", "resolve_rejected", "resolve_queried"]);
+
 /** The document this text was translated from: follow `derived_from` out of the row's own versions. */
 function sourceDocument(row: DocumentRowView, documentId: string): string | null {
   const own = new Map(row.versions.map(version => [version.document_id, version]));
@@ -56,7 +59,10 @@ export function TranslationPart({ row, projectKey, query, canManage, onAssign, o
   // Issue 129, U5: a planned review nobody holds yet is the part's one next step (primary, on its own line);
   // Compare with source and the version actions follow as secondary tools.
   const reviewNext = canManage && !native && reviewers.length === 0 && row.stages?.review.state === "unassigned";
-  const assignOther = canManage && !native && !reviewNext;
+  // Issue 574 F2: the plain "Assign review…" only where its dialog can assign a review (the row's step
+  // assigns one, or the lead resolves a rejected or queried version). An accepted version gets a new
+  // review through "Assign a new review…" or "Ask a reviewer to correct…".
+  const assignOther = canManage && !native && !reviewNext && (row.steps ?? []).some(step => PLAIN_REVIEW_STEPS.has(step.code));
   return <section className="text-card-part" aria-labelledby="text-card-translation">
     <div className="text-card-part-head">
       <h3 id="text-card-translation" className="text-card-part-title">Translation</h3>

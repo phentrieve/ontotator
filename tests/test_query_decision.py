@@ -452,3 +452,43 @@ def test_the_decision_is_the_rows_last_activity(
     decided_at = version["query_decision"]["decided_at"]
     assert decided_at > before["last_activity_at"]
     assert row["last_activity_at"] == decided_at
+
+
+def test_a_query_on_the_accepted_reviewer_text_is_decided_there(
+    client: TestClient, built: dict[str, Any]
+) -> None:
+    """Issue 574 F1: the lead accepts the reviewer's text as v2, asks a
+    reviewer to correct v2, and the reviewer queries v2. The row's Resolve
+    step and its decision dialogs name v2, not the decided v1."""
+    lead = decider(client, built, "take_text")
+    v1 = f"{lead.case}~de~v1"
+    proposed = lead.preview(v1).json()["review"]["proposed_text"]
+    v2 = lead.decide(v1, "reviewer_text", text=proposed).json()["document_id"]
+    _, sha, _ = lead.document(v2)
+    asked = lead.post(
+        f"{lead.base}/documents/{v2}/translation-correction-assignment",
+        {
+            "username": built["users"]["ben"],
+            "expected_text_sha256": sha,
+            "reason": "Check the dose.",
+            "confirm_language": True,
+        },
+    )
+    assert asked.status_code == 200, asked.text
+    lead.review("ben", asked.json()["id"], "query")
+    assert lead.document(v2)[2] == "reviewed"
+    step = lead.row()["next_step"]
+    assert step["code"] == "resolve_queried"
+    assert (step["document_id"], step["detail"]["version"]) == (v2, 2)
+    shown = lead.preview(v2).json()
+    assert (shown["available"], shown["reason"], shown["version"]) == (True, None, 2)
+    # "Correct the translation…" names v2 and v3 as well.
+    correcting = client.get(
+        f"{lead.base}/documents/{v2}/lead-correction", headers=lead.login()
+    ).json()
+    assert (correcting["available"], correcting["version"]) == (True, 2)
+    assert correcting["next_version"] == 3
+    done = lead.decide(v2, "unchanged", answer=ANSWER)
+    assert done.status_code == 200, done.text
+    assert lead.document(v2)[2] == "accepted"
+    assert "resolve_queried" not in codes(lead.row())

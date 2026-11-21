@@ -524,10 +524,31 @@ describe("translation part", () => {
     expect(within(card()).getByText("Ready for review")).toBeTruthy();
     const reviewers = within(card()).getByRole("list", { name: "Translation reviewers" });
     expect(within(reviewers).getByRole("listitem").textContent).toBe("Ana Weber ann-0003Review of v1In progress");
-    fireEvent.click(within(card()).getByRole("button", { name: "Assign review…" }));
-    expect(onAssign).toHaveBeenCalledWith(row, "translation_review");
+    // The review is held: the plain dialog would have nothing to assign (issue 574 F2).
+    expect(within(card()).queryByRole("button", { name: "Assign review…" })).toBeNull();
+    expect(onAssign).not.toHaveBeenCalled();
     fireEvent.click(within(card()).getByRole("link", { name: "Compare with source" }));
     expect(onNavigate).toHaveBeenCalledWith({ name: "projectCase", key: "p", caseId: "case-200", variant: "case-200-de", compare: "case-200-en", documents: query });
+  });
+
+  it("issue 574 F2: Assign review… only where its dialog can assign a review", () => {
+    // An accepted version: no step assigns a review, so the plain dialog has nothing to assign.
+    const accepted = assignRow({
+      versions: [version({ document_id: "case-200-de", origin: "correction", derived_from: "case-200-en", translation_status: "accepted" })],
+      work: [],
+      steps: [stepOf("assign_annotation", { stage: "annotation" })],
+    });
+    renderCard({ row: accepted, initialSegment: "translation" });
+    expect(within(card()).queryByRole("button", { name: "Assign review…" })).toBeNull();
+    cleanup();
+    // A failed check needs a reviewer: the row's step assigns one.
+    const failed = assignRow({
+      versions: [version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "automatic_check_failed" })],
+      steps: [stepOf("assign_translation_review")],
+    });
+    const { onAssign } = renderCard({ row: failed, initialSegment: "translation" });
+    fireEvent.click(within(card()).getByRole("button", { name: "Assign review…" }));
+    expect(onAssign).toHaveBeenCalledWith(failed, "translation_review");
   });
 
   it("issue 483: the reason of a correction request with its additions, and Add to the reason… for the lead", async () => {
