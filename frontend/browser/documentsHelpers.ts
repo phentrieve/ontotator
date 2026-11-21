@@ -184,3 +184,21 @@ export async function showSegment(card: Locator, title: "Translation" | "Annotat
 /** A person's row in the card (#108): one list item per person in a list such as "Annotators", with their status and their own actions. */
 export const personRow = (card: Locator, list: "Annotators" | "Translation reviewers" | "Consolidators", name: string): Locator =>
   card.getByRole("list", { name: list, exact: true }).getByRole("listitem").filter({ has: card.page().getByText(name, { exact: true }) });
+
+/**
+ * Issue 555: "Edit the translation…" of an accepted version: the choice of what changes, then the dialog of that way
+ * ("Fix typos, …" for spelling, spacing or grammar; "Correct it myself, …, accepted" when the meaning changes).
+ */
+export async function editTranslation(page: Page, item: Locator, caseId: string, kind: "typos" | "meaning", version = 1, language = "de"): Promise<void> {
+  await item.getByRole("button", { name: `Edit the translation v${version} of ${caseId} ${language}…`, exact: true }).click();
+  const choice = page.getByRole("dialog", { name: `Edit the translation, ${caseId} ${language} v${version}`, exact: true });
+  await choice.getByRole("radio", { name: kind === "typos" ? "Only spelling, spacing or grammar" : "The meaning changes", exact: true }).check();
+  await choice.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(choice).toHaveCount(0);
+}
+
+/** Issue 556: a version action under "Other ways…" (Ask a reviewer to correct…, Upload a corrected text…). */
+export async function otherVersionAction(page: Page, item: Locator, versionName: string, label: string): Promise<void> {
+  await item.getByRole("button", { name: `Other ways to change ${versionName}`, exact: true }).click();
+  await page.getByRole("menuitem", { name: label, exact: true }).click();
+}

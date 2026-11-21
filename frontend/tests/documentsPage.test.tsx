@@ -1308,14 +1308,17 @@ describe("row actions", () => {
     expect(onNavigate).toHaveBeenLastCalledWith({ name: "projectProblemReport", key: "p", reportId: "report-7", action: "resume" });
   });
 
-  it("Resolve… shows the three options under the row", async () => {
+  it("Resolve… opens a dialog with one primary action and Other ways… (issue 554)", async () => {
     mockRows(page([group("case-1", [planRow("case-1", "de", stepOf("resolve_rejected", { document_id: "case-1-de" }))])]));
     renderPage();
     fireEvent.click(await screen.findByRole("button", { name: "Resolve…, case-1 de" }));
-    const box = screen.getByRole("group", { name: "Resolve rejected translation, case-1 de" });
-    expect(within(box).getByRole("button", { name: "Discard the de translation…" })).toBeTruthy();
+    const box = screen.getByRole("dialog", { name: "Resolve rejected translation, case-1 de" });
+    expect(within(box).getByRole("button", { name: "Correct it myself (counts as accepted)…" })).toBeTruthy();
+    fireEvent.click(within(box).getByRole("button", { name: "Other ways to resolve case-1 de" }));
+    expect(screen.getByRole("menuitem", { name: "Discard the de translation…" })).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
     fireEvent.click(within(box).getByRole("button", { name: "Cancel" }));
-    expect(screen.queryByRole("group", { name: "Resolve rejected translation, case-1 de" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Resolve rejected translation, case-1 de" })).toBeNull();
   });
 
   it("after a decision the panel moves to the next final decision and the row updates in place", async () => {
@@ -1650,35 +1653,35 @@ describe("lead review fixes", () => {
   });
 });
 
-describe("Resolve renders inline under the row (Change 13, F1, F5)", () => {
+describe("Resolve opens a dialog (issue 554; before: inline under the row, Change 13, F1, F5)", () => {
   const rejected = () => planRow("case-1", "de", stepOf("resolve_rejected", { document_id: "case-1-de" }));
   const actionButton = () => document.getElementById(documentsRowId("case-1", "de", "action"));
-  const resolveBox = () => screen.queryByRole("group", { name: "Resolve rejected translation, case-1 de" });
-  const resolveHeading = () => within(resolveBox()!).getByRole("heading", { name: "Resolve rejected translation, case-1 de" });
+  const resolveBox = () => screen.queryByRole("dialog", { name: "Resolve rejected translation, case-1 de" });
+  const resolvePrimary = () => within(resolveBox()!).getByRole("button", { name: "Correct it myself (counts as accepted)…" });
 
-  it("Resolve… renders inline under the row with the lead-correction option and focuses its heading", async () => {
+  it("Resolve… opens a dialog, not a panel under the row, and focuses the primary action", async () => {
     mockRows(page([group("case-1", [rejected()])]));
     renderStateful({});
     fireEvent.click(await screen.findByRole("button", { name: "Resolve…, case-1 de" }));
     const box = resolveBox()!;
-    expect(box.closest(".documents-row-notice-slot")).not.toBeNull();
-    expect(within(box).getByRole("button", { name: "Correct the translation…" })).toBeTruthy();
+    expect(box.closest(".documents-row-notice-slot")).toBeNull();
+    expect(box.getAttribute("aria-modal")).toBe("true");
     expect(screen.queryByRole("complementary")).toBeNull();
-    await waitFor(() => expect(document.activeElement).toBe(resolveHeading()));
-    expect(screen.getAllByRole("group", { name: "Resolve rejected translation, case-1 de" })).toHaveLength(1);
+    await waitFor(() => expect(document.activeElement).toBe(resolvePrimary()));
+    expect(screen.getAllByRole("dialog", { name: "Resolve rejected translation, case-1 de" })).toHaveLength(1);
   });
 
   it("Cancel and Escape return focus to the row's Resolve… button", async () => {
     mockRows(page([group("case-1", [rejected()])]));
     renderStateful({});
     fireEvent.click(await screen.findByRole("button", { name: "Resolve…, case-1 de" }));
-    await waitFor(() => expect(document.activeElement).toBe(resolveHeading()));
+    await waitFor(() => expect(document.activeElement).toBe(resolvePrimary()));
     fireEvent.click(within(resolveBox()!).getByRole("button", { name: "Cancel" }));
     expect(resolveBox()).toBeNull();
     await waitFor(() => expect(document.activeElement).toBe(actionButton()));
 
     fireEvent.click(actionButton()!);
-    await waitFor(() => expect(document.activeElement).toBe(resolveHeading()));
+    await waitFor(() => expect(document.activeElement).toBe(resolvePrimary()));
     fireEvent.keyDown(document.activeElement!, { key: "Escape" });
     expect(resolveBox()).toBeNull();
     await waitFor(() => expect(document.activeElement).toBe(actionButton()));
@@ -1714,23 +1717,23 @@ describe("Resolve renders inline under the row (Change 13, F1, F5)", () => {
     mockRows(page([group("case-1", [reviewOff])]));
     renderStateful({});
     fireEvent.click(await screen.findByRole("button", { name: "Assign review or accept…, case-1 de" }));
-    const box = await screen.findByRole("group", { name: "Translation not accepted, case-1 de" });
-    expect(box.closest(".documents-row-notice-slot")).not.toBeNull();
-    await waitFor(() => expect(document.activeElement).toBe(within(box).getByRole("heading", { name: "Translation not accepted, case-1 de" })));
+    const box = await screen.findByRole("dialog", { name: "Translation not accepted, case-1 de" });
+    expect(box.closest(".documents-row-notice-slot")).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(within(box).getByRole("button", { name: "Turn translation review on" })));
     fireEvent.keyDown(document.activeElement!, { key: "Escape" });
-    expect(screen.queryByRole("group", { name: "Translation not accepted, case-1 de" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Translation not accepted, case-1 de" })).toBeNull();
     await waitFor(() => expect(document.activeElement).toBe(actionButton()));
   });
 
-  it("Correct the translation… opens the lead correction inline and never the case viewer (F1)", async () => {
+  it("Correct it myself… opens the lead correction in the dialog and never the case viewer (F1)", async () => {
     vi.spyOn(api, "getVariantMetadata").mockResolvedValue({ document_id: "case-1-de", text_sha256: "sha-1" } as Awaited<ReturnType<typeof api.getVariantMetadata>>);
     vi.spyOn(api, "startLeadCorrection").mockResolvedValue({ id: 41 } as AssignmentView);
     mockRows(page([group("case-1", [rejectedRow("case-1", "de")])]));
     const { onNavigate } = renderStateful({});
     fireEvent.click(await screen.findByRole("button", { name: "Resolve…, case-1 de" }));
-    fireEvent.click(within(resolveBox()!).getByRole("button", { name: "Correct the translation…" }));
+    fireEvent.click(within(resolveBox()!).getByRole("button", { name: "Correct it myself (counts as accepted)…" }));
     const panel = screen.getByRole("group", { name: "Correct the translation, case-1 de" });
-    expect(panel.closest(".documents-row-notice-slot")).not.toBeNull();
+    expect(panel.closest("[role='dialog']")).toBe(resolveBox());
     await waitFor(() => expect(document.activeElement).toBe(within(panel).getByRole("heading", { name: "Correct the translation, case-1 de" })));
     fireEvent.click(within(panel).getByRole("button", { name: "Open translation review" }));
     await waitFor(() => expect(onNavigate).toHaveBeenCalledWith({ name: "task", assignmentId: 41 }, undefined));
@@ -1751,7 +1754,7 @@ describe("Resolve renders inline under the row (Change 13, F1, F5)", () => {
     mockRows(page([group("case-1", [rejectedRow("case-1", "de")])]));
     renderStateful({});
     fireEvent.click(await screen.findByRole("button", { name: "Resolve…, case-1 de" }));
-    fireEvent.click(within(resolveBox()!).getByRole("button", { name: "Correct the translation…" }));
+    fireEvent.click(within(resolveBox()!).getByRole("button", { name: "Correct it myself (counts as accepted)…" }));
     const panel = screen.getByRole("group", { name: "Correct the translation, case-1 de" });
     fireEvent.click(within(panel).getByRole("button", { name: "Open translation review" }));
     const link = await within(panel).findByRole("link", { name: "Add your qualification in your profile" });
@@ -1764,7 +1767,7 @@ describe("Resolve renders inline under the row (Change 13, F1, F5)", () => {
     renderStateful({});
     await screen.findByRole("list", { name: "Documents" });
     fireEvent.click(await screen.findByRole("button", { name: "Resolve…, case-1 de" }));
-    await waitFor(() => expect(document.activeElement).toBe(resolveHeading()));
+    await waitFor(() => expect(document.activeElement).toBe(resolvePrimary()));
     fireEvent.click(within(resolveBox()!).getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(document.activeElement).toBe(actionButton()));
   });

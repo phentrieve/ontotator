@@ -43,7 +43,7 @@ function renderDialog(kind: QueryDecisionKind) {
 
 it("Accept the reviewer's text: the proposed text, its changes against the version, an optional answer", async () => {
   const props = renderDialog("reviewer_text");
-  const dialog = screen.getByRole("dialog", { name: "Accept the reviewer’s text, case-0101 de v1" });
+  const dialog = screen.getByRole("dialog", { name: "Accept the reviewer’s text as v2, case-0101 de v1" });
   const editor = await within(dialog).findByRole("textbox", { name: "Reviewer’s text" }) as HTMLTextAreaElement;
   expect(api.getQueryDecisionPreview).toHaveBeenCalledWith("p", "case-0101-de");
   // The editor starts with the reviewer's text, not with the version's text.
@@ -65,7 +65,7 @@ it("Accept the reviewer's text: the proposed text, its changes against the versi
 
 it("the lead may change the reviewer's text; the version's own text is not a new version", async () => {
   renderDialog("reviewer_text");
-  const dialog = screen.getByRole("dialog", { name: "Accept the reviewer’s text, case-0101 de v1" });
+  const dialog = screen.getByRole("dialog", { name: "Accept the reviewer’s text as v2, case-0101 de v1" });
   const editor = await within(dialog).findByRole("textbox", { name: "Reviewer’s text" });
   fireEvent.change(editor, { target: { value: `${PROPOSED} Geprüft.` } });
   expect(within(dialog).getByText("You changed the reviewer’s text. The record says so.")).toBeTruthy();
@@ -76,7 +76,7 @@ it("the lead may change the reviewer's text; the version's own text is not a new
   // Back at the version's text: nothing to save, and the other option is named.
   vi.mocked(api.decideQuery).mockClear();
   fireEvent.change(editor, { target: { value: OLD } });
-  expect(within(dialog).getByText("This text is the same as v1. To accept v1 without changes, use Answer and accept the version as it is….")).toBeTruthy();
+  expect(within(dialog).getByText("This text is the same as v1. To accept v1 without changes, use Accept v1 as it is….")).toBeTruthy();
   expect(within(dialog).queryByRole("region", { name: "Text changes" })).toBeNull();
   const accept = within(dialog).getByRole("button", { name: "Accept as v2" });
   expect(accept.getAttribute("aria-disabled")).toBe("true");
@@ -87,15 +87,15 @@ it("the lead may change the reviewer's text; the version's own text is not a new
 it("work on the version is named before the reviewer's text becomes a new version", async () => {
   vi.mocked(api.getQueryDecisionPreview).mockResolvedValue(preview({ annotate_accepted_only: false, annotations: { submitted: 1, open: 1 } }));
   renderDialog("reviewer_text");
-  const dialog = screen.getByRole("dialog", { name: "Accept the reviewer’s text, case-0101 de v1" });
+  const dialog = screen.getByRole("dialog", { name: "Accept the reviewer’s text as v2, case-0101 de v1" });
   expect(await within(dialog).findByText("Annotation has work on v1.")).toBeTruthy();
   expect(within(dialog).getByText(/^2 annotations \(1 submitted, 1 open\) stay on v1\. After saving, the row offers Handle text change…\./)).toBeTruthy();
 });
 
-it("Answer and accept the version as it is: the answer is required", async () => {
+it("Accept v1 as it is: the answer is required", async () => {
   vi.mocked(api.decideQuery).mockResolvedValue(saved({ kind: "unchanged", document_id: "case-0101-de", version: 1 }));
   const props = renderDialog("unchanged");
-  const dialog = screen.getByRole("dialog", { name: "Answer and accept the version as it is, case-0101 de v1" });
+  const dialog = screen.getByRole("dialog", { name: "Accept v1 as it is, case-0101 de" });
   expect(await within(dialog).findByText("v1 is accepted without changes. It is recorded as your decision on the query.")).toBeTruthy();
   expect(within(dialog).getByText("The reviewer also proposed a changed text. It is not taken.")).toBeTruthy();
   expect(within(dialog).queryByRole("textbox", { name: "Reviewer’s text" })).toBeNull();
@@ -125,7 +125,7 @@ it("says in place why the query cannot be decided, before and at saving", async 
   vi.mocked(api.getQueryDecisionPreview).mockResolvedValue(preview());
   vi.mocked(api.decideQuery).mockRejectedValue(new ApiError(409, "refused", "QUERY_DECISION_NOT_AVAILABLE", { reason: "already_decided" }));
   const second = renderDialog("reviewer_text");
-  const dialog = screen.getByRole("dialog", { name: "Accept the reviewer’s text, case-0101 de v1" });
+  const dialog = screen.getByRole("dialog", { name: "Accept the reviewer’s text as v2, case-0101 de v1" });
   await within(dialog).findByRole("textbox", { name: "Reviewer’s text" });
   fireEvent.click(within(dialog).getByRole("button", { name: "Accept as v2" }));
   expect(await within(dialog).findByText("This query was already decided. Reload the row to see its current state.")).toBeTruthy();
@@ -138,17 +138,28 @@ it("words every refusal and the announcement", () => {
   expect(queryDecisionMessage(row, saved(), true)).toBe("case-0101 de: the reviewer’s text was saved as v2 and accepted. The reviewer sees your answer at their submitted task.");
 });
 
-it("Resolve… on a queried translation offers both decisions first; a rejected one does not", async () => {
+it("Resolve… on a queried translation shows the question and the proposed text first, then both decisions; a rejected one does not (issue 554)", async () => {
   vi.spyOn(api, "listTranslationReviews").mockResolvedValue([reviewRecord({ assignment_id: 12, decision: "query", rationale: QUESTION, categories: ["terminology"] })]);
   const props = { mode: "resolve" as const, row, projectKey: "p", revision: 3, onAssignReview: vi.fn(), onNavigate: vi.fn(), onDone: vi.fn(), onChanged: vi.fn(), onAnnounce: vi.fn(), onCancel: vi.fn() };
   render(<ResolveTranslation {...props} />);
-  const box = screen.getByRole("group", { name: "Resolve queried translation, case-0101 de" });
-  expect(within(box).getAllByRole("button").map(button => button.textContent)).toEqual([
-    "Accept the reviewer’s text…", "Answer and accept the version as it is…", "Reopen Ana Weber's review…", "Assign a new review…", "Correct the translation…", "Discard the de translation…", "Cancel",
-  ]);
+  const box = screen.getByRole("dialog", { name: "Resolve queried translation, case-0101 de" });
   await within(box).findByText("Ana Weber asked a question about this translation.");
-  fireEvent.click(within(box).getByRole("button", { name: "Accept the reviewer’s text…" }));
-  const dialog = screen.getByRole("dialog", { name: "Accept the reviewer’s text, case-0101 de v1" });
+  // The proposed text with its changes, on demand, before any decision.
+  const proposal = await within(box).findByText("Show the proposed text (1 passage changed)");
+  expect(within(box).getByRole("region", { name: "Ana Weber’s proposed text, changes to v1", hidden: true }).querySelector("ins")?.textContent).toContain("muskuläre");
+  expect(proposal.tagName).toBe("SUMMARY");
+  // One primary decision, one alternative, the rest under Other ways….
+  expect(within(box).getAllByRole("button").filter(button => !button.closest("details")).map(button => button.textContent)).toEqual([
+    "", "Other ways…", "Cancel", "Accept v1 as it is…", "Accept the reviewer’s text as v2…",
+  ]);
+  expect(within(box).getByRole("button", { name: "Accept the reviewer’s text as v2…" }).className).toContain("btn-primary");
+  fireEvent.click(within(box).getByRole("button", { name: "Other ways to resolve case-0101 de" }));
+  expect(screen.getAllByRole("menuitem").map(item => item.getAttribute("aria-label"))).toEqual([
+    "Reopen Ana Weber's review…", "Assign a new review…", "Correct it myself (counts as accepted)…", "Discard the de translation…",
+  ]);
+  fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+  fireEvent.click(within(box).getByRole("button", { name: "Accept the reviewer’s text as v2…" }));
+  const dialog = screen.getByRole("dialog", { name: "Accept the reviewer’s text as v2, case-0101 de v1" });
   await within(dialog).findByRole("textbox", { name: "Reviewer’s text" });
   fireEvent.click(within(dialog).getByRole("button", { name: "Accept as v2" }));
   await waitFor(() => expect(props.onDone).toHaveBeenCalledWith("case-0101 de: the reviewer’s text was saved as v2 and accepted.", { caseId: "case-0101", revision: 3 }));
@@ -157,6 +168,17 @@ it("Resolve… on a queried translation offers both decisions first; a rejected 
     versions: [version({ document_id: "case-0101-de", chain_name: "DeepL", origin: "machine_translation", translation_status: "reviewed", latest_review_decision: "rejected" })],
   });
   render(<ResolveTranslation {...props} row={rejected} />);
-  expect(screen.queryByRole("button", { name: "Accept the reviewer’s text…" })).toBeNull();
-  expect(screen.queryByRole("button", { name: "Answer and accept the version as it is…" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /Accept the reviewer’s text/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: /as it is…/ })).toBeNull();
+});
+
+it("a query without a proposed change offers only Accept v1 as it is… (no greyed Accept the reviewer’s text)", async () => {
+  vi.mocked(api.getQueryDecisionPreview).mockResolvedValue(preview({ proposes_changes: false, review: { ...preview().review!, proposed_text: OLD } }));
+  vi.spyOn(api, "listTranslationReviews").mockResolvedValue([reviewRecord({ assignment_id: 12, decision: "query", rationale: QUESTION })]);
+  render(<ResolveTranslation mode="resolve" row={row} projectKey="p" revision={3} onAssignReview={vi.fn()} onNavigate={vi.fn()} onDone={vi.fn()}
+    onChanged={vi.fn()} onAnnounce={vi.fn()} onCancel={vi.fn()} />);
+  const box = screen.getByRole("dialog", { name: "Resolve queried translation, case-0101 de" });
+  expect(await within(box).findByText("Ana Weber proposed no change to the text.")).toBeTruthy();
+  expect(within(box).queryByRole("button", { name: /Accept the reviewer’s text/ })).toBeNull();
+  expect(within(box).getByRole("button", { name: "Accept v1 as it is…" }).className).toContain("btn-primary");
 });
