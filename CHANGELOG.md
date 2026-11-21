@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- MCP: `preview_change` shows the dry run of a changing tool as a tool that reads only (#485). A tool with `confirm` does its dry run without it, but it is marked as changing data, so a client that asks before or refuses every changing tool could not show the dry run. `preview_change` takes `tool` (any tool with `confirm`) and its `arguments`, and returns that tool's own dry run with `preview_of` and `how_to_apply`; to apply, the model calls the tool itself with `confirm=true`. It refuses `confirm` and `preview_token`, and while it runs the MCP server sends only requests that change nothing (a GET, a `/preview` route or a body with `"preview": true`): `set_member_roles` with roles to add only, which needs no `confirm`, is stopped before anything is sent. One tool, not a read-only twin of each changing tool. No API change.
+
+### Fixed
+
+- My tasks: a submitted translation review names the reviewer's decision under **Submitted**, for example *Your decision: Rejected* (#472); before, every submitted review read the same. The task's **Submitted review** says what the review made of the version: *Reviewed, not accepted* after **Rejected** or **Query**, *Reviewed; the corrected text was accepted as the next version* after **Accepted with corrections**, where it read *Reviewed* for all three. `GET /api/v1/me/tasks` returns `review_decision` for a submitted translation review (the decision of its current submission; null for other tasks). No migration.
+
 ## [0.12.0] - 2026-11-20
 
 ### Added

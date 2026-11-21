@@ -3,6 +3,7 @@ tool with ``confirm`` says what it acted on (review findings F3 and F4)."""
 
 from __future__ import annotations
 
+import re
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -49,7 +50,12 @@ async def test_every_tool_refuses_an_argument_it_does_not_have(
             with pytest.raises(ToolFailed) as refused:
                 await call(client, name, arguments[name] | {"not_an_argument": 1})
             message = str(refused.value)
-            assert f"Unknown argument 'not_an_argument' for {name}" in message, name
+            # A tool with an argument near the name gets a "did you mean".
+            assert re.search(
+                rf"Unknown argument 'not_an_argument'( \(did you mean '\w+'\?\))?"
+                rf" for {name};",
+                message,
+            ), name
             valid = ", ".join(schema.get("properties", {})) or "none"
             assert f"Valid arguments: {valid}." in message, name
             assert fake.calls == [], name

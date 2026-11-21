@@ -151,10 +151,14 @@ class ToolInfo:
     effect: Effect
     summary: str
     any_of: tuple[Scope, ...] = ()
+    # A tool without scopes of its own (preview_change): what it needs instead.
+    scope_note: str | None = None
 
     @property
     def label(self) -> str:
         """The scopes as the README's table names them."""
+        if self.scope_note:
+            return self.scope_note
         if self.any_of:
             return " or ".join(self.any_of)
         return ", ".join(self.scopes)
@@ -312,16 +316,27 @@ def register(
     effect: Effect,
     idempotent: bool = False,
     title: str | None = None,
+    scope_note: str | None = None,
 ) -> Callable[[F], F]:
-    """``@register(server, scopes=..., effect=...)`` on an async tool function."""
+    """``@register(server, scopes=..., effect=...)`` on an async tool function.
+
+    ``scope_note`` replaces both for a tool that needs the scopes of another
+    tool (preview_change); the description then says that note.
+    """
     needed = (scopes,) if isinstance(scopes, str) else scopes
-    if bool(needed) == bool(any_of):
+    if scope_note is not None:
+        if needed or any_of:
+            raise ValueError("Give scope_note alone.")
+    elif bool(needed) == bool(any_of):
         raise ValueError("Give either scopes or any_of.")
 
     def decorator(fn: F) -> F:
         doc = inspect.cleandoc(fn.__doc__ or "")
         summary = doc.split("\n\n", 1)[0].replace("\n", " ")
-        description = f"{doc}\n\n{scope_text(needed, any_of)} {EFFECT_TEXT[effect]}"
+        scope_line = (
+            f"Token scope: {scope_note}." if scope_note else scope_text(needed, any_of)
+        )
+        description = f"{doc}\n\n{scope_line} {EFFECT_TEXT[effect]}"
         read_only = effect == "read"
         annotations = ToolAnnotations(
             title=title,
@@ -334,7 +349,7 @@ def register(
             open_world_hint=False,
         )
         TOOL_SCOPES[fn.__name__] = ToolInfo(
-            fn.__name__, needed, effect, summary, any_of
+            fn.__name__, needed, effect, summary, any_of, scope_note
         )
         server.add_tool(
             fn, name=fn.__name__, description=description, annotations=annotations

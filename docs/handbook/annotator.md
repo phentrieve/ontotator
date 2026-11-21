@@ -473,6 +473,8 @@ Steps:
 
 On a wide screen, **Your review** is a column on the right. To give the texts more room, drag its left edge (**Resize review panel**), or focus the edge and press `←` or `→`; `Enter` restores the default width. **Collapse review panel** folds it to a narrow strip: the bar at the bottom then shows the decision and **Submit review…**, and **Expand review panel** or **Change ↓** opens it again. Width and folding are remembered in this browser.
 
+In **My tasks** a submitted review names your decision under **Submitted**, for example *Your decision: Rejected*. When you open it, **Submitted review** lists the decision and **Status after this review**: *Accepted* after **Accepted unchanged**, *Reviewed; the corrected text was accepted as the next version* after **Accepted with corrections**, and *Reviewed, not accepted* after **Rejected** or **Query**. That is the status your review gave the version, not necessarily its status today: the lead may have decided since.
+
 After a **Query** the lead decides. **My tasks** then shows *Answer from the lead* at your submitted review (tab **Submitted**). Open the task: above **Submitted review** you read what was decided, for example *The lead decided your query on 18 Nov, 10:12. Your text was accepted as v2.* (or *v1 was accepted as it is.*), and the lead's answer, for example *Answer from the lead: Yes, as proposed.*
 
 A project lead who corrects a translation themselves sees only **Accepted with corrections**. When the lead corrects a translation that was already accepted, the corrected version is reviewed again: it then appears as a new translation review task, usually for you ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).

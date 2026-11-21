@@ -11457,6 +11457,8 @@ export interface components {
             second_review_additions?: components["schemas"]["ReasonAddition"][] | null;
             /** Query Answered At */
             query_answered_at?: string | null;
+            /** Review Decision */
+            review_decision?: ("accepted_unchanged" | "accepted_corrected" | "query" | "rejected") | null;
             /**
              * Report Answered
              * @default false
