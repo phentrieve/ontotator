@@ -197,20 +197,21 @@ for (const [name, viewport] of sizes) {
     const caseId = s.cases!.take_text;
     await login(page, s, "lead");
     await rowAction(page, "Resolve…", caseId, "de").click();
-    const options = page.getByRole("group", { name: textNamePattern("Resolve queried translation, ", caseId, "de") });
+    // Issue 554: Resolve… is a dialog; the reviewer's review is reopened under Other ways….
+    const options = page.getByRole("dialog", { name: textNamePattern("Resolve queried translation, ", caseId, "de") });
     await expect(options).toContainText("Ben Roth asked a question about this translation.");
     await expect(options).toContainText("Is the dose in v2 per day or per dose?");
-    await expect(options.getByRole("button", { name: "Reopen Ben Roth's review…", exact: true })).toBeVisible();
-    await options.getByRole("button", { name: "Accept the reviewer’s text…", exact: true }).click();
-    const taking = page.getByRole("dialog", { name: `Accept the reviewer’s text, ${caseId} de v2`, exact: true });
-    await expect(taking).toContainText("Ben Roth asked a question about v2.");
-    await expect(taking).not.toContainText("already decided");
-    await taking.getByRole("button", { name: "Cancel", exact: true }).click();
-    await expect(taking).toHaveCount(0);
-    await rowAction(page, "Resolve…", caseId, "de").click();
-    await options.getByRole("button", { name: "Answer and accept the version as it is…", exact: true }).click();
-    const dialog = page.getByRole("dialog", { name: `Answer and accept the version as it is, ${caseId} de v2`, exact: true });
+    await options.getByRole("button", { name: textNamePattern("Other ways to resolve ", caseId, "de") }).click();
+    await expect(page.getByRole("menuitem", { name: /^Reopen Ben Roth's review…/ })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toHaveCount(0);
+    // Ben proposed no change, so there is no reviewer's text to take (issue 554); v2 is decided as it is.
+    await expect(options).toContainText("Ben Roth proposed no change to the text.");
+    await expect(options.getByRole("button", { name: /^Accept the reviewer’s text/ })).toHaveCount(0);
+    await options.getByRole("button", { name: "Accept v2 as it is…", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: `Accept v2 as it is, ${caseId} de`, exact: true });
     await expect(dialog).toContainText("v2 is accepted without changes. It is recorded as your decision on the query.");
+    await expect(dialog).not.toContainText("already decided");
     await dialog.getByRole("textbox", { name: /^Answer to the reviewer/ }).fill("Per day, as the source says.");
     await shot(page, `requery-dialog-${name}`);
     await dialog.getByRole("button", { name: "Accept v2", exact: true }).click();
