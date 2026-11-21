@@ -148,7 +148,8 @@ test.describe("the right column as a rail (issue 540)", () => {
     // Back as it was: the tree has the column, the finding is one line.
     await expect(findingBar(page)).toBeVisible();
     await expect(treePanel(page)).toBeVisible();
-    expect(await visibleRows(page)).toBeGreaterThanOrEqual(9);
+    // The tree's rows load again after the expand; wait for them instead of counting once.
+    await expect.poll(() => visibleRows(page)).toBeGreaterThanOrEqual(9);
     // Work that needs the panel opens it again.
     await collapse(page).click();
     await selectText(page, 0, 9);
