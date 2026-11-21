@@ -149,6 +149,10 @@ class BulkTaskActionView(BaseModel):
     change_count: int
     kept_count: int
     skipped_count: int
+    # reason -> number of kept tasks and of skipped texts (also with
+    # ``summary_only``); the reasons of ``kept`` and ``skipped``.
+    kept_by_reason: dict[str, int] = Field(default_factory=dict)
+    skipped_by_reason: dict[str, int] = Field(default_factory=dict)
     changes: list[BulkTaskView]
     kept: list[BulkKeptTaskView]
     skipped: list[BulkSkippedTextView]

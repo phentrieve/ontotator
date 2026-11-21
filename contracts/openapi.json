@@ -16442,6 +16442,20 @@
             "type": "integer",
             "title": "Skipped Count"
           },
+          "kept_by_reason": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Kept By Reason"
+          },
+          "skipped_by_reason": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Skipped By Reason"
+          },
           "changes": {
             "items": {
               "$ref": "#/components/schemas/BulkTaskView"

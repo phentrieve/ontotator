@@ -443,4 +443,43 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
     expect(errors).toEqual([]);
   });
 
+  test(`a paused consolidation stays under Finalization, the pause mark's title names it, More actions gives matching reasons (${width} px)`, async ({ page }) => {
+    const errors: string[] = [];
+    watch(page, errors);
+    await page.setViewportSize(size);
+    const s = await documentsScenario(page, "S464");
+    await loginExisting(page, s.users.lead);
+    await page.goto(`/#/projects/${encodeURIComponent(s.project)}/documents`);
+    await documentsReady(page);
+    // EN100028: 2 of 2 submitted and an open consolidation; EN100023: two open annotations, nothing submitted.
+    await selectTexts(page, ["EN100028", "EN100023"]);
+    await run(page, "Pause", 2, 2, WHY);
+    await page.locator(".ui-toast").getByRole("button", { name: "Dismiss" }).click();
+
+    // Issue 576, F2: the phone card reads like the table: the annotations stay submitted, the consolidation is paused.
+    const row = rowOf(page, "EN100028");
+    const line = (title: string) => phone ? row.locator(".document-card-stage").filter({ hasText: `${title}:` }) : cellUnder(row, STAGE_HEADERS[title === "Annotation" ? "annotation" : "finalization"]);
+    await expect(line("Annotation")).toContainText("2 of 2 submitted");
+    await expect(line("Annotation")).not.toContainText("paused");
+    await expect(line("Finalization")).toContainText(phone ? "consolidating · paused" : "paused");
+    await expect(line("Finalization").locator('.stage-cell-symbol[data-symbol="⏸"]')).toHaveCount(1);
+    await expect(line("Finalization")).not.toContainText("after review");
+    // F3: pointing at the mark (an icon where the table is short of room) names the pause.
+    await expect(row.locator(".documents-lead-paused")).toHaveAttribute("title", new RegExp(`^Paused by lead \\(you, .+\\): ${WHY}$`));
+    await shot(page, `576-paused-consolidation${suffix}`);
+
+    // F6: both texts stay selected; nothing can start a round or be withdrawn, and the reasons say why.
+    const menu = await openMenu(page);
+    await expect(menu.getByRole("menuitem", { name: /^Start a round…/ })).toContainText("1 text has an open consolidation; the other has no submitted annotations.");
+    await expect(menu.getByRole("menuitem", { name: /^Withdraw open tasks…/ })).toContainText("The open tasks are paused by a lead: release the texts first.");
+    await page.keyboard.press("Escape");
+    await rowBox(page, "EN100023", "en").uncheck();
+    await expect(selectionBar(page)).toContainText("1 text in");
+    const alone = await openMenu(page);
+    await expect(alone.getByRole("menuitem", { name: /^Start a round…/ })).toContainText("The selected text has an open consolidation.");
+    await expect(alone.getByRole("menuitem", { name: /^Withdraw open tasks…/ })).toContainText("The open tasks are paused by a lead: release the text first.");
+    expect(await noHorizontalScroll(page)).toBe(true);
+    await shot(page, `576-menu-reasons${suffix}`);
+    expect(errors).toEqual([]);
+  });
 }
