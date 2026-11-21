@@ -92,6 +92,13 @@ export function ChecksSummary({ failed, all, earlier, brackets }: {
   </section>;
 }
 
+/** The status a review gave the version. A rejected, queried or corrected version is "reviewed" in the data; on its
+ * own that read as if the review had passed (issue 472), so the line says what became of the version. */
+export function statusAfterReviewLabel(record: Pick<TranslationReviewRecord, "status_after" | "decision">): string {
+  if (record.status_after !== "reviewed") return translationStatusLabel(record.status_after);
+  return record.decision === "accepted_corrected" ? "Reviewed; the corrected text was accepted as the next version" : "Reviewed, not accepted";
+}
+
 const categoryList = (values: readonly ClinicalCategory[]) => values.map((value) => categoryLabels[value] ?? value).join(", ");
 
 /** Immutable summary of a submitted review, in place of disabled controls. */
@@ -103,7 +110,7 @@ export function ReviewSummary({ record, heading }: { record: TranslationReviewRe
       <div><dt>Clinically relevant change</dt><dd>{record.clinical_change ? `Yes: ${categoryList(record.categories)}` : "No"}</dd></div>
       <div><dt>Rationale</dt><dd className="review-summary-rationale">{record.rationale?.trim() ? record.rationale : <EmptyValue />}</dd></div>
       {/* The status this review gave the version, kept as it was (issue 546: the lead may have accepted it since). */}
-      <div><dt>Status after this review</dt><dd>{translationStatusLabel(record.status_after)}</dd></div>
+      <div><dt>Status after this review</dt><dd>{statusAfterReviewLabel(record)}</dd></div>
       <div><dt>Reviewer</dt><dd>{personLabel({ pseudonym: record.reviewer_pseudonym })}{record.reviewer_qualification ? `, ${record.reviewer_qualification}` : ""}</dd></div>
       <div><dt>Guidelines</dt><dd>{submissionGuidelineLabel(record.guideline_version, record.guideline_withdrawn, null, record.guideline_label).replace(/^Guidelines:? /, "")}</dd></div>
       <div><dt>Submitted</dt><dd><time dateTime={record.created_at}>{formatTime(record.created_at)}</time></dd></div>

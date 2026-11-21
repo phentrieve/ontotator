@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Ontotator Local API",
-    "version": "0.11.0"
+    "version": "0.12.0"
   },
   "paths": {
     "/api/v1/me/tasks": {
@@ -33342,6 +33342,23 @@
               }
             ],
             "title": "Query Answered At"
+          },
+          "review_decision": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "accepted_unchanged",
+                  "accepted_corrected",
+                  "query",
+                  "rejected"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Decision"
           },
           "report_answered": {
             "type": "boolean",
