@@ -154,7 +154,7 @@ Only leads and system administrators can open the list. To decide a query or a r
 
 ### Resolve a rejected or queried translation
 
-What for: decide what happens after a reviewer rejected or queried a translation. The row's next step is **Resolve rejected translation** or **Resolve queried translation**.
+What for: decide what happens after a reviewer rejected or queried a translation. The row's next step is **Resolve rejected translation** or **Resolve queried translation**. It always concerns the newest version that was rejected or queried. For example, after you took the reviewer's text as v2 and asked a reviewer to correct v2, a query on v2 is decided at v2: the dialogs name *v2* and the button reads *Accept v2*.
 
 1. In the row, click **Resolve…**. The options open below the row with the reviewer's rationale. When someone holds an annotation that waits for this translation, a line names them, for example *Ana Weber is waiting for this decision to start the annotation.*
 2. For a query, decide it yourself with one of the first two items. Each closes the query as your decision, and the reviewer reads your answer at their submitted task (**My tasks**, *Answer from the lead*):
