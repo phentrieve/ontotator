@@ -75,7 +75,8 @@ export interface EditorialConsequences {
  * ("Nobody has annotated v1 yet.", "2 waiting tasks continue on v2."); when started or submitted work stays,
  * what stays and what to do next ("2 annotations stay on v1. After saving, use Handle text change… and
  * Carry to v2… on this row to move them."). With a changed text, per person: whose submitted annotation moves
- * to the new version by itself (issue 465) and whose does not, and why.
+ * to the new version by itself (issue 465) and whose does not, and why. Per task that is not submitted and stays, why it
+ * stays (opened, paused, from tool proposals while one waits for a check), and the rule for tasks from proposals (issue 509).
  */
 export function editorialConsequences(preview: EditorialCorrectionPreview): EditorialConsequences {
   const old = `v${preview.version}`, next = `v${preview.next_version}`, moving = preview.tasks_following;
@@ -85,7 +86,11 @@ export function editorialConsequences(preview: EditorialCorrectionPreview): Edit
   const kept = carry.filter(item => !item.carried && item.status === "submitted");
   // Issue 543 (U4-04): before the text changes, nobody knows yet whose annotation moves by itself.
   const unknown = preview.annotation_carry == null ? preview.annotations.submitted : 0;
-  const started = Math.max(0, preview.annotations.open - moving), submitted = Math.max(0, preview.annotations.submitted - carried.length - unknown);
+  // Issue 509: tasks that stay, each with its reason; a task from proposals before the text changes is not decided yet.
+  const stayingTasks = preview.tasks_staying ?? [];
+  const pending = stayingTasks.filter(item => item.reason === "from_proposals");
+  const named = stayingTasks.filter(item => item.reason !== "from_proposals");
+  const started = Math.max(0, preview.annotations.open - moving - pending.length), submitted = Math.max(0, preview.annotations.submitted - carried.length - unknown);
   const staying = submitted + started;
   // The row's own next steps: started work is moved with "Handle text change…", submitted work with "Carry to v2…".
   const steps = [started ? "Handle text change…" : null, submitted ? `Carry to ${next}…` : null].filter(Boolean).join(" and ");
@@ -100,6 +105,7 @@ export function editorialConsequences(preview: EditorialCorrectionPreview): Edit
     carried.length ? `${carried.length === 1 ? "Moves" : "Move"} to ${next} by ${carried.length === 1 ? "itself" : "themselves"}, nobody submits again: the ${carried.length === 1 ? "annotation" : "annotations"} of ${names(carried)}.` : null,
     unknown ? `Once you change the text, this says ${unknown === 1 ? "whether the submitted annotation moves" : `which of the ${unknown} submitted annotations move`} to ${next} by ${unknown === 1 ? "itself" : "themselves"}.` : null,
     moving ? `${plural(moving, "waiting task")} ${moving === 1 ? "continues" : "continue"} on ${next}.` : null,
+    pending.length ? `Once you change the text, this says whether the ${pending.length === 1 ? "task" : "tasks"} from tool proposals of ${names(pending)} ${pending.length === 1 ? "continues" : "continue"} on ${next}. ${PROPOSALS_RULE(next)}` : null,
     proposals && proposals.carried + proposals.needs_check > 0
       ? `Tool proposals move to ${next}${proposals.needs_check ? `; ${proposals.needs_check} ${proposals.needs_check === 1 ? "marks" : "mark"} words you changed and ${proposals.needs_check === 1 ? "waits" : "wait"} for a check` : ""}.`
       : null,
@@ -107,6 +113,7 @@ export function editorialConsequences(preview: EditorialCorrectionPreview): Edit
   const stays = [
     ...keptLines(kept),
     staying ? `${plural(staying, "annotation")} ${staying === 1 ? "stays" : "stay"} on ${old}. ${waits ? `Once ${next} is accepted` : "After saving"}, use ${steps} on this row to move ${staying === 1 ? "it" : "them"}.` : null,
+    ...stayingLines(named, next),
     others ? `${others.charAt(0).toUpperCase()}${others.slice(1)} ${count + (preview.final_result ? 1 : 0) === 1 ? "stays" : "stay"} on ${old}${staying ? " as well" : ""}.` : null,
     findings?.needs_check ? `${findings.needs_check} of ${plural(findings.submitted, "finding")} ${findings.needs_check === 1 ? "marks" : "mark"} words you changed and will need a check when moved.` : null,
   ].filter(present);
@@ -122,11 +129,12 @@ export function editorialConsequences(preview: EditorialCorrectionPreview): Edit
 export function reviewNote(decision: string | null | undefined, next: number): string | null {
   if (!decision) return null;
   const stays = "A submitted translation review stays with the version it reviewed.";
-  return decision === "rejected" || decision === "query" ? `${stays} To have v${next} reviewed, use Resolve… › Assign a new review… on this row after saving.` : stays;
+  return decision === "rejected" || decision === "query" ? `${stays} To have v${next} reviewed, use Resolve… › Other ways… › Assign a new review… on this row after saving.` : stays;
 }
 
 type CarryPerson = NonNullable<EditorialCorrectionPreview["annotation_carry"]>[number];
-const names = (people: readonly CarryPerson[]) => {
+type StayingTask = EditorialCorrectionPreview["tasks_staying"][number];
+const names = (people: readonly { display_name: string; username: string }[]) => {
   const all = people.map(item => item.display_name || item.username);
   return all.length > 1 ? `${all.slice(0, -1).join(", ")} and ${all[all.length - 1]}` : all.join("");
 };
@@ -142,6 +150,27 @@ export const CARRY_REASONS: Readonly<Record<string, string>> = {
   findings_need_check: "a finding marks words you changed",
   not_carryable: "it cannot be moved automatically",
 };
+
+/** Issue 509: the rule for tasks from tool proposals, as the server applies it. */
+export const PROPOSALS_RULE = (next: string): string =>
+  `A task from tool proposals continues on ${next} only when nobody opened it and no proposal waits for a check.`;
+
+/** Why a task that is not submitted stays on the corrected version (`tasks_staying` reasons, issue 509). */
+export const STAY_REASONS: Readonly<Record<string, string>> = {
+  opened: "already opened",
+  paused: "the task is paused",
+  from_proposals_needs_check: "from tool proposals, and a proposal waits for a check",
+  from_proposals_none_carried: "from tool proposals, and no proposal moves to the new version",
+};
+
+/** One line per reason: "Task not moved, already opened: Eva Lang."; the rule for tasks from proposals when one stays for it. */
+function stayingLines(tasks: readonly StayingTask[], next: string): string[] {
+  const byReason = new Map<string, StayingTask[]>();
+  for (const item of tasks) byReason.set(item.reason, [...(byReason.get(item.reason) ?? []), item]);
+  const lines = [...byReason].map(([reason, people]) => `${people.length === 1 ? "Task" : "Tasks"} not moved, ${STAY_REASONS[reason] ?? reason}: ${names(people)}.`);
+  if (tasks.some(item => item.reason.startsWith("from_proposals"))) lines.push(PROPOSALS_RULE(next));
+  return lines;
+}
 
 /** One line per reason: "Not moved by itself, the fix changes a number: Tom Reis and Ana Weber." */
 function keptLines(kept: readonly CarryPerson[]): string[] {

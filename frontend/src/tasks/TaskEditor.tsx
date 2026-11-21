@@ -247,6 +247,8 @@ function AnnotationTaskEditor({ assignmentId, user, onNavigate, routeLeaveRef, l
         { id: "help", label: "Help for this screen", onSelect: () => window.open(helpHref(helpScreen), "_blank", "noopener,noreferrer") }]}
       roundInputs={roundInfo?.moved_by_typo_fix ? NO_INPUTS : roundInputs} roundKind={roundInfo?.kind} roundActive={roundInfo?.active} roundBadge={roundBadge} roundTitle={roundTitle}
       roundOrdinal={roundInfo?.round_ordinal} documentVersion={roundInfo?.document_version} changesSource={changesSource}
+      roundSubmission={roundInfo?.moved_by_typo_fix && roundInfo.latest_submission_id && roundInfo.latest_submission_recorded_at
+        ? { submissionId: roundInfo.latest_submission_id, recordedAt: roundInfo.latest_submission_recorded_at } : null}
       held={assignment.held} holdReason={pauseNotice(assignment).reason} holdTitle={pauseNotice(assignment).title} holdKept={pauseNotice(assignment).kept} saveBeforeReportRef={saveBeforeReportRef}
       onTaskHeld={refreshAssignment}
       headerTimer={<WorkTimerControl timer={workTimer} />} onEdit={workTimer.edit}

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Ontotator Local API",
-    "version": "0.11.0"
+    "version": "0.12.0"
   },
   "paths": {
     "/api/v1/me/tasks": {
@@ -1979,6 +1979,41 @@
               "minimum": 0,
               "default": 0,
               "title": "Offset"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "problem",
+                "question"
+              ],
+              "type": "string",
+              "default": "problem",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "open",
+                    "resolved",
+                    "withdrawn"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
             }
           }
         ],
@@ -8230,7 +8265,7 @@
           "translation-workflow"
         ],
         "summary": "Preview Editorial Correction",
-        "description": "Issue 453, read only: whether this version can be corrected and, with\na text or replacements, the changes, the guards and what follows.",
+        "description": "Issue 453, read only: whether this version can be corrected and, with\na text or replacements, the changes, the guards and what follows.\n\nAnnotation tasks nobody opened follow the new version\n(``tasks_following``); a task from tool proposals only when no proposal\nneeds a check. ``tasks_staying`` names each task that stays and why\n(opened, paused, from proposals that need a check); move it with\n\"Handle text change\" (issue 509).",
         "operationId": "preview_editorial_correction_api_v1_projects__key__documents__doc__editorial_correction_preview_post",
         "parameters": [
           {
@@ -8294,7 +8329,7 @@
           "translation-workflow"
         ],
         "summary": "Editorial Correction",
-        "description": "Issue 453: save an editorial fix (spacing, typos, grammar) as the next\nversion of this translation, with this version's status.",
+        "description": "Issue 453: save an editorial fix (spacing, typos, grammar) as the next\nversion of this translation, with this version's status. Tasks nobody\nopened follow; a task from tool proposals once its proposals are on the\nnew version, when none needs a check (issue 509).",
         "operationId": "editorial_correction_api_v1_projects__key__documents__doc__editorial_correction_post",
         "parameters": [
           {
@@ -16545,6 +16580,20 @@
             "type": "integer",
             "title": "Skipped Count"
           },
+          "kept_by_reason": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Kept By Reason"
+          },
+          "skipped_by_reason": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Skipped By Reason"
+          },
           "changes": {
             "items": {
               "$ref": "#/components/schemas/BulkTaskView"
@@ -20806,6 +20855,13 @@
             "type": "integer",
             "title": "Tasks Following"
           },
+          "tasks_staying": {
+            "items": {
+              "$ref": "#/components/schemas/EditorialStayingTask"
+            },
+            "type": "array",
+            "title": "Tasks Staying"
+          },
           "text": {
             "anyOf": [
               {
@@ -20952,6 +21008,7 @@
           "open_consolidations",
           "final_result",
           "tasks_following",
+          "tasks_staying",
           "text",
           "previous_text",
           "new_text_sha256",
@@ -21108,6 +21165,13 @@
             "type": "integer",
             "title": "Tasks Following"
           },
+          "tasks_staying": {
+            "items": {
+              "$ref": "#/components/schemas/EditorialStayingTask"
+            },
+            "type": "array",
+            "title": "Tasks Staying"
+          },
           "annotations_carried": {
             "type": "integer",
             "title": "Annotations Carried",
@@ -21133,7 +21197,8 @@
           "text_sha256",
           "inserted_characters",
           "deleted_characters",
-          "tasks_following"
+          "tasks_following",
+          "tasks_staying"
         ],
         "title": "EditorialCorrectionResult"
       },
@@ -21233,6 +21298,42 @@
         ],
         "title": "EditorialReplacement",
         "description": "One passage of the text and what replaces it."
+      },
+      "EditorialStayingTask": {
+        "properties": {
+          "assignment_id": {
+            "type": "integer",
+            "title": "Assignment Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "paused",
+              "opened",
+              "from_proposals",
+              "from_proposals_needs_check",
+              "from_proposals_none_carried"
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "assignment_id",
+          "username",
+          "display_name",
+          "reason"
+        ],
+        "title": "EditorialStayingTask",
+        "description": "Issue 509: an annotation task on the corrected version, not\nsubmitted, that stays there. ``reason``: ``paused``, ``opened``,\n``from_proposals_needs_check`` (a tool proposal marks words the fix\nchanges), ``from_proposals_none_carried`` (no proposal reaches the new\nversion) or, before the text is known, ``from_proposals``. Move it with\n\"Handle text change\" (MCP ``move_task_to_version``)."
       },
       "EvidenceMention": {
         "properties": {
@@ -27008,7 +27109,8 @@
               "extend_hold",
               "restart",
               "withdraw",
-              "reopen"
+              "reopen",
+              "answer"
             ],
             "title": "Action"
           },
@@ -27023,6 +27125,11 @@
             },
             "type": "array",
             "title": "Assignment Ids"
+          },
+          "take_proposed_text": {
+            "type": "boolean",
+            "title": "Take Proposed Text",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -27074,6 +27181,48 @@
             "type": "string",
             "minLength": 1,
             "title": "Reason"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "problem",
+              "question"
+            ],
+            "title": "Kind",
+            "default": "problem"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote"
+          },
+          "proposed_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Text"
+          },
+          "pause": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pause"
           }
         },
         "additionalProperties": false,
@@ -27340,6 +27489,80 @@
           "text_paused_by_lead": {
             "type": "boolean",
             "title": "Text Paused By Lead"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "problem",
+              "question"
+            ],
+            "title": "Kind",
+            "default": "problem"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote"
+          },
+          "proposed_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Text"
+          },
+          "pauses": {
+            "type": "boolean",
+            "title": "Pauses",
+            "default": true
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
+          "answered_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answered At"
+          },
+          "answered_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonRefView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "took_proposed_text": {
+            "type": "boolean",
+            "title": "Took Proposed Text",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -29876,6 +30099,11 @@
           "own_task": {
             "type": "boolean",
             "title": "Own Task",
+            "default": false
+          },
+          "took_proposed_text": {
+            "type": "boolean",
+            "title": "Took Proposed Text",
             "default": false
           }
         },
@@ -33638,6 +33866,23 @@
               }
             ],
             "title": "Query Answered At"
+          },
+          "review_decision": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "accepted_unchanged",
+                  "accepted_corrected",
+                  "query",
+                  "rejected"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Decision"
           },
           "report_answered": {
             "type": "boolean",

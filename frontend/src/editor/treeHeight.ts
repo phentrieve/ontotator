@@ -16,8 +16,11 @@ export const treeHeightKey = (username: string) => `ontotator.editor.treeHeight.
  */
 export const TREE_MIN_HEIGHT = 220;
 export const INSPECTOR_MIN_HEIGHT = 160;
-/** Shell header and case toolbar above the columns: an estimate, used only until the column is measured. */
-const CHROME_HEIGHT = 108;
+/**
+ * Shell header and case toolbar above the columns: an estimate, used only until the column is measured. From 1025 px
+ * they share one bar of about 40 px (issue 539); the estimate stays on the side of a lower column.
+ */
+const CHROME_HEIGHT = 56;
 
 /**
  * What the tree needs to be useful: its header, the details of the selected term, "Use this term"
@@ -27,8 +30,9 @@ export const TREE_USEFUL_HEIGHT = 420;
 /**
  * A low window (issue 521): the layout is lower than the annotation panel's least (160 px) and the
  * tree's useful height together. Then the open tree takes the whole right column and the panel
- * shrinks to one line. Measured heights of the layout: 1440 × 900 about 790 px, 1440 × 700 about
- * 590 px (not low), 1280 × 600 about 490 px (low).
+ * shrinks to one line. Measured heights of the layout under the one header bar (issue 539): 1440 × 900 about
+ * 860 px, 1440 × 700 about 660 px (not low), 1280 × 600 about 563 px (low); below 1025 px wide, where the case
+ * toolbar has its own line, about 70 px less.
  */
 export const LOW_LAYOUT_BELOW = INSPECTOR_MIN_HEIGHT + TREE_USEFUL_HEIGHT;
 /**

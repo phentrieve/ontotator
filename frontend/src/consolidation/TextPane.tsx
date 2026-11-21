@@ -127,6 +127,21 @@ function piecesOf(text: string, groups: readonly ConsolidationGroupView[], peopl
   return pieces;
 }
 
+/**
+ * The pieces in text order, in runs: each stretch of adjacent pieces of the selected group is one run, framed as a
+ * whole, so overlapping findings inside it (and the space between two of its words) never get frames of their own.
+ */
+function framedRuns(pieces: readonly Piece[], selectedGroupId: string | null): { selected: boolean; pieces: Piece[] }[] {
+  const runs: { selected: boolean; pieces: Piece[] }[] = [];
+  for (const piece of pieces) {
+    const selected = !!selectedGroupId && piece.groupIds.includes(selectedGroupId);
+    const last = runs[runs.length - 1];
+    if (last && last.selected === selected) last.pieces.push(piece);
+    else runs.push({ selected, pieces: [piece] });
+  }
+  return runs;
+}
+
 /** Codepoint offset of a DOM position inside the text (each piece carries its start in `data-start`). */
 function offsetOf(node: Node | null, offset: number): number | null {
   if (!node) return null;
@@ -177,18 +192,22 @@ export function TextPane({ text, groups, people, selectedGroupId, onSelectGroup,
     {/* Scrollable, so keyboard users can reach it (axe scrollable-region-focusable). */}
     <div className="cons-text-scroll" tabIndex={0} role="region" aria-label="Clinical text, scrollable">
       <div ref={root} className="cons-text-body" onMouseUp={readSelection} onKeyUp={readSelection}>
-        {pieces.map(piece => {
-          const value = chars.slice(piece.start, piece.end).join("");
-          if (!piece.groupIds.length && !piece.added) return <span key={piece.start} data-start={piece.start}>{value}</span>;
-          const selected = !!selectedGroupId && piece.groupIds.includes(selectedGroupId);
-          const className = ["cons-mark", piece.kept && "cons-kept", piece.added && "cons-added", selected && "cons-selected"].filter(Boolean).join(" ");
-          const target = selected ? selectedGroupId! : piece.groupIds[0];
-          const note = piece.modifiers.join("; ");
-          const mark = <span data-start={piece.start} className={className} style={laneStyle(piece.lanes)}
-            data-lanes={piece.lanes.join(" ") || undefined} title={note || undefined}
-            onClick={target ? () => { if (window.getSelection()?.isCollapsed !== false) onSelectGroup(target); } : undefined}>{value}</span>;
-          // The hidden words sit outside the piece, so text offsets (data-start) stay exact.
-          return <Fragment key={piece.start}>{mark}{note && <span className="visually-hidden"> ({note})</span>}</Fragment>;
+        {framedRuns(pieces, selectedGroupId).map(run => {
+          const marks = run.pieces.map(piece => {
+            const value = chars.slice(piece.start, piece.end).join("");
+            if (!piece.groupIds.length && !piece.added) return <span key={piece.start} data-start={piece.start}>{value}</span>;
+            const className = ["cons-mark", piece.kept && "cons-kept", piece.added && "cons-added"].filter(Boolean).join(" ");
+            const target = run.selected ? selectedGroupId! : piece.groupIds[0];
+            const note = piece.modifiers.join("; ");
+            const mark = <span data-start={piece.start} className={className} style={laneStyle(piece.lanes)}
+              data-lanes={piece.lanes.join(" ") || undefined} title={note || undefined}
+              onClick={target ? () => { if (window.getSelection()?.isCollapsed !== false) onSelectGroup(target); } : undefined}>{value}</span>;
+            // The hidden words sit outside the piece, so text offsets (data-start) stay exact.
+            return <Fragment key={piece.start}>{mark}{note && <span className="visually-hidden"> ({note})</span>}</Fragment>;
+          });
+          // One frame around the selected group's adjacent pieces (issue 548, U4-06): never a box per piece.
+          return run.selected ? <span key={run.pieces[0].start} className="cons-selected">{marks}</span>
+            : <Fragment key={run.pieces[0].start}>{marks}</Fragment>;
         })}
       </div>
     </div>

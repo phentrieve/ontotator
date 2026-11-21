@@ -6,7 +6,7 @@
  * 390 px; no console errors, no horizontal page scroll.
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { activityLines, cardPath, personRow, showSegment } from "./documentsHelpers";
+import { activityLines, cardPath, otherVersionAction, personRow, showSegment } from "./documentsHelpers";
 import { loginThroughForm } from "./helpers";
 import { leadScenario, type LeadScenario } from "./leadWorkflowHelpers";
 
@@ -44,9 +44,9 @@ for (const [name, viewport] of sizes) {
     await loginThroughForm(page, s.users.lead, s.display_names.lead);
     let card = await openCard(page, s);
 
-    // "Ask a reviewer to correct…" Ana, who accepted v1.
+    // Other ways… › "Ask a reviewer to correct…" Ana, who accepted v1.
     const v1 = card.locator("li.text-version").first();
-    await v1.getByRole("button", { name: `Ask a reviewer to correct v1 of ${CASE} de…`, exact: true }).click();
+    await otherVersionAction(page, v1, `v1 of ${CASE} de`, "Ask a reviewer to correct…");
     const ask = page.getByRole("dialog", { name: `Ask a reviewer to correct, ${CASE} de`, exact: true });
     const reviewer = ask.getByLabel("Translation reviewer");
     const ana = await reviewer.locator("option", { hasText: s.display_names.ana }).getAttribute("value");

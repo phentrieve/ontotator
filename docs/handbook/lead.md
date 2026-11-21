@@ -2,7 +2,7 @@
 
 This chapter is for project leads. A lead sets up the project, uploads texts, plans and assigns the work, accepts the results and exports them. Back to the [handbook overview](README.md).
 
-As a lead you see an extra group in the sidebar with the name of the current project: **Documents**, **Progress**, **Settings** and **Export**. System administrators see the same pages for every project ([Open and manage any project](admin.md#open-and-manage-any-project)). How annotators and consolidators do their tasks is in the [annotator reference](annotator.md) and the [consolidator chapter](consolidator.md).
+As a lead you see an extra group in the sidebar with the name of the current project: **Documents**, **Questions**, **Progress**, **Settings** and **Export**. System administrators see the same pages for every project ([Open and manage any project](admin.md#open-and-manage-any-project)). How annotators and consolidators do their tasks is in the [annotator reference](annotator.md) and the [consolidator chapter](consolidator.md).
 
 The lead's tasks are in four chapters:
 
@@ -10,7 +10,7 @@ The lead's tasks are in four chapters:
 | --- | --- | --- |
 | [Lead: project settings](lead-settings.md) | **Settings** | Name, languages, ontology, submission rules, workflow, people, guidelines |
 | [Lead: texts, work plans and progress](lead-documents.md) | **Documents**, **Progress** | Upload, the Documents table, the text card, work plans, assigning, progress |
-| [Lead: results, decisions and export](lead-results.md) | **Documents** (Finalization), **Export** | Accept results, consolidations, translation and text-change decisions, problem reports, export |
+| [Lead: results, decisions and export](lead-results.md) | **Documents** (Finalization), **Questions**, **Export** | Accept results, consolidations, translation and text-change decisions, questions, problem reports, export |
 | [Lead: change course in a running project](lead-change-course.md) | **Documents**, **Settings** | Use another translation, annotate texts again, narrow the scope, the command line |
 
 ## Typical project, start to finish

@@ -74,7 +74,8 @@ describe("theme tokens", () => {
 
     it("mark_fills_are_distinct", () => {
       // The floors of tokens.test.ts (mark_fills_are_distinct_…), for this theme.
-      expect(failing(tokens, pairsOf(MARK_FILLS), deltaE2000, 10)).toEqual([]);
+      // Any two fills can be stacked as bands (issue 551): >= 20 in both themes.
+      expect(failing(tokens, pairsOf(MARK_FILLS), deltaE2000, 20)).toEqual([]);
       expect(failing(tokens, MARK_FILLS.map((fill) => [fill, "--surface-raised", "a mark on the sheet"] as Pair), deltaE2000, 10)).toEqual([]);
       for (const d of DEFICIENCIES) {
         const simulated = (a: string, b: string) => deltaE2000(simulate(a, d), simulate(b, d));

@@ -305,6 +305,36 @@ export function stageText(stage: StageName, cell: StageCellView, _row: Pick<Docu
   return finalText(cell);
 }
 
+/**
+ * One stage of a row as the narrow card's line shows it, with the tone of its colour. A running consolidation belongs to
+ * Finalization, as in the table (issue 576, F2): "◐ consolidating" or, paused, "⏸ consolidating · paused" with the
+ * consolidator, the open groups and the reason of the pause; the Annotation line keeps "2 of 2 submitted". Null
+ * without the stage's cell.
+ */
+export function rowStageText(
+  row: Pick<DocumentRowView, "case_id" | "language" | "stages" | "consolidation_progress">,
+  stage: StageName,
+  context: StageContext = {},
+): (StageText & { tone: StageCellView["tone"] }) | null {
+  const cell = row.stages?.[stage];
+  if (!cell) return null;
+  const annotation = row.stages?.annotation;
+  if (annotation?.state !== "consolidating" || stage === "review") return { ...stageText(stage, cell, row, context), tone: cell.tone };
+  const { submitted, total, people, excerpt } = annotation.detail;
+  if (stage === "annotation") {
+    const complete = submitted == null || total == null || submitted >= total;
+    return { symbol: complete ? "✓" : "◐", word: submitted != null && total != null ? submittedOf(submitted, total) : "submitted", detail: "", tone: complete ? "done" : "running" };
+  }
+  const pause = consolidationPause(row);
+  const progress = row.consolidation_progress;
+  return {
+    symbol: pause ? "⏸" : "◐",
+    word: pause ? "consolidating · paused" : "consolidating",
+    detail: join(names(people), progress && `${progress.open} of ${progress.total} groups open`, pause && quoted(excerpt)),
+    tone: pause ? annotation.tone : "running",
+  };
+}
+
 /** VD3: not in plan, plan written by the system under "Nothing planned". */
 export function isUndecided(row: Pick<DocumentRowView, "in_plan" | "plan_row">): boolean {
   return !row.in_plan && row.plan_row?.decided === false;

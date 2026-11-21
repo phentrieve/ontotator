@@ -59,8 +59,8 @@ What for: know where things are.
 The header is the same on every page:
 
 - **Ontotator** on the left takes you to the start page.
-- The breadcrumb shows where you are, for example **My tasks** or **Documents**.
-- At the top right is the user menu: a button with your display name, your pseudonym and your roles. It holds **Profile**, **My technical reports**, **Technical problem…**, the **Theme** (**System**, **Light** or **Dark**) and **Log out**. Open it with a click, or with Enter or the arrow keys; Escape closes it. On a phone the button in the editor shows your initials.
+- The breadcrumb shows where you are, for example **My tasks** or **Documents**. In the editor on a wide screen the text's name is in the toolbar next to it, not again in the breadcrumb.
+- At the top right is the user menu: a button with your display name, your pseudonym and your roles. It holds **Profile**, **My technical reports**, **Technical problem…**, the **Theme** (**System**, **Light** or **Dark**) and **Log out**. Open it with a click, or with Enter or the arrow keys; Escape closes it. In the editor the button shows your initials: on a phone, and on a wide screen, where the header and the text's toolbar share one bar.
 - System administrators also see a gear next to it. It opens **Administration** (see [Administration](admin.md)). A number on the gear counts the open technical reports.
 - The bell next to the user menu shows your notifications. A number on it counts the unread ones. See [Notifications](#notifications).
 - **Handbook** in the header opens this handbook inside the app. On the Documents, consolidation and translation review screens, **Help** opens the handbook section about that screen; in the editor it is **More** > **Help for this screen**. On the project forms, a link next to the task profile opens the section that explains it. In the text card, **How to use it** next to *Newer set available* opens the section on new tool proposals. Click a screenshot in the handbook to open it at full size in a new tab.
@@ -68,7 +68,7 @@ The header is the same on every page:
 
 ![The user menu, open at the top right: Profile, My technical reports, Technical problem…, the theme choice and Log out](images/getting-started-user-menu.png)
 
-The sidebar is for your work. It lists the project switcher, **My tasks** and **Projects**. The number after **My tasks** counts your open tasks, the same tasks as the **To do** tab; it updates as soon as you submit a text. Clicking **My tasks** or **Projects** loads your projects and the count again, so a project you were just added to shows up without reloading the page. Leads also see their project's pages (**Documents**, **Progress**, **Settings**, **Export**); the list **Translation reviews** opens from **Progress**, which stays marked while the list is open. In the editor, the sidebar folds into **Sections**; click it to open it. The user menu and the gear stay at the top right there too.
+The sidebar is for your work. It lists the project switcher, **My tasks** and **Projects**. The number after **My tasks** counts your open tasks, the same tasks as the **To do** tab; it updates as soon as you submit a text. Clicking **My tasks** or **Projects** loads your projects and the count again, so a project you were just added to shows up without reloading the page. Leads also see their project's pages (**Documents**, **Questions**, **Progress**, **Settings**, **Export**); the number after **Questions** counts the open questions to the lead; the list **Translation reviews** opens from **Progress**, which stays marked while the list is open. In the editor, the sidebar folds into **Sections**; click it to open it. The user menu and the gear stay at the top right there too.
 
 ## Notifications
 
@@ -144,7 +144,8 @@ Each row is one task. The **Task** column says what to do, for example **Annotat
 
 - **Reopened**: the lead reopened your submission. The lead's reason stands under the task, for example *Reopened by the lead on 17 Nov, 14:30: The onset in sentence 2 is missing.* (on a narrow screen under the badge). Without a reason, click the badge to read when it was reopened.
 - A **Translation review** the lead asked for a second time shows the lead's reason under the task, for example *Second review requested by the lead on 17 Nov, 14:30: Check the dose in paragraph 2.* What the lead added to it later stands below it, for example *Added by the lead on 17 Nov, 16:05: Paragraph 3 as well.* The translation review and the consolidation show the lead's reason again when you open the task.
-- *Answer from the lead* at a submitted **Translation review**: you submitted it as a **Query** and the lead decided. Open the task to read the decision and the answer ([Review a translation](annotator.md#review-a-translation)).
+- *Your decision: …* under a submitted **Translation review**: what you decided in it, for example *Your decision: Accepted with corrections*.
+- *Answer from the lead* at a submitted **Translation review**: you submitted it as a **Query** (no longer offered) and the lead decided. Open the task to read the decision and the answer ([Review a translation](annotator.md#review-a-translation)).
 - A **Consolidation** task shows the lead's reason under the task, for example *Reason from the lead: Term and assertion differ*, if the lead gave one.
 - **Paused**: the task waits for a decision on a problem report. A long reason is cut off here; the task shows all of it. **Answer to your report** means the lead has replied.
 - **Paused by lead**: the lead paused the work on this text and gives the reason below the mark. You can open and read the task (**View paused task**), but not save it, until the lead releases the text ([A task paused by the lead](annotator.md#a-task-paused-by-the-lead)).

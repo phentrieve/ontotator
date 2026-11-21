@@ -8,12 +8,14 @@
  * - The block "Work stays on v1" names only what stays; who moves stands outside it (issue 543, U4-04).
  * - After saving (issue 543): the card says that one annotator is still on v1, the Annotation step counts the moved
  *   annotation on v2 (U4-01), and Cy's row names the submission, the move and offers Open annotation (U4-02).
+ * - Issue 575: the block counts only the findings that stay; the lead's text view opens Cy's moved annotation
+ *   without carried findings.
  * - The History of the text names the move; Cy's My tasks has one submitted task, on v2, and its view shows the v2
  *   text with the finding, as moved after a typo fix, not as carried findings Cy checked (U4-05). Checked at 1440 px
  *   and 390 px for horizontal scroll.
  */
 import { expect, test, type Page } from "@playwright/test";
-import { activityLines, documentsReady, openCardHistory, openTextCard, personRow, showSegment, textCard, textVersionItems } from "./documentsHelpers";
+import { activityLines, documentsReady, editTranslation, openCardHistory, openTextCard, personRow, showSegment, textCard, textVersionItems } from "./documentsHelpers";
 import { loginThroughForm, TASKS_HOME } from "./helpers";
 import { leadScenario } from "./leadWorkflowHelpers";
 
@@ -48,7 +50,7 @@ test("a typo fix moves one submitted annotation by itself; the other stays, and 
   await expect(page).toHaveURL(new RegExp(`#/projects/${esc(s.project)}/documents`));
   await documentsReady(page);
   const [v1] = await (await textVersionItems(await openTextCard(page, CASE, "de"), 1)).all();
-  await v1.getByRole("button", { name: `Fix typos in v1 of ${CASE} de…`, exact: true }).click();
+  await editTranslation(page, v1, CASE, "typos");
   const dialog = page.getByRole("dialog", { name: `Fix typos, ${CASE} de v1`, exact: true });
   const editor = dialog.getByRole("textbox", { name: "Corrected text", exact: true });
   const original = await editor.inputValue();
@@ -67,6 +69,8 @@ test("a typo fix moves one submitted annotation by itself; the other stays, and 
   await expect(dialog).toContainText("1 annotation stays on v1. After saving, use Carry to v2… on this row to move it.");
   const stays = dialog.locator(".notice").filter({ hasText: "Work stays on v1" });
   await expect(stays).not.toContainText("Moves to v2 by itself");
+  // Issue 575 (F4): only Ben's finding stays, so the count leaves out Cy's.
+  await expect(stays).toContainText("1 of 1 finding marks words you changed and will need a check when moved.");
   await noHorizontalScroll(page, "preview");
   await dialog.getByRole("button", { name: "Typo", exact: true }).click();
   await dialog.getByRole("button", { name: "Save as v2", exact: true }).click();
@@ -90,6 +94,18 @@ test("a typo fix moves one submitted annotation by itself; the other stays, and 
   await expect(activityLines(card).filter({ hasText: "moved to v2 by itself after the typo fix" }))
     .toHaveText([new RegExp(`^Annotation: annotation of ${esc(cy)} \\(${esc(s.pseudonyms.annotator)}\\) moved to v2 by itself after the typo fix, `)]);
   await noHorizontalScroll(page, "history");
+  expect(errors).toEqual([]);
+
+  // Issue 575 (F3): the lead opens Cy's moved annotation without carried findings, as in Cy's own editor.
+  await card.getByRole("button", { name: "Back", exact: true }).click();
+  await showSegment(card, "Annotation");
+  await personRow(card, "Annotators", cy).getByRole("link", { name: `Open annotation of ${cy}`, exact: true }).click();
+  await expect(page.locator(".text-container")).toContainText("generalized hypotonia");
+  await expect(page.getByRole("region", { name: "Findings", exact: true }).getByRole("listitem")).toHaveText([/^Seizure \(HP:0001250\)/]);
+  // The submission's history detail has loaded (it offers the changes since v1), without carried findings.
+  await expect(page.getByRole("checkbox", { name: "Show changes since v1", exact: true })).toBeVisible();
+  await expect(page.getByText("Carried findings", { exact: true })).toHaveCount(0);
+  await expect(page.getByText(/Carried from Round/)).toHaveCount(0);
   expect(errors).toEqual([]);
 
   // Cy: one task for the text, on v2, submitted; its view shows the corrected text with the finding.

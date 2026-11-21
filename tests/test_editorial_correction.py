@@ -142,6 +142,7 @@ def test_an_accepted_text_stays_accepted_without_a_review(accepted):
         "inserted_characters": 1,
         "deleted_characters": 0,
         "tasks_following": 1,
+        "tasks_staying": [],
         # Issue 465: the submitted annotation (a bare submission without a
         # round, made by the fixture) cannot be moved by itself.
         "annotations_carried": 0,
@@ -242,6 +243,7 @@ def test_an_accepted_text_stays_accepted_without_a_review(accepted):
         ],
         "number_changes": [],
         "tasks_following": 1,
+        "tasks_staying": [],
         "annotations_carried": 0,
     }
     (moved,) = audits(env, "assignment.follow_correction")
@@ -422,6 +424,7 @@ def test_preview_is_a_dry_run_with_the_diff_and_the_consequences(accepted):
         "open_consolidations": 0,
         "final_result": False,
         "tasks_following": 1,
+        "tasks_staying": [],
         "text": None,
         "previous_text": None,
         "new_text_sha256": None,

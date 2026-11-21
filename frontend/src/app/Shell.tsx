@@ -112,6 +112,19 @@ const ADMIN_AREA: ReadonlySet<Route["name"]> = new Set(["adminUsers", "adminOnto
 /** Where the gear leads. */
 const ADMIN_START: Route = { name: "adminUsers" };
 
+/** Open questions of the project for its lead (issue 553, prototype); null for others or while unknown. */
+function useOpenQuestionCount(projectKey: string | undefined, navigation: unknown): number | null {
+  const [count, setCount] = useState<number | null>(null);
+  useEffect(() => {
+    let active = true;
+    setCount(null);
+    if (!projectKey) return;
+    api.listQuestions(projectKey, { state: "open" }).then(list => { if (active) setCount(list.length); }, () => undefined);
+    return () => { active = false; };
+  }, [projectKey, navigation]);
+  return count;
+}
+
 /** Open technical reports for a system administrator (the navigation badge); null for others or while unknown. */
 function useOpenReportCount(admin: boolean, navigation: unknown): number | null {
   const [count, setCount] = useState<number | null>(null);
@@ -147,6 +160,7 @@ export function Shell({ user, projects, route, onNavigate, onLogout, breadcrumb,
   const notifications = useNotifications(user.username);
   // "Documents (n)": rows needing the lead's decision (V3); the summary is lead only.
   const needsDecision = useDocumentsSummary(current?.project_key, !!current?.can_manage && current.roles.includes("lead"));
+  const openQuestions = useOpenQuestionCount(current?.can_manage && current.roles.includes("lead") ? current.project_key : undefined, navigation);
   const switcher = projects.length > 0 && <ProjectSwitcher projects={projects} current={current} route={route}
     onNavigate={onNavigate} onChoose={key => setChoice({ username: user.username, key })} />;
   const link = (destination: Route, text: string, label?: string) => <li key={destination.name}>
@@ -186,6 +200,10 @@ export function Shell({ user, projects, route, onNavigate, onLogout, breadcrumb,
         <h2 title={current.name}>{current.name}</h2>
         <ul className="shell-nav-list">
           {documentsLink(current.project_key)}
+          {/* Issue 553 (prototype): the lead's open questions. */}
+          {current.roles.includes("lead") && (openQuestions
+            ? link({ name: "projectQuestions", key: current.project_key }, `Questions (${openQuestions})`, `Questions, ${openQuestions} open`)
+            : link({ name: "projectQuestions", key: current.project_key }, "Questions"))}
           {link({ name: "projectProgress", key: current.project_key }, "Progress")}
           {link({ name: "projectSettings", key: current.project_key }, "Settings")}
           {link({ name: "projectExport", key: current.project_key }, "Export")}

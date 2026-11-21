@@ -187,19 +187,23 @@ def plan_carry(
     """Per person with started or submitted annotation work on ``variant``:
     whether the typo fix to ``proposed`` carries it, and why not.
 
-    Read only. Unopened tasks are not listed: they follow by themselves.
+    Read only. Tasks nobody opened are not listed: they follow by
+    themselves or the dry run names why they stay (``tasks_staying``,
+    issue 509).
     """
     from ontotator.application.text_changes import (
         TextChangeService,
         editable_findings,
         unplaced_findings,
     )
-    from ontotator.assignments.service import unopened_tasks
+    from ontotator.assignments.service import never_opened_tasks
 
     text_reason = _text_reason(conn, pid, variant, previous, proposed)
     waiting = set(
         conn.execute(
-            select(AssignmentRow.id).where(*unopened_tasks(pid, variant.document_id))
+            select(AssignmentRow.id).where(
+                *never_opened_tasks(pid, variant.document_id)
+            )
         ).scalars()
     )
     rows = conn.execute(
@@ -617,6 +621,8 @@ class TypoFixMove:
     version that hold the copy ``submission_id``. The ``first_*`` facts are
     the person's own work, through copies of copies (v1 -> v2 -> v3): the
     submission they made, when, and the task they were given for it.
+    ``source_submission_id`` is the submission the copy was made from (the
+    person's own, or the copy of an earlier fix).
     """
 
     assignment_id: int
@@ -629,6 +635,7 @@ class TypoFixMove:
     first_assignment_id: int | None
     first_assigned_at: datetime | None
     first_assigned_by: int | None
+    source_submission_id: str | None = None
 
 
 def typo_fix_moves(conn: Connection, pid: int) -> dict[str, TypoFixMove]:
@@ -714,6 +721,7 @@ def typo_fix_moves(conn: Connection, pid: int) -> dict[str, TypoFixMove]:
             first_assignment_id=int(task.id) if task is not None else None,
             first_assigned_at=task.created_at if task is not None else None,
             first_assigned_by=task.created_by if task is not None else None,
+            source_submission_id=row.source_submission_id,
         )
     return moves
 
@@ -728,9 +736,19 @@ def submission_order_times(
     copy is the same person's annotation, so the order, and with it every
     tie-break of the grouping, stays as it was before the fix (issue 543).
     All copies of one fix share the fix's time and would otherwise be
-    ordered by their random ids.
+    ordered by their random ids. The views show this time as the copy's
+    submission time too (issue 575).
     """
     moves = typo_fix_moves(conn, pid) if recorded_at else {}
+    return submitted_times(moves, recorded_at)
+
+
+def submitted_times(
+    moves: Mapping[str, TypoFixMove], recorded_at: Mapping[str, datetime]
+) -> dict[str, datetime]:
+    """``submission_order_times`` with the moves already read: what every
+    view shows as the time a copy was submitted (issue 575), the time the
+    person submitted the work it stands for."""
     return {
         sid: moves[sid].first_recorded_at if sid in moves else at
         for sid, at in recorded_at.items()

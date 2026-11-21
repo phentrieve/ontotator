@@ -123,6 +123,7 @@ CONTENT_FIELDS = frozenset(
     {
         "text",
         "proposed_text",
+        "quote",
         "rationale",
         "excerpt",
         "context",

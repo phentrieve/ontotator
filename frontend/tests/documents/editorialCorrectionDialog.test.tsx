@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api, ApiError, type EditorialCorrectionPreview, type EditorialCorrectionResult, type VariantText } from "../../src/api/client";
-import { CARRY_REASONS, editorialConsequences, EditorialCorrectionDialog, editorialRefusal, numberNotice, PREVIEW_DELAY_MS, reasonText, reviewNote } from "../../src/documents/EditorialCorrectionDialog";
+import { CARRY_REASONS, editorialConsequences, PROPOSALS_RULE, STAY_REASONS, EditorialCorrectionDialog, editorialRefusal, numberNotice, PREVIEW_DELAY_MS, reasonText, reviewNote } from "../../src/documents/EditorialCorrectionDialog";
 import { planRow, stepOf, version } from "./fixtures";
 
 const v2 = version({ document_id: "case-0101-de-v2", version: 2, chain_name: "DeepL", origin: "correction", derived_from: "case-0101-de", translation_status: "accepted" });
@@ -16,7 +16,7 @@ function preview(overrides: Partial<EditorialCorrectionPreview> = {}): Editorial
   return {
     document_id: "case-0101-de-v2", case_id: "case-0101", language: "de", version: 2, next_version: 3, translation_status: "accepted", text_sha256: "sha-v2",
     available: true, reason: null, review_on: true, annotate_accepted_only: false, annotations: { submitted: 0, open: 0 }, open_consolidations: 0, final_result: false,
-    tasks_following: 0, text: null, previous_text: null, new_text_sha256: null, inserted_characters: null, deleted_characters: null,
+    tasks_following: 0, tasks_staying: [], text: null, previous_text: null, new_text_sha256: null, inserted_characters: null, deleted_characters: null,
     changed_characters: null, number_changes: null, diff: null, findings: null, proposals: null, ...overrides,
   };
 }
@@ -143,7 +143,7 @@ it("keeps the status of a rejected version", async () => {
   expect(within(dialog).getByText("v3 keeps the status of v2: Rejected in review. No translation review is started.")).toBeTruthy();
   // Issue 547, U2-06: the review is not "nobody worked on it"; it stays with the version it reviewed, and v3 needs its own.
   expect(within(dialog).getByText("Nobody has annotated v2 yet.")).toBeTruthy();
-  expect(within(dialog).getByText("A submitted translation review stays with the version it reviewed. To have v3 reviewed, use Resolve… › Assign a new review… on this row after saving.")).toBeTruthy();
+  expect(within(dialog).getByText("A submitted translation review stays with the version it reviewed. To have v3 reviewed, use Resolve… › Other ways… › Assign a new review… on this row after saving.")).toBeTruthy();
   fireEvent.change(editor, { target: { value: NEW } });
   fireEvent.click(within(dialog).getByRole("button", { name: "Grammar" }));
   fireEvent.click(within(dialog).getByRole("button", { name: "Save as v3" }));
@@ -153,7 +153,7 @@ it("keeps the status of a rejected version", async () => {
 it("names a submitted review by what happens to it (issue 547, U2-06)", () => {
   expect(reviewNote(null, 3)).toBeNull();
   expect(reviewNote("accepted", 3)).toBe("A submitted translation review stays with the version it reviewed.");
-  expect(reviewNote("query", 3)).toBe("A submitted translation review stays with the version it reviewed. To have v3 reviewed, use Resolve… › Assign a new review… on this row after saving.");
+  expect(reviewNote("query", 3)).toBe("A submitted translation review stays with the version it reviewed. To have v3 reviewed, use Resolve… › Other ways… › Assign a new review… on this row after saving.");
 });
 
 it("says in words why a version cannot be corrected, without the editor", async () => {
@@ -178,6 +178,30 @@ it("shows a refusal at saving in place", async () => {
   expect(await within(dialog).findByText("The text of this version changed. Reload the row to see the current text.")).toBeTruthy();
   // The text and the reason stay.
   expect(editor.value).toBe(NEW);
+});
+
+it("consequences: names each task that stays and why, and the rule for tasks from proposals (issue 509)", () => {
+  const task = (username: string, display_name: string, reason: EditorialCorrectionPreview["tasks_staying"][number]["reason"], assignment_id = 1) =>
+    ({ assignment_id, username, display_name, reason });
+  // A task from proposals nobody opened, no proposal for a check: it continues.
+  expect(editorialConsequences(checkedPreview(NEW, { annotations: { submitted: 0, open: 1 }, tasks_following: 1, proposals: { sets: 1, carried: 2, needs_check: 0 } })))
+    .toEqual({ attention: false, moving: ["1 waiting task continues on v3.", "Tool proposals move to v3."], lines: [] });
+  // A proposal waits for a check, another task was opened, a third is paused.
+  expect(editorialConsequences(checkedPreview(NEW, {
+    annotations: { submitted: 0, open: 3 }, tasks_following: 0, proposals: { sets: 1, carried: 1, needs_check: 1 },
+    tasks_staying: [task("ana", "Ana Weber", "from_proposals_needs_check"), task("eva", "Eva Lang", "opened", 2), task("tom", "Tom Reis", "paused", 3)],
+  }))).toEqual({ attention: true, moving: ["Tool proposals move to v3; 1 marks words you changed and waits for a check."], lines: [
+    "3 annotations stay on v2. After saving, use Handle text change… on this row to move them.",
+    "Task not moved, from tool proposals, and a proposal waits for a check: Ana Weber.",
+    "Task not moved, already opened: Eva Lang.",
+    "Task not moved, the task is paused: Tom Reis.",
+    PROPOSALS_RULE("v3"),
+  ] });
+  // Before the text changes, a task from proposals is not decided yet: no block, the rule.
+  expect(editorialConsequences(preview({ annotations: { submitted: 0, open: 1 }, tasks_staying: [task("ana", "Ana Weber", "from_proposals")] })))
+    .toEqual({ attention: false, moving: [`Once you change the text, this says whether the task from tool proposals of Ana Weber continues on v3. ${PROPOSALS_RULE("v3")}`], lines: [] });
+  expect(PROPOSALS_RULE("v3")).toBe("A task from tool proposals continues on v3 only when nobody opened it and no proposal waits for a check.");
+  expect(Object.keys(STAY_REASONS)).toEqual(["opened", "paused", "from_proposals_needs_check", "from_proposals_none_carried"]);
 });
 
 it("consequences: quiet unless work stays on the version", async () => {

@@ -203,6 +203,16 @@ textarea.form-control {
   cursor: not-allowed;
 }
 
+/* A read-only field (a submitted finding's note, issue 542 U1-05) looks like text on the sunken band, not like an input:
+   no white box, no text cursor, no resize grip. It keeps its focus ring, so the keyboard still finds it. */
+.form-control[readonly] {
+  background: var(--surface-sunken);
+  border-style: dashed;
+  color: var(--text);
+  cursor: default;
+  resize: none;
+}
+
 .form-checkbox-row {
   display: flex;
   align-items: center;
@@ -876,6 +886,9 @@ ul.task-counts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space
     min-height: var(--touch-target);
   }
   a.shell-product { display: inline-flex; align-items: center; min-height: var(--touch-target); }
+  /* The breadcrumb's links and buttons too, as "Progress" on Translation reviews (issue 574 F3); the editor's
+     one header row keeps its small breadcrumb. */
+  .shell:not(.shell-reading) .shell-breadcrumb :is(a, button) { display: inline-flex; align-items: center; min-width: var(--touch-target); min-height: var(--touch-target); }
   /* A summary keeps its display (and so its marker): the text is centred by padding instead. */
   .shell-reading-navigation > summary { padding-block: calc((var(--touch-target) - 2px - var(--leading-md)) / 2); line-height: var(--leading-md); }
   .app-nav .shell-nav-link,

@@ -63,6 +63,13 @@ WithdrawTasks = Annotated[
 CONFIRMATION = "WORK_PLAN_CONFIRMATION_REQUIRED"
 # A submission already carried to, or dismissed for, the version (code/reason).
 ALREADY_RESOLVED = "TEXT_CHANGE_NOT_APPLICABLE/already_resolved"
+# Issue 509: what to do with the tasks an editorial correction leaves behind.
+_STAYING_NEXT_STEP = (
+    "The tasks in tasks_staying stay on the corrected version. After the"
+    " correction, move each with move_task_to_version (its assignment_id and"
+    " the new version's document_id); a paused task needs its report decided"
+    " first."
+)
 
 
 async def find_assignment(
@@ -960,7 +967,14 @@ def register_lead(
         notice to check, nothing is refused for it), whether the correction
         is available (reason if not: not_newest, discarded, review_open,
         unchanged) and what follows: tasks_following (annotation tasks nobody
-        opened move to the new version), the annotation work, open
+        opened move to the new version; a task from tool proposals only when
+        no proposal needs a check, i.e. proposals.needs_check is 0, and only
+        once the proposals are on the new version a few seconds after
+        confirm), tasks_staying (each task not submitted that stays, with its
+        assignment_id and reason: opened, paused, from_proposals_needs_check,
+        from_proposals_none_carried, or from_proposals before a text is
+        given; next_step then names move_task_to_version, which moves such a
+        task to the new version after the correction), the annotation work, open
         consolidations and a final result that stay on the current version
         (handle them with the text-change tools), findings of submitted
         annotations and tool proposals that are carried or need a check,
@@ -983,6 +997,8 @@ def register_lead(
             previous = plan.pop("previous_text", None) or ""
             plan["text_characters"] = len(stored)
             plan["previous_text_characters"] = len(previous)
+            if plan.get("tasks_staying"):
+                plan["next_step"] = _STAYING_NEXT_STEP
             return {"applied": False, "plan": plan}
         if not expected_text_sha256:
             raise OntotatorError(
@@ -997,6 +1013,8 @@ def register_lead(
                 "expected_text_sha256": expected_text_sha256,
             },
         )
+        if result.get("tasks_staying"):
+            result["next_step"] = _STAYING_NEXT_STEP
         return {"applied": True, "result": result}
 
     @register(server, scopes=("read", "project-admin"), effect="destructive")

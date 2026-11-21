@@ -152,6 +152,14 @@ class ProblemReportRow(Base):
     __tablename__ = "problem_reports"
     __table_args__ = (
         Index("ix_problem_reports_project_assignment", "project_id", "assignment_id"),
+        CheckConstraint("kind IN ('problem', 'question')", name="kind"),
+        # Issue 553: a proposed wording needs a quoted passage; only questions
+        # carry either.
+        CheckConstraint(
+            "(proposed_text IS NULL OR quote IS NOT NULL)"
+            " AND (kind = 'question' OR (quote IS NULL AND proposed_text IS NULL))",
+            name="question_parts",
+        ),
     )
     report_id: Mapped[str] = mapped_column(primary_key=True)
     project_id: Mapped[int] = mapped_column(
@@ -167,6 +175,10 @@ class ProblemReportRow(Base):
     submission_id: Mapped[str | None]
     reason: Mapped[str]
     created_at: Mapped[datetime]
+    # Issue 553: "problem" (Report a text problem) or "question" (Ask the lead).
+    kind: Mapped[str] = mapped_column(server_default="problem")
+    quote: Mapped[str | None]
+    proposed_text: Mapped[str | None]
 
 
 class ProblemReportStateRow(Base):
