@@ -10,6 +10,7 @@ import { PlaceholderRow } from "../editor/carried/PlaceholderRow";
 import { CarriedProgress } from "../editor/carried/CarriedProgress";
 import { SidebarResizer } from "../editor/SidebarResizer";
 import { useSidebarWidth } from "../editor/sidebarWidth";
+import { DETAILS_STRIP_WIDTH, detailsRailLimits, detailsWidthKey, useDetailsCollapsed } from "../editor/detailsRail";
 import { useTreeHeight } from "../editor/treeHeight";
 import { InspectorTabList, inspectorTabIds, useInspectorTabs } from "../editor/InspectorTabs";
 import type { GuidelinesPanel } from "../tasks/TaskGuidelines";
@@ -31,8 +32,8 @@ import { PausedNotice } from "../editor/PausedNotice";
 import { Textarea } from "../ui/Textarea";
 import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { flushSync } from "react-dom";
+import React, { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { createPortal, flushSync } from "react-dom";
 import {
   api,
   isSessionProblem,
@@ -95,6 +96,8 @@ import { SearchPanel } from "../editor/SearchPanel";
 import { isUntouchedPrefill, passageText, prefillHint, prefillQuery } from "../editor/termSearch";
 import { focusTextAt } from "../editor/textFocus";
 import { useMediaQuery } from "../ui/useMediaQuery";
+import { ShellCaseBarSlot } from "../ui/AppShell";
+import { DismissibleHint, showHintsAgain, useHintsRead } from "../editor/DismissibleHint";
 import { SearchManager } from "../editor/searchState";
 import { TermName } from "../editor/TermName";
 import { TextPane } from "../editor/TextPane";
@@ -113,7 +116,7 @@ import { SpanExclusionOffer, exclusionCopy } from "../editor/SpanExclusionOffer"
 import { Toast } from "../ui/Toast";
 import { type MentionDisplay, type SelectionPayload } from "../spans/adapter";
 import { markColour } from "../editor/markColours";
-import { IconCheck, IconClose, IconLock, IconMore, IconPencil, IconQuestion, IconRedo, IconRetry, IconUndo } from "../ui/icons";
+import { IconCheck, IconChevronLeft, IconChevronRight, IconClose, IconLock, IconMore, IconPencil, IconQuestion, IconRedo, IconRetry, IconTree, IconUndo } from "../ui/icons";
 import { historyControls, stepText, type LastHistoryCommand } from "../editor/history";
 import { MenuButton, type MenuItem } from "../ui/MenuButton";
 import { isNegated } from "../editor/negation";
@@ -526,6 +529,11 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const panesLayout = useMediaQuery("(max-width: 700px)");
   // Below 1024 px the header keeps one bar: "Next open item" moves into "More", the mode text hides.
   const narrowHeader = useMediaQuery("(max-width: 1023px)");
+  // Issue 539: from 1025 px the case toolbar joins the app header in one bar (the header keeps a place for it).
+  const caseBarSlot = useContext(ShellCaseBarSlot);
+  const wideHeader = useMediaQuery("(min-width: 1025px)");
+  const headerMerged = !!caseBarSlot && wideHeader;
+  const hintsRead = useHintsRead();
   // Back to the text after a cancelled new finding: runs after the text pane re-rendered its runs,
   // so the caret lands in the current text nodes (offset null: focus only).
   const [textFocusRequest, setTextFocusRequest] = useState<{ offset: number | null } | null>(null);
@@ -2329,15 +2337,18 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     if (treeMode === "assign") { await setTermOf(treeWalk.annotationId, termId, browseId); return; }
     if (treeMode === "new") { await choosePendingTerm(termId, browseId, label); return; }
     if (treeMode !== "proposal" || !selectedTarget) return;
-    const walk = treeWalk;
-    // The copy takes the walk's id: the tree stays with it, and the term passes the walk's check.
-    setTreeWalk(current => current && current.nonce === walk.nonce ? { ...current, key: annotationKey(walk.annotationId) } : current);
-    const copyId = await handleAdoptAndEditTarget(selectedTarget, undefined, undefined, { annotationId: walk.annotationId });
-    if (!copyId) {
-      setTreeWalk(current => current && current.nonce === walk.nonce ? { ...current, key: walk.key } : current);
-      throw new Error("Nothing was changed.");
-    }
-    await setTermOf(copyId, termId, copyId === walk.annotationId ? browseId : undefined);
+    const walk = treeWalk, target = selectedTarget;
+    // One step (issue 542, U1-03): Undo takes back the copy and its term together, as a modifier change on a proposal does.
+    await inStep(async () => {
+      // The copy takes the walk's id: the tree stays with it, and the term passes the walk's check.
+      setTreeWalk(current => current && current.nonce === walk.nonce ? { ...current, key: annotationKey(walk.annotationId) } : current);
+      const copyId = await handleAdoptAndEditTarget(target, undefined, undefined, { annotationId: walk.annotationId });
+      if (!copyId) {
+        setTreeWalk(current => current && current.nonce === walk.nonce ? { ...current, key: walk.key } : current);
+        throw new Error("Nothing was changed.");
+      }
+      await setTermOf(copyId, termId, copyId === walk.annotationId ? browseId : undefined);
+    });
   };
 
   // Closing changes nothing else: the tree is gone until "Show in tree" is used again. A
@@ -3665,18 +3676,35 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const inspectorIdBase = `inspector${React.useId()}`;
   const inspectorIds = inspectorTabIds(inspectorIdBase);
   const guidelinesPanelRef = useRef<HTMLElement>(null);
+  const inspectorDemand = {
+    key: JSON.stringify([pendingAnnotation?.annotationId ?? null, attachModifier?.mode ?? null, requiredNoteKey, loopFocus?.annotationId ?? null, focusRequest?.key ?? null]),
+    active: !!(pendingAnnotation || attachModifier || requiredNoteKey !== null || loopFocus || focusRequest),
+  };
   const tabs = useInspectorTabs({
     hosted: guidelinesHosted, open: !!guidelines?.open, request: guidelines?.request ?? 0, returnFocus: guidelines?.returnFocus,
     scroller: inspectorRef, panel: guidelinesPanelRef,
     // Work that needs a field of the inspector brings Details to the front; selecting a finding does not.
-    demand: {
-      key: JSON.stringify([pendingAnnotation?.annotationId ?? null, attachModifier?.mode ?? null, requiredNoteKey, loopFocus?.annotationId ?? null, focusRequest?.key ?? null]),
-      active: !!(pendingAnnotation || attachModifier || requiredNoteKey !== null || loopFocus || focusRequest),
-    },
+    demand: inspectorDemand,
   });
   const guidelinesTab = tabs.hosted && tabs.tab === "guidelines";
   // The findings column's limits follow the inspector, which is at least 420 px while it holds the guidelines.
   const sidebarWidth = useSidebarWidth(versionContext?.username, { inspectorWithGuidelines: tabs.hosted });
+  // Issue 540: the right column is a rail, as "Your review" in the translation review (issue 410). From 1060 px (three
+  // columns) its left edge can be dragged and it can be collapsed to a narrow strip; both are kept per user in this browser.
+  const railOn = threeColumns && !compareOpen;
+  const detailsRail = useSidebarWidth(versionContext?.username, { inspectorWithGuidelines: tabs.hosted, storageKeyFor: detailsWidthKey, limitsFor: detailsRailLimits });
+  const [detailsCollapsedChoice, setDetailsCollapsed] = useDetailsCollapsed(versionContext?.username);
+  const detailsCollapsed = railOn && detailsCollapsedChoice;
+  /** Collapses or expands the column; the focus moves to the control that replaces the clicked one. */
+  const collapseDetails = (collapsed: boolean) => {
+    setDetailsCollapsed(collapsed);
+    window.requestAnimationFrame(() => rootRef.current?.querySelector<HTMLElement>(collapsed ? ".details-rail-expand" : ".details-rail-collapse")?.focus());
+  };
+  // Work that needs the panel (a new mark and its term search, a required note, …) opens a collapsed column again.
+  useEffect(() => {
+    if (detailsCollapsed && inspectorDemand.active) setDetailsCollapsed(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only new work opens the column
+  }, [inspectorDemand.key]);
   // The ontology tree's height under the inspector, set by dragging the divider above it.
   const treeHeight = useTreeHeight(versionContext?.username, treeWalk && !treeCollapsed ? treeWalk.nonce : null);
   // Issue 521, a low window: the open tree takes the whole right column and the annotation panel shrinks to one
@@ -4059,8 +4087,9 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
       <div className="visually-hidden" aria-live="polite" data-carried-announcer>{carriedAnnouncement}</div>
       {/* The Undo toast of a removed modifier or a deleted finding; its live region exists only where findings can be edited. */}
       {(modifierLayerIds.size > 0 || !readOnly) && <Toast toast={modifierCommands.toast} onDismiss={modifierCommands.dismissToast} undoDescription="Undo deleting a finding or removing a modifier" undoGroup="Finding" />}
-      {/* Header */}
-      <Toolbar className="case-toolbar" label="Case">
+      {/* Header: in the app header's bar from 1025 px (issue 539), else above the panes. */}
+      {(caseToolbar => headerMerged && caseBarSlot ? createPortal(caseToolbar, caseBarSlot) : caseToolbar)(
+      <Toolbar className={headerMerged ? "case-toolbar case-toolbar--merged" : "case-toolbar"} label="Case">
         <div className={(assignmentNavigation ? assignmentTasks?.length ?? 0 : documentList?.length ?? 0) <= 1 ? "app-title app-title--single-case" : "app-title"}>
           {assignmentNavigation && assignmentTasks?.length ? (
             <CaseNavigation documents={assignmentTasks.map((task, index) => ({ document_id: task.document_id, case_id: task.case_id ?? task.external_id ?? undefined,
@@ -4157,6 +4186,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
             // Below 1024 px "Next open item" leaves the bar for this menu.
             ...(narrowHeader && !readOnly && openItems.length > 0 ? [{ id: "next-open", label: "Next open item", onSelect: goToNextOpenItem }] : []),
             { id: "shortcuts", label: "Keyboard shortcuts (?)", onSelect: openShortcutHelp },
+            // Issue 540: hints hidden once read come back from here.
+            ...(hintsRead.length ? [{ id: "show-hints", label: "Show hints again", onSelect: showHintsAgain }] : []),
           ]} />
           {/* Read-only (submitted, paused, an older version): no edit controls. A consolidation is submitted only on
               its own screen (issue 162): its full editor offers the way back instead of a submit. */}
@@ -4166,6 +4197,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
             pending={submitPending}
             openCount={submitOpenCount(openItems, unconfirmed)}
             onNextOpen={narrowHeader ? undefined : goToNextOpenItem}
+            compact={headerMerged}
           />}
           {!readOnly && consolidationEditor && !narrowHeader && openItems.length > 0
             && <Button type="button" size="sm" onClick={goToNextOpenItem}>Next open item</Button>}
@@ -4175,7 +4207,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
               onKeyDown={onSpaceActivate}>{BACK_TO_CONSOLIDATION}</a>
           </> : null}
         </div>
-      </Toolbar>
+      </Toolbar>)}
 
       {held && <PausedNotice title={holdTitle} reason={holdReason} kept={`Saved work remains readable. Your local input is kept.${holdKept ? ` ${holdKept}` : ""}`} />}
       {!!versionError && <><ErrorNotice error={versionError} /><Button onClick={retryVersions}>Retry version list</Button></>}
@@ -4223,8 +4255,9 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
         ))}
       </nav>
       {/* Main Workspace Layout */}
-      <div className={`app-layout mobile-pane-${mobilePane}${treeShown ? " tree-open" : ""}${treeHeight.height !== null && !panelGivenToTree ? " tree-sized" : ""}${panelGivenToTree ? ` panel-given-to-tree panel-given-to-tree--${panelGivenToTree}` : ""}${tabs.hosted ? " inspector-with-guidelines" : ""}`}
-        style={{ "--sidebar-width": `${sidebarWidth.width}px`, ...(treeHeight.height !== null && !panelGivenToTree ? { "--tree-height": `${treeHeight.height}px` } : {}) } as CSSProperties}>
+      <div className={`app-layout mobile-pane-${mobilePane}${treeShown ? " tree-open" : ""}${treeHeight.height !== null && !panelGivenToTree ? " tree-sized" : ""}${panelGivenToTree ? ` panel-given-to-tree panel-given-to-tree--${panelGivenToTree}` : ""}${tabs.hosted ? " inspector-with-guidelines" : ""}${detailsCollapsed ? " details-collapsed" : ""}`}
+        style={{ "--sidebar-width": `${sidebarWidth.width}px`, ...(treeHeight.height !== null && !panelGivenToTree ? { "--tree-height": `${treeHeight.height}px` } : {}),
+          ...(railOn ? { "--inspector-width": `${detailsCollapsed ? DETAILS_STRIP_WIDTH : detailsRail.width}px` } : {}) } as CSSProperties}>
         {/* Left: Sidebar (Annotations & Review Targets) */}
         <aside className="sidebar density-compact" id="findings-column">
           {/* Narrow layout: attach mode opens on Findings, where the text pane's banner and its Cancel are out of sight. */}
@@ -4483,8 +4516,19 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
           scrollRequest={textScrollRequest}
         />
 
+        {/* The right column's edge (issue 540): drag it, or use the arrow keys on it, to resize the column; the button
+            beside it collapses the column to a strip. Three columns only (editor.css). */}
+        {railOn && !detailsCollapsed && <div className="details-rail-edge">
+          <SidebarResizer side="start" label="Resize details panel" hint="Resize the details panel (focus the divider)" controls="details-column"
+            width={detailsRail.width} limits={detailsRail.limits} onChange={detailsRail.setWidth} onReset={detailsRail.reset} onCommit={detailsRail.commit} />
+          <IconButton size="sm" variant="quiet" className="details-rail-collapse" label="Collapse details panel" icon={<IconChevronRight />}
+            aria-expanded aria-controls="details-column" onClick={() => collapseDetails(true)} />
+        </div>}
+        {detailsCollapsed && <button type="button" className="details-rail-expand" aria-label="Expand details panel" title="Expand details panel"
+          aria-expanded={false} aria-controls="details-column" onClick={() => collapseDetails(false)}>
+          <IconChevronLeft /><span className="details-rail-strip-label" aria-hidden="true">Details</span></button>}
         {/* Right: Annotation & Search Panel + Review Actions */}
-        <div className="inspector-pane density-compact" ref={inspectorRef}>
+        <div className="inspector-pane density-compact" id="details-column" ref={inspectorRef}>
           {/* A low window with the tree open (issue 521): the finding in one line, and the way back to the whole panel. */}
           {findingBarShown && treeWalkSubject && <div className="finding-bar" role="group" aria-label="Finding">
             <p className="finding-bar__summary">
@@ -4521,9 +4565,11 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
             <section className="detail-pane" aria-label="Reference details">
               <ProposalSource source={selectedSource} />
               <div className="detail-section">
-                <h2><TermName termId={selectedSource.annotation.term_id} label={termLabel(selectedSource.annotation.layer_id, selectedSource.annotation.term_id)} /></h2>
-                {selectedSource.annotation.term_id && <Button type="button" variant="secondary" size="sm" className="annotation-tree-button"
-                  title="Show this term in the ontology tree, only to look: broader and narrower terms" onClick={handleShowInTree}>Show in tree</Button>}
+                <div className="term-heading-row">
+                  <h2><TermName termId={selectedSource.annotation.term_id} label={termLabel(selectedSource.annotation.layer_id, selectedSource.annotation.term_id)} /></h2>
+                  {selectedSource.annotation.term_id && <IconButton variant="quiet" size="sm" className="annotation-tree-button" label="Show in tree" icon={<IconTree />}
+                    title="Show in tree, only to look: broader and narrower terms" onClick={handleShowInTree} />}
+                </div>
                 <p>{view.layers?.find(l => l.layer_id === selectedSource.annotation.layer_id)?.label}, Read-only</p>
                 <p>
                   <AiBadge provenance={selectedSource.annotation.provenance} source={selectedSource} />{" "}
@@ -4580,7 +4626,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
                 {pendingIsMarkedSpan
                   ? <>
                     <p className="pending-quote">“{quoteSegments(view.document.text, pendingAnnotation.segments)}”<CopyTextButton text={passageRef.current} onAnnounce={announceCarried} /></p>
-                    <p className="form-hint">Adjust the marked text with its edge handles, or mark new text to replace it.</p>
+                    <DismissibleHint id="adjust-mark">Adjust the marked text with its edge handles, or mark new text to replace it.</DismissibleHint>
                   </>
                   : <p>
                     {pendingAnnotation.carriedInput ? "Save this finding with the original term and values. Then check it and mark it as checked." : pendingAnnotation.reanchorItem ? "Save this finding, check its evidence and values, then complete the text-change review." : "Select a term from the ontology for the new finding."}

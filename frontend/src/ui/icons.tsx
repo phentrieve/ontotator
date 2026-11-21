@@ -192,3 +192,34 @@ export const IconGear = (p: IconProps) => (
     </g>
   </Icon>
 );
+
+/** "Show in tree" (issue 540): a term with a broader one above and two narrower ones below. */
+export const IconTree = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="5.75" y="1.75" width="4.5" height="3.5" rx="1" />
+    <rect x="1.75" y="10.75" width="4.5" height="3.5" rx="1" />
+    <rect x="9.75" y="10.75" width="4.5" height="3.5" rx="1" />
+    <path d="M8 5.25V8M4 10.75V8h8v2.75" />
+  </Icon>
+);
+
+/** "Move to a new finding": out of the box, up and to the right. */
+export const IconMoveOut = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M7 3.25H3.75a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9" />
+    <path d="M9.5 2.75h3.75V6.5M13.25 2.75 7.5 8.5" />
+  </Icon>
+);
+
+export const IconPlus = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M8 3v10M3 8h10" />
+  </Icon>
+);
+
+/** "Next open item" where the bar is short of room (issue 539). */
+export const IconArrowRight = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M2.75 8h10M9 4.25 12.75 8 9 11.75" />
+  </Icon>
+);

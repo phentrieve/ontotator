@@ -1,5 +1,6 @@
 import { Button } from "../ui/Button";
-import { IconCheck } from "../ui/icons";
+import { IconButton } from "../ui/IconButton";
+import { IconArrowRight, IconCheck } from "../ui/icons";
 
 export interface SubmitControlProps {
   onSubmit: () => void;
@@ -9,15 +10,18 @@ export interface SubmitControlProps {
   openCount?: number | null;
   /** Goes to the next open item; shown next to the button while items are open. */
   onNextOpen?: () => void;
+  /** The case bar shares its line with the app header (issue 539): "Next open item" is an icon with that name. */
+  compact?: boolean;
 }
 
 /** Toolbar control that starts the case submission, with the remaining open items. */
-export function SubmitControl({ onSubmit, disabled, pending, openCount = null, onNextOpen }: SubmitControlProps) {
+export function SubmitControl({ onSubmit, disabled, pending, openCount = null, onNextOpen, compact = false }: SubmitControlProps) {
   const open = openCount !== null && openCount > 0;
   return (
     <>
-      {open && onNextOpen && (
-        <Button type="button" size="sm" onClick={onNextOpen}>
+      {open && onNextOpen && (compact
+        ? <IconButton size="sm" label="Next open item" icon={<IconArrowRight />} onClick={onNextOpen} />
+        : <Button type="button" size="sm" onClick={onNextOpen}>
           Next open item
         </Button>
       )}
