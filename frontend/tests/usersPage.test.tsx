@@ -322,6 +322,8 @@ describe("account status, projects at creation, history and erasure", () => {
       { at: "2026-10-19T08:00:00Z", actor: "cli:ops", action: "user.create", target_type: "user", target_id: "alex", project_key: null, details: { pseudonym: "ann-alex", system_admin: false } },
       { at: "2026-10-18T08:00:00Z", actor: "user:alex", action: "assignment.create", target_type: "assignment", target_id: "115", project_key: "study-one", details: { task: "annotate" } },
       { at: "2026-10-17T08:00:00Z", actor: "user:root", action: "problem.resolve", target_type: "problem_report", target_id: "9", project_key: "study-one", details: { user_id: 2, reason: null } },
+      { at: "2026-10-16T08:00:00Z", actor: "user:alex", action: "text.pause", target_type: "text", target_id: "case-1 en", project_key: "study-one", details: { case_id: "case-1", language: "en", reason: "Checked", assignment_ids: [3], via: "bulk_pause_texts" } },
+      { at: "2026-10-15T08:00:00Z", actor: "user:alex", action: "text.release", target_type: "text", target_id: "case-1 en", project_key: "study-one", details: { case_id: "case-1", language: "en", reason: null, paused_reason: "Checked", assignment_ids: [], via: "bulk_release_texts" } },
     ]);
     render(<UsersPage currentUser={currentUser} />); await load();
     more("alex", "History");
@@ -335,6 +337,10 @@ describe("account status, projects at creation, history and erasure", () => {
     expect(within(dialog).getByText("Task: Annotation")).toBeTruthy();
     expect(within(dialog).getByText("Problem resolved")).toBeTruthy();
     expect(within(dialog).getByText("User: Alex Smith")).toBeTruthy();
+    // Issue 576, F4: a lead's pause and release, not "Text.pause".
+    expect(within(dialog).getByText("Text paused")).toBeTruthy();
+    expect(within(dialog).getByText("Text released")).toBeTruthy();
+    expect(within(dialog).queryByText(/Text\.pause|bulk_pause_texts/)).toBeNull();
     expect(within(dialog).getByText(formatTime("2026-10-18T08:00:00Z"))).toBeTruthy();
     expect(api.adminUserAudit).toHaveBeenCalledWith("alex");
   });
@@ -387,6 +393,18 @@ describe("account status, projects at creation, history and erasure", () => {
     expect(auditTarget({ ...created, details: {} })).toBe("API token 6");
     expect(auditDetails({ ...base, details: { name: "N", api_token: { id: 6, name: "nightly" } } })).toBe("Name: N; Via API token: nightly");
     expect(auditDetails({ ...base, details: { ends_at: "2027-02-03T11:54:22Z" } })).toBe(`Ends at: ${formatTime("2027-02-03T11:54:22Z")}`);
+  });
+
+  it("names a lead's pause and release in plain words, with the way it was made (issue 576, F4)", () => {
+    const base = { at: "", actor: "user:lead", target_type: "text", target_id: "L3CASE-002 en", project_key: "p" };
+    const pause = { ...base, action: "text.pause", details: { case_id: "L3CASE-002", language: "en", reason: "Clinic is checking", assignment_ids: [10, 11], via: "bulk_pause_texts" } };
+    expect(auditDetails(pause)).toBe("Reason: Clinic is checking; 2 tasks paused; Via: More actions › Pause texts…");
+    expect(auditDetails({ ...pause, action: "text.release", details: { ...pause.details, reason: null, paused_reason: "Clinic is checking", still_paused_assignment_ids: [11], via: "bulk_release_texts" } }))
+      .toBe("Reason of the pause: Clinic is checking; 1 task released; 1 task still paused by a problem report; Via: More actions › Release texts…");
+    expect(auditTarget(pause)).toBe("Text L3CASE-002 en");
+    // Other changes made through More actions name it too; an unknown way reads as words.
+    expect(auditDetails({ ...base, action: "round.create", details: { kind: "carry_forward", via: "bulk_start_round" } })).toBe("Kind: carry_forward; Via: More actions › Start a round…");
+    expect(auditDetails({ ...base, action: "x.y", details: { via: "bulk_something_new" } })).toBe("Via: Bulk something new");
   });
 
   it("says which languages were added and removed (#467)", () => {

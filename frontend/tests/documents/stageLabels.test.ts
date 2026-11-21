@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import type { DocumentRowView, StageCellView } from "../../src/api/client";
-import { narrowStageState, STAGE_TITLES, stageText, submittedOf, versionMarkerText, waitingOnText, type StageName } from "../../src/documents/stageLabels";
+import { narrowStageState, rowStageText, STAGE_TITLES, stageText, submittedOf, versionMarkerText, waitingOnText, type StageName } from "../../src/documents/stageLabels";
 import { notInPlanRow, row, stepOf } from "./fixtures";
 import { ana, cell, luc, tom } from "./tableFixtures";
 
@@ -99,6 +99,20 @@ describe("Annotation cell", () => {
   it("a paused consolidation names the consolidator and the reason (review 2, F2)", () => {
     expect(text("annotation", cell("consolidating", "waiting", { people: [luc], note: "lead_pause", excerpt: "Source is checked" }))).toEqual(["⏸ Consolidation paused by lead", "Luc Martin, “Source is checked”"]);
     expect(text("annotation", cell("consolidating", "decision", { people: [luc], note: "report_pause", excerpt: "Which rule?" }))).toEqual(["⏸ Consolidation paused", "Luc Martin, “Which rule?”"]);
+  });
+  it("a narrow card reads a running consolidation under Finalization, as the table does (issue 576, F2)", () => {
+    const line = (stage: StageName, annotation: StageCellView, progress: DocumentRowView["consolidation_progress"] = null) => {
+      const result = rowStageText({ ...de, consolidation_progress: progress, stages: { review: cell("source", "none"), annotation, final: cell("after_review", "waiting") } }, stage)!;
+      return [[result.symbol, result.word].join(" "), result.detail, result.tone];
+    };
+    const paused = cell("consolidating", "waiting", { people: [luc], submitted: 2, total: 2, note: "lead_pause", excerpt: "Clinic is checking" });
+    expect(line("annotation", paused)).toEqual(["✓ 2 of 2 submitted", "", "done"]);
+    expect(line("final", paused, { round_id: "r", open: 1, total: 3 })).toEqual(["⏸ consolidating · paused", "Luc Martin, 1 of 3 groups open, “Clinic is checking”", "waiting"]);
+    const running = cell("consolidating", "running", { people: [luc], submitted: 2, total: 2 });
+    expect(line("final", running)).toEqual(["◐ consolidating", "Luc Martin", "running"]);
+    // Other states keep the cell's own words.
+    expect(rowStageText({ ...de, stages: { review: cell("source", "none"), annotation: cell("submitted", "done", { submitted: 2, total: 2 }), final: cell("after_review", "waiting") } }, "final"))
+      .toEqual({ symbol: "○", word: "after review", detail: "", tone: "waiting" });
   });
   it("old_text_open", () => expect(text("annotation", cell("old_text_open", "decision", { people: [tom], from_version: 1, version: 2 }))).toEqual(["⚠ In progress on old text", "Tom Reis works on v1"]));
   it("old_text_submitted", () => expect(text("annotation", cell("old_text_submitted", "decision", { people: [ana], from_version: 1, version: 2, note: "v2_not_annotated" })))
