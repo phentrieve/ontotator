@@ -79,6 +79,8 @@ describe("structure", () => {
     expect(screen.queryByRole("checkbox", { name: /^Select case-107 \(/ })).toBeNull();
     const th = header("case-107 de");
     expect(th.querySelector(".documents-row-case .documents-id")!.textContent).toBe("case-107");
+    // A short ID is plain text, without shorter forms.
+    expect(th.querySelector(".documents-row-case .documents-id")!.children).toHaveLength(0);
     expect(th.textContent).not.toContain("·");
     const more = th.querySelector<HTMLElement>(".documents-more")!;
     expect(within(more).getByText("+1").getAttribute("aria-hidden")).toBe("true");
@@ -393,11 +395,11 @@ describe("cells", () => {
     expect(css).toMatch(/\.waiting-more \{ flex: none; \}/);
   });
 
-  it("the robot icon does not cut the short state: the narrow cap is on the state, not the whole cell", () => {
+  it("no fixed cap cuts a status or Waiting on cell: the words follow the room (issue 544)", () => {
     const css = readFileSync(resolve(__dirname, "../../src/styles/screens/documents-table.css"), "utf8");
-    const narrow = css.slice(css.indexOf("@media (max-width: 1599px)"));
-    expect(narrow).toMatch(/\.documents-status-cell \{ max-width: none;/);
-    expect(narrow).toMatch(/\.documents-status\.stage-cell \{ max-width: 7\.5rem; \}/);
+    const rules = css.split("}").filter(rule => /\.documents-(status-cell|status\.stage-cell|waiting-on)\b[^{]*\{/.test(rule));
+    expect(rules.length).toBeGreaterThan(0);
+    for (const rule of rules) expect(rule, rule).not.toMatch(/max-width:\s*\d/);
   });
 
   it("at most one button per row and no +n", () => {
@@ -472,12 +474,17 @@ describe("cells", () => {
     expect(within(header("case-115 de")).getByText("v2 corrected").className).toBe("documents-version-marker");
   });
 
-  it("middle-truncates long IDs in the Text cell with the full value in title", () => {
+  it("keeps a long ID in full in the Text cell, with a middle-ellipsis form for a table short of room (issue 576)", () => {
     const longId = "case-2026-10-19-0211-imported-batch";
     renderTable(page([group(longId, [planRow(longId, "de", stepOf("assign_annotation"))])]));
-    const short = screen.getByRole("checkbox", { name: `Select ${longId} de` }).closest("tr")!.querySelector("th .documents-id[title]")!;
-    expect(short.getAttribute("title")).toBe(longId);
-    expect(short.textContent).toContain("…");
+    const id = screen.getByRole("checkbox", { name: `Select ${longId} de` }).closest("tr")!.querySelector("th .documents-id[title]")!;
+    expect(id.getAttribute("title")).toBe(longId);
+    const forms = [...id.querySelectorAll(".documents-id-form")].map(form => [form.textContent, form.getAttribute("data-forms"), form.getAttribute("aria-hidden")]);
+    expect(forms).toEqual([[longId, "0", null], ["case-202…ed-batch", "1", "true"], ["case-…batch", "2", "true"]]);
+    // No CSS cap: only the fit (tableFit.ts) switches to a shorter form, by the table's data-ids.
+    const css = readFileSync(resolve(__dirname, "../../src/styles/screens/documents-table.css"), "utf8");
+    expect(css).not.toMatch(/\.documents-id \{[^}]*max-width/);
+    expect(css).toMatch(/\.documents-table\[data-ids="2"\] \.documents-id-form\[data-forms~="2"\]/);
   });
 
   it("shows the visit badge in the row header and the row notice below the row", () => {

@@ -44,6 +44,11 @@ from ontotator.application.text_changes import (
     findings_in_changed_passages,
     unplaced_findings,
 )
+from ontotator.application.typo_fix_carry import (
+    submission_order_times,
+    submitted_times,
+    typo_fix_moves,
+)
 from ontotator.domain import document_rows as rules
 from ontotator.domain.agreement import (
     Agreement,
@@ -252,18 +257,24 @@ def label_rule(
 def _recorded_at(
     conn: Connection, pid: int, submission_ids: Iterable[str]
 ) -> dict[str, datetime]:
+    """Submission order times (``submission_order_times``: a typo-fix copy
+    at the time of the person's own submission)."""
     wanted = sorted(set(submission_ids))
     if not wanted:
         return {}
-    return {
-        row.submission_id: row.recorded_at
-        for row in conn.execute(
-            select(SubmissionRow.submission_id, SubmissionRow.recorded_at).where(
-                SubmissionRow.project_id == pid,
-                SubmissionRow.submission_id.in_(wanted),
+    return submission_order_times(
+        conn,
+        pid,
+        {
+            row.submission_id: row.recorded_at
+            for row in conn.execute(
+                select(SubmissionRow.submission_id, SubmissionRow.recorded_at).where(
+                    SubmissionRow.project_id == pid,
+                    SubmissionRow.submission_id.in_(wanted),
+                )
             )
-        )
-    }
+        },
+    )
 
 
 def _payloads(
@@ -789,9 +800,11 @@ def final_panel(
     listing = build_submissions(conn, key, pid, case_id, language, facts.viewer_user_id)
     ctx = page_context(facts)
     comparison = row_comparison(ctx, case_id, language)
-    recorded_at = {
-        item["submission_id"]: item["recorded_at"] for item in listing["submissions"]
-    }
+    moves = typo_fix_moves(conn, pid)
+    recorded_at = submitted_times(
+        moves,
+        {item["submission_id"]: item["recorded_at"] for item in listing["submissions"]},
+    )
     inputs = _inputs(
         conn,
         pid,
@@ -811,6 +824,11 @@ def final_panel(
     comparable_ids = {item.submission_id for item in comparable}
     origins = _consolidation_origins(conn, pid, listing["submissions"])
     own_not_selectable = bool(listing["adjudicator_not_annotator"])
+    row = build_row(facts, case_id, language, ctx=ctx)
+    # Issue 575: the submission a typo fix moved to the new version is the
+    # copy there; its original is no second choice (the history lists both).
+    final_id = row["final"]["submission_id"] if row["final"] is not None else None
+    replaced = {move.source_submission_id for move in moves.values()} - {final_id}
     submissions = [
         {
             **item,
@@ -824,6 +842,7 @@ def final_panel(
             "consolidation_origins": origins.get(item["submission_id"]),
         }
         for item in listing["submissions"]
+        if item["submission_id"] not in replaced
     ]
     roles = project_roles(conn, pid, profile) if rule == "compare" else None
     all_match_id = (
@@ -874,7 +893,6 @@ def final_panel(
         flagged,
         profile,
     )
-    row = build_row(facts, case_id, language, ctx=ctx)
     causes = [
         item
         for item in [*row["issues"], *row["notes"]]

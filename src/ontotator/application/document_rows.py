@@ -36,6 +36,11 @@ from ontotator.application.final_causes import (
     latest_review_decisions,
 )
 from ontotator.application.people import person_refs
+from ontotator.application.typo_fix_carry import (
+    TypoFixMove,
+    submission_order_times,
+    typo_fix_moves,
+)
 from ontotator.application.typography_counts import typography_hint_counts
 from ontotator.auth.audit import Actor
 from ontotator.authz.policy import Access
@@ -54,7 +59,14 @@ from ontotator.storage.final_tables import FinalSelectionRow
 from ontotator.storage.live_submissions import live_submission, live_submission_ref
 from ontotator.storage.mode_change_tables import DiscardedSubmissionRow
 from ontotator.storage.overview_tables import TextChangeResolutionRow
-from ontotator.storage.plan_tables import WorkPlanFlagsRow
+from ontotator.storage.plan_tables import (
+    DiscardedVariantRow,
+    EditorialCorrectionRow,
+    QueryDecisionRow,
+    TranslationAcceptanceRow,
+    TranslationVersionUploadRow,
+    WorkPlanFlagsRow,
+)
 from ontotator.storage.proposal_queries import newest_proposal_counts
 from ontotator.storage.repository import Repository, _key_str
 from ontotator.storage.tables import (
@@ -385,6 +397,11 @@ class RowFacts:
     # Issue 484: typography hints of the newest version of each chain that
     # has any (document id -> count); computed, never stored.
     typography_hints: dict[str, int] = field(default_factory=dict)
+    # Issue 543: the tasks a typo fix made for moved annotations, by task.
+    typo_fix_moves: dict[int, TypoFixMove] = field(default_factory=dict)
+    # Issue 545: assignment id -> when its translation review was last
+    # submitted (the History line's time).
+    review_submitted_at: dict[int, datetime] = field(default_factory=dict)
 
     def per_text(self, key: tuple[str, str]) -> int:
         """The effective "Annotations per text" of the text ``key`` (issue 422)."""
@@ -442,6 +459,32 @@ def load_last_activity(
         )
         .join(AssignmentRow, AssignmentRow.id == ProblemReportRow.assignment_id)
         .where(ProblemReportEventRow.project_id == pid),
+        # Issue 545: what a lead did to the text's versions - a version
+        # accepted, fixed ("Fix typos…"), uploaded or discarded, and a
+        # decision on a query (on the queried and on the accepted version).
+        # An acceptance that came with the package is an import, no activity.
+        select(
+            TranslationAcceptanceRow.document_id, TranslationAcceptanceRow.accepted_at
+        ).where(
+            TranslationAcceptanceRow.project_id == pid,
+            TranslationAcceptanceRow.source != "package",
+        ),
+        select(
+            EditorialCorrectionRow.document_id, EditorialCorrectionRow.corrected_at
+        ).where(EditorialCorrectionRow.project_id == pid),
+        select(
+            TranslationVersionUploadRow.document_id,
+            TranslationVersionUploadRow.uploaded_at,
+        ).where(TranslationVersionUploadRow.project_id == pid),
+        select(DiscardedVariantRow.document_id, DiscardedVariantRow.discarded_at).where(
+            DiscardedVariantRow.project_id == pid
+        ),
+        select(QueryDecisionRow.document_id, QueryDecisionRow.decided_at).where(
+            QueryDecisionRow.project_id == pid
+        ),
+        select(
+            QueryDecisionRow.accepted_document_id, QueryDecisionRow.decided_at
+        ).where(QueryDecisionRow.project_id == pid),
     ).subquery()
     documents = {
         row.document_id: row.at
@@ -848,40 +891,45 @@ def _submission_counts(conn: Connection, pid: int) -> dict[str, int]:
 
 
 def _selected_submissions(conn: Connection, pid: int) -> dict[str, SubmissionFact]:
+    """The final results' submissions; a typo-fix copy with the time the
+    person submitted (issue 575)."""
     named = select(FinalSelectionRow.submission_id).where(
         FinalSelectionRow.project_id == pid
+    )
+    rows = conn.execute(
+        select(
+            SubmissionRow.submission_id,
+            SubmissionRow.document_id,
+            SubmissionRow.annotator_id,
+            SubmissionRow.recorded_at,
+            SubmissionRow.mode,
+            RoundSubmissionBindingRow.round_id,
+        )
+        .outerjoin(
+            RoundSubmissionBindingRow,
+            and_(
+                RoundSubmissionBindingRow.project_id == SubmissionRow.project_id,
+                RoundSubmissionBindingRow.submission_id == SubmissionRow.submission_id,
+            ),
+        )
+        .where(
+            SubmissionRow.project_id == pid,
+            SubmissionRow.submission_id.in_(named),
+        )
+    ).all()
+    submitted_at = submission_order_times(
+        conn, pid, {row.submission_id: row.recorded_at for row in rows}
     )
     return {
         row.submission_id: SubmissionFact(
             submission_id=row.submission_id,
             document_id=row.document_id,
             annotator_id=row.annotator_id,
-            recorded_at=row.recorded_at,
+            recorded_at=submitted_at[row.submission_id],
             mode=row.mode,
             round_id=row.round_id,
         )
-        for row in conn.execute(
-            select(
-                SubmissionRow.submission_id,
-                SubmissionRow.document_id,
-                SubmissionRow.annotator_id,
-                SubmissionRow.recorded_at,
-                SubmissionRow.mode,
-                RoundSubmissionBindingRow.round_id,
-            )
-            .outerjoin(
-                RoundSubmissionBindingRow,
-                and_(
-                    RoundSubmissionBindingRow.project_id == SubmissionRow.project_id,
-                    RoundSubmissionBindingRow.submission_id
-                    == SubmissionRow.submission_id,
-                ),
-            )
-            .where(
-                SubmissionRow.project_id == pid,
-                SubmissionRow.submission_id.in_(named),
-            )
-        )
+        for row in rows
     }
 
 
@@ -989,6 +1037,23 @@ def _latest_reviews(conn: Connection, pid: int) -> dict[str, ReviewRecord]:
             .distinct(TranslationReviewRow.document_id)
             .order_by(
                 TranslationReviewRow.document_id,
+                TranslationReviewRow.created_at.desc(),
+                TranslationReviewRow.id.desc(),
+            )
+        )
+    }
+
+
+def _review_submitted_at(conn: Connection, pid: int) -> dict[int, datetime]:
+    """Per translation review task: when its newest review was submitted."""
+    return {
+        int(row.assignment_id): row.created_at
+        for row in conn.execute(
+            select(TranslationReviewRow.assignment_id, TranslationReviewRow.created_at)
+            .where(TranslationReviewRow.project_id == pid)
+            .distinct(TranslationReviewRow.assignment_id)
+            .order_by(
+                TranslationReviewRow.assignment_id,
                 TranslationReviewRow.created_at.desc(),
                 TranslationReviewRow.id.desc(),
             )
@@ -1318,6 +1383,11 @@ def load_facts(
     author_ids = _user_ids(conn, (item.annotator_id for item in selected.values()))
     lead_pauses = paused_texts(conn, pid)
     correction_requests = {} if lean else _correction_requests(conn, pid, assignments)
+    moves = (
+        {}
+        if summary
+        else {move.assignment_id: move for move in typo_fix_moves(conn, pid).values()}
+    )
     people = (
         {}
         if summary
@@ -1327,6 +1397,11 @@ def load_facts(
                 viewer_user_id,
                 *(item.user_id for item in assignments),
                 *(item.created_by for item in assignments if item.created_by),
+                *(
+                    move.first_assigned_by
+                    for move in moves.values()
+                    if move.first_assigned_by is not None
+                ),
                 *(item.reporter_id for item in reports.values() if item.reporter_id),
                 *(
                     item["accepted_by"]
@@ -1453,6 +1528,8 @@ def load_facts(
             pid,
             (chain.newest.document_id for chain in rules.build_chains(versions)),
         ),
+        typo_fix_moves=moves,
+        review_submitted_at={} if summary else _review_submitted_at(conn, pid),
     )
 
 

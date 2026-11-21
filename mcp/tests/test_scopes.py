@@ -362,6 +362,13 @@ def _arguments(folder: Path) -> dict[str, dict[str, Any]]:
             "reason": "Text replaced",
             "confirm": True,
         },
+        "preview_change": {
+            "tool": "withdraw_open_tasks",
+            "arguments": {
+                "project": "p",
+                "texts": [{"case_id": "c", "language": "en"}],
+            },
+        },
     }
 
 
@@ -478,10 +485,13 @@ async def test_every_tool_names_the_scopes_of_its_routes(
             await call(client, name, args)
             used = {scope(method, template) for method, template in fake.templates()}
             info = TOOL_SCOPES[name]
+            if info.scope_note:
+                # preview_change needs the scopes of the tool it previews.
+                info = TOOL_SCOPES[args["tool"]]
             if not declared_exactly(used, info.scopes, info.any_of):
                 wrong[name] = sorted(map(str, used))
             assert scope_text(info.scopes, info.any_of) in (
-                listed[name].description or ""
+                listed[info.name].description or ""
             )
         assert wrong == {}, wrong
 

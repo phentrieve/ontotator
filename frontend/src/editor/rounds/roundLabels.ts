@@ -18,7 +18,13 @@ export interface RoundFacts {
   source_submission_recorded_at?: string | null;
   document_language?: string | null;
   document_version?: number | null;
+  /** Issue 543: the person's submitted annotation moved to this version by itself after a typo fix. */
+  moved_by_typo_fix?: boolean;
 }
+
+/** "moved to v2 after a typo fix" (issue 543): nobody checked or changed anything. */
+const movedText = (round: Pick<RoundFacts, "document_version">): string =>
+  `moved to ${round.document_version != null ? `v${round.document_version}` : "the corrected text"} after a typo fix`;
 
 const roundTitle = (ordinal: number | null | undefined): string => (ordinal ? `Round ${ordinal}` : "This round");
 /** Rounds count per text version, so a carry can continue a round of the same number on an earlier version. */
@@ -41,6 +47,10 @@ export function roundIdentity(round: RoundFacts, options: FormatTimeOptions = {}
     case "consolidation":
       return `${title}, consolidation of ${plural(round.input_submission_ids?.length ?? 0, "submission", "submissions")}`;
     case "carry_forward": {
+      if (round.moved_by_typo_fix) {
+        const time = round.source_submission_recorded_at ? `, submitted ${formatTime(round.source_submission_recorded_at, options)}` : "";
+        return `${title}, ${movedText(round)}${time}`;
+      }
       const from = sourceRound(round);
       const source = from ? `${from} submission` : "an earlier submission";
       const time = round.source_submission_recorded_at ? ` (${formatTime(round.source_submission_recorded_at, options)})` : "";
@@ -114,9 +124,11 @@ export function sourceOptionLabel(source: CarrySourceFacts, options: FormatTimeO
 }
 
 /** Starting point in the Work rounds table: "from Round 2 submission", "restarted", … */
-export function roundStartingPoint(round: Pick<RoundFacts, "kind" | "round_ordinal" | "source_round_ordinal" | "input_submission_ids">): string {
+export function roundStartingPoint(round: Pick<RoundFacts, "kind" | "round_ordinal" | "source_round_ordinal" | "input_submission_ids" | "moved_by_typo_fix">): string {
   switch (round.kind) {
-    case "carry_forward": return sourceRound(round) ? `from ${sourceRound(round)} submission` : "from an earlier submission";
+    case "carry_forward":
+      if (round.moved_by_typo_fix) return "moved after a typo fix";
+      return sourceRound(round) ? `from ${sourceRound(round)} submission` : "from an earlier submission";
     case "clean_restart": return "restarted";
     case "consolidation": return `consolidation of ${plural(round.input_submission_ids?.length ?? 0, "submission", "submissions")}`;
     case "text_change": return "carried after text change";
@@ -129,8 +141,9 @@ export function roundStartingPoint(round: Pick<RoundFacts, "kind" | "round_ordin
  * Short toolbar badge of a carry-forward round ("Round 3, continued from Round 2") or of a round moved to a
  * corrected text (the toolbar shows it when nothing needs a check); undefined otherwise.
  */
-export function roundBadge(round: Pick<RoundFacts, "kind" | "round_ordinal" | "source_round_ordinal"> | null | undefined): string | undefined {
+export function roundBadge(round: Pick<RoundFacts, "kind" | "round_ordinal" | "source_round_ordinal" | "moved_by_typo_fix" | "document_version"> | null | undefined): string | undefined {
   if ((round?.kind !== "carry_forward" && round?.kind !== "text_change") || !round.round_ordinal) return undefined;
+  if (round.moved_by_typo_fix) return `Round ${round.round_ordinal}, ${movedText(round)}`;
   // The same round on a newer text version: "continued from Round 1 of an earlier version" was hard to read (issue 472).
   if (round.kind === "text_change" || round.source_round_ordinal === round.round_ordinal) return `Round ${round.round_ordinal}, carried over from the earlier text version`;
   return `Round ${round.round_ordinal}, continued from ${sourceRound(round) ?? "an earlier submission"}`;

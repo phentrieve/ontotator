@@ -229,6 +229,12 @@ describe("role-based shell", () => {
     expect(screen.getByRole("link", { name: "Documents" }).getAttribute("href")).toBe("#/projects/second/documents");
   });
 
+  it("marks Progress while the Translation reviews list is open (issue 547, U2-09)", () => {
+    render(<Shell {...props({ projects: [project("first", true)], route: { name: "projectTranslationReviews", key: "first" } })} />);
+    expect(screen.getByRole("link", { name: "Progress" }).getAttribute("aria-current")).toBe("location");
+    expect(screen.getByRole("link", { name: "Documents" }).hasAttribute("aria-current")).toBe(false);
+  });
+
   it("delegates ordinary navigation without changing the active hash or calling logout", () => {
     const state = props({ projects: [project("first", true)], route: { name: "projectDocuments", key: "first" } });
     render(<Shell {...state} />);

@@ -117,9 +117,10 @@ test("S0 synthetic-accepted: the final is on old text after v2 corrected it; en 
   const scroller = page.locator(".documents-page .data-table-scroll");
   for (const width of [1440, 1400, 1280]) {
     await page.setViewportSize({ width, height: 800 });
-    expect(await scroller.evaluate(element => element.scrollWidth - element.clientWidth), `${width} px`).toBeLessThanOrEqual(0);
-    const heights = await documentsTable(page).locator(".documents-row").evaluateAll(rows => rows.map(row => Math.round(row.getBoundingClientRect().height)));
-    expect(Math.max(...heights), `${width} px row height`).toBeLessThanOrEqual(41);
+    // The table fits itself to the new width after a resize observer has run (tableFit.ts): poll, do not measure once.
+    await expect.poll(() => scroller.evaluate(element => element.scrollWidth - element.clientWidth), { message: `${width} px` }).toBeLessThanOrEqual(0);
+    await expect.poll(async () => Math.max(...await documentsTable(page).locator(".documents-row").evaluateAll(rows => rows.map(row => Math.round(row.getBoundingClientRect().height)))),
+      { message: `${width} px row height` }).toBeLessThanOrEqual(41);
   }
   await expect(rowCell(de, "finalization")).toContainText("Final is on old text");
   // One annotation per text: the v1 submission carried to v2 does not count on v2 (issue 420, never "1 of 2 submitted").
@@ -325,8 +326,9 @@ test("S6 case-0390 de: open problem report with a paused task", async ({ page })
 
   const de = textRow(page, caseId, "de");
   expect(await hasDecisionEdge(de)).toBe(true);
-  // One line: the pause glyph, the card's state and who is paused; the full text (with the reason) is in the title.
-  await expect(rowCell(de, "annotation")).toContainText("⏸");
+  // One line: the pause icon (drawn, not a font glyph: issue 549), the card's state and who is paused; the full text
+  // (with the reason) is in the title.
+  await expect(rowCell(de, "annotation").locator('.stage-cell-symbol[data-symbol="⏸"] svg')).toBeVisible();
   await expect(rowCell(de, "annotation")).toContainText(`open: ${names["ann-0001"]}`);
   await expect(rowCell(de, "next").getByRole("button").first()).toHaveAccessibleName(textNamePattern("Decide on report…, ", caseId, "de"));
   await expect(documentsTab(page, "Needs your decision", 1)).toBeVisible();
@@ -447,7 +449,8 @@ test("S13 case-0713 en: consolidation and carry-forward kinds, the final is the 
 
   const en = textRow(page, caseId, "en");
   await expect(en.getByRole("rowheader")).toContainText("v2 corrected");
-  await expect(rowCell(en, "annotation")).toContainText("Submitted on v1");
+  // Issue 543: one annotation is on v2 already, one waits on v1.
+  await expect(rowCell(en, "annotation")).toContainText("1 on v2, 1 waiting on v1");
   await expect(rowCell(en, "finalization")).toContainText(/ready to compare|ready to accept|Your choice/);
   await expect(rowCell(en, "next").getByRole("button").first()).toHaveAccessibleName(textNamePattern("Carry to v2…, ", caseId, "en"));
   // "Choose final…" became "Accept result…" / "Compare results…" (V6, X14), in the text card (one button per row).

@@ -80,6 +80,30 @@ it("a menu entry that does nothing names the reason (decision 336-C)", () => {
   expect(unavailableReason("withdraw", null)).toBeNull();
 });
 
+it("the menu reasons follow the counts by reason: paused tasks, an open consolidation beside an empty text (issue 576, F6)", () => {
+  const counts = (action: "withdraw" | "start_round" | "reopen", texts: number, kept: Record<string, number>, skipped: Record<string, number> = {}) => ({
+    ...reopenPreview({ action, changes: [], kept: [], skipped: [] }), texts,
+    kept_count: Object.values(kept).reduce((sum, value) => sum + value, 0), kept_by_reason: kept,
+    skipped_count: Object.values(skipped).reduce((sum, value) => sum + value, 0), skipped_by_reason: skipped,
+  });
+  // A paused consolidation and two paused annotations: not "No open tasks".
+  expect(unavailableReason("withdraw", counts("withdraw", 2, { paused_by_lead: 3, submitted: 2 }))).toBe("The open tasks are paused by a lead: release the texts first.");
+  expect(unavailableReason("withdraw", counts("withdraw", 1, { paused_by_lead: 1 }))).toBe("The open tasks are paused by a lead: release the text first.");
+  expect(unavailableReason("withdraw", counts("withdraw", 1, { paused: 1 }))).toBe("The open tasks are paused by a problem report: decide the report first.");
+  expect(unavailableReason("withdraw", counts("withdraw", 2, { paused: 1, paused_by_lead: 1 }))).toBe("The open tasks are paused by a problem report or paused by a lead.");
+  expect(unavailableReason("withdraw", counts("withdraw", 2, { submitted: 4 }))).toBe("No open tasks in the selected texts.");
+  // One text with an open consolidation and one without submissions: not "No submitted annotations".
+  expect(unavailableReason("start_round", counts("start_round", 2, { not_submitted: 2 }, { consolidation_open: 1 })))
+    .toBe("1 text has an open consolidation; the other has no submitted annotations.");
+  expect(unavailableReason("start_round", counts("start_round", 3, { paused: 1 }, { final_result: 1 })))
+    .toBe("1 text has a final result; the others have no submitted annotation that can start a round.");
+  expect(unavailableReason("start_round", counts("start_round", 1, {}, { consolidation_open: 1 }))).toBe("The selected text has an open consolidation.");
+  expect(unavailableReason("start_round", counts("start_round", 2, {}, { consolidation_open: 1, final_result: 1 }))).toBe("The selected texts have an open consolidation or a final result.");
+  expect(unavailableReason("start_round", counts("start_round", 2, { paused: 2 }))).toBe("No submitted annotation in the selected texts can start a round.");
+  expect(unavailableReason("reopen", counts("reopen", 2, { not_submitted: 1 }, { final_chosen: 1 })))
+    .toBe("1 text has a final result: use Change final… first; the other has no submitted tasks.");
+});
+
 it("says that reopened translation reviews cannot be undone", () => {
   const review = { ...task("EN100022", 1), task: "translation_review" as const };
   expect(consequenceLines(reopenPreview({ changes: [review] })).at(-1)).toBe("Translation reviews start again from the current text of their version. This cannot be undone.");

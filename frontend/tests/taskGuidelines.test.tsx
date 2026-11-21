@@ -162,10 +162,17 @@ describe("task guidelines notice", () => {
     expect(await screen.findByRole("heading", { level: 2, name: "Guidelines 3.2 (v3)" })).toBeDefined();
   });
 
+  it("first-exposure notice of a labelled version names it once, without nested brackets (issue 549, U3-07)", async () => {
+    render(<Harness assignment={task({ guideline: { ...inForce(3), label: "3.2" }, guideline_notice: { ...first, to_label: "3.2" } })} />);
+    const notice = within(screen.getByTestId("notice-slot"));
+    expect(await notice.findByText("This project has guidelines 3.2 (v3)")).toBeDefined();
+    expect(notice.queryByText(/\(3\.2 \(v3\)\)/)).toBeNull();
+  });
+
   it("first-exposure notice copy", async () => {
     render(<Harness assignment={task({ guideline_notice: first })} />);
     const notice = within(screen.getByTestId("notice-slot"));
-    expect(await notice.findByText("This project has guidelines (v3)")).toBeDefined();
+    expect(await notice.findByText("This project has guidelines v3")).toBeDefined();
     expect(notice.getByText("Read them before you start; they are available at any time under More › Guidelines in the toolbar.")).toBeDefined();
     expect(notice.getByRole("button", { name: "Read guidelines v3" })).toBeDefined();
     expect(notice.queryByRole("listitem")).toBeNull();
@@ -207,7 +214,7 @@ describe("task guidelines notice", () => {
     // Held: readOnly from assignment.held while the status is not submitted.
     const view = render(<Harness assignment={task({ held: true, guideline_notice: first })} readOnly />);
     await settle();
-    expect(screen.queryByText("This project has guidelines (v3)")).toBeNull();
+    expect(screen.queryByText("This project has guidelines v3")).toBeNull();
     expect(entry()).toBeDefined();
     // A read-only round: workspace.read_only on an in-progress task.
     view.rerender(<Harness assignment={task({ status: "in_progress", guideline_notice: update })} readOnly />);

@@ -101,7 +101,9 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
     const row = rowOf(page, "EN100028");
     await expect(row).toContainText("Paused by lead");
     if (phone) {
-      await expect(row).toContainText("Consolidation paused by lead, Kim Lang");
+      // Issue 576, F2: the card's lines read as the table's cells, not "Consolidation paused by lead" under Annotation.
+      await expect(row.locator(".document-card-stage").filter({ hasText: "Annotation:" })).toContainText("2 of 2 submitted");
+      await expect(row.locator(".document-card-stage").filter({ hasText: "Finalization:" })).toContainText("consolidating · paused, Kim Lang, 2 of 2 groups open");
     } else {
       await expect(cellUnder(row, STAGE_HEADERS.annotation).locator(".documents-status")).toHaveAttribute("title", "2 of 2 submitted");
       await expect(cellUnder(row, STAGE_HEADERS.finalization).locator(".documents-status")).toHaveAttribute("title", "consolidating · paused (2 of 2 groups open)");

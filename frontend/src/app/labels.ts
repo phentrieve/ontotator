@@ -1,5 +1,6 @@
 import type { Route } from "./router";
 import { taskText } from "./identity";
+import { formatTime } from "./submissionLabels";
 
 /** Plain-English presentation of workflow codes outside the editor. Codes stay the data; these are display only. */
 
@@ -88,22 +89,6 @@ export function plural(count: number, singular: string, pluralForm = `${singular
   return `${count} ${count === 1 ? singular : pluralForm}`;
 }
 
-const dateTime = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" });
-
-const shortDateTime = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-
-/** Day, month and time for dense tables, e.g. "27 Oct, 10:18"; pair it with `formatDateTime` in a title. */
-export function formatShortDateTime(value: string | number | Date): string {
-  const date = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(date.getTime()) ? String(value) : shortDateTime.format(date);
-}
-
-/** One English date format for workflow pages, e.g. "16 Oct 2026, 19:17". Invalid input is returned unchanged. */
-export function formatDateTime(value: string | number | Date): string {
-  const date = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(date.getTime()) ? String(value) : dateTime.format(date);
-}
-
 /** The lead's reason for a consolidation (issue 146), for the consolidator in My tasks and the consolidation header. */
 export function consolidationReasonText(reason: string): string {
   return `Reason from the lead: ${reason}`;
@@ -112,6 +97,6 @@ export function consolidationReasonText(reason: string): string {
 /** Why and when a reopened task was reopened (My tasks and the editor); null for other statuses. */
 export function reopenNotice(task: { status: string; reopened_at?: string | null; reopen_reason?: string | null }): string | null {
   if (task.status !== "reopened") return null;
-  const when = task.reopened_at ? ` on ${formatDateTime(task.reopened_at)}` : "";
+  const when = task.reopened_at ? ` on ${formatTime(task.reopened_at)}` : "";
   return `The project lead reopened this task${when}. ${task.reopen_reason ? `Reason: ${task.reopen_reason}` : "No reason given."}`;
 }

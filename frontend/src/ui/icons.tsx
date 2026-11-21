@@ -27,6 +27,10 @@ function Icon({ children, className }: { children: React.ReactNode; className?: 
 
 type IconProps = { className?: string };
 
+/** Two bars: a pause (issue 549; the font glyph U+23F8 is an empty box without a system font that has it). */
+export const IconPause = (p: IconProps) => <Icon {...p}><path d="M5.5 3v10M10.5 3v10" strokeWidth="2.5" strokeLinecap="butt" /></Icon>;
+/** A pilcrow: spacing and invisible characters (typography hints). */
+export const IconPilcrow = (p: IconProps) => <Icon {...p}><path d="M7.5 13V3h5M10.5 3v10M7.5 3a3 3 0 0 0 0 6" /></Icon>;
 export const IconChevronLeft = (p: IconProps) => <Icon {...p}><path d="m10 3-5 5 5 5" /></Icon>;
 export const IconChevronRight = (p: IconProps) => <Icon {...p}><path d="m6 3 5 5-5 5" /></Icon>;
 export const IconSort = (p: IconProps) => <Icon {...p}><path d="m5 5 3-3 3 3M5 11l3 3 3-3" /></Icon>;
@@ -186,5 +190,36 @@ export const IconGear = (p: IconProps) => (
       <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
       <circle cx="12" cy="12" r="3" />
     </g>
+  </Icon>
+);
+
+/** "Show in tree" (issue 540): a term with a broader one above and two narrower ones below. */
+export const IconTree = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="5.75" y="1.75" width="4.5" height="3.5" rx="1" />
+    <rect x="1.75" y="10.75" width="4.5" height="3.5" rx="1" />
+    <rect x="9.75" y="10.75" width="4.5" height="3.5" rx="1" />
+    <path d="M8 5.25V8M4 10.75V8h8v2.75" />
+  </Icon>
+);
+
+/** "Move to a new finding": out of the box, up and to the right. */
+export const IconMoveOut = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M7 3.25H3.75a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9" />
+    <path d="M9.5 2.75h3.75V6.5M13.25 2.75 7.5 8.5" />
+  </Icon>
+);
+
+export const IconPlus = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M8 3v10M3 8h10" />
+  </Icon>
+);
+
+/** "Next open item" where the bar is short of room (issue 539). */
+export const IconArrowRight = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M2.75 8h10M9 4.25 12.75 8 9 11.75" />
   </Icon>
 );

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, TECHNICAL_REPORTS_PAGE, type OwnTechnicalReportView } from "../api/client";
 import { ErrorNotice } from "../admin/ErrorNotice";
-import { formatDateTime, formatShortDateTime } from "../app/labels";
+import { formatTime, fullTimestamp } from "../app/submissionLabels";
 import { SHOW_MY_TECHNICAL_REPORTS, TECHNICAL_REPORT_SENT } from "../reports/technicalReport";
 import { Button, DataTable, EmptyState, InlineMessage, StatusBadge, type Column } from "../ui";
 import "../reports/reports.css";
@@ -21,7 +21,7 @@ function WhatHappened({ text }: { text: string }): JSX.Element {
 
 const COLUMNS: Column<OwnTechnicalReportView>[] = [
   { id: "reference", header: "Ref.", cell: report => <span className="own-technical-report-nowrap">{report.reference}</span>, rowHeader: true },
-  { id: "sent", header: "Sent", cell: report => <time dateTime={report.created_at} title={formatDateTime(report.created_at)}>{formatShortDateTime(report.created_at)}</time> },
+  { id: "sent", header: "Sent", cell: report => <time dateTime={report.created_at} title={fullTimestamp(report.created_at)}>{formatTime(report.created_at)}</time> },
   { id: "what", header: "What happened", cell: report => <WhatHappened text={report.description} /> },
   { id: "status", header: "Status", cell: report => report.status === "done"
     ? <StatusBadge tone="success">Done</StatusBadge> : <StatusBadge tone="info">Open</StatusBadge> },

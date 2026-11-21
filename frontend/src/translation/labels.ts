@@ -1,6 +1,7 @@
 import type { TaskSummary } from "../api/client";
 import { taskText } from "../app/identity";
 import type { ClinicalCategory, IssueCode, ReviewDecisionCode } from "./reviewRules";
+import { formatTime } from "../app/submissionLabels";
 
 /** English presentation keyed by domain codes, ready for later translation. */
 export const decisionLabels: Readonly<Record<ReviewDecisionCode, string>> = {
@@ -269,17 +270,17 @@ export function versionOriginRows(origin: VersionOriginFacts): [string, string][
   const rows: [string, string][] = [];
   if (origin.kind === "upload") {
     rows.push(["This version", [uploadMethodWords[origin.method ?? ""] ?? "Uploaded text", origin.provider?.trim(), origin.model?.trim()].filter(Boolean).join(", ")]);
-    rows.push(["Uploaded", ["by the project lead", origin.at ? `on ${formatReviewDate(origin.at)}` : null].filter(Boolean).join(" ")]);
+    rows.push(["Uploaded", ["by the project lead", origin.at ? `on ${formatTime(origin.at)}` : null].filter(Boolean).join(" ")]);
     const made = [origin.made_on ? `on ${calendarDay(origin.made_on)}` : null, origin.made_by?.trim() ? `by ${origin.made_by.trim()}` : null].filter(Boolean).join(" ");
     if (made) rows.push(["Made", made]);
     if (origin.note?.trim()) rows.push(["Note", origin.note.trim()]);
   } else if (origin.kind === "editorial_correction") {
     // "Fix typos…": spacing, typos or grammar fixed by a lead without a review; the note is the recorded reason.
-    rows.push(["This version", `Typos fixed by the project lead${origin.at ? ` on ${formatReviewDate(origin.at)}` : ""}`]);
+    rows.push(["This version", `Typos fixed by the project lead${origin.at ? ` on ${formatTime(origin.at)}` : ""}`]);
     if (origin.note?.trim()) rows.push(["What was fixed", origin.note.trim()]);
   } else {
     rows.push(["This version", origin.kind === "lead_correction" ? "Corrected by the project lead" : origin.kind === "review_correction" ? "Corrected in a translation review" : "Correction"]);
-    if (origin.at) rows.push(["Corrected", `on ${formatReviewDate(origin.at)}`]);
+    if (origin.at) rows.push(["Corrected", `on ${formatTime(origin.at)}`]);
   }
   rows.push(["Version before", `v${origin.previous_version}`]);
   return rows;
@@ -305,16 +306,6 @@ export function languageName(code: string): string {
   } catch {
     return code;
   }
-}
-
-const dateTime = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit",
-});
-
-/** English date and time without seconds, in the reader's time zone. */
-export function formatReviewDate(value: string): string {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : dateTime.format(date);
 }
 
 /** Coupled scrolling notes (editor-axes-and-coupled-scroll spec 2.6). */

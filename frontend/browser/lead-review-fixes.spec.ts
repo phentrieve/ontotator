@@ -134,8 +134,9 @@ for (const [width, height, suffix] of SIZES) {
     await expect(page.locator(".final-panel-success")).toHaveCount(0);
     await shot(page, `f2-undone-after${suffix}`);
 
-    // History, newest first: the Undo, the change in the card, the bulk change, the first choice.
-    const lines = await showHistory(card);
+    // History, newest first: the Undo, the change in the card, the bulk change, the first choice. In time order
+    // (issue 545), R. Roe's newer submission stands between the first choice and the bulk change.
+    const lines = (await showHistory(card)).filter({ hasText: /^Finalization/ });
     const roe = String.raw`the result of R\. Roe \(ann-\d+\)`;
     const tom = String.raw`the result of Tom Reis \(ann-\d+\)`;
     await expect(lines.nth(0)).toHaveText(new RegExp(`^Finalization: ?change undone by you, ${roe} is final again, ${WHEN}$`));

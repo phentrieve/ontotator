@@ -99,13 +99,14 @@ const NARROW_STATES: readonly (readonly [RegExp, string])[] = [
   [/^not reviewed, optional$/, "not reviewed"],
   [/^(?:Final is|In progress|Submitted|Finishing) on old text$/, "on old text"],
   [/^Submitted on (v\d+)$/, "$1 submitted"],
+  [/^\d+ on v\d+, (\d+) waiting on (v\d+)$/, "$1 left on $2"],
   [/^Finishing on (v\d+)$/, "finishing $1"],
   [/^ready to compare$/, "to compare"],
   // What changed ("newer result", "text corrected") stays in the title.
   [/^Check changes, .+$/, "Check changes"],
   [/^consolidating \(.+\)$/, "consolidating"],
-  // The ⏸ glyph (and the row's "Paused by lead" badge) says the pause where "· paused" would be cut.
-  [/^consolidating · paused(?: \(.+\))?$/, "consolidating"],
+  // The pause stays in words beside the pause icon (issue 549); "consolidating" and the progress go to the title.
+  [/^consolidating · paused(?: \(.+\))?$/, "paused"],
 ];
 
 /** The narrow table's short state (`NARROW_STATES`); null when the state fits as it is. */
@@ -248,6 +249,11 @@ function annotationText(cell: StageCellView): StageText {
       if (detail.note === "no_target_proposals") {
         return { symbol: "○", word: `${version(detail.from_version) ?? "Old"} work waits`, detail: join(people, `${version(detail.version) ?? "the new text"} has no proposals yet`) };
       }
+      // Issue 543: some annotations are on the new version already (moved by a typo fix, or carried).
+      if (detail.submitted) {
+        const waiting = detail.people?.length ?? 0;
+        return { symbol: "⚠", word: `${detail.submitted} on ${version(detail.version) ?? "new text"}, ${waiting} waiting on ${version(detail.from_version) ?? "old text"}`, detail: people };
+      }
       return { symbol: "⚠", word: `Submitted on ${version(detail.from_version) ?? "old text"}`, detail: join(people, `${version(detail.version) ?? "new text"} not annotated`) };
     case "finishing_on_old":
       return { symbol: "◐", word: `Finishing on ${version(detail.from_version) ?? "old text"}`, detail: join(people, `carried to ${version(detail.version) ?? "the new text"} on submit`) };
@@ -297,6 +303,36 @@ export function stageText(stage: StageName, cell: StageCellView, _row: Pick<Docu
   if (stage === "review") return reviewText(cell, context);
   if (stage === "annotation") return annotationText(cell);
   return finalText(cell);
+}
+
+/**
+ * One stage of a row as the narrow card's line shows it, with the tone of its colour. A running consolidation belongs to
+ * Finalization, as in the table (issue 576, F2): "◐ consolidating" or, paused, "⏸ consolidating · paused" with the
+ * consolidator, the open groups and the reason of the pause; the Annotation line keeps "2 of 2 submitted". Null
+ * without the stage's cell.
+ */
+export function rowStageText(
+  row: Pick<DocumentRowView, "case_id" | "language" | "stages" | "consolidation_progress">,
+  stage: StageName,
+  context: StageContext = {},
+): (StageText & { tone: StageCellView["tone"] }) | null {
+  const cell = row.stages?.[stage];
+  if (!cell) return null;
+  const annotation = row.stages?.annotation;
+  if (annotation?.state !== "consolidating" || stage === "review") return { ...stageText(stage, cell, row, context), tone: cell.tone };
+  const { submitted, total, people, excerpt } = annotation.detail;
+  if (stage === "annotation") {
+    const complete = submitted == null || total == null || submitted >= total;
+    return { symbol: complete ? "✓" : "◐", word: submitted != null && total != null ? submittedOf(submitted, total) : "submitted", detail: "", tone: complete ? "done" : "running" };
+  }
+  const pause = consolidationPause(row);
+  const progress = row.consolidation_progress;
+  return {
+    symbol: pause ? "⏸" : "◐",
+    word: pause ? "consolidating · paused" : "consolidating",
+    detail: join(names(people), progress && `${progress.open} of ${progress.total} groups open`, pause && quoted(excerpt)),
+    tone: pause ? annotation.tone : "running",
+  };
 }
 
 /** VD3: not in plan, plan written by the system under "Nothing planned". */

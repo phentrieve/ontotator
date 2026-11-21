@@ -231,11 +231,27 @@ it("uses the current immutable submitted record without a saver or write control
   const summary = within(screen.getByRole("region", { name: "Submitted review" }));
   expect(summary.getByText("Accepted with corrections")).toBeDefined();
   expect(summary.getByText("R, Reviewer")).toBeDefined();
-  expect(summary.getByText(/^\d{1,2} October 2026 at \d{2}:\d{2}$/)).toBeDefined();
+  // Issue 546: the one date format of the app; the status is the one this review gave, named as such.
+  expect(summary.getByText(/^\d{1,2} [A-Z][a-z]{2}(?: \d{4})?, \d{2}:\d{2}$/)).toBeDefined();
+  expect(summary.getByText("Status after this review")).toBeDefined();
   expect(screen.getByText("Older review")).toBeDefined();
   vi.useFakeTimers(); await clock(1600); expect(save).not.toHaveBeenCalled(); expect(submit).not.toHaveBeenCalled();
   expect(await routeLeaveRef.current!()).toBe(true);
   const unload = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(unload); expect(unload.defaultPrevented).toBe(false);
+});
+
+it("a rejected review's summary says the version was not accepted (issue 472)", async () => {
+  setup(reviewWorkspace({ read_only: true, submitted_record: reviewRecord({ decision: "rejected", status_after: "reviewed" }) }));
+  const summary = within(await screen.findByRole("region", { name: "Submitted review" }));
+  expect(summary.getByText("Rejected")).toBeDefined();
+  expect(summary.getByText("Reviewed, not accepted")).toBeDefined();
+  expect(summary.queryByText("Reviewed")).toBeNull();
+});
+
+it("a review accepted with corrections says the corrected text was accepted (issue 472)", async () => {
+  setup(reviewWorkspace({ read_only: true, submitted_record: reviewRecord({ decision: "accepted_corrected", status_after: "reviewed" }) }));
+  const summary = within(await screen.findByRole("region", { name: "Submitted review" }));
+  expect(summary.getByText("Reviewed; the corrected text was accepted as the next version")).toBeDefined();
 });
 
 it("drains edits made during a deferred route flush using each actual returned revision", async () => {
@@ -785,7 +801,7 @@ it("summarises decision, categories and a rationale excerpt before submitting, t
   expect(submit).toHaveBeenCalledWith(17, 6);
   expect(screen.getByText(decisionOutcomes.rejected)).toBeDefined();
   const summary = within(screen.getByRole("region", { name: "Submitted review" }));
-  expect(summary.getByText("Reviewed")).toBeDefined();
+  expect(summary.getByText("Reviewed, not accepted")).toBeDefined();
   expect(screen.queryByText("reviewed")).toBeNull();
 });
 it("names the typography hints of the saved text in the submit confirmation; they block nothing (issue 484)", async () => {

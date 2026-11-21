@@ -119,13 +119,19 @@ describe("band styles", () => {
     }
   });
 
-  it("bands_stay_inside_the_lower_highlight_and_never_move_the_text", () => {
+  it("bands_fill_the_run_with_a_gap_between_them_and_never_move_the_text", () => {
     for (const selector of [".run--bands-2", ".run--bands-3", ".run--bands-more", ".run--negated.run--bands-more"]) {
       const body = rule(selector);
       expect(body, selector).not.toMatch(/padding|margin|line-height|font|border|height:/);
     }
-    expect(rule(".run--bands-2")).toMatch(/transparent 0 40%,\s*var\(--run-band-1\) 54% 77%, var\(--run-band-0\) 77% 100%/);
-    expect(rule(".run--bands-3")).toMatch(/var\(--run-band-2\) 54% 69%, var\(--run-band-1\) 69% 85%, var\(--run-band-0\) 85% 100%/);
+    // Issue 551: two bands split the run from 12% of its height (band 0 keeps a single mark's 54% to 100%), three
+    // share it in thirds, and a 1 px gap of the sheet parts every two bands.
+    const separator = (at: number) => `var\\(--mark-band-separator\\) calc\\(${at}% - 1px\\) ${at}%`;
+    expect(rule(".run--bands-2")).toMatch(new RegExp(
+      `transparent 0 6%,\\s*var\\(--run-band-1\\) 12% calc\\(54% - 1px\\), ${separator(54)},\\s*var\\(--run-band-0\\) 54% 100%`));
+    expect(rule(".run--bands-3")).toMatch(new RegExp(
+      `var\\(--run-band-2\\) 12% calc\\(41% - 1px\\), ${separator(41)},\\s*var\\(--run-band-1\\) 41% calc\\(70% - 1px\\), ${separator(70)},\\s*var\\(--run-band-0\\) 70% 100%`));
+    expect(rule(".run--bands-more")).toMatch(new RegExp(`${separator(41)},\\s*var\\(--run-band-1\\) 41% calc\\(70% - 1px\\), ${separator(70)}`));
     // The negated hatch is drawn over the bands, also for the striped band.
     expect(rule(".run--negated.run--bands-more")).toMatch(/var\(--mark-negated-hatch\)[\s\S]*var\(--run-highlight\), var\(--run-stripes\)/);
   });

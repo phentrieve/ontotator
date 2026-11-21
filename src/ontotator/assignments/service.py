@@ -60,6 +60,7 @@ from ontotator.authz.project_authority import (
 from ontotator.domain.annotation_modes import AnnotationMode, workspace_mode
 from ontotator.domain.errors import DomainError
 from ontotator.domain.next_steps import translations_accepted
+from ontotator.domain.translation_review import ReviewDecisionCode
 from ontotator.domain.variants import VariantInfo
 from ontotator.domain.workspace import WorkspaceMode
 from ontotator.projects.assignments import revoke_assignments
@@ -216,6 +217,30 @@ def query_answer_times(
     return {row.id: row.decided_at for row in rows}
 
 
+def submitted_review_decisions(
+    conn: Connection, assignment_ids: Sequence[int]
+) -> dict[int, ReviewDecisionCode]:
+    """The decision of each submitted translation review (issue 472): only
+    the task's current submission counts, as for ``query_answer_times``."""
+    if not assignment_ids:
+        return {}
+    from ontotator.storage.tables import TranslationReviewRow
+
+    rows = conn.execute(
+        select(AssignmentRow.id, TranslationReviewRow.decision)
+        .join(
+            TranslationReviewRow,
+            TranslationReviewRow.assignment_id == AssignmentRow.id,
+        )
+        .where(
+            AssignmentRow.id.in_(sorted(assignment_ids)),
+            AssignmentRow.last_submission_id
+            == func.concat("tr-", TranslationReviewRow.id),
+        )
+    )
+    return {row.id: cast(ReviewDecisionCode, row.decision) for row in rows}
+
+
 def latest_reopen(
     conn: Connection, assignment_id: int
 ) -> tuple[datetime, str | None] | None:
@@ -285,6 +310,9 @@ class TaskSummary:
     # A submitted translation review that asked a query: when the lead decided
     # it (issue 483; the answer is in the review's workspace); None otherwise.
     query_answered_at: datetime | None = None
+    # A submitted translation review: the reviewer's decision, so My tasks
+    # says more than "Submitted" (issue 472); None for other tasks.
+    review_decision: ReviewDecisionCode | None = None
     # R-26: a lead answered one of the owner's reports on this task since the
     # owner last opened it.
     report_answered: bool = False
@@ -468,6 +496,28 @@ def _paused(row: RowMapping) -> dict[str, Any]:
     return values
 
 
+def _first_assigned(conn: Connection, rows: list[RowMapping]) -> dict[int, datetime]:
+    """Assignment id -> when the person was given the work, for each task a
+    typo fix made for a moved annotation (issue 543)."""
+    from ontotator.application.typo_fix_carry import typo_fix_moves
+
+    keys = {
+        r["project_key"]
+        for r in rows
+        if r["task"] == "annotate" and r["status"] == "submitted"
+    }
+    if not keys:
+        return {}
+    found: dict[int, datetime] = {}
+    for pid in conn.execute(
+        select(ProjectRow.id).where(ProjectRow.project_key.in_(keys))
+    ).scalars():
+        for move in typo_fix_moves(conn, int(pid)).values():
+            if move.first_assigned_at is not None:
+                found[move.assignment_id] = move.first_assigned_at
+    return found
+
+
 def _last_saves(
     conn: Connection, user_id: int, assignment_ids: List[int]
 ) -> dict[int, datetime]:
@@ -592,19 +642,75 @@ def source_obligation_documents(
     )
 
 
-def unopened_tasks(project_id: int, document_id: str) -> tuple[Any, ...]:
-    """The annotation tasks on a version that ``move_waiting_tasks`` moves:
-    nobody ever opened them, they are not paused and not from proposals."""
+def never_opened_tasks(project_id: int, document_id: str) -> tuple[Any, ...]:
+    """The live annotation tasks on a version that nobody ever opened: no
+    round and nothing submitted, paused or not, from proposals or not."""
     return (
         AssignmentRow.project_id == project_id,
         AssignmentRow.document_id == document_id,
         AssignmentRow.task == "annotate",
         AssignmentRow.revoked_at.is_(None),
         AssignmentRow.status == "open",
-        AssignmentRow.held.is_(False),
         AssignmentRow.active_round_id.is_(None),
+    )
+
+
+def unopened_tasks(project_id: int, document_id: str) -> tuple[Any, ...]:
+    """The annotation tasks on a version that ``move_waiting_tasks`` moves:
+    nobody ever opened them, they are not paused and not from proposals."""
+    return (
+        *never_opened_tasks(project_id, document_id),
+        AssignmentRow.held.is_(False),
         AssignmentRow.annotation_mode != "proposals",
     )
+
+
+def unopened_proposal_tasks(project_id: int, document_id: str) -> tuple[Any, ...]:
+    """The tasks from proposals on a version that nobody opened and that are
+    not paused: after an editorial correction they follow the new version
+    once its proposals are there and none of them needs a check (issue 509,
+    ``move_unopened_proposal_tasks``)."""
+    return (
+        *never_opened_tasks(project_id, document_id),
+        AssignmentRow.held.is_(False),
+        AssignmentRow.annotation_mode == "proposals",
+    )
+
+
+def _move_tasks(
+    conn: Connection,
+    actor: Actor,
+    project_id: int,
+    tasks: tuple[Any, ...],
+    from_document_id: str,
+    to_document_id: str,
+    now: datetime,
+) -> list[int]:
+    """Move the assignments ``tasks`` selects to ``to_document_id``; they keep
+    their ids. Audited per assignment."""
+    moved = conn.execute(
+        update(AssignmentRow)
+        .where(*tasks)
+        .values(
+            document_id=to_document_id,
+            workflow_revision=AssignmentRow.workflow_revision + 1,
+            updated_at=now,
+        )
+        .returning(AssignmentRow.id)
+    ).scalars()
+    ids = list(moved.all())
+    for assignment_id in ids:
+        record_audit(
+            conn,
+            actor,
+            "assignment.follow_correction",
+            target_type="assignment",
+            target_id=assignment_id,
+            project_id=project_id,
+            details={"from_document_id": from_document_id, "to": to_document_id},
+            at=now,
+        )
+    return ids
 
 
 def move_waiting_tasks(
@@ -627,8 +733,11 @@ def move_waiting_tasks(
     Only tasks nobody ever opened: no draft or round exists to carry, so the
     assignment itself moves and keeps its id. Started work, paused tasks and
     tasks from proposals (a new version needs its own proposals, plan review
-    R10) stay with the lead's "Handle text change". The caller holds the
-    project lock and has written the status of ``from_document_id``.
+    R10) stay with the lead's "Handle text change". After an editorial
+    correction, unopened tasks from proposals follow later, once the
+    re-anchoring job has carried every proposal (issue 509,
+    ``move_unopened_proposal_tasks``). The caller holds the project lock and
+    has written the status of ``from_document_id``.
     """
     if waiting_only:
         rule_on = conn.execute(
@@ -641,27 +750,39 @@ def move_waiting_tasks(
             variants[from_document_id], variants.get
         ):
             return
-    moved = conn.execute(
-        update(AssignmentRow)
-        .where(*unopened_tasks(project_id, from_document_id))
-        .values(
-            document_id=to_document_id,
-            workflow_revision=AssignmentRow.workflow_revision + 1,
-            updated_at=now,
-        )
-        .returning(AssignmentRow.id)
-    ).scalars()
-    for assignment_id in moved.all():
-        record_audit(
-            conn,
-            actor,
-            "assignment.follow_correction",
-            target_type="assignment",
-            target_id=assignment_id,
-            project_id=project_id,
-            details={"from_document_id": from_document_id, "to": to_document_id},
-            at=now,
-        )
+    _move_tasks(
+        conn,
+        actor,
+        project_id,
+        unopened_tasks(project_id, from_document_id),
+        from_document_id,
+        to_document_id,
+        now,
+    )
+
+
+def move_unopened_proposal_tasks(
+    conn: Connection,
+    actor: Actor,
+    project_id: int,
+    from_document_id: str,
+    to_document_id: str,
+    now: datetime,
+) -> list[int]:
+    """Issue 509: after an editorial correction, the tasks from proposals
+    nobody opened follow the new version. The re-anchoring job calls this
+    once it has stored the new version's proposals and none of them needed
+    a check; a task opened or paused in the meantime stays. The caller holds
+    the project lock."""
+    return _move_tasks(
+        conn,
+        actor,
+        project_id,
+        unopened_proposal_tasks(project_id, from_document_id),
+        from_document_id,
+        to_document_id,
+        now,
+    )
 
 
 def enable_source_change_review(
@@ -1722,14 +1843,13 @@ class AssignmentService:
                     if r["assignment_id"] in second_reviews
                 },
             )
-            query_answers = query_answer_times(
-                conn,
-                [
-                    r["assignment_id"]
-                    for r in rows
-                    if r["task"] == "translation_review" and r["status"] == "submitted"
-                ],
-            )
+            submitted_reviews = [
+                r["assignment_id"]
+                for r in rows
+                if r["task"] == "translation_review" and r["status"] == "submitted"
+            ]
+            query_answers = query_answer_times(conn, submitted_reviews)
+            review_decisions = submitted_review_decisions(conn, submitted_reviews)
             reports = {
                 r.report_id: r
                 for r in conn.execute(
@@ -1837,6 +1957,7 @@ class AssignmentService:
                         )
                     }
             saved = _last_saves(conn, user_id, [r["assignment_id"] for r in rows])
+            first_assigned = _first_assigned(conn, rows)
             result = []
             for row in rows:
                 source = target = None
@@ -1870,6 +1991,12 @@ class AssignmentService:
                                 row["updated_at"],
                                 saved.get(row["assignment_id"], row["updated_at"]),
                             ),
+                            # Issue 543: a task a typo fix made for the
+                            # person's annotation keeps the day they were
+                            # given the work.
+                            "assigned_at": first_assigned.get(
+                                row["assignment_id"], row["assigned_at"]
+                            ),
                         },
                         waiting_for_translation_review=waiting and not for_lead,
                         waiting_for_lead=waiting and for_lead,
@@ -1896,6 +2023,7 @@ class AssignmentService:
                         second_review_reason=second[1] if second else None,
                         second_review_additions=additions.get(row["assignment_id"]),
                         query_answered_at=query_answers.get(row["assignment_id"]),
+                        review_decision=review_decisions.get(row["assignment_id"]),
                     )
                 )
             return result

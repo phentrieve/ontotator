@@ -326,9 +326,10 @@ test('wide editor keeps the real text and docked inspector/tree floors with visi
   await expect(findingBar).toHaveCount(0);
   await floors(800);
 
-  // 720 px high: with the banner the layout is lower than the panel and a useful tree need (550 of 580 px).
+  // 640 px high: with the banner the layout is lower than the panel and a useful tree need (about 545 of 580 px;
+  // at 720 px it was 550 before the case toolbar joined the header's bar, issue 539, and is now about 625).
   // The tree takes the column and the finding is one line; "Show finding" gives the panel its floor back.
-  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.setViewportSize({ width: 1280, height: 640 });
   await expect(findingBar).toBeVisible();
   expect((await rect('.app-layout')).height).toBeLessThan(LOW_LAYOUT_BELOW);
   await expect(findingBar).toContainText('Hypotonia');
@@ -337,7 +338,7 @@ test('wide editor keeps the real text and docked inspector/tree floors with visi
   expect(tree.height).toBeGreaterThanOrEqual(column.height - 60);
   await findingBar.getByRole('button', { name: 'Show finding', exact: true }).click();
   await expect(findingBar.getByRole('button', { name: 'Hide finding', exact: true })).toHaveAttribute('aria-expanded', 'true');
-  await floors(720);
+  await floors(640);
   await openVersions(page);
   await expect(page.getByLabel('Language', { exact: true })).toBeVisible();
   await openVersions(page);

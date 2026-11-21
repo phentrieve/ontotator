@@ -6,7 +6,8 @@ import { ErrorNotice } from "./ErrorNotice";
 import { fieldError } from "./errors";
 import { LanguagesField } from "./LanguagesField";
 import { importPlanOptions, toolProposalOptions } from "./projectFields";
-import { formatDateTime, formatShortDateTime, humanize, labelFor, roleLabels, taskLabels } from "../app/labels";
+import { humanize, labelFor, plural, roleLabels, taskLabels } from "../app/labels";
+import { formatTime, fullTimestamp } from "../app/submissionLabels";
 import { KIND_LABELS, SCOPE_LABELS } from "../me/TokensSection";
 
 export interface UsersPageProps {
@@ -103,6 +104,25 @@ const auditActions: Readonly<Record<string, string>> = {
   "work_plan.import": "Work plan imported",
   "work_plan.update": "Work plan changed",
   "text.annotations_per_text": "Annotators per text changed for one text",
+  "text.pause": "Text paused",
+  "text.release": "Text released",
+};
+/**
+ * The way a change was made (`via` in its details), by the names of the screens: the selection bar's More actions and
+ * the Undo in its message (issue 576). A way added later on the server shows as its humanized code.
+ */
+const VIA_LABELS: Readonly<Record<string, string>> = {
+  bulk_pause_texts: "More actions › Pause texts…",
+  bulk_release_texts: "More actions › Release texts…",
+  bulk_reopen: "More actions › Reopen…",
+  bulk_reopen_undo: "Undo of Reopen…",
+  bulk_withdraw: "More actions › Withdraw open tasks…",
+  bulk_withdraw_undo: "Undo of Withdraw open tasks…",
+  bulk_start_round: "More actions › Start a round…",
+  bulk_change_mode: "More actions › Change mode…",
+  bulk_change_final: "More actions › Change final…",
+  bulk_change_final_undo: "Undo of Change final…",
+  accept_agreeing: "More actions › Accept agreeing results…",
 };
 /**
  * Changed fields by the names of the screens: a project's Settings (General, Workflow, Annotation, Ontology) and a
@@ -143,7 +163,8 @@ const spanlessChoice = (allowed: unknown, note: unknown): string =>
 /** A setting's value as its screen shows it: a checkbox is on or off, a choice has its label. */
 const settingValue = (field: string, value: unknown): string =>
   typeof value === "boolean" ? (value ? "on" : "off")
-    : Array.isArray(value) ? value.map(String).join(", ") || "none"
+    // Settings says "Empty: any language" (issue 546): an empty list of languages allows every language, never none.
+    : Array.isArray(value) ? value.map(String).join(", ") || (field === "languages" ? "any language" : "none")
     : field === "import_plan" ? importPlanOptions.find(option => option.value === value)?.label ?? String(value)
     : field === "tool_proposal_mode" ? toolProposalOptions.find(option => option.value === value)?.label ?? String(value)
     : isBlank(value) ? "none" : String(value);
@@ -168,13 +189,32 @@ function languageChange(details: Record<string, unknown>): string {
   const [before, after] = [details.before.map(String), details.after.map(String)];
   const added = after.filter(language => !before.includes(language));
   const removed = before.filter(language => !after.includes(language));
+  // Since issue 576 the server records no event without a change; older events still read "No change.".
   return [added.length && `Added: ${added.join(", ")}.`, removed.length && `Removed: ${removed.join(", ")}.`].filter(Boolean).join(" ") || "No change.";
+}
+/**
+ * "Reason: …; 2 tasks paused; Via: More actions › Pause texts…" for a lead's pause or release of a text (issue 576);
+ * the text is under Whom.
+ */
+function pauseDetails(action: "text.pause" | "text.release", details: Record<string, unknown>): string {
+  const count = (value: unknown) => (Array.isArray(value) ? value.length : 0);
+  const still = count(details.still_paused_assignment_ids);
+  // A release lists every task of the text; those a problem report pauses as well stay paused.
+  const tasks = count(details.assignment_ids) - (action === "text.release" ? still : 0);
+  const reason = action === "text.pause" ? details.reason : details.paused_reason;
+  return [
+    typeof reason === "string" && reason.trim() && `${action === "text.pause" ? "Reason" : "Reason of the pause"}: ${reason.trim()}`,
+    action === "text.release" && typeof details.reason === "string" && details.reason.trim() && `Reason of the release: ${details.reason.trim()}`,
+    tasks > 0 && `${plural(tasks, "task")} ${action === "text.pause" ? "paused" : "released"}`,
+    still > 0 && `${plural(still, "task")} still paused by a problem report`,
+    typeof details.via === "string" && `Via: ${labelFor(VIA_LABELS, details.via)}`,
+  ].filter(Boolean).join("; ");
 }
 const isBlank = (value: unknown): boolean =>
   value === null || value === undefined || value === "" || (Array.isArray(value) ? value.length === 0 : typeof value === "object" && Object.keys(value).length === 0);
 const auditValue = (key: string, value: unknown): string =>
   key === "task" && typeof value === "string" ? labelFor(taskLabels, value)
-    : key.endsWith("_at") && typeof value === "string" ? formatDateTime(value)
+    : key.endsWith("_at") && typeof value === "string" ? formatTime(value)
     : Array.isArray(value) ? value.filter(item => !isBlank(item)).map(item => item !== null && typeof item === "object" && !Array.isArray(item) ? `(${auditValue(key, item)})` : auditValue(key, item)).join(", ")
       : typeof value === "boolean" ? (value ? "yes" : "no")
         : value !== null && typeof value === "object" ? auditEntries(value as Record<string, unknown>).join(", ") : String(value);
@@ -183,6 +223,7 @@ const auditEntries = (details: Record<string, unknown>, userNames?: ReadonlyMap<
   Object.entries(details).filter(([, value]) => !isBlank(value)).map(([key, value]) =>
     key === "user_id" && typeof value === "number" ? (userNames?.has(value) ? `User: ${userNames.get(value)}` : `User ${value}`)
       : key === "api_token" && typeof (value as { name?: unknown }).name === "string" ? `Via API token: ${(value as { name: string }).name}`
+      : key === "via" && typeof value === "string" ? `Via: ${labelFor(VIA_LABELS, value)}`
       : `${humanize(key)}: ${auditValue(key, value)}`);
 /** Plain words for the audit details people need; any other details as "Key: value" text. */
 export function auditDetails(event: AuditEvent, userNames?: ReadonlyMap<number, string>): string {
@@ -191,6 +232,7 @@ export function auditDetails(event: AuditEvent, userNames?: ReadonlyMap<number, 
   if (typeof details.active === "boolean") return details.active ? "Activated" : "Deactivated";
   if (typeof details.is_system_admin === "boolean") return details.is_system_admin ? "Granted" : "Withdrawn";
   if (event.action === "user.languages") return languageChange(details);
+  if (event.action === "text.pause" || event.action === "text.release") return pauseDetails(event.action, details);
   if (Array.isArray(details.fields)) return changedFields(details.fields, details.changes);
   // A move to the newest translations: the files, not the kept conditions (issue 254).
   if (event.action === "project.translations_refresh") return auditEntries({ added: details.added, replaced: details.replaced, removed: details.removed }).join("; ");
@@ -199,7 +241,7 @@ export function auditDetails(event: AuditEvent, userNames?: ReadonlyMap<number, 
   if (event.action === "api_token.create" || event.action === "api_token.revoke") return [
     `${labelFor(KIND_LABELS, String(details.kind))} token`,
     Array.isArray(details.scopes) && `Scopes: ${details.scopes.map(scope => labelFor(SCOPE_LABELS, String(scope))).join(", ")}`,
-    typeof details.expires_at === "string" && `Expires: ${formatDateTime(details.expires_at)}`,
+    typeof details.expires_at === "string" && `Expires: ${formatTime(details.expires_at)}`,
     typeof details.owner === "string" && details.owner !== auditActor(event.actor) && `Owner: ${details.owner}`,
   ].filter(Boolean).join("; ");
   return auditEntries(details, userNames).join("; ");
@@ -433,7 +475,7 @@ function UsersContent({ currentUser, routeLeaveRef }: UsersPageProps): JSX.Eleme
     { id: "admin", header: "Admin", cell: user => user.is_system_admin ? <StatusBadge tone="info">Admin</StatusBadge> : "No" },
     { id: "active", header: "Active", cell: user => user.anonymised ? "Anonymised" : user.active ? "Yes" : "No" },
     { id: "setup", header: "Setup", cell: user => user.setup_pending ? "Pending" : user.anonymised ? <EmptyValue /> : "Done", sortValue: user => user.setup_pending ? 0 : 1 },
-    { id: "last-login", header: "Last login", cell: user => user.last_login_at ? <time dateTime={user.last_login_at} title={formatDateTime(user.last_login_at)}>{formatShortDateTime(user.last_login_at)}</time> : "Never", sortValue: user => user.last_login_at ?? "" },
+    { id: "last-login", header: "Last login", cell: user => user.last_login_at ? <time dateTime={user.last_login_at} title={fullTimestamp(user.last_login_at)}>{formatTime(user.last_login_at)}</time> : "Never", sortValue: user => user.last_login_at ?? "" },
     { id: "actions", header: "Actions", cell: user => user.anonymised ? <Toolbar label={`Actions for ${user.username}`}>
       <Button size="sm" disabled={pageBlocked} aria-label={`History of ${user.username}`} onClick={() => { void showHistory(user.username); }}>History</Button>
     </Toolbar> : <Toolbar label={`Actions for ${user.username}`}>
@@ -464,8 +506,10 @@ function UsersContent({ currentUser, routeLeaveRef }: UsersPageProps): JSX.Eleme
           <Button size="sm" disabled={pageBlocked} onClick={() => setAllUsers(true)}>Show all {total}</Button>
         </div> }} />}
     </section>
-    {creating && <Dialog open title="New user" onClose={busy ? undefined : () => setCreating(false)}>
-      <form aria-label="New user" onSubmit={event => { event.preventDefault(); void createUser(); }}>
+    {/* Issue 550, U5-08: Cancel and Create user in the footer, which stays in view while the fields scroll in a low window. */}
+    {creating && <Dialog open title="New user" onClose={busy ? undefined : () => setCreating(false)}
+      footer={<><Button disabled={busy} onClick={() => setCreating(false)}>Cancel</Button><Button ref={createButton} type="submit" form="new-user-form" variant="primary" disabled={blocked}>Create user</Button></>}>
+      <form id="new-user-form" aria-label="New user" onSubmit={event => { event.preventDefault(); void createUser(); }}>
         <TextInput ref={usernameInput} id="new-username" label="Username" error={usernameError} required minLength={3} maxLength={64} value={create.username} disabled={blocked} onChange={event => { setCreateError(undefined); setCreate({ ...create, username: event.target.value }); }} />
         <TextInput ref={displayNameInput} id="new-name" label="Display name" error={displayNameError} required maxLength={120} value={create.display_name} disabled={blocked} onChange={event => { setCreateError(undefined); setCreate({ ...create, display_name: event.target.value }); }} />
         <TextInput id="new-email" label="E-mail" type="email" value={create.email ?? ""} disabled={blocked} onChange={event => setCreate({ ...create, email: event.target.value })} />
@@ -482,7 +526,6 @@ function UsersContent({ currentUser, routeLeaveRef }: UsersPageProps): JSX.Eleme
           </div>)}
         </fieldset>}
         {createError !== undefined && !usernameError && !displayNameError && <ErrorNotice error={createError} />}
-        <Toolbar label="New user actions"><Button disabled={busy} onClick={() => setCreating(false)}>Cancel</Button><Button ref={createButton} type="submit" variant="primary" disabled={blocked}>Create user</Button></Toolbar>
       </form>
     </Dialog>}
     {editing && <Dialog open title={`Edit ${editing.baseline.username}`} onClose={busy || confirmation ? undefined : () => setEditing(null)}>
@@ -504,7 +547,7 @@ function UsersContent({ currentUser, routeLeaveRef }: UsersPageProps): JSX.Eleme
     {history && <Dialog open title={`History of ${history.username}`} size="lg" className="audit-history-dialog" onClose={() => setHistory(null)} closeOnBackdrop>
       {history.events === null ? <InlineMessage tone="info">Loading history…</InlineMessage> : history.error !== undefined ? <ErrorNotice error={history.error} /> :
         <DataTable label="History" rows={history.events} rowKey={event => `${event.at}-${event.action}-${event.target_id}-${JSON.stringify(event.details)}`} empty={<EmptyState title="No recorded changes." />} columns={[
-          { id: "at", header: "When", cell: event => <time className="audit-when" dateTime={event.at} title={formatDateTime(event.at)}>{formatShortDateTime(event.at)}</time> },
+          { id: "at", header: "When", cell: event => <time className="audit-when" dateTime={event.at} title={fullTimestamp(event.at)}>{formatTime(event.at)}</time> },
           { id: "actor", header: "By", cell: event => auditActor(event.actor) },
           { id: "action", header: "What", cell: event => labelFor(auditActions, event.action) },
           { id: "target", header: "Whom", cell: auditTarget },

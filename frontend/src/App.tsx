@@ -393,6 +393,10 @@ export function App({ user: givenUser, onLogout }: AppProps): JSX.Element {
     breadcrumb={route.name === "task" ? [
       { label: "My tasks", onClick: () => go(MY_TASKS) },
       { label: crumbTask?.identity === taskIdentity && crumbTask.task ? taskCrumbLabel(crumbTask.task) : "Task", title: `Assignment ${route.assignmentId}` },
+    ] : route.name === "projectTranslationReviews" ? [
+      // Issue 547, U2-09: the way back to Progress, where the list is opened.
+      { label: "Progress", onClick: () => go({ name: "projectProgress", key: route.key }) },
+      { label: "Translation reviews" },
     ] : undefined}>
     {!!projectError && <><ErrorNotice error={projectError} /><Button onClick={() => setRetry(value => value + 1)}>Retry projects</Button></>}
     {/* A crash on any screen shows a way back and a report instead of a blank page; another screen resets it. */}

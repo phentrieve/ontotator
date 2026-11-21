@@ -6,7 +6,7 @@ import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, AuthError, type AdminUser, type CodeResponse, type CreatedUser, type CurrentUser } from "../src/api/client";
 import { auditActor, auditDetails, auditTarget, fieldLabels, UsersPage } from "../src/admin/UsersPage";
-import { formatDateTime, formatShortDateTime } from "../src/app/labels";
+import { formatTime, fullTimestamp } from "../src/app/submissionLabels";
 
 const currentUser: CurrentUser = { username: "root", display_name: "Root", pseudonym: "ann-root", is_system_admin: true, csrf_token: "csrf" };
 const root: AdminUser = { id: 1, qualification: null, username: "root", display_name: "Root", email: null, pseudonym: "ann-root", is_system_admin: true, active: true, languages: ["de"], projects: [], setup_pending: false, anonymised: false };
@@ -15,7 +15,8 @@ const created: CreatedUser = { user: { ...alex, username: "bea", display_name: "
 const reset: CodeResponse = { code: "new-reset-secret", expires_at: "2026-10-17T13:30:00Z" };
 const deferred = <T,>() => { let resolve!: (value: T) => void; let reject!: (error: unknown) => void; const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
 const load = () => screen.findByText("Alex Smith");
-const newForm = () => within(screen.getByRole("form", { name: "New user" }));
+/** The New user dialog: its fields are in the form, its buttons in the footer (issue 550, U5-08). */
+const newForm = () => within(screen.getByRole("dialog", { name: "New user" }));
 const editForm = () => within(screen.getByRole("form", { name: "Edit user" }));
 /** Opens a row's More menu; with `item`, chooses that action. */
 const more = (username: string, item?: string) => {
@@ -48,6 +49,17 @@ describe("users administration", () => {
     expect(screen.queryByRole("form", { name: "New user" })).toBeNull(); expect(screen.getByRole("group", { name: "Users actions" }).textContent).toContain("New user…");
     fireEvent.change(screen.getByLabelText("Filter users"), { target: { value: "SMITH" } }); expect(table.queryByText("Root")).toBeNull();
     fireEvent.change(screen.getByLabelText("Filter users"), { target: { value: "root" } }); expect(table.queryByText("Alex Smith")).toBeNull();
+  });
+
+  it("keeps Cancel and Create user in the dialog footer, in view while the fields scroll (issue 550, U5-08)", async () => {
+    render(<UsersPage currentUser={currentUser} />); await load();
+    fireEvent.click(screen.getByRole("button", { name: "New user…" }));
+    const dialog = screen.getByRole("dialog", { name: "New user" });
+    for (const name of ["Cancel", "Create user"]) {
+      const button = within(dialog).getByRole("button", { name });
+      expect(button.closest(".modal-actions")?.parentElement).toBe(dialog);
+      expect(button.closest(".ui-dialog-body")).toBeNull();
+    }
   });
 
   it("creates a user and keeps the setup code transient until acknowledged close", async () => {
@@ -252,8 +264,8 @@ describe("account status, projects at creation, history and erasure", () => {
     expect(table.getByRole("columnheader", { name: /Setup/ })).toBeTruthy();
     expect(table.getByText("Pending")).toBeTruthy();
     expect(table.getByText("Never")).toBeTruthy();
-    const login = table.getByText(formatShortDateTime("2026-10-20T08:00:00Z"));
-    expect(login.getAttribute("title")).toBe(formatDateTime("2026-10-20T08:00:00Z"));
+    const login = table.getByText(formatTime("2026-10-20T08:00:00Z"));
+    expect(login.getAttribute("title")).toBe(fullTimestamp("2026-10-20T08:00:00Z"));
     more("alex");
     expect(screen.queryByRole("menuitem", { name: "New setup code" })).toBeNull();
     expect(screen.getByRole("menuitem", { name: "Activate" }).getAttribute("aria-describedby")).toBeTruthy();
@@ -310,6 +322,8 @@ describe("account status, projects at creation, history and erasure", () => {
       { at: "2026-10-19T08:00:00Z", actor: "cli:ops", action: "user.create", target_type: "user", target_id: "alex", project_key: null, details: { pseudonym: "ann-alex", system_admin: false } },
       { at: "2026-10-18T08:00:00Z", actor: "user:alex", action: "assignment.create", target_type: "assignment", target_id: "115", project_key: "study-one", details: { task: "annotate" } },
       { at: "2026-10-17T08:00:00Z", actor: "user:root", action: "problem.resolve", target_type: "problem_report", target_id: "9", project_key: "study-one", details: { user_id: 2, reason: null } },
+      { at: "2026-10-16T08:00:00Z", actor: "user:alex", action: "text.pause", target_type: "text", target_id: "case-1 en", project_key: "study-one", details: { case_id: "case-1", language: "en", reason: "Checked", assignment_ids: [3], via: "bulk_pause_texts" } },
+      { at: "2026-10-15T08:00:00Z", actor: "user:alex", action: "text.release", target_type: "text", target_id: "case-1 en", project_key: "study-one", details: { case_id: "case-1", language: "en", reason: null, paused_reason: "Checked", assignment_ids: [], via: "bulk_release_texts" } },
     ]);
     render(<UsersPage currentUser={currentUser} />); await load();
     more("alex", "History");
@@ -323,7 +337,11 @@ describe("account status, projects at creation, history and erasure", () => {
     expect(within(dialog).getByText("Task: Annotation")).toBeTruthy();
     expect(within(dialog).getByText("Problem resolved")).toBeTruthy();
     expect(within(dialog).getByText("User: Alex Smith")).toBeTruthy();
-    expect(within(dialog).getByText(formatShortDateTime("2026-10-18T08:00:00Z"))).toBeTruthy();
+    // Issue 576, F4: a lead's pause and release, not "Text.pause".
+    expect(within(dialog).getByText("Text paused")).toBeTruthy();
+    expect(within(dialog).getByText("Text released")).toBeTruthy();
+    expect(within(dialog).queryByText(/Text\.pause|bulk_pause_texts/)).toBeNull();
+    expect(within(dialog).getByText(formatTime("2026-10-18T08:00:00Z"))).toBeTruthy();
     expect(api.adminUserAudit).toHaveBeenCalledWith("alex");
   });
 
@@ -369,12 +387,24 @@ describe("account status, projects at creation, history and erasure", () => {
       .toBe("Added: hp-es.babelon.tsv");
     // API tokens (issue 305): kind, scopes and a formatted expiry; the name goes to Whom, the owner only if someone else acted.
     const created = { ...base, actor: "user:root", action: "api_token.create", target_type: "api_token", target_id: "6", details: { name: "nightly", kind: "personal", owner: "lena", scopes: ["read", "project-admin"], expires_at: "2027-02-03T11:54:22.241326+00:00" } };
-    expect(auditDetails(created)).toBe(`Personal token; Scopes: Read, Project administration; Expires: ${formatDateTime("2027-02-03T11:54:22.241326+00:00")}; Owner: lena`);
+    expect(auditDetails(created)).toBe(`Personal token; Scopes: Read, Project administration; Expires: ${formatTime("2027-02-03T11:54:22.241326+00:00")}; Owner: lena`);
     expect(auditDetails({ ...created, actor: "user:lena", action: "api_token.revoke", details: { name: "nightly", kind: "personal", owner: "lena" } })).toBe("Personal token");
     expect(auditTarget(created)).toBe("API token “nightly”");
     expect(auditTarget({ ...created, details: {} })).toBe("API token 6");
     expect(auditDetails({ ...base, details: { name: "N", api_token: { id: 6, name: "nightly" } } })).toBe("Name: N; Via API token: nightly");
-    expect(auditDetails({ ...base, details: { ends_at: "2027-02-03T11:54:22Z" } })).toBe(`Ends at: ${formatDateTime("2027-02-03T11:54:22Z")}`);
+    expect(auditDetails({ ...base, details: { ends_at: "2027-02-03T11:54:22Z" } })).toBe(`Ends at: ${formatTime("2027-02-03T11:54:22Z")}`);
+  });
+
+  it("names a lead's pause and release in plain words, with the way it was made (issue 576, F4)", () => {
+    const base = { at: "", actor: "user:lead", target_type: "text", target_id: "L3CASE-002 en", project_key: "p" };
+    const pause = { ...base, action: "text.pause", details: { case_id: "L3CASE-002", language: "en", reason: "Clinic is checking", assignment_ids: [10, 11], via: "bulk_pause_texts" } };
+    expect(auditDetails(pause)).toBe("Reason: Clinic is checking; 2 tasks paused; Via: More actions › Pause texts…");
+    expect(auditDetails({ ...pause, action: "text.release", details: { ...pause.details, reason: null, paused_reason: "Clinic is checking", still_paused_assignment_ids: [11], via: "bulk_release_texts" } }))
+      .toBe("Reason of the pause: Clinic is checking; 1 task released; 1 task still paused by a problem report; Via: More actions › Release texts…");
+    expect(auditTarget(pause)).toBe("Text L3CASE-002 en");
+    // Other changes made through More actions name it too; an unknown way reads as words.
+    expect(auditDetails({ ...base, action: "round.create", details: { kind: "carry_forward", via: "bulk_start_round" } })).toBe("Kind: carry_forward; Via: More actions › Start a round…");
+    expect(auditDetails({ ...base, action: "x.y", details: { via: "bulk_something_new" } })).toBe("Via: Bulk something new");
   });
 
   it("says which languages were added and removed (#467)", () => {
@@ -403,7 +433,7 @@ describe("account status, projects at creation, history and erasure", () => {
         name: { before: "Study", after: "Study One" }, tool_proposal_mode: { before: "proposals", after: "scratch" },
       },
     } })).toBe("Annotators per text: 1 → 3; Hide annotator names during consolidation: off → on; Description; "
-      + "New imports: Plan review and annotation for every translation → Plan nothing; I plan texts on Documents; Languages of the texts: none → de, fr; "
+      + "New imports: Plan review and annotation for every translation → Plan nothing; I plan texts on Documents; Languages of the texts: any language → de, fr; "
       + "Name: Study → Study One; Texts with tool proposals: Annotators work from the proposals → Annotators start from scratch");
     // The two fields behind one choice show as that choice.
     expect(auditDetails({ ...base, details: { fields: ["require_spanless_note"], changes: { allow_spanless_findings: { before: true, after: true }, require_spanless_note: { before: true, after: false } } } }))
@@ -440,6 +470,8 @@ describe("users table with many accounts", () => {
     await screen.findByText("Person 98");
     expect(bodyRows()).toHaveLength(100);
     expect(document.querySelector(".users-more")?.textContent).toBe("The first 100 of 250 users are shown. Type into Filter users to find someone.Show all 250");
+    // Issue 550, U5-02: below the table, outside the area that scrolls sideways on a phone.
+    expect(document.querySelector(".users-more")?.closest(".data-table-scroll")).toBeNull();
     expect(screen.queryByText("Person 99")).toBeNull();
     // Filtering searches all accounts, not only the shown ones.
     fireEvent.change(document.querySelector("#users-filter")!, { target: { value: "person" } });

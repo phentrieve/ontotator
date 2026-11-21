@@ -2,7 +2,10 @@
 
 import hashlib
 import json
+import os
+import re
 import runpy
+import stat
 import subprocess
 from pathlib import Path
 
@@ -66,6 +69,13 @@ def test_refuses_populated_or_unexpected_stack_before_any_seed(
 
 def test_only_expected_bootstrap_identity_is_fresh(seed):
     seed["require_fresh"]("admin\tp\tAdministrator\tactive, admin\n", "", "")
+
+
+def test_fresh_accepts_the_current_users_list_with_e_mail_and_projects(seed):
+    # `ontotator admin users list` prints six columns since e-mail and projects were added.
+    seed["require_fresh"](
+        "admin\tann-0001\tAdministrator\tactive, admin\t-\t-\n", "", ""
+    )
 
 
 def test_local_output_must_be_new_and_inside_ignored_acceptance_area(seed, tmp_path):
@@ -384,3 +394,159 @@ def test_seed_defaults_match_the_server_rule(seed):
     assert seed["clinical_creation_defaults"](profile, hidden) == (
         clinical_creation_defaults(TaskProfile.model_validate(profile), hidden)
     )
+
+
+def prepared_run(seed, tmp_path, monkeypatch):
+    """Run the real ``prepare`` in a temporary checkout, without Git or Docker."""
+    root = tmp_path / "checkout"
+    root.mkdir()
+    base = SCRIPT.parents[1] / "docker-compose.dev.yml"
+    (root / "docker-compose.dev.yml").write_bytes(base.read_bytes())
+    globals_ = seed["prepare"].__globals__
+    monkeypatch.setitem(globals_, "ROOT", root)
+    monkeypatch.setitem(
+        globals_,
+        "checked",
+        lambda command, *, env, data=None: "" if "status" in command else "b" * 40,
+    )
+    directory = root / "build" / "acceptance" / "run"
+    seed["prepare"](config(seed), directory)
+    return directory
+
+
+def test_prepare_writes_a_read_only_demo_login_override_used_after_seed_only(
+    seed, tmp_path, monkeypatch
+):
+    directory = prepared_run(seed, tmp_path, monkeypatch)
+    override = json.loads((directory / "demo-logins.override.json").read_text())
+    assert override == {
+        "services": {
+            "app": {
+                "environment": {
+                    "ONTOTATOR_DEMO_LOGINS_FILE": "/run/ontotator-demo-logins.json"
+                },
+                "volumes": [
+                    {
+                        "type": "bind",
+                        "source": str(directory / "demo-logins.json"),
+                        "target": "/run/ontotator-demo-logins.json",
+                        "read_only": True,
+                        "bind": {"create_host_path": False},
+                    }
+                ],
+            }
+        }
+    }
+    # Absolute: a relative source would resolve against the checkout.
+    assert Path(override["services"]["app"]["volumes"][0]["source"]).is_absolute()
+    commands = json.loads((directory / "commands.json").read_text())
+    demo = str(directory / "demo-logins.override.json")
+    # The first start, which seed verifies, has no demo logins.
+    assert demo not in commands["start"]
+    assert commands["restart"][-6:] == ["-f", demo, "up", "-d", "--no-build", "--wait"]
+    assert commands["restart"][:-6] == commands["start"][:-4]
+    assert commands["host"].startswith("http://127.0.0.1:")
+    # The Compose environment of every command stays without the setting.
+    assert "ONTOTATOR_DEMO_LOGINS_FILE" not in (directory / "compose.env").read_text()
+    identity = json.loads((directory / "identity.json").read_text())
+    assert identity["demo_logins_override"] == demo
+    assert seed["load_prepared"](directory)["demo_logins_override"] == demo
+
+
+def test_seed_refuses_a_changed_demo_login_override(seed, tmp_path, monkeypatch):
+    directory = prepared_run(seed, tmp_path, monkeypatch)
+    path = directory / "demo-logins.override.json"
+    changed = json.loads(path.read_text())
+    changed["services"]["app"]["volumes"][0]["read_only"] = False
+    path.write_text(json.dumps(changed))
+    with pytest.raises(ValueError, match="demo login override"):
+        seed["load_prepared"](directory)
+
+
+def test_demo_logins_list_the_seeded_accounts_and_the_dev_admin(seed):
+    passwords = {name: f"pw-{name}" for name in seed["ACTORS"]}
+    assert seed["demo_logins"](passwords) == [
+        {"username": "demo-lead", "password": "pw-demo-lead", "label": "Project lead"},
+        {
+            "username": "demo-reviewer",
+            "password": "pw-demo-reviewer",
+            "label": "Translation reviewer",
+        },
+        {
+            "username": "demo-annotator",
+            "password": "pw-demo-annotator",
+            "label": "Annotator",
+        },
+        {
+            "username": "admin",
+            "password": "development-only-password",
+            "label": "Administrator",
+        },
+    ]
+
+
+def test_dev_admin_demo_password_matches_the_dev_compose_hash(seed):
+    from argon2 import PasswordHasher
+
+    compose = (SCRIPT.parents[1] / "docker-compose.dev.yml").read_text()
+    stored = re.search(r"ONTOTATOR_ADMIN_PASSWORD_HASH: (\S+)", compose)
+    assert stored is not None
+    username, password, _ = seed["BOOTSTRAP_ADMIN"]
+    assert username == "admin"
+    assert PasswordHasher().verify(stored.group(1).replace("$$", "$"), password)
+
+
+def test_written_demo_logins_follow_the_settings_safety_rules(seed, tmp_path):
+    from ontotator import settings
+
+    path = tmp_path / "demo-logins.json"
+    passwords = {name: f"pw-{name}" for name in seed["ACTORS"]}
+    seed["write_private"](path, seed["demo_logins"](passwords), mode=0o644)
+    env = {"ONTOTATOR_DEMO_LOGINS_FILE": str(path), "ONTOTATOR_ENV": "development"}
+    logins = settings.demo_logins(env, public_origin="http://127.0.0.1:18080")
+    assert [login.username for login in logins] == [
+        "demo-lead",
+        "demo-reviewer",
+        "demo-annotator",
+        "admin",
+    ]
+    with pytest.raises(settings.SettingsError, match="production"):
+        settings.demo_logins(
+            env | {"ONTOTATOR_ENV": "production"},
+            public_origin="http://127.0.0.1:18080",
+        )
+    with pytest.raises(settings.SettingsError, match="loopback"):
+        settings.demo_logins(env, public_origin="https://ontotator.example.org")
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX file modes")
+def test_demo_login_file_is_readable_by_the_container_user_whatever_the_umask(
+    seed, tmp_path
+):
+    previous = os.umask(0o077)
+    try:
+        seed["write_private"](tmp_path / "demo-logins.json", [], mode=0o644)
+        seed["write_private"](tmp_path / "credentials.json", {})
+    finally:
+        os.umask(previous)
+    assert stat.S_IMODE((tmp_path / "demo-logins.json").stat().st_mode) == 0o644
+    assert stat.S_IMODE((tmp_path / "credentials.json").stat().st_mode) == 0o600
+    with pytest.raises(FileExistsError):
+        seed["write_private"](tmp_path / "demo-logins.json", [], mode=0o644)
+
+
+def test_seed_writes_demo_logins_last_and_refuses_when_they_exist(
+    seed, tmp_path, monkeypatch
+):
+    names = seed["seed"].__code__.co_names
+    assert "demo_logins" in names
+    (tmp_path / "demo-logins.json").write_text("[]")
+    globals_ = seed["seed"].__globals__
+    monkeypatch.setitem(
+        globals_, "load_prepared", lambda directory: {"directory": str(tmp_path)}
+    )
+    monkeypatch.setitem(
+        globals_, "Stack", lambda *args: pytest.fail("No Docker on a past attempt")
+    )
+    with pytest.raises(ValueError, match="already attempted"):
+        seed["seed"](tmp_path)

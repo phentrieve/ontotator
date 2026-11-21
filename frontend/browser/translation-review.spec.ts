@@ -155,7 +155,7 @@ test('lead assigns the exact pending translation; ordinary reviewer corrects, su
     const dialog = lead.page.getByRole('dialog', { name: 'Assign translation review', exact: true });
     await dialog.getByRole('table', { name: 'Members' }).getByRole('radio', { name: new RegExp(s.users.reviewer) }).check();
     // The row holds two parallel de translations (target and failed); the row assigns both roots.
-    await dialog.getByRole('button', { name: 'Assign 2', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Assign 2 tasks', exact: true }).click();
     await expect(dialog).toHaveCount(0);
     const inventory = await (await authenticatedRequest(lead.page, `/api/v1/projects/${encodeURIComponent(s.project)}/assignments`)).json() as Assignment[];
     const assigned = inventory.filter(a => a.document_id === s.documents.target && a.username === s.users.reviewer && a.task === 'translation_review' && !a.revoked_at);
@@ -224,7 +224,7 @@ test('lead assigns the exact pending translation; ordinary reviewer corrects, su
   await expect(summary).toContainText('Number or unit');
   await expect(summary).toContainText('The source states the corrected dose.');
   await expect(summary).toContainText(record.reviewer_pseudonym);
-  await expect(summary.locator('time')).toHaveText(/^\d{1,2} [A-Z][a-z]+ \d{4} at \d{2}:\d{2}$/);
+  await expect(summary.locator('time')).toHaveText(/^\d{1,2} [A-Z][a-z]{2}(?: \d{4})?, \d{2}:\d{2}$/);
   expect((await workspace(page, assignmentId)).submitted_record).toEqual(record); expect(writes).toEqual([]);
   await page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('button', { name: 'My tasks', exact: true }).click();
   const submittedTask = page.getByTestId('task-row').filter({ has: page.locator(`a[href="#/tasks/${assignmentId}"]`) });
@@ -580,6 +580,20 @@ test('390x844: checkbox hidden, action works', async ({ page }) => {
   await expect(target(page)).toHaveValue(value); await expect(target(page)).toBeFocused();
   expect((await caretState(page)).selection).toEqual([caret, caret]);
   await evidence(page, '21-narrow-action');
+});
+
+test('390x844: the pinned reason line keeps the space before "and 1 more" (issue 547, U2-04)', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 }); const s = await scenario(page, 'target'); await openReview(page, s);
+  await page.getByRole('radio', { name: 'Rejected', exact: true }).check();
+  const line = page.locator('.translation-pinned-bar .translation-submit-reason-line');
+  await expect(line).toContainText('and 1 more');
+  // The two spans are flex items: the leading space of the second one is dropped, so a gap stands for it.
+  const gap = await line.evaluate(element => {
+    const [first, more] = [element.querySelector('.translation-submit-reason-first')!, element.querySelector('.translation-submit-reason-more')!];
+    return more.getBoundingClientRect().left - first.getBoundingClientRect().right;
+  });
+  expect(gap).toBeGreaterThanOrEqual(3);
+  await evidence(page, '22-phone-reason-space');
 });
 
 test('Your review can be resized and collapsed, both kept on reload, and the page never scrolls sideways (#410)', async ({ page }) => {

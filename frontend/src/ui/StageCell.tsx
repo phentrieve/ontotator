@@ -15,18 +15,22 @@ export interface StageCellProps {
   muted?: boolean;
 }
 
-/** ○ ◐ ● as circles of one size: the font fallback draws ● visibly smaller. Other glyphs stay text. */
-const CIRCLES: Readonly<Record<string, JSX.Element>> = {
+/**
+ * ○ ◐ ● as circles of one size: the font fallback draws ● visibly smaller. ⏸ as two bars: the app fonts have no
+ * U+23F8, and without a system font that has it the glyph is an empty box (issue 549). Other glyphs stay text.
+ */
+const SHAPES: Readonly<Record<string, JSX.Element>> = {
   "○": <circle cx="8" cy="8" r="6" fill="none" />,
   "◐": <><circle cx="8" cy="8" r="6" fill="none" /><path d="M8 2a6 6 0 0 0 0 12z" stroke="none" /></>,
   "●": <circle cx="8" cy="8" r="6" />,
+  "⏸": <><rect x="3.5" y="2.5" width="3" height="11" rx="0.5" stroke="none" /><rect x="9.5" y="2.5" width="3" height="11" rx="0.5" stroke="none" /></>,
 };
 
 /** The decorative stage glyph (`aria-hidden`); shared by the stage cell, the table row and the narrow cards. */
 export function StageSymbol({ symbol }: { symbol: string }): JSX.Element {
-  const circle = CIRCLES[symbol];
-  return <span className="stage-cell-symbol" aria-hidden="true">
-    {circle ? <svg viewBox="0 0 16 16" fill="currentColor" stroke="currentColor" strokeWidth="1.5" focusable="false">{circle}</svg> : symbol}
+  const shape = SHAPES[symbol];
+  return <span className="stage-cell-symbol" data-symbol={symbol} aria-hidden="true">
+    {shape ? <svg viewBox="0 0 16 16" fill="currentColor" stroke="currentColor" strokeWidth="1.5" focusable="false">{shape}</svg> : symbol}
   </span>;
 }
 

@@ -18,9 +18,13 @@ const stepNames: Record<AssignTask, string> = { translation_review: "Translation
 export const taskNoun = (task: AssignTask, count: number): string => `${count} ${nouns[task][count === 1 ? 0 : 1]}`;
 export const stepName = (task: AssignTask): string => stepNames[task];
 
-/** "Translation review, de, 20 versions" */
-export function stepLabel(task: AssignTask, language: string, versions: number): string {
-  return `${stepNames[task]}, ${language}, ${versions} ${versions === 1 ? "version" : "versions"}`;
+/**
+ * "Translation review, de, 20 texts"; "Annotation, de, 2 texts (3 versions)" where parallel translations give a text
+ * more than one version to work on (issue 546: the dialog counts texts, as the selection bar does).
+ */
+export function stepLabel(task: AssignTask, language: string, texts: number, versions = texts): string {
+  const counted = `${stepNames[task]}, ${language}, ${texts} ${texts === 1 ? "text" : "texts"}`;
+  return versions > texts ? `${counted} (${versions} versions)` : counted;
 }
 
 /** "Translation review de" (one step of the assign dialog's step list, issue 233). */
@@ -52,6 +56,8 @@ export function onePersonSummary({ person, gets, task, language, openBefore, ope
   return `${personName(person)} gets ${taskNoun(task, gets)} (${language}). Open tasks: ${openBefore} → ${openAfter}.`;
 }
 
+/** "1 text", "3 texts": the skip lines count texts (issue 546; "1 already assigned" did not say of what). */
+const texts = (n: number): string => `${n} ${n === 1 ? "text" : "texts"}`;
 const skipOrder: BatchSkipView["reason"][] = ["waiting_for_review", "not_in_plan", "already_assigned", "step_differs", "discarded", "no_proposals_on_version", "other_root_in_review"];
 /** `task` names the work in the not-in-plan line: a case planned only in another language is skipped for this one (issue 195). */
 export function skippedLines(skipped: readonly BatchSkipView[], language: string, task: AssignTask = "annotate"): string[] {
@@ -59,13 +65,13 @@ export function skippedLines(skipped: readonly BatchSkipView[], language: string
     const n = skipped.filter(item => item.reason === reason).length;
     if (!n) return [];
     switch (reason) {
-      case "waiting_for_review": return [`${n} without a translation review under way: assign the review first`];
-      case "not_in_plan": return [`${n} without ${nouns[task][0]} of ${language} in the plan (other languages are separate tasks)`];
-      case "already_assigned": return [`${n} already assigned`];
-      case "step_differs": return [`${n} at another step`];
-      case "discarded": return [`${n} with the ${language} version discarded`];
-      case "no_proposals_on_version": return [`${n} without tool proposals on the newest version: their annotation started from proposals`];
-      case "other_root_in_review": return [`${n} accepted while a parallel translation is in review: assign once that review is accepted`];
+      case "waiting_for_review": return [`${texts(n)} without a translation review under way: assign the review first`];
+      case "not_in_plan": return [`${texts(n)} without ${nouns[task][0]} of ${language} in the plan (other languages are separate tasks)`];
+      case "already_assigned": return [`${texts(n)} already assigned`];
+      case "step_differs": return [`${texts(n)} at another step`];
+      case "discarded": return [`${texts(n)} with the ${language} version discarded`];
+      case "no_proposals_on_version": return [`${texts(n)} without tool proposals on the newest version: their annotation started from proposals`];
+      case "other_root_in_review": return [`${texts(n)} accepted while a parallel translation is in review: assign once that review is accepted`];
     }
   });
 }
@@ -78,7 +84,7 @@ export function memberReason(member: Pick<BatchPersonView, "unavailable" | "alre
     case "role_missing": return task === "annotate" ? "Cannot annotate in this project" : "Cannot review translations in this project";
     case "does_not_read": return member.reads.includes(language) ? "does not read the source language" : `does not read ${language}`;
   }
-  if (member.already_assigned > 0) return `Already ${task === "annotate" ? "annotating" : "reviewing"} ${member.already_assigned} of these cases`;
+  if (member.already_assigned > 0) return `Already ${task === "annotate" ? "annotating" : "reviewing"} ${member.already_assigned} of these texts`;
   return null;
 }
 

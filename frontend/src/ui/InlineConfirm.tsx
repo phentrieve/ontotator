@@ -1,6 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
-import { formatDateTime } from "../app/labels";
-import { fullTimestamp } from "../app/submissionLabels";
+import { fullTimestamp, formatTime } from "../app/submissionLabels";
 import { Button } from "./Button";
 import { useShortcut } from "./shortcuts";
 
@@ -75,7 +74,7 @@ export function InlineConfirm({
     {!conflict && ownReason && <p id={unavailableId} className="action-reason">{confirmUnavailable?.reason}</p>}
     {conflict && <p ref={notice} tabIndex={-1} className="inline-confirm-notice" role="alert">
       {conflictMessage ?? defaultConflictMessage}
-      {conflict.changedBy && conflict.changedAt && <> Changed by {conflict.changedBy} at <time dateTime={conflict.changedAt} title={fullTimestamp(conflict.changedAt)}>{formatDateTime(conflict.changedAt)}</time>.</>}
+      {conflict.changedBy && conflict.changedAt && <> Changed by {conflict.changedBy} at <time dateTime={conflict.changedAt} title={fullTimestamp(conflict.changedAt)}>{formatTime(conflict.changedAt)}</time>.</>}
     </p>}
     {outcome?.kind === "error" && <p className="inline-confirm-notice" role="alert">Could not save. Nothing changed.</p>}
     {outcome?.kind === "session" && <p className="inline-confirm-notice" role="alert">Your session ended. Nothing was saved. Sign in and confirm again.</p>}

@@ -2400,6 +2400,12 @@ export interface paths {
          * Preview Editorial Correction
          * @description Issue 453, read only: whether this version can be corrected and, with
          *     a text or replacements, the changes, the guards and what follows.
+         *
+         *     Annotation tasks nobody opened follow the new version
+         *     (``tasks_following``); a task from tool proposals only when no proposal
+         *     needs a check. ``tasks_staying`` names each task that stays and why
+         *     (opened, paused, from proposals that need a check); move it with
+         *     "Handle text change" (issue 509).
          */
         post: operations["preview_editorial_correction_api_v1_projects__key__documents__doc__editorial_correction_preview_post"];
         delete?: never;
@@ -2420,7 +2426,9 @@ export interface paths {
         /**
          * Editorial Correction
          * @description Issue 453: save an editorial fix (spacing, typos, grammar) as the next
-         *     version of this translation, with this version's status.
+         *     version of this translation, with this version's status. Tasks nobody
+         *     opened follow; a task from tool proposals once its proposals are on the
+         *     new version, when none needs a check (issue 509).
          */
         post: operations["editorial_correction_api_v1_projects__key__documents__doc__editorial_correction_post"];
         delete?: never;
@@ -5436,6 +5444,14 @@ export interface components {
             kept_count: number;
             /** Skipped Count */
             skipped_count: number;
+            /** Kept By Reason */
+            kept_by_reason?: {
+                [key: string]: number;
+            };
+            /** Skipped By Reason */
+            skipped_by_reason?: {
+                [key: string]: number;
+            };
             /** Changes */
             changes: components["schemas"]["BulkTaskView"][];
             /** Kept */
@@ -6908,6 +6924,8 @@ export interface components {
             final_result: boolean;
             /** Tasks Following */
             tasks_following: number;
+            /** Tasks Staying */
+            tasks_staying: components["schemas"]["EditorialStayingTask"][];
             /** Text */
             text: string | null;
             /** Previous Text */
@@ -6978,6 +6996,8 @@ export interface components {
             deleted_characters: number;
             /** Tasks Following */
             tasks_following: number;
+            /** Tasks Staying */
+            tasks_staying: components["schemas"]["EditorialStayingTask"][];
             /**
              * Annotations Carried
              * @default 0
@@ -7021,6 +7041,28 @@ export interface components {
             old: string;
             /** New */
             new: string;
+        };
+        /**
+         * EditorialStayingTask
+         * @description Issue 509: an annotation task on the corrected version, not
+         *     submitted, that stays there. ``reason``: ``paused``, ``opened``,
+         *     ``from_proposals_needs_check`` (a tool proposal marks words the fix
+         *     changes), ``from_proposals_none_carried`` (no proposal reaches the new
+         *     version) or, before the text is known, ``from_proposals``. Move it with
+         *     "Handle text change" (MCP ``move_task_to_version``).
+         */
+        EditorialStayingTask: {
+            /** Assignment Id */
+            assignment_id: number;
+            /** Username */
+            username: string;
+            /** Display Name */
+            display_name: string;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "paused" | "opened" | "from_proposals" | "from_proposals_needs_check" | "from_proposals_none_carried";
         };
         /**
          * EvidenceMention
@@ -7188,6 +7230,8 @@ export interface components {
             guideline_withdrawn: boolean;
             /** Kept Automatically */
             kept_automatically?: number;
+            /** Moved By Typo Fix */
+            moved_by_typo_fix?: boolean;
             /**
              * Eligible
              * @default true
@@ -10782,6 +10826,8 @@ export interface components {
             guideline_withdrawn: boolean;
             /** Kept Automatically */
             kept_automatically?: number;
+            /** Moved By Typo Fix */
+            moved_by_typo_fix?: boolean;
         };
         /** RowSubmissions */
         RowSubmissions: {
@@ -11347,6 +11393,10 @@ export interface components {
             mode: string;
             /** Round Id */
             round_id?: string | null;
+            /** Round Ordinal */
+            round_ordinal?: number | null;
+            /** Kind */
+            kind?: ("consolidation" | "carry_forward" | "annotation" | "proposal_check") | null;
             /** Guideline Version */
             guideline_version?: number | null;
             /** Guideline Label */
@@ -11496,6 +11546,8 @@ export interface components {
             second_review_additions?: components["schemas"]["ReasonAddition"][] | null;
             /** Query Answered At */
             query_answered_at?: string | null;
+            /** Review Decision */
+            review_decision?: ("accepted_unchanged" | "accepted_corrected" | "query" | "rejected") | null;
             /**
              * Report Answered
              * @default false
@@ -12299,6 +12351,31 @@ export interface components {
             /** External Url */
             external_url?: string | null;
         };
+        /**
+         * TypoFixMoveView
+         * @description The annotation a typo fix moved to this task's version by itself
+         *     (issue 543): the copy it made, the version it came from, and the
+         *     person's own work (when they were given it and submitted it).
+         */
+        TypoFixMoveView: {
+            /** Submission Id */
+            submission_id: string;
+            /** From Version */
+            from_version?: number | null;
+            /**
+             * Moved At
+             * Format: date-time
+             */
+            moved_at: string;
+            /**
+             * Submitted At
+             * Format: date-time
+             */
+            submitted_at: string;
+            /** Assigned At */
+            assigned_at?: string | null;
+            assigned_by?: components["schemas"]["MemberRefView"] | null;
+        };
         /** TypographyHintView */
         TypographyHintView: {
             /**
@@ -12961,6 +13038,9 @@ export interface components {
              */
             waiting_for_lead: boolean;
             correction_request?: components["schemas"]["CorrectionRequestView"] | null;
+            /** Submitted At */
+            submitted_at?: string | null;
+            moved_by_typo_fix?: components["schemas"]["TypoFixMoveView"] | null;
         };
         /** WorkRoundView */
         WorkRoundView: {
@@ -13023,6 +13103,8 @@ export interface components {
             document_language?: string | null;
             /** Document Version */
             document_version?: number | null;
+            /** Moved By Typo Fix */
+            moved_by_typo_fix?: boolean;
         };
         /** WorkTimeItemRequest */
         WorkTimeItemRequest: {

@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { clinicalChangeFacts, decisionDescriptions, decisionKeyHint, rationaleHint, allChecksLine, calmCheckText, checkBandText, checkDeviationGuidance, checkExplanation, checkLabel, checkNoLocation, failedChecksTitle, shortCheckLabel, unknownCheckExplanation, formatReviewDate, languageName, translationStatusLabel, translationNote, decisionConsequence, versionOriginRows, earlierChecksText } from "../src/translation/labels";
+import { clinicalChangeFacts, decisionDescriptions, decisionKeyHint, rationaleHint, allChecksLine, calmCheckText, checkBandText, checkDeviationGuidance, checkExplanation, checkLabel, checkNoLocation, failedChecksTitle, shortCheckLabel, unknownCheckExplanation, languageName, translationStatusLabel, translationNote, decisionConsequence, versionOriginRows, earlierChecksText } from "../src/translation/labels";
+import { formatTime } from "../src/app/submissionLabels";
 
 describe("translation review labels", () => {
   it("names known check codes and turns unknown codes into words", () => {
@@ -53,10 +54,6 @@ describe("translation review labels", () => {
     expect(languageName("en")).toBe("English");
     expect(languageName("not a code")).toBe("not a code");
   });
-  it("formats review dates in English without seconds", () => {
-    expect(formatReviewDate("2026-10-16T12:00:30Z")).toMatch(/^\d{1,2} October 2026 at \d{2}:\d{2}$/);
-    expect(formatReviewDate("not a date")).toBe("not a date");
-  });
   it("has short decision hints and fact lines", () => {
     expect(decisionDescriptions).toEqual({
       accepted_unchanged: "Correct as it stands. No edits.",
@@ -94,15 +91,15 @@ describe("a version after the first (user review 2026-11)", () => {
   });
   it("describes how the version was made, not the run of the first version", () => {
     expect(versionOriginRows({ kind: "upload", previous_version: 1, at: "2026-11-17T09:30:00Z", method: "machine_translation", provider: "DeepL", model: "deepl-2026-10", made_on: "2026-11-12", made_by: "Dr. Roe", note: "Checked" }))
-      .toEqual([["This version", "Machine translation, DeepL, deepl-2026-10"], ["Uploaded", `by the project lead on ${formatReviewDate("2026-11-17T09:30:00Z")}`],
+      .toEqual([["This version", "Machine translation, DeepL, deepl-2026-10"], ["Uploaded", `by the project lead on ${formatTime("2026-11-17T09:30:00Z")}`],
         ["Made", "on 12 November 2026 by Dr. Roe"], ["Note", "Checked"], ["Version before", "v1"]]);
     expect(versionOriginRows({ kind: "upload", previous_version: 2, method: "human_translation" })).toEqual([["This version", "Human translation"], ["Uploaded", "by the project lead"], ["Version before", "v2"]]);
     expect(versionOriginRows({ kind: "lead_correction", previous_version: 1, at: "2026-11-17T09:30:00Z" }))
-      .toEqual([["This version", "Corrected by the project lead"], ["Corrected", `on ${formatReviewDate("2026-11-17T09:30:00Z")}`], ["Version before", "v1"]]);
+      .toEqual([["This version", "Corrected by the project lead"], ["Corrected", `on ${formatTime("2026-11-17T09:30:00Z")}`], ["Version before", "v1"]]);
     expect(versionOriginRows({ kind: "review_correction", previous_version: 1 })[0]).toEqual(["This version", "Corrected in a translation review"]);
     // "Fix typos…" (issue 453): named as what it is, with the recorded reason.
     expect(versionOriginRows({ kind: "editorial_correction", previous_version: 2, at: "2026-11-17T09:30:00Z", note: "Spacing; Typo" }))
-      .toEqual([["This version", `Typos fixed by the project lead on ${formatReviewDate("2026-11-17T09:30:00Z")}`], ["What was fixed", "Spacing; Typo"], ["Version before", "v2"]]);
+      .toEqual([["This version", `Typos fixed by the project lead on ${formatTime("2026-11-17T09:30:00Z")}`], ["What was fixed", "Spacing; Typo"], ["Version before", "v2"]]);
     expect(versionOriginRows({ kind: "correction", previous_version: 1 })).toEqual([["This version", "Correction"], ["Version before", "v1"]]);
     expect(earlierChecksText(1, 2, [])).toBe("The automatic checks ran on v1, not on this version (v2).");
     expect(earlierChecksText(1, 2, ["units_added", "numbers_changed"])).toBe("The automatic checks ran on v1, not on this version (v2). 2 automatic checks failed on v1: Units added and Numbers changed.");

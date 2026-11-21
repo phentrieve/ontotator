@@ -123,9 +123,11 @@ def test_registry_has_twelve_scenarios_and_unknown_is_404(client):
         "ROWS",
         "REJECTED_TRANSLATION_FOR_LEAD",
         "QUERIED_TRANSLATION_FOR_LEAD",
+        "QUERIED_CORRECTION_FOR_LEAD",
         "ACCEPTED_TRANSLATION_FOR_LEAD",
         "UPLOAD_DIALOG",
         "TYPO_FIX_CARRY",
+        "TYPO_FIX_PROPOSALS",
         "QUESTION_FOR_LEAD",
     }
     response = client.post("/__test_lead_workflow__", params={"scenario": "S99"})
@@ -384,3 +386,42 @@ def test_typo_fix_carry_builds_and_its_fix_moves_one_annotation(client):
     assert saved.status_code == 200, saved.text
     assert saved.json()["annotations_carried"] == 1
     assert carry(saved.json()) == carry(preview.json())
+
+
+def test_typo_fix_proposals_builds_and_names_the_tasks_that_stay(client):
+    """Issue 509: Ben's task from proposals nobody opened stays while a
+    proposal needs a check and follows otherwise; Cy's opened task stays."""
+    built = scenario(client, "TYPO_FIX_PROPOSALS")
+    document_id = built["documents"]["de"]
+    origin = str(client.base_url).rstrip("/")
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"username": built["users"]["lead"], "password": TEST_PASSWORD},
+        headers={"Origin": origin},
+    )
+    assert login.status_code == 200, login.text
+    headers = {"Origin": origin, "X-CSRF-Token": login.json()["csrf_token"]}
+    base = f"/api/v1/projects/{built['project']}/documents/{document_id}"
+    names = {username: name for name, username in built["users"].items()}
+
+    def preview(old: str, new: str) -> dict[str, Any]:
+        response = client.post(
+            f"{base}/editorial-correction/preview",
+            json={"replacements": [{"old": old, "new": new}]},
+            headers=headers,
+        )
+        assert response.status_code == 200, response.text
+        return dict(response.json())
+
+    typo = preview("hypotnia", "hypotonia")
+    assert typo["proposals"] == {"sets": 1, "carried": 1, "needs_check": 1}
+    assert typo["tasks_following"] == 0
+    assert sorted(
+        (names[item["username"]], item["reason"]) for item in typo["tasks_staying"]
+    ) == [("annotator", "opened"), ("ben", "from_proposals_needs_check")]
+    elsewhere = preview("On examination", "At examination")
+    assert elsewhere["proposals"] == {"sets": 1, "carried": 2, "needs_check": 0}
+    assert elsewhere["tasks_following"] == 1
+    assert [
+        (names[item["username"]], item["reason"]) for item in elsewhere["tasks_staying"]
+    ] == [("annotator", "opened")]

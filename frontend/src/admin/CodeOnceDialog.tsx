@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { components } from "../api/generated";
 import { Button, Checkbox, Dialog, InlineMessage, Toolbar } from "../ui";
-import { formatDateTime } from "../app/labels";
+import { formatTime } from "../app/submissionLabels";
 
 export type CodeOnceDialogProps = components["schemas"]["CodeResponse"] & {
   open: boolean;
@@ -28,7 +28,7 @@ export function handoverText({ code, expires_at, kind, username }: Pick<CodeOnce
     "",
     `Code: ${code}`,
     "",
-    `The code works once and is valid for about ${validityText(expires_at, now)}, until ${formatDateTime(expires_at)}. Capital letters, spaces and hyphens do not matter.`,
+    `The code works once and is valid for about ${validityText(expires_at, now)}, until ${formatTime(expires_at)}. Capital letters, spaces and hyphens do not matter.`,
   ].join("\n");
 }
 
@@ -71,7 +71,7 @@ function CodeSession(props: CodeOnceDialogProps): JSX.Element {
     footer={<Button variant="primary" disabled={!acknowledged} onClick={close}>Close</Button>}>
     <p>This code is shown only once. Hand it over in person or by a secure channel.</p>
     <p className="code-once-value"><code>{code}</code></p>
-    <p>This code works once and expires in {validity}, on <time dateTime={expires_at}>{formatDateTime(expires_at)}</time> (local time).</p>
+    <p>This code works once and expires in {validity}, on <time dateTime={expires_at}>{formatTime(expires_at)}</time> (local time).</p>
     <Toolbar label="Copy">
       <Button loading={state("code") === "pending"} onClick={() => { void copyValue("code"); }}>{state("code") === "copied" ? "Copied" : "Copy"}</Button>
       <Button loading={state("text") === "pending"} onClick={() => { void copyValue("text"); }}>{state("text") === "copied" ? "Hand-over text copied" : "Copy hand-over text"}</Button>

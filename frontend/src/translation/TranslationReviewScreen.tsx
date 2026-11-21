@@ -25,12 +25,13 @@ import { ASK_LABEL } from "../questions/labels";
 import { TaskQuestionList } from "../questions/TaskQuestionList";
 import { useTaskQuestions } from "../questions/useTaskQuestions";
 import { autoNoteText, chooseDecision, reactToTextEdit, USER_ORIGIN, type DecisionState } from "./decisionOrigin";
-import { acceptedCorrection, OFFERED_DECISIONS, annotateThisTextLabel, categoryLabels, comparisonCountsDiffer, couplingEditingNote, couplingNote, decisionConsequence, decisionKeyHint, decisionLabels, decisionOutcomes, formatReviewDate, issueMessages, languageName, leadCorrectionKeyHint, leadCorrectionNote, matchingParagraphStatus, nextTaskLabel, paragraphCountChanged, paragraphCountsDiffer, remainingTasksText, reviewIssueMessage, showMatchingLabel, showMatchingShortcut, showMatchingTitle, translationNote, versionOriginRows } from "./labels";
+import { acceptedCorrection, OFFERED_DECISIONS, annotateThisTextLabel, categoryLabels, comparisonCountsDiffer, couplingEditingNote, couplingNote, decisionConsequence, decisionKeyHint, decisionLabels, decisionOutcomes, issueMessages, languageName, leadCorrectionKeyHint, leadCorrectionNote, matchingParagraphStatus, nextTaskLabel, paragraphCountChanged, paragraphCountsDiffer, remainingTasksText, reviewIssueMessage, showMatchingLabel, showMatchingShortcut, showMatchingTitle, translationNote, versionOriginRows } from "./labels";
 import { checkReview, type ClinicalCategory, type ReviewDecisionCode, type ReviewForm as FormValue } from "./reviewRules";
 import { LanguageTag } from "../ui/LanguageTag";
 import { SentenceCount, SentenceView } from "./SentenceMarks";
 import { InvisiblesKey } from "./invisibles";
 import { isChecked, rebaseMarks, resolveMarks, splitSentences, storedMarks, toggled, withRange, type MarkState, type Sentence, type Side, type StoredMarks } from "./sentences";
+import { formatTime } from "../app/submissionLabels";
 
 export interface TranslationReviewScreenProps {
   assignmentId: number; username: string; onNavigate: (route: Route) => void;
@@ -945,7 +946,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
           {!readOnly && saveState === "error" && <Button onClick={() => { void retrySave(); }}>Retry save</Button>}
           {earlier.length > 0 && <section className="review-history" aria-labelledby="review-history-heading">
             <h2 id="review-history-heading" className="translation-section-title">Previous reviews</h2>
-            {earlier.map(value => <details key={value.id}><summary>{decisionLabels[value.decision]}, {formatReviewDate(value.created_at)}</summary>
+            {earlier.map(value => <details key={value.id}><summary>{decisionLabels[value.decision]}, {formatTime(value.created_at)}</summary>
               <ReviewSummary record={value} heading="Review details" />
               <h3 className="review-history-label">Proposed text</h3>
               <p className="review-history-text">{value.proposed_text}</p></details>)}

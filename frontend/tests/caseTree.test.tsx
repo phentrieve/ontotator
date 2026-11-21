@@ -656,7 +656,7 @@ describe("the tree only to look, and taking a term after a confirmation (issue 5
     return panel;
   };
 
-  it("an undecided proposal: looking changes nothing; Confirm runs Edit & Replace with the term, decided as Changed", async () => {
+  it("an undecided proposal: looking changes nothing; Confirm runs Edit & Replace with the term in one step, decided as Replaced", async () => {
     const view = reviewView([]);
     const { open } = mockTree();
     const { apply, decide } = mockServer(view);
@@ -673,7 +673,7 @@ describe("the tree only to look, and taking a term after a confirmation (issue 5
     await waitFor(() => expect(takeButton(panel).disabled).toBe(false));
     fireEvent.click(takeButton(panel));
     expect(apply).not.toHaveBeenCalled();
-    const confirm = within(panel).getByRole("group", { name: "Proposal: decide as Changed with Beta term (HP:B)" });
+    const confirm = within(panel).getByRole("group", { name: "Proposal: decide as Replaced with Beta term (HP:B)" });
     fireEvent.click(within(confirm).getByRole("button", { name: "Confirm" }));
 
     await waitFor(() => expect(decide).toHaveBeenCalledTimes(1));
@@ -690,6 +690,10 @@ describe("the tree only to look, and taking a term after a confirmation (issue 5
       outcome: "changed",
       replacement: { annotation_id: walkId, version: `${walkId}-v2` },
     });
+    // One user action, one step (issue 542, U1-03): the copy, its term and the decision share a step id, so one Undo takes them back.
+    const steps = new Set([...apply.mock.calls, ...decide.mock.calls].map(call => (call[1] as { step_id?: string }).step_id));
+    expect(steps.size).toBe(1);
+    expect([...steps][0]).toEqual(expect.any(String));
     // The copy is selected; the tree stays with it, the same walk, and now assigns directly.
     expect(entry(container, walkId).classList.contains("selected")).toBe(true);
     expect(panelNow()).toBe(panel);

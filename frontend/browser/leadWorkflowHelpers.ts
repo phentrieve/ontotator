@@ -10,6 +10,7 @@ export type LeadScenarioName =
   | "ROWS"
   | "REJECTED_TRANSLATION_FOR_LEAD"
   | "QUERIED_TRANSLATION_FOR_LEAD"
+  | "QUERIED_CORRECTION_FOR_LEAD"
   | "ACCEPTED_TRANSLATION_FOR_LEAD"
   | "UPLOAD_DIALOG"
   | "TYPO_FIX_CARRY"
@@ -51,6 +52,7 @@ export interface LeadScenario {
    * ROWS: the case of each row action (de rows; "chip" and "acceptance" are fr rows).
    * REJECTED_TRANSLATION_FOR_LEAD: "rejected", "queried" and "to_assign" (de rows, Review and Annotate on).
    * QUERIED_TRANSLATION_FOR_LEAD: "take_text" and "answer_only" (de rows Ana queried with a proposed text; issue 483) and "rejected".
+   *   QUERIED_CORRECTION_FOR_LEAD: the same, but Ana's text of "take_text" is v2, accepted, and Ben queried v2 (issue 574).
    * ACCEPTED_TRANSLATION_FOR_LEAD: "accepted" (with annotation work), "unreviewed" and "in_review" (an open translation review; issue 341).
    */
   cases?: Record<

@@ -26,6 +26,7 @@ import {
   WaitingOnCell,
 } from "./RowCells";
 import { isActiveRow, waitingOnText } from "./stageLabels";
+import { useTableFit } from "./tableFit";
 
 /** The case of a `"{case}:{language}"` key (case IDs may hold colons; languages do not). */
 const caseOfKey = (key: string): string => key.slice(0, key.lastIndexOf(":"));
@@ -165,6 +166,9 @@ export function DocumentsTable({
 }: DocumentsTableProps): JSX.Element {
   const rows = useMemo(() => givenRows ?? tableRows(page, showNotInPlan, columnSort), [givenRows, page, showNotInPlan, columnSort]);
   const order = useMemo(() => rows.map(rowKeyOf), [rows]);
+  // Issue 544: as much text per cell as fits the page without sideways scroll (tableFit.ts).
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useTableFit(scrollRef, [rows, translations, activeKey]);
   const hidden = useMemo(() => new Map(page.groups.map(group => [group.case_id, showNotInPlan ? 0 : hiddenNotInPlan(group)])), [page.groups, showNotInPlan]);
   const activeCase = activeKey ? caseOfKey(activeKey) : null;
   const isSibling = (row: DocumentRowView) => row.case_id === activeCase && rowKeyOf(row) !== activeKey;
@@ -247,6 +251,7 @@ export function DocumentsTable({
     <DataTable
       label="Documents"
       className="documents-table"
+      scrollRef={scrollRef}
       columns={columns}
       rows={[...rows]}
       rowKey={rowKeyOf}

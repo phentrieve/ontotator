@@ -174,8 +174,8 @@ it("lists only unfinished uploads, by start time and file names", async () => {
   fireEvent.click(summary);
   const items = screen.getAllByRole("listitem").filter(item => item.closest(".upload-unfinished-list"));
   const texts = items.map(item => item.querySelector(".upload-unfinished-text")!.textContent);
-  expect(texts[0]).toMatch(/^Started 16 Oct 2026, \d{2}:\d{2}: case\.txt · Plain text, en · Importing$/);
-  expect(texts[1]).toMatch(/^Started 16 Oct 2026, \d{2}:\d{2}: case\.txt · Plain text, en · Ready to import$/);
+  expect(texts[0]).toMatch(/^Started 16 Oct(?: 2026)?, \d{2}:\d{2}: case\.txt · Plain text, en · Importing$/);
+  expect(texts[1]).toMatch(/^Started 16 Oct(?: 2026)?, \d{2}:\d{2}: case\.txt · Plain text, en · Ready to import$/);
   expect(within(items[0]).getByRole("button").textContent).toBe("Show progress");
   expect(within(items[1]).getByRole("button").textContent).toBe("Open preview");
   expect(document.body.textContent).not.toMatch(/Upload 3|Upload 4/);
