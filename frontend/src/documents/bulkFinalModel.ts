@@ -186,17 +186,21 @@ export function finalAppliedText(preview: FinalPreview): string {
     : `Changed the final result of ${plural(count, "text")}.`;
 }
 
-/** A menu entry that does nothing for the selection gives its reason (decision 336-C); null when it acts or is unknown. */
-export function finalUnavailableReason(preview: FinalPreview | null | undefined): string | null {
+/**
+ * A menu entry that does nothing for the selection gives its reason (decision 336-C); null when it acts or is unknown.
+ * `count` is the number of selected texts: one text gets the singular (issue 585).
+ */
+export function finalUnavailableReason(preview: FinalPreview | null | undefined, count: number): string | null {
   if (!preview) return null;
+  const one = count === 1;
   if (preview.action === "accept") {
     const { texts, skipped, already_final: final } = preview.data;
     if (texts.length) return null;
-    return final && !skipped.length ? "The selected texts already have a final result: use Change final…." : "No selected text has annotations that agree in full.";
+    if (final && !skipped.length) return `The selected ${one ? "text already has" : "texts already have"} a final result: use Change final….`;
+    return one ? "The selected text has no annotations that agree in full." : "No selected text has annotations that agree in full.";
   }
   const { change_count: changes, skipped_count: skipped, skipped_by_reason: reasons } = preview.data;
   if (changes) return null;
-  return skipped && (reasons.no_final ?? 0) >= skipped
-    ? "The selected texts have no final result yet."
-    : "No selected text has a newer submission than its final result.";
+  if (skipped && (reasons.no_final ?? 0) >= skipped) return `The selected ${one ? "text has" : "texts have"} no final result yet.`;
+  return one ? "The selected text has no newer submission than its final result." : "No selected text has a newer submission than its final result.";
 }

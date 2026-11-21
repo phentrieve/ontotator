@@ -122,14 +122,22 @@ it("words the Undo: what came back, exports made meanwhile, and the texts in the
 });
 
 it("a menu entry that does nothing names the reason (decision 336-C)", () => {
-  expect(finalUnavailableReason(null)).toBeNull();
-  expect(finalUnavailableReason({ action: "change", data: changePreview() })).toBeNull();
-  expect(finalUnavailableReason({ action: "change", data: changePreview({ changes: [], skipped: [skip("a", "no_final")] }) })).toBe("The selected texts have no final result yet.");
-  expect(finalUnavailableReason({ action: "change", data: changePreview({ changes: [], skipped: [skip("a", "no_final"), skip("b", "already_newest")] }) }))
+  expect(finalUnavailableReason(null, 2)).toBeNull();
+  expect(finalUnavailableReason({ action: "change", data: changePreview() }, 2)).toBeNull();
+  expect(finalUnavailableReason({ action: "change", data: changePreview({ changes: [], skipped: [skip("a", "no_final"), skip("b", "no_final")] }) }, 2)).toBe("The selected texts have no final result yet.");
+  expect(finalUnavailableReason({ action: "change", data: changePreview({ changes: [], skipped: [skip("a", "no_final"), skip("b", "already_newest")] }) }, 2))
     .toBe("No selected text has a newer submission than its final result.");
-  expect(finalUnavailableReason({ action: "accept", data: acceptPreview() })).toBeNull();
-  expect(finalUnavailableReason({ action: "accept", data: acceptPreview({ texts: [], skipped: [] }) })).toBe("The selected texts already have a final result: use Change final….");
-  expect(finalUnavailableReason({ action: "accept", data: acceptPreview({ texts: [] }) })).toBe("No selected text has annotations that agree in full.");
+  expect(finalUnavailableReason({ action: "accept", data: acceptPreview() }, 2)).toBeNull();
+  expect(finalUnavailableReason({ action: "accept", data: acceptPreview({ texts: [], skipped: [] }) }, 2)).toBe("The selected texts already have a final result: use Change final….");
+  expect(finalUnavailableReason({ action: "accept", data: acceptPreview({ texts: [] }) }, 2)).toBe("No selected text has annotations that agree in full.");
+});
+
+it("with one text selected, the reasons speak of one text (issue 585)", () => {
+  expect(finalUnavailableReason({ action: "change", data: changePreview({ changes: [], skipped: [skip("a", "no_final")] }) }, 1)).toBe("The selected text has no final result yet.");
+  expect(finalUnavailableReason({ action: "change", data: changePreview({ changes: [], skipped: [skip("a", "already_newest")] }) }, 1))
+    .toBe("The selected text has no newer submission than its final result.");
+  expect(finalUnavailableReason({ action: "accept", data: acceptPreview({ texts: [], skipped: [] }) }, 1)).toBe("The selected text already has a final result: use Change final….");
+  expect(finalUnavailableReason({ action: "accept", data: acceptPreview({ texts: [] }) }, 1)).toBe("The selected text has no annotations that agree in full.");
 });
 
 it("Change final… previews, needs I understand, then applies with the preview's token", async () => {

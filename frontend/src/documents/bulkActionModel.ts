@@ -206,8 +206,8 @@ export function unavailableReason(action: BulkAction, preview: BulkTaskActionVie
   if (action === "withdraw") {
     const reasons = Object.keys(kept ?? {}).filter(reason => reason !== "submitted");
     const words = reasons.map(reason => WITHDRAW_KEPT[reason]).filter(Boolean);
-    if (!words.length || words.length < reasons.length) return "No open tasks in the selected texts.";
     const texts = preview.texts === 1 ? "text" : "texts";
+    if (!words.length || words.length < reasons.length) return `No open tasks in the selected ${texts}.`;
     if (words.length === 1) return `The open tasks are ${words[0][0]}: ${words[0][1].replace("{texts}", texts)}.`;
     return `The open tasks are ${words.map(([noun]) => noun).join(" or ")}.`;
   }
@@ -219,9 +219,11 @@ export function unavailableReason(action: BulkAction, preview: BulkTaskActionVie
   const skipped = skippedPart(preview);
   if (skipped && preview.skipped_count >= preview.texts) return `${skipped}.`;
   if (skipped) return `${skipped}; the ${preview.texts - preview.skipped_count === 1 ? "other has" : "others have"} ${rest}.`;
+  // One selected text gets the singular (issue 585).
+  const texts = preview.texts === 1 ? "text" : "texts";
   if (preview.skipped_count && preview.skipped_count >= preview.texts) return action === "start_round"
-    ? "The selected texts have a final result or an open consolidation."
-    : "The selected texts have a final result: use Change final… first.";
-  if (action === "start_round") return blocked ? "No submitted annotation in the selected texts can start a round." : "No submitted annotations in the selected texts.";
-  return blocked ? "No submitted task in the selected texts can be reopened." : "No submitted tasks in the selected texts.";
+    ? `The selected ${preview.texts === 1 ? "text has" : "texts have"} a final result or an open consolidation.`
+    : `The selected ${preview.texts === 1 ? "text has" : "texts have"} a final result: use Change final… first.`;
+  if (action === "start_round") return blocked ? `No submitted annotation in the selected ${texts} can start a round.` : `No submitted annotations in the selected ${texts}.`;
+  return blocked ? `No submitted task in the selected ${texts} can be reopened.` : `No submitted tasks in the selected ${texts}.`;
 }

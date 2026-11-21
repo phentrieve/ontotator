@@ -106,8 +106,12 @@ export function pauseAppliedText(result: TextPauseActionView): string {
   return `${result.action === "pause" ? "Paused" : "Released"} ${plural(result.changes.length, "text")}.`;
 }
 
-/** A menu entry that does nothing for the selection gives its reason (decision 336-C); null when it acts or is unknown. */
-export function pauseUnavailableReason(action: PauseAction, preview: TextPauseActionView | null | undefined): string | null {
+/**
+ * A menu entry that does nothing for the selection gives its reason (decision 336-C); null when it acts or is unknown.
+ * `count` is the number of selected texts: one text gets the singular (issue 585).
+ */
+export function pauseUnavailableReason(action: PauseAction, preview: TextPauseActionView | null | undefined, count: number): string | null {
   if (!preview || preview.change_count) return null;
+  if (count === 1) return action === "pause" ? "The selected text is already paused." : "The selected text is not paused by a lead.";
   return action === "pause" ? "The selected texts are already paused." : "None of the selected texts is paused by a lead.";
 }

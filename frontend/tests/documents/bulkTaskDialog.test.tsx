@@ -74,10 +74,21 @@ it("groups the preview by consequence and names people with their counts (decisi
 it("a menu entry that does nothing names the reason (decision 336-C)", () => {
   expect(unavailableReason("reopen", reopenPreview())).toBeNull();
   expect(unavailableReason("reopen", reopenPreview({ changes: [], texts: 1, skipped: [{ case_id: "x", language: "de", reason: "final_chosen", message: "" }] })))
+    .toBe("The selected text has a final result: use Change final… first.");
+  expect(unavailableReason("reopen", reopenPreview({ changes: [], texts: 2, skipped: [{ case_id: "x", language: "de", reason: "final_chosen", message: "" }, { case_id: "y", language: "de", reason: "final_chosen", message: "" }] })))
     .toBe("The selected texts have a final result: use Change final… first.");
   expect(unavailableReason("reopen", reopenPreview({ changes: [], skipped: [] }))).toBe("No submitted tasks in the selected texts.");
   expect(unavailableReason("withdraw", reopenPreview({ action: "withdraw", changes: [] }))).toBe("No open tasks in the selected texts.");
   expect(unavailableReason("withdraw", null)).toBeNull();
+});
+
+it("with one text selected, the menu reasons speak of one text (issue 585)", () => {
+  const one = (action: "withdraw" | "start_round" | "reopen", skipped: BulkTaskActionView["skipped"] = []) => reopenPreview({ action, changes: [], kept: [], skipped, texts: 1 });
+  const final: BulkTaskActionView["skipped"] = [{ case_id: "x", language: "de", reason: "final_result", message: "" }];
+  expect(unavailableReason("withdraw", one("withdraw"))).toBe("No open tasks in the selected text.");
+  expect(unavailableReason("reopen", one("reopen"))).toBe("No submitted tasks in the selected text.");
+  expect(unavailableReason("start_round", one("start_round"))).toBe("No submitted annotations in the selected text.");
+  expect(unavailableReason("start_round", one("start_round", final))).toBe("The selected text has a final result or an open consolidation.");
 });
 
 it("the menu reasons follow the counts by reason: paused tasks, an open consolidation beside an empty text (issue 576, F6)", () => {

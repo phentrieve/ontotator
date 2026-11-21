@@ -78,10 +78,13 @@ it("says what the people notice, what stays untouched and the way back", () => {
 });
 
 it("the menu entries name why they do nothing for the selection", () => {
-  expect(pauseUnavailableReason("pause", pausePreview())).toBeNull();
-  expect(pauseUnavailableReason("pause", null)).toBeNull();
-  expect(pauseUnavailableReason("pause", pausePreview({ changes: [] }))).toBe("The selected texts are already paused.");
-  expect(pauseUnavailableReason("release", releasePreview({ changes: [] }))).toBe("None of the selected texts is paused by a lead.");
+  expect(pauseUnavailableReason("pause", pausePreview(), 2)).toBeNull();
+  expect(pauseUnavailableReason("pause", null, 2)).toBeNull();
+  expect(pauseUnavailableReason("pause", pausePreview({ changes: [] }), 2)).toBe("The selected texts are already paused.");
+  expect(pauseUnavailableReason("release", releasePreview({ changes: [] }), 2)).toBe("None of the selected texts is paused by a lead.");
+  // One text selected (issue 585).
+  expect(pauseUnavailableReason("pause", pausePreview({ changes: [] }), 1)).toBe("The selected text is already paused.");
+  expect(pauseUnavailableReason("release", releasePreview({ changes: [] }), 1)).toBe("The selected text is not paused by a lead.");
 });
 
 it("asks for the reason, shows the consequences, then pauses with the preview's token after I understand", async () => {
