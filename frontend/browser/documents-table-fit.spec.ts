@@ -8,7 +8,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import type { components } from "../src/api/generated";
-import { documentsReady, documentsScenario, documentsTable, rowCell, textRow } from "./documentsHelpers";
+import { documentsReady, documentsScenario, documentsTable, rowCell, textName, textRow } from "./documentsHelpers";
 import { loginExisting } from "./helpers";
 
 type Rows = components["schemas"]["DocumentRowsPage"];
@@ -93,3 +93,48 @@ test("a paused consolidation shows the pause icon and the word at 1280, 1440 and
     expect(shown, `${width} px words`).toContain("paused");
   }
 });
+
+/** S0 with the case IDs of the acceptance stack (issue 576, F1): two pairs that share a long start, one very long ID. */
+const CASE_IDS = ["synthetic-accepted", "synthetic-ready", "synthetic-failed", "L3CASE-006-very-long-identifier-for-layout", "L3CASE-007-typo"];
+
+async function openManyIds(page: Page) {
+  const s = await documentsScenario(page, "S0");
+  await loginExisting(page, s.users.lead);
+  await page.route(url => new URL(url).pathname.endsWith("/document-rows"), async route => {
+    const body = await (await route.fetch()).json() as Rows;
+    const [first] = body.groups;
+    body.groups = CASE_IDS.map(caseId => ({ ...structuredClone(first), case_id: caseId, rows: first.rows.map(row => ({ ...structuredClone(row), case_id: caseId })) }));
+    await route.fulfill({ json: body });
+  });
+  await page.goto(`/#/projects/${encodeURIComponent(s.project)}/documents`);
+  await documentsReady(page);
+  await expect(textName(page, "L3CASE-007-typo", "en")).toBeVisible();
+}
+
+/** What each row's case ID shows: the visible text, and whether CSS cuts it (an ellipsis drawn over the text). */
+const shownIds = (page: Page) => documentsTable(page).locator("th[scope=row] .documents-row-case .documents-id").evaluateAll(ids => ids.map(id => {
+  const parts = [...id.children].filter((part): part is HTMLElement => part instanceof HTMLElement);
+  const shown = parts.length ? parts.find(part => part.getClientRects().length > 0) ?? id : id;
+  return { full: id.getAttribute("title") ?? "", text: shown.textContent ?? "", cut: [id, shown].some(element => element.scrollWidth > element.clientWidth + 1) };
+}));
+
+for (const width of [1280, 1366, 1440]) {
+  test(`case IDs stay apart at ${width} px: in full while the table has room, else one middle ellipsis (issue 576, F1)`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await openManyIds(page);
+    expect(await overflow(page), "sideways overflow of the table").toBeLessThanOrEqual(0);
+    const ids = await shownIds(page);
+    expect(ids.filter(id => id.cut), "IDs cut by CSS").toEqual([]);
+    // One shown form per case: no two cases read the same.
+    const forms = new Map(ids.map(id => [id.full, id.text]));
+    expect(new Set(forms.values()).size, JSON.stringify([...forms])).toBe(CASE_IDS.length);
+    for (const id of ids) {
+      expect(id.text.split("…").length, `one ellipsis at most: ${id.text}`).toBeLessThanOrEqual(2);
+      // Short IDs keep every character, with room or not.
+      if (id.full.length <= 18) expect(id.text).toBe(id.full);
+    }
+    // From 1366 px the table has room for the IDs of up to 24 characters in full; only the 42-character one keeps its
+    // two ends around "…" (at 1366 px "L3CASE-00…" read the same for 006 and 007-typo, and "synthetic-…" for three).
+    if (width >= 1366) expect(ids.filter(id => id.full.length <= 24 && id.text !== id.full).map(id => id.text)).toEqual([]);
+  });
+}

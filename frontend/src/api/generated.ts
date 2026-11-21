@@ -5436,6 +5436,14 @@ export interface components {
             kept_count: number;
             /** Skipped Count */
             skipped_count: number;
+            /** Kept By Reason */
+            kept_by_reason?: {
+                [key: string]: number;
+            };
+            /** Skipped By Reason */
+            skipped_by_reason?: {
+                [key: string]: number;
+            };
             /** Changes */
             changes: components["schemas"]["BulkTaskView"][];
             /** Kept */
