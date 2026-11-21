@@ -6,7 +6,7 @@ import { ErrorNotice } from "./ErrorNotice";
 import { fieldError } from "./errors";
 import { LanguagesField } from "./LanguagesField";
 import { importPlanOptions, toolProposalOptions } from "./projectFields";
-import { humanize, labelFor, roleLabels, taskLabels } from "../app/labels";
+import { humanize, labelFor, plural, roleLabels, taskLabels } from "../app/labels";
 import { formatTime, fullTimestamp } from "../app/submissionLabels";
 import { KIND_LABELS, SCOPE_LABELS } from "../me/TokensSection";
 
@@ -102,6 +102,25 @@ const auditActions: Readonly<Record<string, string>> = {
   "work_plan.import": "Work plan imported",
   "work_plan.update": "Work plan changed",
   "text.annotations_per_text": "Annotators per text changed for one text",
+  "text.pause": "Text paused",
+  "text.release": "Text released",
+};
+/**
+ * The way a change was made (`via` in its details), by the names of the screens: the selection bar's More actions and
+ * the Undo in its message (issue 576). A way added later on the server shows as its humanized code.
+ */
+const VIA_LABELS: Readonly<Record<string, string>> = {
+  bulk_pause_texts: "More actions › Pause texts…",
+  bulk_release_texts: "More actions › Release texts…",
+  bulk_reopen: "More actions › Reopen…",
+  bulk_reopen_undo: "Undo of Reopen…",
+  bulk_withdraw: "More actions › Withdraw open tasks…",
+  bulk_withdraw_undo: "Undo of Withdraw open tasks…",
+  bulk_start_round: "More actions › Start a round…",
+  bulk_change_mode: "More actions › Change mode…",
+  bulk_change_final: "More actions › Change final…",
+  bulk_change_final_undo: "Undo of Change final…",
+  accept_agreeing: "More actions › Accept agreeing results…",
 };
 /**
  * Changed fields by the names of the screens: a project's Settings (General, Workflow, Annotation, Ontology) and a
@@ -168,7 +187,26 @@ function languageChange(details: Record<string, unknown>): string {
   const [before, after] = [details.before.map(String), details.after.map(String)];
   const added = after.filter(language => !before.includes(language));
   const removed = before.filter(language => !after.includes(language));
+  // Since issue 576 the server records no event without a change; older events still read "No change.".
   return [added.length && `Added: ${added.join(", ")}.`, removed.length && `Removed: ${removed.join(", ")}.`].filter(Boolean).join(" ") || "No change.";
+}
+/**
+ * "Reason: …; 2 tasks paused; Via: More actions › Pause texts…" for a lead's pause or release of a text (issue 576);
+ * the text is under Whom.
+ */
+function pauseDetails(action: "text.pause" | "text.release", details: Record<string, unknown>): string {
+  const count = (value: unknown) => (Array.isArray(value) ? value.length : 0);
+  const still = count(details.still_paused_assignment_ids);
+  // A release lists every task of the text; those a problem report pauses as well stay paused.
+  const tasks = count(details.assignment_ids) - (action === "text.release" ? still : 0);
+  const reason = action === "text.pause" ? details.reason : details.paused_reason;
+  return [
+    typeof reason === "string" && reason.trim() && `${action === "text.pause" ? "Reason" : "Reason of the pause"}: ${reason.trim()}`,
+    action === "text.release" && typeof details.reason === "string" && details.reason.trim() && `Reason of the release: ${details.reason.trim()}`,
+    tasks > 0 && `${plural(tasks, "task")} ${action === "text.pause" ? "paused" : "released"}`,
+    still > 0 && `${plural(still, "task")} still paused by a problem report`,
+    typeof details.via === "string" && `Via: ${labelFor(VIA_LABELS, details.via)}`,
+  ].filter(Boolean).join("; ");
 }
 const isBlank = (value: unknown): boolean =>
   value === null || value === undefined || value === "" || (Array.isArray(value) ? value.length === 0 : typeof value === "object" && Object.keys(value).length === 0);
@@ -183,6 +221,7 @@ const auditEntries = (details: Record<string, unknown>, userNames?: ReadonlyMap<
   Object.entries(details).filter(([, value]) => !isBlank(value)).map(([key, value]) =>
     key === "user_id" && typeof value === "number" ? (userNames?.has(value) ? `User: ${userNames.get(value)}` : `User ${value}`)
       : key === "api_token" && typeof (value as { name?: unknown }).name === "string" ? `Via API token: ${(value as { name: string }).name}`
+      : key === "via" && typeof value === "string" ? `Via: ${labelFor(VIA_LABELS, value)}`
       : `${humanize(key)}: ${auditValue(key, value)}`);
 /** Plain words for the audit details people need; any other details as "Key: value" text. */
 export function auditDetails(event: AuditEvent, userNames?: ReadonlyMap<number, string>): string {
@@ -191,6 +230,7 @@ export function auditDetails(event: AuditEvent, userNames?: ReadonlyMap<number, 
   if (typeof details.active === "boolean") return details.active ? "Activated" : "Deactivated";
   if (typeof details.is_system_admin === "boolean") return details.is_system_admin ? "Granted" : "Withdrawn";
   if (event.action === "user.languages") return languageChange(details);
+  if (event.action === "text.pause" || event.action === "text.release") return pauseDetails(event.action, details);
   if (Array.isArray(details.fields)) return changedFields(details.fields, details.changes);
   // A move to the newest translations: the files, not the kept conditions (issue 254).
   if (event.action === "project.translations_refresh") return auditEntries({ added: details.added, replaced: details.replaced, removed: details.removed }).join("; ");

@@ -100,11 +100,12 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
       }, (s.assignments as Record<string, number>).first);
       expect(rounds).toEqual(restart ? ["ordinary:abandoned", "clean_restart:editable"] : ["ordinary:superseded", "carry_forward:editable"]);
 
-      // Nothing is submitted any more on the texts that take a round: the entry says so.
+      // Nothing is submitted any more on the texts that take a round: the entry says so, and names the two texts it
+      // skips (issue 576, F6: it read "No submitted annotations" for them too).
       await bar.getByRole("button", { name: "More actions" }).click();
       menu = page.getByRole("menu", { name: "More actions" });
       await expect(menu.getByRole("menuitem", { name: /^Start a round…/ })).toHaveAttribute("aria-disabled", "true");
-      await expect(menu.getByRole("menuitem", { name: /^Start a round…/ })).toContainText("No submitted annotations in the selected texts.");
+      await expect(menu.getByRole("menuitem", { name: /^Start a round…/ })).toContainText("1 text has a final result, 1 has an open consolidation; the others have no submitted annotations.");
       if (restart) await shot(page, `336-round-menu-unavailable-after${suffix}`);
       expect(errors).toEqual([]);
     });
