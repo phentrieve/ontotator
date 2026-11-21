@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-D585j8YE.js";import{n as a,t as o}from"./lib-DmmFpHat.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-D0HOLCxf.js";import{n as a,t as o}from"./lib-DVysM3f5.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -2506,7 +2506,7 @@ The selected texts now come first, in their earlier order among themselves; the 
 
 What for: assign a single review or annotation.
 
-1. In the row, click **Assign review…** or **Assign annotation…**. In the text card, use **Assign review…** or **Assign annotators…**.
+1. In the row, click **Assign review…** or **Assign annotation…**. In the text card, use **Assign review…** or **Assign annotators…**. The card offers **Assign review…** only while the text needs a reviewer, or under **Resolve…**. An accepted translation has none: to have it reviewed again, use **Ask a reviewer to correct…**, **Reopen…** at its submitted review, or **Assign a new review…** ([Accept a translation that was not reviewed](lead-results.md#accept-a-translation-that-was-not-reviewed)).
 2. Tick the people. To annotate yourself without the Annotator role, click **Add me as annotator**.
 3. Click the assign button, for example *Assign 2 people*.
 
