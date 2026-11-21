@@ -506,6 +506,100 @@ def queried_translation_for_lead(app: FastAPI) -> dict[str, Any]:
     )
 
 
+QUESTION_CASES = {
+    "ask": "case-0101",
+    "asked": "case-0102",
+    "old_query": "case-0103",
+}
+# Issue 553: the passage Ana asks about, her wording and her question.
+QUESTION_QUOTE = "generalized hypotonia"
+QUESTION_PROPOSED = "generalized muscular hypotonia"
+QUESTION_TEXT = "The source says hypotonia. Should it read muscular hypotonia here?"
+OLD_QUERY_ANSWER = "The short form is meant. Accepted as it is."
+
+
+def question_for_lead(app: FastAPI) -> dict[str, Any]:
+    """Issue 553 (Ask the lead, prototype): rule on, 3 cases with de review +
+    annotate. Ana has open translation reviews of case-0101 (nothing asked)
+    and case-0102, where she asked the lead about "generalized hypotonia"
+    with a proposed wording, without pausing. case-0103 has her old review
+    submitted as Query, which the lead decided ("accepted as it is")."""
+    from ontotator.application.problem_reports import ProblemReportService
+    from ontotator.application.query_decisions import QueryDecisionService
+    from ontotator.application.translation_reviews import TranslationReviewService
+    from ontotator.assignments.service import AssignmentService
+
+    scenario = lead_project(app, "QUESTION_FOR_LEAD")
+    scenario.app.state.accounts.update_profile(
+        Actor.cli(), scenario.users["lead"], qualification="Physician"
+    )
+    case_ids = cases(101, 3)
+    docs = import_units(scenario, case_units(case_ids, ("de",)))
+    plan(scenario, case_ids, {"de": REVIEW_AND_ANNOTATE})
+    review = TranslationReviewService(scenario.db, scenario.app.state.jobs)
+    access, actor = identity(scenario, "ana")
+    tasks: dict[str, int] = {}
+    for name in ("ask", "asked", "old_query"):
+        document_id = docs[(QUESTION_CASES[name], "de")]
+        tasks[name] = assign(scenario, document_id, "ana", "translation_review")
+        review.open(access, tasks[name])
+    with scenario.db.transaction() as conn:
+        task = AssignmentService._get(conn, tasks["asked"])
+    asked = ProblemReportService(scenario.db).report(
+        access,
+        actor,
+        tasks["asked"],
+        request_id=f"question-{uuid4().hex}",
+        expected_workflow_revision=task.workflow_revision,
+        reason=QUESTION_TEXT,
+        round_id=task.active_round_id,
+        kind="question",
+        quote=QUESTION_QUOTE,
+        proposed_text=QUESTION_PROPOSED,
+        pause=False,
+    )
+    # The old way: a review submitted as Query, decided by the lead.
+    old = docs[(QUESTION_CASES["old_query"], "de")]
+    opened = review.open(access, tasks["old_query"])
+    revision = review.save_draft(
+        access,
+        tasks["old_query"],
+        expected_revision=opened.draft.revision,
+        text=opened.text.replace(QUERY_OLD, QUERY_NEW),
+        form={
+            "decision": "query",
+            "clinical_change": True,
+            "categories": ["terminology"],
+            "rationale": QUERY_RATIONALE,
+        },
+    )
+    review.submit(access, tasks["old_query"], expected_revision=revision)
+    decisions = QueryDecisionService(scenario.db, scenario.app.state.jobs)
+    lead = Actor.user(
+        scenario.app.state.accounts.get_by_username(scenario.users["lead"]).id,
+        scenario.users["lead"],
+    )
+    preview = decisions.preview(lead, scenario.key, old)
+    decisions.decide(
+        lead,
+        scenario.key,
+        old,
+        kind="unchanged",
+        expected_text_sha256=preview["text_sha256"],
+        expected_review_id=preview["review"]["id"],
+        answer=OLD_QUERY_ANSWER,
+    )
+    return result(
+        scenario,
+        all_rows(case_ids, ("de",)),
+        case_ids={"de": list(case_ids)},
+        cases=dict(QUESTION_CASES),
+        tasks=tasks,
+        report_id=asked.report_id,
+        report_reason=QUESTION_TEXT,
+    )
+
+
 ACCEPTED_FOR_LEAD_CASES = {
     "accepted": "case-0101",
     "unreviewed": "case-0102",
@@ -738,6 +832,7 @@ BUILDERS: dict[str, Builder] = {
     "UPLOAD_DIALOG": build_upload_dialog,
     "TYPO_FIX_CARRY": typo_fix_carry,
     "TYPO_FIX_PROPOSALS": typo_fix_proposals,
+    "QUESTION_FOR_LEAD": question_for_lead,
 }
 
 

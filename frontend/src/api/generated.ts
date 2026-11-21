@@ -9119,11 +9119,16 @@ export interface components {
              * Action
              * @enum {string}
              */
-            action: "resume" | "resolve" | "extend_hold" | "restart" | "withdraw" | "reopen";
+            action: "resume" | "resolve" | "extend_hold" | "restart" | "withdraw" | "reopen" | "answer";
             /** Reason */
             reason: string;
             /** Assignment Ids */
             assignment_ids?: number[];
+            /**
+             * Take Proposed Text
+             * @default false
+             */
+            take_proposed_text: boolean;
         };
         /** ProblemReportRequest */
         ProblemReportRequest: {
@@ -9137,6 +9142,18 @@ export interface components {
             submission_id?: string | null;
             /** Reason */
             reason: string;
+            /**
+             * Kind
+             * @default problem
+             * @enum {string}
+             */
+            kind: "problem" | "question";
+            /** Quote */
+            quote?: string | null;
+            /** Proposed Text */
+            proposed_text?: string | null;
+            /** Pause */
+            pause?: boolean | null;
         };
         /** ProblemReportView */
         ProblemReportView: {
@@ -9226,6 +9243,31 @@ export interface components {
             answered: boolean;
             /** Text Paused By Lead */
             text_paused_by_lead?: boolean;
+            /**
+             * Kind
+             * @default problem
+             * @enum {string}
+             */
+            kind: "problem" | "question";
+            /** Quote */
+            quote?: string | null;
+            /** Proposed Text */
+            proposed_text?: string | null;
+            /**
+             * Pauses
+             * @default true
+             */
+            pauses: boolean;
+            /** Answer */
+            answer?: string | null;
+            /** Answered At */
+            answered_at?: string | null;
+            answered_by?: components["schemas"]["PersonRefView"] | null;
+            /**
+             * Took Proposed Text
+             * @default false
+             */
+            took_proposed_text: boolean;
         };
         /** Profile */
         Profile: {
@@ -10253,6 +10295,11 @@ export interface components {
              * @default false
              */
             own_task: boolean;
+            /**
+             * Took Proposed Text
+             * @default false
+             */
+            took_proposed_text: boolean;
         };
         /** ReportHoldView */
         ReportHoldView: {
@@ -14419,6 +14466,8 @@ export interface operations {
                 assignment_id?: number | null;
                 limit?: number;
                 offset?: number;
+                kind?: "problem" | "question";
+                state?: ("open" | "resolved" | "withdrawn") | null;
             };
             header?: never;
             path: {

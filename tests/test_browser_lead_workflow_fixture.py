@@ -127,6 +127,7 @@ def test_registry_has_twelve_scenarios_and_unknown_is_404(client):
         "UPLOAD_DIALOG",
         "TYPO_FIX_CARRY",
         "TYPO_FIX_PROPOSALS",
+        "QUESTION_FOR_LEAD",
     }
     response = client.post("/__test_lead_workflow__", params={"scenario": "S99"})
     assert response.status_code == 404

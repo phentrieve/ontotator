@@ -1864,6 +1864,7 @@ class AssignmentService:
                     )
                     .where(
                         ProblemReportRow.reporter_id == user_id,
+                        ProblemReportRow.kind == "problem",  # issue 553
                         ProblemReportRow.assignment_id.in_(
                             [r["assignment_id"] for r in rows]
                         ),

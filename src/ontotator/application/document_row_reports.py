@@ -87,7 +87,8 @@ def load_row_reports(
             ),
         )
         .join(UserRow, UserRow.id == ProblemReportRow.reporter_id)
-        .where(ProblemReportRow.project_id == pid)
+        # Issue 553: questions to the lead are listed on their own page.
+        .where(ProblemReportRow.project_id == pid, ProblemReportRow.kind == "problem")
         .order_by(ProblemReportRow.created_at.desc(), ProblemReportRow.report_id)
     )
     result: dict[RowKey, list[dict[str, Any]]] = {}

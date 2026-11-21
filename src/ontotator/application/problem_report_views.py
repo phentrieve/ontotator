@@ -37,7 +37,7 @@ from ontotator.storage.workflow_tables import (
     WorkRoundRow,
 )
 
-STATE_CHANGING = frozenset({"resolve", "restart", "withdraw", "reopen"})
+STATE_CHANGING = frozenset({"resolve", "restart", "withdraw", "reopen", "answer"})
 REPORTER_HIDDEN_UNLESS_OWN = frozenset({"resume", "extend_hold"})
 
 
@@ -67,6 +67,8 @@ class ReportEventView(BaseModel):
     abandoned_translation_draft: dict[str, Any] | None = None
     affected: list[AffectedTask] = Field(default_factory=list)  # leads only
     own_task: bool = False  # the event touched the reporter's task
+    # Issue 553: the answer took the asker's proposed wording into their draft.
+    took_proposed_text: bool = False
 
 
 class OtherActiveHold(BaseModel):
@@ -156,6 +158,17 @@ class ProblemReportView(BaseModel):
     # cause: releasing this report's pauses leaves the text's open tasks
     # paused until the text is released.
     text_paused_by_lead: bool = Field(default_factory=lambda: False)
+    # Issue 553: "question" for Ask the lead; quote and proposed wording are
+    # optional parts of a question. ``pauses``: the report paused the task
+    # when it was made (always for a problem, by choice for a question).
+    kind: Literal["problem", "question"] = "problem"
+    quote: str | None = None
+    proposed_text: str | None = None
+    pauses: bool = True
+    answer: str | None = None
+    answered_at: datetime | None = None
+    answered_by: PersonRefView | None = None
+    took_proposed_text: bool = False
 
 
 def _ids(details: dict[str, Any]) -> list[int]:
@@ -378,6 +391,7 @@ def build_report_view(
                 if viewer_is_lead
                 else [],
                 own_task=own_task,
+                took_proposed_text=r.details.get("took_proposed_text") is True,
             )
         )
 
@@ -452,6 +466,7 @@ def build_report_view(
         (r for r in reversed(event_rows) if r.action in STATE_CHANGING), None
     )
     facts = [EventFact(r.actor_id, r.action) for r in event_rows]
+    answer_event = next((r for r in reversed(event_rows) if r.action == "answer"), None)
     return ProblemReportView(
         report_id=report_id,
         project_key=row["project_key"],
@@ -491,6 +506,17 @@ def build_report_view(
         and answered(event_rows, reporter_id, own, row["reporter_seen_at"]),
         text_paused_by_lead=bool(
             paused_texts(conn, pid, [(row["case_id"], row["language"])])
+        ),
+        kind=row["kind"],
+        quote=row["quote"],
+        proposed_text=row["proposed_text"],
+        pauses=row["kind"] == "problem"
+        or any(h.created_by == reporter_id for h in hold_rows),
+        answer=answer_event.details.get("reason") if answer_event else None,
+        answered_at=answer_event.created_at if answer_event else None,
+        answered_by=people.get(answer_event.actor_id) if answer_event else None,
+        took_proposed_text=bool(
+            answer_event and answer_event.details.get("took_proposed_text") is True
         ),
     )
 
