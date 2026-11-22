@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
-from auth_harness import log_in
+from auth_harness import log_in, logged_in
 from fastapi.testclient import TestClient
 from problem_report_team import act, report
 from sqlalchemy import func, select, update
@@ -282,3 +282,68 @@ def test_the_answer_to_a_question_tells_the_asker(team):
     assert "Yes, the short form." not in str(item)
     # The lead answered; the lead's own bell does not hear of it.
     assert "answer_received" not in _kinds(team.lead)
+
+
+def _ask(team: Any, request_id: str, **extra: Any) -> dict[str, Any]:
+    current = team.bob.get(f"/api/v1/assignments/{team.bob_task.id}").json()
+    asked = team.bob.post(
+        f"/api/v1/assignments/{team.bob_task.id}/problem-reports",
+        json={
+            "request_id": request_id,
+            "expected_workflow_revision": current["workflow_revision"],
+            "round_id": current["active_round_id"],
+            "reason": "Is the short form meant?",
+            "kind": "question",
+            **extra,
+        },
+    )
+    assert asked.status_code == 200, asked.text
+    return dict(asked.json())
+
+
+def test_a_question_tells_every_lead_with_the_asker_and_no_text(team):
+    # Ask the lead (issue 553) with issue 557: each lead of the project gets
+    # "Question from <asker>: <case> <lang>"; the question, the quoted passage
+    # and the proposed wording stay in the question.
+    dora = logged_in(
+        team.app,
+        "dora",
+        pseudonym="lead-0002",
+        projects={team.key: ["lead"]},
+        assignments=[],
+    )
+    question = _ask(
+        team,
+        f"ask-leads-{team.bob_task.id}",
+        quote="the quoted passage",
+        proposed_text="the proposed wording",
+    )
+    for lead in (team.lead, dora):
+        [item] = [i for i in _items(lead) if i["kind"] == "question_received"]
+        assert item["target_id"] == question["report_id"]
+        assert item["assignment_id"] == team.bob_task.id
+        assert item["case_id"] and item["language"]
+        assert item["actor"]["pseudonym"] == "ann-0004"
+        assert item["read"] is False
+        for text in ("Is the short form meant?", "quoted passage", "proposed wording"):
+            assert text not in str(item)
+    # The asker and the other annotator hear nothing of it.
+    assert "question_received" not in _kinds(team.bob)
+    assert "question_received" not in _kinds(team.carol)
+
+
+def test_answering_a_pausing_question_rings_once(team):
+    # The answer releases the asker's pause; the asker gets "Answer from the
+    # lead", not also "Task released" for the same step.
+    question = _ask(team, f"ask-pause-{team.bob_task.id}", pause=True)
+    assert question["pauses"] is True
+    before = {item["id"] for item in _items(team.bob)}
+    act(team.lead, question["report_id"], question["revision"], "answer", "Yes.")
+    new = [item for item in _items(team.bob) if item["id"] not in before]
+    assert [item["kind"] for item in new] == ["answer_received"]
+    assert new[0]["target_id"] == question["report_id"]
+    # Opening it marks it read; the count follows.
+    unread = _unread(team.bob)
+    marked = team.bob.post(f"{URL}/{new[0]['id']}/read")
+    assert marked.status_code == 200, marked.text
+    assert marked.json()["unread"] == unread - 1
