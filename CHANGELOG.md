@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Notifications: a bell in the header, next to the user menu (#557, prototype). It counts the unread notifications and opens a short list, newest first; each entry opens its place (the task or the problem report) and is then marked read; **Mark as read** and **Mark all as read** mark them without opening. Events: a new task, a task reopened, a task released (lead pause or problem report), the lead's answer to a question (**Ask the lead**, #553), and for the leads a text problem or a question received (a question opens **Questions**). A notification holds identifiers only, no text: the case, the language and the person are read when the list is shown, display names only for leads, as elsewhere. Read ones are kept 30 days, unread ones 180 days, at most 200 per person; erasing an account deletes its notifications; a project archive leaves them out. The count is polled every minute and on window focus. New endpoints `GET /api/v1/me/notifications`, `GET …/summary`, `POST …/{id}/read` and `POST …/read-all` (browser sessions only). Migration 0057 adds the table `notifications`.
+
 ## [0.13.0] - 2026-11-22
 
 ### Added
