@@ -8,15 +8,15 @@
  *   correction for a query, and "Discard the {language} translation…" (reason required, consequences confirmed).
  * - `not_accepted` (rule 4a, D24): "Turn translation review on" or the external-review acceptance with a reason.
  */
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, ApiError, type ConsequencesView, type DocumentRowView, type QueryDecisionPreview } from "../api/client";
 import { textLabel } from "../app/identity";
 import type { Route } from "../app/router";
 import { ErrorNotice } from "../admin/ErrorNotice";
-import { DiffView } from "../translation/DiffView";
+import { DiffView, scrollToFirstChange } from "../translation/DiffView";
 import { diffTextBounded } from "../translation/textDiff";
 import { Button, Checkbox, Dialog, InlineConfirm, InlineMessage, MenuButton, Textarea, type MenuItem } from "../ui";
-import { correctionDocumentId, LeadCorrectionPanel, openLeadCorrection, reviewedAgain } from "./LeadCorrectionPanel";
+import { correctionDocumentId, correctLabel, LeadCorrectionPanel, openLeadCorrection, reviewedAgain } from "./LeadCorrectionPanel";
 import { stepLabel } from "./nextStepLabels";
 import { QueryDecisionDialog, type QueryDecisionKind } from "./QueryDecisionDialog";
 import { changedPassages } from "./UploadVersionDialog";
@@ -89,10 +89,7 @@ export function queryActionLabel(kind: QueryDecisionKind, version: number, nextV
   return kind === "reviewer_text" ? `Accept the reviewer’s text as v${nextVersion}…` : `Accept v${version} as it is…`;
 }
 
-/** Issue 555: the lead's own correction, named by what follows: counted as accepted, or reviewed again. */
-export function correctLabel(again: boolean): string {
-  return again ? "Correct it myself (reviewed again)…" : "Correct it myself (counts as accepted)…";
-}
+export { correctLabel };
 
 /**
  * Issues 554 and 556: Resolve… is a dialog, not a panel under the row. What the reviewer said comes first; then one
@@ -143,6 +140,15 @@ function ResolveOptions(props: ResolveTranslationProps): JSX.Element {
   const nextVersion = preview?.next_version ?? version + 1;
   // The reviewer proposed no change: taking their text is not possible, so it is not offered (rule 4 of issue 556).
   const canTake = preview === null || preview.proposes_changes;
+  // Issue 591: the dialog opened with focus on "Accept the reviewer’s text…", offered until the preview said there is
+  // no change. That button is gone now; focus fell to <body>, so it moves to the one decision left (rule 6).
+  useLayoutEffect(() => {
+    if (canTake) return;
+    const active = document.activeElement;
+    if (!active || active === document.body || !active.isConnected) primaryButton.current?.focus();
+  }, [canTake]);
+  // Issue 591: the proposed text opens at its first change, not at its start.
+  const proposalView = useRef<HTMLDivElement>(null);
 
   // Cancel in the discard, correction or reopen step returns to the options with focus on what opened it.
   useEffect(() => {
@@ -245,9 +251,9 @@ function ResolveOptions(props: ResolveTranslationProps): JSX.Element {
     body = <div className="documents-resolve" role="group" aria-label={title}>
       {reviewReason && <ReviewReason record={reviewReason} lead={reasonLead(row, reviewReason)} />}
       {queried && preview && proposed !== null && (preview.proposes_changes
-        ? <details className="documents-resolve-proposal">
+        ? <details className="documents-resolve-proposal" onToggle={event => { if (event.currentTarget.open && proposalView.current) scrollToFirstChange(proposalView.current); }}>
           <summary>{`Show the proposed text${count !== null ? ` (${count} ${count === 1 ? "passage" : "passages"} changed)` : ""}`}</summary>
-          <DiffView before={preview.text} after={proposed} parts={proposal ?? undefined} lang={row.language} label={`${reviewer}’s proposed text, changes to v${version}`} />
+          <DiffView ref={proposalView} before={preview.text} after={proposed} parts={proposal ?? undefined} lang={row.language} label={`${reviewer}’s proposed text, changes to v${version}`} />
         </details>
         : <p>{`${reviewer} proposed no change to the text.`}</p>)}
       {waitingLine(row) && <p className="documents-resolve-waiting">{waitingLine(row)}</p>}

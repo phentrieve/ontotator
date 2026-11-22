@@ -64,7 +64,7 @@ export function BulkFinalDialog({ projectKey, action, rows, onClose, onApplied }
 
   let blocked: string | null = null;
   if (!preview) blocked = CHECKING;
-  else if (!count) blocked = finalSummaryText(preview);
+  else if (!count) blocked = finalSummaryText(preview, rows.length);
   else if (confirming && !understood) blocked = "Confirm that you understand the consequences first.";
 
   const apply = async () => {
@@ -106,7 +106,7 @@ export function BulkFinalDialog({ projectKey, action, rows, onClose, onApplied }
       {preview && groups.length > 0 && <ul className="bulk-groups" aria-label="Preview">
         {groups.filter(group => !confirming || group.tone === "change").map(group => <GroupLine key={group.id} group={group} id={`${ids}-${group.id}`} />)}
       </ul>}
-      {preview && <p className="work-plan-summary" aria-live="polite"><strong>{finalSummaryLabel(action)}</strong> {finalSummaryText(preview)}</p>}
+      {preview && <p className="work-plan-summary" aria-live="polite"><strong>{finalSummaryLabel(action)}</strong> {finalSummaryText(preview, rows.length)}</p>}
       {confirming && preview && <div className="work-plan-confirm">
         <div className="work-plan-warning">
           <strong>What happens</strong>

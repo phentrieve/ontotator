@@ -244,6 +244,7 @@ export function EditorialCorrectionDialog({ row, version, projectKey, onCorrecte
   const numbers = current ? numberNotice(current.number_changes) : null;
   const consequences = current ?? state;
   const work = consequences ? editorialConsequences(consequences) : null;
+  const rule = consequences ? PROPOSALS_RULE(`v${consequences.next_version}`) : null;
   const review = reviewNote(version.latest_review_decision, next);
 
   const save = async () => {
@@ -262,6 +263,13 @@ export function EditorialCorrectionDialog({ row, version, projectKey, onCorrecte
   const refusedText = refusedSave(error, short);
   const failure = refusedText ? <InlineMessage tone="warning">{refusedText}</InlineMessage> : error !== undefined && <ErrorNotice error={error} />;
   const close = busy ? undefined : onClose;
+  const ready = state !== null && original !== null;
+  // Rule 4 of docs/design.md › Panels and actions: a greyed Save names its reason as description and tooltip.
+  const missingText = !changed ? "Change the text and say what you fixed." : "Say what you fixed.";
+  const greyed = !ready ? "Loading the text…" : invalid ? missingText : refusedCheck;
+  const greyedId = ready && !invalid ? `${id}-refused` : `${id}-missing`;
+  // Rule 6: focus on the primary action when the dialog opens.
+  const primary = useRef<HTMLButtonElement>(null);
 
   if (loadError !== undefined || blocked !== null) {
     return <Dialog open size="sm" title={title} onClose={onClose} returnFocus={returnFocus} footer={<Button onClick={onClose}>Close</Button>}>
@@ -269,17 +277,17 @@ export function EditorialCorrectionDialog({ row, version, projectKey, onCorrecte
     </Dialog>;
   }
 
-  const ready = state !== null && original !== null;
-  return <Dialog open size="lg" title={title} onClose={close} returnFocus={returnFocus}
+  return <Dialog open size="lg" title={title} onClose={close} returnFocus={returnFocus} initialFocus={primary}
     footer={<>
       <Button disabled={busy} onClick={onClose}>Cancel</Button>
-      <Button variant="primary" loading={busy} aria-disabled={!ready || invalid || refusedCheck !== null || busy ? true : undefined}
-        aria-describedby={invalid && tried ? `${id}-missing` : undefined} onClick={() => { void save(); }}>{`Save as v${next}`}</Button>
+      <Button ref={primary} variant="primary" loading={busy} aria-disabled={!ready || invalid || refusedCheck !== null || busy ? true : undefined}
+        aria-describedby={greyed !== null && !busy ? greyedId : undefined} title={busy ? undefined : greyed ?? undefined}
+        onClick={() => { void save(); }}>{`Save as v${next}`}</Button>
     </>}>
     <div className="editorial-correction">
       <p>Fix spacing, typos or grammar directly in the text. A change of content belongs in a translation review.</p>
       {!ready
-        ? <InlineMessage tone="info">Loading the text…</InlineMessage>
+        ? <InlineMessage tone="info"><span id={`${id}-missing`}>Loading the text…</span></InlineMessage>
         : <>
           <div className="form-group">
             <label id={`${id}-text-label`} htmlFor={`${id}-text`} className="form-label">Corrected text</label>
@@ -293,7 +301,7 @@ export function EditorialCorrectionDialog({ row, version, projectKey, onCorrecte
             <DiffView before={original} after={value} parts={parts} lang={row.language} />
           </div>}
           {changed && parts === null && <p className="field-hint">The texts differ too much to mark the changes.</p>}
-          {refusedCheck !== null && <InlineMessage tone="warning">{refusedCheck}</InlineMessage>}
+          {refusedCheck !== null && <InlineMessage tone="warning"><span id={`${id}-refused`}>{refusedCheck}</span></InlineMessage>}
           {numbers !== null && <InlineMessage tone="warning">{numbers}</InlineMessage>}
           <fieldset className="plan-step editorial-correction-reason" aria-describedby={tried && missingReason ? `${id}-reason-error` : undefined}>
             <legend>What did you fix? (required)</legend>
@@ -309,7 +317,11 @@ export function EditorialCorrectionDialog({ row, version, projectKey, onCorrecte
             ? <>
               {work.moving.length > 0 && <p className="editorial-correction-work">{work.moving.join(" ")}</p>}
               <InlineMessage tone="warning" title={`Work stays on v${version.version}`}>
-                {work.lines.map(line => <span key={line} className="lead-correction-consequence">{line} </span>)}
+                {/* Issue 584: one line per reason, the rule for tasks from proposals set apart below them. */}
+                <ul className="editorial-correction-stays">
+                  {work.lines.filter(line => line !== rule).map(line => <li key={line}>{line}</li>)}
+                </ul>
+                {rule !== null && work.lines.includes(rule) && <p className="editorial-correction-rule">{rule}</p>}
               </InlineMessage>
             </>
             : <p className="editorial-correction-work">{[...work.moving, ...work.lines].join(" ")}</p>)}
@@ -317,7 +329,10 @@ export function EditorialCorrectionDialog({ row, version, projectKey, onCorrecte
           {review !== null && <p className="field-hint">{review}</p>}
         </>}
       {failure}
-      {invalid && tried && <p id={`${id}-missing`} className="action-reason">{!changed ? "Change the text and say what you fixed." : "Say what you fixed."}</p>}
+      {/* Before a press the reason is the button's description only; after it, it shows in place. A refused check shows above. */}
+      {ready && invalid && (tried
+        ? <p id={`${id}-missing`} className="action-reason">{greyed}</p>
+        : <span id={`${id}-missing`} hidden>{greyed}</span>)}
     </div>
   </Dialog>;
 }

@@ -215,6 +215,9 @@ class WorkItemView(_View):
     is_me: bool
     task: Task
     status: AssignmentStatus
+    # Issue 584: ``open`` and opened by the person, nothing saved yet (the
+    # typo fix's "already opened"); the card reads "Opened".
+    opened: bool = False
     # Paused by any cause; ``pause_causes`` names them: ``report`` (a problem
     # report) and/or ``lead`` (the lead paused the text, issue 464).
     held: bool

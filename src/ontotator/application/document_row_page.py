@@ -887,6 +887,8 @@ def _work_item(
         "person": ctx.person(item.user_id, item.pseudonym),
         "task": item.task,
         "status": item.status,
+        # Issue 584: opened, nothing saved yet (the typo fix's "already opened").
+        "opened": item.status == "open" and item.active_round_id is not None,
         "held": item.held,
         "pause_causes": _pause_causes(item),
         "lead_correction": item.lead_correction,

@@ -99,9 +99,10 @@ export function affectedLine(person: AffectedPerson): string {
   return `${person.name}: ${parts.join("; ")}.`;
 }
 
-/** "the annotation mode of 5 texts", or why nothing changes. */
-export function modeSummaryText(preview: BulkModeChangeView): string {
-  return preview.changes.length ? `the annotation mode of ${plural(preview.changes.length, "text")}` : `No selected text can change to annotation ${MODE_WORDS[preview.mode]}.`;
+/** "the annotation mode of 5 texts", or why nothing changes; `count` selected texts, one gets the singular (issue 585). */
+export function modeSummaryText(preview: BulkModeChangeView, count: number): string {
+  if (preview.changes.length) return `the annotation mode of ${plural(preview.changes.length, "text")}`;
+  return `${count === 1 ? "The selected text cannot" : "No selected text can"} change to annotation ${MODE_WORDS[preview.mode]}.`;
 }
 
 /** The dialog's action button: "Change mode of 5 texts"; "Change mode" before a preview. */
@@ -132,13 +133,15 @@ export function modeAppliedText(preview: BulkModeChangeView): string {
 
 /**
  * The menu entry does nothing for the selection when neither mode changes a text: its reason (decision 336-C); null
- * when it acts or is unknown. Reads the counts only (`summary_only`), one preview per mode.
+ * when it acts or is unknown. Reads the counts only (`summary_only`), one preview per mode. `count` is the number of
+ * selected texts: one text gets the singular (issue 585).
  */
-export function modeUnavailableReason(previews: readonly (BulkModeChangeView | null | undefined)[]): string | null {
+export function modeUnavailableReason(previews: readonly (BulkModeChangeView | null | undefined)[], count: number): string | null {
   if (previews.some(preview => !preview) || previews.some(preview => preview!.change_count)) return null;
   const every = (reason: string) => previews.every(preview => preview!.skipped_count > 0 && (preview!.skipped_by_reason[reason] ?? 0) + (preview!.skipped_by_reason.unchanged ?? 0) >= preview!.skipped_count)
     && previews.some(preview => preview!.skipped_by_reason[reason]);
-  if (every("final_result")) return "The selected texts have a final result: use Withdraw final… first.";
-  if (every("not_locked")) return "No annotation work on the selected texts yet: set the mode with Plan….";
-  return "No selected text can change its annotation mode.";
+  const one = count === 1;
+  if (every("final_result")) return `The selected ${one ? "text has" : "texts have"} a final result: use Withdraw final… first.`;
+  if (every("not_locked")) return `No annotation work on the selected ${one ? "text" : "texts"} yet: set the mode with Plan….`;
+  return one ? "The selected text cannot change its annotation mode." : "No selected text can change its annotation mode.";
 }

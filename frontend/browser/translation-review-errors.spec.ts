@@ -62,7 +62,7 @@ test("Retry corrected version metadata: the submitted correction names its new v
   await rowAction(page, "Resolve…", caseId, "de").click();
   const area = page.getByRole("dialog", { name: textNamePattern("Resolve rejected translation, ", caseId, "de") });
   await area.getByRole("button", { name: "Correct it myself (counts as accepted)…", exact: true }).click();
-  await area.getByRole("group", { name: textNamePattern("Correct the translation, ", caseId, "de") }).getByRole("button", { name: "Open translation review", exact: true }).click();
+  await area.getByRole("group", { name: textNamePattern("Correct it myself (counts as accepted), ", caseId, "de") }).getByRole("button", { name: "Open translation review", exact: true }).click();
   await expect(page).toHaveURL(/#\/tasks\/\d+$/);
   await expect(translation(page)).toBeVisible({ timeout: 30_000 });
   await translation(page).fill(`${await translation(page).inputValue()} The second seizure episode is included.`);
