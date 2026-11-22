@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { item } from './reanchorFixtures';
 import { ReanchorPanel, pendingDiffParts } from '../src/variants/ReanchorPanel';
 import { historical } from './variantFixtures';
+import { shownText } from './support/shownText';
 
 afterEach(cleanup);
 it('shows whole changed words after validating the exact server character windows', () => {
@@ -11,7 +12,7 @@ it('shows whole changed words after validating the exact server character window
     { op: 'replace', old_start: 0, old_end: 8, new_start: 0, new_end: 15, old_text: 'Krampfan', new_text: 'Epileptische An' },
     { op: 'equal', old_start: 8, old_end: before.length, new_start: 15, new_end: after.length, old_text: 'fälle', new_text: 'fälle' },
   ] })]} labelFor={() => null} onContext={() => {}} />);
-  expect(mounted.container.querySelector('del')?.textContent).toBe(before);
+  expect(shownText(mounted.container.querySelector('del')!)).toBe(before);
   expect(mounted.container.querySelector('ins')?.textContent).toBe(after);
 });
 it.each([
@@ -23,7 +24,7 @@ it.each([
     { op: 'replace', old_start: 0, old_end: oldEnd, new_start: 0, new_end: newEnd, old_text: before, new_text: after },
   ] })]} labelFor={() => null} onContext={() => {}} />);
   const parts = [...mounted.container.querySelectorAll('[data-diff-op]')];
-  expect(parts.filter(part => part.getAttribute('data-diff-op') !== 'insert').map(part => part.textContent).join('')).toBe(before);
+  expect(parts.filter(part => part.getAttribute('data-diff-op') !== 'insert').map(shownText).join('')).toBe(before);
   expect(parts.filter(part => part.getAttribute('data-diff-op') !== 'delete').map(part => part.textContent).join('')).toBe(after);
   expect(mounted.container.querySelector('[data-paragraph-offset="0"]')).not.toBeNull();
 });

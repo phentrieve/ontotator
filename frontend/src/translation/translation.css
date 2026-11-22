@@ -2,6 +2,9 @@
 .translation-diff { white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto; height: 40vh; min-height: 200px; padding: var(--space-3); font-family: var(--font-serif); font-size: var(--size-reading); line-height: var(--leading-reading); background: var(--surface-raised); }
 .translation-diff ins { color: var(--success); background: var(--success-light); text-decoration: underline; text-underline-offset: 3px; }
 .translation-diff del { color: var(--danger); background: var(--danger-light); text-decoration: line-through; }
+/* Deleted words are generated content: shown and read aloud like text, but skipped by the browser's find,
+   selection and copy, so find matches the proposed text (issue 533). */
+.generated-text::after { content: attr(data-text); }
 
 /* Translation review. At least 1100 px: the texts own the viewport, the decision sits in a
    pinned rail and only the texts and the rail scroll. Narrower: one scrolling page whose

@@ -26,19 +26,32 @@ export function InvisiblesKey(): JSX.Element {
 const PATTERN = new RegExp(`\\r\\n|\\r|\\n|[${[...KINDS.keys()].join("")}]`, "g");
 
 /**
+ * `text` drawn as generated content (CSS `::after` from `data-text`). It is laid out, shown and read by screen
+ * readers like text, but the browser's find (Ctrl/Cmd+F), selection and copy skip it (issue 533). Deleted words
+ * in a change view use it, so find reads `Dosis 5 mg` → `Dosis 10 mg` as "Dosis 10 mg".
+ */
+export function generatedText(text: string, key?: string): ReactNode {
+  return <span key={key} className="generated-text" data-text={text} />;
+}
+
+/**
  * `text` as nodes whose characters are exactly `text`: every invisible character sits in a span of its own,
  * and CSS draws its mark over it. The marks are generated content, so they are never selected or copied,
  * and the spans add no width: the text wraps as it does without them.
+ * With `generated`, the characters themselves are generated content too (see `generatedText`).
  */
-export function invisibleNodes(text: string, key: string): ReactNode[] {
+export function invisibleNodes(text: string, key: string, { generated = false } = {}): ReactNode[] {
   const nodes: ReactNode[] = [];
   let position = 0, index = 0;
+  const plain = (piece: string) => nodes.push(generated ? generatedText(piece, `${key}-${index++}`) : piece);
   for (const match of text.matchAll(PATTERN)) {
-    const start = match.index ?? 0, found = match[0];
-    if (start > position) nodes.push(text.slice(position, start));
-    nodes.push(<span key={`${key}-${index++}`} className="invisible-char" data-invisible={KINDS.get(found) ?? "line-end"}>{found}</span>);
+    const start = match.index ?? 0, found = match[0], kind = KINDS.get(found) ?? "line-end";
+    if (start > position) plain(text.slice(position, start));
+    nodes.push(generated
+      ? <span key={`${key}-${index++}`} className="invisible-char generated-text" data-invisible={kind} data-text={found} />
+      : <span key={`${key}-${index++}`} className="invisible-char" data-invisible={kind}>{found}</span>);
     position = start + found.length;
   }
-  if (position < text.length) nodes.push(text.slice(position));
+  if (position < text.length) plain(text.slice(position));
   return nodes;
 }
