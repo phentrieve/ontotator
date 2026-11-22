@@ -67,7 +67,7 @@ export function BulkModeDialog({ projectKey, rows, reach, onClose, onApplied }: 
   let blocked: string | null = null;
   if (!mode) blocked = "Choose the new mode first.";
   else if (!fresh) blocked = CHECKING;
-  else if (!count) blocked = modeSummaryText(fresh);
+  else if (!count) blocked = modeSummaryText(fresh, rows.length);
   else if (confirming && !understood) blocked = "Confirm that you understand the consequences first.";
   else if (!reason.trim()) blocked = "Enter the reason first.";
 
@@ -111,7 +111,7 @@ export function BulkModeDialog({ projectKey, rows, reach, onClose, onApplied }: 
               onChange={() => { setMode(value); setNotice(null); setError(undefined); }} />
             <label htmlFor={`${ids}-mode-${value}`}>{MODE_CHOICES[value].label}</label>
             <p id={`${ids}-mode-${value}-help`} className="plan-option-help">
-              {MODE_CHOICES[value].help}{reached !== undefined && ` ${reached ? `Changes ${plural(reached, "selected text")}.` : "Changes none of the selected texts."}`}
+              {MODE_CHOICES[value].help}{reached !== undefined && ` ${reached ? `Changes ${plural(reached, "selected text")}.` : rows.length === 1 ? "Does not change the selected text." : "Changes none of the selected texts."}`}
             </p>
           </div>;
         })}
@@ -126,7 +126,7 @@ export function BulkModeDialog({ projectKey, rows, reach, onClose, onApplied }: 
         <strong>{people.length ? `Work of ${plural(people.length, "person", "people")} is affected:` : "Nobody's work is affected."}</strong>
         {people.length > 0 && <ul aria-label="Affected people">{people.map(person => <li key={person.name}>{affectedLine(person)}</li>)}</ul>}
       </div>}
-      {fresh && <p className="work-plan-summary" aria-live="polite"><strong>Will change:</strong> {modeSummaryText(fresh)}</p>}
+      {fresh && <p className="work-plan-summary" aria-live="polite"><strong>Will change:</strong> {modeSummaryText(fresh, rows.length)}</p>}
       {!confirming && mode && <Textarea id={`${ids}-reason`} label="Reason" required maxLength={2000} value={reason}
         onChange={event => setReason(event.target.value)} hint="Recorded with each text's mode change." />}
       {confirming && fresh && <div className="work-plan-confirm">

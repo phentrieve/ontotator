@@ -47,8 +47,8 @@ it("groups the pause preview by consequence: work in progress, later tasks, skip
     "change: Pause 1 text without open tasks · tasks assigned later are paused from the start",
     "skip: Skip 1 text · already paused by a lead",
   ]);
-  expect(pauseSummaryText(pausePreview())).toBe("the work on 3 texts");
-  expect(pauseSummaryText(pausePreview({ changes: [] }))).toBe("The selected texts are already paused.");
+  expect(pauseSummaryText(pausePreview(), 3)).toBe("the work on 3 texts");
+  expect(pauseSummaryText(pausePreview({ changes: [] }), 3)).toBe("The selected texts are already paused.");
   expect(pauseApplyLabel("pause", 3)).toBe("Pause 3 texts");
   expect(pauseAppliedText(pausePreview({ applied: true }))).toBe("Paused 3 texts.");
 });
@@ -64,7 +64,7 @@ it("a release names the tasks a problem report still pauses", () => {
     "1 task stays paused by a problem report until that report is decided.",
     "Pause texts… pauses them again.",
   ]);
-  expect(pauseSummaryText(releasePreview({ changes: [] }))).toBe("None of the selected texts is paused by a lead.");
+  expect(pauseSummaryText(releasePreview({ changes: [] }), 3)).toBe("None of the selected texts is paused by a lead.");
   expect(pauseAppliedText(releasePreview({ applied: true }))).toBe("Released 2 texts.");
 });
 
@@ -77,11 +77,19 @@ it("says what the people notice, what stays untouched and the way back", () => {
   expect(pauseConsequences(pausePreview({ changes: [change("EN100025", [])] }))[0]).toBe("Nobody has an open task on these texts now.");
 });
 
+it("with one text selected, the dialog summary speaks of one text (issue 585)", () => {
+  expect(pauseSummaryText(pausePreview({ changes: [] }), 1)).toBe("The selected text is already paused.");
+  expect(pauseSummaryText(releasePreview({ changes: [] }), 1)).toBe("The selected text is not paused by a lead.");
+});
+
 it("the menu entries name why they do nothing for the selection", () => {
-  expect(pauseUnavailableReason("pause", pausePreview())).toBeNull();
-  expect(pauseUnavailableReason("pause", null)).toBeNull();
-  expect(pauseUnavailableReason("pause", pausePreview({ changes: [] }))).toBe("The selected texts are already paused.");
-  expect(pauseUnavailableReason("release", releasePreview({ changes: [] }))).toBe("None of the selected texts is paused by a lead.");
+  expect(pauseUnavailableReason("pause", pausePreview(), 2)).toBeNull();
+  expect(pauseUnavailableReason("pause", null, 2)).toBeNull();
+  expect(pauseUnavailableReason("pause", pausePreview({ changes: [] }), 2)).toBe("The selected texts are already paused.");
+  expect(pauseUnavailableReason("release", releasePreview({ changes: [] }), 2)).toBe("None of the selected texts is paused by a lead.");
+  // One text selected (issue 585).
+  expect(pauseUnavailableReason("pause", pausePreview({ changes: [] }), 1)).toBe("The selected text is already paused.");
+  expect(pauseUnavailableReason("release", releasePreview({ changes: [] }), 1)).toBe("The selected text is not paused by a lead.");
 });
 
 it("asks for the reason, shows the consequences, then pauses with the preview's token after I understand", async () => {
