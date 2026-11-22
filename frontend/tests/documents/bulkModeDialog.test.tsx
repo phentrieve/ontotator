@@ -68,8 +68,10 @@ it("groups the preview by consequence, with every reason a text is skipped (issu
   ]);
   expect(groups[0].texts).toEqual(["EN100022 en", "EN100023 en", "EN100024 en", "EN100025 en"]);
   expect(workText({ changes: [change("a", [], [assignment("a", 1)])] })).toBe("no work to discard");
-  expect(modeSummaryText(modePreview())).toBe("the annotation mode of 4 texts");
-  expect(modeSummaryText(modePreview({ mode: "proposals", changes: [] }))).toBe("No selected text can change to annotation from proposals.");
+  expect(modeSummaryText(modePreview(), 4)).toBe("the annotation mode of 4 texts");
+  expect(modeSummaryText(modePreview({ mode: "proposals", changes: [] }), 4)).toBe("No selected text can change to annotation from proposals.");
+  // One text selected (issue 585).
+  expect(modeSummaryText(modePreview({ mode: "proposals", changes: [] }), 1)).toBe("The selected text cannot change to annotation from proposals.");
   expect(modeAppliedText(modePreview({ applied: true }))).toBe("Changed the annotation mode of 4 texts.");
 });
 
@@ -92,11 +94,23 @@ it("says plainly what is discarded and that the bulk change cannot be undone her
 
 it("the menu entry names why it does nothing for the selection (decision 336-C)", () => {
   const none = (reasons: BulkModeChangeView["skipped"][number]["reason"][], mode: "scratch" | "proposals" = "scratch") => modePreview({ mode, changes: [], skipped: reasons.map((reason, index) => skip(`c${index}`, reason)) });
-  expect(modeUnavailableReason([modePreview(), none(["unchanged"], "proposals")])).toBeNull();
-  expect(modeUnavailableReason([null, none(["unchanged"])])).toBeNull();
-  expect(modeUnavailableReason([none(["final_result", "final_result"]), none(["unchanged", "final_result"], "proposals")])).toBe("The selected texts have a final result: use Withdraw final… first.");
-  expect(modeUnavailableReason([none(["not_locked"]), none(["not_locked"], "proposals")])).toBe("No annotation work on the selected texts yet: set the mode with Plan….");
-  expect(modeUnavailableReason([none(["not_locked", "final_result"]), none(["no_proposals", "not_locked"], "proposals")])).toBe("No selected text can change its annotation mode.");
+  expect(modeUnavailableReason([modePreview(), none(["unchanged"], "proposals")], 2)).toBeNull();
+  expect(modeUnavailableReason([null, none(["unchanged"])], 2)).toBeNull();
+  expect(modeUnavailableReason([none(["final_result", "final_result"]), none(["unchanged", "final_result"], "proposals")], 2)).toBe("The selected texts have a final result: use Withdraw final… first.");
+  expect(modeUnavailableReason([none(["not_locked", "not_locked"]), none(["not_locked", "not_locked"], "proposals")], 2)).toBe("No annotation work on the selected texts yet: set the mode with Plan….");
+  expect(modeUnavailableReason([none(["not_locked", "final_result"]), none(["no_proposals", "not_locked"], "proposals")], 2)).toBe("No selected text can change its annotation mode.");
+  // One text selected (issue 585).
+  expect(modeUnavailableReason([none(["final_result"]), none(["final_result"], "proposals")], 1)).toBe("The selected text has a final result: use Withdraw final… first.");
+  expect(modeUnavailableReason([none(["not_locked"]), none(["not_locked"], "proposals")], 1)).toBe("No annotation work on the selected text yet: set the mode with Plan….");
+  expect(modeUnavailableReason([none(["no_proposals"]), none(["no_proposals"], "proposals")], 1)).toBe("The selected text cannot change its annotation mode.");
+});
+
+it("with one text selected, a mode that changes nothing says so of one text (issue 585)", async () => {
+  render(<BulkModeDialog projectKey="p" rows={rows.slice(0, 1)} reach={{ scratch: 1, proposals: 0 }} onClose={vi.fn()} onApplied={vi.fn()} />);
+  const dialog = await screen.findByRole("dialog", { name: "Change mode: 1 text" });
+  expect(within(dialog).getByText(/Changes 1 selected text\./)).toBeTruthy();
+  expect(within(dialog).getByText(/Does not change the selected text\./)).toBeTruthy();
+  expect(within(dialog).queryByText(/selected texts/)).toBeNull();
 });
 
 it("asks for the mode and a reason, lists the people, then applies with the preview's token after I understand", async () => {
