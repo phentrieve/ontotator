@@ -196,7 +196,8 @@ test('lead assigns the exact pending translation; ordinary reviewer corrects, su
   await expect(page.locator('.translation-editor-mirror ins')).toContainText('7');
   await page.getByRole('checkbox', { name: 'Show changes', exact: true }).check();
   await expect(target(page)).toHaveCount(0);
-  await expect(page.locator('.translation-diff del')).toContainText('5');
+  // Deleted words are drawn from data-text (browser find skips them, #533), so read what the view shows.
+  await expect.poll(() => page.locator('.translation-diff del').evaluateAll(dels => dels.map(el => [...el.querySelectorAll('[data-text]')].map(span => span.getAttribute('data-text')).join('')).join(' '))).toContain('5');
   await expect(page.locator('.translation-diff ins')).toContainText('7');
   await page.getByRole('checkbox', { name: 'Show changes', exact: true }).uncheck();
   const confirmed = await saved(page, assignmentId, corrected, 'accepted_corrected');
