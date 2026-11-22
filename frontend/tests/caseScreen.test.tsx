@@ -2831,6 +2831,21 @@ describe("CaseScreen: finding modifiers (attach mode, Modifiers section, marks)"
     expect(screen.queryByRole("region", { name: "New finding" })).toBeNull();
   });
 
+  it("Change text span…: the finding's handles are inactive while the modifier's text is picked (issue 583)", async () => {
+    const { container } = await setup(modView(SEVERE_ON_SEIZURE));
+    const handles = () => Array.from(container.querySelectorAll<HTMLElement>(".resize-handle")).map(el => `${el.dataset.mention}:${el.dataset.edge}`);
+    fireEvent.click(container.querySelector('[data-list-key="annotation:seizure"]')!);
+    await waitFor(() => expect(handles()).toEqual(["ev-seizure:start", "ev-seizure:end"]));
+    fireEvent.click(await screen.findByRole("button", { name: "Actions, Severe" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Change text span…" }));
+    expect(container.querySelector(".attach-mention-banner")!.textContent).toContain("Select the text for Severe, then press Enter. Esc cancels.");
+    await waitFor(() => expect(handles()).toEqual([]));
+    // Esc ends the mode: the finding's handles come back.
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    await waitFor(() => expect(container.querySelector(".attach-mention-banner")).toBeNull());
+    await waitFor(() => expect(handles()).toEqual(["ev-seizure:start", "ev-seizure:end"]));
+  });
+
   it("hovering a finding row frames its marks and modifier segments; a click on a modifier segment selects the finding and focuses the chip", async () => {
     const { container } = await setup(modView(SEVERE_ON_SEIZURE));
     const row = container.querySelector<HTMLElement>('[data-list-key="annotation:seizure"]')!;

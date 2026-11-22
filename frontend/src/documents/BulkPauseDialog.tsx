@@ -57,7 +57,7 @@ export function BulkPauseDialog({ projectKey, action, rows, onClose, onApplied }
 
   let blocked: string | null = null;
   if (!preview) blocked = CHECKING;
-  else if (!count) blocked = pauseSummaryText(preview);
+  else if (!count) blocked = pauseSummaryText(preview, rows.length);
   else if (confirming && !understood) blocked = "Confirm that you understand the consequences first.";
   else if (pausing && !reason.trim()) blocked = "Enter the reason first.";
 
@@ -100,7 +100,7 @@ export function BulkPauseDialog({ projectKey, action, rows, onClose, onApplied }
       {preview && groups.length > 0 && <ul className="bulk-groups" aria-label="Preview">
         {groups.filter(group => !confirming || group.tone !== "skip").map(group => <GroupLine key={group.id} group={group} id={`${ids}-${group.id}`} />)}
       </ul>}
-      {preview && <p className="work-plan-summary" aria-live="polite"><strong>Will change:</strong> {pauseSummaryText(preview)}</p>}
+      {preview && <p className="work-plan-summary" aria-live="polite"><strong>Will change:</strong> {pauseSummaryText(preview, rows.length)}</p>}
       {!confirming && <Textarea id={`${ids}-reason`} label={pausing ? "Reason" : "Reason (optional)"} required={pausing} maxLength={2000} value={reason}
         onChange={event => setReason(event.target.value)}
         hint={pausing ? "The people see it in My tasks and in the task. It is kept in the audit log." : "Kept with each release in the audit log."} />}

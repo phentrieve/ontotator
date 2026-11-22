@@ -478,6 +478,10 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
     const alone = await openMenu(page);
     await expect(alone.getByRole("menuitem", { name: /^Start a round…/ })).toContainText("The selected text has an open consolidation.");
     await expect(alone.getByRole("menuitem", { name: /^Withdraw open tasks…/ })).toContainText("The open tasks are paused by a lead: release the text first.");
+    // Issue 585: every reason speaks of one text.
+    await expect(alone.getByRole("menuitem", { name: /^Change final…/ })).toContainText("The selected text has no final result yet.");
+    await expect(alone.getByRole("menuitem", { name: /^Pause texts…/ })).toContainText("The selected text is already paused.");
+    await expect(alone).not.toContainText("selected texts");
     expect(await noHorizontalScroll(page)).toBe(true);
     await shot(page, `576-menu-reasons${suffix}`);
     expect(errors).toEqual([]);
