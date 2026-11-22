@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-D1wi-0oS.js";import{n as a,t as o}from"./lib-D9yZCIe-.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index--YKDtP5I.js";import{n as a,t as o}from"./lib-BvByX23n.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -1688,18 +1688,20 @@ The bell at the top right, next to the user menu, tells you about:
 
 - a new task for you (*New task: annotation of case-0102 de*);
 - a task of yours that the lead reopened (*Task reopened: …*) or released after a pause (*Task released: …*);
-- the lead's answer to a question you asked with **Ask the lead** (*Answer from the lead on case-0102 de*);
-- for leads: a text problem that someone reported in your project (*Text problem from Ana Weber (ann-0004): case-0042 de*), or a question to the lead (*Question from Ana Weber (ann-0004): case-0102 de*).
+- the lead's answer to a question you asked with **Ask the lead** (*Answer from the lead: case-0102 de*). If you paused your task until the answer, the answer also opens it again; you get this one notification, not a second *Task released*;
+- for leads: a text problem that someone reported in your project (*Text problem from Ana Weber (ann-0004): case-0042 de*), or a question to the lead (*Question from Ana Weber (ann-0004): case-0102 de*). Every lead of the project gets the question.
 
 A number on the bell counts the unread notifications. It updates every minute and when you come back to the window.
 
 1. Click the bell. A short list opens with the newest notifications first. Unread ones have a dot and bold text. Each one names the project and the time.
-2. Click a notification to open its place: the task, the problem report, or **Questions** for a question to the lead. It is then marked as read.
+2. Click a notification to open its place: the task, or the problem report. It is then marked as read.
+   - A question to the lead opens **Questions** at that question: its tab is selected (**Open**, or **Answered** if another lead answered it already) and the question is marked.
+   - An answer from the lead opens your task. The answer is under **Questions to the lead** in **Your review**.
 3. To mark one as read without opening it, click **Mark as read** next to it. **Mark all as read** below the list marks all of them.
 
 With the keyboard, Tab to the bell and press Enter; Tab moves through the list and Escape closes it. On a phone the list opens as a full screen sheet.
 
-Notifications never contain the text of a case, a reason or a comment: only the names of the task, the text and the person. They are kept for 30 days once read and for 180 days at most; you keep the newest 200. A notification about a task that is no longer yours, or from a project you left, is not shown.
+Notifications never contain the text of a case, a reason, a comment, a question or an answer: only the names of the task, the text and the person. They are kept for 30 days once read and for 180 days at most; you keep the newest 200. A notification about a task that is no longer yours, or from a project you left, is not shown.
 
 ## Report a technical problem
 
@@ -2784,12 +2786,12 @@ Only leads and system administrators can open the list. To decide a query or a r
 
 What for: answer a question a person asked with **Ask the lead** (today in a translation review). Their task stays open while you answer, unless they chose to pause it.
 
-1. In the sidebar, click **Questions**. The count shows the open ones, for example *Questions (2)*.
+1. In the sidebar, click **Questions**. The count shows the open ones, for example *Questions (2)*. Or click the notification *Question from Ana Weber (ann-0004): case-0102 de* under the bell: Questions opens at that question, marked (see [Notifications](getting-started.md#notifications)).
 2. The **Open** tab lists each question with who asked, the task and text, the question and, if given, the passage with the proposed wording marked as changes.
 3. Click **Answer…**, write **Your answer**, and click **Send answer**.
 4. With a proposed wording, tick **Take the proposed wording into the reviewer's text** to put it into their open review in the same step; the button then reads **Answer and take the wording**. The reviewer still checks the text and submits the review. If the passage is no longer in their text, the dialog says *The quoted passage is no longer in the reviewer's text, so the wording cannot be taken.*; untick the box and send the answer without it.
 
-The answer appears in the person's task under **Questions to the lead**. Answered questions stay under **Answered**, and the count in the sidebar follows at once. The **Questions** page is for leads; other people read their own questions in their task. A question is no problem report: it does not show on **Documents** and does not hold the export. A question that paused its asker's task keeps that task open in the work, so **Export** lists the text under **Needs your decision** with *Waiting for your answer to a question: …* and **Open Questions**, which leads here.
+The answer appears in the person's task under **Questions to the lead**, and their bell shows *Answer from the lead: case-0102 de*. Answered questions stay under **Answered**, and the count in the sidebar follows at once. The **Questions** page is for leads; other people read their own questions in their task. A question is no problem report: it does not show on **Documents** and does not hold the export. A question that paused its asker's task keeps that task open in the work, so **Export** lists the text under **Needs your decision** with *Waiting for your answer to a question: …* and **Open Questions**, which leads here.
 
 ### Resolve a rejected or queried translation
 
