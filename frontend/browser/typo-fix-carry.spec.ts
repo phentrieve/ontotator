@@ -15,7 +15,7 @@
  *   and 390 px for horizontal scroll.
  */
 import { expect, test, type Page } from "@playwright/test";
-import { activityLines, documentsReady, openCardHistory, openTextCard, personRow, showSegment, textCard, textVersionItems } from "./documentsHelpers";
+import { activityLines, documentsReady, editTranslation, openCardHistory, openTextCard, personRow, showSegment, textCard, textVersionItems } from "./documentsHelpers";
 import { loginThroughForm, TASKS_HOME } from "./helpers";
 import { leadScenario } from "./leadWorkflowHelpers";
 
@@ -50,7 +50,7 @@ test("a typo fix moves one submitted annotation by itself; the other stays, and 
   await expect(page).toHaveURL(new RegExp(`#/projects/${esc(s.project)}/documents`));
   await documentsReady(page);
   const [v1] = await (await textVersionItems(await openTextCard(page, CASE, "de"), 1)).all();
-  await v1.getByRole("button", { name: `Fix typos in v1 of ${CASE} de…`, exact: true }).click();
+  await editTranslation(page, v1, CASE, "typos");
   const dialog = page.getByRole("dialog", { name: `Fix typos, ${CASE} de v1`, exact: true });
   const editor = dialog.getByRole("textbox", { name: "Corrected text", exact: true });
   const original = await editor.inputValue();

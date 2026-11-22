@@ -128,6 +128,7 @@ def test_registry_has_twelve_scenarios_and_unknown_is_404(client):
         "UPLOAD_DIALOG",
         "TYPO_FIX_CARRY",
         "TYPO_FIX_PROPOSALS",
+        "QUESTION_FOR_LEAD",
     }
     response = client.post("/__test_lead_workflow__", params={"scenario": "S99"})
     assert response.status_code == 404
@@ -424,3 +425,23 @@ def test_typo_fix_proposals_builds_and_names_the_tasks_that_stay(client):
     assert [
         (names[item["username"]], item["reason"]) for item in elsewhere["tasks_staying"]
     ] == [("annotator", "opened")]
+
+
+def test_typo_fix_proposals_an_opened_task_reads_opened_on_the_lead_card(client):
+    """Issue 584: the task the typo-fix dialog calls "already opened" is
+    opened in the lead's card too; a task nobody opened is not."""
+    built = scenario(client, "TYPO_FIX_PROPOSALS")
+    document_id = built["documents"]["de"]
+    _bar, rows = lead_rows(client, built)
+    (row,) = [
+        row
+        for row in rows.values()
+        if any(item["document_id"] == document_id for item in row["work"])
+    ]
+    names = {username: name for name, username in built["users"].items()}
+    work = {
+        names[item["person"]["username"]]: (item["status"], item["opened"])
+        for item in row["work"]
+        if item["task"] == "annotate" and item["document_id"] == document_id
+    }
+    assert work == {"annotator": ("open", True), "ben": ("open", False)}

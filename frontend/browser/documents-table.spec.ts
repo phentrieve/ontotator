@@ -117,9 +117,10 @@ test("S0 synthetic-accepted: the final is on old text after v2 corrected it; en 
   const scroller = page.locator(".documents-page .data-table-scroll");
   for (const width of [1440, 1400, 1280]) {
     await page.setViewportSize({ width, height: 800 });
-    expect(await scroller.evaluate(element => element.scrollWidth - element.clientWidth), `${width} px`).toBeLessThanOrEqual(0);
-    const heights = await documentsTable(page).locator(".documents-row").evaluateAll(rows => rows.map(row => Math.round(row.getBoundingClientRect().height)));
-    expect(Math.max(...heights), `${width} px row height`).toBeLessThanOrEqual(41);
+    // The table fits itself to the new width after a resize observer has run (tableFit.ts): poll, do not measure once.
+    await expect.poll(() => scroller.evaluate(element => element.scrollWidth - element.clientWidth), { message: `${width} px` }).toBeLessThanOrEqual(0);
+    await expect.poll(async () => Math.max(...await documentsTable(page).locator(".documents-row").evaluateAll(rows => rows.map(row => Math.round(row.getBoundingClientRect().height)))),
+      { message: `${width} px row height` }).toBeLessThanOrEqual(41);
   }
   await expect(rowCell(de, "finalization")).toContainText("Final is on old text");
   // One annotation per text: the v1 submission carried to v2 does not count on v2 (issue 420, never "1 of 2 submitted").

@@ -343,7 +343,7 @@ export function SelectionBar({
   const visible = keys.size >= MIN_TEXTS || undoState !== null;
   useFloatingBar(section, visible);
   if (!visible && !plan && !bulk && !finalAction && !modeChange && !pauseAction) return null;
-  const modeReason = modeUnavailableReason([reachable?.scratch, reachable?.proposals]);
+  const modeReason = modeUnavailableReason([reachable?.scratch, reachable?.proposals], rows.length);
   const withdrawing = undoState?.kind === "conflict" && undoState.consequences.withdrawn.length > 0;
 
   return <>
@@ -364,7 +364,7 @@ export function SelectionBar({
                 return { id: action, label: ACTION_LABELS[action], disabled: reason !== null, ...(reason ? { description: reason } : {}), onSelect: () => setBulk(action) };
               }),
               ...(["accept", "change"] as const).map(action => {
-                const reason = finalUnavailableReason(reachable?.[action]);
+                const reason = finalUnavailableReason(reachable?.[action], rows.length);
                 return { id: action, label: FINAL_ACTION_LABELS[action], disabled: reason !== null, ...(reason ? { description: reason } : {}), onSelect: () => setFinalAction(action) };
               }),
               ...(["start_round"] as const).map(action => {
@@ -373,7 +373,7 @@ export function SelectionBar({
               }),
               { id: "change_mode", label: MODE_ACTION_LABEL, disabled: modeReason !== null, ...(modeReason ? { description: modeReason } : {}), onSelect: () => setModeChange(true) },
               ...(["pause", "release"] as const).map(action => {
-                const reason = pauseUnavailableReason(action, reachable?.[action]);
+                const reason = pauseUnavailableReason(action, reachable?.[action], rows.length);
                 return { id: `${action}_texts`, label: PAUSE_ACTION_LABELS[action], disabled: reason !== null, ...(reason ? { description: reason } : {}), onSelect: () => setPauseAction(action) };
               }),
             ]} />

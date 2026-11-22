@@ -143,7 +143,7 @@ it("keeps the status of a rejected version", async () => {
   expect(within(dialog).getByText("v3 keeps the status of v2: Rejected in review. No translation review is started.")).toBeTruthy();
   // Issue 547, U2-06: the review is not "nobody worked on it"; it stays with the version it reviewed, and v3 needs its own.
   expect(within(dialog).getByText("Nobody has annotated v2 yet.")).toBeTruthy();
-  expect(within(dialog).getByText("A submitted translation review stays with the version it reviewed. To have v3 reviewed, use Resolve… › Assign a new review… on this row after saving.")).toBeTruthy();
+  expect(within(dialog).getByText("A submitted translation review stays with the version it reviewed. To have v3 reviewed, use Resolve… › Other ways… › Assign a new review… on this row after saving.")).toBeTruthy();
   fireEvent.change(editor, { target: { value: NEW } });
   fireEvent.click(within(dialog).getByRole("button", { name: "Grammar" }));
   fireEvent.click(within(dialog).getByRole("button", { name: "Save as v3" }));
@@ -153,7 +153,7 @@ it("keeps the status of a rejected version", async () => {
 it("names a submitted review by what happens to it (issue 547, U2-06)", () => {
   expect(reviewNote(null, 3)).toBeNull();
   expect(reviewNote("accepted", 3)).toBe("A submitted translation review stays with the version it reviewed.");
-  expect(reviewNote("query", 3)).toBe("A submitted translation review stays with the version it reviewed. To have v3 reviewed, use Resolve… › Assign a new review… on this row after saving.");
+  expect(reviewNote("query", 3)).toBe("A submitted translation review stays with the version it reviewed. To have v3 reviewed, use Resolve… › Other ways… › Assign a new review… on this row after saving.");
 });
 
 it("says in words why a version cannot be corrected, without the editor", async () => {
@@ -302,4 +302,27 @@ it("shows in the dialog who moves by itself, and says so after saving", async ()
   fireEvent.click(within(dialog).getByRole("button", { name: "Save as v3" }));
   await waitFor(() => expect(props.onCorrected).toHaveBeenCalled());
   expect(props.onCorrected.mock.calls[0][0]).toMatch(/1 annotation moved to v3\.$/);
+});
+
+it("issue 584: the block Work stays on v2 lists each reason on its own line, the rule for tasks from proposals set apart", async () => {
+  const staying = {
+    annotations: { submitted: 0, open: 2 }, tasks_following: 0, proposals: { sets: 1, carried: 1, needs_check: 1 },
+    tasks_staying: [
+      { assignment_id: 1, username: "ana", display_name: "Ana Weber", reason: "from_proposals_needs_check" as const },
+      { assignment_id: 2, username: "eva", display_name: "Eva Lang", reason: "opened" as const },
+    ],
+  };
+  vi.mocked(api.previewEditorialCorrection).mockImplementation(async (_key, _id, text) => (text === undefined ? preview(staying) : checkedPreview(text, staying)));
+  const { dialog, editor } = await renderDialog();
+  await type(editor, NEW);
+  const block = (await within(dialog).findByText("Work stays on v2")).closest(".notice") as HTMLElement;
+  const list = within(block).getByRole("list");
+  expect(within(list).getAllByRole("listitem").map(item => item.textContent)).toEqual([
+    "2 annotations stay on v2. After saving, use Handle text change… on this row to move them.",
+    "Task not moved, from tool proposals, and a proposal waits for a check: Ana Weber.",
+    "Task not moved, already opened: Eva Lang.",
+  ]);
+  const rule = within(block).getByText(PROPOSALS_RULE("v3"));
+  expect(rule.tagName).toBe("P");
+  expect(list.contains(rule)).toBe(false);
 });

@@ -211,3 +211,66 @@ test("Add finding: a typed passage and a searched term are saved with the search
   await expect(values).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Added findings" })).toContainText("Absent");
 });
+
+// Issue 548, U4-06: overlapping findings split the selected group into pieces ("Krampfanfälle", the space, "werden");
+// the frame is one outline per line of text around them, never a box per piece or around the space alone.
+const OVERLAP_TEXT = "Die Mutter berichtet über Müdigkeit am Vormittag. Im Verlauf: Krampfanfälle werden als positiver Befund vermerkt. "
+  + "Muskuläre Hypotonie ist nicht beschrieben.";
+const overlapAt = (words: string): [number, number] => {
+  const start = OVERLAP_TEXT.indexOf(words);
+  return [start, start + words.length];
+};
+
+for (const scheme of ["light", "dark"] as const) {
+  test(`the selected group is one frame per line over overlapping findings (${scheme})`, async ({ page }) => {
+    test.info().annotations.push({ type: "issue", description: "548 U4-06" });
+    await page.emulateMedia({ colorScheme: scheme });
+    const s = await consolidationScenario(page, true);
+    // The opened view gets an invented text whose findings overlap (nothing is saved).
+    await page.route(url => /\/api\/v1\/rounds\/[^/]+\/consolidation$/.test(new URL(url).pathname), async route => {
+      const response = await route.fetch();
+      const body = await response.json();
+      const [first, second] = body.people.map((person: { person_id: string }) => person.person_id);
+      const template = body.groups.find((group: { state: string }) => group.state === "open");
+      const group = (id: string, members: Array<[string, string, string, string]>) => ({
+        ...structuredClone(template), group_id: id, kinds: ["partial"], state: "open", annotation_ids: [], result: null,
+        start: overlapAt(members[0][3])[0],
+        members: members.map(([person, term, label, words], index) => ({ ...structuredClone(template.members[0]),
+          input_id: `${id}-${index}`, annotation_id: `input-${id}-${index}`, person_id: person, term_id: term, term_label: label,
+          spans: [overlapAt(words)], modifiers: [] })),
+      });
+      body.text = OVERLAP_TEXT;
+      body.groups = [
+        group("g-seizure", [[first, "HP:0001250", "Seizure", "Krampfanfälle"]]),
+        group("g-dialeptic", [[second, "HP:0011146", "Dialeptic seizure", "Krampfanfälle werden"]]),
+        group("g-werden", [[first, "HP:0000001", "Positive finding", "werden als positiver Befund"]]),
+        group("g-hypotonia", [[first, "HP:0001252", "Hypotonia", "Hypotonie"], [second, "HP:0001252", "Hypotonia", "Hypotonie ist"]]),
+      ];
+      await route.fulfill({ response, json: body });
+    });
+    const writes: string[] = [];
+    page.on("request", request => { if (request.method() !== "GET" && /\/consolidation-groups\/|\/submit$/.test(request.url())) writes.push(request.url()); });
+    await loginExisting(page, s.users.lead);
+    await page.goto(`/#/tasks/${s.assignment_id}`);
+    const text = page.locator(".cons-text-body");
+    await expect(text).toHaveText(OVERLAP_TEXT);
+
+    for (const [title, passage] of [["Krampfanfälle werden", "Krampfanfälle werden"], ["Hypotonie", "Hypotonie ist"]]) {
+      await page.getByRole("button", { name: new RegExp(`^Conflict ${title} `) }).click();
+      const frame = text.locator(".cons-selected");
+      await expect(frame).toHaveCount(1);
+      await expect(frame).toHaveText(passage);
+      // One box per line: as many outline boxes as lines, none of them a sliver around a space (about 4 px).
+      const { boxes, lines, left } = await frame.evaluate(node => {
+        const rects = [...node.getClientRects()];
+        return { boxes: rects.map(rect => ({ left: rect.left, width: rect.width })), lines: new Set(rects.map(rect => Math.round(rect.top))).size,
+          left: node.closest(".cons-text-scroll")!.getBoundingClientRect().left };
+      });
+      expect(boxes).toHaveLength(lines);
+      for (const box of boxes) expect(box.width).toBeGreaterThan(8);
+      // The outline (2 px, 1 px away) is not cut off at the text's left edge.
+      for (const box of boxes) expect(box.left - 3).toBeGreaterThanOrEqual(left);
+    }
+    expect(writes).toEqual([]);
+  });
+}

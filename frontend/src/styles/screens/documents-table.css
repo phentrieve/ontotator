@@ -169,6 +169,10 @@ button.documents-text-name { min-height: 24px; padding: 0; border: 0; background
 .documents-resolve { display: grid; gap: var(--space-2); }
 .documents-resolve p { margin: 0; }
 .documents-resolve-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+/* Resolve… dialog (issue 554): the proposed text on demand; "Other ways…" sits left of Cancel and the primary action. */
+.documents-resolve-proposal > summary { cursor: pointer; color: var(--accent); width: fit-content; }
+.documents-resolve-proposal > .translation-diff { height: auto; min-height: 0; max-height: min(30vh, 16rem); margin-top: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius); }
+.modal-actions > .documents-resolve-other { margin-inline-end: auto; }
 .documents-id { overflow-wrap: anywhere; }
 
 /* Page shell: filters, actions, paging, notices */
@@ -246,6 +250,8 @@ button.documents-text-name { min-height: 24px; padding: 0; border: 0; background
 .editorial-correction-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .editorial-correction-chips .ui-plan-chip + .ui-plan-chip { margin-inline-start: 0; }
 .editorial-correction-work { margin: 0; overflow-wrap: anywhere; }
+.editorial-correction-stays { margin: var(--space-1) 0 0; padding-inline-start: 1.25rem; display: grid; gap: var(--space-1); }
+.editorial-correction-rule { margin: var(--space-2) 0 0; }
 /* The lead decides a query (issue 483): the layout of "Fix typos…", with the reviewer's question on top. */
 .query-decision .documents-review-reason { margin-top: 0; }
 /* "Add to the reason…" (issue 547, U2-08): the quoted reason and the field below it are apart, not touching. */

@@ -5,7 +5,7 @@ import { api, ApiError, type TaskSummary } from "../src/api/client";
 import type { RouteLeaveGuard } from "../src/app/router";
 import { TranslationReviewScreen } from "../src/translation/TranslationReviewScreen";
 import { firstVersionWorkspace, reviewRecord, reviewWorkspace } from "./translationFixtures";
-import { decisionConsequences, decisionLabels, decisionOutcomes, issueMessages } from "../src/translation/labels";
+import { decisionConsequences, decisionLabels, decisionOutcomes, issueMessages, retiredQueryHistory, retiredQueryNote } from "../src/translation/labels";
 import { ShortcutHelpHost, openShortcutHelp } from "../src/ui/ShortcutHelp";
 import type { ReviewDecisionCode } from "../src/translation/reviewRules";
 
@@ -138,7 +138,7 @@ it("hides the guidelines notice once the review is submitted here and lists the 
   const row = within(summary).getByText("Guidelines", { selector: "dt" }).parentElement!;
   expect(row.querySelector("dd")?.textContent).toBe("v2");
 });
-it.each<ReviewDecisionCode>(["accepted_unchanged", "accepted_corrected", "query", "rejected"])("submits a deliberately selected %s through the real form and saver", async decision => {
+it.each<ReviewDecisionCode>(["accepted_unchanged", "accepted_corrected", "rejected"])("submits a deliberately selected %s through the real form and saver", async decision => {
   const { save, submit } = setup();
   const clinical = decision === "query" || decision === "rejected";
   const text = decision === "accepted_corrected" ? "Corrected text" : "Übersetzt.";
@@ -787,19 +787,19 @@ it("always lists Ctrl+Enter in help; it explains a blocked submit and otherwise 
 });
 it("summarises decision, categories and a rationale excerpt before submitting, then reports the outcome in words", async () => {
   const rationale = `The dose differs. ${"Long explanation ".repeat(20)}`;
-  const { submit } = setup(reviewWorkspace({ draft: { revision: 6, text: "Übersetzt.", form: { decision: "query", clinical_change: true, categories: ["value", "omission"], rationale } } }));
-  submit.mockResolvedValue(reviewRecord({ decision: "query", clinical_change: true, categories: ["omission", "value"], rationale, proposed_text: "Übersetzt.", created_variant_id: null, status_after: "reviewed" }));
+  const { submit } = setup(reviewWorkspace({ draft: { revision: 6, text: "Übersetzt.", form: { decision: "rejected", clinical_change: true, categories: ["value", "omission"], rationale } } }));
+  submit.mockResolvedValue(reviewRecord({ decision: "rejected", clinical_change: true, categories: ["omission", "value"], rationale, proposed_text: "Übersetzt.", created_variant_id: null, status_after: "reviewed" }));
   await screen.findByRole("textbox", { name: "Translation (de)" });
   fireEvent.click(submitButton());
   const dialog = within(screen.getByRole("dialog", { name: "Submit this review?" }));
-  expect(dialog.getByText("Query")).toBeDefined();
+  expect(dialog.getByText("Rejected")).toBeDefined();
   expect(dialog.getByText("Yes: Number or unit, Omission")).toBeDefined();
   const excerpt = dialog.getByText(/^The dose differs\./).textContent!;
   expect(excerpt.endsWith("…")).toBe(true); expect(Array.from(excerpt).length).toBeLessThanOrEqual(161);
-  expect(dialog.getByText(decisionConsequences.query)).toBeDefined();
+  expect(dialog.getByText(decisionConsequences.rejected)).toBeDefined();
   await act(async () => { fireEvent.click(dialog.getByRole("button", { name: "Submit review" })); });
   expect(submit).toHaveBeenCalledWith(17, 6);
-  expect(screen.getByText(decisionOutcomes.query)).toBeDefined();
+  expect(screen.getByText(decisionOutcomes.rejected)).toBeDefined();
   const summary = within(screen.getByRole("region", { name: "Submitted review" }));
   expect(summary.getByText("Reviewed, not accepted")).toBeDefined();
   expect(screen.queryByText("reviewed")).toBeNull();
@@ -840,7 +840,7 @@ it("explains a blocked submit right at the button with the rules' own issues", a
   setup();
   await screen.findByRole("textbox", { name: "Translation (de)" });
   expect(document.getElementById(submitButton().getAttribute("aria-describedby")!)?.textContent).toBe("Choose a decision to submit.");
-  fireEvent.click(screen.getByRole("radio", { name: "Query" }));
+  fireEvent.click(screen.getByRole("radio", { name: "Rejected" }));
   const issues = screen.getByRole("list", { name: "Review issues" });
   expect(within(issues).getAllByRole("listitem").map(item => item.textContent)).toEqual([issueMessages.CATEGORY_REQUIRED, issueMessages.RATIONALE_REQUIRED]);
   expect(issues.closest(".translation-decision-footer")?.contains(submitButton())).toBe(true);
@@ -911,10 +911,10 @@ it("names a replaced Accepted unchanged and drops the note once the reviewer pic
   expect(radio("Accepted unchanged").checked).toBe(true);
   expect(screen.getByText("Your edits are undone, so the decision is back to Accepted unchanged.")).toBeDefined();
   fireEvent.change(input, { target: { value: "Übersetzt?" } });
-  fireEvent.click(radio("Query"));
+  fireEvent.click(radio("Rejected"));
   expect(screen.queryByText(/because you edited the translation|Your edits are undone/)).toBeNull();
   fireEvent.change(input, { target: { value: "Übersetzt." } });
-  expect(radio("Query").checked).toBe(true);
+  expect(radio("Rejected").checked).toBe(true);
 });
 it("offers a way out when Accepted unchanged meets edited text", async () => {
   setup();
@@ -944,24 +944,25 @@ it("treats a stored decision as chosen by the user after reload", async () => {
   expect(screen.queryByText(/because you edited the translation|Your edits are undone/)).toBeNull();
   expect(within(footer).getByText("Accepted with corrections needs changed text.")).toBeDefined();
 });
-it("keys 1 to 4 choose decisions outside text fields and never inside the translation or rationale", async () => {
+it("keys 1 to 3 choose decisions outside text fields and never inside the translation or rationale", async () => {
   setup();
   const input = await screen.findByRole("textbox", { name: "Translation (de)" }) as HTMLTextAreaElement;
   fireEvent.keyDown(document.body, { key: "3" });
-  expect(radio("Query").checked).toBe(true);
-  expect(screen.getByText("Clinically relevant change: yes, always for a query.")).toBeDefined();
+  expect(radio("Rejected").checked).toBe(true);
+  expect(screen.getByText("Clinically relevant change: yes, always for a rejection.")).toBeDefined();
   input.focus(); fireEvent.keyDown(input, { key: "1" });
-  expect(radio("Query").checked).toBe(true);
+  expect(radio("Rejected").checked).toBe(true);
   expect(input.value).toBe("Übersetzt.");
   const rationale = screen.getByRole("textbox", { name: "Rationale" });
-  rationale.focus(); fireEvent.keyDown(rationale, { key: "4" });
-  expect(radio("Query").checked).toBe(true);
-  expect(document.activeElement).toBe(rationale);
-  fireEvent.keyDown(radio("Query"), { key: "4" });
+  rationale.focus(); fireEvent.keyDown(rationale, { key: "2" });
   expect(radio("Rejected").checked).toBe(true);
-  fireEvent.keyDown(document.body, { key: "1" });
+  expect(document.activeElement).toBe(rationale);
+  fireEvent.keyDown(radio("Rejected"), { key: "1" });
   expect(radio("Accepted unchanged").checked).toBe(true);
   fireEvent.keyDown(document.body, { key: "2" });
+  expect(radio("Accepted with corrections").checked).toBe(true);
+  // Issue 553: 4 chose Query; it chooses nothing now.
+  fireEvent.keyDown(document.body, { key: "4" });
   expect(radio("Accepted with corrections").checked).toBe(true);
 });
 it("ignores decision keys while a review is read-only", async () => {
@@ -978,19 +979,20 @@ it("ignores decision keys while a review is read-only", async () => {
   expect(screen.queryByRole("radio")).toBeNull();
   expect(within(screen.getByRole("region", { name: "Submitted review" })).getByText("Accepted with corrections")).toBeDefined();
 });
-it("lists the four decision keys under Translation review in ? help", async () => {
+it("lists the three decision keys under Translation review in ? help", async () => {
   setup();
   render(<ShortcutHelpHost />);
   await screen.findByRole("textbox", { name: "Translation (de)" });
   act(openShortcutHelp);
   const group = screen.getByRole("heading", { name: "Translation review" }).closest("section") as HTMLElement;
-  for (const description of ["Choose Accepted unchanged", "Choose Accepted with corrections", "Choose Query", "Choose Rejected"])
+  for (const description of ["Choose Accepted unchanged", "Choose Accepted with corrections", "Choose Rejected"])
     expect(within(group).getByText(description)).toBeDefined();
+  expect(within(group).queryByText("Choose Query")).toBeNull();
 });
-it("never shows CLINICAL_CHANGE_REQUIRED for query or rejected", async () => {
+it("never shows CLINICAL_CHANGE_REQUIRED for rejected", async () => {
   setup();
   await screen.findByRole("textbox", { name: "Translation (de)" });
-  fireEvent.click(radio("Query"));
+  fireEvent.click(radio("Rejected"));
   expect(screen.queryByText(issueMessages.CLINICAL_CHANGE_REQUIRED)).toBeNull();
   fireEvent.click(screen.getByRole("checkbox", { name: "Number or unit" }));
   fireEvent.change(screen.getByRole("textbox", { name: "Rationale" }), { target: { value: "Dose differs" } });
@@ -1008,10 +1010,28 @@ it("normalises a stored legacy query draft to an implied clinical change once on
   expect(save).toHaveBeenCalledTimes(1);
   expect(save).toHaveBeenCalledWith(17, { expected_revision: 6, text: "Übersetzt.", form: { decision: "query", clinical_change: true, categories: ["value"], rationale: "r" } });
 });
+it("offers three decisions and keeps a stored Query draft from being submitted (issue 553)", async () => {
+  setup(reviewWorkspace({ draft: { revision: 6, text: "Übersetzt.", form: { decision: "query", clinical_change: true, categories: ["value"], rationale: "r" } } }));
+  await screen.findByRole("textbox", { name: "Translation (de)" });
+  expect(screen.getAllByRole("radio").map(node => (node as HTMLInputElement).value)).toEqual(["accepted_unchanged", "accepted_corrected", "rejected"]);
+  expect(screen.queryByRole("radio", { name: "Query" })).toBeNull();
+  expect(screen.getByRole("note").textContent).toBe(retiredQueryNote);
+  expect(submitButton().getAttribute("aria-disabled")).toBe("true");
+  expect(document.getElementById(submitButton().getAttribute("aria-describedby")!)?.textContent).toBe("Query is no longer a decision. Choose another to submit.");
+  fireEvent.click(radio("Rejected"));
+  expect(screen.queryByRole("note")).toBeNull();
+});
+it("shows a submitted Query review read-only with its label (issue 553)", async () => {
+  setup(reviewWorkspace({ read_only: true, submitted_record: reviewRecord({ decision: "query", clinical_change: true, categories: ["value"], rationale: "Is it meant?" }) }));
+  await screen.findByRole("textbox", { name: "Translation (de)" });
+  const summary = within(screen.getByRole("region", { name: "Submitted review" }));
+  expect(summary.getByText(/^Query/).textContent).toBe(`Query (${retiredQueryHistory})`);
+  expect(screen.queryByRole("radio")).toBeNull();
+});
 it("shows the key hint line in the rail footer", async () => {
   setup();
   await screen.findByRole("textbox", { name: "Translation (de)" });
-  const hint = screen.getByText("Ctrl + Enter submits, 1–4 choose a decision outside the text");
+  const hint = screen.getByText("Ctrl + Enter submits, 1–3 choose a decision outside the text");
   expect(hint.closest(".translation-decision-footer")).not.toBeNull();
 });
 
@@ -1056,8 +1076,8 @@ it("shows the pinned bottom bar with the decision and the only Submit button bel
   expect(submits[0].getAttribute("aria-describedby")).toBe("review-submit-reason");
   expect(document.querySelectorAll("#review-submit-reason")).toHaveLength(1);
   expect(document.querySelector(".translation-decision-footer")).toBeNull();
-  fireEvent.click(screen.getByRole("radio", { name: "Query" }));
-  expect(bar.textContent).toContain("Decision: Query");
+  fireEvent.click(screen.getByRole("radio", { name: "Rejected" }));
+  expect(bar.textContent).toContain("Decision: Rejected");
   fireEvent.click(within(bar).getByRole("button", { name: "Change ↓" }));
   expect(document.activeElement).toBe(document.querySelector("[data-decision-legend]"));
   expect(screen.getAllByRole("button", { name: "Submit review…" })).toHaveLength(1);
@@ -1152,7 +1172,7 @@ it("scrolls the decision legend to the start for Change ↓", async () => {
 it("shows one reason line in the pinned bar and the full issue list in the decision form", async () => {
   setup(undefined, false, viewportOf(800).viewport);
   await screen.findByRole("textbox", { name: "Translation (de)" });
-  fireEvent.click(screen.getByRole("radio", { name: "Query" }));
+  fireEvent.click(screen.getByRole("radio", { name: "Rejected" }));
   const reason = document.getElementById(submitButton().getAttribute("aria-describedby")!)!;
   expect(reason.closest(".translation-pinned-bar")).not.toBeNull();
   expect(reason.textContent).toBe(`${issueMessages.CATEGORY_REQUIRED} and 1 more`);
@@ -1166,7 +1186,7 @@ const liveRegionsWith = (text: string) => [...document.querySelectorAll("[aria-l
 it("below 1100 px exactly one live region carries the submit reason", async () => {
   setup(undefined, false, viewportOf(800).viewport);
   await screen.findByRole("textbox", { name: "Translation (de)" });
-  fireEvent.click(screen.getByRole("radio", { name: "Query" }));
+  fireEvent.click(screen.getByRole("radio", { name: "Rejected" }));
   expect(screen.getAllByRole("list", { name: "Review issues" })).toHaveLength(1);
   const regions = liveRegionsWith(issueMessages.CATEGORY_REQUIRED);
   expect(regions).toHaveLength(1);
@@ -1175,7 +1195,7 @@ it("below 1100 px exactly one live region carries the submit reason", async () =
 it("at 1100 px and wider the reason is announced once in the rail", async () => {
   setup(undefined, false, viewportOf(1100).viewport);
   await screen.findByRole("textbox", { name: "Translation (de)" });
-  fireEvent.click(screen.getByRole("radio", { name: "Query" }));
+  fireEvent.click(screen.getByRole("radio", { name: "Rejected" }));
   const regions = liveRegionsWith(issueMessages.CATEGORY_REQUIRED);
   expect(regions).toHaveLength(1);
   expect(regions[0].id).toBe("review-submit-reason");
@@ -1349,7 +1369,7 @@ it("lead correction shows only Accepted with corrections, preselected, with the 
   expect(screen.getByRole("radio", { name: "Accepted with corrections" })).toBe(radios[0]);
   expect(screen.getByText("You are correcting this translation as project lead.")).toBeDefined();
   expect(screen.getByText(issueMessages.TEXT_UNCHANGED, { selector: "#review-submit-reason *" })).toBeDefined();
-  expect(screen.queryByText(/1–4 choose a decision/)).toBeNull();
+  expect(screen.queryByText(/1–3 choose a decision/)).toBeNull();
   vi.useFakeTimers();
   fireEvent.keyDown(document.body, { key: "3" });
   expect((screen.getByRole("radio", { name: "Accepted with corrections" }) as HTMLInputElement).checked).toBe(true);

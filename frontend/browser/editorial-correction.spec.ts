@@ -58,7 +58,9 @@ async function loginLead(page: Page, s: LeadScenario) {
 }
 
 const correctionDialog = (page: Page, caseId: string) => page.getByRole("dialog", { name: `Fix typos, ${caseId} de v1`, exact: true });
-const fixAction = (item: Locator, caseId: string, v = 1) => item.getByRole("button", { name: `Fix typos in v${v} of ${caseId} de…`, exact: true });
+/** Where only the typo fix is possible (a version that is not accepted), the button names it and its consequence. */
+const fixAction = (item: Locator, caseId: string, v = 1) => item.getByRole("button", { name: `Fix typos (no review) in v${v} of ${caseId} de…`, exact: true });
+const editAction = (item: Locator, caseId: string, v = 1) => item.getByRole("button", { name: `Edit the translation v${v} of ${caseId} de…`, exact: true });
 
 test("a comma added to an accepted translation becomes an accepted v2 on one page; a changed number is pointed out", async ({ page }) => {
   const errors = consoleErrors(page);
@@ -67,14 +69,18 @@ test("a comma added to an accepted translation becomes an accepted v2 on one pag
   await loginLead(page, s);
   const card = await openTextCard(page, caseId, "de");
   const [v1] = await (await textVersionItems(card, 1)).all();
-  // Next to the other version actions of the newest version, with a hint that tells it apart.
-  await expect(v1.getByRole("button", { name: `Correct v1 of ${caseId} de myself…`, exact: true })).toBeVisible();
-  await expect(v1.getByRole("button", { name: `Upload a corrected text for v1 of ${caseId} de…`, exact: true })).toBeVisible();
-  const open = fixAction(v1, caseId);
-  await expect(open).toHaveText("Fix typos…");
-  await expect(open).toHaveAttribute("title", "Spacing, typos, grammar. Keeps the status; no review.");
+  // Issue 555: an accepted version has one edit action; the choice of what changes comes first, with its consequence.
+  await expect(fixAction(v1, caseId)).toHaveCount(0);
+  await expect(v1.getByRole("button", { name: `Other ways to change v1 of ${caseId} de`, exact: true })).toBeVisible();
+  await expect(v1.locator(".text-version-hint")).toHaveCount(0);
   await evidence(page, "453-row-before");
-  await open.click();
+  await editAction(v1, caseId).click();
+  const choice = page.getByRole("dialog", { name: `Edit the translation, ${caseId} de v1`, exact: true });
+  await expect(choice.getByRole("radio", { name: "Only spelling, spacing or grammar", exact: true })).toHaveAccessibleDescription("The meaning stays. No review; submitted annotations move to v2.");
+  await expect(choice.getByRole("radio", { name: "The meaning changes", exact: true })).toHaveAccessibleDescription("v2 is reviewed again. Annotations stay on v1; you handle the text change after.");
+  await evidence(page, "555-edit-choice");
+  await choice.getByRole("radio", { name: "Only spelling, spacing or grammar", exact: true }).check();
+  await choice.getByRole("button", { name: "Continue", exact: true }).click();
 
   const dialog = correctionDialog(page, caseId);
   // The translation editor starts with the text of v1; there is no second step.
@@ -128,8 +134,8 @@ test("a comma added to an accepted translation becomes an accepted v2 on one pag
   await expect(newest.getByRole("button", { name: `Accept v2 of ${caseId} de…`, exact: true })).toHaveCount(0);
   const older = items.filter({ hasNotText: "Correction of v1" });
   await expect(older).toContainText("Accepted");
-  await expect(older.getByRole("button", { name: /^Fix typos/ })).toHaveCount(0);
-  await expect(fixAction(newest, caseId, 2)).toBeVisible();
+  await expect(older.getByRole("button", { name: /^(Fix typos|Edit the translation)/ })).toHaveCount(0);
+  await expect(editAction(newest, caseId, 2)).toBeVisible();
   await evidence(page, "453-row-after");
   await textCard(page, caseId, "de").getByRole("button", { name: "Close", exact: true }).click();
   expect(errors).toEqual([]);

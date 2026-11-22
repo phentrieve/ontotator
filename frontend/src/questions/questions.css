@@ -1,0 +1,17 @@
+/* Issue 553 (prototype): "Ask the lead" in a task and the lead's Questions page. */
+.task-questions { display: grid; gap: var(--space-2); margin-block: var(--space-3); }
+.task-questions-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.task-question-list, .lead-question-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.task-question, .lead-question { border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-2) var(--space-3); background: var(--surface-raised); }
+.task-question--open, .lead-question--open { border-inline-start: 3px solid var(--warning); }
+.task-question p, .lead-question p { margin: 0 0 var(--space-1); overflow-wrap: anywhere; }
+.task-question-status, .lead-question-meta { color: var(--text-muted); }
+.task-question-text, .lead-question-text { white-space: pre-wrap; }
+.task-question-term { font-weight: 600; }
+.task-question-answer { border-top: 1px solid var(--border); padding-top: var(--space-1); margin-top: var(--space-1); }
+.ask-lead-form { display: grid; gap: var(--space-3); }
+.ask-lead-consequence { margin: 0; color: var(--text-muted); }
+.lead-question-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+/* A quoted passage with its proposed wording: as tall as its text, not a reading pane. */
+.question-passage .translation-diff { height: auto; min-height: 0; max-height: 8rem; padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius); }
+.questions-page { display: grid; gap: var(--space-3); max-width: 60rem; }
