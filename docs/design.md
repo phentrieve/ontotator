@@ -194,7 +194,8 @@ every new screen; existing screens follow them as they are changed.
    keyboard, Escape closes it, and its name is *Help: <topic>* (*Help: What
    did you fix?*). A hint that fits in a field goes into its placeholder
    instead. A greyed action uses `ReasonButton`: its reason is its accessible
-   description and shows on pointing, focus and press.
+   description and its `title`, and shows next to it on pointing, focus and
+   press.
 
 ### Before and after
 

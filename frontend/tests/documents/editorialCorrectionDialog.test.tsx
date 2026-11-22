@@ -345,13 +345,16 @@ it("opens with focus on Save; a greyed Save names its reason as description and 
   expect(document.activeElement).toBe(save);
   expect(save.getAttribute("aria-disabled")).toBe("true");
   expect(describedBy(save)).toBe("Change the text first.");
+  expect(save.getAttribute("title")).toBe("Change the text first.");
   // Before any press: the reason shows as the button's tooltip (focused here), not as a hint under the controls.
   const tip = () => within(dialog).getByText(describedBy(save)).closest(".ui-reason-tip");
   expect(tip()?.getAttribute("data-shown")).toBe("true");
   await type(editor, NEW);
   expect(describedBy(save)).toBe("Choose what you fixed first.");
+  expect(save.getAttribute("title")).toBe("Choose what you fixed first.");
   fireEvent.click(within(dialog).getByRole("button", { name: "Spacing" }));
   expect(save.getAttribute("aria-disabled")).toBeNull();
+  expect(save.getAttribute("title")).toBeNull();
   expect(save.getAttribute("aria-describedby")).toBeNull();
 });
 

@@ -40,6 +40,8 @@ it("a greyed button says its reason: as its description, and visibly when focuse
   expect(button.getAttribute("aria-disabled")).toBe("true");
   const tip = document.getElementById(button.getAttribute("aria-describedby")!)!;
   expect(tip.textContent).toBe("Choose what you fixed first.");
+  // The tooltip a greyed control has everywhere (issue 591).
+  expect(button.getAttribute("title")).toBe("Choose what you fixed first.");
   expect(tip.dataset.shown).toBeUndefined();
   fireEvent.focus(button);
   expect(tip.dataset.shown).toBe("true");
@@ -52,4 +54,5 @@ it("a greyed button says its reason: as its description, and visibly when focuse
   rerender(<ReasonButton reason={null} onClick={onClick}>Save</ReasonButton>);
   expect(button.getAttribute("aria-disabled")).toBeNull();
   expect(button.getAttribute("aria-describedby")).toBeNull();
+  expect(button.getAttribute("title")).toBeNull();
 });

@@ -58,8 +58,9 @@ export interface ReasonButtonProps extends ButtonProps {
 }
 
 /**
- * A button that can be greyed with a reason (rule 4). The reason is its accessible description; it shows next to
- * the button while the button is pointed at or focused, and after a press, so a touch or keyboard user sees it too.
+ * A button that can be greyed with a reason (rule 4). The reason is its accessible description and its `title`
+ * (the tooltip a greyed control has everywhere, as in `InlineConfirm`); it also shows next to the button while the
+ * button is pointed at or focused, and after a press, so a touch or keyboard user sees it too.
  * A press still calls `onClick`, so the dialog can show what is missing in place.
  */
 export const ReasonButton = forwardRef<HTMLButtonElement, ReasonButtonProps>(function ReasonButton(
@@ -73,6 +74,7 @@ export const ReasonButton = forwardRef<HTMLButtonElement, ReasonButtonProps>(fun
   const describedBy = [props["aria-describedby"], reason ? `${id}-reason` : null].filter(Boolean).join(" ") || undefined;
   return <span className="ui-reason-anchor">
     <Button {...props} ref={ref} aria-disabled={reason ? true : props["aria-disabled"]} aria-describedby={describedBy}
+      title={reason ?? props.title}
       onFocus={event => { setFocused(true); onFocus?.(event); }} onBlur={event => { setFocused(false); setPressed(false); onBlur?.(event); }}
       onClick={event => { if (reason) setPressed(true); onClick?.(event); }} />
     {reason && <span id={`${id}-reason`} className="ui-reason-tip" data-shown={focused || pressed ? "true" : undefined}>{reason}</span>}

@@ -160,6 +160,7 @@ for (const scheme of ["light", "dark"] as const) {
     await expect(save).toBeFocused();
     await expect(save).toHaveAttribute("aria-disabled", "true");
     await expect(save).toHaveAccessibleDescription("Change the text first.");
+    await expect(save).toHaveAttribute("title", "Change the text first.");
     // Before any press, the reason shows as a tooltip on focus and on hover.
     const tip = fix.locator(".ui-reason-tip", { hasText: "Change the text first." });
     await expect(tip).toBeVisible();
