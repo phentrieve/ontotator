@@ -936,6 +936,39 @@ ul.task-counts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space
   .segment[aria-current="page"] { border-bottom-color: Highlight; color: Highlight; }
 }
 
+/* Help on demand (ui/Help.tsx, issue 556): a visible (?) next to a field or action; the explanation opens in place. */
+.ui-help-button {
+  position: relative; display: inline-flex; flex: none; align-items: center; justify-content: center; vertical-align: middle;
+  width: 20px; height: 20px; margin-inline-start: var(--space-1); padding: 0;
+  border: 1px solid var(--border-strong); border-radius: 50%; background: var(--surface-raised); color: var(--text-muted);
+  font: var(--weight-strong) var(--size-xs) / 1 var(--font-sans); cursor: pointer;
+}
+/* The hit area is larger than the circle: 36 px, 44 px on a touch screen. */
+.ui-help-button::after { content: ""; position: absolute; inset: -8px; }
+@media (pointer: coarse) { .ui-help-button::after { inset: -12px; } }
+.ui-help-button:hover { border-color: var(--accent); color: var(--accent); }
+.ui-help-button[aria-expanded="true"] { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+.ui-help-button:focus-visible { outline: var(--focus-width) solid var(--focus-ring); outline-offset: var(--focus-offset); }
+.ui-help-text {
+  margin: 0; padding: var(--space-2) var(--space-3); border-inline-start: 3px solid var(--accent); border-radius: var(--radius-sm);
+  background: var(--accent-light); color: var(--text); font-size: var(--size-sm); line-height: var(--leading-sm); overflow-wrap: anywhere;
+}
+.ui-help-text[hidden] { display: none; }
+.ui-help-text > p { margin: 0; max-width: none; }
+.ui-help-text > p + p { margin-top: var(--space-1); }
+/* A greyed action's reason (rule 4): shown above the button while it is pointed at, focused or pressed. */
+.ui-reason-anchor { position: relative; display: inline-flex; max-width: 100%; }
+.ui-reason-tip {
+  position: absolute; z-index: 5; inset-inline-end: 0; bottom: calc(100% + var(--space-2)); width: max-content; max-width: min(22rem, 80vw);
+  padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); background: var(--text); color: var(--surface-raised);
+  font-size: var(--size-sm); line-height: var(--leading-sm); pointer-events: none; visibility: hidden;
+}
+.ui-reason-anchor:hover > .ui-reason-tip,
+.ui-reason-tip[data-shown] { visibility: visible; }
+@media (forced-colors: active) {
+  .ui-reason-tip, .ui-help-text { border: 1px solid CanvasText; }
+}
+
 /* Lead workflow primitives: plan chip, tri-state cell, undo toast, group selection checkbox. */
 .ui-plan-chip,
 .ui-tristate {

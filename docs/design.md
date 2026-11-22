@@ -186,6 +186,16 @@ every new screen; existing screens follow them as they are changed.
    dialog opens and back to the opener when it closes. Other ways… is a menu
    button (arrow keys, Escape). The descriptions of menu items and choices are
    their accessible descriptions.
+7. **Help on demand is a visible (?).** An explanation that is needed only
+   sometimes (a rule, what a choice means, why something moves or stays) sits
+   behind a (?) button next to the field or heading it explains
+   (`HelpButton` and `HelpText` in `ui/Help.tsx`), never in a tooltip only. The
+   (?) is a disclosure: it toggles a short text in place, works by touch and
+   keyboard, Escape closes it, and its name is *Help: <topic>* (*Help: What
+   did you fix?*). A hint that fits in a field goes into its placeholder
+   instead. A greyed action uses `ReasonButton`: its reason is its accessible
+   description and its `title`, and shows next to it on pointing, focus and
+   press.
 
 ### Before and after
 

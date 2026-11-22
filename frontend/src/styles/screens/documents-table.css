@@ -249,9 +249,16 @@ button.documents-text-name { min-height: 24px; padding: 0; border: 0; background
 .editorial-correction-reason { display: grid; gap: var(--space-2); min-width: 0; }
 .editorial-correction-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .editorial-correction-chips .ui-plan-chip + .ui-plan-chip { margin-inline-start: 0; }
-.editorial-correction-work { margin: 0; overflow-wrap: anywhere; }
-.editorial-correction-stays { margin: var(--space-1) 0 0; padding-inline-start: 1.25rem; display: grid; gap: var(--space-1); }
-.editorial-correction-rule { margin: var(--space-2) 0 0; }
+.editorial-correction-reason > legend { display: flex; align-items: center; }
+/* "After saving" (issue 556): a compact block, one line per person; ✓ moves, ⚠ stays. */
+.editorial-correction-after { display: grid; gap: var(--space-2); min-width: 0; padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-raised); }
+.editorial-correction-after-head { display: flex; align-items: center; }
+.editorial-correction-after-head > h3 { margin: 0; font-size: var(--size-md); line-height: var(--leading-md); font-weight: var(--weight-strong); }
+.editorial-correction-lines { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; font-size: var(--size-md); line-height: var(--leading-md); }
+.editorial-correction-lines > li { display: grid; grid-template-columns: 1.25em minmax(0, 1fr); gap: var(--space-1); overflow-wrap: anywhere; }
+.editorial-correction-mark { font-weight: var(--weight-strong); }
+.editorial-correction-lines > li[data-kind="moves"] > .editorial-correction-mark { color: var(--success); }
+.editorial-correction-lines > li[data-kind="stays"] > .editorial-correction-mark { color: var(--warning); }
 /* The lead decides a query (issue 483): the layout of "Fix typos…", with the reviewer's question on top. */
 .query-decision .documents-review-reason { margin-top: 0; }
 /* "Add to the reason…" (issue 547, U2-08): the quoted reason and the field below it are apart, not touching. */
