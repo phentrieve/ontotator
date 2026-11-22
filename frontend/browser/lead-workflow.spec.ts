@@ -425,7 +425,12 @@ test("ACCEPTANCE: annotate without review", async ({ page }) => {
   const block = dialog.getByRole("group", { name: "Acceptance, fr" });
   await expect(block.getByText("fr: 12 of 30 translations are not marked as reviewed in the package. Annotation needs an accepted translation.", { exact: true })).toBeVisible();
   await expect(block.getByText("18 already marked as reviewed in the package metadata need nothing.", { exact: true })).toBeVisible();
-  await expect(block.getByText("The acceptance is recorded with your name, the reason and the time.", { exact: true })).toBeVisible();
+  // Issue 556: how the acceptance is recorded is behind the (?) of the reason.
+  await expect(block).not.toContainText("The acceptance is recorded");
+  const reasonHelp = dialog.getByRole("button", { name: "Help: Reason", exact: true });
+  await reasonHelp.click();
+  await expect(dialog.getByText(/the acceptance is recorded with your name, the reason and the time/)).toBeVisible();
+  await reasonHelp.click();
   const save = dialog.getByRole("button", { name: "Save for 30 cases", exact: true });
   await expect(save).toHaveAttribute("aria-disabled", "true");
 

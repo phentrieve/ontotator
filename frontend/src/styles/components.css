@@ -954,6 +954,10 @@ ul.task-counts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space
   background: var(--accent-light); color: var(--text); font-size: var(--size-sm); line-height: var(--leading-sm); overflow-wrap: anywhere;
 }
 .ui-help-text[hidden] { display: none; }
+/* A field label with its (?): the label keeps its own spacing, the (?) sits right after it. */
+.form-label-row { display: flex; align-items: center; margin-bottom: 4px; }
+.form-label-row > .form-label { margin-bottom: 0; }
+.form-group > .ui-help-text { margin-bottom: var(--space-1); }
 .ui-help-text > p { margin: 0; max-width: none; }
 .ui-help-text > p + p { margin-top: var(--space-1); }
 /* A greyed action's reason (rule 4): shown above the button while it is pointed at, focused or pressed. */

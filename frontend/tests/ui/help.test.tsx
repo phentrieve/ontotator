@@ -1,7 +1,7 @@
 /** Issue 556: the (?) help button and the greyed button that says its reason (ui/Help.tsx). */
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { HelpButton, HelpText, ReasonButton, useHelp } from "../../src/ui";
+import { HelpButton, HelpText, ReasonButton, Textarea, useHelp } from "../../src/ui";
 
 afterEach(cleanup);
 
@@ -31,6 +31,14 @@ it("the (?) is a disclosure: named by its topic, toggled by click, closed by Esc
   // A closed explanation lets Escape through.
   fireEvent.keyDown(button, { key: "Escape" });
   expect(outer).toHaveBeenCalledTimes(1);
+});
+
+it("a field's help is a (?) after its label, outside the label, so the field keeps its name", () => {
+  render(<Textarea id="reason" label="Reason" help={{ topic: "Reason", content: <p>Kept with the change.</p> }} />);
+  expect(screen.getByRole("textbox", { name: "Reason" })).toBeTruthy();
+  const button = screen.getByRole("button", { name: "Help: Reason" });
+  fireEvent.click(button);
+  expect(document.getElementById(button.getAttribute("aria-controls")!)!.textContent).toBe("Kept with the change.");
 });
 
 it("a greyed button says its reason: as its description, and visibly when focused or pressed", () => {
