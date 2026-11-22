@@ -37657,6 +37657,11 @@
             ],
             "title": "Status"
           },
+          "opened": {
+            "type": "boolean",
+            "title": "Opened",
+            "default": false
+          },
           "held": {
             "type": "boolean",
             "title": "Held"
