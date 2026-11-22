@@ -1,6 +1,6 @@
 import { forwardRef, useMemo, type ReactNode } from "react";
 import { paragraphStarts } from "../variants/paragraphs";
-import { invisibleNodes } from "./invisibles";
+import { generatedText, invisibleNodes } from "./invisibles";
 import { diffText, type TextDiffPart } from "./textDiff";
 import "./translation.css";
 
@@ -9,6 +9,8 @@ import "./translation.css";
  * Markers address the proposed text: deleted words never advance its coordinates.
  * Without deletions the rendered characters equal `after` exactly.
  * With `invisibles`, spaces, tabs, line ends and other invisible characters get a visible mark (issue 454).
+ * Deleted words are generated content: they look and read as before, but the browser's find matches the
+ * proposed text only, and copying the view gives the proposed text (issue 533).
  */
 export function paragraphNodes(after: string, parts: readonly TextDiffPart[], { deletions = true, invisibles = false } = {}): ReactNode[] {
   const starts = paragraphStarts(after), nodes: ReactNode[] = [];
@@ -17,7 +19,8 @@ export function paragraphNodes(after: string, parts: readonly TextDiffPart[], { 
   for (const part of parts) {
     const chunk = (text: string) => {
       if (!text) return;
-      const id = `t${key++}`, content = invisibles ? invisibleNodes(text, id) : text;
+      const id = `t${key++}`, deleted = part.op === "delete";
+      const content = invisibles ? invisibleNodes(text, id, { generated: deleted }) : deleted ? generatedText(text) : text;
       nodes.push(part.op === "delete" ? <del key={id} data-diff-op={part.op}>{content}</del> : part.op === "insert" ? <ins key={id} data-diff-op={part.op}>{content}</ins> : <span key={id} data-diff-op={part.op}>{content}</span>);
     };
     if (part.op === "delete") { if (deletions) chunk(part.text); continue; }

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { api, ApiError, type SourceObligationView } from '../src/api/client';
 import { TranslationReviewScreen } from '../src/translation/TranslationReviewScreen';
 import { reviewRecord, reviewWorkspace } from './translationFixtures';
+import { shownText } from './support/shownText';
 
 const cause: SourceObligationView = { cause_id: 'exact-cause', cause_revision: 1, code: 'SOURCE_UPDATE_UNREVIEWED', case_id: 'case', language: 'de', document_id: 'target',
   old_source_document_id: 'original-v1', new_source_document_id: 'original-v2', translation_text_sha256: 'sha', old_source_text_sha256: 'old-hash', new_source_text_sha256: 'new-hash',
@@ -33,9 +34,10 @@ it('shows old and updated sources before deliberately saving/submitting the exac
   expect(within(dialog).getByText(cause.old_source_text)).toBeTruthy();
   // The updated source marks the differences with the review's word diff.
   const updated = within(dialog).getByRole('region', { name: 'Updated source' });
-  expect([...updated.querySelectorAll('del')].map(node => node.textContent).join('|')).toBe('Original|no ');
+  expect([...updated.querySelectorAll('del')].map(shownText).join('|')).toBe('Original|no ');
   expect([...updated.querySelectorAll('ins')].map(node => node.textContent).join('|')).toBe('Updated');
-  expect(updated.textContent!.replace('Original', '').replace('no ', '')).toBe(cause.new_source_text);
+  // Deleted words are generated content: the text itself, which find and copy see, is the updated source (issue 533).
+  expect(updated.textContent).toBe(cause.new_source_text);
   expect(within(dialog).getByText('In the updated source, added text is underlined and removed text is struck through.')).toBeTruthy();
   expect(within(dialog).getByText('Übersetzt.')).toBeTruthy();
   fireEvent.click(within(dialog).getByRole('button', { name: 'Submit review and resolve source update' }));

@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { api, type ReviewWorkspace } from "../src/api/client";
 import { TranslationReviewScreen } from "../src/translation/TranslationReviewScreen";
 import { reviewWorkspace } from "./translationFixtures";
+import { shownText } from "./support/shownText";
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); window.localStorage.clear(); });
 
@@ -53,7 +54,7 @@ it("compares with the previous version by default and marks what changed since i
   fireEvent.click(screen.getByRole("menuitem", { name: "The previous version (v1)" }));
   const pane = await screen.findByRole("region", { name: "Comparison" });
   expect(pane.closest(".translation-column")!.querySelector(".translation-column-subtitle")!.textContent).toBe("Changes from v1 to v2");
-  expect([...pane.querySelectorAll("del")].map(node => node.textContent)).toEqual(["mg"]);
+  expect([...pane.querySelectorAll("del")].map(shownText)).toEqual(["mg"]);
   expect([...pane.querySelectorAll("ins")].map(node => node.textContent)).toEqual(["Milligramm"]);
   // "Show changes" keeps showing the reviewer's own edits against the given version.
   fireEvent.click(screen.getByRole("checkbox", { name: "Show changes" }));

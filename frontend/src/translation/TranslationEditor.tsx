@@ -21,11 +21,15 @@ export interface TranslationEditorProps {
   onCompositionEnd?: (event: CompositionEvent<HTMLTextAreaElement>) => void;
 }
 
+/** React 18 has no typed `inert` prop; an empty string renders the boolean attribute. */
+const INERT = { inert: "" } as Record<string, string>;
+
 /**
  * The single editable translation surface. The textarea grows with its text inside
  * one scrollport; a hidden mirror behind it lays out the same characters, marks text
  * that differs from the machine translation and carries the paragraph markers that
- * coupled scrolling reads. The mirror never shows text of its own.
+ * coupled scrolling reads. The mirror never shows text of its own. It is `inert`, so the
+ * browser's find (Ctrl/Cmd+F) skips it and counts each passage once, in the textarea (issue 533).
  */
 export const TranslationEditor = forwardRef<HTMLDivElement, TranslationEditorProps>(function TranslationEditor(
   { id, labelledBy, describedBy, machineText, value, lang, readOnly = false, disabled = false, showInvisibles = false, onChange, onBlur, onCompositionStart, onCompositionEnd }, ref,
@@ -33,7 +37,7 @@ export const TranslationEditor = forwardRef<HTMLDivElement, TranslationEditorPro
   const mirror = useMemo(() => paragraphNodes(value, diffText(machineText, value), { deletions: false, invisibles: showInvisibles }), [machineText, value, showInvisibles]);
   return <div ref={ref} className={`translation-editor${showInvisibles ? " show-invisibles" : ""}`}>
     <div className="translation-editor-sizer">
-      <div className="translation-editor-mirror" aria-hidden="true">{mirror}{"​"}</div>
+      <div className="translation-editor-mirror" aria-hidden="true" {...INERT}>{mirror}{"​"}</div>
       <textarea id={id} className="translation-editor-input" aria-labelledby={labelledBy} aria-describedby={describedBy}
         value={value} lang={lang} readOnly={readOnly} disabled={disabled} onChange={onChange}
         onBlur={onBlur} onCompositionStart={onCompositionStart} onCompositionEnd={onCompositionEnd} />
