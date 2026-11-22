@@ -63,6 +63,8 @@ describe("Show invisible characters", () => {
     const source = screen.getByRole("region", { name: "Source (en)" });
     const editor = screen.getByRole("textbox", { name: "Translation (de)" }) as HTMLTextAreaElement;
     const mirror = document.querySelector(".translation-editor-mirror")!;
+    // The mirror is inert, so the browser's find counts each passage once, in the textarea (issue 533).
+    expect(mirror.hasAttribute("inert")).toBe(true);
     expect(document.querySelectorAll(".invisible-char")).toHaveLength(0);
     const sourceBefore = source.textContent, mirrorBefore = mirror.textContent;
     // Issue 472: the key of the marks is on the screen while they are shown, and only then.

@@ -3447,9 +3447,13 @@ details.case-version-controls > .btn { vertical-align: bottom; }
     background: transparent;
     gap: var(--space-3);
   }
-  .case-toolbar--merged .case-title { font-size: var(--size-reading); line-height: var(--leading-base); }
-  /* The mode gives way before the case name. */
-  .case-toolbar--merged .case-mode { min-width: 0; overflow: hidden; text-overflow: ellipsis; flex-shrink: 6; }
+  /* The bar shares its line with the header's controls (the bell among them, issue 557). The mode says what the task
+     asks ("Check after text change"), so it keeps its words: the case name gives way first (its far larger shrink
+     factor), to an ellipsis (full name in its title) but not below its opening characters; only then does the mode
+     shorten. A one-case stepper ("1 of 1") has nowhere to go and leaves the bar, as on a phone. */
+  .case-toolbar--merged .case-title { font-size: var(--size-reading); line-height: var(--leading-base); flex-shrink: 1000; min-width: 7em; }
+  .case-toolbar--merged .case-mode { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .case-toolbar--merged .app-title--single-case .case-navigation { display: none; }
 }
 /* A low window (below 800 px): the bar is tighter still, so the tree and the text keep every pixel the bar can spare. */
 @media (min-width: 1025px) and (max-height: 799px) {

@@ -107,7 +107,8 @@ for (const [name, viewport] of sizes) {
     const comparison = page.getByRole("region", { name: "Comparison", exact: true });
     await expect(page.locator(".translation-column-subtitle")).toHaveText("Changes from v1 to v2");
     await expect(comparison.locator("ins").first()).toHaveText("Milligramm");
-    await expect(comparison.locator("del").first()).toHaveText("mg");
+    // Deleted words are drawn from data-text (browser find skips them, #533), so read what the view shows.
+    await expect.poll(() => comparison.locator("del").first().evaluate(el => [...el.querySelectorAll("[data-text]")].map(span => span.getAttribute("data-text")).join(""))).toBe("mg");
     await comparison.scrollIntoViewIfNeeded();
     await shot(page, `f1-compare-${name}`);
     await page.getByRole("button", { name: "Close comparison", exact: true }).click();

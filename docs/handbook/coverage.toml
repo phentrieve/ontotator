@@ -324,6 +324,11 @@ chapter = "admin.md"
 glob = "frontend/src/admin/UsersPage.tsx"
 chapter = "admin.md"
 
+# Notifications (issue 557): the header bell.
+[[map]]
+glob = "frontend/src/notifications/**"
+chapter = "getting-started.md"
+
 # Technical reports (#259): the report dialog for everyone, the admin page.
 [[map]]
 glob = "frontend/src/reports/TechnicalReportDialog.tsx"

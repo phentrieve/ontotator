@@ -62,6 +62,7 @@ it("passes the actual session user to Export and keeps authorized downloads bina
   vi.spyOn(api, "documentsSummary").mockResolvedValue({ needs_decision: 0 });
   // The lead's open questions count (issue 553) has its own endpoint too.
   vi.spyOn(api, "listQuestions").mockResolvedValue([]);
+  vi.spyOn(api, "notificationSummary").mockResolvedValue({ unread: 0 });
   const save = vi.spyOn(downloads, "saveDownload").mockImplementation(() => {});
   const blob = new Blob([new Uint8Array([0, 255, 7])], { type: "application/zip" });
   const json = vi.fn();
