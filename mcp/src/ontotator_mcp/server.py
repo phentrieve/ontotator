@@ -109,7 +109,7 @@ def build_server(
         lifespan=lifespan,
     )
     register_setup(server, api)
-    register_people(server, api)
+    register_people(server, api, read_content=settings.read_content)
     register_lead(server, api, read_content=settings.read_content)
     register_translation_decisions(server, api, read_content=settings.read_content)
     register_status(server, api)

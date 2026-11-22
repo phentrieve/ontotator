@@ -75,6 +75,8 @@ test("keyboard-only: tabs, filter popover, row checkbox range, text card accept,
   await tabTo(page, page.getByRole("button", { name: "Clear all", exact: true }));
   await page.keyboard.press("Enter");
   await expect(filterButton(page)).toHaveAccessibleName("Filter");
+  // Clearing the filter loads the rows again; tab to a row checkbox only once that page is in (focus would go with the old row).
+  await expect(documentsTable(page)).not.toHaveAttribute("aria-busy", "true");
 
   const de = page.getByRole("checkbox", { name: namePattern("Select ", "case-104", "de") });
   const fr = page.getByRole("checkbox", { name: namePattern("Select ", "case-104", "fr") });

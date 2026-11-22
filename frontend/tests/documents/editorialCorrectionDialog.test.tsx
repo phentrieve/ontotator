@@ -143,7 +143,7 @@ it("keeps the status of a rejected version", async () => {
   expect(within(dialog).getByText("v3 keeps the status of v2: Rejected in review. No translation review is started.")).toBeTruthy();
   // Issue 547, U2-06: the review is not "nobody worked on it"; it stays with the version it reviewed, and v3 needs its own.
   expect(within(dialog).getByText("Nobody has annotated v2 yet.")).toBeTruthy();
-  expect(within(dialog).getByText("A submitted translation review stays with the version it reviewed. To have v3 reviewed, use Resolve… › Assign a new review… on this row after saving.")).toBeTruthy();
+  expect(within(dialog).getByText("A submitted translation review stays with the version it reviewed. To have v3 reviewed, use Resolve… › Other ways… › Assign a new review… on this row after saving.")).toBeTruthy();
   fireEvent.change(editor, { target: { value: NEW } });
   fireEvent.click(within(dialog).getByRole("button", { name: "Grammar" }));
   fireEvent.click(within(dialog).getByRole("button", { name: "Save as v3" }));
@@ -153,7 +153,7 @@ it("keeps the status of a rejected version", async () => {
 it("names a submitted review by what happens to it (issue 547, U2-06)", () => {
   expect(reviewNote(null, 3)).toBeNull();
   expect(reviewNote("accepted", 3)).toBe("A submitted translation review stays with the version it reviewed.");
-  expect(reviewNote("query", 3)).toBe("A submitted translation review stays with the version it reviewed. To have v3 reviewed, use Resolve… › Assign a new review… on this row after saving.");
+  expect(reviewNote("query", 3)).toBe("A submitted translation review stays with the version it reviewed. To have v3 reviewed, use Resolve… › Other ways… › Assign a new review… on this row after saving.");
 });
 
 it("says in words why a version cannot be corrected, without the editor", async () => {

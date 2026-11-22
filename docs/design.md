@@ -155,6 +155,66 @@ Transitive parent/child relations trigger a hint, never automatic removal or
 replacement. Obsolete terms can be shown but not chosen for a new annotation;
 imported problems stay visible.
 
+## Panels and actions
+
+A panel, dialog or row offers what the person can do next. It does not explain
+itself under its buttons. Text under a control is read after the decision, is
+often skipped, and makes every panel look like a manual. These rules apply to
+every new screen; existing screens follow them as they are changed.
+
+1. **Few, ranked actions.** Each panel has one primary action: the usual way.
+   A decision between two equal ways (for example the two ways to decide a
+   query) may show both. Every other way sits under **Other ways…** (a menu
+   button), each item with one line on when to use it. A single other way may
+   stay a plain secondary button. Cancel and Close are not counted.
+2. **Labels say the consequence.** The label names what follows, not the size
+   or kind of the edit: *Fix typos (no review)…*, *Correct it myself (counts as
+   accepted)…*, *Accept v1 as it is…*. The dialog an action opens repeats the
+   label in its title.
+3. **Explanations come before the choice, or on demand.** Say what is decided
+   first: who asked, what they said, what they propose. Keep it to a line above
+   the actions, a disclosure (*Show the proposed text*), the description of a
+   menu item or of a radio choice. Never a paragraph under the buttons.
+4. **Greyed controls.** Hide what is not possible in this state. Keep a control
+   greyed only when the person would otherwise look for it; then it stays
+   focusable (`aria-disabled`), and the reason is its accessible description
+   and tooltip. A press on it may show the reason in place. A validation
+   message after a press (*Choose what changes.*) is not a hint and stays.
+5. **Bigger decisions open a dialog.** A decision that needs the text, a reason
+   or more than two ways opens a dialog. It does not expand a table row.
+6. **Keyboard and screen reader.** Focus goes to the primary action when a
+   dialog opens and back to the opener when it closes. Other ways… is a menu
+   button (arrow keys, Escape). The descriptions of menu items and choices are
+   their accessible descriptions.
+
+### Before and after
+
+**Resolve… on a rejected or queried translation** (Documents row).
+
+- Before: a panel expanded under the row, with six equal buttons and Cancel:
+  *Accept the reviewer’s text…*, *Answer and accept the version as it is…*,
+  *Reopen Ana Weber's review…*, *Assign a new review…*, *Correct the
+  translation…*, *Discard the de translation…*. The reviewer's proposed text
+  was not visible.
+- After: a dialog. First the reviewer's reason, and for a query *Show the
+  proposed text (1 passage changed)*. Then **Accept the reviewer’s text as
+  v2…** (primary) and **Accept v1 as it is…**, or for a rejected version only
+  **Correct it myself (counts as accepted)…**. Reopen, Assign a new review and
+  Discard sit under **Other ways…**. A query without a proposed change does not
+  offer *Accept the reviewer’s text* at all.
+
+**Changing the text of an accepted version** (text card, Translation).
+
+- Before: *Correct it myself…* and *Fix typos…* side by side, and a hint line
+  under the buttons: *Correct it myself: you edit it here; it is reviewed
+  again. Fix typos: spacing, typos, grammar; the status stays, no review.*
+- After: one button, **Edit the translation…**. Its dialog asks *What
+  changes?*: *Only spelling, spacing or grammar* (the meaning stays; no
+  review, submitted annotations move to v2) or *The meaning changes* (v2 is
+  reviewed again; annotations stay on v1). Where only the typo fix is possible,
+  the button reads **Fix typos (no review)…**. *Ask a reviewer to correct…*
+  and *Upload a corrected text…* sit under **Other ways…**. No hint line.
+
 ## Acceptance criteria
 
 1. A synthetic package with human and machine proposals is imported, reviewed,

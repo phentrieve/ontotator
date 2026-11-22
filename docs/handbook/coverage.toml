@@ -122,6 +122,23 @@ chapter = "annotator.md"
 glob = "frontend/src/problems/ReportTimeline.tsx"
 chapter = "annotator.md"
 
+# Ask the lead (issue 553): the asker's dialog and list, the lead's Questions page.
+[[map]]
+glob = "frontend/src/questions/AskLeadDialog.tsx"
+chapter = "annotator.md"
+
+[[map]]
+glob = "frontend/src/questions/TaskQuestionList.tsx"
+chapter = "annotator.md"
+
+[[map]]
+glob = "frontend/src/questions/QuestionsPage.tsx"
+chapter = "lead-results.md"
+
+[[map]]
+glob = "frontend/src/questions/AnswerQuestionDialog.tsx"
+chapter = "lead-results.md"
+
 [[map]]
 glob = "frontend/src/problems/labels.ts"
 chapter = "annotator.md"

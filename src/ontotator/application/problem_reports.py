@@ -44,10 +44,14 @@ from ontotator.domain.canonical import canonical_hash
 from ontotator.domain.errors import AccessDenied, DomainError
 from ontotator.domain.problem_reports import (
     EventFact,
+    ReportKind,
+    check_answer,
     check_permission,
+    check_question,
     check_state,
     next_resolution,
     next_state,
+    take_proposed,
     withdrawable,
 )
 from ontotator.domain.problem_reports import (
@@ -295,9 +299,27 @@ class ProblemReportService:
         reason: str,
         round_id: str | None = None,
         submission_id: str | None = None,
+        kind: ReportKind = "problem",
+        quote: str | None = None,
+        proposed_text: str | None = None,
+        pause: bool | None = None,
     ) -> ProblemReportView:
+        """A text problem (always pauses) or a question to the lead (issue 553).
+
+        A question pauses the task only with ``pause``; its ``quote`` and
+        ``proposed_text`` are optional.
+        """
         if not reason.strip():
             raise DomainError("REPORT_REASON_REQUIRED")
+        quote, proposed_text = check_question(kind, quote, proposed_text)
+        pauses = pause is not False if kind == "problem" else bool(pause)
+        if kind == "problem" and not pauses:
+            raise DomainError("QUESTION_PARTS_INVALID", {"reason": "problem_pauses"})
+        question = (
+            {"kind": kind, "quote": quote, "proposed_text": proposed_text}
+            if kind == "question"
+            else {}
+        )
         digest = canonical_hash(
             {
                 "action": "report",
@@ -306,6 +328,8 @@ class ProblemReportService:
                 "reason": reason,
                 "round_id": round_id,
                 "submission_id": submission_id,
+                **question,
+                **({"pause": pauses} if question else {}),
             }
         )
         with self.db.transaction() as conn:
@@ -379,6 +403,9 @@ class ProblemReportService:
                     submission_id=submission_id,
                     reason=reason,
                     created_at=now,
+                    kind=kind,
+                    quote=quote,
+                    proposed_text=proposed_text,
                 )
             )
             conn.execute(
@@ -388,24 +415,27 @@ class ProblemReportService:
             )
             # Initial binding and the personal hold are one externally visible
             # transition, including when the round was allocated lazily above.
-            self._hold(
-                conn,
-                pid,
-                assignment_id,
-                rid,
-                reason,
-                actor,
-                now,
-                workflow_revision=expected_workflow_revision + 1,
-            )
+            if pauses:
+                self._hold(
+                    conn,
+                    pid,
+                    assignment_id,
+                    rid,
+                    reason,
+                    actor,
+                    now,
+                    workflow_revision=expected_workflow_revision + 1,
+                )
             record_audit(
                 conn,
                 actor,
-                "problem.report",
+                "question.ask" if kind == "question" else "problem.report",
                 target_type="problem_report",
                 target_id=rid,
                 project_id=pid,
-                details={"assignment_id": assignment_id},
+                details={"assignment_id": assignment_id, **question}
+                if question
+                else {"assignment_id": assignment_id},
                 at=now,
             )
             result = self._view(conn, rid, fresh, project)
@@ -516,7 +546,14 @@ class ProblemReportService:
         action: ReportAction,
         reason: str,
         assignment_ids: list[int] | None = None,
+        take_proposed_text: bool = False,
     ) -> ProblemReportView:
+        """A lead or reporter action; ``answer`` answers a question (issue 553).
+
+        ``reason`` is the answer. With ``take_proposed_text`` the asker's
+        proposed wording replaces the quoted passage in their open
+        translation review draft, in the same transaction.
+        """
         if not reason.strip():
             raise DomainError("REPORT_REASON_REQUIRED")
         selected = sorted(set(assignment_ids or []))
@@ -527,6 +564,7 @@ class ProblemReportService:
                 "revision": expected_revision,
                 "reason": reason,
                 "assignment_ids": selected,
+                **({"take_proposed_text": True} if take_proposed_text else {}),
             }
         )
         with self.db.transaction() as conn:
@@ -578,11 +616,50 @@ class ProblemReportService:
                     state["state"], raw["reporter_id"], facts
                 ),
             )
+            if action != "answer" and take_proposed_text:
+                raise DomainError(
+                    "QUESTION_ANSWER_NOT_AVAILABLE", {"reason": "not_an_answer"}
+                )
             now = datetime.now(UTC)
             event_id = f"report-event-{uuid4().hex}"
             new_round = None
             abandoned_translation_draft = None
-            if action == "extend_hold":
+            took: dict[str, Any] = {}
+            if action == "answer":
+                check_answer(
+                    raw["kind"],
+                    take_proposed_text=take_proposed_text,
+                    proposed=raw["proposed_text"] is not None,
+                )
+                if take_proposed_text:
+                    took = self._take_proposed(conn, raw, fresh.user_id, now)
+                # The answer releases the asker's pause, if they chose one.
+                own = raw["assignment_id"]
+                AssignmentService._locked(conn, own)
+                held_now = conn.execute(
+                    select(TaskHoldRow.hold_id)
+                    .join(
+                        TaskHoldStateRow,
+                        TaskHoldStateRow.hold_id == TaskHoldRow.hold_id,
+                    )
+                    .where(
+                        TaskHoldRow.report_id == report_id,
+                        TaskHoldRow.assignment_id == own,
+                        TaskHoldStateRow.active.is_(True),
+                    )
+                ).first()
+                selected = [own] if held_now else []
+                if selected:
+                    self._release(
+                        conn,
+                        report_id,
+                        selected,
+                        now,
+                        released_by=fresh.user_id,
+                        release_action="resume",
+                        event_id=event_id,
+                    )
+            elif action == "extend_hold":
                 if not selected:
                     raise DomainError("HOLD_TARGET_REQUIRED")
                 for aid in selected:
@@ -683,6 +760,7 @@ class ProblemReportService:
                             if abandoned_translation_draft is not None
                             else {}
                         ),
+                        **took,
                     },
                     created_at=now,
                 )
@@ -690,17 +768,75 @@ class ProblemReportService:
             record_audit(
                 conn,
                 actor,
-                f"problem.{action}",
+                "question.answer" if action == "answer" else f"problem.{action}",
                 target_type="problem_report",
                 target_id=report_id,
                 project_id=pid,
-                details={"assignment_ids": selected},
+                details={"assignment_ids": selected, **took},
                 at=now,
             )
             result = self._view(conn, report_id, fresh, project)
             result.new_round = new_round
             self._remember(conn, pid, access, request_id, digest, result, now)
             return result
+
+    def _take_proposed(
+        self, conn: Connection, raw: RowMapping, lead_id: int, now: datetime
+    ) -> dict[str, Any]:
+        """The asker's proposed wording goes into their open review draft.
+
+        Only an open translation review has a draft to take it into. The
+        draft's revision moves on, so an editor that still holds the old
+        text gets a conflict and reloads, as after any other change.
+        """
+        assignment = AssignmentService._get(conn, raw["assignment_id"])
+        if assignment.task != "translation_review" or assignment.status == "submitted":
+            raise DomainError(
+                "QUESTION_ANSWER_NOT_AVAILABLE", {"reason": "no_open_review"}
+            )
+        draft = (
+            conn.execute(
+                select(TranslationReviewDraftRow)
+                .where(TranslationReviewDraftRow.assignment_id == assignment.id)
+                .with_for_update()
+            )
+            .mappings()
+            .one_or_none()
+        )
+        if draft is None:
+            pid = self.repo._require_project(conn, assignment.project_key)
+            current = conn.execute(
+                select(DocumentRow.text).where(
+                    DocumentRow.project_id == pid,
+                    DocumentRow.document_id == assignment.document_id,
+                )
+            ).scalar_one()
+        else:
+            current = draft["text"]
+        text = take_proposed(current, raw["quote"], raw["proposed_text"])
+        values: dict[str, Any] = {
+            "text": text,
+            "revision": (draft["revision"] if draft else 0) + 1,
+            "updated_by": lead_id,
+            "updated_at": now,
+        }
+        if draft:
+            conn.execute(
+                update(TranslationReviewDraftRow)
+                .where(TranslationReviewDraftRow.assignment_id == assignment.id)
+                .values(**values)
+            )
+        else:
+            conn.execute(
+                insert(TranslationReviewDraftRow).values(
+                    assignment_id=assignment.id, form={}, **values
+                )
+            )
+        return {
+            "took_proposed_text": True,
+            "draft_revision": values["revision"],
+            "text_sha256": canonical_hash(text),
+        }
 
     def _readable(
         self, conn: Connection, access: Access, report_id: str
@@ -770,6 +906,8 @@ class ProblemReportService:
         assignment_id: int | None = None,
         limit: int = 100,
         offset: int = 0,
+        kind: ReportKind = "problem",
+        state: str | None = None,
     ) -> list[ProblemReportView]:
         """Reports the viewer may read, newest first (reporters: only their own).
 
@@ -784,8 +922,15 @@ class ProblemReportService:
             query = (
                 select(ProblemReportRow.report_id)
                 .join(AssignmentRow, AssignmentRow.id == ProblemReportRow.assignment_id)
-                .where(ProblemReportRow.project_id == pid)
+                .where(
+                    ProblemReportRow.project_id == pid, ProblemReportRow.kind == kind
+                )
             )
+            if state is not None:
+                query = query.join(
+                    ProblemReportStateRow,
+                    ProblemReportStateRow.report_id == ProblemReportRow.report_id,
+                ).where(ProblemReportStateRow.state == state)
             if not can(fresh, Action.MANAGE_ASSIGNMENTS, project):
                 query = query.where(ProblemReportRow.reporter_id == fresh.user_id)
             if document_id is not None:

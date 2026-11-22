@@ -320,7 +320,7 @@ describe("TreeBrowser: one walk", () => {
   });
 
   it.each([
-    ["proposal", "Proposal: decide as Changed with Status epilepticus (HP:2133)"],
+    ["proposal", "Proposal: decide as Replaced with Status epilepticus (HP:2133)"],
     ["new", "New finding: choose Status epilepticus (HP:2133)"],
   ] as const)("in mode %s, takes a term only after a confirmation that says what happens", async (mode, effect) => {
     vi.spyOn(api, "openTree").mockResolvedValue(seizureWalk());

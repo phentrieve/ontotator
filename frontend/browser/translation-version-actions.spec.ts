@@ -7,7 +7,7 @@
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { documentsReady, openTextCard, textCard, textVersionItems } from "./documentsHelpers";
+import { documentsReady, editTranslation, openTextCard, otherVersionAction, textCard, textVersionItems } from "./documentsHelpers";
 import { loginThroughForm } from "./helpers";
 import { leadScenario, type LeadScenario } from "./leadWorkflowHelpers";
 
@@ -51,7 +51,8 @@ test("b: the correction of an accepted version names the annotation work that st
   const card = await openTextCard(page, caseId, "de");
   const [v1] = await (await textVersionItems(card, 1)).all();
   await expect(v1.getByRole("button", { name: "Accept this version…" })).toHaveCount(0);
-  await v1.getByRole("button", { name: `Correct v1 of ${caseId} de myself…`, exact: true }).click();
+  // Issue 555: one edit action; "The meaning changes" opens the correction.
+  await editTranslation(page, v1, caseId, "meaning");
 
   const dialog = page.getByRole("dialog", { name: `Correct it myself, ${caseId} de v1, accepted`, exact: true });
   await expect(dialog).toContainText("You correct the accepted v1 yourself in the translation review and submit it as Accepted with corrections. The corrected text becomes v2.");
@@ -96,7 +97,7 @@ test("b: Ask a reviewer to correct… is refused while the lead's own correction
   await loginLead(page, s);
   const card = await openTextCard(page, caseId, "de");
   const [v1] = await (await textVersionItems(card, 1)).all();
-  await v1.getByRole("button", { name: `Correct v1 of ${caseId} de myself…`, exact: true }).click();
+  await editTranslation(page, v1, caseId, "meaning");
   await page.getByRole("dialog", { name: `Correct it myself, ${caseId} de v1, accepted`, exact: true })
     .getByRole("button", { name: "Open translation review", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Translation (de)", exact: true })).toBeVisible({ timeout: 30_000 });
@@ -106,7 +107,7 @@ test("b: Ask a reviewer to correct… is refused while the lead's own correction
   await documentsReady(page);
   const again = await openTextCard(page, caseId, "de");
   const [version] = await (await textVersionItems(again, 1)).all();
-  await version.getByRole("button", { name: /^Ask a reviewer to correct / }).click();
+  await otherVersionAction(page, version, `v1 of ${caseId} de`, "Ask a reviewer to correct…");
   const dialog = page.getByRole("dialog", { name: /^Ask a reviewer to correct, / });
   await dialog.getByLabel("Translation reviewer").selectOption({ index: 1 });
   await dialog.getByLabel("Reason for another review").fill("Dose missing");
@@ -124,7 +125,7 @@ test("d: Accept this version… accepts exactly that version with a reason", asy
   await loginLead(page, s);
   const card = await openTextCard(page, caseId, "de");
   const [v1] = await (await textVersionItems(card, 1)).all();
-  await expect(v1.getByRole("button", { name: /^Correct .* myself/ })).toHaveCount(0);
+  await expect(v1.getByRole("button", { name: /^(Correct .* myself|Edit the translation)/ })).toHaveCount(0);
   await expect(v1.getByRole("link", { name: `View text v1 of ${caseId} de`, exact: true })).toBeVisible();
   await evidence(page, "341-accept-button");
   await v1.getByRole("button", { name: `Accept v1 of ${caseId} de…`, exact: true }).click();
