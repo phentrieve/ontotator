@@ -201,13 +201,16 @@ it("stops conflicts and guards beforeunload and route cancellation without losin
 it("reloads a conflicted review only after explicit discard and uses the fresh server revision", async () => {
   const { save, open } = setup(); save.mockRejectedValueOnce(new ApiError(409, "Changed elsewhere", "REVISION_CONFLICT"));
   await edited(); await clock();
+  // Issue 610: the refused save reads the saved review once; a change no taken wording explains is the reviewer's choice.
+  expect(open).toHaveBeenCalledTimes(2);
+  expect(screen.getByRole("button", { name: "Keep my text" })).toBeDefined();
   open.mockResolvedValue(reviewWorkspace({ draft: { text: "Fresh baseline", form: {}, revision: 87 } }));
   fireEvent.click(screen.getByRole("button", { name: "Reload from server" }));
   await act(async () => { await Promise.resolve(); });
   const dialog = screen.getByRole("dialog", { name: "Changes not saved" });
-  expect(open).toHaveBeenCalledTimes(1);
-  await act(async () => { fireEvent.click(within(dialog).getByRole("button", { name: "Discard edits and leave" })); });
   expect(open).toHaveBeenCalledTimes(2);
+  await act(async () => { fireEvent.click(within(dialog).getByRole("button", { name: "Discard edits and leave" })); });
+  expect(open).toHaveBeenCalledTimes(3);
   expect((screen.getByRole("textbox", { name: "Translation (de)" }) as HTMLTextAreaElement).value).toBe("Fresh baseline");
   fireEvent.change(screen.getByRole("textbox", { name: "Translation (de)" }), { target: { value: "After reopen" } }); await clock();
   // The edit differs from the machine text, so Accepted with corrections is selected automatically (spec A.4).

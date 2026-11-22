@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MutableRefObject, type ReactNode } from "react";
-import { api, ApiError, type CheckedSentences, type DraftTypographyHints, type ReviewWorkspace, type TaskSummary, type TranslationReviewRecord, type SourceObligationView } from "../api/client";
+import { api, ApiError, type CheckedSentences, type DraftTypographyHints, type ProblemReportView, type ReviewWorkspace, type TaskSummary, type TranslationReviewRecord, type SourceObligationView } from "../api/client";
 import { ErrorNotice } from "../admin/ErrorNotice";
 import { nextOpenTask } from "../app/caseOrder";
 import { MY_TASKS, routeHref, type Route, type RouteLeaveGuard } from "../app/router";
@@ -12,6 +12,8 @@ import { useShortcut } from "../ui/shortcuts";
 import { caretInParagraph, paragraphStarts } from "../variants/paragraphs";
 import { useCoupledScroll } from "../variants/useCoupledScroll";
 import { createDraftSaver, type DraftSaver } from "./draftSaver";
+import { mapOffset, mergeServerText, takeWording, type TakenWording } from "./wordingMerge";
+import { WordingNotices, type MergeTrouble, type WordingNotice } from "./WordingNotices";
 import { DiffView, TextView } from "./DiffView";
 import { TranslationEditor } from "./TranslationEditor";
 import { SourceObligationReview } from './SourceObligationReview';
@@ -106,6 +108,23 @@ function clearPassage(): void {
   if (editor instanceof HTMLTextAreaElement && editor.selectionStart !== editor.selectionEnd) editor.setSelectionRange(editor.selectionEnd, editor.selectionEnd);
   window.getSelection()?.removeAllRanges();
 }
+/** The questions whose proposed wording the lead took into the text (issue 610). */
+function takenWordings(list: readonly ProblemReportView[]): TakenWording[] {
+  return list.flatMap(question => question.took_proposed_text && question.quote && question.proposed_text != null
+    ? [{ report_id: question.report_id, quote: question.quote, proposed_text: question.proposed_text, answered_at: question.answered_at }] : []);
+}
+/** The element of the editor's mirror that lays out the character at `offset`, to scroll it into view. */
+function passageElement(editor: HTMLTextAreaElement, offset: number): HTMLElement | null {
+  const mirror = editor.closest(".translation-editor")?.querySelector(".translation-editor-mirror");
+  if (!mirror) return null;
+  const walker = document.createTreeWalker(mirror, NodeFilter.SHOW_TEXT);
+  let seen = 0;
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    seen += node.textContent?.length ?? 0;
+    if (seen > offset) return node.parentElement;
+  }
+  return editor;
+}
 
 const paragraphMarkers = (element: HTMLElement) => [...element.querySelectorAll<HTMLElement>("[data-paragraph]")];
 const paneTop = (element: HTMLElement) => element.getBoundingClientRect().top + element.clientTop;
@@ -181,6 +200,13 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   const decisionStateRef = useRef(decisionState); decisionStateRef.current = decisionState;
   const draftRef = useRef(draft); draftRef.current = draft;
   const saver = useRef<DraftSaver<RawDraft> | null>(null);
+  /** The text of the saver's revision, as this screen saved or loaded it: the base of a merge (issue 610). */
+  const savedText = useRef(workspace.draft.text);
+  const syncRef = useRef<() => Promise<void>>(async () => {});
+  const [wordingNotices, setWordingNotices] = useState<WordingNotice[]>([]);
+  const [mergeTrouble, setMergeTrouble] = useState<MergeTrouble | null>(null);
+  /** A merge with the saved draft runs: the text on screen may be about to change, so it is not shown as Saved. */
+  const [merging, setMerging] = useState(false);
   const alive = useRef(false), operation = useRef(false), departing = useRef(false), readOnlyRef = useRef(workspace.read_only);
   const [, refresh] = useState(0);
   const [busy, setBusy] = useState(false), [error, setError] = useState<unknown>(null);
@@ -478,12 +504,21 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   useEffect(() => {
     alive.current = true;
     if (!immutableReadOnly) {
+      savedText.current = workspace.draft.text;
       const instance = createDraftSaver<RawDraft>({ initialRevision: workspace.draft.revision,
         save: async (value, expected_revision) => {
           if (!alive.current || readOnlyRef.current) throw new Error("This review is read-only.");
-          try { return (await api.saveTranslationReviewDraft(props.assignmentId, { ...value, expected_revision })).revision; }
-          catch (failure) { notePause(failure); throw failure; }
-        }, onStateChange: () => { if (alive.current && saver.current === instance) refresh(n => n + 1); } });
+          try {
+            const { revision } = await api.saveTranslationReviewDraft(props.assignmentId, { ...value, expected_revision });
+            savedText.current = value.text;
+            return revision;
+          } catch (failure) { notePause(failure); throw failure; }
+        }, onStateChange: () => {
+          if (!alive.current || saver.current !== instance) return;
+          refresh(n => n + 1);
+          // Issue 610: a refused save is merged with the saved draft, never left for a discarding reload.
+          if (instance.state === "conflict") void syncRef.current();
+        } });
       saver.current = instance;
       if (normaliseOnOpen) instance.update(draftRef.current);
     }
@@ -594,7 +629,10 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   }, [submitted, busy, nextTaskLoad, props.assignmentId, projectKey, leadCorrection, label]);
   const nextTaskId = nextTask?.kind === "ready" ? nextTask.next?.assignment_id : undefined;
   useEffect(() => { if (nextTaskId !== undefined) nextTaskButton.current?.focus({ preventScroll: true }); }, [nextTaskId]);
-  const saveState = saver.current?.state ?? "saved";
+  // Issue 610: a refused save that is being merged reads as saving; only a change that needs the reviewer is a conflict.
+  const saverState = saver.current?.state ?? "saved";
+  const saveState = mergeTrouble?.kind === "unmerged" ? "conflict" : saverState === "conflict" && !mergeTrouble ? "saving"
+    : merging && saverState === "saved" ? "saving" : saverState;
   const canSubmit = !readOnly && !busy && form !== null && form.decision !== "query" && issues.length === 0 && nonblank(qualification)
     && saveState === "saved" && !saver.current?.hasUnsavedChanges;
   const submit = async (cause?: SourceObligationView): Promise<boolean> => {
@@ -659,6 +697,132 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     // The whole returned form, so undoing an automatic selection can remove the decision again.
     edit({ text: nextText, form: result.form === current.form ? result.form : withClinicalDefault(result.form) });
     decisionStateRef.current = result.state; setDecisionState(result.state);
+  };
+
+  /*
+   * Issue 610: the lead's "Take the proposed wording" writes into the saved draft while this screen may hold newer
+   * edits. The saved draft is merged into the text on screen (wordingMerge.ts) and saved from there: the wording goes
+   * in where its passage is unchanged, the reviewer's text wins where it is not, and any other change elsewhere is
+   * the reviewer's choice (Keep my text or Load the saved review). Nothing typed is replaced without a notice.
+   */
+  const syncing = useRef<Promise<void> | null>(null), syncAgain = useRef(false);
+  const restoreSelection = useRef<{ start: number; end: number } | null>(null);
+  useLayoutEffect(() => {
+    const selection = restoreSelection.current; restoreSelection.current = null;
+    const editor = document.getElementById("review-translation");
+    if (selection && editor instanceof HTMLTextAreaElement) editor.setSelectionRange(selection.start, selection.end);
+  }, [draft]);
+  const mergeSaved = async (): Promise<void> => {
+    const instance = saver.current;
+    if (!instance || !alive.current || readOnlyRef.current || operation.current) return;
+    // Waiting edits are saved first; a refused save is merged below.
+    if (instance.state !== "conflict" && instance.hasUnsavedChanges) { try { await instance.flush(); } catch { /* merged below */ } }
+    let fresh: ReviewWorkspace;
+    try { fresh = await api.openTranslationReview(props.assignmentId); } catch {
+      if (alive.current && saver.current === instance && instance.state === "conflict") setMergeTrouble({ kind: "failed" });
+      return;
+    }
+    const list = await api.listQuestions(workspace.assignment.project_key, { assignmentId: props.assignmentId }).catch(() => questions.questions ?? []);
+    while (composing.current && alive.current) await new Promise(resolve => window.setTimeout(resolve, 200));
+    if (!alive.current || saver.current !== instance || readOnlyRef.current || operation.current) return;
+    // Paused or submitted meanwhile: the task's own reload shows that; nothing is merged into a read-only review.
+    if (fresh.read_only || fresh.submitted_record) return;
+    const server = fresh.draft;
+    // An older read (a save of this screen came after it) or nothing new: nothing to merge.
+    if (server.revision < instance.revision || (server.revision === instance.revision && instance.state !== "conflict")) return;
+    const current = draftRef.current;
+    const merge = server.revision > instance.revision
+      ? mergeServerText(savedText.current, server.text, current.text, takenWordings(list)) : { kind: "conflict" as const };
+    // A newer revision that no taken wording explains is another change: the reviewer chooses.
+    if (merge.kind === "conflict" || merge.applied.length + merge.kept.length === 0) {
+      setMergeTrouble({ kind: "unmerged", revision: server.revision, text: server.text });
+      return;
+    }
+    let next = current, decisionNext = decisionStateRef.current;
+    if (merge.text !== current.text) {
+      const result = reactToTextEdit(decisionNext, current.form, workspace.text, merge.text);
+      next = { text: merge.text, form: result.form === current.form ? result.form : withClinicalDefault(result.form) };
+      decisionNext = result.state;
+    }
+    const needsSave = instance.state === "conflict" || instance.hasUnsavedChanges || next.text !== server.text || next.form !== current.form;
+    // A save in flight decides first; a refused one brings the merge back.
+    if (!instance.rebase(server.revision, needsSave ? next : undefined)) { syncAgain.current = true; return; }
+    savedText.current = server.text;
+    setMergeTrouble(null);
+    if (next !== current) {
+      rebaseTranslationMarks(current.text, next.text);
+      decisionStateRef.current = decisionNext; setDecisionState(decisionNext);
+      const editor = document.getElementById("review-translation");
+      if (editor instanceof HTMLTextAreaElement && document.activeElement === editor)
+        restoreSelection.current = { start: mapOffset(editor.selectionStart, merge.replacements), end: mapOffset(editor.selectionEnd, merge.replacements) };
+      draftRef.current = next; setDraft(next);
+    }
+    const merged = new Set([...merge.applied, ...merge.kept.map(kept => kept.wording)].map(wording => wording.report_id));
+    setWordingNotices(notices => [...notices.filter(notice => !merged.has(notice.wording.report_id)),
+      ...merge.applied.map(wording => ({ kind: "applied" as const, wording, mine: "" })),
+      ...merge.kept.map(kept => ({ kind: "kept" as const, wording: kept.wording, mine: kept.mine }))]);
+    void questions.reload();
+  };
+  /** One merge at a time; a request during one runs it again afterwards. */
+  const sync = (): Promise<void> => {
+    if (syncing.current) { syncAgain.current = true; return syncing.current; }
+    setMerging(true);
+    const run = (async () => {
+      try {
+        for (let round = 0; round < 5 && alive.current; round += 1) {
+          syncAgain.current = false;
+          await mergeSaved();
+          if (!syncAgain.current) break;
+        }
+      } finally { syncing.current = null; if (alive.current) setMerging(false); }
+    })();
+    syncing.current = run;
+    return run;
+  };
+  syncRef.current = sync;
+  /** A wording the lead took (it shows on focus, or within 15 s while a question waits) and a resumed task merge at once. */
+  const tookIds = (questions.questions ?? []).filter(question => question.took_proposed_text).map(question => question.report_id).sort().join(" ");
+  // Before paint, so a resumed task never shows Saved next to text that is about to change.
+  useLayoutEffect(() => { if (tookIds && !readOnly) void syncRef.current(); }, [tookIds, readOnly]);
+  const awaitingWording = !readOnly && (questions.questions ?? []).some(question => question.state === "open" && question.proposed_text);
+  const reloadQuestions = questions.reload;
+  useEffect(() => {
+    if (!awaitingWording) return;
+    const timer = window.setInterval(() => { if (document.visibilityState !== "hidden") void reloadQuestions(); }, 15_000);
+    return () => window.clearInterval(timer);
+  }, [awaitingWording, reloadQuestions]);
+  /** Selects a passage of the translation and brings it into view. */
+  const selectInEditor = (start: number, end: number) => {
+    if (showChanges) setShowChanges(false);
+    window.requestAnimationFrame(() => {
+      const editor = document.getElementById("review-translation");
+      if (!(editor instanceof HTMLTextAreaElement)) return;
+      editor.focus({ preventScroll: true }); editor.setSelectionRange(start, end);
+      passageElement(editor, start)?.scrollIntoView?.({ block: "center" });
+    });
+  };
+  const showWording = async (question: Pick<ProblemReportView, "report_id" | "quote" | "proposed_text" | "answered_at">) => {
+    await syncRef.current();
+    if (!alive.current || !question.proposed_text) return;
+    const value = draftRef.current.text, at = value.indexOf(question.proposed_text);
+    if (at >= 0) { selectInEditor(at, at + question.proposed_text.length); return; }
+    // Not in the text: the reviewer changed it. The wording stays at hand.
+    const quote = question.quote ?? "";
+    const wording: TakenWording = { report_id: question.report_id, quote, proposed_text: question.proposed_text, answered_at: question.answered_at };
+    setWordingNotices(notices => [...notices.filter(notice => notice.wording.report_id !== question.report_id), { kind: "kept", wording, mine: takeWording(value, quote, "") !== null ? quote : "" }]);
+  };
+  const applyWording = (notice: WordingNotice) => {
+    const value = draftRef.current.text, replaced = takeWording(value, notice.mine, notice.wording.proposed_text);
+    if (replaced === null || readOnlyRef.current) return;
+    const at = value.indexOf(notice.mine);
+    editText(replaced);
+    setWordingNotices(notices => notices.filter(other => other !== notice));
+    selectInEditor(at, at + notice.wording.proposed_text.length);
+  };
+  const keepMine = () => {
+    const instance = saver.current, trouble = mergeTrouble;
+    if (!instance || trouble?.kind !== "unmerged") return;
+    if (instance.rebase(trouble.revision, draftRef.current)) { savedText.current = trouble.text; setMergeTrouble(null); }
   };
   const keyOptions = { scope: "screen", group: "Translation review", enabled: !readOnly && !leadCorrection } as const;
   useShortcut("1", () => chooseOption(decisionKeys[0]), { ...keyOptions, description: `Choose ${decisionLabels[decisionKeys[0]]}` });
@@ -735,7 +899,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
 
   const [status, statusTone]: readonly [string, StatusTone] = readOnly ? ["Read-only", "neutral"] : ({
     saved: ["Saved", "neutral"], dirty: ["Changes not saved", "info"], saving: ["Saving…", "info"],
-    error: ["Changes not saved", "warning"], conflict: ["Conflict: reload", "danger"],
+    error: ["Changes not saved", "warning"], conflict: ["Conflict", "danger"],
   } satisfies Record<typeof saveState, readonly [string, StatusTone]>)[saveState];
   const submitBlocker: string | null = readOnly || busy ? null
     : !decision(rawForm.decision) ? "Choose a decision to submit."
@@ -743,7 +907,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     : !form ? "Update the unsupported values above to submit."
     : issues.length > 0 ? null
     : !nonblank(qualification) ? "Your qualification is required to submit."
-    : saveState === "conflict" ? "This review was changed elsewhere. Reload from server to continue."
+    : saveState === "conflict" ? "This review was changed elsewhere. Keep your text or load the saved review to continue."
     : saveState === "error" ? "Your changes are not saved. Retry saving to submit."
     : saveState !== "saved" || saver.current?.hasUnsavedChanges ? "Saving your changes…"
     : null;
@@ -908,8 +1072,12 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
           <LeadReason task={{ ...workspace, status: record ? "submitted" : workspace.assignment.status }} />
           {/* Issue 483: the lead's decision on this submitted query, with the answer. */}
           {record && <QueryAnswer answer={workspace.query_answer} />}
+          {!leadCorrection && !readOnly && <WordingNotices notices={wordingNotices} trouble={mergeTrouble} text={text} busy={busy}
+            onUse={applyWording}
+            onDismiss={notice => setWordingNotices(notices => notices.filter(other => other !== notice))}
+            onKeepMine={keepMine} onLoadSaved={() => { void reload(); }} onRetry={() => { setMergeTrouble(null); void sync(); }} />}
           {!leadCorrection && <TaskQuestionList assignment={workspace.assignment} state={questions} withProposal readOnly={readOnly}
-            selectedText={selectedPassage} onShowInText={() => { void reload(); }} dialogOpen={asking} onDialogOpen={setAsking}
+            selectedText={selectedPassage} onShowInText={question => { void showWording(question); }} dialogOpen={asking} onDialogOpen={setAsking}
             // Issue 590: a pausing question pauses the task at once, as a problem report does; a resume opens it again.
             onSaveBeforePause={async () => { await flush(); }} onAsked={clearPassage} onPauseChanged={() => onTaskHeld.current?.()} />}
           <SourceObligationReview assignmentId={props.assignmentId} username={props.username} documentId={workspace.variant.document_id}
