@@ -48,7 +48,7 @@ function ResumeFromQuestion({ question, onResumed }: { question: ProblemReportVi
 export function QuestionItem({ question, onShowInText, onResumed }: {
   question: ProblemReportView;
   /** "Show it in my text" after the lead took the wording; left out on read-only work, where nothing is shown again. */
-  onShowInText?: () => void;
+  onShowInText?: (question: ProblemReportView) => void;
   /** Offers "Resume my task…" while this question pauses the task. */
   onResumed?: (question: ProblemReportView) => void;
 }): JSX.Element {
@@ -61,7 +61,7 @@ export function QuestionItem({ question, onShowInText, onResumed }: {
     {onResumed && ownPauseActive(question) && <ResumeFromQuestion question={question} onResumed={onResumed} />}
     {question.answer != null && <div className="task-question-answer">
       <p><strong>Answer from the lead:</strong> {question.answer}</p>
-      {question.took_proposed_text && <p>{TOOK_PROPOSED}{onShowInText && <> <Button size="sm" onClick={onShowInText}>{SHOW_IN_TEXT}</Button></>}</p>}
+      {question.took_proposed_text && <p>{TOOK_PROPOSED}{onShowInText && <> <Button size="sm" onClick={() => onShowInText(question)}>{SHOW_IN_TEXT}</Button></>}</p>}
     </div>}
   </li>;
 }
@@ -74,8 +74,8 @@ export function TaskQuestionList({ assignment, state, withProposal, readOnly, se
   assignment: Pick<AssignmentView, "id" | "workflow_revision" | "active_round_id">; state: TaskQuestions; withProposal: boolean; readOnly: boolean;
   /** The passage selected in the task's text, read when the dialog opens. */
   selectedText?: () => string;
-  /** Reload the task after the lead took a proposed wording into the text. */
-  onShowInText?: () => void;
+  /** Shows the wording the lead took into the text (issue 610: merged into the text on screen, never reloaded over it). */
+  onShowInText?: (question: ProblemReportView) => void;
   /** The dialog is controlled by the screen so that its header button opens it too. */
   dialogOpen: { quote: string } | null;
   onDialogOpen: (value: { quote: string } | null) => void;

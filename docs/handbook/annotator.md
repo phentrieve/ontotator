@@ -418,7 +418,9 @@ What for: ask the project lead a question about the task you are working on, for
 
 With **Pause my task until the lead answers** ticked, your task is paused as soon as you send; your edits are saved first. The banner reads *Paused until the lead answers your question*. The lead's answer opens your task again. To go on without waiting, click **Resume my task…** on the question under **Questions to the lead**, write **Why can you continue?** and click **Resume my task**: the question stays open and the lead can still answer it. A question is not a text problem: **Report a text problem** does not count it.
 
-**Questions to the lead** lists your questions: *Waiting for the lead's answer*, then *Answered by the lead* with **Answer from the lead**. If the lead took your wording, it reads *The lead put your wording into your text.*; click **Show it in my text** to load it. Check it and submit your review as usual.
+**Questions to the lead** lists your questions: *Waiting for the lead's answer*, then *Answered by the lead* with **Answer from the lead**. If the lead took your wording, it reads *The lead put your wording into your text.*; click **Show it in my text** to select it in your text. Check it and submit your review as usual.
+
+You can keep typing while the lead answers: nothing you type is lost. When the review is open, the wording comes into your text as soon as your screen learns of the answer (when you come back to the window, within 15 seconds, or with your next save), and your other edits stay. A notice says *The lead's wording is in your text now: …*. If you changed the passage yourself meanwhile, your text wins: the notice *Your text was kept* names the lead's wording, and **Use the lead's wording** puts it in place of your version with one click. If the review was changed elsewhere in another way, for example in a second window, the status reads **Conflict** and you choose: **Keep my text** saves your text over the other change, **Load the saved review…** discards your edits here.
 
 ## Report a text problem
 
