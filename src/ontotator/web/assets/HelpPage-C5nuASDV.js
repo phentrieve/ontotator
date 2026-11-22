@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-DDEDjbxm.js";import{n as a,t as o}from"./lib-Dxiuv1eO.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-DM7Eq99e.js";import{n as a,t as o}from"./lib--iyX4WeG.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -1422,7 +1422,7 @@ The typo fix (**Edit the translation…** › **Only spelling, spacing or gramma
 
 ### "This question cannot be answered this way."
 
-The answer to a question was refused. With **Take the proposed wording into the reviewer's text**: the passage is no longer in the reviewer's text exactly once, or the review was submitted. Send the answer without taking the wording. The question may also have been answered already; reload the page. See [Answer a question](lead-results.md#answer-a-question).
+The answer to a question was refused, and the question may have been answered already; reload the page. When the wording could not be taken, the dialog says so instead: *The quoted passage is no longer in the reviewer's text, so the wording cannot be taken.* (the passage is not in their text exactly once) or *The reviewer's review is no longer open…*. Untick **Take the proposed wording into the reviewer's text** and send the answer without it. See [Answer a question](lead-results.md#answer-a-question).
 
 ### "The question could not be sent."
 
@@ -1675,7 +1675,7 @@ The header is the same on every page:
 
 ![The user menu, open at the top right: Profile, My technical reports, Technical problem…, the theme choice and Log out](images/getting-started-user-menu.png)
 
-The sidebar is for your work. It lists the project switcher, **My tasks** and **Projects**. The number after **My tasks** counts your open tasks, the same tasks as the **To do** tab; it updates as soon as you submit a text. Clicking **My tasks** or **Projects** loads your projects and the count again, so a project you were just added to shows up without reloading the page. Leads also see their project's pages (**Documents**, **Questions**, **Progress**, **Settings**, **Export**); the number after **Questions** counts the open questions to the lead; the list **Translation reviews** opens from **Progress**, which stays marked while the list is open. In the editor, the sidebar folds into **Sections**; click it to open it. The user menu and the gear stay at the top right there too.
+The sidebar is for your work. It lists the project switcher, **My tasks** and **Projects**. The number after **My tasks** counts your open tasks, the same tasks as the **To do** tab; it updates as soon as you submit a text. Clicking **My tasks** or **Projects** loads your projects and the count again, so a project you were just added to shows up without reloading the page. Leads also see their project's pages (**Documents**, **Questions**, **Progress**, **Settings**, **Export**); the number after **Questions** counts the open questions to the lead and updates as soon as you answer one; the list **Translation reviews** opens from **Progress**, which stays marked while the list is open. In the editor, the sidebar folds into **Sections**; click it to open it. The user menu and the gear stay at the top right there too.
 
 ## Report a technical problem
 
