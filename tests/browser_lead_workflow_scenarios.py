@@ -113,9 +113,11 @@ def case_units(
     languages: Sequence[str],
     *,
     marked: Iterable[str] = (),
+    lead_in: str = "",
 ) -> list[Any]:
     """Per case an ``en`` source and machine translations (``marked`` cases
-    carry ``translation.review.status == "reviewed"``, format 1.3)."""
+    carry ``translation.review.status == "reviewed"``, format 1.3). A
+    ``lead_in`` comes before each translation's text."""
     from t1_builders import native_unit, translation_unit
 
     marked = set(marked)
@@ -125,7 +127,10 @@ def case_units(
         units.append(source)
         for language in languages:
             unit = translation_unit(
-                case, language, f"{SYNTHETIC} ({case}, {language})", source=source
+                case,
+                language,
+                f"{lead_in}{SYNTHETIC} ({case}, {language})",
+                source=source,
             )
             units.append(package_reviewed(unit) if case in marked else unit)
     return units
@@ -460,10 +465,16 @@ QUERIED_CASES = {
 # What Ana changes in the texts she queries, and her question.
 QUERY_OLD, QUERY_NEW = "hypotonia", "muscular hypotonia"
 QUERY_RATIONALE = "The source says muscular hypotonia. Is the short form meant?"
+# Issue 591: paragraphs before the queried words, so the change starts below the
+# visible part of "Show the proposed text".
+LONG_LEAD_IN = "".join(
+    f"Paragraph {n}: the history of the family is unremarkable so far.\n\n"
+    for n in range(1, 9)
+)
 
 
 def queried_translation_for_lead(
-    app: FastAPI, *, requery: bool = False
+    app: FastAPI, *, requery: bool = False, long_text: bool = False
 ) -> dict[str, Any]:
     """Issue 483: rule on, 3 cases with de review + annotate. Ana queried the
     de translations of case-0101 and case-0102, each with a proposed text
@@ -471,7 +482,9 @@ def queried_translation_for_lead(
     case-0103. The lead decides the queries under "Resolve…".
 
     With ``requery`` (issue 574 F1) the lead has taken Ana's text of
-    case-0101 as v2, accepted, asked Ben to correct v2, and Ben queried v2."""
+    case-0101 as v2, accepted, asked Ben to correct v2, and Ben queried v2.
+    With ``long_text`` (issue 591) eight paragraphs come before the queried
+    words."""
     from ontotator.application.query_decisions import QueryDecisionService
     from ontotator.application.translation_reviews import TranslationReviewService
     from ontotator.application.translation_workflow import (
@@ -483,7 +496,8 @@ def queried_translation_for_lead(
         Actor.cli(), scenario.users["lead"], qualification="Physician"
     )
     case_ids = cases(101, 3)
-    docs = import_units(scenario, case_units(case_ids, ("de",)))
+    lead_in = LONG_LEAD_IN if long_text else ""
+    docs = import_units(scenario, case_units(case_ids, ("de",), lead_in=lead_in))
     plan(scenario, case_ids, {"de": REVIEW_AND_ANNOTATE})
     review = TranslationReviewService(scenario.db, scenario.app.state.jobs)
     access, _actor = identity(scenario, "ana")
@@ -561,6 +575,10 @@ REQUERY_RATIONALE = "Is the dose in v2 per day or per dose?"
 
 def queried_correction_for_lead(app: FastAPI) -> dict[str, Any]:
     return queried_translation_for_lead(app, requery=True)
+
+
+def queried_long_translation_for_lead(app: FastAPI) -> dict[str, Any]:
+    return queried_translation_for_lead(app, long_text=True)
 
 
 QUESTION_CASES = {
@@ -886,6 +904,7 @@ BUILDERS: dict[str, Builder] = {
     "REJECTED_TRANSLATION_FOR_LEAD": rejected_translation_for_lead,
     "QUERIED_TRANSLATION_FOR_LEAD": queried_translation_for_lead,
     "QUERIED_CORRECTION_FOR_LEAD": queried_correction_for_lead,
+    "QUERIED_LONG_TRANSLATION_FOR_LEAD": queried_long_translation_for_lead,
     "ACCEPTED_TRANSLATION_FOR_LEAD": accepted_translation_for_lead,
     "UPLOAD_DIALOG": build_upload_dialog,
     "TYPO_FIX_CARRY": typo_fix_carry,
