@@ -245,6 +245,7 @@ class ProblemReportService:
         released_by: int,
         release_action: str,
         event_id: str,
+        notify_owner: bool = True,
     ) -> None:
         # Only active holds: an earlier release record is never overwritten.
         ids = list(
@@ -290,9 +291,10 @@ class ProblemReportService:
                 )
                 .returning(AssignmentRow.user_id, AssignmentRow.project_id)
             ).one()
-            if remaining is None:
+            if remaining is None and notify_owner:
                 # Issue 557: the task can be worked on again; its owner learns
-                # it unless they released it themselves.
+                # it unless they released it themselves. An answer to a
+                # question says it in its own notification.
                 notify(
                     conn,
                     owner.user_id,
@@ -685,6 +687,7 @@ class ProblemReportService:
                         released_by=fresh.user_id,
                         release_action="resume",
                         event_id=event_id,
+                        notify_owner=False,
                     )
                 # Issue 557: the asker's bell names the answer and opens the
                 # task; the answer itself stays in the question.

@@ -29,17 +29,22 @@ export function notificationText(item: NotificationView): string {
     case "task_released": return `Task released: ${task(item)}`;
     case "text_problem_received": return `Text problem from ${who}: ${text(item)}`;
     case "question_received": return `Question from ${who}: ${text(item)}`;
-    case "answer_received": return `Answer from the lead on ${text(item)}`;
+    case "answer_received": return `Answer from the lead: ${text(item)}`;
     case "submission_waiting": return `Waiting for your decision: ${text(item)}`;
   }
 }
 
-/** Where an entry leads: the task, the problem report, the lead's Questions, or Documents' Needs your decision. */
+/**
+ * Where an entry leads: the task (for an answer to a question too: the answer is under "Questions to the lead" there),
+ * the problem report, the question on the lead's Questions page, or Documents' Needs your decision.
+ */
 export function notificationRoute(item: NotificationView): Route {
   if (item.kind === "text_problem_received" && item.target_id) {
     return { name: "projectProblemReport", key: item.project_key, reportId: item.target_id };
   }
-  if (item.kind === "question_received") return { name: "projectQuestions", key: item.project_key };
+  if (item.kind === "question_received") {
+    return { name: "projectQuestions", key: item.project_key, ...(item.target_id ? { question: item.target_id } : {}) };
+  }
   if (item.kind === "submission_waiting") return { name: "projectDocuments", key: item.project_key, segment: "decision" };
   if (item.assignment_id !== null) return { name: "task", assignmentId: item.assignment_id };
   return { name: "tasks", project: item.project_key, status: "all" };

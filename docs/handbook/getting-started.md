@@ -78,18 +78,20 @@ The bell at the top right, next to the user menu, tells you about:
 
 - a new task for you (*New task: annotation of case-0102 de*);
 - a task of yours that the lead reopened (*Task reopened: …*) or released after a pause (*Task released: …*);
-- the lead's answer to a question you asked with **Ask the lead** (*Answer from the lead on case-0102 de*);
-- for leads: a text problem that someone reported in your project (*Text problem from Ana Weber (ann-0004): case-0042 de*), or a question to the lead (*Question from Ana Weber (ann-0004): case-0102 de*).
+- the lead's answer to a question you asked with **Ask the lead** (*Answer from the lead: case-0102 de*). If you paused your task until the answer, the answer also opens it again; you get this one notification, not a second *Task released*;
+- for leads: a text problem that someone reported in your project (*Text problem from Ana Weber (ann-0004): case-0042 de*), or a question to the lead (*Question from Ana Weber (ann-0004): case-0102 de*). Every lead of the project gets the question.
 
 A number on the bell counts the unread notifications. It updates every minute and when you come back to the window.
 
 1. Click the bell. A short list opens with the newest notifications first. Unread ones have a dot and bold text. Each one names the project and the time.
-2. Click a notification to open its place: the task, the problem report, or **Questions** for a question to the lead. It is then marked as read.
+2. Click a notification to open its place: the task, or the problem report. It is then marked as read.
+   - A question to the lead opens **Questions** at that question: its tab is selected (**Open**, or **Answered** if another lead answered it already) and the question is marked.
+   - An answer from the lead opens your task. The answer is under **Questions to the lead** in **Your review**.
 3. To mark one as read without opening it, click **Mark as read** next to it. **Mark all as read** below the list marks all of them.
 
 With the keyboard, Tab to the bell and press Enter; Tab moves through the list and Escape closes it. On a phone the list opens as a full screen sheet.
 
-Notifications never contain the text of a case, a reason or a comment: only the names of the task, the text and the person. They are kept for 30 days once read and for 180 days at most; you keep the newest 200. A notification about a task that is no longer yours, or from a project you left, is not shown.
+Notifications never contain the text of a case, a reason, a comment, a question or an answer: only the names of the task, the text and the person. They are kept for 30 days once read and for 180 days at most; you keep the newest 200. A notification about a task that is no longer yours, or from a project you left, is not shown.
 
 ## Report a technical problem
 

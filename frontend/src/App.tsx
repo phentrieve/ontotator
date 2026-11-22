@@ -362,7 +362,7 @@ export function App({ user: givenUser, onLogout }: AppProps): JSX.Element {
     case "projectTranslationReviews": content = <TranslationReviewsPage projectKey={route.key} query={route} onNavigate={go} />; break;
     // Issue 590: lead only, like the other lead pages; the asker reads their questions and answers in their task.
     case "projectQuestions": content = projectGate(route.key, "Questions", "The Questions page is for project leads. Your own questions and their answers are in your task, under “Questions to the lead”.")
-      ?? <QuestionsPage projectKey={route.key} onNavigate={go} />; break;
+      ?? <QuestionsPage projectKey={route.key} question={route.question} onNavigate={go} />; break;
     case "projectExport": {
       const exported = projects.find(project => project.project_key === route.key);
       content = <ExportPage projectKey={route.key} currentUser={user} documentCount={exported?.document_count} onNavigate={go}
