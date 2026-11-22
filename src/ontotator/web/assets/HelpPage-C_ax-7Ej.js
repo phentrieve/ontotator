@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-B5wbrT97.js";import{n as a,t as o}from"./lib-BhwMYGO8.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-BvkgUbn2.js";import{n as a,t as o}from"./lib-BKmEeqjk.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -819,6 +819,8 @@ What for: ask the project lead a question about the task you are working on, for
 4. Optional: tick **Pause my task until the lead answers** if you cannot go on without the answer.
 5. Click **Send question**.
 
+With **Pause my task until the lead answers** ticked, your task is paused as soon as you send; your edits are saved first. The banner reads *Paused until the lead answers your question*. The lead's answer opens your task again. To go on without waiting, click **Resume my task…** on the question under **Questions to the lead**, write **Why can you continue?** and click **Resume my task**: the question stays open and the lead can still answer it. A question is not a text problem: **Report a text problem** does not count it.
+
 **Questions to the lead** lists your questions: *Waiting for the lead's answer*, then *Answered by the lead* with **Answer from the lead**. If the lead took your wording, it reads *The lead put your wording into your text.*; click **Show it in my text** to load it. Check it and submit your review as usual.
 
 ## Report a text problem
@@ -1420,7 +1422,7 @@ The typo fix (**Edit the translation…** › **Only spelling, spacing or gramma
 
 ### "This question cannot be answered this way."
 
-The answer to a question was refused. With **Take the proposed wording into the reviewer's text**: the passage is no longer in the reviewer's text exactly once, or the review was submitted. Send the answer without taking the wording. The question may also have been answered already; reload the page. See [Answer a question](lead-results.md#answer-a-question).
+The answer to a question was refused, and the question may have been answered already; reload the page. When the wording could not be taken, the dialog says so instead: *The quoted passage is no longer in the reviewer's text, so the wording cannot be taken.* (the passage is not in their text exactly once) or *The reviewer's review is no longer open…*. Untick **Take the proposed wording into the reviewer's text** and send the answer without it. See [Answer a question](lead-results.md#answer-a-question).
 
 ### "The question could not be sent."
 
@@ -1673,7 +1675,7 @@ The header is the same on every page:
 
 ![The user menu, open at the top right: Profile, My technical reports, Technical problem…, the theme choice and Log out](images/getting-started-user-menu.png)
 
-The sidebar is for your work. It lists the project switcher, **My tasks** and **Projects**. The number after **My tasks** counts your open tasks, the same tasks as the **To do** tab; it updates as soon as you submit a text. Clicking **My tasks** or **Projects** loads your projects and the count again, so a project you were just added to shows up without reloading the page. Leads also see their project's pages (**Documents**, **Questions**, **Progress**, **Settings**, **Export**); the number after **Questions** counts the open questions to the lead; the list **Translation reviews** opens from **Progress**, which stays marked while the list is open. In the editor, the sidebar folds into **Sections**; click it to open it. The user menu and the gear stay at the top right there too.
+The sidebar is for your work. It lists the project switcher, **My tasks** and **Projects**. The number after **My tasks** counts your open tasks, the same tasks as the **To do** tab; it updates as soon as you submit a text. Clicking **My tasks** or **Projects** loads your projects and the count again, so a project you were just added to shows up without reloading the page. Leads also see their project's pages (**Documents**, **Questions**, **Progress**, **Settings**, **Export**); the number after **Questions** counts the open questions to the lead and updates as soon as you answer one; the list **Translation reviews** opens from **Progress**, which stays marked while the list is open. In the editor, the sidebar folds into **Sections**; click it to open it. The user menu and the gear stay at the top right there too.
 
 ## Report a technical problem
 
@@ -2761,9 +2763,9 @@ What for: answer a question a person asked with **Ask the lead** (today in a tra
 1. In the sidebar, click **Questions**. The count shows the open ones, for example *Questions (2)*.
 2. The **Open** tab lists each question with who asked, the task and text, the question and, if given, the passage with the proposed wording marked as changes.
 3. Click **Answer…**, write **Your answer**, and click **Send answer**.
-4. With a proposed wording, tick **Take the proposed wording into the reviewer's text** to put it into their open review in the same step; the button then reads **Answer and take the wording**. The reviewer still checks the text and submits the review. If the passage is no longer in their text, the answer is refused with the wording; send it without.
+4. With a proposed wording, tick **Take the proposed wording into the reviewer's text** to put it into their open review in the same step; the button then reads **Answer and take the wording**. The reviewer still checks the text and submits the review. If the passage is no longer in their text, the dialog says *The quoted passage is no longer in the reviewer's text, so the wording cannot be taken.*; untick the box and send the answer without it.
 
-The answer appears in the person's task under **Questions to the lead**. Answered questions stay under **Answered**. A question is no problem report: it does not show on **Documents** and does not hold the export.
+The answer appears in the person's task under **Questions to the lead**. Answered questions stay under **Answered**, and the count in the sidebar follows at once. The **Questions** page is for leads; other people read their own questions in their task. A question is no problem report: it does not show on **Documents** and does not hold the export. A question that paused its asker's task keeps that task open in the work, so **Export** lists the text under **Needs your decision** with *Waiting for your answer to a question: …* and **Open Questions**, which leads here.
 
 ### Resolve a rejected or queried translation
 

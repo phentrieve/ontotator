@@ -204,7 +204,7 @@ The typo fix (**Edit the translation…** › **Only spelling, spacing or gramma
 
 ### "This question cannot be answered this way."
 
-The answer to a question was refused. With **Take the proposed wording into the reviewer's text**: the passage is no longer in the reviewer's text exactly once, or the review was submitted. Send the answer without taking the wording. The question may also have been answered already; reload the page. See [Answer a question](lead-results.md#answer-a-question).
+The answer to a question was refused, and the question may have been answered already; reload the page. When the wording could not be taken, the dialog says so instead: *The quoted passage is no longer in the reviewer's text, so the wording cannot be taken.* (the passage is not in their text exactly once) or *The reviewer's review is no longer open…*. Untick **Take the proposed wording into the reviewer's text** and send the answer without it. See [Answer a question](lead-results.md#answer-a-question).
 
 ### "The question could not be sent."
 

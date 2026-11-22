@@ -100,6 +100,12 @@ function selectedPassage(): string {
   if (editor instanceof HTMLTextAreaElement && editor.selectionStart !== editor.selectionEnd) return editor.value.slice(editor.selectionStart, editor.selectionEnd);
   return window.getSelection()?.toString() ?? "";
 }
+/** After a question is sent, the quoted selection is let go: the next question does not quote it again (issue 590). */
+function clearPassage(): void {
+  const editor = document.getElementById("review-translation");
+  if (editor instanceof HTMLTextAreaElement && editor.selectionStart !== editor.selectionEnd) editor.setSelectionRange(editor.selectionEnd, editor.selectionEnd);
+  window.getSelection()?.removeAllRanges();
+}
 
 const paragraphMarkers = (element: HTMLElement) => [...element.querySelectorAll<HTMLElement>("[data-paragraph]")];
 const paneTop = (element: HTMLElement) => element.getBoundingClientRect().top + element.clientTop;
@@ -315,7 +321,8 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     changeMarks({ ...marks, [side]: storedMarks(sentences, change(states)) });
   };
   const sideCount = (states: readonly MarkState[]) => ({ checked: states.filter(isChecked).length, total: states.length, stale: states.filter(state => state?.kind === "stale").length });
-  const form = typedForm(rawForm), issues = form ? checkReview(form, workspace.text, text, workspace.failed_checks.length > 0) : [];
+  // Issue 590: a draft that still holds the retired Query lists that first; the form's own issues follow a new decision.
+  const form = typedForm(rawForm), issues = form && form.decision !== "query" ? checkReview(form, workspace.text, text, workspace.failed_checks.length > 0) : [];
   const comparison = comparisonOpen ? comparisons.find(row => row.id === comparisonId) : undefined;
   /** The editable translation is shown: it is the fixed leader and its pairing waits for a recompute (spec 2.2, 2.3). */
   const editing = !readOnly && !showChanges && !marking;
@@ -902,7 +909,9 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
           {/* Issue 483: the lead's decision on this submitted query, with the answer. */}
           {record && <QueryAnswer answer={workspace.query_answer} />}
           {!leadCorrection && <TaskQuestionList assignment={workspace.assignment} state={questions} withProposal readOnly={readOnly}
-            selectedText={selectedPassage} onShowInText={() => { void reload(); }} dialogOpen={asking} onDialogOpen={setAsking} />}
+            selectedText={selectedPassage} onShowInText={() => { void reload(); }} dialogOpen={asking} onDialogOpen={setAsking}
+            // Issue 590: a pausing question pauses the task at once, as a problem report does; a resume opens it again.
+            onSaveBeforePause={async () => { await flush(); }} onAsked={clearPassage} onPauseChanged={() => onTaskHeld.current?.()} />}
           <SourceObligationReview assignmentId={props.assignmentId} username={props.username} documentId={workspace.variant.document_id}
             translationText={text} canResolve={canSubmit && !!form && ['accepted_unchanged', 'accepted_corrected'].includes(form.decision)}
             busy={busy} readOnly={readOnly} error={error} onResolve={submit} onPending={setPendingSourceUpdates} openRef={openSourceUpdate} />

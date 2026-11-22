@@ -89,7 +89,8 @@ export function ReporterReportCard({ report, assignment, confirm, onConfirmChang
       // Issue 464: the lead pause of the text is its own cause; it stays when this report's pause ends.
       const textPaused = (assignment.pause_causes ?? []).includes("lead");
       const still = otherPauses.length > 0 || textPaused;
-      const stillBy = leadPauses.length > 0 || textPaused ? "a project lead" : "another of your reports";
+      const stillBy = leadPauses.length > 0 || textPaused ? "a project lead"
+        : otherPauses.every(h => h.kind === "question") ? "your question to the lead" : "another of your reports";
       setMessage(kind === "resume"
         ? still ? `Resumed. Your task is still paused by ${stillBy}.` : open ? "Resumed. The report stays open." : "Resumed."
         : still ? `Withdrawn. Your task is still paused by ${stillBy}.` : "Withdrawn. Your task is no longer paused by this report.");
@@ -140,6 +141,7 @@ export function ReporterReportCard({ report, assignment, confirm, onConfirmChang
         <p>{open ? "The report stays open. A project lead decides on it." : "The report is already closed. Only the pause is released."}</p>
         {otherPauses.map((h, index) => <p key={`${h.created_at}-${index}`}>{h.own_report_id === null
           ? `Your task stays paused by a project lead: ${h.reason}.`
+          : h.kind === "question" ? `Your task stays paused by your question "${reportTitle(h.reason)}" until the lead answers.`
           : `Your task stays paused by your report "${reportTitle(h.reason)}".`}</p>)}
       </>}>
       {reasonField("Why can you continue?", "Recorded in the report history. Project leads see it.")}
