@@ -10,6 +10,7 @@ import { Button, EmptyState, InlineMessage } from "../ui";
 import { tabId, Tabs } from "../ui/Tabs";
 import { AnswerQuestionDialog } from "./AnswerQuestionDialog";
 import { ANSWER_LABEL, openCount, QUESTIONS_PAGE_TITLE, taskNoun } from "./labels";
+import { notifyQuestionsChanged } from "./questionsEvents";
 import "./questions.css";
 
 type Segment = "open" | "answered";
@@ -73,6 +74,8 @@ export function QuestionsPage({ projectKey, onNavigate }: { projectKey: string; 
     {answering && <AnswerQuestionDialog question={answering} onClose={() => setAnswering(null)} onAnswered={done => {
       setAnswering(null);
       setQuestions(list => (list ?? []).map(q => q.report_id === done.report_id ? done : q));
+      // Issue 590: "Questions (n)" in the sidebar follows the Open tab.
+      notifyQuestionsChanged();
       setNotice(done.took_proposed_text ? "Answer sent. The proposed wording is in the reviewer's text." : "Answer sent.");
     }} />}
     </div>

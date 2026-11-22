@@ -316,6 +316,11 @@ export function errorMessage(error: unknown): string {
     const max = error.details.max;
     if (typeof max === "number" && Number.isSafeInteger(max) && max > 0) return `You already have ${max} jobs waiting. Try again when one of them has started.`;
   }
+  // Issue 590: taking the asker's wording failed for a reason a reload does not change; the message says what to do.
+  if (error instanceof ApiError && error.code === "QUESTION_ANSWER_NOT_AVAILABLE" && typeof error.details === "object" && error.details !== null) {
+    if (error.details.reason === "quote_not_found") return "The quoted passage is no longer in the reviewer's text, so the wording cannot be taken. Untick “Take the proposed wording…” and send the answer without it.";
+    if (error.details.reason === "no_open_review") return "The reviewer's review is no longer open, so the wording cannot be taken. Untick “Take the proposed wording…” and send the answer without it.";
+  }
   if (error instanceof ApiError && error.code === "TEXT_CHANGE_NOT_APPLICABLE" && typeof error.details === "object" && error.details !== null && error.details.reason === "no_target_proposals") {
     return "The new version has no proposals yet: their automatic transfer may still be running, or they must be imported. Wait for or import the proposals for the new version, then try again.";
   }

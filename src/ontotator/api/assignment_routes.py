@@ -48,11 +48,17 @@ router = APIRouter(prefix="/api/v1", tags=["assignments"])
 
 
 class ActiveHoldView(BaseModel):
-    """An active pause on the owner's task; other people's reports stay unnamed."""
+    """An active pause on the owner's task; other people's reports stay unnamed.
+
+    ``kind`` says what paused it: a problem report, or a question to the lead
+    whose asker chose to pause (issue 553). Only the answer, or the asker's
+    own resume, releases the pause of a question.
+    """
 
     reason: str
     created_at: datetime
     own_report_id: str | None
+    kind: Literal["problem", "question"] = "problem"
 
 
 class AssignmentGuidelineView(BaseModel):
@@ -312,6 +318,7 @@ def _views(
                     TaskHoldRow.created_at,
                     ProblemReportRow.report_id,
                     ProblemReportRow.reporter_id,
+                    ProblemReportRow.kind,
                 )
                 .join(TaskHoldStateRow, TaskHoldStateRow.hold_id == TaskHoldRow.hold_id)
                 .join(
@@ -324,12 +331,13 @@ def _views(
                 )
                 .order_by(TaskHoldRow.created_at, TaskHoldRow.hold_id)
             ).all()
-            for assignment_id, reason, created_at, report_id, reporter_id in rows:
+            for assignment_id, reason, created_at, report_id, reporter_id, kind in rows:
                 holds.setdefault(assignment_id, []).append(
                     ActiveHoldView(
                         reason=reason,
                         created_at=created_at,
                         own_report_id=report_id if reporter_id == owner_id else None,
+                        kind=kind,
                     )
                 )
 

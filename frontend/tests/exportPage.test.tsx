@@ -160,6 +160,21 @@ it("links each preflight warning and omission to its Documents row", async () =>
   expect(screen.getByRole("rowgroup", { name: "Left out: no final result" })).toBeTruthy();
 });
 
+// Issue 590: a text that waits for the lead's answer to a question leads to the Questions page, not to Documents.
+it("links a text paused by a question to the Questions page", async () => {
+  vi.mocked(api.finalExportPreflight).mockResolvedValue({ project: "p/a", selections: [{ case_id: "GSC17", language: "de", document_id: "d", submission_id: "s", revision: 1 }],
+    warnings: [
+      { id: "q", code: "TASK_ON_HOLD", cause_revision: 1, case_id: "GSC 17", language: "de", document_id: "d", reason: "Waiting for your answer to a question: Is it meant?", destination: "#/projects/p%2Fa/questions" },
+      { id: "r", code: "OPEN_PROBLEM_REPORT", cause_revision: 1, case_id: "GSC 18", language: "de", document_id: "e", reason: "An open problem report needs a lead decision.", destination: "#/projects/p%2Fa/problem-reports/r" },
+    ],
+    omissions: [], state_digest: "a".repeat(64), planned_out_texts: 0 });
+  render(<ExportPage projectKey="p/a" currentUser={user} />);
+  await screen.findByText("Waiting for your answer to a question: Is it meant?");
+  expect(screen.getByRole("link", { name: "Open Questions, GSC 17 de" }).getAttribute("href")).toBe("#/projects/p%2Fa/questions");
+  expect(screen.queryByRole("link", { name: "Open in Documents, GSC 17 de" })).toBeNull();
+  expect(screen.getByRole("link", { name: "Open in Documents, GSC 18 de" })).toBeTruthy();
+});
+
 it("runs the preflight on open", async () => {
   let resolve!: (value: FinalPreflight) => void;
   vi.mocked(api.finalExportPreflight).mockImplementationOnce(() => new Promise(r => { resolve = r; }));
