@@ -97,7 +97,7 @@ What for: finish fewer texts than planned, for example when the work goes slower
 1. Select the texts to take out. Use **Select by case IDs…** with a list from a spreadsheet, or a filter and the checkbox in the table header ([Select texts](lead-documents.md#select-texts)). To keep a list of texts and take out all others, paste the list and tick **Select all except these**. One selection holds at most 2000 cases.
 2. Click **Plan…** in the selection bar.
 3. Under **Annotation**, choose **Off (not annotated)** for each language. Under **Translation review**, choose **Off** if the reviews should stop too.
-4. Optional: enter a **Reason (optional)**, for example *Adults only in this study*. The final export names the texts you take out with this reason.
+4. Optional: enter a **Reason (optional)**, for example *Adults only in this study*. The final export names the texts you take out with this reason. The (?) next to the field says where the reason is kept.
 5. Read what will change. Open tasks are withdrawn; annotation drafts are kept. Final results of these texts stay in the history but are no longer exported.
 6. Tick **I understand** (or **I understand — withdraw the open tasks**) and save again.
 
