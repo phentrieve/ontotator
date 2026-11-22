@@ -186,7 +186,7 @@ it("after a bulk Undo the toast offers the texts of the withdrawn tasks, also af
 async function planWithPreset(preset: string) {
   fireEvent.click(within(bar()).getByRole("button", { name: "Plan…" }));
   const dialog = await screen.findByRole("dialog", { name: "Work plan: 20 cases" });
-  fireEvent.click(await within(dialog).findByRole("button", { name: preset }));
+  fireEvent.click(await within(dialog).findByRole("button", { name: new RegExp(`^${preset}`) }));
   const save = within(dialog).getByRole("button", { name: "Save for 20 cases" });
   await waitFor(() => expect(save.getAttribute("aria-disabled")).toBeNull());
   await act(async () => { fireEvent.click(save); });

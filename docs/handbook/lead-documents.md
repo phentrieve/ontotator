@@ -335,10 +335,10 @@ A selection holds the texts of at most 2000 cases. With more, the dialog selects
 What for: set the work plan for a selection.
 
 1. Select the texts, then click **Plan…** in the selection bar.
-2. Optional: under **Quick choice for the selected translations**, pick **Translation review and annotation** or **Annotation only, no translation review**.
+2. Optional: under **Quick choice for the selected translations**, pick **Translation review and annotation** or **Annotation only, no translation review**. Each button says how many texts it changes, for example *Translation review and annotation (12 texts)*; one that changes nothing is greyed and says *Already planned.* A quick choice only fills the choices below; nothing is saved until you save.
 3. Or set it per language: **Translation review** and **Annotation**. **Leave as is** keeps the current plan.
 4. Read what will change.
-5. Optional: enter a **Reason (optional)**, for example *Adults only in this study*. It is kept with the change. When you take texts out of the plan, the final export names them with this reason. When you accept translations as reviewed outside Ontotator, the **Reason** is required and also recorded with the acceptance.
+5. Optional: enter a **Reason (optional)**, for example *Adults only in this study*. It is kept with the change. When you take texts out of the plan, the final export names them with this reason. When you accept translations as reviewed outside Ontotator, the **Reason** is required and also recorded with the acceptance, with your name and the time. The (?) next to the field says this in the dialog.
 6. Click the save button, for example *Save for 20 cases*.
 7. If work already exists, the dialog lists what happens to it. Tick **I understand** (or **I understand — withdraw the open tasks**) and save again.
 

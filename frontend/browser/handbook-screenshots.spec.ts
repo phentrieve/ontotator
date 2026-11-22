@@ -399,7 +399,7 @@ test.describe("lead.md", () => {
     const plan = page.getByRole("dialog", { name: /^Work plan\W+3 cases$/ });
     await expect(plan.getByRole("group", { name: "Quick choice for the selected translations" })).toBeVisible();
     for (const choice of ["Translation review and annotation", "Annotation only, no translation review"]) {
-      await expect(plan.getByRole("button", { name: choice, exact: true })).toBeVisible();
+      await expect(plan.getByRole("button", { name: new RegExp(`^${choice}( \\(\\d+ texts?\\))?$`) })).toBeVisible();
     }
     await expect(plan.getByRole("button", { name: "Save for 3 cases", exact: true })).toBeVisible();
     await shot(page, "lead-work-plan");

@@ -189,7 +189,8 @@ every new screen; existing screens follow them as they are changed.
 7. **Help on demand is a visible (?).** An explanation that is needed only
    sometimes (a rule, what a choice means, why something moves or stays) sits
    behind a (?) button next to the field or heading it explains
-   (`HelpButton` and `HelpText` in `ui/Help.tsx`), never in a tooltip only. The
+   (`HelpButton` and `HelpText` in `ui/Help.tsx`; `help` on a `TextInput` or
+   `Textarea`), never in a tooltip only. The
    (?) is a disclosure: it toggles a short text in place, works by touch and
    keyboard, Escape closes it, and its name is *Help: <topic>* (*Help: What
    did you fix?*). A hint that fits in a field goes into its placeholder

@@ -80,11 +80,11 @@ describe("PlanDialog", () => {
       ? preview({ cases: 2, languages: [lang("source", 1, null, [0, 1]), lang("de", 1, [0, 1], [0, 1], { will_change: 1 })] }) : preview());
     renderDialog({ rows });
     const quick = await screen.findByRole("group", { name: "Quick choice for the selected translations" });
-    fireEvent.click(within(quick).getByRole("button", { name: "Translation review and annotation" }));
+    fireEvent.click(within(quick).getByRole("button", { name: /^Translation review and annotation/ }));
     await waitFor(() => expect(lastPreviewBody()).toEqual({ rows, languages: { de: { review: "on", annotate: "on" } } }));
     expect((await radio("de", "Translation review", "On")).checked).toBe(true);
     expect(screen.queryByRole("region", { name: /^fr In selection/ })).toBeNull();
-    fireEvent.click(within(quick).getByRole("button", { name: "Annotation only, no translation review" }));
+    fireEvent.click(within(quick).getByRole("button", { name: /^Annotation only, no translation review/ }));
     await waitFor(() => expect(lastPreviewBody()).toEqual({ rows, languages: { de: { review: "off_unstarted", annotate: "on" } } }));
     expect((await radio("de", "Translation review", "Off")).checked).toBe(true);
     expect(api.saveWorkPlans).not.toHaveBeenCalled();
@@ -100,11 +100,13 @@ describe("PlanDialog", () => {
     });
     renderDialog({ rows });
     const quick = await screen.findByRole("group", { name: "Quick choice for the selected translations" });
-    const both = within(quick).getByRole("button", { name: "Translation review and annotation" });
+    const both = within(quick).getByRole("button", { name: /^Translation review and annotation/ });
     await waitFor(() => expect(both.getAttribute("aria-disabled")).toBe("true"));
     expect(description(both)).toBe("Already planned.");
-    const only = within(quick).getByRole("button", { name: "Annotation only, no translation review" });
-    await waitFor(() => expect(description(only)).toBe("Changes 1 text. 1 text keeps its translation review: it has started or is done."));
+    const only = within(quick).getByRole("button", { name: /^Annotation only, no translation review/ });
+    // Issue 556: the button names how many texts it changes; no text under it.
+    await waitFor(() => expect(only.textContent).toBe("Annotation only, no translation review (1 text)"));
+    expect(description(only)).toBe("");
     fireEvent.click(both);
     expect((await radio("de", "Translation review", /^Leave as is/)).checked).toBe(true);
     fireEvent.click(only);
@@ -212,7 +214,10 @@ describe("PlanDialog", () => {
     await choose("de", "Annotation", "Off (not annotated)");
     const reason = screen.getByLabelText(/^Reason \(optional\)/) as HTMLTextAreaElement;
     expect(reason.required).toBe(false);
-    expect(description(reason)).toContain("The final export names it for texts you take out of the plan.");
+    // Issue 556: the explanation is behind (?) next to the label.
+    const help = screen.getByRole("button", { name: "Help: Reason" });
+    fireEvent.click(help);
+    expect(document.getElementById(help.getAttribute("aria-controls")!)!.textContent).toContain("The final export names it for texts you take out of the plan.");
     await waitFor(() => expect(save().getAttribute("aria-disabled")).toBeNull());
     fireEvent.change(reason, { target: { value: "  Adults only in this study.  " } });
     fireEvent.click(save());
