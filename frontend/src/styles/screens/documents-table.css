@@ -250,6 +250,8 @@ button.documents-text-name { min-height: 24px; padding: 0; border: 0; background
 .editorial-correction-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .editorial-correction-chips .ui-plan-chip + .ui-plan-chip { margin-inline-start: 0; }
 .editorial-correction-work { margin: 0; overflow-wrap: anywhere; }
+.editorial-correction-stays { margin: var(--space-1) 0 0; padding-inline-start: 1.25rem; display: grid; gap: var(--space-1); }
+.editorial-correction-rule { margin: var(--space-2) 0 0; }
 /* The lead decides a query (issue 483): the layout of "Fix typos…", with the reviewer's question on top. */
 .query-decision .documents-review-reason { margin-top: 0; }
 /* "Add to the reason…" (issue 547, U2-08): the quoted reason and the field below it are apart, not touching. */

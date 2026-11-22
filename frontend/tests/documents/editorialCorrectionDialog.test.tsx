@@ -324,3 +324,26 @@ it("opens with focus on Save; a greyed Save names its reason as description and 
   expect(save.getAttribute("title")).toBeNull();
   expect(save.getAttribute("aria-describedby")).toBeNull();
 });
+
+it("issue 584: the block Work stays on v2 lists each reason on its own line, the rule for tasks from proposals set apart", async () => {
+  const staying = {
+    annotations: { submitted: 0, open: 2 }, tasks_following: 0, proposals: { sets: 1, carried: 1, needs_check: 1 },
+    tasks_staying: [
+      { assignment_id: 1, username: "ana", display_name: "Ana Weber", reason: "from_proposals_needs_check" as const },
+      { assignment_id: 2, username: "eva", display_name: "Eva Lang", reason: "opened" as const },
+    ],
+  };
+  vi.mocked(api.previewEditorialCorrection).mockImplementation(async (_key, _id, text) => (text === undefined ? preview(staying) : checkedPreview(text, staying)));
+  const { dialog, editor } = await renderDialog();
+  await type(editor, NEW);
+  const block = (await within(dialog).findByText("Work stays on v2")).closest(".notice") as HTMLElement;
+  const list = within(block).getByRole("list");
+  expect(within(list).getAllByRole("listitem").map(item => item.textContent)).toEqual([
+    "2 annotations stay on v2. After saving, use Handle text change… on this row to move them.",
+    "Task not moved, from tool proposals, and a proposal waits for a check: Ana Weber.",
+    "Task not moved, already opened: Eva Lang.",
+  ]);
+  const rule = within(block).getByText(PROPOSALS_RULE("v3"));
+  expect(rule.tagName).toBe("P");
+  expect(list.contains(rule)).toBe(false);
+});

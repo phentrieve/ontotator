@@ -19,11 +19,13 @@ const STATUS: Readonly<Record<CardWorkItem["status"], { tone: StatusTone; label:
   submitted: { tone: "success", label: "Submitted" },
 };
 
-/** The status pill of a work item; an unsubmitted consolidation says "Consolidating" (its round runs once it is assigned, even while the assignment is still "open"). */
+/** The status pill of a work item ("Opened" for an open task the person opened without saving a change); an unsubmitted consolidation says "Consolidating" (its round runs once it is assigned, even while the assignment is still "open"). */
 export function workStatus(item: CardWorkItem): { tone: StatusTone; label: string } {
   if (item.task === "review" && item.status !== "submitted") return { tone: "info", label: "Consolidating" };
   if (item.waiting_for_translation_review) return { tone: "neutral", label: "Waiting for review" };
   if (item.waiting_for_lead) return { tone: "neutral", label: "Waiting for the project lead" };
+  // Issue 584: opened, nothing saved yet; the typo fix keeps such a task on its version ("already opened").
+  if (item.status === "open" && item.opened) return { tone: "info", label: "Opened" };
   return STATUS[item.status];
 }
 

@@ -244,6 +244,7 @@ export function EditorialCorrectionDialog({ row, version, projectKey, onCorrecte
   const numbers = current ? numberNotice(current.number_changes) : null;
   const consequences = current ?? state;
   const work = consequences ? editorialConsequences(consequences) : null;
+  const rule = consequences ? PROPOSALS_RULE(`v${consequences.next_version}`) : null;
   const review = reviewNote(version.latest_review_decision, next);
 
   const save = async () => {
@@ -316,7 +317,11 @@ export function EditorialCorrectionDialog({ row, version, projectKey, onCorrecte
             ? <>
               {work.moving.length > 0 && <p className="editorial-correction-work">{work.moving.join(" ")}</p>}
               <InlineMessage tone="warning" title={`Work stays on v${version.version}`}>
-                {work.lines.map(line => <span key={line} className="lead-correction-consequence">{line} </span>)}
+                {/* Issue 584: one line per reason, the rule for tasks from proposals set apart below them. */}
+                <ul className="editorial-correction-stays">
+                  {work.lines.filter(line => line !== rule).map(line => <li key={line}>{line}</li>)}
+                </ul>
+                {rule !== null && work.lines.includes(rule) && <p className="editorial-correction-rule">{rule}</p>}
               </InlineMessage>
             </>
             : <p className="editorial-correction-work">{[...work.moving, ...work.lines].join(" ")}</p>)}

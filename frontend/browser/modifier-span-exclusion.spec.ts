@@ -228,3 +228,56 @@ test("a modifier outside the finding's span gets no offer", async ({ page }) => 
   await attachSevere(page);
   await expect(offer(page)).toHaveCount(0);
 });
+
+test("Change text span… on a modifier: a drag from the finding's first letter picks the modifier's text, the finding keeps its span", async ({ page }) => {
+  // Issue 583: the finding's start handle stayed active in this mode, so the drag resized the finding instead.
+  await open(page, true, { inside: "1" });
+  await selectSeizure(page);
+  await expect(page.locator(".text-container .resize-handle")).toHaveCount(2);
+  await severeRow(page).getByRole("button", { name: "Actions, Severe" }).click();
+  await page.getByRole("menuitem", { name: "Change text span…" }).click();
+  await expect(page.locator(".attach-mention-banner")).toContainText("Select the text for Severe, then press Enter. Esc cancels.");
+  await expect(page.locator(".text-container .resize-handle")).toHaveCount(0);
+
+  let edits = 0;
+  page.on("request", request => {
+    if (request.url().endsWith("/commands") && (request.postDataJSON() as { payload?: { command?: string } } | null)?.payload?.command === "edit_mention") edits += 1;
+  });
+  const linked = commandResponse(page, "set_modifier_segments");
+  await drag(page, "wiederholt");
+  const response = await linked;
+  expect(response.ok()).toBeTruthy();
+  expect((response.request().postDataJSON() as { payload: { segments: unknown } }).payload.segments).toEqual([{ start: 14, end: 24 }]);
+  await expect(severeRow(page)).toContainText("Severe · HP:0012828 “wiederholt”");
+  // The finding still covers all three words.
+  for (const word of ["wiederholt", "schwere", "Krampfanfälle"]) expect(await findingIdsAt(page, word)).toHaveLength(1);
+  expect(edits).toBe(0);
+  // Out of the mode, the finding's handles are back.
+  await expect(page.locator(".attach-mention-banner")).toHaveCount(0);
+  await expect(page.locator(".text-container .resize-handle")).toHaveCount(2);
+});
+
+for (const width of [1440, 390]) {
+  test(`the row hint In span · Exclude leaves the modifier's quote whole (${width} px)`, async ({ page }) => {
+    // Issue 583: the hint sat beside the name and cut the quote to "“schwere Kr…”"; now it wraps below when needed.
+    const s = await open(page, true, { inside: "1" });
+    await selectSeizure(page);
+    await severeRow(page).getByRole("button", { name: "Actions, Severe" }).click();
+    await page.getByRole("menuitem", { name: "Change text span…" }).click();
+    const linked = commandResponse(page, "set_modifier_segments");
+    const start = s.texts[CASE].indexOf("schwere");
+    await selectText(page, start, start + "schwere Krampfanfälle".length);
+    expect((await linked).ok()).toBeTruthy();
+    await offer(page).getByRole("button", { name: "Keep span" }).click();
+    if (width < 600) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.getByRole("navigation", { name: "Select view" }).getByRole("button", { name: /^Details/ }).click();
+    }
+    await expect(hint(page)).toHaveText("In span · Exclude");
+    await expect(severeRow(page)).toContainText("Severe · HP:0012828 “schwere Krampfanfälle”");
+    // Nothing of the name, code or quote is cut off.
+    const main = severeRow(page).locator(".mod-row-main");
+    expect(await main.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
+    await expect(hint(page)).toBeInViewport({ ratio: 1 });
+  });
+}

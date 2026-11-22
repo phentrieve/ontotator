@@ -372,6 +372,7 @@ WORK_KEYS = {
     "is_me",
     "task",
     "status",
+    "opened",
     "held",
     "pause_causes",
     "round_ordinal",
