@@ -156,12 +156,12 @@ Only leads and system administrators can open the list. To decide a query or a r
 
 What for: answer a question a person asked with **Ask the lead** (today in a translation review). Their task stays open while you answer, unless they chose to pause it.
 
-1. In the sidebar, click **Questions**. The count shows the open ones, for example *Questions (2)*.
+1. In the sidebar, click **Questions**. The count shows the open ones, for example *Questions (2)*. Or click the notification *Question from Ana Weber (ann-0004): case-0102 de* under the bell: Questions opens at that question, marked (see [Notifications](getting-started.md#notifications)).
 2. The **Open** tab lists each question with who asked, the task and text, the question and, if given, the passage with the proposed wording marked as changes.
 3. Click **Answer…**, write **Your answer**, and click **Send answer**.
 4. With a proposed wording, tick **Take the proposed wording into the reviewer's text** to put it into their open review in the same step; the button then reads **Answer and take the wording**. The reviewer still checks the text and submits the review. If the passage is no longer in their text, the dialog says *The quoted passage is no longer in the reviewer's text, so the wording cannot be taken.*; untick the box and send the answer without it.
 
-The answer appears in the person's task under **Questions to the lead**. Answered questions stay under **Answered**, and the count in the sidebar follows at once. The **Questions** page is for leads; other people read their own questions in their task. A question is no problem report: it does not show on **Documents** and does not hold the export. A question that paused its asker's task keeps that task open in the work, so **Export** lists the text under **Needs your decision** with *Waiting for your answer to a question: …* and **Open Questions**, which leads here.
+The answer appears in the person's task under **Questions to the lead**, and their bell shows *Answer from the lead: case-0102 de*. Answered questions stay under **Answered**, and the count in the sidebar follows at once. The **Questions** page is for leads; other people read their own questions in their task. A question is no problem report: it does not show on **Documents** and does not hold the export. A question that paused its asker's task keeps that task open in the work, so **Export** lists the text under **Needs your decision** with *Waiting for your answer to a question: …* and **Open Questions**, which leads here.
 
 ### Resolve a rejected or queried translation
 
