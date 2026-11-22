@@ -7,6 +7,8 @@ from uuid import uuid4
 from pydantic import ValidationError
 from sqlalchemy import Connection, RowMapping, func, insert, select, update
 
+from ontotator.application.notifications import notify, notify_leads
+
 # The view models live in problem_report_views; re-exported for routes and callers.
 from ontotator.application.problem_report_views import (
     AffectedTask as AffectedTask,
@@ -243,6 +245,7 @@ class ProblemReportService:
         released_by: int,
         release_action: str,
         event_id: str,
+        notify_owner: bool = True,
     ) -> None:
         # Only active holds: an earlier release record is never overwritten.
         ids = list(
@@ -277,7 +280,7 @@ class ProblemReportService:
                 .order_by(TaskHoldRow.created_at, TaskHoldRow.hold_id)
                 .limit(1)
             ).scalar_one_or_none()
-            conn.execute(
+            owner = conn.execute(
                 update(AssignmentRow)
                 .where(AssignmentRow.id == aid)
                 .values(
@@ -286,7 +289,22 @@ class ProblemReportService:
                     workflow_revision=AssignmentRow.workflow_revision + 1,
                     updated_at=now,
                 )
-            )
+                .returning(AssignmentRow.user_id, AssignmentRow.project_id)
+            ).one()
+            if remaining is None and notify_owner:
+                # Issue 557: the task can be worked on again; its owner learns
+                # it unless they released it themselves. An answer to a
+                # question says it in its own notification.
+                notify(
+                    conn,
+                    owner.user_id,
+                    owner.project_id,
+                    "task_released",
+                    actor_id=released_by,
+                    assignment_id=aid,
+                    target_id=report_id,
+                    at=now,
+                )
 
     def report(
         self,
@@ -436,6 +454,17 @@ class ProblemReportService:
                 details={"assignment_id": assignment_id, **question}
                 if question
                 else {"assignment_id": assignment_id},
+                at=now,
+            )
+            # Issue 557: the leads' bell; the reason stays in the report. A
+            # question to the lead (issue 553) has its own kind.
+            notify_leads(
+                conn,
+                pid,
+                "question_received" if kind == "question" else "text_problem_received",
+                actor_id=fresh.user_id,
+                assignment_id=assignment_id,
+                target_id=rid,
                 at=now,
             )
             result = self._view(conn, rid, fresh, project)
@@ -658,7 +687,20 @@ class ProblemReportService:
                         released_by=fresh.user_id,
                         release_action="resume",
                         event_id=event_id,
+                        notify_owner=False,
                     )
+                # Issue 557: the asker's bell names the answer and opens the
+                # task; the answer itself stays in the question.
+                notify(
+                    conn,
+                    raw["reporter_id"],
+                    pid,
+                    "answer_received",
+                    actor_id=fresh.user_id,
+                    assignment_id=own,
+                    target_id=report_id,
+                    at=now,
+                )
             elif action == "extend_hold":
                 if not selected:
                     raise DomainError("HOLD_TARGET_REQUIRED")

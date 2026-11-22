@@ -4,6 +4,9 @@
 .task-question-list, .lead-question-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
 .task-question, .lead-question { border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-2) var(--space-3); background: var(--surface-raised); }
 .task-question--open, .lead-question--open { border-inline-start: 3px solid var(--warning); }
+/* The question a notification opened (issue 557): marked until the page is left; the focus ring shows on top. */
+.lead-question--target { background: var(--accent-light); box-shadow: inset 0 0 0 1px var(--accent); }
+.lead-question--target:focus-visible { outline: var(--focus-width) solid var(--focus-ring); outline-offset: var(--focus-offset); }
 .task-question p, .lead-question p { margin: 0 0 var(--space-1); overflow-wrap: anywhere; }
 .task-question-status, .lead-question-meta { color: var(--text-muted); }
 .task-question-text, .lead-question-text { white-space: pre-wrap; }

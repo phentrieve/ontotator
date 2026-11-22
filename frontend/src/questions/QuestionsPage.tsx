@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, type ProblemReportView } from "../api/client";
 import { ErrorNotice } from "../admin/ErrorNotice";
 import { textLabel } from "../app/identity";
@@ -16,12 +16,21 @@ import "./questions.css";
 type Segment = "open" | "answered";
 
 /** One question as the lead reads it, with "Answer…" while it is open. */
-function LeadQuestion({ question, projectKey, onAnswer, onNavigate }: {
+function LeadQuestion({ question, projectKey, target, onAnswer, onNavigate }: {
   question: ProblemReportView; projectKey: string; onAnswer: () => void; onNavigate: (route: Route) => void;
+  /** The question a notification opened (issue 557): marked, scrolled into view and focused once. */
+  target?: boolean;
 }): JSX.Element {
   const open = question.state === "open";
   const documents: Route = { name: "projectDocuments", key: projectKey, case: question.case_id, language: question.language };
-  return <li className={`lead-question${open ? " lead-question--open" : ""}`}>
+  const item = useRef<HTMLLIElement>(null);
+  useEffect(() => {
+    if (!target || !item.current) return;
+    item.current.scrollIntoView?.({ block: "center" });
+    item.current.focus({ preventScroll: true });
+  }, [target]);
+  return <li ref={item} className={`lead-question${open ? " lead-question--open" : ""}${target ? " lead-question--target" : ""}`}
+    {...(target ? { tabIndex: -1, "aria-current": true } : {})}>
     <p className="lead-question-meta">{`${reporterName(question)} · ${taskNoun(question.task)} of ${textLabel(question)} · ${formatTime(question.created_at ?? "")}`}
       {question.pauses && open && " · task paused"}</p>
     <p className="lead-question-text">{question.reason}</p>
@@ -44,7 +53,12 @@ function LeadQuestion({ question, projectKey, onAnswer, onNavigate }: {
  * The lead's questions of a project (issue 553, prototype): open ones first, with "Answer…"; answered ones below.
  * The server lists every question to a lead and refuses nothing here; other members see only their own.
  */
-export function QuestionsPage({ projectKey, onNavigate }: { projectKey: string; onNavigate: (route: Route) => void }): JSX.Element {
+export function QuestionsPage({ projectKey, question: targetId, onNavigate }: {
+  projectKey: string;
+  /** A question to show (from a notification, issue 557): its tab is selected and the question is marked. */
+  question?: string;
+  onNavigate: (route: Route) => void;
+}): JSX.Element {
   const [questions, setQuestions] = useState<ProblemReportView[] | null>(null);
   const [error, setError] = useState<unknown>(null), [reload, setReload] = useState(0);
   const [segment, setSegment] = useState<Segment>("open");
@@ -54,6 +68,15 @@ export function QuestionsPage({ projectKey, onNavigate }: { projectKey: string; 
     api.listQuestions(projectKey).then(list => { if (active) { setQuestions(list); setError(null); } }, failure => { if (active) setError(failure); });
     return () => { active = false; };
   }, [projectKey, reload]);
+  // The tab of the question a notification opened, once the list is there (answered since: Answered). Only once, so
+  // answering it here does not switch the tab.
+  const targetState = questions?.find(q => q.report_id === targetId)?.state;
+  const shownTarget = useRef<string | null>(null);
+  useEffect(() => {
+    if (!targetId || !targetState || shownTarget.current === targetId) return;
+    shownTarget.current = targetId;
+    setSegment(targetState === "open" ? "open" : "answered");
+  }, [targetId, targetState]);
   const open = (questions ?? []).filter(q => q.state === "open");
   const answered = (questions ?? []).filter(q => q.state !== "open");
   const shown = segment === "open" ? open : answered;
@@ -69,6 +92,7 @@ export function QuestionsPage({ projectKey, onNavigate }: { projectKey: string; 
     {questions !== null && shown.length === 0 && <EmptyState title={segment === "open" ? "No open questions" : "No answered questions yet"} />}
     {shown.length > 0 && <ul className="lead-question-list" aria-label={segment === "open" ? openCount(open.length) : "Answered questions"}>
       {shown.map(question => <LeadQuestion key={question.report_id} question={question} projectKey={projectKey} onNavigate={onNavigate}
+        target={question.report_id === targetId}
         onAnswer={() => { setNotice(null); setAnswering(question); }} />)}
     </ul>}
     {answering && <AnswerQuestionDialog question={answering} onClose={() => setAnswering(null)} onAnswered={done => {

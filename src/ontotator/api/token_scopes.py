@@ -61,6 +61,11 @@ ROUTE_SCOPES: Mapping[tuple[str, str], RouteScope] = {
     ("PUT", "/api/v1/preferences"): SESSION,
     ("POST", "/api/v1/technical-reports"): SESSION,
     ("GET", "/api/v1/me/technical-reports"): SESSION,
+    # The header bell (issue 557): a browser session's own inbox.
+    ("GET", "/api/v1/me/notifications"): SESSION,
+    ("GET", "/api/v1/me/notifications/summary"): SESSION,
+    ("POST", "/api/v1/me/notifications/{notification_id}/read"): SESSION,
+    ("POST", "/api/v1/me/notifications/read-all"): SESSION,
     # A token reads its own record (expiry, scopes) with any non-admin scope.
     ("GET", "/api/v1/me/token"): ("read", "import", "export", "project-admin"),
     # API tokens: never with a token

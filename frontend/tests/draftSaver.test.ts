@@ -251,3 +251,48 @@ describe("translation review draft saver", () => {
     expect(onStateChange).toHaveBeenCalledTimes(notices);
   });
 });
+
+describe("rebase after a merged conflict (issue 610)", () => {
+  const conflict = Object.assign(new Error("Changed elsewhere"), { status: 409 });
+
+  it("saves the merged draft with the newer revision and ends the conflict", async () => {
+    const save = vi.fn(async (_draft: string, revision: number) => { if (revision === 3) throw conflict; return revision + 1; });
+    const saver = createDraftSaver<string>({ save, initialRevision: 3 });
+    saver.update("pending edit");
+    await vi.advanceTimersByTimeAsync(800);
+    expect([saver.state, saver.hasUnsavedChanges]).toEqual(["conflict", true]);
+    // Typing goes on in the conflict; nothing is saved until the merge.
+    saver.update("pending edit and more");
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(saver.rebase(4, "merged text")).toBe(true);
+    await vi.runAllTimersAsync();
+    expect(save).toHaveBeenLastCalledWith("merged text", 4);
+    expect([saver.state, saver.revision, saver.hasUnsavedChanges]).toEqual(["saved", 5, false]);
+  });
+
+  it("adopts the newer revision without a save when nothing waits", async () => {
+    const save = vi.fn(async (_draft: string, revision: number) => revision + 1);
+    const saver = createDraftSaver<string>({ save, initialRevision: 3 });
+    expect(saver.rebase(4)).toBe(true);
+    await vi.runAllTimersAsync();
+    expect(save).not.toHaveBeenCalled();
+    expect([saver.state, saver.revision]).toEqual(["saved", 4]);
+    saver.update("next");
+    await vi.runAllTimersAsync();
+    expect(save).toHaveBeenLastCalledWith("next", 4);
+  });
+
+  it("refuses while a save is in flight, whose outcome decides first", async () => {
+    const reply = deferred<number>();
+    const save = vi.fn(() => reply.promise);
+    const saver = createDraftSaver<string>({ save, initialRevision: 3 });
+    saver.update("edit");
+    await vi.advanceTimersByTimeAsync(800);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(saver.rebase(9, "merged")).toBe(false);
+    reply.resolve(4);
+    await vi.runAllTimersAsync();
+    expect([saver.state, saver.revision]).toEqual(["saved", 4]);
+  });
+});

@@ -308,7 +308,9 @@ test('live qualification refusal retains inputs and the guarded profile link flu
     expected_revision: current.draft.revision, text: current.draft.text, form: current.draft.form,
   }); expect(changed.ok()).toBeTruthy();
   const localOnly = `${latest}\nKeep conflicted input.`; await target(page).fill(localOnly);
-  await expect(review(page).locator('.translation-save-status')).toHaveText('Conflict: reload');
+  await expect(review(page).locator('.translation-save-status')).toHaveText('Conflict');
+  // Issue 610: a change elsewhere that no taken wording explains offers Keep my text, not only discarding.
+  await expect(page.getByRole('button', { name: 'Keep my text', exact: true })).toBeVisible();
   await section(page, 'My tasks');
   const leave = page.getByRole('dialog', { name: 'Changes not saved', exact: true });
   await leave.getByRole('button', { name: 'Cancel', exact: true }).click();

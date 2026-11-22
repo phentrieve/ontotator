@@ -11,6 +11,12 @@ export interface DraftSaver<T> {
   update(draft: T): void;
   flush(): Promise<void>;
   dispose(): void;
+  /**
+   * Continues from a newer saved revision after a conflict was merged (issue 610): the revision becomes `revision`
+   * and the conflict ends. With `draft` that draft is saved next; without it nothing is waiting. False while a
+   * save is in flight, whose outcome decides first.
+   */
+  rebase(revision: number, draft?: T): boolean;
   readonly state: DraftSaverState;
   readonly revision: number;
   readonly error: unknown;
@@ -131,6 +137,19 @@ export function createDraftSaver<T>({
     dispose() {
       disposed = true;
       cancelTimer();
+    },
+    rebase(nextRevision, draft) {
+      if (disposed || inFlight || worker) return false;
+      cancelTimer();
+      revision = nextRevision;
+      error = undefined;
+      ready = false;
+      pending = draft === undefined ? undefined : { draft: structuredClone(draft) };
+      if (!pending) { transition("saved"); return true; }
+      transition("dirty");
+      ready = true;
+      void run().catch(() => {});
+      return true;
     },
   };
 }

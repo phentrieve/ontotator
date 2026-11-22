@@ -48,6 +48,22 @@ export const RESUMED_NOTICE = "Resumed. Your question stays open.";
 export const TOOK_PROPOSED = "The lead put your wording into your text.";
 export const SHOW_IN_TEXT = "Show it in my text";
 
+/** Issue 610: the reviewer's screen merges a taken wording into the text on screen, without losing an edit. */
+export function wordingApplied(wording: string): string {
+  return `The lead's wording is in your text now: “${wording}”. Your own edits are kept.`;
+}
+export const WORDING_KEPT_TITLE = "Your text was kept";
+export function wordingKept(quote: string, wording: string): string {
+  return `You changed “${quote}” after you asked, so the lead's wording was not put in: “${wording}”.`;
+}
+export const USE_WORDING = "Use the lead's wording";
+export const WORDING_KEPT_HINT = "To use it, change the passage in your text.";
+export const UNMERGED_TITLE = "This review was changed elsewhere";
+export const UNMERGED_TEXT = "Your text here is not saved yet. Keep my text saves it over the other change. Load the saved review discards your edits here.";
+export const KEEP_MINE = "Keep my text";
+export const LOAD_SAVED = "Load the saved review…";
+export const SYNC_FAILED = "The saved review could not be read, so the change made elsewhere is not in your text yet. Your text stays here.";
+
 /** The lead's side. */
 export const QUESTIONS_PAGE_TITLE = "Questions";
 export const ANSWER_LABEL = "Answer…";
