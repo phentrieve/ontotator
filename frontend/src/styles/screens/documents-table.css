@@ -169,6 +169,10 @@ button.documents-text-name { min-height: 24px; padding: 0; border: 0; background
 .documents-resolve { display: grid; gap: var(--space-2); }
 .documents-resolve p { margin: 0; }
 .documents-resolve-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+/* Resolve… dialog (issue 554): the proposed text on demand; "Other ways…" sits left of Cancel and the primary action. */
+.documents-resolve-proposal > summary { cursor: pointer; color: var(--accent); width: fit-content; }
+.documents-resolve-proposal > .translation-diff { height: auto; min-height: 0; max-height: min(30vh, 16rem); margin-top: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius); }
+.modal-actions > .documents-resolve-other { margin-inline-end: auto; }
 .documents-id { overflow-wrap: anywhere; }
 
 /* Page shell: filters, actions, paging, notices */

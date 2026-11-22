@@ -1,5 +1,5 @@
 import { IconButton } from "../ui/IconButton";
-import { IconCheck, IconClose } from "../ui/icons";
+import { IconCheck, IconClose, IconTree } from "../ui/icons";
 import { Button } from "../ui/Button";
 import { FilterChip } from "../ui/FilterChip";
 import { InlineMessage } from "../ui/InlineMessage";
@@ -459,11 +459,14 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
         // preview of another length never moves the rows under the pointer. A long definition scrolls inside the
         // pane, so it is a named region in the Tab order: a keyboard user can reach it and scroll it with the arrows.
         <section className="candidate-preview" data-testid="candidate-preview" aria-labelledby={`${listboxId}-preview`} tabIndex={0}>
-          <div id={`${listboxId}-preview`} className="candidate-preview-title">{`Definition of ${candidates[shownActive].label} (${candidates[shownActive].term_id})`}</div>
-          {onShowInTree && <Button type="button" size="sm" variant="secondary" className="annotation-tree-button"
-            aria-label={`Show in tree: ${candidates[shownActive].label}`}
-            title="Show this term in the ontology tree, only to look: broader and narrower terms"
-            onClick={() => onShowInTree(candidates[shownActive])}>Show in tree</Button>}
+          {/* The title and "Show in tree" share one row (issue 540). */}
+          <div className="candidate-preview-head">
+            <div id={`${listboxId}-preview`} className="candidate-preview-title">{`Definition of ${candidates[shownActive].label} (${candidates[shownActive].term_id})`}</div>
+            {onShowInTree && <IconButton size="sm" variant="quiet" className="annotation-tree-button" icon={<IconTree />}
+              label={`Show in tree: ${candidates[shownActive].label}`}
+              title="Show in tree, only to look: broader and narrower terms"
+              onClick={() => onShowInTree(candidates[shownActive])} />}
+          </div>
           <p className="candidate-preview-text">{candidates[shownActive].definition || "This term has no definition in the ontology."}</p>
         </section>
       )}

@@ -100,7 +100,7 @@ describe("role-based shell", () => {
 
   it("shows a lead the pages of the current project under the two entries, and no gear", () => {
     render(<Shell {...props({ projects: [project("led", true)], route: { name: "projectDocuments", key: "led" } })} />);
-    expect(sidebar()).toEqual(["My tasks", "Projects", "Documents", "Progress", "Settings", "Export"]);
+    expect(sidebar()).toEqual(["My tasks", "Projects", "Documents", "Questions", "Progress", "Settings", "Export"]);
     expect(administrationGear()).toBeNull();
   });
 

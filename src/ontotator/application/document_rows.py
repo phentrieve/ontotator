@@ -986,7 +986,10 @@ def _reports(conn: Connection, pid: int) -> dict[str, ReportFact]:
                 ProblemReportStateRow.report_id == ProblemReportRow.report_id,
             )
             .join(UserRow, UserRow.id == ProblemReportRow.reporter_id)
-            .where(ProblemReportRow.project_id == pid)
+            # Issue 553: questions to the lead are not text problems.
+            .where(
+                ProblemReportRow.project_id == pid, ProblemReportRow.kind == "problem"
+            )
         )
     }
 

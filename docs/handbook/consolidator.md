@@ -75,7 +75,7 @@ If the pause arrives while you have the consolidation open, the next decision is
 
 What for: see who marked what and work through the differences in order.
 
-1. The **Clinical text** shows one underline per person. The legend below says which line style belongs to whom. There are four line styles: with more than four people, the fourth (double) line stands for everyone from the fourth person on, and the legend lists them, for example *Line 4 (double): +5: …*. The table of a group still has every person. Kept findings are shaded; the selected group is framed.
+1. The **Clinical text** shows one underline per person. The legend below says which line style belongs to whom. There are four line styles: with more than four people, the fourth (double) line stands for everyone from the fourth person on, and the legend lists them, for example *Line 4 (double): +5: …*. The table of a group still has every person. Kept findings are shaded; the selected group is framed, with one frame per line around its whole passage, also where other findings overlap it.
 2. Beside it, the list **Groups** holds the groups in text order, each with its passage and [its state](#groups-and-their-states).
 3. One group is open at a time. Click a group, or a marked passage in the text, to open it.
 4. Press `j` for the next open group and `k` for the previous one, or click **Next open group** on the progress card.

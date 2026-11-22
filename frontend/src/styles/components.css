@@ -203,6 +203,16 @@ textarea.form-control {
   cursor: not-allowed;
 }
 
+/* A read-only field (a submitted finding's note, issue 542 U1-05) looks like text on the sunken band, not like an input:
+   no white box, no text cursor, no resize grip. It keeps its focus ring, so the keyboard still finds it. */
+.form-control[readonly] {
+  background: var(--surface-sunken);
+  border-style: dashed;
+  color: var(--text);
+  cursor: default;
+  resize: none;
+}
+
 .form-checkbox-row {
   display: flex;
   align-items: center;
@@ -1140,7 +1150,11 @@ ul.task-counts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space
   border-radius: var(--radius);
   background: var(--surface-raised);
   box-shadow: var(--shadow-2);
+  /* Taller than the room beside its button: the menu scrolls inside the window (MenuButton sets max-height). */
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
+.ui-menu > * { flex-shrink: 0; }
 .ui-menu-item {
   min-height: 32px;
   padding: var(--space-1) var(--space-2);

@@ -1980,6 +1980,41 @@
               "default": 0,
               "title": "Offset"
             }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "problem",
+                "question"
+              ],
+              "type": "string",
+              "default": "problem",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "open",
+                    "resolved",
+                    "withdrawn"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
           }
         ],
         "responses": {
@@ -26726,7 +26761,8 @@
               "extend_hold",
               "restart",
               "withdraw",
-              "reopen"
+              "reopen",
+              "answer"
             ],
             "title": "Action"
           },
@@ -26741,6 +26777,11 @@
             },
             "type": "array",
             "title": "Assignment Ids"
+          },
+          "take_proposed_text": {
+            "type": "boolean",
+            "title": "Take Proposed Text",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -26792,6 +26833,48 @@
             "type": "string",
             "minLength": 1,
             "title": "Reason"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "problem",
+              "question"
+            ],
+            "title": "Kind",
+            "default": "problem"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote"
+          },
+          "proposed_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Text"
+          },
+          "pause": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pause"
           }
         },
         "additionalProperties": false,
@@ -27058,6 +27141,80 @@
           "text_paused_by_lead": {
             "type": "boolean",
             "title": "Text Paused By Lead"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "problem",
+              "question"
+            ],
+            "title": "Kind",
+            "default": "problem"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote"
+          },
+          "proposed_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Text"
+          },
+          "pauses": {
+            "type": "boolean",
+            "title": "Pauses",
+            "default": true
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
+          "answered_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answered At"
+          },
+          "answered_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonRefView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "took_proposed_text": {
+            "type": "boolean",
+            "title": "Took Proposed Text",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -29594,6 +29751,11 @@
           "own_task": {
             "type": "boolean",
             "title": "Own Task",
+            "default": false
+          },
+          "took_proposed_text": {
+            "type": "boolean",
+            "title": "Took Proposed Text",
             "default": false
           }
         },

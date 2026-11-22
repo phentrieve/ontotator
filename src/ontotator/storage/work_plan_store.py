@@ -747,6 +747,7 @@ def open_reports(
         .where(
             ProblemReportRow.project_id == project_id,
             ProblemReportStateRow.state == "open",
+            ProblemReportRow.kind == "problem",  # issue 553
             _in_keys(DocumentRow.case_id, DocumentRow.language, keys),
         )
         .order_by(DocumentRow.case_id, DocumentRow.language, ProblemReportRow.report_id)

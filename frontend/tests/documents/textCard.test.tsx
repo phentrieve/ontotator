@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, type AssignmentView, type DocumentRowView } from "../../src/api/client";
+import { api, type AssignmentView, type DocumentRowView, type VariantSummary } from "../../src/api/client";
 import { routeHref, type ProjectDocumentsQuery, type Route } from "../../src/app/router";
 import { formatTime } from "../../src/app/submissionLabels";
 import { TextCard, type TextCardProps } from "../../src/documents/textCard/TextCard";
@@ -641,7 +641,7 @@ describe("translation part", () => {
     expect(within(part).queryByRole("button", { name: "Ask a reviewer to correct…" })).toBeNull();
   });
 
-  it("issue 341: Correct it myself… on the accepted newest version, Accept this version… on the one not reviewed", () => {
+  it("issue 341: Correct it myself (reviewed again)… on the accepted newest version, Accept this version… on the one not reviewed", () => {
     const versions = [
       version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "reviewed", chain_name: "m1", is_newest_in_chain: false }),
       version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "m1", translation_status: "accepted" }),
@@ -653,10 +653,10 @@ describe("translation part", () => {
     const row = assignRow({ versions, parallel_roots: true, work: [] });
     renderCard({ row, initialSegment: "translation", textVersionTools });
     const part = within(card()).getByRole("heading", { name: "Translation" }).closest("section")!;
-    const correct = within(part).getAllByText("Correct it myself…");
+    const correct = within(part).getAllByText("Correct it myself (reviewed again)…");
     expect(correct).toHaveLength(1);
-    expect(correct[0].getAttribute("aria-label")).toBe("Correct m1 v2 of case-200 de myself…");
-    // One action that changes the text: nothing to tell apart, no hint line.
+    expect(correct[0].getAttribute("aria-label")).toBe("Correct m1 v2 of case-200 de myself (reviewed again)…");
+    // Issue 556: no hint line under the buttons; the label says the consequence.
     expect(part.querySelector(".text-version-hint")).toBeNull();
     fireEvent.click(correct[0]);
     expect(onCorrectTranslation).toHaveBeenCalledWith(row, versions[1]);
@@ -694,7 +694,7 @@ describe("translation part", () => {
     expect(within(part).getByText("Typo fix by Project lead (ann-0002), 17 Nov, 10:12 · Space before the full stop")).toBeTruthy();
   });
 
-  it("issue 453: Fix typos… on the newest version of each translation, a rejected one included", () => {
+  it("issue 453: Fix typos (no review)… on the newest version of each translation, a rejected one included", () => {
     const versions = [
       version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "accepted", chain_name: "m1", is_newest_in_chain: false }),
       version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", chain_name: "m1", translation_status: "accepted" }),
@@ -706,22 +706,38 @@ describe("translation part", () => {
     const row = assignRow({ versions, parallel_roots: true, work: [] });
     renderCard({ row, initialSegment: "translation", textVersionTools });
     const part = within(card()).getByRole("heading", { name: "Translation" }).closest("section")!;
-    // Not on the older version; a rejected newest version can be corrected too.
-    const buttons = within(part).getAllByText("Fix typos…");
-    expect(buttons.map(button => button.getAttribute("aria-label"))).toEqual(["Fix typos in m1 v2 of case-200 de…", "Fix typos in mt v1 of case-200 de…"]);
-    // The tooltip tells it apart from "Correct it myself…" and "Upload a corrected text…".
-    expect(buttons[0].getAttribute("title")).toBe("Spacing, typos, grammar. Keeps the status; no review.");
-    // Next to the other version actions, before the upload.
+    // Not on the older version; a rejected newest version can be corrected too. The label says the consequence.
+    const buttons = within(part).getAllByText("Fix typos (no review)…");
+    expect(buttons.map(button => button.getAttribute("aria-label"))).toEqual(["Fix typos (no review) in m1 v2 of case-200 de…", "Fix typos (no review) in mt v1 of case-200 de…"]);
+    // Next to the other version actions, before the upload; no hint line under the buttons (issue 556).
     expect(buttons[0].nextElementSibling?.textContent).toBe("Upload a corrected text…");
-    // Lead review F8: one visible hint line under the buttons says what tells the offered actions apart.
-    const hints = [...part.querySelectorAll(".text-version-hint")].map(hint => hint.textContent);
-    expect(hints).toEqual([
-      "Fix typos: spacing, typos, grammar; the status stays, no review. Upload: a text made elsewhere becomes the next version.",
-      "Fix typos: spacing, typos, grammar; the status stays, no review. Upload: a text made elsewhere becomes the next version.",
-    ]);
+    expect(part.querySelector(".text-version-hint")).toBeNull();
     fireEvent.click(buttons[0]);
     expect(onEditorialCorrection).toHaveBeenCalledWith(row, versions[1]);
   });
+
+  it("issue 555: Edit the translation… is the one edit action of an accepted version; asking and uploading sit under Other ways…", () => {
+    const versions = [
+      version({ document_id: "case-200-de", origin: "machine_translation", derived_from: "case-200-en", translation_status: "accepted", chain_name: "m1" }),
+    ];
+    const variant = { document_id: "case-200-de", translation_status: "accepted" } as VariantSummary;
+    const onEditTranslation = vi.fn(), onRequestCorrection = vi.fn(), onUploadVersion = vi.fn();
+    const textVersionTools = { username: "lead", members: [], assignments: [], variants: new Map([["case-200-de", variant]]), requiredLanguages: () => ["de"],
+      onAssignmentsChanged: vi.fn(), onRequestCorrection, onUploadVersion, onEditorialCorrection: vi.fn(), onCorrectTranslation: vi.fn(), onEditTranslation };
+    const row = assignRow({ versions, work: [] });
+    renderCard({ row, initialSegment: "translation", textVersionTools });
+    const part = within(card()).getByRole("heading", { name: "Translation" }).closest("section")!;
+    expect(within(part).queryByText("Correct it myself (reviewed again)…")).toBeNull();
+    expect(within(part).queryByText("Fix typos (no review)…")).toBeNull();
+    fireEvent.click(within(part).getByRole("button", { name: "Edit the translation v1 of case-200 de…" }));
+    expect(onEditTranslation).toHaveBeenCalledWith(row, versions[0]);
+    fireEvent.click(within(part).getByRole("button", { name: "Other ways to change v1 of case-200 de" }));
+    expect(screen.getAllByRole("menuitem").map(item => item.getAttribute("aria-label"))).toEqual(["Ask a reviewer to correct…", "Upload a corrected text…"]);
+    expect(screen.getByText("A reviewer corrects it in a new review.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Upload a corrected text…" }));
+    expect(onUploadVersion).toHaveBeenCalledWith(row, versions[0]);
+  });
+
 
   it("issue 341: Upload a corrected text… on the newest version of each translation, with how an uploaded version was made", () => {
     const versions = [

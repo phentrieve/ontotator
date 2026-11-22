@@ -58,10 +58,10 @@ test("Retry corrected version metadata: the submitted correction names its new v
   await expect(page).toHaveURL(new RegExp(`#/projects/${esc(s.project)}/documents`));
   await documentsReady(page);
 
-  // Resolve… › Correct the translation… › Open translation review: the lead's own correction of v1.
+  // Resolve… › Correct it myself… › Open translation review: the lead's own correction of v1.
   await rowAction(page, "Resolve…", caseId, "de").click();
-  const area = page.locator(".documents-row-notice-slot");
-  await area.getByRole("group", { name: textNamePattern("Resolve rejected translation, ", caseId, "de") }).getByRole("button", { name: "Correct the translation…", exact: true }).click();
+  const area = page.getByRole("dialog", { name: textNamePattern("Resolve rejected translation, ", caseId, "de") });
+  await area.getByRole("button", { name: "Correct it myself (counts as accepted)…", exact: true }).click();
   await area.getByRole("group", { name: textNamePattern("Correct the translation, ", caseId, "de") }).getByRole("button", { name: "Open translation review", exact: true }).click();
   await expect(page).toHaveURL(/#\/tasks\/\d+$/);
   await expect(translation(page)).toBeVisible({ timeout: 30_000 });
