@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-22
+
 ### Added
 
 - Editor: a modifier marked inside its finding's text span is offered to be taken out of that span (#535; a mockup that waits for sign-off). After the modifier is attached or linked, a box under **Modifiers** asks, for example, *Exclude “schwere” from the text span of Seizure?*, shows the span now with those words struck through and the span after (*wiederholt … Krampfanfälle*), and offers **Exclude from span** and **Keep span**. Exclude sends one `edit_mention`: the finding keeps the remaining words, in two segments when the modifier was in the middle; spaces and punctuation at the cut are trimmed. There is no offer when the modifier covers the whole span, lies outside it, would cut a word in half, or the mention has cue segments. **Undo** in the message or in the header takes it back. The offer stays available later: when a finding is opened and a modifier still lies inside its span, that modifier's row shows the quiet link *In span · Exclude*, and its row menu has **Exclude from finding's span**; both open the same box, with the focus on **Exclude from span**. A tool proposal's span is never changed: a change of its modifiers makes the annotator's copy (Edit & Replace), and the offer is for the copy. No setting, no API change, no migration.
@@ -547,7 +549,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 First public release.
 
-[Unreleased]: https://github.com/phentrieve/ontotator/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/phentrieve/ontotator/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/phentrieve/ontotator/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/phentrieve/ontotator/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/phentrieve/ontotator/compare/v0.10.2...v0.11.0
 [0.10.2]: https://github.com/phentrieve/ontotator/compare/v0.10.1...v0.10.2
