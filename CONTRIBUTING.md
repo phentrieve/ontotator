@@ -31,11 +31,21 @@ A release is one pull request `release: X.Y.Z`; its merge commit on `main` is ta
 - adds a `[X.Y.Z] - YYYY-MM-DD` heading under `[Unreleased]` in `CHANGELOG.md` and updates the compare links at the end;
 - sets the version in `pyproject.toml`, `src/ontotator/__init__.py` and `frontend/package.json`, and in `uv.lock`, `frontend/package-lock.json` and `contracts/openapi.json` with them (the gate fails on contract drift);
 - sets the same version for the MCP server in `mcp/pyproject.toml` and `mcp/src/ontotator_mcp/__init__.py`, and in `mcp/uv.lock` with them (`cd mcp && uv lock`). `ontotator-mcp --version`, its User-Agent and `whoami` show it;
-- bumps the MCP pin in [mcp/README.md](mcp/README.md) to the new tag (`ontotator@vX.Y.Z#subdirectory=mcp`, three places).
+- bumps the MCP pin in [mcp/README.md](mcp/README.md) to the new tag (`ontotator@vX.Y.Z#subdirectory=mcp`, three places);
+- sets `version` and `date-released` in [`CITATION.cff`](CITATION.cff) to the new version and the date of its CHANGELOG heading.
 
-The MCP tests fail until the MCP version and the pin match the version in `pyproject.toml`.
+The MCP tests fail until the MCP version and the pin match the version in `pyproject.toml`; `tests/test_citation_metadata.py` fails until `CITATION.cff` matches it and the CHANGELOG. [`.zenodo.json`](.zenodo.json) has no version: Zenodo takes it from the tag. Change it only with `CITATION.cff` (title, abstract, license, authors), as the same test checks.
 
-Pushing the tag publishes the Docker image (see [docs/operations.md](docs/operations.md)).
+After the merge:
+
+1. Tag the merge commit and push the tag: `git tag -a vX.Y.Z -m vX.Y.Z <merge commit>`, `git push origin vX.Y.Z`. Pushing the tag publishes the Docker image (see [docs/operations.md](docs/operations.md)); check that the **Docker publish** run passed.
+2. Publish a GitHub release for the tag (`gh release create vX.Y.Z --verify-tag --title vX.Y.Z --notes-file <the release's CHANGELOG section>`). A tag alone gets no DOI: Zenodo archives a release only when it is **published** on GitHub, not a draft.
+3. Once Zenodo has archived it, check the new DOI on the Zenodo record. The README's "How to cite" names the concept DOI, which always resolves to the newest version, once it exists.
+
+Steps only the repository owner can do, outside this repository:
+
+- **Zenodo integration (once; postponed by the owner on 2026-11-22, B6-5):** sign in to [Zenodo](https://zenodo.org/) with the GitHub account that administers `phentrieve/ontotator`, open **GitHub** in the account settings and switch the repository on. From then on each published release gets a DOI. Releases published before that get none; to archive one, publish a new release. Then add the concept DOI to `README.md` ("How to cite") and as `doi` to `CITATION.cff`.
+- **ontospan release:** `pyproject.toml` and `uv.lock` pin `ontospan` to commit `311f93e`, two commits after its only tag `v1.2.1`. In `phentrieve/ontospan`: tag that commit (for example `v1.2.2`), publish a GitHub release (with Zenodo switched on there too, for its own DOI) and, if wanted, publish it on PyPI. Then, in this repository, pin the tag instead of the commit, in one pull request: `"ontospan @ git+https://github.com/phentrieve/ontospan.git@v1.2.2"` in `pyproject.toml` (or `"ontospan==1.2.2"` once it is on PyPI, which also lets `allow-direct-references` go), `uv lock`, and check that `uv.lock` still resolves to the same commit `311f93e`. Do not pin `v1.2.1`: it lacks the two commits after it that the current pin includes.
 
 ## Security
 

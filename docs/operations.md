@@ -353,33 +353,39 @@ bash backup.sh /private/backup --wait-jobs 600 --keep-days 14
 
 It runs in the deployment directory (or with `COMPOSE_PROJECT_NAME`/`COMPOSE_FILE` set), waits up to `--wait-jobs` seconds for running import/export jobs and gives up with exit code 75 without touching app if they do not finish, stops app for the dump and archive (about 15 s for small data) and **always starts it again**, also when the backup fails. It writes into `BACKUP_ROOT/<UTC timestamp>.partial` and renames the directory to `BACKUP_ROOT/<UTC timestamp>` only once both files exist and `SHA256SUMS` is written; it prints that path as the last line. `--keep-days` deletes older recovery points it created (names `YYYYMMDDTHHMMSSZ`, and stale `.partial` directories); without it nothing is deleted. CLI writers are not blocked: do not schedule it while operators run `admin import`/`export`.
 
-A recovery point that exists only on the deployment host is lost with the host's disk. Copy every complete recovery point off the host, **encrypted**, with its `SHA256SUMS`, for example by a systemd service that runs the script and then an off-host step of your choice (an encrypting backup tool such as restic or borg with a remote repository, or `age`/`gpg` plus `rsync`/`rclone` to storage you control). Never copy `.partial` directories. For example, with systemd (a sketch; adapt paths, user and the off-host step):
+A recovery point that exists only on the deployment host is lost with the host's disk. Copy every complete recovery point off the host, **encrypted**, with its `SHA256SUMS`. Never copy `.partial` directories. The repository has the pieces for this, all configured through the environment; no secret is in the repository:
 
-```bash
-#!/bin/bash
-# /usr/local/bin/ontotator-nightly-backup
-set -euo pipefail
-cd /opt/ontotator # the deployment directory
-point="$(bash backup.sh /private/backup --keep-days 14 | tail -n 1)"
-ontotator-offsite "$point" # your encrypt-and-upload command
-```
+- [`scripts/offsite-backup.sh`](../scripts/offsite-backup.sh) copies one recovery point off the host with [restic](https://restic.net/) (`push`) and fetches one back (`fetch`). restic encrypts and authenticates everything it stores (AES-256 with the repository key), so the off-host copy is encrypted at rest on any storage: S3-compatible object storage, Backblaze B2, SFTP, a restic REST server or any [rclone](https://rclone.org/) remote. `push` verifies `SHA256SUMS` first and refuses a `.partial` directory, stores the point as one snapshot tagged `ontotator-recovery-point` and its name, then thins old snapshots (`ONTOTATOR_OFFSITE_KEEP_DAILY`/`_WEEKLY`/`_MONTHLY`, default 14, 8 and 12; all `0` keeps every snapshot) and, with `ONTOTATOR_OFFSITE_CHECK_SUBSET` (for example `5%`), reads back and verifies that part of the stored data. `fetch DEST [NAME]` restores the newest (or the named) point into `DEST/NAME` and verifies its `SHA256SUMS`. It needs `RESTIC_REPOSITORY` (or `_FILE`) and `RESTIC_PASSWORD_FILE` (or `RESTIC_PASSWORD_COMMAND`); it refuses a bare `RESTIC_PASSWORD`, which would sit in the environment file next to the storage credentials.
+- [`scripts/nightly-backup.sh`](../scripts/nightly-backup.sh) is the scheduled run: `backup.sh` with local retention, then `offsite-backup.sh push` if the off-host copy is configured, then, on the days in `ONTOTATOR_RESTORE_CHECK_DAYS` and only if `ONTOTATOR_RESTORE_CHECK_DIR` names a prepared isolated target, `offsite-backup.sh fetch` of the same point and [`restore-check.sh`](#restore-drill-on-the-host) on that fetched copy, which it deletes afterwards. So each drill tests the copy that would be used after losing the host, not the local one; without an off-host copy it drills the local point. On success it writes `BACKUP_ROOT/last-success` (time, point, off-host and drill result); a monitor that alerts when that file is older than 26 hours catches a timer that stopped running. The exit code is not 0 when any step fails, 75 when `backup.sh` gave up because of running jobs.
+- [`examples/systemd/`](../examples/systemd/) holds the service, the timer (03:30 UTC every night, catching up after the host was off) and `ontotator-backup.env.example`, the environment file with every setting and example values.
 
-```ini
-# /etc/systemd/system/ontotator-backup.service
-[Service]
-Type=oneshot
-User=deploy
-ExecStart=/usr/local/bin/ontotator-nightly-backup
+**The off-host copy is optional and off until it is configured.** `ONTOTATOR_OFFSITE` has no default: unset (or `none`), `nightly-backup.sh` skips the copy with a warning (*no off-host copy configured … this recovery point exists on this host only*), writes `off-host: skipped (not configured)` to `last-success` and exits 0. Only `ONTOTATOR_OFFSITE=restic` turns it on, and from then on a missing or broken restic setting fails the run. The local recovery points, the drill and the app itself do not depend on it. The tests and CI never need an off-host target.
 
-# /etc/systemd/system/ontotator-backup.timer
-[Timer]
-OnCalendar=*-*-* 03:30:00 UTC
-Persistent=true
-[Install]
-WantedBy=timers.target
-```
+Decisions (owner, 2026-11-22):
 
-Keep the off-host encryption key off the deployment host, or at least out of the backup. Alert on a failed unit (`OnFailure=` or your monitoring), not only on a missing file. Run the backup additionally right before every image switch (see [Upgrades](#upgrades)). Check regularly that the newest **off-host** copy decrypts and verifies with `sha256sum --check`, and rehearse a restore as below, from an off-host copy, after any change to this procedure or to the Compose files and at least once on the real host.
+- **Off-host target (B6-2):** an SFTP server of the owner's own institution (restic's `sftp:` backend). It is not available yet, so the copy stays off (`ONTOTATOR_OFFSITE` unset) until it is; then follow the steps below.
+- **Recovery objectives (B6-4):** RPO 24 hours and RTO 4 hours are confirmed (see [Recovery objectives](#recovery-objectives)).
+- **Postponed:** how often the restore drill runs (B6-3; the quarterly rule in [Restore drill on the host](#restore-drill-on-the-host) stays the guidance until then) and the Zenodo DOI (B6-5; the Zenodo steps in `CONTRIBUTING.md` › Releases wait).
+
+Set it up once on the host (owner's steps; the repository cannot do them):
+
+1. Choose the off-host storage (decided: the institution's SFTP server, see above), in another place than the host and under an account the deploy user cannot delete from if you can (object lock, append-only REST server or a separate provider account). Create its credentials.
+2. Install restic on the host (distribution package, 0.16 or later). Write `/etc/ontotator/backup.env` from the example (owner the backup user, mode `0600`), with `ONTOTATOR_OFFSITE=restic` and the `sftp:` repository and the repository key to `RESTIC_PASSWORD_FILE` (mode `0600`). Keep a second copy of the key off the host, for example in the team's password manager: without it the off-host copy cannot be read, and with only the host's copy it is lost with the host.
+3. With the same variables set, run `restic init` once, then copy `backup.sh`, `offsite-backup.sh`, `restore-check.sh` and `nightly-backup.sh` from the release you deploy next to its `docker-compose.yml`.
+4. Prepare the isolated restore target as in [Restore](#restore) and set `ONTOTATOR_RESTORE_CHECK_DIR`. The drill starts a second stack next to the live one for a few minutes; choose drill days (for example `7`, Sundays) that leave the host the memory for it.
+5. Install the unit files, add an `OnFailure=` unit or monitoring of your own, run `systemctl start ontotator-backup.service` once by hand and read `journalctl -u ontotator-backup.service`, then `systemctl enable --now ontotator-backup.timer`. Record the first drill in [Restore drill on the host](#restore-drill-on-the-host).
+
+Alert on a failed unit (`OnFailure=` or your monitoring), not only on a missing file. Run the backup additionally right before every image switch (see [Upgrades](#upgrades)); `bash nightly-backup.sh` by hand does this including the off-host copy. Rehearse a restore as below, from an off-host copy, after any change to this procedure or to the Compose files and at least once on the real host.
+
+### Recovery objectives
+
+With the nightly timer and the off-host copy set up (until the off-host copy is configured, losing the host's disk loses every recovery point, and neither objective holds for that case):
+
+- **RPO (data that can be lost): up to 24 hours.** A recovery point is taken every night at 03:30 UTC and before every image switch; work after the last point is lost when the host is lost. For a smaller RPO, run the timer more often (`OnCalendar=`): each run stops the app for about 15 s with small data, longer with more.
+- **RTO (time until the service is back): target 4 hours** after a replacement host with Docker is available. Fetching and restoring take minutes for the data sizes seen so far (restore and start of the 2026-10-27 drill: 25 s with synthetic data); most of the time goes to provisioning, DNS and proxy. Check the target against the timings recorded in [Restore drill on the host](#restore-drill-on-the-host) and adjust it when the data grows.
+- **Retention:** 14 days on the host; off the host 14 daily, 8 weekly and 12 monthly points by default. Recovery points taken before an upgrade by hand are kept on the host until deleted.
+
+The objectives hold only when the last off-host copy is recent (`last-success`) and the last drill passed. The owner confirmed these figures on 2026-11-22 (B6-4). They are not measured on the production host yet.
 
 ### Restore
 
@@ -440,7 +446,9 @@ It verifies `SHA256SUMS` first and refuses a `.partial` directory or a point tha
 
 The script checks the restored copy against the recovery point, not against the live deployment, which has moved on since the backup. Logins, an ontology search, a restored document and a new export through an isolated test origin are not part of it: check them with `--keep` when the drill follows a change to this procedure, the Compose files or a major upgrade.
 
-Run the drill at least **once a quarter**, and in addition after any change to the backup or restore procedure, to the Compose files or to the host (new disk, Docker or PostgreSQL major version), and before relying on backups for a planned migration. Record each run here, newest first, with the summary of the script:
+With `ONTOTATOR_RESTORE_CHECK_DIR` set, [`nightly-backup.sh`](#scheduled-and-off-host-backups) runs this drill by itself on the configured days, on the night's recovery point fetched back from off-host storage; its summary is in the journal of `ontotator-backup.service`. To drill an older off-host point by hand, fetch it first: `bash offsite-backup.sh fetch /private/drill 20261115T033000Z`, then run `restore-check.sh` on the printed path and delete the fetched copy.
+
+Run the drill at least **once a quarter** (the final frequency is postponed, B6-3), and in addition after any change to the backup or restore procedure, to the Compose files or to the host (new disk, Docker or PostgreSQL major version), and before relying on backups for a planned migration. Record each run here, newest first, with the summary of the script:
 
 | Date (UTC) | Host | Recovery point (age, from off-host copy?) | Data size (dump / data.tar) | Timings (verify / restore / compare / start / cleanup) | Result | By |
 | --- | --- | --- | --- | --- | --- | --- |
