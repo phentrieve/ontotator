@@ -78,7 +78,7 @@ def nightly(tmp_path):
 
 
 def test_backs_up_copies_off_host_and_records_success(nightly):
-    result, calls = nightly()
+    result, calls = nightly(ONTOTATOR_OFFSITE="restic")
     assert result.returncode == 0, result.stderr
     point = nightly.root / NAME
     assert calls == [
@@ -93,6 +93,7 @@ def test_backs_up_copies_off_host_and_records_success(nightly):
 
 def test_drill_runs_on_the_copy_fetched_back_and_removes_it(nightly):
     result, calls = nightly(
+        ONTOTATOR_OFFSITE="restic",
         ONTOTATOR_RESTORE_CHECK_DIR=str(nightly.drill_dir),
         ONTOTATOR_RESTORE_CHECK_DAYS=str(today_iso_weekday()),
     )
@@ -110,6 +111,7 @@ def test_drill_runs_on_the_copy_fetched_back_and_removes_it(nightly):
 def test_no_drill_on_other_days(nightly):
     other = today_iso_weekday() % 7 + 1
     result, calls = nightly(
+        ONTOTATOR_OFFSITE="restic",
         ONTOTATOR_RESTORE_CHECK_DIR=str(nightly.drill_dir),
         ONTOTATOR_RESTORE_CHECK_DAYS=str(other),
     )
@@ -129,9 +131,24 @@ def test_without_off_host_copy_the_drill_uses_the_local_point(nightly):
     assert (nightly.root / NAME).is_dir()
 
 
+def test_off_host_copy_is_off_until_configured(nightly):
+    # No ONTOTATOR_OFFSITE and no restic settings, as on a host without an
+    # off-host target: the run passes, warns and records the skip.
+    result, calls = nightly(ONTOTATOR_RESTORE_CHECK_DIR=str(nightly.drill_dir))
+    assert result.returncode == 0, result.stderr
+    assert not any(c.startswith("offsite") for c in calls)
+    assert calls[-1] == f"drill {nightly.root / NAME} {nightly.drill_dir} present"
+    assert "no off-host copy configured" in result.stderr
+    status = (nightly.root / "last-success").read_text()
+    assert "off-host: skipped (not configured)" in status
+    assert "restore drill: passed (local copy)" in status
+
+
 def test_a_failed_drill_fails_the_run_and_records_no_success(nightly):
     result, _ = nightly(
-        ONTOTATOR_RESTORE_CHECK_DIR=str(nightly.drill_dir), STUB_DRILL_EXIT="1"
+        ONTOTATOR_OFFSITE="restic",
+        ONTOTATOR_RESTORE_CHECK_DIR=str(nightly.drill_dir),
+        STUB_DRILL_EXIT="1",
     )
     assert result.returncode == 1
     assert "restore drill" in result.stderr
@@ -141,7 +158,9 @@ def test_a_failed_drill_fails_the_run_and_records_no_success(nightly):
 
 def test_a_failed_off_host_copy_fails_the_run(nightly):
     result, calls = nightly(
-        STUB_OFFSITE_EXIT="1", ONTOTATOR_RESTORE_CHECK_DIR=str(nightly.drill_dir)
+        ONTOTATOR_OFFSITE="restic",
+        STUB_OFFSITE_EXIT="1",
+        ONTOTATOR_RESTORE_CHECK_DIR=str(nightly.drill_dir),
     )
     assert result.returncode == 1
     assert not any(c.startswith("drill") for c in calls)

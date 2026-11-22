@@ -13,9 +13,11 @@
 #   ONTOTATOR_BACKUP_ROOT           local backup directory (required, mode 0700)
 #   ONTOTATOR_BACKUP_KEEP_DAYS      local retention in days (default 14)
 #   ONTOTATOR_BACKUP_WAIT_JOBS      seconds to wait for running jobs (default 600)
-#   ONTOTATOR_OFFSITE               restic (default) or none. none keeps the
-#                                   backup on this host only; use it only for
-#                                   a test host.
+#   ONTOTATOR_OFFSITE               restic or none; unset (default) means
+#                                   not configured. The off-host copy is
+#                                   optional and off until set to restic:
+#                                   unset or none skips it with a warning and
+#                                   keeps the backup on this host only.
 #   RESTIC_* and backend credentials, ONTOTATOR_OFFSITE_*: see offsite-backup.sh
 #   ONTOTATOR_RESTORE_CHECK_DIR     prepared isolated restore target; empty
 #                                   (default) runs no drill
@@ -42,8 +44,8 @@ root="${ONTOTATOR_BACKUP_ROOT:-}"
 [[ -n "$root" ]] || fail "set ONTOTATOR_BACKUP_ROOT"
 keep_days="${ONTOTATOR_BACKUP_KEEP_DAYS:-14}"
 wait_jobs="${ONTOTATOR_BACKUP_WAIT_JOBS:-600}"
-offsite="${ONTOTATOR_OFFSITE:-restic}"
-[[ "$offsite" == restic || "$offsite" == none ]] || fail "ONTOTATOR_OFFSITE must be restic or none"
+offsite="${ONTOTATOR_OFFSITE:-}"
+[[ -z "$offsite" || "$offsite" == restic || "$offsite" == none ]] || fail "ONTOTATOR_OFFSITE must be restic or none"
 drill_dir="${ONTOTATOR_RESTORE_CHECK_DIR:-}"
 drill_days="${ONTOTATOR_RESTORE_CHECK_DAYS:-1 2 3 4 5 6 7}"
 [[ "$drill_days" =~ ^[1-7]([[:space:]]+[1-7])*$ ]] || fail "ONTOTATOR_RESTORE_CHECK_DAYS must list days 1 to 7"
@@ -55,12 +57,15 @@ point="$(bash "$here/backup.sh" "$root" --wait-jobs "$wait_jobs" --keep-days "$k
 log "recovery point $point"
 
 # 2. Encrypted copy off the host.
-offsite_result="skipped (ONTOTATOR_OFFSITE=none)"
 if [[ "$offsite" == restic ]]; then
     bash "$here/offsite-backup.sh" push "$point"
     offsite_result=copied
-else
+elif [[ "$offsite" == none ]]; then
+    offsite_result="skipped (ONTOTATOR_OFFSITE=none)"
     log "warning: ONTOTATOR_OFFSITE=none; this recovery point exists on this host only"
+else
+    offsite_result="skipped (not configured)"
+    log "warning: no off-host copy configured (set ONTOTATOR_OFFSITE=restic to enable it); this recovery point exists on this host only"
 fi
 
 # 3. Restore drill, of the off-host copy when there is one.

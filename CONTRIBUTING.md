@@ -44,7 +44,7 @@ After the merge:
 
 Steps only the repository owner can do, outside this repository:
 
-- **Zenodo integration (once):** sign in to [Zenodo](https://zenodo.org/) with the GitHub account that administers `phentrieve/ontotator`, open **GitHub** in the account settings and switch the repository on. From then on each published release gets a DOI. Releases published before that get none; to archive one, publish a new release. Then add the concept DOI to `README.md` ("How to cite") and as `doi` to `CITATION.cff`.
+- **Zenodo integration (once; postponed by the owner on 2026-11-22, B6-5):** sign in to [Zenodo](https://zenodo.org/) with the GitHub account that administers `phentrieve/ontotator`, open **GitHub** in the account settings and switch the repository on. From then on each published release gets a DOI. Releases published before that get none; to archive one, publish a new release. Then add the concept DOI to `README.md` ("How to cite") and as `doi` to `CITATION.cff`.
 - **ontospan release:** `pyproject.toml` and `uv.lock` pin `ontospan` to commit `311f93e`, two commits after its only tag `v1.2.1`. In `phentrieve/ontospan`: tag that commit (for example `v1.2.2`), publish a GitHub release (with Zenodo switched on there too, for its own DOI) and, if wanted, publish it on PyPI. Then, in this repository, pin the tag instead of the commit, in one pull request: `"ontospan @ git+https://github.com/phentrieve/ontospan.git@v1.2.2"` in `pyproject.toml` (or `"ontospan==1.2.2"` once it is on PyPI, which also lets `allow-direct-references` go), `uv lock`, and check that `uv.lock` still resolves to the same commit `311f93e`. Do not pin `v1.2.1`: it lacks the two commits after it that the current pin includes.
 
 ## Security
