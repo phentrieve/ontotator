@@ -1216,8 +1216,7 @@
       z-index: 3;
     }
     .case-screen:not(.case-comparing) .app-layout.details-collapsed > .inspector-pane,
-    .case-screen:not(.case-comparing) .app-layout.details-collapsed > .tree-host,
-    .case-screen:not(.case-comparing) .app-layout.details-collapsed > .sidebar-resizer--rows { display: none; }
+    .case-screen:not(.case-comparing) .app-layout.details-collapsed > .tree-host { display: none; }
     .case-screen:not(.case-comparing) .app-layout.tree-open.details-collapsed { grid-template-rows: minmax(0, 1fr); }
     .case-screen:not(.case-comparing) .details-rail-expand {
       display: flex;
@@ -1671,7 +1670,8 @@
 /* Issue 542, U1-02: with the tree open the panel above it is short, and a pinned preview covered the hits, the
    "Modifiers only" chip and the language hint. It follows the hits there, as in the stacked inspector. */
 .app-layout.tree-open .candidate-preview { position: static; }
-.app-layout.tree-open .search-panel .candidate-card { scroll-margin-bottom: 0; }
+/* Issue 589: a hit brought into view stops above the divider of the tree, which reaches 8 px into the panel. */
+.app-layout.tree-open .search-panel .candidate-card { scroll-margin-bottom: 8px; }
 
 /* Title and "Show in tree" in one row (issue 540). */
 .candidate-preview-head {

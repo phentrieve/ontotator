@@ -96,6 +96,20 @@ describe("the right column as a rail (issue 540)", () => {
     expect(screen.getByRole("button", { name: "Collapse details panel" })).toBeDefined();
   });
 
+  it("folded with the tree open, has no tree divider: nothing over the strip, no Tab stop after Expand (issue 589)", async () => {
+    windowOf(1440);
+    const { container } = render(<CaseScreen view={makeView([snapshot("a1", "HP:1")])} workspaceId="ws" onClose={vi.fn()} versionContext={versionContext("ada")} />);
+    fireEvent.click(container.querySelector<HTMLElement>('[data-list-key="annotation:a1"]')!);
+    fireEvent.click(within(container.querySelector<HTMLElement>(".term-heading-actions")!).getByRole("button", { name: "Show in tree" }));
+    expect(screen.getByRole("separator", { name: "Resize ontology tree" })).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Collapse details panel" }));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Expand details panel" })));
+    expect(screen.queryByRole("separator", { name: "Resize ontology tree" })).toBeNull();
+    expect(container.querySelector(".sidebar-resizer--rows")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Expand details panel" }));
+    expect(screen.getByRole("separator", { name: "Resize ontology tree" })).toBeDefined();
+  });
+
   it("is resized from the keyboard as the findings column is, and remembers the width", async () => {
     windowOf(1440);
     const { container } = render(<CaseScreen view={makeView([snapshot("a1", "HP:1")])} workspaceId="ws" onClose={vi.fn()} versionContext={versionContext("ada")} />);
