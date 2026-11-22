@@ -41,6 +41,18 @@ export const DiffView = forwardRef<HTMLDivElement, { before: string; after: stri
   return <div ref={ref} className={`translation-diff${showInvisibles ? " show-invisibles" : ""}`} role="region" aria-label={label} tabIndex={0} lang={lang}>{content}</div>;
 });
 
+/**
+ * Scrolls a diff view so that its first change is in sight, with about a third of the view of text above it as
+ * context (issue 591); without a change, or when the change is already in the upper part, nothing moves.
+ */
+export function scrollToFirstChange(view: HTMLElement): void {
+  const mark = view.querySelector<HTMLElement>('[data-diff-op="insert"],[data-diff-op="delete"]');
+  if (!mark) return;
+  const top = mark.getBoundingClientRect().top - view.getBoundingClientRect().top + view.scrollTop;
+  const target = Math.max(0, Math.round(top - view.clientHeight / 3));
+  if (top - view.scrollTop > view.clientHeight / 2 || top < view.scrollTop) view.scrollTop = target;
+}
+
 /** Read-only reading text with paragraph markers, without any editing affordance. */
 export const TextView = forwardRef<HTMLDivElement, { text: string; label: string; lang?: string; showInvisibles?: boolean }>(function TextView({ text, label, lang, showInvisibles = false }, ref) {
   const content = useMemo(() => paragraphNodes(text, [{ op: "equal", text }], { invisibles: showInvisibles }), [text, showInvisibles]);

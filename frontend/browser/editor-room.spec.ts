@@ -230,3 +230,64 @@ test.describe("the tree from a proposal or a search hit (issue 542)", () => {
     await expect(page.locator(".sidebar [data-list-key^='annotation:']")).toHaveCount(0);
   });
 });
+
+test.describe("acceptance of the editor room (issue 589)", () => {
+  const treeDivider = (page: Page) => page.getByRole("separator", { name: "Resize ontology tree" });
+
+  for (const size of [{ width: 1440, height: 900 }, { width: 1280, height: 720 }]) {
+    test(`${size.width}x${size.height}: a column folded with the tree open is only the strip; Expand takes all of it and is the last Tab stop there`, async ({ page }) => {
+      await open(page, `room-fold-tree-${size.width}`, size);
+      await annotateSeizure(page);
+      await page.getByRole("button", { name: "Show in tree" }).click();
+      await expect(treePanel(page)).toBeVisible();
+      await expect(treeDivider(page)).toBeVisible();
+
+      await collapse(page).click();
+      await expect(expand(page)).toBeFocused();
+      // The tree's divider is gone with the tree: nothing drawn on the strip, no Tab stop after Expand.
+      await expect(treeDivider(page)).toHaveCount(0);
+      await expect(page.locator(".sidebar-resizer--rows")).toHaveCount(0);
+      await page.keyboard.press("Tab");
+      expect(await page.evaluate(() => document.activeElement?.closest(".app-layout") !== null
+        && document.activeElement?.getAttribute("role") === "separator")).toBe(false);
+
+      // Every point of the strip is Expand, the bottom (where the divider used to lie) as well.
+      const strip = await box(expand(page));
+      const covered = await page.evaluate(({ x, ys }) => ys.map((y) => {
+        const hit = document.elementFromPoint(x, y);
+        return hit?.closest(".details-rail-expand") ? null : (hit as HTMLElement | null)?.className ?? "nothing";
+      }).filter(Boolean), { x: strip.x + strip.width / 2, ys: [strip.y + 8, strip.y + strip.height / 2, strip.y + strip.height - 4] });
+      expect(covered).toEqual([]);
+      await page.mouse.click(strip.x + strip.width / 2, strip.y + strip.height - 4);
+      await expect(collapse(page)).toBeFocused();
+      // Expanded, the tree and its divider are back.
+      await expect(treePanel(page)).toBeVisible();
+      await expect(treeDivider(page)).toBeVisible();
+    });
+  }
+
+  for (const size of [{ width: 1280, height: 720 }, { width: 1440, height: 900 }]) {
+    test(`${size.width}x${size.height}: the tree opened from a search hit leaves the active hit in view, clear of the divider`, async ({ page }) => {
+      await open(page, `room-hit-tree-${size.width}`, size);
+      await selectText(page, 0, 9);
+      await page.getByLabel("Search term", { exact: true }).fill("seiz");
+      const seizure = page.getByRole("option", { name: /^Seizure HP:0001250/ });
+      await seizure.hover();
+      await page.getByRole("button", { name: "Show in tree: Seizure" }).click();
+      await expect(treeItem(page, SEIZURE)).toHaveAttribute("aria-selected", "true");
+      await expect(seizure).toHaveAttribute("aria-selected", "true");
+      // Wholly inside the panel's part of the column, and what lies at its top, middle and bottom is the hit itself.
+      await expect.poll(() => seizure.evaluate((option) => {
+        const r = option.getBoundingClientRect();
+        const panel = option.closest(".inspector-pane")!.getBoundingClientRect();
+        if (r.top < panel.top || r.bottom > panel.bottom) return "outside the panel";
+        const x = r.left + r.width / 2;
+        return [r.top + 2, r.top + r.height / 2, r.bottom - 2].map((y) => {
+          const hit = document.elementFromPoint(x, y);
+          return hit && option.contains(hit) ? "" : (hit as HTMLElement | null)?.className ?? "nothing";
+        }).join("");
+      })).toBe("");
+      await expect(seizure).toBeInViewport({ ratio: 1 });
+    });
+  }
+});

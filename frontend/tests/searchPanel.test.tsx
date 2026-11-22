@@ -420,6 +420,32 @@ describe("SearchPanel", () => {
     expect(screen.queryByRole("button", { name: /Show in tree/ })).toBeNull();
   });
 
+  it("brings the active hit into view when the tree opens under the panel, and only then (issue 589)", async () => {
+    const scrolled: string[] = [];
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) { scrolled.push(this.id || this.className); };
+    try {
+      const manager = new SearchManager({ searchOntology: vi.fn().mockResolvedValue(threeHits) } as any);
+      const props = { searchManager: manager, annotationId: "a", workspaceKey: key, layerId: "phenotype", onSelectCandidate: vi.fn(), debounceMs: 0, onShowInTree: vi.fn() };
+      const { rerender } = render(<SearchPanel {...props} />);
+      const input = screen.getByRole("combobox", { name: "Search term" });
+      fireEvent.change(input, { target: { value: "seizure" } });
+      await waitFor(() => expect(activeId(input)).toBe(options()[1].id));
+      fireEvent.keyDown(input, { key: "ArrowDown" });
+      expect(activeId(input)).toBe(options()[2].id);
+      scrolled.length = 0;
+      rerender(<SearchPanel {...props} treeShown />);
+      expect(scrolled).toEqual([options()[2].id]);
+      // Open, the tree moves nothing more; a new render of the open tree does not pull the hit back.
+      scrolled.length = 0;
+      rerender(<SearchPanel {...props} treeShown />);
+      rerender(<SearchPanel {...props} treeShown={false} />);
+      expect(scrolled).toEqual([]);
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
+
   it("shows no definition preview without an active hit", async () => {
     const input = renderPanel(vi.fn().mockResolvedValue(threeHits), { canAssign: false });
     fireEvent.change(input, { target: { value: "seizure" } });

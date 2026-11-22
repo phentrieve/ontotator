@@ -2,7 +2,7 @@
  * The lead's own correction of a rejected, queried or accepted translation (spec F1, FD1 to FD9): a
  * panel that explains the outcome, starts the lead correction (`startLeadCorrection`) and opens the
  * ordinary translation review screen (`#/tasks/{assignment_id}`). Shown from the inline Resolve options
- * under the Documents row ("Correct the translation…"; documents overview Change 13) and, for an accepted
+ * in the Resolve dialog of the Documents row ("Correct it myself (counts as accepted)…", issue 555) and, for an accepted
  * version, in a dialog from its row in the Translation part's version list (issue 341 b): before anything
  * is saved it lists the annotation work that stays on the accepted version (`getLeadCorrectionPreview`).
  */
@@ -70,6 +70,11 @@ export function reviewedAgain(row: Pick<DocumentRowView, "versions">, documentId
     current = parent ? row.versions.find(item => item.document_id === parent) : undefined;
   }
   return false;
+}
+
+/** Issue 555: the lead's own correction, named by what follows: counted as accepted, or reviewed again. */
+export function correctLabel(again: boolean): string {
+  return again ? "Correct it myself (reviewed again)…" : "Correct it myself (counts as accepted)…";
 }
 
 /** Refusals whose generic admin message does not fit starting a correction. */
@@ -144,7 +149,9 @@ export function LeadCorrectionPanel({ row, projectKey, onNavigate, onCancel, hea
   const unconfirmed = missing !== null && !confirmLanguage;
   const blocked = unconfirmed || unavailable !== null;
 
-  useEffect(() => { if (!inDialog) heading.current?.focus(); }, [inDialog]);
+  // Rule 6 of docs/design.md › Panels and actions: in its own dialog, focus starts on the primary action.
+  const primary = useRef<HTMLButtonElement>(null);
+  useEffect(() => { (inDialog ? primary : heading).current?.focus(); }, [inDialog]);
   // Issue 341 b: the consequences for the work on an accepted version (or its rejected correction), before saving.
   useEffect(() => {
     if (!again) return;
@@ -170,7 +177,8 @@ export function LeadCorrectionPanel({ row, projectKey, onNavigate, onCancel, hea
   const consequences = preview ? correctionConsequences(preview) : [];
   const annotated = preview ? preview.annotations.submitted + preview.annotations.open > 0 : false;
   return <div className="documents-resolve" role="group" aria-labelledby={inDialog ? undefined : `${id}-title`} aria-label={inDialog ? `Correct it myself, ${textLabel(row)} v${version}` : undefined}>
-    {!inDialog && <Heading id={`${id}-title`} ref={heading} tabIndex={-1} className="inline-confirm-title">{`Correct the translation, ${textLabel(row)}`}</Heading>}
+    {/* Rule 2: the step repeats the label of the action that opened it. */}
+    {!inDialog && <Heading id={`${id}-title`} ref={heading} tabIndex={-1} className="inline-confirm-title">{`${correctLabel(again).replace(/…$/, "")}, ${textLabel(row)}`}</Heading>}
     {accepted
       ? <p>{`You correct the accepted v${version} yourself in the translation review and submit it as Accepted with corrections. The corrected text becomes v${next}.`}</p>
       : again
@@ -180,7 +188,7 @@ export function LeadCorrectionPanel({ row, projectKey, onNavigate, onCancel, hea
       {consequences.map(line => <span key={line} className="lead-correction-consequence">{line} </span>)}
     </InlineMessage>}
     {again && <p className="field-hint">{`v${next} starts as a correction with review On.`}</p>}
-    {unavailable && <InlineMessage tone="warning">{unavailable}</InlineMessage>}
+    {unavailable && <InlineMessage tone="warning"><span id={`${id}-unavailable`}>{unavailable}</span></InlineMessage>}
     {previewError !== undefined && <ErrorNotice error={previewError} />}
     {missing !== null && <Checkbox id={`${id}-language`} label={`Correct despite missing ${missing.join(", ")} in your profile`}
       checked={confirmLanguage} onChange={event => setConfirmLanguage(event.target.checked)} />}
@@ -193,8 +201,11 @@ export function LeadCorrectionPanel({ row, projectKey, onNavigate, onCancel, hea
     {unconfirmed && <p id={`${id}-unconfirmed`} className="action-reason">Confirm the missing languages.</p>}
     <div className="documents-resolve-actions">
       <Button size="sm" onClick={onCancel}>Cancel</Button>
-      <Button size="sm" variant="primary" loading={busy} aria-disabled={blocked || busy ? true : undefined}
-        aria-describedby={unconfirmed ? `${id}-unconfirmed` : undefined} onClick={() => { void start(); }}>Open translation review</Button>
+      <Button ref={primary} size="sm" variant="primary" loading={busy} aria-disabled={blocked || busy ? true : undefined}
+        // Rule 4 of docs/design.md › Panels and actions: a greyed Open names its reason as description and tooltip.
+        aria-describedby={busy ? undefined : unconfirmed ? `${id}-unconfirmed` : unavailable !== null ? `${id}-unavailable` : undefined}
+        title={busy ? undefined : unconfirmed ? "Confirm the missing languages." : unavailable ?? undefined}
+        onClick={() => { void start(); }}>Open translation review</Button>
     </div>
   </div>;
 }

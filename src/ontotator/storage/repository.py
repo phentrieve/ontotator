@@ -736,6 +736,7 @@ class Repository:
                 TaskHoldRow.report_id,
                 TaskHoldRow.assignment_id,
                 ProblemReportStateRow.state.label("report_state"),
+                ProblemReportRow.kind.label("report_kind"),
                 AssignmentRow.document_id,
                 DocumentRow.case_id,
                 DocumentRow.language,
@@ -744,6 +745,10 @@ class Repository:
             .join(
                 ProblemReportStateRow,
                 ProblemReportStateRow.report_id == TaskHoldRow.report_id,
+            )
+            .join(
+                ProblemReportRow,
+                ProblemReportRow.report_id == TaskHoldRow.report_id,
             )
             .join(AssignmentRow, AssignmentRow.id == TaskHoldRow.assignment_id)
             .join(
@@ -760,6 +765,10 @@ class Repository:
         ).all()
         for held in holds:
             report_open = held.report_state == "open"
+            # Issue 590: a question that pauses its asker's task waits for the
+            # lead's answer on the Questions page, not for a decision in
+            # Documents; the cause leads there.
+            question = report_open and held.report_kind == "question"
             result.append(
                 {
                     "cause_id": held.hold_id
@@ -774,10 +783,14 @@ class Repository:
                     "document_id": held.document_id,
                     "report_id": held.report_id,
                     "assignment_id": held.assignment_id,
-                    "reason": held.reason
+                    "reason": f"Waiting for your answer to a question: {held.reason}"
+                    if question
+                    else held.reason
                     if report_open
                     else "This task is paused, but its report is resolved.",
-                    "destination": f"#/projects/{quote(project_key, safe='')}/problem-reports/{quote(held.report_id, safe='')}",
+                    "destination": f"#/projects/{quote(project_key, safe='')}/questions"
+                    if question
+                    else f"#/projects/{quote(project_key, safe='')}/problem-reports/{quote(held.report_id, safe='')}",
                 }
             )
         return result

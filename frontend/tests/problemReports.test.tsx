@@ -101,7 +101,7 @@ it("can resume a translation first opened while held without treating the hold a
 });
 
 it("resumes only the selected own report pause, reuses the request identity on retry and refreshes task metadata", async () => {
-  const paused = { ...assignment, held: true, hold_reason: report.reason, active_holds: [{ reason: report.reason, created_at: "2026-10-19T01:00:00Z", own_report_id: "report-1" }] };
+  const paused = { ...assignment, held: true, hold_reason: report.reason, active_holds: [{ reason: report.reason, created_at: "2026-10-19T01:00:00Z", own_report_id: "report-1", kind: "problem" as const }] };
   vi.spyOn(api, "listTaskProblemReports").mockResolvedValue([report]);
   const action = vi.spyOn(api, "actOnProblemReport").mockRejectedValueOnce(new Error("Connection lost")).mockResolvedValue({ ...report, revision: 3, held_assignment_ids: [] });
   const metadata = vi.spyOn(api, "getAssignmentMetadata").mockResolvedValue(paused);

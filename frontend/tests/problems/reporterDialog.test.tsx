@@ -16,7 +16,7 @@ function task(over: Partial<AssignmentView> = {}): AssignmentView {
     updated_at: "2026-10-19T00:00:00Z", revoked_at: null, last_submission_id: null, active_round_id: "round-2", ...over } as AssignmentView;
 }
 const pausedTask = (over: Partial<AssignmentView> = {}) => task({ held: true, hold_reason: OWN_REASON, workflow_revision: 4,
-  active_holds: [{ reason: OWN_REASON, created_at: "2026-10-19T01:12:00Z", own_report_id: "r1" }], ...over });
+  active_holds: [{ reason: OWN_REASON, created_at: "2026-10-19T01:12:00Z", own_report_id: "r1", kind: "problem" }], ...over });
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -131,7 +131,7 @@ describe("reporter dialog", () => {
 
     // A lead pause added elsewhere.
     const leadPaused = task({ held: true, hold_reason: "Wait for the glossary", workflow_revision: 6,
-      active_holds: [{ reason: "Wait for the glossary", created_at: "2026-10-19T02:00:00Z", own_report_id: null }] });
+      active_holds: [{ reason: "Wait for the glossary", created_at: "2026-10-19T02:00:00Z", own_report_id: null, kind: "problem" }] });
     meta.mockResolvedValue(leadPaused);
     fireEvent.focus(window);
     await waitFor(() => expect(onRefresh).toHaveBeenLastCalledWith(leadPaused));
@@ -217,7 +217,7 @@ describe("reporter dialog", () => {
     await act(async () => undefined);
     fireEvent.click(entry());
     list.mockResolvedValue([created]);
-    meta.mockResolvedValue(pausedTask({ active_holds: [{ reason: "Glossary term missing", created_at: "2026-10-19T01:12:00Z", own_report_id: "r-new" }] }));
+    meta.mockResolvedValue(pausedTask({ active_holds: [{ reason: "Glossary term missing", created_at: "2026-10-19T01:12:00Z", own_report_id: "r-new", kind: "problem" }] }));
     fireEvent.change(screen.getByRole("textbox", { name: /What is the problem\?/ }), { target: { value: "Glossary term missing" } });
     fireEvent.click(footer().getByRole("button", { name: "Report and pause my task" }));
     expect(await screen.findByText("Reported. Your task is paused until you or a project lead resume it.")).toBeTruthy();
@@ -235,7 +235,7 @@ describe("reporter dialog", () => {
     await act(async () => undefined);
     fireEvent.click(entry());
     list.mockResolvedValue([created]);
-    meta.mockResolvedValue(pausedTask({ active_holds: [{ reason: "Glossary term missing", created_at: "2026-10-19T01:12:00Z", own_report_id: "r1" }] }));
+    meta.mockResolvedValue(pausedTask({ active_holds: [{ reason: "Glossary term missing", created_at: "2026-10-19T01:12:00Z", own_report_id: "r1", kind: "problem" }] }));
     fireEvent.change(screen.getByRole("textbox", { name: /What is the problem\?/ }), { target: { value: "Glossary term missing" } });
     fireEvent.click(footer().getByRole("button", { name: "Report and pause my task" }));
     expect(await screen.findByText("Reported. Your task is paused until you or a project lead resume it.")).toBeTruthy();
@@ -265,8 +265,8 @@ describe("reporter dialog", () => {
 
   it("states the remaining pauses in the resume confirm and after success", async () => {
     const assignment = pausedTask({ active_holds: [
-      { reason: OWN_REASON, created_at: "2026-10-19T01:12:00Z", own_report_id: "r1" },
-      { reason: "Wait for the glossary", created_at: "2026-10-19T01:20:00Z", own_report_id: null },
+      { reason: OWN_REASON, created_at: "2026-10-19T01:12:00Z", own_report_id: "r1", kind: "problem" },
+      { reason: "Wait for the glossary", created_at: "2026-10-19T01:20:00Z", own_report_id: null, kind: "problem" },
     ] });
     const resumed = report({ revision: 2, withdrawable: false, holds: [hold({ active: false, release_action: "resume", released_by_label: "ann-0004", released_at: T1 })], events: [event()] });
     const action = vi.spyOn(api, "actOnProblemReport").mockResolvedValue(resumed);
