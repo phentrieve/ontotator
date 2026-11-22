@@ -32,8 +32,17 @@ export function questionStatus(question: ProblemReportView): string {
   if (question.state === "withdrawn") return "Withdrawn";
   if (question.answer != null && question.answered_at) return `Answered by the lead, ${formatTime(question.answered_at)}`;
   if (question.state === "resolved") return "Closed by the lead";
-  return question.pauses ? "Waiting for the lead's answer. Your task is paused." : "Waiting for the lead's answer";
+  // Issue 590: "paused" only while this question's pause is in force (a resume ends it, the question stays open).
+  const paused = question.holds ? question.holds.some(hold => hold.assignment_id === question.assignment_id && hold.active)
+    : (question.held_assignment_ids ?? []).includes(question.assignment_id);
+  return paused ? "Waiting for the lead's answer. Your task is paused." : "Waiting for the lead's answer";
 }
+
+/** The asker resumes a task their own question paused (issue 590); the question stays open. */
+export const RESUME_LABEL = "Resume my task";
+export const RESUME_CONFIRM = "Your task opens again. The question stays open and the lead can still answer it.";
+export const RESUME_HINT = "Recorded with your question. Project leads see it.";
+export const RESUMED_NOTICE = "Resumed. Your question stays open.";
 
 /** The asker reads what the answer did to their text. */
 export const TOOK_PROPOSED = "The lead put your wording into your text.";

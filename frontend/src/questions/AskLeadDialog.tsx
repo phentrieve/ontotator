@@ -8,12 +8,14 @@ import { askConsequence, ASK_LABEL, PAUSE_LABEL, PROPOSED_FIELD, PROPOSED_HINT, 
  * "Ask the lead" (issue 553, prototype): a question, an optional quoted passage and, in a translation review, an
  * optional wording for it. By default the task stays open; "Pause my task until the lead answers" pauses it.
  */
-export function AskLeadDialog({ assignment, quote: initialQuote = "", withProposal, onAsked, onClose }: {
+export function AskLeadDialog({ assignment, quote: initialQuote = "", withProposal, onSaveBeforePause, onAsked, onClose }: {
   assignment: Pick<AssignmentView, "id" | "workflow_revision" | "active_round_id">;
   /** The passage selected in the text when the dialog opened. */
   quote?: string;
   /** Offer "Your wording for this passage" (translation review). */
   withProposal: boolean;
+  /** Saves the task's pending edits before a question that pauses it: a paused task refuses saves (issue 590). */
+  onSaveBeforePause?: () => Promise<void>;
   onAsked: (question: ProblemReportView, pause: boolean) => void;
   onClose: () => void;
 }): JSX.Element {
@@ -33,9 +35,12 @@ export function AskLeadDialog({ assignment, quote: initialQuote = "", withPropos
     const quoted = quote.trim() ? quote : null;
     const wording = withProposal && quoted && proposed.trim() && proposed !== quote ? proposed : null;
     try {
+      if (pause) await onSaveBeforePause?.();
+      // The task as it is now: an earlier question's pause or resume moved its revision since the screen opened.
+      const current = await api.getAssignmentMetadata(assignment.id);
       const asked = await api.createProblemReport(assignment.id, {
-        request_id: requestId.current, expected_workflow_revision: assignment.workflow_revision,
-        round_id: assignment.active_round_id ?? null, submission_id: null,
+        request_id: requestId.current, expected_workflow_revision: current.workflow_revision,
+        round_id: current.active_round_id ?? null, submission_id: null,
         reason: question.trim(), kind: "question", quote: quoted, proposed_text: wording, pause,
       });
       if (active.current) onAsked(asked, pause);
@@ -45,7 +50,9 @@ export function AskLeadDialog({ assignment, quote: initialQuote = "", withPropos
   };
 
   return <Dialog open title={ASK_LABEL} size="md" initialFocus={textarea} onClose={busy ? undefined : onClose} footer={<>
-    <Button variant="primary" loading={busy} onClick={() => { void send(); }}>{SEND_LABEL}</Button>
+    {/* Issue 590: what sending does stays in sight, also when the form scrolls (1280 × 720). */}
+    <span id={`${id}-consequence`} className="dialog-footer-reason ask-lead-consequence" aria-live="polite">{askConsequence(pause)}</span>
+    <Button variant="primary" loading={busy} aria-describedby={`${id}-consequence`} onClick={() => { void send(); }}>{SEND_LABEL}</Button>
     <Button aria-disabled={busy || undefined} onClick={() => { if (!busy) onClose(); }}>Cancel</Button>
   </>}>
     <form className="ask-lead-form" noValidate onSubmit={event => { event.preventDefault(); void send(); }}>
@@ -62,7 +69,6 @@ export function AskLeadDialog({ assignment, quote: initialQuote = "", withPropos
       {withProposal && <Textarea id={`${id}-proposed`} label={PROPOSED_FIELD} rows={2} value={proposed} readOnly={busy || !quote.trim()}
         hint={quote.trim() ? PROPOSED_HINT : "Quote a passage first."} onChange={event => setProposed(event.target.value)} />}
       <Checkbox id={`${id}-pause`} label={PAUSE_LABEL} checked={pause} disabled={busy} onChange={event => setPause(event.target.checked)} />
-      <p className="ask-lead-consequence">{askConsequence(pause)}</p>
       {error != null && <ErrorNotice error={error} />}
     </form>
   </Dialog>;

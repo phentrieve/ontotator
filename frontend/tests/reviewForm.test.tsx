@@ -113,7 +113,8 @@ describe("ReviewForm", () => {
     [{ decision: "accepted_unchanged" as const }, false, null, false, true],
     [{ decision: "accepted_corrected" as const }, true, null, false, true],
     // Issue 553: an older draft's Query is no longer offered; the note asks for another decision.
-    [{ decision: "query" as const }, false, retiredQueryNote, true, true],
+    // Issue 590: an editable draft with Query shows the note, not the category fields of a decision.
+    [{ decision: "query" as const }, false, retiredQueryNote, false, true],
     [{ decision: "rejected" as const }, false, "Clinically relevant change: yes, always for a rejection.", true, true],
     // Stored values a rule still judges stay visible, so a blocking value can always be cleared.
     [{ decision: "accepted_unchanged" as const, clinical_change: true }, true, null, true, true],
@@ -146,7 +147,7 @@ describe("ReviewForm", () => {
   });
 
   it("changes only the selected category and preserves other fields", () => {
-    const value = { decision: "query" as const, clinical_change: true, categories: ["source" as const, "value" as const], rationale: "Why" };
+    const value = { decision: "rejected" as const, clinical_change: true, categories: ["source" as const, "value" as const], rationale: "Why" };
     const onChange = vi.fn();
     const view = render(<ReviewForm value={value} issues={[]} onChange={onChange} />);
     fireEvent.click(screen.getByRole("checkbox", { name: "Number or unit" }));
@@ -177,6 +178,8 @@ describe("ReviewForm", () => {
   it("disables every control and refuses even synthetic changes when read only", async () => {
     const onChange = vi.fn();
     render(<ReviewForm value={{ decision: "query", clinical_change: true, categories: ["source"], rationale: "Original" }} issues={[]} readOnly onChange={onChange} />);
+    // A submitted Query review keeps its categories readable (issue 590 hides them only in an editable draft).
+    expect(screen.getByRole("group", { name: "Clinical change categories" })).toBeDefined();
     const controls = [...screen.getAllByRole("radio"), ...screen.getAllByRole("checkbox"), screen.getByRole("textbox")];
     expect(controls.every((control) => control.matches(":disabled"))).toBe(true);
     for (const control of controls) fireEvent.click(control);

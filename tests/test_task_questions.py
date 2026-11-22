@@ -158,6 +158,93 @@ def test_a_question_pauses_the_task_when_the_asker_chooses_so(
     assert p.task(case)["held"] is False
 
 
+def test_a_pausing_question_is_named_as_a_question_and_the_asker_can_resume(
+    client: TestClient, built: dict[str, Any]
+) -> None:
+    """Issue 590: the task says its pause is a question, the export leads to
+    the Questions page, and the asker can resume while the question stays
+    open."""
+    p = people(client, built)
+    case = built["cases"]["ask"]
+    asked = p.ask(case, pause=True)
+    assert asked.status_code == 200, asked.text
+    body = asked.json()
+    task_id = p.task(case)["id"]
+    p.login("ana")
+    meta = client.get(f"/api/v1/assignments/{task_id}")
+    assert meta.status_code == 200, meta.text
+    held = meta.json()
+    assert held["held"] is True and held["pause_causes"] == ["report"]
+    assert [(h["kind"], h["own_report_id"]) for h in held["active_holds"]] == [
+        ("question", body["report_id"])
+    ]
+    # The export's cause for the paused task leads to the Questions page.
+    app: Any = client.app
+    repo = app.state.repo
+    with repo.db.transaction() as conn:
+        pid = repo._require_project(conn, built["project"])
+        causes = repo.workflow_causes_in(conn, built["project"], pid)
+    (cause,) = [
+        c
+        for c in causes
+        if c["code"] == "TASK_ON_HOLD" and c["report_id"] == body["report_id"]
+    ]
+    assert cause["destination"] == f"#/projects/{built['project']}/questions"
+    assert cause["reason"] == "Waiting for your answer to a question: " + body["reason"]
+    # The asker resumes: the task opens, the question stays open for the lead.
+    resumed = client.post(
+        f"/api/v1/problem-reports/{body['report_id']}/actions",
+        json={
+            "request_id": f"resume-{body['report_id']}",
+            "expected_revision": body["revision"],
+            "action": "resume",
+            "reason": "I can go on with the rest.",
+            "assignment_ids": [task_id],
+        },
+        headers=p.login("ana"),
+    )
+    assert resumed.status_code == 200, resumed.text
+    assert resumed.json()["state"] == "open"
+    assert resumed.json()["held_assignment_ids"] == []
+    assert p.task(case)["held"] is False
+    assert [q["report_id"] for q in p.questions(state="open")].count(
+        body["report_id"]
+    ) == 1
+    # The lead still answers it.
+    fresh = next(q for q in p.questions() if q["report_id"] == body["report_id"])
+    answered = p.answer(fresh)
+    assert answered.status_code == 200, answered.text
+
+
+def test_an_ordinary_problem_hold_keeps_its_kind_and_destination(
+    client: TestClient, built: dict[str, Any]
+) -> None:
+    p = people(client, built)
+    case = built["cases"]["ask"]
+    task = p.task(case)
+    reported = client.post(
+        f"/api/v1/assignments/{task['id']}/problem-reports",
+        json={
+            "request_id": "report-590",
+            "expected_workflow_revision": task["workflow_revision"],
+            "round_id": task["active_round_id"],
+            "reason": "The source text is cut off.",
+        },
+        headers=p.login("ana"),
+    )
+    assert reported.status_code == 200, reported.text
+    meta = client.get(f"/api/v1/assignments/{task['id']}").json()
+    assert [h["kind"] for h in meta["active_holds"]] == ["problem"]
+    app: Any = client.app
+    repo = app.state.repo
+    with repo.db.transaction() as conn:
+        pid = repo._require_project(conn, built["project"])
+        causes = repo.workflow_causes_in(conn, built["project"], pid)
+    (cause,) = [c for c in causes if c["code"] == "TASK_ON_HOLD"]
+    assert "/problem-reports/" in cause["destination"]
+    assert cause["reason"] == "The source text is cut off."
+
+
 def test_the_lead_sees_open_questions_with_quote_and_proposed_text(
     client: TestClient, built: dict[str, Any]
 ) -> None:

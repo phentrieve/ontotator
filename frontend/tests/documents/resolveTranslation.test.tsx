@@ -115,7 +115,7 @@ it("Correct it myself (counts as accepted)… opens the panel in the dialog", as
   const props = renderResolve();
   fireEvent.click(screen.getByRole("button", { name: "Correct it myself (counts as accepted)…" }));
   expect(screen.queryByRole("group", { name: "Resolve rejected translation, case-0101 de" })).toBeNull();
-  const panel = within(resolveDialog()).getByRole("group", { name: "Correct the translation, case-0101 de" });
+  const panel = within(resolveDialog()).getByRole("group", { name: "Correct it myself (counts as accepted), case-0101 de" });
   expect(within(panel).getByText(/You review v1 yourself/)).toBeTruthy();
   expect(props.onNavigate).not.toHaveBeenCalled();
   fireEvent.click(within(panel).getByRole("button", { name: "Open translation review" }));
@@ -126,7 +126,7 @@ it("Correct it myself (counts as accepted)… opens the panel in the dialog", as
   cleanup();
   renderResolve();
   fireEvent.click(screen.getByRole("button", { name: "Correct it myself (counts as accepted)…" }));
-  fireEvent.click(within(screen.getByRole("group", { name: "Correct the translation, case-0101 de" })).getByRole("button", { name: "Cancel" }));
+  fireEvent.click(within(screen.getByRole("group", { name: "Correct it myself (counts as accepted), case-0101 de" })).getByRole("button", { name: "Cancel" }));
   await waitFor(() => expect(document.activeElement).toBe(within(resolveDialog()).getByRole("button", { name: "Correct it myself (counts as accepted)…" })));
 });
 
@@ -162,6 +162,9 @@ it("discards with a required reason and shows consequences", async () => {
   const confirm = screen.getByRole("group", { name: "Discard the de translation of case-0101" });
   const discard = within(confirm).getByRole("button", { name: "Discard" });
   expect(discard.getAttribute("aria-disabled")).toBe("true");
+  // Rule 4 (issue 591): the reason is the description and the tooltip.
+  expect(document.getElementById(discard.getAttribute("aria-describedby") ?? "")?.textContent).toBe("Enter a reason.");
+  expect(discard.getAttribute("title")).toBe("Enter a reason.");
   fireEvent.click(discard);
   expect(api.discardVariant).not.toHaveBeenCalled();
   fireEvent.change(within(confirm).getByLabelText("Reason (required)"), { target: { value: "Wrong source" } });
@@ -266,7 +269,9 @@ it("a rejected correction of an accepted version names the other consequence: re
     version({ document_id: "case-0101-de", version: 2, chain_name: "DeepL", origin: "correction", derived_from: "case-0101-de-v1", translation_status: "reviewed", latest_review_decision: "rejected" }),
   ] };
   renderResolve({ row });
-  expect(within(resolveDialog()).getByRole("button", { name: "Correct it myself (reviewed again)…" })).toBeTruthy();
+  fireEvent.click(within(resolveDialog()).getByRole("button", { name: "Correct it myself (reviewed again)…" }));
+  // Rule 2 (issue 591): the step repeats the label of the button.
+  expect(within(resolveDialog()).getByRole("heading", { name: "Correct it myself (reviewed again), case-0101 de" })).toBeTruthy();
 });
 
 it("quotes the reviewer's reason and categories above the options, named by the review's work item", async () => {

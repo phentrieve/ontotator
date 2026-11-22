@@ -18,10 +18,15 @@ env:
   NODE_VERSION: "24"
 
 jobs:
-  backend:
-    name: Backend (lint, types, drift, pytest)
+  # The backend gate runs as one static job and four pytest shards on their own runners (each
+  # with its own testcontainer PostgreSQL). scripts/pytest_shard.py splits the test files by
+  # tests/pytest_timings.json; the static job checks that the shards cover every collected test.
+  backend-static:
+    name: Backend static (lint, types, drift, handbook)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
+    outputs:
+      tests: ${{ steps.shards.outputs.tests }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -42,15 +47,116 @@ jobs:
         env:
           BASE_REF: ${{ github.base_ref }}
         run: uv run python scripts/check_handbook.py --check --base "origin/$BASE_REF"
+      - name: Shards cover every collected test once
+        id: shards
+        shell: bash
+        run: |
+          uv run python scripts/pytest_shard.py --of 4 --verify | tee shard-verify.txt
+          echo "tests=$(sed -n 's/^unsharded: \([0-9]*\) tests.*/\1/p' shard-verify.txt)" >> "$GITHUB_OUTPUT"
+
+  backend-pytest:
+    name: Backend pytest shard ${{ matrix.shard }}/4
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          # Some tests run git against the checkout (handbook, check-affected).
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv sync --locked
       # PostgreSQL comes from a testcontainer (tests/pg_harness.py); the runner has Docker.
       # sys.monitoring (Python 3.12+) keeps the coverage overhead of the suite small.
-      - env:
+      - name: pytest (this shard's test files)
+        shell: bash
+        env:
           COVERAGE_CORE: sysmon
-        run: uv run pytest -q -n 4 --durations=20 --cov=ontotator --cov-report=term --cov-report=xml
+          SHARD: ${{ matrix.shard }}
+        run: |
+          mapfile -t files < <(uv run python scripts/pytest_shard.py --of 4 --shard "$SHARD")
+          echo "shard $SHARD/4: ${#files[@]} test files"
+          test "${#files[@]}" -gt 0
+          uv run pytest -q -n 4 --durations=20 --cov=ontotator --cov-report= \
+            --junitxml="pytest-junit-shard-$SHARD.xml" "${files[@]}"
+          mv .coverage "coverage-shard-$SHARD"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: python-coverage-shard-${{ matrix.shard }}
+          path: coverage-shard-${{ matrix.shard }}
+          retention-days: 3
+      # Per-test seconds: refresh tests/pytest_timings.json with --update-timings.
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pytest-junit-shard-${{ matrix.shard }}
+          path: pytest-junit-shard-${{ matrix.shard }}.xml
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # Same artifact as the unsharded job had: python-coverage with coverage.xml (no threshold).
+  backend-coverage:
+    name: Backend coverage (combine shards)
+    needs: [backend-static, backend-pytest]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: python-coverage-shard-*
+          path: shards
+          merge-multiple: true
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: pytest-junit-shard-*
+          path: shards
+          merge-multiple: true
+      - name: The shards ran every collected test
+        shell: bash
+        env:
+          EXPECTED: ${{ needs.backend-static.outputs.tests }}
+        run: |
+          ran=$(uv run python scripts/pytest_shard.py --count-junit shards/pytest-junit-shard-*.xml)
+          echo "collected unsharded: $EXPECTED; run across shards: $ran"
+          test -n "$EXPECTED" && test "$ran" = "$EXPECTED"
+      - run: uv run coverage combine shards/coverage-shard-*
+      - run: uv run coverage report
+      - run: uv run coverage xml
       - uses: actions/upload-artifact@v7
         with:
           name: python-coverage
           path: coverage.xml
+
+  # The ruleset on main requires a check named "Backend (lint, types, drift, pytest)"; this job
+  # carries that name and passes only if the static job, every shard and the combine passed.
+  backend:
+    name: Backend (lint, types, drift, pytest)
+    needs: [backend-static, backend-pytest, backend-coverage]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: All backend jobs passed
+        env:
+          STATIC: ${{ needs.backend-static.result }}
+          PYTEST: ${{ needs.backend-pytest.result }}
+          COVERAGE: ${{ needs.backend-coverage.result }}
+        run: |
+          echo "static: $STATIC, pytest shards: $PYTEST, coverage: $COVERAGE"
+          test "$STATIC" = success && test "$PYTEST" = success && test "$COVERAGE" = success
 
   mcp:
     name: MCP server (lint, types, pytest)
@@ -100,10 +206,16 @@ jobs:
       - name: Embedded bundle matches the build
         run: diff -r frontend/dist src/ontotator/web
 
-  browser:
-    name: Browser (Playwright)
+  # Four runners, each with its own fixture server and PostgreSQL. Playwright splits the
+  # spec files between them; tests inside a file stay serial on one runner.
+  browser-shard:
+    name: Browser (Playwright) shard ${{ matrix.shard }}/4
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v7
         with:
@@ -121,18 +233,35 @@ jobs:
       - name: Install Playwright browsers
         working-directory: frontend
         run: npx playwright install --with-deps chromium
-      # Builds the frontend, then runs all specs against tests/browser_server.py (testcontainer PostgreSQL).
-      - run: npm --prefix frontend run test:e2e
+      # Builds the frontend (a vite build per shard, under a minute), then runs this shard's specs
+      # against tests/browser_server.py (testcontainer PostgreSQL). npm appends the flag to playwright.
+      - run: npm --prefix frontend run test:e2e -- --shard=${{ matrix.shard }}/4
       - name: Upload Playwright traces
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-results
+          name: playwright-results-shard-${{ matrix.shard }}
           path: |
             frontend/test-results/
             frontend/playwright-report/
           if-no-files-found: ignore
           retention-days: 14
+
+  # The ruleset on main requires a check named "Browser (Playwright)"; the shards report under
+  # their own names, so this job carries the required name and passes only if every shard passed.
+  browser:
+    name: Browser (Playwright)
+    needs: browser-shard
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: All browser shards passed
+        env:
+          RESULT: ${{ needs.browser-shard.result }}
+        run: |
+          echo "browser shards: $RESULT"
+          test "$RESULT" = success
 
   wheel:
     name: Wheel (lock and contents)

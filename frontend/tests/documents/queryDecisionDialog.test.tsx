@@ -182,3 +182,74 @@ it("a query without a proposed change offers only Accept v1 as it is… (no grey
   expect(within(box).queryByRole("button", { name: /Accept the reviewer’s text/ })).toBeNull();
   expect(within(box).getByRole("button", { name: "Accept v1 as it is…" }).className).toContain("btn-primary");
 });
+
+// ---- Issue 591: focus, the position of the proposed text, rules 4 and 6 in the decision dialogs ----
+
+/** The accessible description from `aria-describedby` (hidden elements count, as for a screen reader). */
+const description = (element: HTMLElement) => (element.getAttribute("aria-describedby") ?? "").split(/\s+/).filter(Boolean)
+  .map(id => document.getElementById(id)?.textContent ?? "").join(" ");
+const renderResolve = () => render(<ResolveTranslation mode="resolve" row={row} projectKey="p" revision={3} onAssignReview={vi.fn()} onNavigate={vi.fn()}
+  onDone={vi.fn()} onChanged={vi.fn()} onAnnounce={vi.fn()} onCancel={vi.fn()} />);
+
+it("a query without a proposed change opens with focus on Accept v1 as it is…, not on <body> (issue 591)", async () => {
+  vi.mocked(api.getQueryDecisionPreview).mockResolvedValue(preview({ proposes_changes: false, review: { ...preview().review!, proposed_text: OLD } }));
+  vi.spyOn(api, "listTranslationReviews").mockResolvedValue([reviewRecord({ assignment_id: 12, decision: "query", rationale: QUESTION })]);
+  renderResolve();
+  const box = screen.getByRole("dialog", { name: "Resolve queried translation, case-0101 de" });
+  await within(box).findByText("Ana Weber proposed no change to the text.");
+  await waitFor(() => expect(document.activeElement).toBe(within(box).getByRole("button", { name: "Accept v1 as it is…" })));
+});
+
+it("Show the proposed text opens at the first change (issue 591)", async () => {
+  const far = `${"Erster Absatz ohne Änderung.\n\n".repeat(8)}${OLD}`;
+  vi.mocked(api.getQueryDecisionPreview).mockResolvedValue(preview({ text: far, review: { ...preview().review!, proposed_text: far.replace("eine Hypotonie", "eine muskuläre Hypotonie") } }));
+  vi.spyOn(api, "listTranslationReviews").mockResolvedValue([reviewRecord({ assignment_id: 12, decision: "query", rationale: QUESTION })]);
+  renderResolve();
+  const box = screen.getByRole("dialog", { name: "Resolve queried translation, case-0101 de" });
+  const summary = await within(box).findByText("Show the proposed text (1 passage changed)");
+  const view = within(box).getByRole("region", { name: "Ana Weber’s proposed text, changes to v1", hidden: true });
+  // jsdom has no layout: the view is 240 px high, 100 px from the top; the change starts 600 px into it.
+  Object.defineProperty(view, "clientHeight", { configurable: true, value: 240 });
+  view.getBoundingClientRect = () => ({ top: 100 }) as DOMRect;
+  view.querySelector<HTMLElement>("ins")!.getBoundingClientRect = () => ({ top: 700 }) as DOMRect;
+  const details = summary.closest("details")!;
+  details.open = true;
+  fireEvent(details, new Event("toggle"));
+  // A third of the view stays above the change as context.
+  expect(view.scrollTop).toBe(600 - 80);
+});
+
+it("the decision dialogs open with focus on their primary action (rule 6, issue 591)", async () => {
+  renderDialog("reviewer_text");
+  const taking = screen.getByRole("dialog", { name: "Accept the reviewer’s text as v2, case-0101 de v1" });
+  await within(taking).findByRole("textbox", { name: "Reviewer’s text" });
+  expect(document.activeElement).toBe(within(taking).getByRole("button", { name: "Accept as v2" }));
+  cleanup();
+  renderDialog("unchanged");
+  const unchanged = screen.getByRole("dialog", { name: "Accept v1 as it is, case-0101 de" });
+  await within(unchanged).findByText("v1 is accepted without changes. It is recorded as your decision on the query.");
+  expect(document.activeElement).toBe(within(unchanged).getByRole("button", { name: "Accept v1" }));
+});
+
+it("a greyed Accept names its reason as accessible description and tooltip before any press (rule 4, issue 591)", async () => {
+  renderDialog("unchanged");
+  const dialog = screen.getByRole("dialog", { name: "Accept v1 as it is, case-0101 de" });
+  await within(dialog).findByText("v1 is accepted without changes. It is recorded as your decision on the query.");
+  const accept = within(dialog).getByRole("button", { name: "Accept v1" });
+  expect(accept.getAttribute("aria-disabled")).toBe("true");
+  expect(description(accept)).toBe("Enter the answer to the reviewer.");
+  expect(accept.getAttribute("title")).toBe("Enter the answer to the reviewer.");
+  // Before the press it is not a visible hint.
+  expect(within(dialog).getByText("Enter the answer to the reviewer.").closest("[hidden]")).toBeTruthy();
+  fireEvent.change(within(dialog).getByRole("textbox", { name: /^Answer to the reviewer/ }), { target: { value: "The short form is meant." } });
+  expect(accept.getAttribute("aria-disabled")).toBeNull();
+  expect(accept.getAttribute("title")).toBeNull();
+  expect(accept.getAttribute("aria-describedby")).toBeNull();
+  cleanup();
+  renderDialog("reviewer_text");
+  const taking = screen.getByRole("dialog", { name: "Accept the reviewer’s text as v2, case-0101 de v1" });
+  fireEvent.change(await within(taking).findByRole("textbox", { name: "Reviewer’s text" }), { target: { value: OLD } });
+  const save = within(taking).getByRole("button", { name: "Accept as v2" });
+  expect(description(save)).toBe("Change the text, or accept the version as it is.");
+  expect(save.getAttribute("title")).toBe("Change the text, or accept the version as it is.");
+});

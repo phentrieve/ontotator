@@ -12,6 +12,7 @@ import { useDocumentsSummary } from "../documents/useDocumentsSummary";
 import { TASKS_CHANGED } from "../tasks/tasksEvents";
 import { NotificationBell } from "../notifications/NotificationBell";
 import { useNotifications } from "../notifications/useNotifications";
+import { QUESTIONS_CHANGED } from "../questions/questionsEvents";
 import { TechnicalReportHost } from "../reports/TechnicalReportDialog";
 import { TECHNICAL_REPORTS_CHANGED } from "../reports/TechnicalReportsPage";
 import { openTechnicalReport, REPORT_NAV_LABEL, SHOW_MY_TECHNICAL_REPORTS } from "../reports/technicalReport";
@@ -119,8 +120,16 @@ function useOpenQuestionCount(projectKey: string | undefined, navigation: unknow
     let active = true;
     setCount(null);
     if (!projectKey) return;
-    api.listQuestions(projectKey, { state: "open" }).then(list => { if (active) setCount(list.length); }, () => undefined);
-    return () => { active = false; };
+    // Issue 590: also after an answer on the Questions page and on window focus, so the count equals the Open tab.
+    let request = 0;
+    const load = () => {
+      const mine = ++request;
+      api.listQuestions(projectKey, { state: "open" }).then(list => { if (active && mine === request) setCount(list.length); }, () => undefined);
+    };
+    load();
+    window.addEventListener(QUESTIONS_CHANGED, load);
+    window.addEventListener("focus", load);
+    return () => { active = false; window.removeEventListener(QUESTIONS_CHANGED, load); window.removeEventListener("focus", load); };
   }, [projectKey, navigation]);
   return count;
 }

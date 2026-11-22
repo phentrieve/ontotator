@@ -1732,9 +1732,9 @@ describe("Resolve opens a dialog (issue 554; before: inline under the row, Chang
     const { onNavigate } = renderStateful({});
     fireEvent.click(await screen.findByRole("button", { name: "Resolve…, case-1 de" }));
     fireEvent.click(within(resolveBox()!).getByRole("button", { name: "Correct it myself (counts as accepted)…" }));
-    const panel = screen.getByRole("group", { name: "Correct the translation, case-1 de" });
+    const panel = screen.getByRole("group", { name: "Correct it myself (counts as accepted), case-1 de" });
     expect(panel.closest("[role='dialog']")).toBe(resolveBox());
-    await waitFor(() => expect(document.activeElement).toBe(within(panel).getByRole("heading", { name: "Correct the translation, case-1 de" })));
+    await waitFor(() => expect(document.activeElement).toBe(within(panel).getByRole("heading", { name: "Correct it myself (counts as accepted), case-1 de" })));
     fireEvent.click(within(panel).getByRole("button", { name: "Open translation review" }));
     await waitFor(() => expect(onNavigate).toHaveBeenCalledWith({ name: "task", assignmentId: 41 }, undefined));
     expect(api.startLeadCorrection).toHaveBeenCalledWith("p", "case-1-de", { expected_text_sha256: "sha-1", confirm_language: false });
@@ -1755,7 +1755,7 @@ describe("Resolve opens a dialog (issue 554; before: inline under the row, Chang
     renderStateful({});
     fireEvent.click(await screen.findByRole("button", { name: "Resolve…, case-1 de" }));
     fireEvent.click(within(resolveBox()!).getByRole("button", { name: "Correct it myself (counts as accepted)…" }));
-    const panel = screen.getByRole("group", { name: "Correct the translation, case-1 de" });
+    const panel = screen.getByRole("group", { name: "Correct it myself (counts as accepted), case-1 de" });
     fireEvent.click(within(panel).getByRole("button", { name: "Open translation review" }));
     const link = await within(panel).findByRole("link", { name: "Add your qualification in your profile" });
     expect(link.getAttribute("href")).toBe("#/me?documents=p");

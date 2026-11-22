@@ -45,6 +45,8 @@ export interface SearchPanelProps {
   modifierFilter?: boolean;
   /** Issue 523: "Show in tree" at the active hit opens the ontology tree there, only to look. */
   onShowInTree?: (candidate: SearchCandidate) => void;
+  /** The ontology tree is open under the panel (issue 589): when it opens, the active hit is brought into view. */
+  treeShown?: boolean;
 }
 
 /** Reason line of a modifier hit in "Change term" and the tree: allowed, but usually a modifier (some name a finding, e.g. Stillbirth). */
@@ -77,6 +79,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
   onPickModifier,
   modifierFilter = false,
   onShowInTree,
+  treeShown = false,
 }) => {
   const [modifiersOnly, setModifiersOnly] = useState(false);
   // "Modifiers only" switched on by the `mod:` prefix: an emptied field switches it off again.
@@ -227,6 +230,14 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
     if (shownActive < 0) return;
     listRef.current?.querySelector<HTMLElement>(`[data-option-index="${shownActive}"]`)?.scrollIntoView?.({ block: "nearest" });
   }, [shownActive]);
+  // Issue 589: the tree opened under the panel takes most of a column of 1280 × 720, and the panel's top (the term,
+  // the mark, the field) filled what was left: no hit was in view. The active hit, the one "Show in tree" was used
+  // on, scrolls into the panel's view; the field may leave it for as long as the tree is open.
+  useLayoutEffect(() => {
+    if (!treeShown || shownActive < 0) return;
+    listRef.current?.querySelector<HTMLElement>(`[data-option-index="${shownActive}"]`)?.scrollIntoView?.({ block: "nearest" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the tree's opening moves the panel
+  }, [treeShown]);
   // A short stacked pane can leave the first hit below its edge: bring it in, the field stays in view above it.
   useEffect(() => {
     if (expanded) listRef.current?.firstElementChild?.scrollIntoView?.({ block: "nearest" });

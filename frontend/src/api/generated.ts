@@ -4047,6 +4047,10 @@ export interface components {
         /**
          * ActiveHoldView
          * @description An active pause on the owner's task; other people's reports stay unnamed.
+         *
+         *     ``kind`` says what paused it: a problem report, or a question to the lead
+         *     whose asker chose to pause (issue 553). Only the answer, or the asker's
+         *     own resume, releases the pause of a question.
          */
         ActiveHoldView: {
             /** Reason */
@@ -4058,6 +4062,12 @@ export interface components {
             created_at: string;
             /** Own Report Id */
             own_report_id: string | null;
+            /**
+             * Kind
+             * @default problem
+             * @enum {string}
+             */
+            kind: "problem" | "question";
         };
         /**
          * ActorRef
@@ -13135,6 +13145,11 @@ export interface components {
              * @enum {string}
              */
             status: "open" | "in_progress" | "submitted" | "reopened";
+            /**
+             * Opened
+             * @default false
+             */
+            opened: boolean;
             /** Held */
             held: boolean;
             /** Pause Causes */

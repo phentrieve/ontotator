@@ -1153,7 +1153,11 @@ ul.task-counts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space
   border-radius: var(--radius);
   background: var(--surface-raised);
   box-shadow: var(--shadow-2);
+  /* Taller than the room beside its button: the menu scrolls inside the window (MenuButton sets max-height). */
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
+.ui-menu > * { flex-shrink: 0; }
 .ui-menu-item {
   min-height: 32px;
   padding: var(--space-1) var(--space-2);

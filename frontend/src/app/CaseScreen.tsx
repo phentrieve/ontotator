@@ -2949,21 +2949,6 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   };
 
   const editableLayerIds = view.scope?.editable_layer_ids ?? (view.layers ? view.layers.map(l => l.layer_id) : []);
-  // Only the selected curated annotation's mentions can be resized, and not while
-  // another text interaction (attaching a mention, choosing a term) is in progress.
-  // A newly marked span (not re-anchor, not carried) can be adjusted before a term is chosen.
-  const pendingEvidenceId = pendingIsMarkedSpan ? pendingAnnotation?.evidenceId : undefined;
-  const resizableEvidenceIds = readOnly || isAttachingMention ? []
-    : pendingEvidenceId ? [pendingEvidenceId]
-      : selectedAnnotation && !pendingAnnotation && editableLayerIds.includes(selectedAnnotation.annotation.layer_id)
-        ? (selectedAnnotation.annotation.evidence_refs ?? []).map((r) => r.evidence_id)
-        : [];
-  // The handles of a finding's mentions name the finding ("Start of Seizure mention").
-  const resizableLabels = pendingEvidenceId ? { [pendingEvidenceId]: PENDING_HANDLE_LABELS }
-    : selectedAnnotation ? Object.fromEntries(resizableEvidenceIds.map(id => {
-      const name = findingNameOf(selectedAnnotation);
-      return [id, { start: `Start of ${name} mention`, end: `End of ${name} mention` }];
-    })) : undefined;
 
   // --- Modifiers: attach mode (E-a), framing, link a text span -------------------------------------
   const ownerOfEvidence = (evidenceId: string) => visibleAnnotations.find(snapshot =>
@@ -3008,6 +2993,26 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     }];
   })];
   const attachActive = !!attachModifier && (attachModifier.mode === "convert" || pendingIsMarkedSpan) && !readOnly && attachTargets.length > 0;
+  /** The text pane waits for new text (a mention, a modifier's span, a re-anchor, a copy): a selection there picks
+   *  text, it never resizes a mention. Attaching a modifier also shows the banner, but keeps the pending mark
+   *  resizable: that mark is the modifier's text. */
+  const pickingText = !!linkSpan || isAttachingMention || !!activeReanchor || !!activeCarried
+    || (!!pendingEvidenceAdoption && !confirmRequest);
+  // Only the selected curated annotation's mentions can be resized, and not while the text pane waits for new text.
+  // Otherwise a drag that starts on the finding's first letter grabs its handle and resizes the finding (issue 583).
+  // A newly marked span (not re-anchor, not carried) can be adjusted before a term is chosen.
+  const pendingEvidenceId = pendingIsMarkedSpan ? pendingAnnotation?.evidenceId : undefined;
+  const resizableEvidenceIds = readOnly || pickingText ? []
+    : pendingEvidenceId ? [pendingEvidenceId]
+      : selectedAnnotation && !pendingAnnotation && editableLayerIds.includes(selectedAnnotation.annotation.layer_id)
+        ? (selectedAnnotation.annotation.evidence_refs ?? []).map((r) => r.evidence_id)
+        : [];
+  // The handles of a finding's mentions name the finding ("Start of Seizure mention").
+  const resizableLabels = pendingEvidenceId ? { [pendingEvidenceId]: PENDING_HANDLE_LABELS }
+    : selectedAnnotation ? Object.fromEntries(resizableEvidenceIds.map(id => {
+      const name = findingNameOf(selectedAnnotation);
+      return [id, { start: `Start of ${name} mention`, end: `End of ${name} mention` }];
+    })) : undefined;
   const attachSegments = attachModifier?.mode === "convert" ? attachModifier.mark : pendingAnnotation?.segments ?? [];
   const attachMark = attachSegments.length
     ? { start: Math.min(...attachSegments.map(s => s.start)), end: Math.max(...attachSegments.map(s => s.end)) } : null;
@@ -4500,7 +4505,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
           contextSegments={reanchorContext.contextSegments}
           text={view.document.text}
           mentions={textMentions}
-          isAttachingMention={attachActive || !!linkSpan || isAttachingMention || !!activeReanchor || !!activeCarried || (!!pendingEvidenceAdoption && !confirmRequest)}
+          isAttachingMention={attachActive || pickingText}
           attachMessage={attachActive && attachModifier ? attachCopy.banner(attachModifier.termLabel)
             : linkSpan ? `Select the text for ${linkSpan.term}, then press Enter. Esc cancels.`
             : activeCarried ? `Select supporting text to re-create ${carriedTermText(activeCarried.source_snapshot)}.` : activeReanchor ? `Select supporting text to re-create ${activeReanchor.term_id}. Save the finding, review its values, then complete the text-change review.` : pendingEvidenceAdoption ? `${targetRequiresSpan(pendingEvidenceAdoption) ? "This annotation type requires a text span. " : ""}Select supporting text to create an editable copy of this proposal. The current decision is kept until you confirm the replacement.` : undefined}
@@ -4666,7 +4671,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
                   onPickModifier={pendingIsMarkedSpan && modifierLayerIds.has(pendingAnnotation.layerId) ? startAttach : undefined}
                   modifierFilter={modifierLayerIds.has(pendingAnnotation.layerId)}
                   onSelectCandidate={(candidate, searchId) => { void choosePendingTerm(candidate.term_id, searchId, candidate.label ?? undefined); }}
-                  onShowInTree={candidate => handleShowHitInTree(candidate.term_id)} />}
+                  onShowInTree={candidate => handleShowHitInTree(candidate.term_id)} treeShown={treeShown} />}
                 {!pendingIsMarkedSpan && <Button type="button" variant="secondary" disabled={queueState === "saving"} onClick={cancelPending}>Cancel</Button>}
               </div>
             </section>
@@ -4922,8 +4927,9 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
           />
         )}
         {/* The divider drawn above the tree sets its height (three columns only, editor.css); after it in the
-            focus order, as the findings column's divider follows that column. */}
-        {treeShown && !panelGivenToTree && (
+            focus order, as the findings column's divider follows that column. A folded column has no tree to size
+            (issue 589): the divider is not rendered, so it neither covers the strip's Expand nor takes a Tab stop. */}
+        {treeShown && !panelGivenToTree && !detailsCollapsed && (
           <SidebarResizer orientation="horizontal" side="start" width={treeHeight.value} limits={treeHeight.limits} controls="ontology-tree"
             onChange={treeHeight.setHeight} onReset={treeHeight.reset} onCommit={treeHeight.commit}
             label="Resize ontology tree" hint="Resize the ontology tree (focus the divider)" measure={treeHeight.measure} />

@@ -161,7 +161,7 @@ What for: pick a broader or narrower term than the one you have, or look at the 
 
 The confirmation names what happens; **Cancel** or `Esc` closes it and changes nothing. Nothing changes until you click **Confirm**. On a proposal, the confirmed term is one change: one **Undo** takes back the copy and its term, and the proposal is open again.
 
-In a wide window the tree sits under the annotation panel. To give the tree more or less room, drag the divider between the two (**Resize ontology tree**) up or down, or focus it and press `↑` or `↓`. A double click or `Enter` restores the usual split. The height is kept in this browser.
+In a wide window the tree sits under the annotation panel. To give the tree more or less room, drag the divider between the two (**Resize ontology tree**) up or down, or focus it and press `↑` or `↓`. A double click or `Enter` restores the usual split. The height is kept in this browser. Opened from a hit of the term search, the panel above the tree scrolls to that hit, so it stays in view where the tree takes most of the column (for example 1280 × 720); scroll the panel up to reach the search field.
 
 In a low window (for example 1280 × 600) the open tree takes the whole right column. The annotation panel shrinks to one line above the tree: the marked words and the term of the finding, or of the proposal or reference the tree was opened from. **Use this term** changes the term in that line too. **Show finding** brings the whole panel back above the tree, with the divider; **Hide finding** gives the tree the column again. When you close the tree, the panel is back as before.
 
@@ -244,7 +244,7 @@ If the modifier's words lie inside the finding's text span, for example "severe"
 
 You can take up the offer later. When you open a finding and one of its modifiers still lies inside its span, that modifier's row shows a small link *In span · Exclude*. Click **Exclude**, or choose **Exclude from finding's span** in the row menu: the same box opens. There is no link and no menu item when the modifier covers the whole span, would cut a word in half, or the mention has imported negation cues. A tool proposal's span is never changed: once your change makes the copy, the offer is for the copy.
 
-To change a modifier later, open its row menu: **Link a text span…**, **Remove text span**, **Exclude from finding's span** or **Remove modifier**. A removal can be undone with **Undo** in the message or in the header.
+To change a modifier later, open its row menu: **Link a text span…**, **Remove text span**, **Exclude from finding's span** or **Remove modifier**. A removal can be undone with **Undo** in the message or in the header. On a modifier with a span, **Link a text span…** reads **Change text span…**. While the editor waits for the new words, the finding's own edges cannot be dragged, so the finding's span stays as it is.
 
 A tool proposal's modifiers change the same way while the proposal is open; see [Review tool proposals](#review-tool-proposals).
 
@@ -415,6 +415,8 @@ What for: ask the project lead a question about the task you are working on, for
 3. Write **Your question**. **Passage you ask about (optional)** holds the passage you selected. In **Your wording for this passage (optional)**, write how you would put it; the lead can take it into your text with the answer.
 4. Optional: tick **Pause my task until the lead answers** if you cannot go on without the answer.
 5. Click **Send question**.
+
+With **Pause my task until the lead answers** ticked, your task is paused as soon as you send; your edits are saved first. The banner reads *Paused until the lead answers your question*. The lead's answer opens your task again. To go on without waiting, click **Resume my task…** on the question under **Questions to the lead**, write **Why can you continue?** and click **Resume my task**: the question stays open and the lead can still answer it. A question is not a text problem: **Report a text problem** does not count it.
 
 **Questions to the lead** lists your questions: *Waiting for the lead's answer*, then *Answered by the lead* with **Answer from the lead**. If the lead took your wording, it reads *The lead put your wording into your text.*; click **Show it in my text** to load it. Check it and submit your review as usual.
 

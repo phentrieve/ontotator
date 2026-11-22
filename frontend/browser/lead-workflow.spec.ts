@@ -661,8 +661,8 @@ test("lead corrects a rejected translation and annotation becomes assignable", a
 
   // Correct it myself…: the panel explains the outcome; its heading takes focus.
   await resolve.getByRole("button", { name: "Correct it myself (counts as accepted)…", exact: true }).click();
-  const panel = area.getByRole("group", { name: textNamePattern("Correct the translation, ", caseId, "de") });
-  await expect(panel.getByRole("heading", { name: textNamePattern("Correct the translation, ", caseId, "de") })).toBeFocused();
+  const panel = area.getByRole("group", { name: textNamePattern("Correct it myself (counts as accepted), ", caseId, "de") });
+  await expect(panel.getByRole("heading", { name: textNamePattern("Correct it myself (counts as accepted), ", caseId, "de") })).toBeFocused();
   await expect(panel).toContainText("You review v1 yourself and submit it as Accepted with corrections. The corrected text becomes v2 and counts as accepted.");
   // No language confirmation: the lead reads de and has a qualification.
   await expect(panel.getByRole("checkbox")).toHaveCount(0);

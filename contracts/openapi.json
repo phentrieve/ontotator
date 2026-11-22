@@ -12663,6 +12663,15 @@
               }
             ],
             "title": "Own Report Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "problem",
+              "question"
+            ],
+            "title": "Kind",
+            "default": "problem"
           }
         },
         "type": "object",
@@ -12672,7 +12681,7 @@
           "own_report_id"
         ],
         "title": "ActiveHoldView",
-        "description": "An active pause on the owner's task; other people's reports stay unnamed."
+        "description": "An active pause on the owner's task; other people's reports stay unnamed.\n\n``kind`` says what paused it: a problem report, or a question to the lead\nwhose asker chose to pause (issue 553). Only the answer, or the asker's\nown resume, releases the pause of a question."
       },
       "ActorRef": {
         "properties": {
@@ -38004,6 +38013,11 @@
               "reopened"
             ],
             "title": "Status"
+          },
+          "opened": {
+            "type": "boolean",
+            "title": "Opened",
+            "default": false
           },
           "held": {
             "type": "boolean",

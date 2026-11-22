@@ -47,10 +47,12 @@ export function ReviewForm({ value, issues, onChange, onChooseDecision, failedCh
   const numberKeys = decisions === allDecisions;
   const id = useId();
   const decision = value.decision;
-  const implied = decision === "query" || decision === "rejected";
-  const clinical = implied || value.clinical_change === true;
-  const chosen = (value.categories?.length ?? 0) > 0;
-  const showCheckbox = !implied && (value.clinical_change === true || decision === "accepted_corrected");
+  // Issue 590: an editable draft that still holds the retired Query shows its note, not the fields of a decision.
+  const queryDraft = decision === "query" && !readOnly;
+  const implied = (decision === "query" && !queryDraft) || decision === "rejected";
+  const clinical = implied || (!queryDraft && value.clinical_change === true);
+  const chosen = !queryDraft && (value.categories?.length ?? 0) > 0;
+  const showCheckbox = !implied && !queryDraft && (value.clinical_change === true || decision === "accepted_corrected");
   const showCategories = clinical || chosen;
   const showRationale = decision !== undefined || clinical || (value.rationale ?? "") !== "";
 

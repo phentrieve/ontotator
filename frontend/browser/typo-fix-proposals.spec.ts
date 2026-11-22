@@ -9,7 +9,7 @@
  *   390 px for horizontal scroll.
  */
 import { expect, test, type Page } from "@playwright/test";
-import { documentsReady, editTranslation, openTextCard, textVersionItems } from "./documentsHelpers";
+import { documentsReady, editTranslation, openTextCard, showSegment, textVersionItems } from "./documentsHelpers";
 import { loginThroughForm } from "./helpers";
 import { leadScenario } from "./leadWorkflowHelpers";
 
@@ -65,4 +65,44 @@ test("the typo fix dialog names each task that stays and why, and lets an unopen
   await dialog.getByRole("button", { name: "Save as v2", exact: true }).click();
   await expect(dialog).toHaveCount(0);
   await expect(page.locator(".ui-toast .ui-toast-message")).toHaveText(`Typos fixed: v2 of ${CASE} de saved. It stays Accepted.`);
+});
+
+// Issue 584: one line per reason in "Work stays on v1", the rule set apart; Cy's opened task reads Opened in the card.
+test("the reasons a task stays are a list, and the opened task reads Opened in the lead's card", async ({ page }) => {
+  const s = await leadScenario(page, "TYPO_FIX_PROPOSALS");
+  const cy = s.display_names.annotator, ben = s.display_names.ben;
+  await loginThroughForm(page, s.users.lead, s.display_names.lead, { lastProject: s.project });
+  await documentsReady(page);
+  const card = await openTextCard(page, CASE, "de");
+  await showSegment(card, "Annotation");
+  const annotators = card.getByRole("list", { name: "Annotators", exact: true });
+  await expect(annotators.getByRole("listitem").filter({ hasText: cy })).toContainText("Opened");
+  await expect(annotators.getByRole("listitem").filter({ hasText: cy })).not.toContainText("Not started");
+  await expect(annotators.getByRole("listitem").filter({ hasText: ben })).toContainText("Not started");
+  await card.screenshot({ path: test.info().outputPath("584-card-opened-1440.png") });
+
+  const [v1] = await (await textVersionItems(card, 1)).all();
+  // The version is accepted: "Edit the translation…" holds the typo fix (issue 555, #571).
+  await editTranslation(page, v1, CASE, "typos");
+  const dialog = page.getByRole("dialog", { name: `Fix typos, ${CASE} de v1`, exact: true });
+  const editor = dialog.getByRole("textbox", { name: "Corrected text", exact: true });
+  await editor.fill((await editor.inputValue()).replace("hypotnia", "hypotonia"));
+  const stays = dialog.locator(".notice").filter({ hasText: "Work stays on v1" });
+  const items = stays.getByRole("list").getByRole("listitem");
+  await expect(items).toHaveText([
+    "2 annotations stay on v1. After saving, use Handle text change… on this row to move them.",
+    `Task not moved, from tool proposals, and a proposal waits for a check: ${ben}.`,
+    `Task not moved, already opened: ${cy}.`,
+  ]);
+  await expect(stays.locator("p", { hasText: RULE })).toBeVisible();
+  for (const [viewport, name] of [[{ width: 1440, height: 900 }, "1440"], [PHONE, "390"]] as const) {
+    await page.setViewportSize(viewport);
+    // Each reason starts on a line of its own, below the one before.
+    const tops = await items.evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().top));
+    expect(tops.every((top, index) => index === 0 || top > tops[index - 1]), `one line per reason at ${name} px`).toBe(true);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+    expect(overflow, `no horizontal scroll at ${name} px`).toBe(false);
+    await stays.scrollIntoViewIfNeeded();
+    await stays.screenshot({ path: test.info().outputPath(`584-stays-list-${name}.png`) });
+  }
 });
