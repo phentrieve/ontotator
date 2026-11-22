@@ -4666,7 +4666,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
                   onPickModifier={pendingIsMarkedSpan && modifierLayerIds.has(pendingAnnotation.layerId) ? startAttach : undefined}
                   modifierFilter={modifierLayerIds.has(pendingAnnotation.layerId)}
                   onSelectCandidate={(candidate, searchId) => { void choosePendingTerm(candidate.term_id, searchId, candidate.label ?? undefined); }}
-                  onShowInTree={candidate => handleShowHitInTree(candidate.term_id)} />}
+                  onShowInTree={candidate => handleShowHitInTree(candidate.term_id)} treeShown={treeShown} />}
                 {!pendingIsMarkedSpan && <Button type="button" variant="secondary" disabled={queueState === "saving"} onClick={cancelPending}>Cancel</Button>}
               </div>
             </section>
@@ -4922,8 +4922,9 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
           />
         )}
         {/* The divider drawn above the tree sets its height (three columns only, editor.css); after it in the
-            focus order, as the findings column's divider follows that column. */}
-        {treeShown && !panelGivenToTree && (
+            focus order, as the findings column's divider follows that column. A folded column has no tree to size
+            (issue 589): the divider is not rendered, so it neither covers the strip's Expand nor takes a Tab stop. */}
+        {treeShown && !panelGivenToTree && !detailsCollapsed && (
           <SidebarResizer orientation="horizontal" side="start" width={treeHeight.value} limits={treeHeight.limits} controls="ontology-tree"
             onChange={treeHeight.setHeight} onReset={treeHeight.reset} onCommit={treeHeight.commit}
             label="Resize ontology tree" hint="Resize the ontology tree (focus the divider)" measure={treeHeight.measure} />
