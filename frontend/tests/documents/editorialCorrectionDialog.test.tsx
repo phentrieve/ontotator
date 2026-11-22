@@ -303,3 +303,24 @@ it("shows in the dialog who moves by itself, and says so after saving", async ()
   await waitFor(() => expect(props.onCorrected).toHaveBeenCalled());
   expect(props.onCorrected.mock.calls[0][0]).toMatch(/1 annotation moved to v3\.$/);
 });
+
+// ---- Issue 591: rules 4 and 6 of docs/design.md › Panels and actions ----
+
+it("opens with focus on Save; a greyed Save names its reason as description and tooltip (issue 591)", async () => {
+  const { dialog, editor } = await renderDialog();
+  const save = within(dialog).getByRole("button", { name: "Save as v3" });
+  expect(document.activeElement).toBe(save);
+  const reason = () => document.getElementById(save.getAttribute("aria-describedby") ?? "")?.textContent;
+  expect(save.getAttribute("aria-disabled")).toBe("true");
+  expect(reason()).toBe("Change the text and say what you fixed.");
+  expect(save.getAttribute("title")).toBe("Change the text and say what you fixed.");
+  // Not a visible hint before the press.
+  expect(within(dialog).getByText("Change the text and say what you fixed.").closest("[hidden]")).toBeTruthy();
+  await type(editor, NEW);
+  expect(reason()).toBe("Say what you fixed.");
+  expect(save.getAttribute("title")).toBe("Say what you fixed.");
+  fireEvent.click(within(dialog).getByRole("button", { name: "Spacing" }));
+  expect(save.getAttribute("aria-disabled")).toBeNull();
+  expect(save.getAttribute("title")).toBeNull();
+  expect(save.getAttribute("aria-describedby")).toBeNull();
+});

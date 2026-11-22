@@ -11,7 +11,7 @@ function renderPanel(row = rejectedRow("case-0101", "de", { version: 2 })) {
   render(<LeadCorrectionPanel {...props} />);
   return props;
 }
-const panel = () => screen.getByRole("group", { name: "Correct the translation, case-0101 de" });
+const panel = () => screen.getByRole("group", { name: "Correct it myself (counts as accepted), case-0101 de" });
 const open = () => within(panel()).getByRole("button", { name: "Open translation review" });
 
 beforeEach(() => {
@@ -24,7 +24,7 @@ it("explains v{n} → v{n+1} and opens the translation review", async () => {
   vi.mocked(api.startLeadCorrection).mockResolvedValue(assignment(41));
   const props = renderPanel();
   expect(within(panel()).getByText("You review v2 yourself and submit it as Accepted with corrections. The corrected text becomes v3 and counts as accepted.")).toBeTruthy();
-  await waitFor(() => expect(document.activeElement).toBe(within(panel()).getByRole("heading", { name: "Correct the translation, case-0101 de" })));
+  await waitFor(() => expect(document.activeElement).toBe(within(panel()).getByRole("heading", { name: "Correct it myself (counts as accepted), case-0101 de" })));
   expect(within(panel()).queryByRole("checkbox")).toBeNull();
   fireEvent.click(open());
   await waitFor(() => expect(api.startLeadCorrection).toHaveBeenCalledWith("p", "case-0101-de", { expected_text_sha256: "sha-v2", confirm_language: false }));
@@ -122,6 +122,8 @@ it("lists the annotation work on an accepted version before the correction start
   render(<LeadCorrectionPanel {...props} documentId="case-0101-de" inDialog />);
   const group = screen.getByRole("group", { name: "Correct it myself, case-0101 de v1" });
   expect(within(group).queryByRole("heading")).toBeNull();
+  // Rule 6 (issue 591): in its own dialog, focus starts on the primary action.
+  await waitFor(() => expect(document.activeElement).toBe(within(group).getByRole("button", { name: "Open translation review" })));
   expect(within(group).getByText("You correct the accepted v1 yourself in the translation review and submit it as Accepted with corrections. The corrected text becomes v2.")).toBeTruthy();
   expect(await within(group).findByText("Annotation has work on v1.")).toBeTruthy();
   expect(within(group).getByText("3 annotations (2 submitted, 1 open) stay on v1. After saving, the row offers Handle text change….")).toBeTruthy();
@@ -137,6 +139,10 @@ it("explains a preview that is not available and does not start", async () => {
   expect(await screen.findByText(/A translation review of this version is open/)).toBeTruthy();
   const button = screen.getByRole("button", { name: "Open translation review" });
   expect(button.getAttribute("aria-disabled")).toBe("true");
+  // Rule 4 (issue 591): the reason is the greyed button's accessible description and tooltip.
+  const reason = "A translation review of this version is open. Withdraw it with Remove… in the reviewer’s row of the Translation part before you correct the translation yourself.";
+  expect(document.getElementById(button.getAttribute("aria-describedby") ?? "")?.textContent).toBe(reason);
+  expect(button.getAttribute("title")).toBe(reason);
   fireEvent.click(button);
   expect(api.startLeadCorrection).not.toHaveBeenCalled();
 });
@@ -161,4 +167,6 @@ it("a rejected correction of an accepted version: the next correction is reviewe
   expect(screen.getByText("You review v2 yourself and submit it as Accepted with corrections. The corrected text becomes v3 and is reviewed again.")).toBeTruthy();
   expect(await screen.findByText("v3 starts as a correction with review On.")).toBeTruthy();
   expect(screen.queryByText(/counts as accepted/)).toBeNull();
+  // Rule 2 (issue 591): the step repeats the label that opened it.
+  expect(screen.getByRole("heading", { name: "Correct it myself (reviewed again), case-0101 de" })).toBeTruthy();
 });

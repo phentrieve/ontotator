@@ -119,6 +119,12 @@ export function QueryDecisionDialog({ kind, row, documentId, projectKey, reviewe
   const refusedText = refusedSave(error, short);
   const failure = refusedText ? <InlineMessage tone="warning">{refusedText}</InlineMessage> : error !== undefined && <ErrorNotice error={error} />;
   const close = busy ? undefined : onClose;
+  // Rule 4 of docs/design.md › Panels and actions: a greyed Accept names its reason as description and tooltip.
+  const greyed = state === null ? "Loading the query…" : !invalid ? null
+    : taking ? "Change the text, or accept the version as it is." : "Enter the answer to the reviewer.";
+  const describedBy = greyed === null || busy ? undefined : tried && !taking && state !== null ? `${id}-answer-error` : `${id}-missing`;
+  // Rule 6: focus on the primary action when the dialog opens.
+  const primary = useRef<HTMLButtonElement>(null);
 
   if (loadError !== undefined || blocked !== null) {
     return <Dialog open size="sm" title={title} onClose={onClose} returnFocus={returnFocus} footer={<Button onClick={onClose}>Close</Button>}>
@@ -128,15 +134,15 @@ export function QueryDecisionDialog({ kind, row, documentId, projectKey, reviewe
 
   const question = state?.review?.rationale?.trim();
   const count = parts ? changedPassages(parts) : null;
-  return <Dialog open size={taking ? "lg" : "md"} title={title} onClose={close} returnFocus={returnFocus}
+  return <Dialog open size={taking ? "lg" : "md"} title={title} onClose={close} returnFocus={returnFocus} initialFocus={primary}
     footer={<>
       <Button disabled={busy} onClick={onClose}>Cancel</Button>
-      <Button variant="primary" loading={busy} aria-disabled={state === null || invalid || busy ? true : undefined}
-        aria-describedby={invalid && tried ? (taking ? `${id}-missing` : `${id}-answer-error`) : undefined} onClick={() => { void save(); }}>{taking ? `Accept as ${next}` : `Accept ${short}`}</Button>
+      <Button ref={primary} variant="primary" loading={busy} aria-disabled={state === null || invalid || busy ? true : undefined}
+        aria-describedby={describedBy} title={busy ? undefined : greyed ?? undefined} onClick={() => { void save(); }}>{taking ? `Accept as ${next}` : `Accept ${short}`}</Button>
     </>}>
     <div className="editorial-correction query-decision">
       {state === null
-        ? <InlineMessage tone="info">Loading the query…</InlineMessage>
+        ? <InlineMessage tone="info"><span id={`${id}-missing`}>Loading the query…</span></InlineMessage>
         : <>
           <div className="documents-review-reason">
             <p>{`${reviewer} asked a question about ${short}.`}</p>
@@ -172,7 +178,10 @@ export function QueryDecisionDialog({ kind, row, documentId, projectKey, reviewe
         </>}
       {failure}
       {/* Without an answer the field says so itself; the button points there, not to a second copy (issue 547, U2-05). */}
-      {invalid && tried && taking && <p id={`${id}-missing`} className="action-reason">Change the text, or accept the version as it is.</p>}
+      {/* Before a press the reason is the button's description only; after it, it shows in place. */}
+      {state !== null && greyed !== null && (tried && taking
+        ? <p id={`${id}-missing`} className="action-reason">{greyed}</p>
+        : !tried && <span id={`${id}-missing`} hidden>{greyed}</span>)}
     </div>
   </Dialog>;
 }
