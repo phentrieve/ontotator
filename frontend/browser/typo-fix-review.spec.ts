@@ -68,7 +68,7 @@ async function fixTypos(page: Page, caseId: string, reviewNote: string, accepted
   const [v1] = await (await textVersionItems(card, 1)).all();
   if (accepted) await editTranslation(page, v1, caseId, "typos");
   else await v1.getByRole("button", { name: `Fix typos (no review) in v1 of ${caseId} de…`, exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: `Fix typos, ${caseId} de v1`, exact: true });
+  const dialog = page.getByRole("dialog", { name: `Fix typos (no review), ${caseId} de v1`, exact: true });
   const editor = dialog.getByRole("textbox", { name: "Corrected text", exact: true });
   await editor.fill((await editor.inputValue()).replace("hypotonia", "Hypotonie"));
   // Issue 547, U2-06: the submitted review is not "nobody worked on it"; it stays with v1, and v2 gets its own.
@@ -76,7 +76,7 @@ async function fixTypos(page: Page, caseId: string, reviewNote: string, accepted
   await expect(dialog.getByText(reviewNote, { exact: true })).toBeVisible();
   await shot(page, `u2-06-fix-typos-${page.viewportSize()!.width}`);
   await dialog.getByRole("button", { name: "Typo", exact: true }).click();
-  await dialog.getByRole("button", { name: "Save as v2", exact: true }).click();
+  await dialog.getByRole("button", { name: /^Save as v2 \(stays / }).click();
   await expect(dialog).toHaveCount(0);
 }
 

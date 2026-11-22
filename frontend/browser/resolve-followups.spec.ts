@@ -153,14 +153,21 @@ for (const scheme of ["light", "dark"] as const) {
     await edit.click();
     await choice.getByRole("radio", { name: "Only spelling, spacing or grammar", exact: true }).check();
     await choice.getByRole("button", { name: "Continue", exact: true }).click();
-    const fix = page.getByRole("dialog", { name: `Fix typos, ${caseId} de v1`, exact: true });
+    // Issue 556: the title and the button name the consequence; the greyed Save's reason is a ReasonButton tip.
+    const fix = page.getByRole("dialog", { name: `Fix typos (no review), ${caseId} de v1`, exact: true });
     await expect(fix.getByRole("textbox", { name: "Corrected text", exact: true })).toBeVisible();
-    const save = fix.getByRole("button", { name: "Save as v2", exact: true });
+    const save = fix.getByRole("button", { name: "Save as v2 (stays Accepted)", exact: true });
     await expect(save).toBeFocused();
     await expect(save).toHaveAttribute("aria-disabled", "true");
-    await expect(save).toHaveAccessibleDescription("Change the text and say what you fixed.");
-    await expect(save).toHaveAttribute("title", "Change the text and say what you fixed.");
+    await expect(save).toHaveAccessibleDescription("Change the text first.");
+    // Before any press, the reason shows as a tooltip on focus and on hover.
+    const tip = fix.locator(".ui-reason-tip", { hasText: "Change the text first." });
+    await expect(tip).toBeVisible();
+    await fix.getByRole("textbox", { name: "Corrected text", exact: true }).focus();
+    await expect(tip).toBeHidden();
     await save.hover();
+    await expect(tip).toBeVisible();
+    await save.focus();
     await shot(page, `fix-typos-${scheme}-1440`);
     await page.keyboard.press("Escape");
     await expect(fix).toHaveCount(0);

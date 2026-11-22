@@ -187,7 +187,7 @@ export const personRow = (card: Locator, list: "Annotators" | "Translation revie
 
 /**
  * Issue 555: "Edit the translation…" of an accepted version: the choice of what changes, then the dialog of that way
- * ("Fix typos, …" for spelling, spacing or grammar; "Correct it myself, …, accepted" when the meaning changes).
+ * ("Fix typos (no review), …" for spelling, spacing or grammar; "Correct it myself, …, accepted" when the meaning changes).
  */
 export async function editTranslation(page: Page, item: Locator, caseId: string, kind: "typos" | "meaning", version = 1, language = "de"): Promise<void> {
   await item.getByRole("button", { name: `Edit the translation v${version} of ${caseId} ${language}…`, exact: true }).click();

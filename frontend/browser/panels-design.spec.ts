@@ -135,8 +135,12 @@ test("1440 px: Edit the translation… asks what changes, then opens the way tha
   await expect(typos).toBeChecked();
   await shot(page, "edit-choice-1440");
   await choice.getByRole("button", { name: "Continue", exact: true }).click();
-  const fix = page.getByRole("dialog", { name: `Fix typos, ${caseId} de v1`, exact: true });
+  const fix = page.getByRole("dialog", { name: `Fix typos (no review), ${caseId} de v1`, exact: true });
   await expect(fix.getByRole("textbox", { name: "Corrected text", exact: true })).toBeVisible();
+  // Issue 556: the explanations behind (?) pass axe opened as well.
+  await fix.getByRole("button", { name: "Help: What did you fix?", exact: true }).click();
+  await fix.getByRole("button", { name: "Help: After saving", exact: true }).click();
+  expect(await axe(page)).toEqual([]);
   await fix.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(fix).toHaveCount(0);
   // Focus goes back to the button that started it.
