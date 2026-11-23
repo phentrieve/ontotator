@@ -42,7 +42,8 @@ export const presetEffectText = ({ change, kept }: { change: number; kept: numbe
   `${change === 0 ? "Already planned." : `Changes ${plural(change, "text")}.`}${kept > 0 ? ` ${keptReviewText(kept)}` : ""}`;
 /** "Translation review and annotation (12 texts)": a quick choice names how many texts it changes (issue 556). */
 export const presetLabel = (preset: PlanPreset, effect?: { change: number }): string =>
-  (effect && effect.change > 0 ? `${PRESET_LABELS[preset]} (${plural(effect.change, "text")})` : PRESET_LABELS[preset]);
+  // A no-break space keeps "(2 texts)" on one line (issue 621).
+  (effect && effect.change > 0 ? `${PRESET_LABELS[preset]} (${plural(effect.change, "text").replace(" ", "\u00a0")})` : PRESET_LABELS[preset]);
 type AnnotationChoice = "keep" | "off" | "on" | "proposals" | "scratch";
 /** "on" = annotate with each text's mode kept (a quick-action preset); the mode radios set a mode. */
 const annotationChoice = (choice: PlanChoices[string] | undefined): AnnotationChoice => {
@@ -113,6 +114,8 @@ export function PlanDialog({ projectKey, caseIds, rows, initial, onClose, onSave
   const [step, setStep] = useState<{ kind: "edit" } | { kind: "confirm"; consequences: ConsequencesView }>({ kind: "edit" });
   const [understood, setUnderstood] = useState(false);
   const quickHelp = useHelp();
+  // Rule 6: the dialog opens on its primary action, in view in the footer (issue 621); the body is still loading then.
+  const saveButton = useRef<HTMLButtonElement>(null);
   const [accept, setAccept] = useState<Record<string, boolean>>({});
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
@@ -231,10 +234,10 @@ export function PlanDialog({ projectKey, caseIds, rows, initial, onClose, onSave
   const footer = <>
     {confirming ? <Button onClick={() => { setStep({ kind: "edit" }); setUnderstood(false); }}>Back</Button> : <Button onClick={onClose}>Cancel</Button>}
     {/* Issue 556 (rule 4): the greyed Save says why on hover, focus and press, not in a line before the buttons. */}
-    <ReasonButton variant="primary" loading={saving} reason={saving ? null : blocked || null} onClick={save}>Save for {plural(caseIds.length, "case")}</ReasonButton>
+    <ReasonButton ref={saveButton} variant="primary" loading={saving} reason={saving ? null : blocked || null} onClick={save}>Save for {plural(caseIds.length, "case")}</ReasonButton>
   </>;
 
-  return <Dialog open title={title} size="md" onClose={onClose} footer={footer}>
+  return <Dialog open title={title} size="md" onClose={onClose} footer={footer} initialFocus={saveButton}>
     <div className="work-plan-dialog">
       {notice && <InlineMessage tone="info">{notice}</InlineMessage>}
       {!preview && previewError === undefined && <p className="field-hint">{CHECKING}</p>}

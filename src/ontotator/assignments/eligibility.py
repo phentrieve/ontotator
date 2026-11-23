@@ -110,6 +110,42 @@ def annotation_waits(
     )
 
 
+def waiting_annotation_tasks(
+    conn: Connection, project_id: int, assignment_ids: Collection[int]
+) -> set[int]:
+    """Of ``assignment_ids``, the annotation tasks that stay closed until a
+    translation is accepted (``annotation_waits``; also a version the text
+    moved on from, which the lead decides). Such a task does not open when a
+    pause ends (issue 620). One query for the tasks, one for the project's
+    versions, and none when the project does not wait for reviews."""
+    if not assignment_ids:
+        return set()
+    rule_on = conn.execute(
+        select(ProjectRow.annotate_accepted_translations_only).where(
+            ProjectRow.id == project_id
+        )
+    ).scalar_one_or_none()
+    if not rule_on:
+        return set()
+    tasks = conn.execute(
+        select(AssignmentRow.id, AssignmentRow.document_id).where(
+            AssignmentRow.project_id == project_id,
+            AssignmentRow.id.in_(list(assignment_ids)),
+            AssignmentRow.task == "annotate",
+            AssignmentRow.status != "submitted",
+        )
+    ).all()
+    if not tasks:
+        return set()
+    variants = load_variants(conn, project_id)
+    return {
+        int(aid)
+        for aid, document_id in tasks
+        if document_id in variants
+        and annotation_waits(variants[document_id], variants.get)
+    }
+
+
 def open_review_documents(
     conn: Connection, project_id: int, case_id: str | None = None
 ) -> set[str]:

@@ -9,7 +9,7 @@
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import AxeBuilder from "@axe-core/playwright";
-import { expect, request as playwrightRequest, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, request as playwrightRequest, test, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 import type { components } from "../src/api/generated";
 import { loginExisting, TEST_PASSWORD } from "./helpers";
 import { problemReportScenario, type ProblemReportScenario } from "./problemReportHelpers";
@@ -151,4 +151,114 @@ test("phone: the list is a sheet with 44 px targets; dark theme", async ({ page 
   await expect(panel(page)).toBeVisible();
   expect(await axeViolations(page, ".ui-popover")).toEqual([]);
   await shot(page, "5-lead-desktop-dark");
+});
+
+// Issue 620: the bell's follow-ups from the 0.14.0 acceptance.
+const PAUSE_ROWS = (s: ProblemReportScenario) => [{ case_id: s.case_ids.a, language: "de" }];
+
+/** The lead pauses or releases text a de through the preview and its token, as the Documents dialog does. */
+async function pauseText(s: ProblemReportScenario, action: "pause" | "release"): Promise<void> {
+  await as(s.users.lead, async call => {
+    const body = { rows: PAUSE_ROWS(s), ...(action === "pause" ? { reason: "Source is being clarified" } : {}) };
+    const url = `/api/v1/projects/${encodeURIComponent(s.project)}/text-pauses/${action}`;
+    const preview = await call<{ preview_token: string }>(url, "POST", { ...body, preview: true });
+    await call(url, "POST", { ...body, preview_token: preview.preview_token });
+  });
+}
+
+/** How many line boxes the element's text takes. */
+const lineBoxes = (locator: Locator) => locator.evaluate(element => {
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  return new Set([...range.getClientRects()].map(rect => Math.round(rect.top))).size;
+});
+
+test.describe("phone, touch (issue 620)", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+
+  test("the sheet's Close and Mark all as read are 44 px; the pseudonym is not broken; a greyed Mark all says why", async ({ page }) => {
+    const s = await problemReportScenario(page, "base");
+    await fileReport(s);
+    await loginExisting(page, s.users.lead);
+    await bell(page).tap();
+    const sheet = page.locator(".ui-popover-sheet");
+    await expect(sheet).toBeVisible();
+    for (const name of ["Close", "Mark all as read"]) {
+      const box = (await sheet.getByRole("button", { name, exact: true }).boundingBox())!;
+      expect(box.width, name).toBeGreaterThanOrEqual(44);
+      expect(box.height, name).toBeGreaterThanOrEqual(44);
+    }
+    const entry = sheet.getByRole("link", { name: new RegExp(`Text problem from .*\\(${s.labels.reporter}\\): ${s.case_ids.a} de`) });
+    await expect(entry).toBeVisible();
+    const pseudonym = entry.locator(".notification-nowrap");
+    await expect(pseudonym).toHaveText(s.labels.reporter);
+    expect(await lineBoxes(pseudonym)).toBe(1);
+    // Everything read: the greyed button stays focusable and gives its reason.
+    await sheet.getByRole("button", { name: `Mark as read: ${await entry.locator(".notification-text").textContent()}` }).tap();
+    const markAll = sheet.getByRole("button", { name: "Mark all as read", exact: true });
+    await expect(markAll).toHaveAttribute("aria-disabled", "true");
+    await expect(markAll).toHaveAccessibleDescription("Everything is read.");
+    await markAll.focus();
+    await expect(markAll).toBeFocused();
+    await expect(sheet.locator(".ui-reason-tip", { hasText: "Everything is read." })).toBeVisible();
+    await shot(page, "6-lead-phone-all-read");
+    // Close by touch.
+    await sheet.getByRole("button", { name: "Close", exact: true }).tap();
+    await expect(sheet).toHaveCount(0);
+  });
+});
+
+test("keyboard: with nothing unread, Mark all as read is still reached by Tab and gives its reason", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const s = await problemReportScenario(page, "base");
+  await loginExisting(page, s.users.reporter);
+  await expect(bell(page)).toHaveAccessibleName("Notifications, 1 unread");
+  await bell(page).focus();
+  await page.keyboard.press("Enter");
+  await expect(panel(page).getByRole("link", { name: /^Unread: New task:/ })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Enter");
+  await expect(bell(page)).toHaveAccessibleName("Notifications");
+  // Open again: the list, then Tab to the greyed button (no Mark as read is left before it).
+  await page.keyboard.press("Escape");
+  await expect(bell(page)).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(panel(page).getByRole("link").first()).toBeFocused();
+  await page.keyboard.press("Tab");
+  const markAll = panel(page).getByRole("button", { name: "Mark all as read", exact: true });
+  await expect(markAll).toBeFocused();
+  await expect(markAll).toHaveAttribute("aria-disabled", "true");
+  await expect(panel(page).locator(".ui-reason-tip", { hasText: "Everything is read." })).toBeVisible();
+  // A press changes nothing.
+  await page.keyboard.press("Enter");
+  await expect(bell(page)).toHaveAccessibleName("Notifications");
+  await expect(markAll).toHaveAccessibleDescription("Everything is read.");
+  expect(await axeViolations(page, ".ui-popover")).toEqual([]);
+});
+
+test("a release the person did not see yet: My tasks follows the bell on window focus", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const s = await problemReportScenario(page, "base");
+  await pauseText(s, "pause");
+  await loginExisting(page, s.users.reporter);
+  const row = page.getByTestId("task-row").filter({ hasText: `${s.case_ids.a} de` }).first();
+  await expect(row).toContainText("Paused by lead");
+  await expect(bell(page)).toHaveAccessibleName("Notifications, 1 unread");
+  await pauseText(s, "release");
+  // The person comes back to the window: the bell, "My tasks (n)" and the list move together.
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(bell(page)).toHaveAccessibleName("Notifications, 2 unread");
+  await expect(row).not.toContainText("Paused");
+});
+
+test("the bell reads its count again on a move inside the app", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const s = await problemReportScenario(page, "base");
+  await loginExisting(page, s.users.lead);
+  await expect(bell(page)).toHaveAccessibleName("Notifications");
+  await fileReport(s);
+  // No focus change, no minute passed: only the navigation.
+  await page.getByRole("link", { name: "Handbook", exact: true }).click();
+  await expect(page).toHaveURL(/#\/help$/);
+  await expect(bell(page)).toHaveAccessibleName("Notifications, 1 unread");
 });

@@ -11,7 +11,7 @@ from auth_harness import log_in, logged_in
 from fastapi.testclient import TestClient
 from problem_report_team import act, report
 from sqlalchemy import func, select, update
-from work_plan_support import BASE, assign, doc, plan_env, submit
+from work_plan_support import BASE, assign, doc, plan_all, plan_env, submit
 
 from ontotator.application import notifications as notices
 from ontotator.application.notifications import notify, notify_leads
@@ -95,6 +95,27 @@ def test_reopen_and_release_tell_the_task_owner(env):
     _apply(env, RELEASE, [C1])
     assert _kinds(anno) == ["task_released", "task_reopened", "task_assigned"]
     assert _items(anno)[0]["assignment_id"] == task
+
+
+def test_release_does_not_tell_an_annotation_that_waits_for_its_review(env):
+    # Issue 620: c1 de is a translation nobody accepted yet, so its annotation
+    # waits for the translation review; releasing the text does not open it.
+    plan_all(env.db, "proj")
+    review = assign(env, doc("c1", "de"), "ana", "translation_review")
+    waiting = assign(env, doc("c1", "de"), "anno", "annotate")
+    opening = assign(env, doc("c1", "en"), "anno2", "annotate")
+    rows = [C1, {"case_id": "c1", "language": "de"}]
+    _apply(env, PAUSE, rows, reason="Source is being clarified")
+    _apply(env, RELEASE, rows)
+    anno, anno2 = _client(env.app, "anno"), _client(env.app, "anno2")
+    assert _kinds(anno) == ["task_assigned"]
+    assert _items(anno)[0]["assignment_id"] == waiting
+    assert _kinds(anno2) == ["task_released", "task_assigned"]
+    assert _items(anno2)[0]["assignment_id"] == opening
+    # The review itself opens again: its owner is told.
+    ana = _client(env.app, "ana")
+    assert _kinds(ana) == ["task_released", "task_assigned"]
+    assert _items(ana)[0]["assignment_id"] == review
 
 
 def test_mark_one_and_mark_all_read(env):

@@ -8,3 +8,10 @@ export const NOTIFICATIONS_CHANGED = "notifications-changed";
 export function notifyNotificationsChanged(): void {
   window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED));
 }
+
+/** Window event fired when the bell's unread count grows (issue 620): pages that show the same tasks load them again. */
+export const NOTIFICATIONS_ARRIVED = "notifications-arrived";
+
+export function notifyNotificationsArrived(): void {
+  window.dispatchEvent(new Event(NOTIFICATIONS_ARRIVED));
+}

@@ -48,6 +48,13 @@ async function radio(language: string, step: "Translation review" | "Annotation"
 const choose = async (language: string, step: "Translation review" | "Annotation", option: string | RegExp) => fireEvent.click(await radio(language, step, option));
 
 describe("PlanDialog", () => {
+  it("opens with the focus on Save, its primary action, not on a (?) in the body (issue 621)", async () => {
+    renderDialog();
+    await screen.findByRole("dialog", { name: "Work plan: 20 cases" });
+    expect(document.activeElement).toBe(save());
+    await region("de");
+    expect(document.activeElement).toBe(save());
+  });
   it("lists each language as a block with its count and the steps in words; the source has no translation review", async () => {
     renderDialog();
     expect(await screen.findByRole("dialog", { name: "Work plan: 20 cases" })).toBeTruthy();
@@ -105,7 +112,7 @@ describe("PlanDialog", () => {
     expect(description(both)).toBe("Already planned.");
     const only = within(quick).getByRole("button", { name: /^Annotation only, no translation review/ });
     // Issue 556: the button names how many texts it changes; no text under it.
-    await waitFor(() => expect(only.textContent).toBe("Annotation only, no translation review (1 text)"));
+    await waitFor(() => expect(only.textContent).toBe("Annotation only, no translation review (1\u00a0text)"));
     expect(description(only)).toBe("");
     fireEvent.click(both);
     expect((await radio("de", "Translation review", /^Leave as is/)).checked).toBe(true);

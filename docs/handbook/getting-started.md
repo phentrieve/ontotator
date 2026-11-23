@@ -77,17 +77,17 @@ What for: learn about new work without looking for it.
 The bell at the top right, next to the user menu, tells you about:
 
 - a new task for you (*New task: annotation of case-0102 de*);
-- a task of yours that the lead reopened (*Task reopened: …*) or released after a pause (*Task released: …*);
+- a task of yours that the lead reopened (*Task reopened: …*) or released after a pause (*Task released: …*). An annotation that still waits for its translation review gets no *Task released*: it opens only once the translation is accepted;
 - the lead's answer to a question you asked with **Ask the lead** (*Answer from the lead: case-0102 de*). If you paused your task until the answer, the answer also opens it again; you get this one notification, not a second *Task released*;
 - for leads: a text problem that someone reported in your project (*Text problem from Ana Weber (ann-0004): case-0042 de*), or a question to the lead (*Question from Ana Weber (ann-0004): case-0102 de*). Every lead of the project gets the question.
 
-A number on the bell counts the unread notifications. It updates every minute and when you come back to the window.
+A number on the bell counts the unread notifications. It updates every minute, when you come back to the window and when you move to another page in Ontotator. **My tasks** loads your tasks again at the same moments, and when a new notification arrives, so the list shows a reopened or released task as the bell does.
 
 1. Click the bell. A short list opens with the newest notifications first. Unread ones have a dot and bold text. Each one names the project and the time.
 2. Click a notification to open its place: the task, or the problem report. It is then marked as read.
    - A question to the lead opens **Questions** at that question: its tab is selected (**Open**, or **Answered** if another lead answered it already) and the question is marked.
    - An answer from the lead opens your task. The answer is under **Questions to the lead** in **Your review**.
-3. To mark one as read without opening it, click **Mark as read** next to it. **Mark all as read** below the list marks all of them.
+3. To mark one as read without opening it, click **Mark as read** next to it. **Mark all as read** below the list marks all of them. Once everything is read, it is greyed and says *Everything is read.*
 
 With the keyboard, Tab to the bell and press Enter; Tab moves through the list and Escape closes it. On a phone the list opens as a full screen sheet.
 
