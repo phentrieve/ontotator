@@ -343,7 +343,7 @@ describe("project settings sections", () => {
     await screen.findByText("Annotation saved.");
     expect(api.updateProjectSettings).toHaveBeenCalledTimes(1);
     expect(api.updateProjectSettings).toHaveBeenCalledWith(settings.project_key, { allow_spanless_findings: true, require_spanless_note: false, require_chosen_axes: false,
-      contiguous_mentions_only: false, hidden_axis_values: { findings: { assertion: ["absent"] } }, creation_defaults: { findings: { phenotype: { assertion: "present" } } }, hide_term_id_prefix: false });
+      contiguous_mentions_only: false, hidden_axis_values: { findings: { assertion: ["absent"] } }, creation_defaults: { findings: { phenotype: { assertion: "present" } } }, hide_term_id_prefix: false, term_link_templates: {} });
   });
 
   it("saves only one section and preserves another section's unsaved draft", async () => {
@@ -386,7 +386,7 @@ describe("project settings sections", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "Findings that point to no text passage" }), { target: { value: "optional" } });
     fireEvent.click(saveIn("Annotation"));
     await screen.findByText("Annotation saved.");
-    expect(api.updateProjectSettings).toHaveBeenLastCalledWith(settings.project_key, { require_chosen_axes: false, contiguous_mentions_only: false, allow_spanless_findings: true, require_spanless_note: false, hidden_axis_values: {}, creation_defaults: {}, hide_term_id_prefix: false });
+    expect(api.updateProjectSettings).toHaveBeenLastCalledWith(settings.project_key, { require_chosen_axes: false, contiguous_mentions_only: false, allow_spanless_findings: true, require_spanless_note: false, hidden_axis_values: {}, creation_defaults: {}, hide_term_id_prefix: false, term_link_templates: {} });
   });
 
   it("Annotation saves the switch that shows codes without the ontology prefix", async () => {
@@ -396,6 +396,42 @@ describe("project settings sections", () => {
     fireEvent.click(saveIn("Annotation"));
     await screen.findByText("Annotation saved.");
     expect(api.updateProjectSettings).toHaveBeenLastCalledWith(settings.project_key, expect.objectContaining({ hide_term_id_prefix: true }));
+  });
+
+  it("Annotation saves a code link per ontology; an emptied field brings the default link back", async () => {
+    vi.mocked(api.getProjectSettings).mockResolvedValue({ ...settings, term_link_templates: { HP: "https://example.org/hpo/{code}" } });
+    vi.mocked(api.updateProjectSettings).mockImplementation(async (_key, change) => ({ ...settings, ...change }) as typeof settings);
+    const view = renderSettings("general");
+    view.show("annotation");
+    const field = await screen.findByLabelText("Code link for HPO");
+    expect(field).toHaveProperty("value", "https://example.org/hpo/{code}");
+    fireEvent.change(field, { target: { value: "https://www.icd10data.com/search?s={code}" } });
+    fireEvent.click(saveIn("Annotation"));
+    await screen.findByText("Annotation saved.");
+    expect(api.updateProjectSettings).toHaveBeenLastCalledWith(settings.project_key,
+      expect.objectContaining({ term_link_templates: { HP: "https://www.icd10data.com/search?s={code}" } }));
+
+    fireEvent.change(field, { target: { value: "" } });
+    fireEvent.click(saveIn("Annotation"));
+    await waitFor(() => expect(api.updateProjectSettings).toHaveBeenLastCalledWith(settings.project_key, expect.objectContaining({ term_link_templates: {} })));
+  });
+
+  it("names what is wrong with a code link and does not save it", async () => {
+    const view = renderSettings("general");
+    view.show("annotation");
+    const field = await screen.findByLabelText("Code link for HPO");
+    for (const [template, problem] of [
+      ["http://www.icd10data.com/search?s={code}", "Use an https:// address."],
+      ["https://{code}.example.org/", "Use an https:// address."],
+      ["https://www.icd10data.com/search", "Put {code} or {id} where the code goes."],
+      ["https://example.org/{label}", "Use only {code} and {id} in braces."],
+    ] as const) {
+      fireEvent.change(field, { target: { value: template } });
+      expect(document.getElementById(field.getAttribute("aria-describedby")!.split(" ").pop()!)?.textContent).toBe(problem);
+      expect((field as HTMLInputElement).validationMessage).toBe(problem);
+    }
+    fireEvent.click(saveIn("Annotation"));
+    expect(api.updateProjectSettings).not.toHaveBeenCalled();
   });
 
   it.each([

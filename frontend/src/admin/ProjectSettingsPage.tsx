@@ -13,6 +13,7 @@ import { SettingsCard, SettingsHint } from "./SettingsCard";
 import { draftPins, PinFields, ProfileUpload, ReleaseFields, serializePins, ANNOTATION_SCHEME_LABELS, TaskProfileHelp, WorkflowFields, workflowOf, type UploadedProfile } from "./projectFields";
 import { RepinReportPanel } from "./RepinReport";
 import { FrozenTranslationsCard } from "./FrozenTranslationsCard";
+import { TermLinkField } from "./TermLinkField";
 import { axisOptionLabel } from "../editor/axisLabels";
 export interface ProjectSettingsPageProps {
   projectKey: string;
@@ -64,7 +65,7 @@ const settingsRoute = (key: string, section: SettingsSection): Route =>
   section === DEFAULT_SETTINGS_SECTION ? { name: "projectSettings", key } : { name: "projectSettings", key, section };
 const generalOf = (settings: ProjectSettings) => ({ name: settings.name, description: settings.description ?? "", languages: settings.languages ?? [] });
 /** Settings › Annotation (M-8c): submit rules, prefilled values and the values annotators can choose; one Save. */
-const annotationOf = (settings: ProjectSettings) => ({ allow_spanless_findings: settings.allow_spanless_findings ?? true, require_spanless_note: settings.require_spanless_note ?? true, require_chosen_axes: settings.require_chosen_axes, contiguous_mentions_only: settings.contiguous_mentions_only, hidden_axis_values: settings.hidden_axis_values ?? {}, creation_defaults: settings.creation_defaults ?? {}, hide_term_id_prefix: settings.hide_term_id_prefix ?? false });
+const annotationOf = (settings: ProjectSettings) => ({ allow_spanless_findings: settings.allow_spanless_findings ?? true, require_spanless_note: settings.require_spanless_note ?? true, require_chosen_axes: settings.require_chosen_axes, contiguous_mentions_only: settings.contiguous_mentions_only, hidden_axis_values: settings.hidden_axis_values ?? {}, creation_defaults: settings.creation_defaults ?? {}, hide_term_id_prefix: settings.hide_term_id_prefix ?? false, term_link_templates: settings.term_link_templates ?? {} });
 
 function SettingsEditor({ initial, ontologies, projectKey, currentUser, onSaved, onDeleted, section = DEFAULT_SETTINGS_SECTION, onNavigate, routeLeaveRef }: ProjectSettingsPageProps & { initial: ProjectSettings; ontologies: OntologyInfo[] }): JSX.Element {
   const [model, setModel] = useState(initial);
@@ -256,10 +257,16 @@ function SettingsEditor({ initial, ontologies, projectKey, currentUser, onSaved,
           <Checkbox id="project-rule-chosen" label="Annotators must confirm every value before submitting" hint="Off: unconfirmed prefilled values are submitted marked as prefilled, after a warning." checked={annotation.require_chosen_axes} onChange={event => editAnnotation({ require_chosen_axes: event.target.checked })} />
           <Checkbox id="project-rule-contiguous" label="A finding must be one continuous passage" checked={annotation.contiguous_mentions_only} onChange={event => editAnnotation({ contiguous_mentions_only: event.target.checked })} />
         </SettingsCard>
-        <SettingsCard title="Term codes" hint="How the editor shows a term's code."
-          why="Display only. Saved findings and exports keep the full code with its prefix. Projects with more than one ontology always show the prefix.">
+        <SettingsCard title="Term codes" hint="How the editor shows a term's code and where its link goes."
+          why="Display only. Saved findings and exports keep the full code with its prefix. Projects with more than one ontology always show the prefix. The link next to a code in the ontology tree opens the page you set here; without one, HPO and MONDO codes open their term page and other codes the EBI OLS search.">
           <Checkbox id="project-hide-term-id-prefix" label="Show codes without the ontology prefix" hint="For example N18.1 instead of ICD10CM:N18.1."
             checked={annotation.hide_term_id_prefix} onChange={event => editAnnotation({ hide_term_id_prefix: event.target.checked })} />
+          {model.profile.ontologies.map(ontology => <TermLinkField key={ontology.ontology_id} ontologyId={ontology.ontology_id} label={ontology.label}
+            value={annotation.term_link_templates[ontology.ontology_id] ?? ""}
+            onChange={value => {
+              const { [ontology.ontology_id]: _previous, ...others } = annotation.term_link_templates;
+              editAnnotation({ term_link_templates: value ? { ...others, [ontology.ontology_id]: value } : others });
+            }} />)}
         </SettingsCard>
         <SettingsCard title="Prefilled values" hint="New findings start with these values, marked as not confirmed."
           why="The mark stays until the annotator confirms or changes the value. Existing findings, proposals and carried findings keep their values.">

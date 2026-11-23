@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - Settings: **Show codes without the ontology prefix** in the new card **Term codes** (tab **Annotation**). In a project with one ontology the editor and the consolidation then show `N18.1` instead of `ICD10CM:N18.1` in the term search, the ontology tree and the findings; pointing at a short code shows the full one. Display only: saved findings, exports, the API and term links keep the full id. Off by default; a project with more than one ontology always shows the prefix. New column `projects.hide_term_id_prefix` (migration 0058); the setting is in `GET`/`PATCH …/settings` and the workspace view.
+- Settings: **Code link for** each ontology in the card **Term codes** (tab **Annotation**; #497). A lead sets where the link next to a code in the ontology tree goes, for example `https://www.icd10data.com/search?s={code}` for ICD-10-CM, which the EBI OLS search does not know. `{code}` is the code without the prefix, `{id}` the full code; the address must be https with a placeholder outside the host. Without one, the links stay as they were (HPO and MONDO term pages, else the OLS search). Migration 0059 adds `projects.term_link_templates`.
 
 ### Changed
 

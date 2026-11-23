@@ -150,6 +150,10 @@ class ProjectRow(Base):
     hide_term_id_prefix: Mapped[bool] = mapped_column(
         Boolean, server_default=text("false")
     )
+    # Ontology id -> link template for its term codes (ontology/links.py).
+    term_link_templates: Mapped[dict[str, Any]] = mapped_column(
+        server_default=text("'{}'::jsonb")
+    )
     import_plan: Mapped[str] = mapped_column(
         server_default=text("'review_and_annotate_translations'")
     )

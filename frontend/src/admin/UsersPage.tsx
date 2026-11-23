@@ -145,6 +145,8 @@ export const fieldLabels: Readonly<Record<string, string>> = {
   contiguous_mentions_only: "A finding must be one continuous passage",
   creation_defaults: "Prefilled values",
   hidden_axis_values: "Values annotators can choose",
+  hide_term_id_prefix: "Show codes without the ontology prefix",
+  term_link_templates: "Term codes",
   pins: "Ontology version",
   profile: "Task profile",
   display_name: "Display name",

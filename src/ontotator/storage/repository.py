@@ -2053,6 +2053,16 @@ class Repository:
             ).scalar_one_or_none()
         return bool(value)
 
+    def term_link_templates(self, project_key: str) -> dict[str, str]:
+        """Ontology id -> the project's link template for its term codes."""
+        with self.db.transaction() as conn:
+            value = conn.execute(
+                select(ProjectRow.term_link_templates).where(
+                    ProjectRow.project_key == project_key
+                )
+            ).scalar_one_or_none()
+        return dict(value or {})
+
     def get_axes_config(self, project_key: str) -> AxesConfig:
         """AxesConfig synthesized from the task profile, for older callers."""
         return legacy_axes_config(

@@ -9866,6 +9866,10 @@ export interface components {
             record_working_time?: boolean;
             /** Hide Term Id Prefix */
             hide_term_id_prefix?: boolean;
+            /** Term Link Templates */
+            term_link_templates?: {
+                [key: string]: string;
+            };
             /** Hidden Axis Values */
             hidden_axis_values?: {
                 [key: string]: {
@@ -9968,6 +9972,10 @@ export interface components {
             record_working_time?: boolean;
             /** Hide Term Id Prefix */
             hide_term_id_prefix?: boolean;
+            /** Term Link Templates */
+            term_link_templates?: {
+                [key: string]: string;
+            };
             /** Hidden Axis Values */
             hidden_axis_values?: {
                 [key: string]: {

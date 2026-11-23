@@ -153,6 +153,7 @@ CALLS: dict[str, Callable[[Repository], object]] = {
     "get_axes_config": lambda r: r.get_axes_config("B"),
     "get_project_rules": lambda r: r.get_project_rules("B"),
     "hide_term_id_prefix": lambda r: r.hide_term_id_prefix("B"),
+    "term_link_templates": lambda r: r.term_link_templates("B"),
     "get_document": lambda r: r.get_document("B", "doc-beta"),
     "get_variant": lambda r: r.get_variant("B", "doc-beta"),
     "get_variant_text": lambda r: r.get_variant_text("B", "doc-beta"),
