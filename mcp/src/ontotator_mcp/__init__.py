@@ -4,4 +4,4 @@ Runs on the user's computer, speaks MCP over stdio, and calls the Ontotator
 HTTP API with an API token from ``ONTOTATOR_TOKEN``.
 """
 
-__version__ = "0.14.0"
+__version__ = "0.14.1"
