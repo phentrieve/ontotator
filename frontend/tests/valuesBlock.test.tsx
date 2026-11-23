@@ -219,6 +219,16 @@ describe("Values block", () => {
     expect(container.querySelectorAll(".axis-default-tag")).toHaveLength(3);
   });
 
+  it("read-only values are marked as such, so they do not look like choices (#612)", () => {
+    const { container, unmount } = render(<AnnotationPanel {...props({ readOnly: true })} />);
+    const groups = [...container.querySelectorAll(".axis-options")];
+    expect(groups.length).toBeGreaterThan(0);
+    for (const group of groups) expect(group.classList.contains("is-readonly")).toBe(true);
+    unmount();
+    const editable = render(<AnnotationPanel {...props({})} />);
+    expect(editable.container.querySelector(".axis-options.is-readonly")).toBeNull();
+  });
+
   it("keeps an unavailable stored value as the last disabled chosen segment", () => {
     const base = props({}, []);
     base.annotation!.annotation.axes_values = { assertion: "unknown", experiencer: "patient", temporality: "current" };

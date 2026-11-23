@@ -230,7 +230,9 @@ function annotationText(cell: StageCellView): StageText {
       // Below the limit (the server sends `target` then): "max 2" after the open work.
       const max = detail.target != null && (detail.assigned ?? 0) < detail.target ? `max ${detail.target}` : null;
       if (detail.total != null && detail.submitted != null) {
-        return { symbol: "◐", word: submittedOf(detail.submitted, detail.total), detail: join(people && `waiting: ${people}`, startedPart(detail), max, waiting) };
+        // Issue 606: nothing submitted and no task started yet is "○", as with one annotator; ◐ once work runs.
+        const idle = detail.submitted <= 0 && startedOf(detail) === "none";
+        return { symbol: idle ? "○" : "◐", word: submittedOf(detail.submitted, detail.total), detail: join(people && `waiting: ${people}`, startedPart(detail), max, waiting) };
       }
       const change = detail.note === "may_change" ? join(version(detail.version), "may change") : null;
       const started = startedOf(detail);

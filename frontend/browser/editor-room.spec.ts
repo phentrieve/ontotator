@@ -334,3 +334,67 @@ test.describe("acceptance of the editor room (issue 589)", () => {
     });
   }
 });
+
+test.describe("editor room follow-ups (issue 596)", () => {
+  // Point 2: a long mode ("Round 1, carried over from the earlier text version") takes two lines in the bar, no ellipsis.
+  for (const size of [{ width: 1280, height: 720 }, { width: 1280, height: 600 }, { width: 1440, height: 900 }]) {
+    test(`${size.width}x${size.height}: a long mode is shown in full in the one bar`, async ({ page }) => {
+      await open(page, `room-mode-${size.width}-${size.height}`, size);
+      const long = "Round 1, carried over from the earlier text version";
+      // The mode of a carried task, with the width hint CaseScreen gives it (about half its length).
+      await page.locator(".case-toolbar--merged .case-mode").evaluate((mode, text) => {
+        mode.textContent = text;
+        (mode as HTMLElement).style.setProperty("--mode-half", `${Math.ceil(text.length / 2) + 1}ch`);
+      }, long);
+      await expect.poll(() => page.locator(".case-toolbar--merged .case-mode").evaluate((mode) =>
+        mode.scrollWidth <= mode.clientWidth + 1 && mode.scrollHeight <= mode.clientHeight + 2 && mode.clientHeight <= 34)).toBe(true);
+      expect((await box(header(page))).height).toBeLessThanOrEqual(48);
+      await expect(caseBar(page).getByRole("button", { name: /^Finish & submit/ })).toBeInViewport();
+    });
+  }
+
+  // Point 3: a finding selected while the column is folded is named on the strip.
+  test("1440x900: the folded column's strip names the selected finding", async ({ page }) => {
+    await open(page, "room-strip-selection", { width: 1440, height: 900 });
+    await annotateSeizure(page);
+    await collapse(page).click();
+    await expect(expand(page)).toBeFocused();
+    const selection = page.locator(".details-rail-strip-selection");
+    // The finding just made is selected: the strip says so; Escape clears the selection and the strip with it.
+    await expect(selection).toContainText("Seizure");
+    await expect(expand(page)).toHaveAccessibleDescription("Selected: Seizure");
+    await page.locator(".text-container").click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press("Escape");
+    await expect(selection).toHaveCount(0);
+    await page.locator(".sidebar .doc-item").filter({ hasText: "Seizure" }).first().click();
+    await expect(selection).toContainText("Seizure");
+    // Inside the strip, every point is still Expand.
+    const strip = await box(expand(page));
+    const name = await box(selection);
+    expect(name.y + name.height).toBeLessThanOrEqual(strip.y + strip.height);
+    await page.mouse.click(name.x + name.width / 2, name.y + name.height / 2);
+    await expect(collapse(page)).toBeFocused();
+    await expect(selection).toHaveCount(0);
+  });
+
+  // Point 4: the tree opened from a hit at 1280 × 720 leaves the search field and the hit in view.
+  test("1280x720: the tree opened from a search hit leaves the search field and the hit in view", async ({ page }) => {
+    await open(page, "room-hit-field", { width: 1280, height: 720 });
+    await selectText(page, 0, 9);
+    const field = page.getByLabel("Search term", { exact: true });
+    await field.fill("seiz");
+    const seizure = page.getByRole("option", { name: /^Seizure HP:0001250/ });
+    await seizure.hover();
+    await page.getByRole("button", { name: "Show in tree: Seizure" }).click();
+    await expect(treeItem(page, SEIZURE)).toHaveAttribute("aria-selected", "true");
+    const inPanel = (locator: Locator) => locator.evaluate((element) => {
+      const r = element.getBoundingClientRect();
+      const panel = element.closest(".inspector-pane")!.getBoundingClientRect();
+      return r.top >= panel.top - 1 && r.bottom <= panel.bottom + 1;
+    });
+    await expect.poll(() => inPanel(field)).toBe(true);
+    await expect.poll(() => inPanel(seizure)).toBe(true);
+    // The tree keeps more than its least height.
+    expect((await box(treePanel(page))).height).toBeGreaterThanOrEqual(220);
+  });
+});

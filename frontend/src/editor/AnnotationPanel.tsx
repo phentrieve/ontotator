@@ -374,7 +374,7 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
                   {unconfirmed && <>{" "}<span className="axis-default-tag">Default</span></>}
                 </legend>
                 {options.length <= 4 ? (
-                  <div className="axis-options">
+                  <div className={`axis-options${readOnly ? " is-readonly" : ""}`}>
                     {options.map((option) => {
                       const isDefault = unconfirmed && val === option.value;
                       const confirmsDefault = isDefault && !readOnly && !!onConfirmDefaults;

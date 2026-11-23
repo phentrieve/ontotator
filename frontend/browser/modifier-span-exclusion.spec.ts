@@ -236,7 +236,7 @@ test("Change text span… on a modifier: a drag from the finding's first letter 
   await expect(page.locator(".text-container .resize-handle")).toHaveCount(2);
   await severeRow(page).getByRole("button", { name: "Actions, Severe" }).click();
   await page.getByRole("menuitem", { name: "Change text span…" }).click();
-  await expect(page.locator(".attach-mention-banner")).toContainText("Select the text for Severe, then press Enter. Esc cancels.");
+  await expect(page.locator(".attach-mention-banner")).toContainText("Select the text for Severe. Esc cancels.");
   await expect(page.locator(".text-container .resize-handle")).toHaveCount(0);
 
   let edits = 0;

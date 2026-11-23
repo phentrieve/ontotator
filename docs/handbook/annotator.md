@@ -30,7 +30,7 @@ The findings in the list follow the text: a finding stands where its first marke
 
 To make the findings list wider or narrower, drag the divider between the findings list and the text (**Resize findings column**), or focus it and press `←` or `→`.
 
-The right column works the same way on a wide screen (three columns): drag its left edge (**Resize details panel**), or focus it and press `←` or `→`; `Home` and `End` go to the least and the most, a double click or `Enter` restores the usual width. The round button on that edge, **Collapse details panel**, folds the column, with the ontology tree, to a narrow strip, so the text gets the room. Click the strip (**Expand details panel**) to bring it back. When you mark text, the column opens again by itself, for the term search. Width and folding are kept in this browser, for you.
+The right column works the same way on a wide screen (three columns): drag its left edge (**Resize details panel**), or focus it and press `←` or `→`; `Home` and `End` go to the least and the most, a double click or `Enter` restores the usual width. The round button on that edge, **Collapse details panel**, folds the column, with the ontology tree, to a narrow strip, so the text gets the room. Click the strip (**Expand details panel**) to bring it back. While the column is folded, the strip names the selected finding or proposal under *Details*. When you mark text, the column opens again by itself, for the term search. Width and folding are kept in this browser, for you.
 
 The small actions of a finding sit next to it as icons: **Show in tree** next to the term's name, **Copy text**, **Add segment** and **Move to a new finding** at each mention. Point at an icon to see its name.
 
@@ -131,7 +131,7 @@ What for: find the right ontology term quickly.
 
 1. Press `/` or click **Change term** to focus the search.
 2. Type a name or a code. Hits appear in the list **Terms**.
-3. Move with `↓` and `↑`, or point at a hit (pointing skips a **Weak match**). Below the hits, the full definition of the active hit is shown; in a narrow window, scroll down to it. Read it, then press Enter or click the hit to take it, or press Esc to cancel. Enter and a click take the hit at once.
+3. Move with `↓` and `↑`, or point at a hit (pointing skips a **Weak match**). On a phone or tablet, tap a hit to take it; a swipe that scrolls the list does not change the active hit. Below the hits, the full definition of the active hit is shown; in a narrow window, scroll down to it. Read it, then press Enter or click the hit to take it, or press Esc to cancel. Enter and a click take the hit at once.
 
 Search options:
 
@@ -162,7 +162,7 @@ What for: pick a broader or narrower term than the one you have, or look at the 
 
 The confirmation names what happens; **Cancel** or `Esc` closes it and changes nothing. Nothing changes until you click **Confirm**. On a proposal, the confirmed term is one change: one **Undo** takes back the copy and its term, and the proposal is open again.
 
-In a wide window the tree sits under the annotation panel. To give the tree more or less room, drag the divider between the two (**Resize ontology tree**) up or down, or focus it and press `↑` or `↓`. A double click or `Enter` restores the usual split. The height is kept in this browser. Opened from a hit of the term search, the panel above the tree scrolls to that hit, so it stays in view where the tree takes most of the column (for example 1280 × 720); scroll the panel up to reach the search field.
+In a wide window the tree sits under the annotation panel. To give the tree more or less room, drag the divider between the two (**Resize ontology tree**) up or down, or focus it and press `↑` or `↓`. A double click or `Enter` restores the usual split. The height is kept in this browser. Opened from a hit of the term search, the tree leaves the panel enough room for the search field and the first hits (at 1280 × 720 it is a little lower than otherwise), and the panel scrolls to that hit if it is further down.
 
 In a low window (for example 1280 × 600) the open tree takes the whole right column. The annotation panel shrinks to one line above the tree: the marked words and the term of the finding, or of the proposal or reference the tree was opened from. **Use this term** changes the term in that line too. **Show finding** brings the whole panel back above the tree, with the divider; **Hide finding** gives the tree the column again. When you close the tree, the panel is back as before.
 
@@ -197,7 +197,7 @@ What for: link a finding to every place in the text that supports it.
    - **Move to a new finding**: gives one mention its own finding with the same term and values. The new finding is selected, so you can change it right away; modifiers stay with the original finding.
    - **Remove**, then **Yes, remove**: detaches the mention.
 
-You cannot remove the last mention when the project requires a text span. If the project allows findings without a span, enter a reason in the note first. In a submitted or read-only task nothing can be changed: the greyed-out buttons say so when you point at them, and the note is shown on a grey band, not as a field to type in.
+You cannot remove the last mention when the project requires a text span. If the project allows findings without a span, enter a reason in the note first. In a submitted or read-only task nothing can be changed: the greyed-out buttons say so when you point at them, the values show the chosen one on a grey band without the colour of a choice, and the note is shown on a grey band, not as a field to type in. On a copy made by **Edit & Replace**, **Back to the proposal** takes you back to the proposal.
 
 ## Add a finding without a text span
 
@@ -231,7 +231,7 @@ If a term has become obsolete, the panel says so. Change the term or delete the 
 What for: add severity, onset, pattern and similar details to a finding.
 
 1. Select the finding. In **Modifiers**, click **+ Add modifier…**, type into **Search modifier** and choose the modifier.
-2. Optional: to link the modifier to the words that state it, click **Link a text span** and mark the text.
+2. Optional: to link the modifier to the words that state it, click **Link a text span** and mark the text. The span is linked as soon as you let go of the mouse (with the keyboard: of `Shift`); you do not need to press Enter. Esc or **Cancel** stops without a change.
 
 Every modifier row names the modifier and its code, for example *Severe · HP:0012828*, followed by the linked words. The line *Modifiers:* in the findings list names the codes too, as do the text view and the consolidation.
 

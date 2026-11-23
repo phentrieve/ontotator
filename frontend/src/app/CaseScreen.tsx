@@ -95,7 +95,7 @@ import { useSearchLanguages } from "../editor/searchLanguages";
 import { SearchPanel } from "../editor/SearchPanel";
 import { isUntouchedPrefill, passageText, prefillHint, prefillQuery } from "../editor/termSearch";
 import { focusTextAt } from "../editor/textFocus";
-import { useMediaQuery } from "../ui/useMediaQuery";
+import { useMediaQuery, useTouchOnly } from "../ui/useMediaQuery";
 import { ShellCaseBarSlot } from "../ui/AppShell";
 import { DismissibleHint, showHintsAgain, useHintsRead } from "../editor/DismissibleHint";
 import { SearchManager } from "../editor/searchState";
@@ -537,6 +537,8 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
   const rootRef = useRef<HTMLDivElement>(null);
   // At ≤700 px the editor shows one pane at a time; marking text does not switch panes on its own.
   const panesLayout = useMediaQuery("(max-width: 700px)");
+  // A touch screen: the marking banners leave out keys (issue 612); the banner's Cancel ends the mode.
+  const touchOnly = useTouchOnly();
   // Below 1024 px the header keeps one bar: "Next open item" moves into "More", the mode text hides.
   const narrowHeader = useMediaQuery("(max-width: 1023px)");
   // Issue 539: from 1025 px the case toolbar joins the app header in one bar (the header keeps a place for it).
@@ -3286,15 +3288,16 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
   };
 
   // One line above the text, only while a marking mode waits for text (spec C.6).
+  const escCancels = touchOnly ? "" : " Esc cancels.";
   const intentTerm = selectedAnnotation
     ? termLabel(selectedAnnotation.annotation.layer_id, selectedAnnotation.annotation.term_id) || selectedAnnotation.annotation.term_id
     : null;
   const extendedMention = selectedAnnotation && selectedEvidenceId
     ? (selectedAnnotation.annotation.evidence_refs ?? []).findIndex(ref => ref.evidence_id === selectedEvidenceId) + 1 : 0;
   const intentMessage = readOnly || !intentTerm ? null
-    : isAttachingMention ? `Adding a mention to ${intentTerm}. Mark the text. Esc cancels.`
+    : isAttachingMention ? `Adding a mention to ${intentTerm}. Mark the text.${escCancels}`
     : selectionIntent === "extend_mention" && extendedMention > 0
-      ? `Adding a segment to mention ${extendedMention} of ${intentTerm}. Mark the text. Esc cancels.` : null;
+      ? `Adding a segment to mention ${extendedMention} of ${intentTerm}. Mark the text.${escCancels}` : null;
 
   const openReviewTargets = reviewTargets.filter(
     (t) => !(draft.decisions ?? []).some((d) => refKey(d.target) === refKey(t)),
@@ -3717,6 +3720,10 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
     setDetailsCollapsed(collapsed);
     window.requestAnimationFrame(() => rootRef.current?.querySelector<HTMLElement>(collapsed ? ".details-rail-expand" : ".details-rail-collapse")?.focus());
   };
+  /** The name of what the folded column would show: the selected finding, else the selected proposal (issue 596). */
+  const stripSelection = !detailsCollapsed ? null
+    : selectedAnnotation ? termLabel(selectedAnnotation.annotation.layer_id, selectedAnnotation.annotation.term_id) || selectedAnnotation.annotation.term_id
+      : selectedTarget?.term_id ? termLabel(selectedTarget.layer_id ?? "", selectedTarget.term_id) || selectedTarget.term_id : null;
   // Work that needs the panel (a new mark and its term search, a required note, …) opens a collapsed column again.
   useEffect(() => {
     if (detailsCollapsed && inspectorDemand.active) setDetailsCollapsed(false);
@@ -4129,12 +4136,13 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
           {assignmentNavigation
             ? <h1 className="case-title" title={view.document.document_id}><LanguageText text={taskText(assignmentNavigation.current)} code={assignmentNavigation.current.language} /></h1>
             : <><h1 className="case-title" title={view.document.document_id}>{view.document.document_id}</h1><LanguageTag code={view.document.language} /></>}
-          <span
-            title={roundTitle ?? (roundKind !== "consolidation" && !isCarryKind(roundKind) ? badge.title : undefined)}
-            className="case-mode"
-          >
-            {roundKind === "consolidation" ? modeBadge("review").label : roundKind === "text_change" && roundInputs.length > 0 ? TEXT_CHANGE_ORIGIN : isCarryKind(roundKind) ? roundBadge ?? "Review carried findings" : badge.label}
-          </span>
+          {(() => {
+            const modeText = roundKind === "consolidation" ? modeBadge("review").label : roundKind === "text_change" && roundInputs.length > 0 ? TEXT_CHANGE_ORIGIN : isCarryKind(roundKind) ? roundBadge ?? "Review carried findings" : badge.label;
+            // Issue 596: in the merged bar a long mode takes two lines rather than an ellipsis; --mode-half is about
+            // half its length, the least width at which two lines hold it (editor.css).
+            return <span title={roundTitle ?? (roundKind !== "consolidation" && !isCarryKind(roundKind) ? badge.title : undefined)}
+              className="case-mode" style={{ "--mode-half": `${Math.ceil(modeText.length / 2) + 1}ch` } as CSSProperties}>{modeText}</span>;
+          })()}
           {readOnly && consolidationAssignmentId ? <a className="btn btn-secondary btn-sm" href={routeHref({ name: "task", assignmentId: consolidationAssignmentId })} onKeyDown={onSpaceActivate}>{BACK_TO_CONSOLIDATION}</a> : null}
           {/* The display name has a bounded width (full text in the title), so the header
               does not need another line; the pseudonym is never shortened. */}
@@ -4279,7 +4287,7 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
         <aside className="sidebar density-compact" id="findings-column">
           {/* Narrow layout: attach mode opens on Findings, where the text pane's banner and its Cancel are out of sight. */}
           {panesLayout && attachActive && attachModifier && mobilePane === "list" && <div role="status" className="attach-mention-banner attach-mention-banner--list">
-            <span>{attachCopy.banner(attachModifier.termLabel)}</span>
+            <span>{attachCopy.banner(attachModifier.termLabel, touchOnly)}</span>
             <Button size="sm" aria-keyshortcuts="Escape" onClick={cancelAttachModifier}>Cancel (Esc)</Button>
           </div>}
           {/* Multi-layer controls (rendered only if >1 layer) */}
@@ -4511,8 +4519,9 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
           text={view.document.text}
           mentions={textMentions}
           isAttachingMention={attachActive || pickingText}
-          attachMessage={attachActive && attachModifier ? attachCopy.banner(attachModifier.termLabel)
-            : linkSpan ? `Select the text for ${linkSpan.term}, then press Enter. Esc cancels.`
+          attachMessage={attachActive && attachModifier ? attachCopy.banner(attachModifier.termLabel, touchOnly)
+            // Releasing the mouse (or Shift after Shift + arrows) links the span; Enter is not needed (issue 612).
+            : linkSpan ? `Select the text for ${linkSpan.term}.${escCancels}`
             : activeCarried ? `Select supporting text to re-create ${carriedTermText(activeCarried.source_snapshot)}.` : activeReanchor ? `Select supporting text to re-create ${activeReanchor.term_id}. Save the finding, review its values, then complete the text-change review.` : pendingEvidenceAdoption ? `${targetRequiresSpan(pendingEvidenceAdoption) ? "This annotation type requires a text span. " : ""}Select supporting text to create an editable copy of this proposal. The current decision is kept until you confirm the replacement.` : undefined}
           intentMessage={intentMessage}
           // TextPane owns Esc while a banner is shown (window capture): each mode cancels through its own handler.
@@ -4541,9 +4550,14 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
           <IconButton size="sm" variant="quiet" className="details-rail-collapse" label="Collapse details panel" icon={<IconChevronRight />}
             aria-expanded aria-controls="details-column" onClick={() => collapseDetails(true)} />
         </div>}
-        {detailsCollapsed && <button type="button" className="details-rail-expand" aria-label="Expand details panel" title="Expand details panel"
+        {/* Issue 596: a finding or proposal selected while the column is folded is named on the strip, under "Details". */}
+        {detailsCollapsed && <button type="button" className="details-rail-expand" aria-label="Expand details panel"
+          title={stripSelection ? `Expand details panel (selected: ${stripSelection})` : "Expand details panel"}
+          aria-describedby={stripSelection ? "details-strip-selection" : undefined}
           aria-expanded={false} aria-controls="details-column" onClick={() => collapseDetails(false)}>
-          <IconChevronLeft /><span className="details-rail-strip-label" aria-hidden="true">Details</span></button>}
+          <IconChevronLeft /><span className="details-rail-strip-label" aria-hidden="true">Details</span>
+          {stripSelection && <span id="details-strip-selection" className="details-rail-strip-selection">
+            <span className="visually-hidden">Selected: </span>{stripSelection}</span>}</button>}
         {/* Right: Annotation & Search Panel + Review Actions */}
         <div className="inspector-pane density-compact" id="details-column" ref={inspectorRef}>
           {/* A low window with the tree open (issue 521): the finding in one line, and the way back to the whole panel. */}
@@ -4777,10 +4791,11 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
                 <p className="field-hint">{changes.length ? `Changes: ${changes.join("; ")}.` : "No changes yet. Edit the term, values or text below; the proposal counts as replaced once the copy differs."}</p>
                 {/* Issue 257: an unchanged copy goes on Done; Discard copy is the way back that drops the copy. */}
                 <div className="review-actions__row">
-                  <Button type="button" variant="primary" size="sm" onClick={() => {
+                  {/* Issue 612: read-only, nothing is done here; a plain way back, not the primary action. */}
+                  <Button type="button" variant={readOnly ? "secondary" : "primary"} size="sm" onClick={() => {
                     if (readOnly) { selectProposal(replaced); return; }
                     void discardCopy(replaced, { from: "copy", onlyUnchanged: true });
-                  }}>Done, back to the proposal</Button>
+                  }}>{readOnly ? "Back to the proposal" : "Done, back to the proposal"}</Button>
                   {!readOnly && <Button type="button" size="sm" onClick={() => { void discardCopy(replaced, { from: "copy" }); }}>
                     <IconUndo />Discard copy
                   </Button>}
