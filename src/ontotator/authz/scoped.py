@@ -613,6 +613,10 @@ class ScopedRepository(Repository):
         self._visible(project_key)
         return super().get_project_rules(project_key)
 
+    def hide_term_id_prefix(self, project_key: str) -> bool:
+        self._visible(project_key)
+        return super().hide_term_id_prefix(project_key)
+
     # --- documents and proposals ------------------------------------------- #
 
     def get_variant(self, project_key: str, document_id: str) -> VariantInfo:

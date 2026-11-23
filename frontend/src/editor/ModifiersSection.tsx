@@ -5,6 +5,7 @@ import { IconMore } from "../ui/icons";
 import { SearchPanel, type SearchPanelProps } from "./SearchPanel";
 import { COHORT_TAG, chipText as editorChipText, exclusiveWarnings, quoteOf, sortByLabel, type ModifierLike, type TermInfo } from "./modifiers";
 import "./modifiers.css";
+import { useTermIdDisplay } from "./termIds";
 
 export interface ModifiersSectionProps {
   /** The finding's term label, e.g. "Seizure". */
@@ -48,6 +49,7 @@ export interface ModifiersSectionProps {
  */
 export function ModifiersSection({ finding, modifiers, text, termInfo, readOnly = false, chipText = editorChipText, codeSeparator = " · ", hint,
   onAdd, onLinkSpan, onRemoveSpan, onRemove, canExcludeFromSpan, onExcludeFromSpan, exclusionTermId = null, selectedTermId = null, onSelectModifier, searchProps }: ModifiersSectionProps): JSX.Element {
+  const showTermId = useTermIdDisplay();
   const headingId = useId();
   const [searching, setSearching] = useState(false);
   const [status, setStatus] = useState<{ text: string; linkTermId?: string } | null>(null);
@@ -82,7 +84,7 @@ export function ModifiersSection({ finding, modifiers, text, termInfo, readOnly 
         // The name in strong text, the quote muted after a space (mockup 01 A, R-6); the cohort tag keeps its " · ".
         const name = words.startsWith(label) ? label : "";
         // Issue 525: every row names its term ID after the name, as the finding's own term does.
-        const code = label !== modifier.term_id && <span className="mod-row-code">{codeSeparator}{modifier.term_id}</span>;
+        const code = label !== modifier.term_id && <span className="mod-row-code" title={modifier.term_id}>{codeSeparator}{showTermId(modifier.term_id)}</span>;
         const body = <>{name && <span className="mod-row-label">{name}</span>}{name && code}<span className="mod-row-quote">{name ? words.slice(name.length).replace(/^ · /, " ") : words}</span>
           {!name && code}{cohortTag && <> · <span className="mod-cohort">{COHORT_TAG}</span></>}</>;
         const selected = selectedTermId === modifier.term_id;
@@ -106,7 +108,7 @@ export function ModifiersSection({ finding, modifiers, text, termInfo, readOnly 
       const chosen = selectedTermId ? modifiers.find(modifier => modifier.term_id === selectedTermId) : undefined;
       if (!chosen) return null;
       const quote = chosen.segments?.length ? quoteOf(text, chosen.segments) : null;
-      return <p className="mod-selected">{`${termInfo(chosen.term_id)?.label ?? chosen.term_id} · ${chosen.term_id} · ${quote ? `in the text: “${quote}”` : "no text span"}`}</p>;
+      return <p className="mod-selected">{`${termInfo(chosen.term_id)?.label ?? showTermId(chosen.term_id)} · ${showTermId(chosen.term_id)} · ${quote ? `in the text: “${quote}”` : "no text span"}`}</p>;
     })()}
     {warnings.map(warning => <p key={warning} className="mod-warning">{warning}</p>)}
     {/* The offer to link ends once the modifier has its span, however it got it. */}

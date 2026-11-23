@@ -9864,6 +9864,8 @@ export interface components {
             annotate_accepted_translations_only: boolean;
             /** Record Working Time */
             record_working_time?: boolean;
+            /** Hide Term Id Prefix */
+            hide_term_id_prefix?: boolean;
             /** Hidden Axis Values */
             hidden_axis_values?: {
                 [key: string]: {
@@ -9964,6 +9966,8 @@ export interface components {
             annotate_accepted_translations_only: boolean;
             /** Record Working Time */
             record_working_time?: boolean;
+            /** Hide Term Id Prefix */
+            hide_term_id_prefix?: boolean;
             /** Hidden Axis Values */
             hidden_axis_values?: {
                 [key: string]: {
@@ -13399,6 +13403,8 @@ export interface components {
             axes_config_sha256: string;
             /** Modifier Layer Ids */
             modifier_layer_ids?: string[];
+            /** Hide Term Id Prefix */
+            hide_term_id_prefix?: boolean;
         };
     };
     responses: never;

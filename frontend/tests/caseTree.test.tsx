@@ -224,6 +224,19 @@ describe("the tree in the case screen", () => {
     expect(link.parentElement).toBe(detail.querySelector(".tree-detail__id")?.parentElement);
   });
 
+  it("shows the code without the prefix when the project hides it; the link keeps the full id", async () => {
+    const view = { ...baseView([snapshot("a1", "HP:A")]), hide_term_id_prefix: true };
+    mockTree();
+    const { container } = render(<CaseScreen view={view} workspaceId="ws" onClose={vi.fn()} />);
+
+    const panel = await openPanel(container, "a1");
+    const detail = panel.querySelector<HTMLElement>(".tree-detail")!;
+    const link = await within(detail).findByRole("link", { name: "View HP:A on hpo.jax.org" });
+    expect(link.getAttribute("href")).toBe("https://hpo.jax.org/browse/term/HP:A");
+    expect(detail.querySelector(".tree-detail__id")?.textContent).toBe("A");
+    expect(detail.querySelector(".tree-detail__id")?.getAttribute("title")).toBe("HP:A");
+  });
+
   it("hides the details under the tree down to name and id, and remembers that for the user", async () => {
     window.localStorage.clear();
     mockTree({ synonyms: ["Alpha synonym"], definition: "A made-up definition." });

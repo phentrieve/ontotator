@@ -132,6 +132,7 @@ import { isReviewLike, modeBadge } from "../editor/modes";
 import { LanguageTag, LanguageText } from "../ui/LanguageTag";
 import { onSpaceActivate } from "../ui/spaceActivates";
 import { actorName } from "../editor/actorName";
+import { TermIdsProvider } from "../editor/termIds";
 
 const refKey = (r: { annotation_id: string; version: string }) => JSON.stringify([r.annotation_id, r.version]);
 
@@ -280,7 +281,11 @@ const PENDING_HANDLE_LABELS = { start: "Start of marked text", end: "End of mark
 /** Round kinds whose inputs are carried findings to check (a text change and a lead's handover included). */
 const isCarryKind = (kind: CaseScreenProps["roundKind"]): boolean => kind === "carry_forward" || kind === "text_change" || kind === "handover";
 
-export const CaseScreen: React.FC<CaseScreenProps> = ({
+/** The annotation screen. With the project setting on, one ontology's term ids are shown without the prefix (termIds.tsx). */
+export const CaseScreen: React.FC<CaseScreenProps> = (props) =>
+  <TermIdsProvider ontologyIds={props.view.hide_term_id_prefix ? (props.view.ontologies ?? []).map(item => item.ontology_id) : []}><CaseScreenBody {...props} /></TermIdsProvider>;
+
+const CaseScreenBody: React.FC<CaseScreenProps> = ({
   view,
   workspaceId,
   onClose,

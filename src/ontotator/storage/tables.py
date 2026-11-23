@@ -146,6 +146,10 @@ class ProjectRow(Base):
     record_working_time: Mapped[bool] = mapped_column(
         Boolean, server_default=text("false")
     )
+    # Show term ids without the ontology prefix (`N18.1`, not `ICD10CM:N18.1`).
+    hide_term_id_prefix: Mapped[bool] = mapped_column(
+        Boolean, server_default=text("false")
+    )
     import_plan: Mapped[str] = mapped_column(
         server_default=text("'review_and_annotate_translations'")
     )

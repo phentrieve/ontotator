@@ -3,6 +3,7 @@ import { Button } from "../ui/Button";
 import { Kbd } from "../ui/Kbd";
 import type { AttachCandidate, AttachFinding } from "./modifiers";
 import "./modifiers.css";
+import { useTermIdDisplay } from "./termIds";
 
 export interface AttachModePanelProps {
   termLabel: string;
@@ -53,6 +54,7 @@ export const attachCopy = {
 /** The inspector while the attach mode is on (a labelled region "Attach Severe"). The banner over the text owns the
  * instruction and the one Cancel (Esc); the inspector only offers the nearest target. */
 export function AttachModePanel({ termLabel, termId, markQuote, nearest, focused, existing, noFindings, onAttach, onReplace, onCancel, showCancel = false, note, onUseAsFinding }: AttachModePanelProps): JSX.Element {
+  const showTermId = useTermIdDisplay();
   const enter = <span aria-hidden="true"> <Kbd>Enter</Kbd></span>;
   const ok = useRef<HTMLButtonElement>(null);
   useEffect(() => { if (noFindings) ok.current?.focus({ preventScroll: true }); }, [noFindings]);
@@ -71,7 +73,7 @@ export function AttachModePanel({ termLabel, termId, markQuote, nearest, focused
   return <section className="detail-pane" aria-label={`Attach ${termLabel}`}>
     <div className="detail-section mod-attach-panel">
       <h2 className="term-heading">{termLabel}{" "}<span className="mod-tag">Modifier</span></h2>
-      <p className="mod-line-id">{termId}{markQuote ? ` · “${markQuote}”` : ""}</p>
+      <p className="mod-line-id">{showTermId(termId)}{markQuote ? ` · “${markQuote}”` : ""}</p>
       {note}
       {nearest
         ? <p><strong>Nearest in this sentence:</strong> {nearest.term}{nearest.quote ? ` · “${nearest.quote}”` : ""}</p>

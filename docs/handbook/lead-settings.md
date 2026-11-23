@@ -201,6 +201,16 @@ What for: decide what annotators must do before they can submit.
 4. Tick **A finding must be one continuous passage** if a finding may not have several text segments.
 5. Click **Save changes**. The rules apply to every submission from now on.
 
+## Show codes without the ontology prefix
+
+What for: in a project with one ontology, the prefix in front of every code says nothing new. With this setting the editor shows `N18.1` instead of `ICD10CM:N18.1`.
+
+1. Open **Settings**, tab **Annotation**, card **Term codes**.
+2. Tick **Show codes without the ontology prefix**.
+3. Click **Save changes**. Annotators see the short codes the next time they open a text.
+
+This changes the display only, not the search. Saved findings, exports and the API keep the full code, and links to term pages use it. Pointing at a short code shows the full one. A project with more than one ontology always shows the prefix.
+
 ## Set prefilled values for new findings
 
 What for: new findings start with these values. They stay marked as not confirmed until the annotator confirms or changes them.

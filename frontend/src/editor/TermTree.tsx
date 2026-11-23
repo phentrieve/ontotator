@@ -1,6 +1,7 @@
 import { viewLabel } from "./termLinks";
 import React, { useEffect, useRef } from "react";
 import { keyAction, type TreeRow } from "./treeState";
+import { useTermIdDisplay } from "./termIds";
 
 export interface TermTreeProps {
   rows: TreeRow[];
@@ -36,6 +37,7 @@ export const TermTree: React.FC<TermTreeProps> = ({
   onSelect,
   onClose,
 }) => {
+  const showTermId = useTermIdDisplay();
   const items = useRef(new Map<string, HTMLLIElement>());
   // Exactly one row is in the Tab order: the focused one, or the first while there is none.
   const tabKey = rows.some((row) => row.key === focusedKey) ? focusedKey : rows[0]?.key ?? null;
@@ -114,7 +116,7 @@ export const TermTree: React.FC<TermTreeProps> = ({
             <span className="tree-label" id={`tree-label-${row.key}`}>
               {row.label}
             </span>
-            <span className="tree-id">{row.termId}</span>
+            <span className="tree-id" title={row.termId}>{showTermId(row.termId)}</span>
             {row.externalUrl && (
               <a
                 className="tree-external"

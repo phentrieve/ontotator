@@ -325,7 +325,7 @@ describe("project settings sections", () => {
     view.show("annotation");
     const form = screen.getByRole("form", { name: "Annotation" });
     expect(document.activeElement).toBe(form);
-    expect(within(form).getAllByRole("heading", { level: 2 }).map(heading => heading.textContent)).toEqual(["When submitting", "Prefilled values"]);
+    expect(within(form).getAllByRole("heading", { level: 2 }).map(heading => heading.textContent)).toEqual(["When submitting", "Term codes", "Prefilled values"]);
     const save = within(form).getByRole("button", { name: "Save changes" });
     const control = within(form).getByRole("combobox", { name: "Findings that point to no text passage" });
     expect(save.className).toContain("btn-primary");
@@ -343,7 +343,7 @@ describe("project settings sections", () => {
     await screen.findByText("Annotation saved.");
     expect(api.updateProjectSettings).toHaveBeenCalledTimes(1);
     expect(api.updateProjectSettings).toHaveBeenCalledWith(settings.project_key, { allow_spanless_findings: true, require_spanless_note: false, require_chosen_axes: false,
-      contiguous_mentions_only: false, hidden_axis_values: { findings: { assertion: ["absent"] } }, creation_defaults: { findings: { phenotype: { assertion: "present" } } } });
+      contiguous_mentions_only: false, hidden_axis_values: { findings: { assertion: ["absent"] } }, creation_defaults: { findings: { phenotype: { assertion: "present" } } }, hide_term_id_prefix: false });
   });
 
   it("saves only one section and preserves another section's unsaved draft", async () => {
@@ -386,7 +386,16 @@ describe("project settings sections", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "Findings that point to no text passage" }), { target: { value: "optional" } });
     fireEvent.click(saveIn("Annotation"));
     await screen.findByText("Annotation saved.");
-    expect(api.updateProjectSettings).toHaveBeenLastCalledWith(settings.project_key, { require_chosen_axes: false, contiguous_mentions_only: false, allow_spanless_findings: true, require_spanless_note: false, hidden_axis_values: {}, creation_defaults: {} });
+    expect(api.updateProjectSettings).toHaveBeenLastCalledWith(settings.project_key, { require_chosen_axes: false, contiguous_mentions_only: false, allow_spanless_findings: true, require_spanless_note: false, hidden_axis_values: {}, creation_defaults: {}, hide_term_id_prefix: false });
+  });
+
+  it("Annotation saves the switch that shows codes without the ontology prefix", async () => {
+    const view = renderSettings("general");
+    view.show("annotation");
+    fireEvent.click(await screen.findByRole("checkbox", { name: /Show codes without the ontology prefix/ }));
+    fireEvent.click(saveIn("Annotation"));
+    await screen.findByText("Annotation saved.");
+    expect(api.updateProjectSettings).toHaveBeenLastCalledWith(settings.project_key, expect.objectContaining({ hide_term_id_prefix: true }));
   });
 
   it.each([

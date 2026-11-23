@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Settings: **Show codes without the ontology prefix** in the new card **Term codes** (tab **Annotation**). In a project with one ontology the editor and the consolidation then show `N18.1` instead of `ICD10CM:N18.1` in the term search, the ontology tree and the findings; pointing at a short code shows the full one. Display only: saved findings, exports, the API and term links keep the full id. Off by default; a project with more than one ontology always shows the prefix. New column `projects.hide_term_id_prefix` (migration 0058); the setting is in `GET`/`PATCH …/settings` and the workspace view.
+
 ## [0.14.0] - 2026-11-23
 
 ### Added
