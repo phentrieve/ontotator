@@ -5,11 +5,12 @@ import { textLabel } from "../app/identity";
 import { routeHref, type Route } from "../app/router";
 import { formatTime } from "../app/submissionLabels";
 import { reporterName } from "../problems/labels";
+import { ownPauseActive } from "../problems/ReporterReportCard";
 import { DiffView } from "../translation/DiffView";
 import { Button, EmptyState, InlineMessage } from "../ui";
 import { tabId, Tabs } from "../ui/Tabs";
 import { AnswerQuestionDialog } from "./AnswerQuestionDialog";
-import { ANSWER_LABEL, openCount, QUESTIONS_PAGE_TITLE, taskNoun } from "./labels";
+import { ANSWER_LABEL, ANSWERED_TOOK, openCount, QUESTIONS_PAGE_TITLE, resumedNote, taskNoun, TOOK_AT_ANSWER } from "./labels";
 import { NOTIFICATIONS_CHANGED } from "../notifications/notificationsEvents";
 import { notifyQuestionsChanged, QUESTIONS_CHANGED } from "./questionsEvents";
 import "./questions.css";
@@ -23,6 +24,9 @@ function LeadQuestion({ question, projectKey, target, onAnswer, onNavigate }: {
   target?: boolean;
 }): JSX.Element {
   const open = question.state === "open";
+  // Issue 611: "task paused" only while the question's pause is in force; after "Resume my task" its reason shows.
+  const paused = question.pauses && open && ownPauseActive(question);
+  const resumed = question.pauses && !paused ? (question.events ?? []).filter(event => event.action === "resume").at(-1) : undefined;
   const documents: Route = { name: "projectDocuments", key: projectKey, case: question.case_id, language: question.language };
   const item = useRef<HTMLLIElement>(null);
   useEffect(() => {
@@ -33,13 +37,13 @@ function LeadQuestion({ question, projectKey, target, onAnswer, onNavigate }: {
   return <li ref={item} className={`lead-question${open ? " lead-question--open" : ""}${target ? " lead-question--target" : ""}`}
     {...(target ? { tabIndex: -1, "aria-current": true } : {})}>
     <p className="lead-question-meta">{`${reporterName(question)} · ${taskNoun(question.task)} of ${textLabel(question)} · ${formatTime(question.created_at ?? "")}`}
-      {question.pauses && open && " · task paused"}</p>
+      {paused && " · task paused"}{resumed && ` · ${resumedNote(resumed.reason)}`}</p>
     <p className="lead-question-text">{question.reason}</p>
     {question.quote && question.proposed_text
       ? <div className="question-passage"><DiffView before={question.quote} after={question.proposed_text} label={`Proposed wording, ${textLabel(question)}`} lang={question.language} /></div>
       : question.quote && <p><span className="task-question-term">About:</span> <q>{question.quote}</q></p>}
     {question.answer != null && <p><strong>Your answer{question.answered_at ? `, ${formatTime(question.answered_at)}` : ""}:</strong> {question.answer}
-      {question.took_proposed_text && " The proposed wording was taken into the text."}</p>}
+      {question.took_proposed_text && ` ${TOOK_AT_ANSWER}`}</p>}
     <div className="lead-question-actions">
       {open && <Button size="sm" variant="primary" onClick={onAnswer}>{ANSWER_LABEL}</Button>}
       <a className="btn btn-secondary btn-sm" href={routeHref(documents)} onClick={event => {
@@ -120,7 +124,7 @@ export function QuestionsPage({ projectKey, question: targetId, onNavigate }: {
       setQuestions(list => (list ?? []).map(q => q.report_id === done.report_id ? done : q));
       // Issue 590: "Questions (n)" in the sidebar follows the Open tab.
       notifyQuestionsChanged();
-      setNotice(done.took_proposed_text ? "Answer sent. The proposed wording is in the reviewer's text." : "Answer sent.");
+      setNotice(done.took_proposed_text ? ANSWERED_TOOK : "Answer sent.");
     }} />}
     </div>
   </section>;

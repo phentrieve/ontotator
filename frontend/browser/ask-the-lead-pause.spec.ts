@@ -7,6 +7,9 @@
  * - Taking a wording whose passage is gone says so.
  * - Export leads to the Questions page for a text paused by a question.
  * - The Questions page is for leads only.
+ * - Issue 611: "task paused" on the lead's page only while the pause holds, then the resume reason; the take error goes
+ *   when Take is unticked; Send and Cancel share a row; at 390 px the banner wraps at words, the dialog is as tall as
+ *   its form and Export's "Why" reads as a sentence.
  * Screenshots for human review only (never baselines): ONTOTATOR_SHOTS_DIR, else build/ask-the-lead-pause.
  */
 import { mkdirSync } from "node:fs";
@@ -62,19 +65,23 @@ async function selectPassage(page: Page, quote: string) {
 }
 
 async function askPausing(page: Page, question: string, wording?: string) {
-  await page.getByRole("button", { name: "Ask the lead", exact: true }).click();
+  await page.locator(".ask-lead-entry").click();
   const ask = page.getByRole("dialog", { name: "Ask the lead" });
   await ask.getByRole("textbox", { name: /Your question/ }).fill(question);
   if (wording) await ask.getByRole("textbox", { name: /Your wording for this passage/ }).fill(wording);
   await ask.getByRole("checkbox", { name: "Pause my task until the lead answers" }).check();
   await expect(ask.locator(".modal-actions")).toContainText("Your task is paused until the lead answers.");
+  // Issue 611: the consequence line has a row of its own; Cancel stays beside Send.
+  const sendBox = await ask.getByRole("button", { name: "Send question" }).boundingBox();
+  const cancelBox = await ask.getByRole("button", { name: "Cancel" }).boundingBox();
+  expect(Math.abs(sendBox!.y - cancelBox!.y)).toBeLessThan(2);
   await ask.getByRole("button", { name: "Send question" }).click();
   await expect(ask).toHaveCount(0);
 }
 
 async function expectPausedByQuestion(page: Page) {
   await expect(status(page)).toHaveText("Read-only");
-  await expect(page.getByRole("button", { name: "Ask the lead", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Ask the lead…" })).toHaveCount(0);
   await expect(page.locator("#review-translation")).not.toBeEditable();
   await expect(banner(page)).toContainText("Paused until the lead answers your question");
   // Not a text problem: the header entry offers a new report, with no pause badge.
@@ -129,7 +136,7 @@ test("1440 px: a pausing question pauses at once, names itself, can be resumed; 
   await expect(status(page)).toHaveText("Saved", { timeout: 15_000 });
 
   // A second question does not quote the earlier selection again; it pauses the task again.
-  await page.getByRole("button", { name: "Ask the lead", exact: true }).click();
+  await page.locator(".ask-lead-entry").click();
   const ask = page.getByRole("dialog", { name: "Ask the lead" });
   await expect(ask.getByRole("textbox", { name: /Passage you ask about/ })).toHaveValue("");
   await ask.getByRole("button", { name: "Cancel" }).click();
@@ -140,12 +147,18 @@ test("1440 px: a pausing question pauses at once, names itself, can be resumed; 
   await page.goto(`/#/projects/${encodeURIComponent(s.project)}/questions`);
   await expect(page.getByText("The Questions page is for project leads.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Answer…" })).toHaveCount(0);
+  // Issue 611: no rule under the notice with nothing after it.
+  expect(await page.locator(".shell-page .detail-section").evaluate(element => getComputedStyle(element).borderBottomWidth)).toBe("0px");
   await shot(page, "after-4-reviewer-questions-url-1440");
 
   // The lead: taking the wording of a passage that is gone says what to do.
   await login(page, s, "lead");
   await page.getByRole("link", { name: "Questions, 3 open" }).click();
   const first = page.getByRole("list", { name: "3 open questions" }).getByRole("listitem").filter({ hasText: QUESTION });
+  // Issue 611: the first question's pause was resumed, so it shows the reason, not "task paused"; the second pauses.
+  await expect(first).toContainText("· resumed: I can check the other passages meanwhile.");
+  await expect(first).not.toContainText("task paused");
+  await expect(page.getByRole("listitem").filter({ hasText: SECOND })).toContainText("· task paused");
   await first.getByRole("button", { name: "Answer…" }).click();
   const answer = page.getByRole("dialog", { name: /^Answer Ana Weber/ });
   await answer.getByRole("textbox", { name: /Your answer/ }).fill("Yes, muscular hypotonia is meant.");
@@ -154,6 +167,8 @@ test("1440 px: a pausing question pauses at once, names itself, can be resumed; 
   await expect(answer).toContainText("The quoted passage is no longer in the reviewer's text, so the wording cannot be taken.");
   await shot(page, "after-5-quote-gone-1440");
   await answer.getByRole("checkbox", { name: /Take the proposed wording/ }).uncheck();
+  // Issue 611: the error named unticking as the fix, so it goes.
+  await expect(answer).not.toContainText("The quoted passage is no longer in the reviewer's text");
   await answer.getByRole("button", { name: "Send answer" }).click();
   await expect(answer).toHaveCount(0);
   // The sidebar count follows the Open tab at once.
@@ -168,6 +183,13 @@ test("1440 px: a pausing question pauses at once, names itself, can be resumed; 
   await expect(waiting.getByRole("link", { name: /^Open Questions/ })).toHaveAttribute("href", `#/projects/${encodeURIComponent(s.project)}/questions`);
   await waiting.scrollIntoViewIfNeeded();
   await shot(page, "after-7-export-1440");
+  // Issue 611: on a phone the reason takes the row's full width under the text and its action.
+  await page.setViewportSize({ width: 390, height: 844 });
+  const why = waiting.locator("td").nth(1);
+  await expect.poll(async () => (await why.boundingBox())?.width ?? 0).toBeGreaterThan(280);
+  await waiting.scrollIntoViewIfNeeded();
+  await shot(page, "after-7b-export-390");
+  await page.setViewportSize({ width: 1440, height: 900 });
   await waiting.getByRole("link", { name: /^Open Questions/ }).click();
   await expect(page.getByRole("heading", { name: "Questions", level: 1 })).toBeVisible();
   // The only failed request is the refused answer with the wording (409, quote_not_found).
@@ -180,15 +202,20 @@ test("390 px: a pausing question pauses at once on a phone", async ({ page }) =>
   const s = await leadScenario(page, "QUESTION_FOR_LEAD");
   await login(page, s, "ana");
   await openReview(page, s.tasks!.ask);
-  await page.getByRole("button", { name: "Ask the lead", exact: true }).click();
+  await page.locator(".ask-lead-entry").click();
   const ask = page.getByRole("dialog", { name: "Ask the lead" });
   await ask.getByRole("textbox", { name: /Your question/ }).fill(QUESTION);
   await ask.getByRole("checkbox", { name: "Pause my task until the lead answers" }).check();
   await shot(page, "after-8-ask-dialog-390");
+  // Issue 611: as tall as its form, not a full-height sheet with a gap above the footer.
+  expect((await ask.boundingBox())!.height).toBeLessThan(760);
   await ask.getByRole("button", { name: "Send question" }).click();
   await expect(ask).toHaveCount(0);
   await expectPausedByQuestion(page);
   await page.evaluate(() => window.scrollTo(0, 0));
+  // Issue 611: the banner wraps at words; the title and the question are in sight without "Show more".
+  const reason = banner(page).locator(".paused-notice__reason");
+  expect(await reason.evaluate(element => element.scrollHeight <= element.clientHeight + 1)).toBe(true);
   await shot(page, "after-9-paused-390");
   expect(errors).toEqual([]);
 });

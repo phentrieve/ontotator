@@ -27,7 +27,7 @@ export interface ShellProps {
   breadcrumb?: Crumb[];
   children: ReactNode;
   taskProject?: string;
-  /** The open task's kind: an annotator on a translation review reads as "Translation reviewer". */
+  /** The open task's kind: on a translation review the role line adds the task ("Annotator · translation review"). */
   taskKind?: string;
   /** Changes on each navigation to My tasks or Projects; the My tasks count reloads then (issue 192). */
   navigation?: unknown;
@@ -60,14 +60,18 @@ function NavigationLink({ destination, current, onNavigate, label, children }: {
 
 const ROLE_ORDER = ["lead", "adjudicator", "annotator"] as const;
 
-/** Second header line: the roles in the current project, else across all projects. */
+/**
+ * Second header line: the roles in the current project, else across all projects. Issue 611: the same person reads
+ * the same role everywhere; inside a translation review the task is named after the role, not in place of it.
+ */
 export function shellRole(user: CurrentUser, projects: readonly ProjectSummary[], current: ProjectSummary | undefined, taskKind?: string): string | undefined {
   const roles = new Set((current ? [current] : projects).flatMap(project => project.roles));
   const labels = [
     ...(user.is_system_admin ? ["System administrator"] : []),
-    ...ROLE_ORDER.filter(role => roles.has(role)).map(role => role === "annotator" && taskKind === "translation_review" ? "Translation reviewer" : roleLabels[role]),
+    ...ROLE_ORDER.filter(role => roles.has(role)).map(role => roleLabels[role]),
   ];
-  return labels.length ? labels.join(", ") : undefined;
+  if (!labels.length) return undefined;
+  return `${labels.join(", ")}${taskKind === "translation_review" && roles.has("annotator") ? " · translation review" : ""}`;
 }
 
 /**

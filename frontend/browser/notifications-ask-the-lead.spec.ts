@@ -83,7 +83,7 @@ test("a reviewer asks, the lead's bell opens the question; the lead answers, the
   await login(page, s, "ana");
   await page.goto(`/#/tasks/${task}`);
   await expect(page.getByRole("region", { name: "Translation review" })).toBeVisible();
-  await page.getByRole("button", { name: "Ask the lead", exact: true }).click();
+  await page.locator(".ask-lead-entry").click();
   const ask = page.getByRole("dialog", { name: "Ask the lead" });
   await ask.getByRole("textbox", { name: /Your question/ }).fill(QUESTION);
   await ask.getByRole("button", { name: "Send question" }).click();

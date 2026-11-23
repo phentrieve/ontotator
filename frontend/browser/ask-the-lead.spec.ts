@@ -75,7 +75,10 @@ test("1440 px: ask, answer with the proposed wording, read the answer; three dec
     const start = editor.value.indexOf(quote);
     editor.focus(); editor.setSelectionRange(start, start + quote.length);
   }, QUOTE);
-  await page.getByRole("button", { name: "Ask the lead", exact: true }).click();
+  // Issue 611: the header button and the one in the rail read the same; the role line names the same role as elsewhere.
+  await expect(page.getByRole("button", { name: "Ask the lead…" })).toHaveCount(2);
+  await expect(page.getByTestId("current-user").locator(".cell-secondary")).toHaveText("Annotator · translation review");
+  await page.locator(".ask-lead-entry").click();
   const ask = page.getByRole("dialog", { name: "Ask the lead" });
   await expect(ask.getByRole("textbox", { name: /Passage you ask about/ })).toHaveValue(QUOTE);
   await ask.getByRole("textbox", { name: /Your question/ }).fill(QUESTION);
@@ -109,7 +112,7 @@ test("1440 px: ask, answer with the proposed wording, read the answer; three dec
   await shot(page, "lead-answer-dialog-1440");
   await answer.getByRole("button", { name: "Answer and take the wording" }).click();
   await expect(answer).toHaveCount(0);
-  await expect(page.getByText("Answer sent. The proposed wording is in the reviewer's text.")).toBeVisible();
+  await expect(page.getByText("Answer sent. The proposed wording was put into the reviewer's saved text.")).toBeVisible();
   await expect(page.getByRole("list", { name: "1 open question" })).toBeVisible();
 
   // The reviewer reads the answer; the wording is in the text.
@@ -117,6 +120,7 @@ test("1440 px: ask, answer with the proposed wording, read the answer; three dec
   await openReview(page, tasks.ask);
   await expect(questions(page)).toContainText(`Answer from the lead: ${ANSWER}`);
   await expect(questions(page)).toContainText("The lead put your wording into your text.");
+  await expect(questions(page)).not.toContainText("Question sent.");
   await expect(page.locator("#review-translation")).toHaveValue(new RegExp(esc(WORDING)));
   await questions(page).scrollIntoViewIfNeeded();
   await shot(page, "task-answered-1440");
@@ -145,7 +149,7 @@ test("390 px: the ask dialog on a phone", async ({ page }) => {
   const s = await leadScenario(page, "QUESTION_FOR_LEAD");
   await login(page, s, "ana");
   await openReview(page, s.tasks!.ask);
-  await page.getByRole("button", { name: "Ask the lead", exact: true }).click();
+  await page.locator(".ask-lead-entry").click();
   const ask = page.getByRole("dialog", { name: "Ask the lead" });
   await ask.getByRole("textbox", { name: /Your question/ }).fill(QUESTION);
   await ask.getByRole("textbox", { name: /Passage you ask about/ }).fill(QUOTE);

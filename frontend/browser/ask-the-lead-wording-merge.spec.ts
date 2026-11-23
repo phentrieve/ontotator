@@ -4,6 +4,9 @@
  *   lead's wording reaches the text on screen without a reload, and the status never says Saved for a stale text.
  * - Paused variant: the answer reopens the task with the wording in the text; the first edit saves.
  * - A clash (the reviewer changed the passage meanwhile) keeps the reviewer's text and offers the wording in one click.
+ * - Issue 616: a rewrite of several words is replaced as a whole; until then the card does not claim the wording is in
+ *   the text, and the lead's side says what the answer did, not what the text holds now.
+ * - Issue 611: "Question sent …" goes once the answer is there.
  * Screenshots for human review only (never baselines): ONTOTATOR_SHOTS_DIR, else build/ask-the-lead-wording-merge.
  */
 import { mkdirSync } from "node:fs";
@@ -64,7 +67,7 @@ async function ask(page: Page, pause: boolean) {
     const textarea = element as HTMLTextAreaElement, start = textarea.value.indexOf(quote);
     textarea.focus(); textarea.setSelectionRange(start, start + quote.length);
   }, QUOTE);
-  await page.getByRole("button", { name: "Ask the lead", exact: true }).click();
+  await page.locator(".ask-lead-entry").click();
   const dialog = page.getByRole("dialog", { name: "Ask the lead" });
   await expect(dialog.getByRole("textbox", { name: /Passage you ask about/ })).toHaveValue(QUOTE);
   await dialog.getByRole("textbox", { name: /Your question/ }).fill(QUESTION);
@@ -84,7 +87,7 @@ async function prepareAnswer(lead: Page) {
   await dialog.getByRole("checkbox", { name: /Take the proposed wording/ }).check();
   return async () => {
     await dialog.getByRole("button", { name: "Answer and take the wording" }).click();
-    await expect(lead.getByText("Answer sent. The proposed wording is in the reviewer's text.")).toBeVisible();
+    await expect(lead.getByText("Answer sent. The proposed wording was put into the reviewer's saved text.")).toBeVisible();
   };
 }
 
@@ -135,6 +138,9 @@ test("1440 px: an edit waiting at the answer and the edits after it are kept, wi
   await shot(page, "1-reviewer-after-answer-1440");
   await expect(status(page)).toHaveText("Saved");
   await expect(page.getByText(`The lead's wording is in your text now: “${WORDING}”. Your own edits are kept.`)).toBeVisible();
+  // Issue 611: the "Question sent" notice goes once the answer is there.
+  await expect(questions(page)).toContainText(`Answer from the lead: ${ANSWER}`);
+  await expect(questions(page)).not.toContainText("Question sent.");
 
   // 6: the reviewer keeps working; that is saved as well.
   await typeAt(page, "EDITA", " EDITD");
@@ -221,6 +227,49 @@ test("1440 px: the reviewer changed the passage meanwhile, so their text wins an
   await expect(editor(page)).toHaveValue(new RegExp(WORDING));
   await settled(page);
   expect(await savedText(page, task)).toContain(WORDING);
+  await close();
+  expect(errors).toEqual([]);
+});
+
+test("1440 px, issue 616: a rewrite of several words is replaced as a whole, and no side says the wording is in the text before", async ({ browser, page }, info) => {
+  const errors = consoleErrors(page);
+  const { s, lead, close } = await twoPeople(browser, page, info);
+  const task = s.tasks!.ask;
+  await ask(page, false);
+  const send = await prepareAnswer(lead);
+  const save = await holdNextSave(page);
+  // The reviewer turns the two words into three while the lead answers: the word diff matches the spaces between them.
+  await editor(page).evaluate((element, quote) => {
+    const textarea = element as HTMLTextAreaElement, start = textarea.value.indexOf(quote);
+    textarea.focus(); textarea.setSelectionRange(start, start + quote.length);
+  }, QUOTE);
+  await page.keyboard.type("low muscle tone");
+  await save.sent;
+  await send();
+  save.release();
+  await settled(page);
+  const kept = page.locator(".notice").filter({ hasText: "Your text was kept" });
+  await expect(kept).toContainText("Replaces “low muscle tone” in your text.");
+  // The card points to what happened instead of "The lead put your wording into your text".
+  await expect(questions(page)).toContainText("The lead chose your wording. It is not in your text now: you changed that passage.");
+  await expect(questions(page)).not.toContainText("The lead put your wording into your text.");
+  await expect(questions(page).getByRole("button", { name: "Show it in my text" })).toHaveCount(0);
+  await kept.scrollIntoViewIfNeeded();
+  await shot(page, "6-clash-multiword-1440");
+
+  // The lead's Answered entry says what the answer did, not that the wording is in the text now.
+  await lead.getByRole("tab", { name: /Answered/ }).click();
+  await expect(lead.getByRole("listitem").filter({ hasText: QUESTION })).toContainText("The proposed wording was put into the reviewer's saved text with this answer.");
+
+  await kept.getByRole("button", { name: "Use the lead's wording" }).click();
+  await expect(kept).toHaveCount(0);
+  const shown = await editor(page).inputValue();
+  expect(shown).toContain(WORDING);
+  expect(shown).not.toContain("low muscle");
+  expect(shown).not.toContain(`${WORDING} tone`);
+  await settled(page);
+  expect(await savedText(page, task)).toBe(shown);
+  await expect(questions(page)).toContainText("The lead put your wording into your text.");
   await close();
   expect(errors).toEqual([]);
 });

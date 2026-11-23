@@ -422,7 +422,7 @@ for (const width of [1280, 1024, 600]) test(`review source, the one editable tra
   // From 1100 px the rail's collapse button sits next to its heading (#410).
   if (width >= 1100) { await expect(page.getByRole('button', { name: 'Collapse review panel', exact: true })).toBeFocused(); await page.keyboard.press('Tab'); }
   // Issue 553: "Questions to the lead" with "Ask the lead…" comes before the decisions.
-  await expect(page.getByRole('button', { name: 'Ask the lead…', exact: true })).toBeFocused(); await page.keyboard.press('Tab');
+  await expect(page.locator('#translation-decision-body').getByRole('button', { name: 'Ask the lead…', exact: true })).toBeFocused(); await page.keyboard.press('Tab');
   // Editing the translation auto-selected Accepted with corrections; Tab enters the decisions at the selected one.
   const selectedDecision = page.getByRole('radio', { name: 'Accepted with corrections', exact: true });
   await expect(selectedDecision).toBeChecked(); await expect(selectedDecision).toBeFocused();

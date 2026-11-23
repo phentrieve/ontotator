@@ -4,7 +4,7 @@ import { ErrorNotice } from "../admin/ErrorNotice";
 import { ownPauseActive } from "../problems/ReporterReportCard";
 import { Button, InlineMessage, Textarea } from "../ui";
 import { AskLeadDialog } from "./AskLeadDialog";
-import { askedNotice, ASK_LABEL, QUESTIONS_HEADING, questionStatus, RESUME_CONFIRM, RESUME_HINT, RESUME_LABEL, RESUMED_NOTICE, SHOW_IN_TEXT, TOOK_PROPOSED } from "./labels";
+import { askedNotice, ASK_LABEL, QUESTIONS_HEADING, questionStatus, RESUME_CONFIRM, RESUME_HINT, RESUME_LABEL, RESUMED_NOTICE, SHOW_IN_TEXT, SHOW_WORDING, TOOK_PROPOSED, TOOK_PROPOSED_KEPT } from "./labels";
 import { notifyQuestionsChanged } from "./questionsEvents";
 import type { TaskQuestions } from "./useTaskQuestions";
 import "./questions.css";
@@ -45,10 +45,12 @@ function ResumeFromQuestion({ question, onResumed }: { question: ProblemReportVi
 }
 
 /** One question as the asker reads it: question, passage, wording, status and the lead's answer. */
-export function QuestionItem({ question, onShowInText, onResumed }: {
+export function QuestionItem({ question, onShowInText, onResumed, wordingInText }: {
   question: ProblemReportView;
   /** "Show it in my text" after the lead took the wording; left out on read-only work, where nothing is shown again. */
   onShowInText?: (question: ProblemReportView) => void;
+  /** Issue 616: the taken wording is in the text on screen; when not, the card says so instead of "put into your text". */
+  wordingInText?: (question: ProblemReportView) => boolean;
   /** Offers "Resume my task…" while this question pauses the task. */
   onResumed?: (question: ProblemReportView) => void;
 }): JSX.Element {
@@ -61,7 +63,9 @@ export function QuestionItem({ question, onShowInText, onResumed }: {
     {onResumed && ownPauseActive(question) && <ResumeFromQuestion question={question} onResumed={onResumed} />}
     {question.answer != null && <div className="task-question-answer">
       <p><strong>Answer from the lead:</strong> {question.answer}</p>
-      {question.took_proposed_text && <p>{TOOK_PROPOSED}{onShowInText && <> <Button size="sm" onClick={() => onShowInText(question)}>{SHOW_IN_TEXT}</Button></>}</p>}
+      {question.took_proposed_text && (wordingInText?.(question) ?? true
+        ? <p>{TOOK_PROPOSED}{onShowInText && <> <Button size="sm" onClick={() => onShowInText(question)}>{SHOW_IN_TEXT}</Button></>}</p>
+        : <p>{TOOK_PROPOSED_KEPT}{onShowInText && <> <Button size="sm" onClick={() => onShowInText(question)}>{SHOW_WORDING}</Button></>}</p>)}
     </div>}
   </li>;
 }
@@ -70,12 +74,14 @@ export function QuestionItem({ question, onShowInText, onResumed }: {
  * "Questions to the lead" in a task's side panel (issue 553, prototype): the asker's questions with their answers,
  * and "Ask the lead…". The header button of the screen opens the same dialog through `askRef`.
  */
-export function TaskQuestionList({ assignment, state, withProposal, readOnly, selectedText, onShowInText, dialogOpen, onDialogOpen, onSaveBeforePause, onAsked, onPauseChanged }: {
+export function TaskQuestionList({ assignment, state, withProposal, readOnly, selectedText, onShowInText, wordingInText, dialogOpen, onDialogOpen, onSaveBeforePause, onAsked, onPauseChanged }: {
   assignment: Pick<AssignmentView, "id" | "workflow_revision" | "active_round_id">; state: TaskQuestions; withProposal: boolean; readOnly: boolean;
   /** The passage selected in the task's text, read when the dialog opens. */
   selectedText?: () => string;
   /** Shows the wording the lead took into the text (issue 610: merged into the text on screen, never reloaded over it). */
   onShowInText?: (question: ProblemReportView) => void;
+  /** Issue 616: whether a taken wording is in the text on screen. */
+  wordingInText?: (question: ProblemReportView) => boolean;
   /** The dialog is controlled by the screen so that its header button opens it too. */
   dialogOpen: { quote: string } | null;
   onDialogOpen: (value: { quote: string } | null) => void;
@@ -86,10 +92,13 @@ export function TaskQuestionList({ assignment, state, withProposal, readOnly, se
   /** A question paused the task or a resume released it: the caller reads the task again, as after a problem report (issue 590). */
   onPauseChanged?: () => void;
 }): JSX.Element | null {
-  const [notice, setNotice] = useState<string | null>(null);
+  /** After sending or resuming; issue 611: it goes once the lead has answered that question. */
+  const [sent, setNotice] = useState<{ text: string; reportId: string } | null>(null);
   const list = state.questions ?? [];
+  const about = sent && list.find(question => question.report_id === sent.reportId);
+  const notice = sent && (!about || (about.state === "open" && about.answer == null)) ? sent.text : null;
   if (readOnly && list.length === 0) return null;
-  const resumed = (question: ProblemReportView) => { state.put(question); setNotice(RESUMED_NOTICE); onPauseChanged?.(); void state.reload(); };
+  const resumed = (question: ProblemReportView) => { state.put(question); setNotice({ text: RESUMED_NOTICE, reportId: question.report_id }); onPauseChanged?.(); void state.reload(); };
   return <section className="task-questions" aria-labelledby="task-questions-heading">
     <div className="task-questions-head">
       <h2 id="task-questions-heading" className="translation-section-title">{QUESTIONS_HEADING}</h2>
@@ -99,11 +108,11 @@ export function TaskQuestionList({ assignment, state, withProposal, readOnly, se
     {list.length === 0
       ? <p className="field-hint">Not sure about something? Ask the lead. Your task stays open while you wait.</p>
       : <ul className="task-question-list">{list.map(question => <QuestionItem key={question.report_id} question={question}
-        onShowInText={readOnly ? undefined : onShowInText} onResumed={resumed} />)}</ul>}
+        onShowInText={readOnly ? undefined : onShowInText} wordingInText={wordingInText} onResumed={resumed} />)}</ul>}
     {dialogOpen && <AskLeadDialog assignment={assignment} quote={dialogOpen.quote} withProposal={withProposal}
       onSaveBeforePause={onSaveBeforePause} onClose={() => onDialogOpen(null)}
       onAsked={(question, pause) => {
-        state.put(question); setNotice(askedNotice(pause)); onDialogOpen(null); onAsked?.(); notifyQuestionsChanged();
+        state.put(question); setNotice({ text: askedNotice(pause), reportId: question.report_id }); onDialogOpen(null); onAsked?.(); notifyQuestionsChanged();
         if (pause) onPauseChanged?.();
         void state.reload();
       }} />}

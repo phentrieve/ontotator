@@ -306,7 +306,7 @@ export function App({ user: givenUser, onLogout }: AppProps): JSX.Element {
   };
   let content: JSX.Element;
   // X-1: a page the role cannot use says so instead of showing a form the server refuses.
-  const notice = (title: string, message: string) => <section className="detail-section"><h1>{title}</h1><InlineMessage tone="info">{message}</InlineMessage></section>;
+  const notice = (title: string, message: string) => <section className="detail-section detail-section--alone"><h1>{title}</h1><InlineMessage tone="info">{message}</InlineMessage></section>;
   // With a failed project list only its error and Retry show (above the page), not a loading line that never ends.
   const accessLoading = projectError ? <></> : <InlineMessage tone="info">Loading project access…</InlineMessage>;
   const projectGate = (key: string, page: string, refused = `${page} is for project leads. Your tasks for this project are under My tasks.`): JSX.Element | null => {
