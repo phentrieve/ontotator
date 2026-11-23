@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type MouseEvent } from "react";
 import type { NotificationView } from "../api/client";
 import { routeHref, type Route } from "../app/router";
 import { Time } from "../app/Time";
+import { notifyQuestionsChanged } from "../questions/questionsEvents";
 import { Button } from "../ui/Button";
 import { IconBell } from "../ui/icons";
 import { Popover } from "../ui/Popover";
@@ -63,6 +64,8 @@ export function NotificationBell({ state, onNavigate }: NotificationBellProps): 
     event.preventDefault();
     close();
     onNavigate(notificationRoute(item));
+    // Issue 619: a new question; the Questions page (if open) and "Questions (n)" load it.
+    if (item.kind === "question_received") notifyQuestionsChanged();
   };
   // The button turns disabled: focus stays in the list instead of falling back to the page.
   const markAll = () => {

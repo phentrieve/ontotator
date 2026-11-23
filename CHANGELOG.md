@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Questions: a question asked while the lead is already on **Questions** shows up there (#619). Opening its bell entry *Question from …* kept the old list: the new question was missing, nothing was marked, and the **Open** tab said 1 while the sidebar said **Questions (2)**. The page now loads the list again when a notification opens another question, when the sidebar link **Questions** is used (also while the page is open), after a bell entry for a question, and on window focus, as the sidebar count does; the question is then listed in its tab, marked and focused, and the tab and the sidebar count the same. No API change, no migration.
 - Translation review: the browser's own find (Ctrl/Cmd+F) counts and matches what the text says (#533). In the editor, every passage was found twice, first in the hidden layout copy behind the text box, so one occurrence read *1 of 2*; the copy is now `inert` and find skips it. With **Show changes**, the deleted words were part of the text, so `Dosis 5 mg` → `Dosis 10 mg` read *Dosis 510 mg* and *Dosis 10 mg* was not found; deleted words are now drawn by CSS, so find and copy see the new text. They look the same, and screen readers still read them as deletions. The same holds wherever changes are shown (comparison, updated source, re-anchoring, Resolve, questions). The annotation editor and the source column had no hidden copy. No custom find bar, no API change, no migration.
 
 ## [0.13.0] - 2026-11-22
