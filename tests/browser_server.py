@@ -381,8 +381,8 @@ def fixture_project(spec: str) -> str:
     return f"browser-fixture-{spec}"
 
 
-def icd10cm_package() -> ValidatedPackage:
-    """A project on the ICD-10-CM excerpt: one text, no proposals (ICD10CM_PROJECT)."""
+def icd10cm_package(project_key: str = ICD10CM_PROJECT) -> ValidatedPackage:
+    """A project on the ICD-10-CM excerpt: one text, no proposals."""
     ontology = OntologyDefinition(
         ontology_id="icd10cm",
         label="ICD-10-CM",
@@ -391,7 +391,7 @@ def icd10cm_package() -> ValidatedPackage:
         format="obo-graph-json",
         resource_path="ontologies/icd10cm.json",
     )
-    base = fixture_package(project_key=ICD10CM_PROJECT)
+    base = fixture_package(project_key=project_key)
     hp_layer = base.manifest.task_profile.layers[0]
     layer = hp_layer.model_copy(
         update={"layer_id": "icd-layer", "label": "Diagnoses", "ontology_id": "icd10cm"}
@@ -487,6 +487,8 @@ def seed_packages() -> list[ValidatedPackage]:
         copy_tree_follow_package(),
         copy_passage_package(),
         icd10cm_package(),
+        # term-links.spec.ts changes its settings: a copy of its own.
+        icd10cm_package(f"{ICD10CM_PROJECT}-links"),
     ]
 
 

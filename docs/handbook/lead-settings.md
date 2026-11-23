@@ -211,6 +211,16 @@ What for: in a project with one ontology, the prefix in front of every code says
 
 This changes the display only, not the search. Saved findings, exports and the API keep the full code, and links to term pages use it. Pointing at a short code shows the full one. A project with more than one ontology always shows the prefix.
 
+## Link term codes to a website
+
+What for: the ↗ link next to a code in the ontology tree opens a page about the term. HPO and MONDO codes open their term page, every other ontology the EBI OLS search. For an ontology that OLS does not know, such as ICD-10-CM, set your own page.
+
+1. Open **Settings**, tab **Annotation**, card **Term codes**.
+2. In **Code link for** your ontology, enter the web address with a placeholder where the code goes, for example `https://www.icd10data.com/search?s={code}`. `{code}` is the code without the prefix (`E11.621`), `{id}` the full code (`ICD10CM:E11.621`).
+3. Click **Save changes**. The tree links through your address the next time it opens.
+
+The address must start with `https://` and hold `{code}` or `{id}`, not in the host name. Empty the field to go back to the default link.
+
 ## Set prefilled values for new findings
 
 What for: new findings start with these values. They stay marked as not confirmed until the annotator confirms or changes them.

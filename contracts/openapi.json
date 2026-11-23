@@ -28612,6 +28612,13 @@
             "type": "boolean",
             "title": "Hide Term Id Prefix"
           },
+          "term_link_templates": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Term Link Templates"
+          },
           "hidden_axis_values": {
             "additionalProperties": {
               "additionalProperties": {
@@ -28793,6 +28800,13 @@
           "hide_term_id_prefix": {
             "type": "boolean",
             "title": "Hide Term Id Prefix"
+          },
+          "term_link_templates": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Term Link Templates"
           },
           "hidden_axis_values": {
             "additionalProperties": {

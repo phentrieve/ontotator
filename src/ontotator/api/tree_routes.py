@@ -25,6 +25,7 @@ from ontotator.api.routes import (
 )
 from ontotator.domain.errors import DomainError
 from ontotator.domain.workspace import WorkspaceKey
+from ontotator.ontology.links import external_term_url
 from ontotator.ontology.modifiers import ModifierClassifier
 from ontotator.ontology.tree import (
     TreeLevel,
@@ -97,6 +98,30 @@ def _roles(classifier: ModifierClassifier, nodes: list[TreeNode]) -> list[TreeNo
     return nodes
 
 
+def _link_template(repo: RepoDep, project_key: str, layer_id: str) -> str | None:
+    """The project's link template for the layer's ontology, if it set one."""
+    layer = next(
+        item
+        for item in repo.get_task_profile(project_key).layers
+        if item.layer_id == layer_id
+    )
+    return repo.term_link_templates(project_key).get(layer.ontology_id)
+
+
+def _linked(
+    template: str | None, *groups: list[TreeNode] | TreeTermDetail | None
+) -> None:
+    """Point every link at the project's template; without one they stay."""
+    if template is None:
+        return
+    for group in groups:
+        if group is None:
+            continue
+        items = [group] if isinstance(group, TreeTermDetail) else group
+        for item in items:
+            item.external_url = external_term_url(item.term_id, template)
+
+
 def _shown(*groups: list[TreeNode]) -> list[str]:
     """Term ids in order of first appearance."""
     return list(dict.fromkeys(node.term_id for group in groups for node in group))
@@ -130,6 +155,13 @@ def open_tree(
     detail = tree.detail(req.term_id)
     if detail is not None:
         _roles(classifier, detail.parents)
+    _linked(
+        _link_template(repo, req.workspace_key.project_key, req.layer_id),
+        roots,
+        *(level.children for level in levels),
+        detail,
+        detail.parents if detail is not None else None,
+    )
     shown = _shown(roots, *(level.children for level in levels))
 
     browse_id = str(uuid4())
@@ -215,6 +247,13 @@ def tree_node(
     for level in levels:
         _roles(classifier, level.children)
     _roles(classifier, detail.parents)
+    _linked(
+        _link_template(repo, req.workspace_key.project_key, req.layer_id),
+        children,
+        *(level.children for level in levels),
+        detail,
+        detail.parents,
+    )
 
     # The repository checks the owner again, in the transaction that writes.
     grown = repo.append_search_event_candidates(
