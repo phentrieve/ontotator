@@ -29,7 +29,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-_CURIE_FORMAT = re.compile(r"^[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$")
+# PREFIX:LOCAL; dots may sit inside the local part (`ICD10CM:T36.0X1A`).
+_CURIE_FORMAT = re.compile(r"^[A-Za-z0-9_-]+:[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*$")
+# The last segment of an OBO-style IRI, PREFIX_LOCAL: `HP_0001250`,
+# `ICD10CM_T36.0X1A`. The underscore separates, so neither side holds one.
+_IRI_TAIL = re.compile(r"^([A-Za-z0-9]+)_([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*)$")
 # The release date sits inside the version IRI:
 # `http://purl.obolibrary.org/obo/hp/releases/2026-06-23/hp.json`
 _RELEASE = re.compile(r"/releases/([0-9]{4}-[0-9]{2}-[0-9]{2})/")
@@ -84,9 +88,9 @@ def curie(iri: str) -> str | None:
         return raw
     # Handle OBO-style IRIs where the final path component is PREFIX_LOCALID
     tail = raw.rsplit("/", 1)[-1] if "/" in raw else raw
-    parts = tail.split("_")
-    if len(parts) == 2 and parts[0].isalnum() and parts[1].isalnum():
-        return f"{parts[0]}:{parts[1]}"
+    parts = _IRI_TAIL.match(tail)
+    if parts:
+        return f"{parts.group(1)}:{parts.group(2)}"
     return None
 
 

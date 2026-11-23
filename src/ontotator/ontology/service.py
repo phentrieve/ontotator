@@ -56,6 +56,11 @@ logger = logging.getLogger(__name__)
 # Digits alone, PREFIX:digits or PREFIX_digits. Anything else is a keyword.
 _CODE_QUERY = re.compile(r"^(?:\d+|[A-Za-z][A-Za-z0-9]*[:_]\d+)$")
 _SPACED_CODE = re.compile(r"^([A-Za-z][A-Za-z0-9]*) \d+$")
+# A code with letters or dots, as ICD-10-CM has (`E11.621`, `T36.0X1A`), with
+# or without its prefix (`ICD10CM:E11.621`). Dots only inside, as in term ids.
+_LETTER_CODE = re.compile(
+    r"^(?:([A-Za-z][A-Za-z0-9_-]*):)?([A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*)$"
+)
 
 
 def looks_like_code(query: str, prefix: str | None = None) -> bool:
@@ -73,6 +78,39 @@ def looks_like_code(query: str, prefix: str | None = None) -> bool:
 
 class OntologyService:
     """Provides validated term lookups, model-free / lexical searches."""
+
+    def typed_code(self, query: str) -> str | None:
+        """The term a typed code with letters or dots names, else None.
+
+        `E11.621`, `e11.621` and `ICD10CM:E11.621` name `ICD10CM:E11.621` when
+        the ontology has that term; a code without prefix takes the ontology's
+        own. Only a code that names a term counts: anything else stays a
+        keyword, so `HP:00012A` or a word is searched as before. Digits-only
+        codes are :func:`looks_like_code`'s and never get here.
+        """
+        match = _LETTER_CODE.match((query or "").strip())
+        if match is None:
+            return None
+        typed_prefix, local = match.group(1), match.group(2)
+        if not any(char.isdigit() for char in local):
+            return None
+        dominant = self.ontology.dominant_prefix
+        prefix = typed_prefix or dominant
+        if not prefix:
+            return None
+        if dominant and prefix.casefold() == dominant.casefold():
+            prefix = dominant
+        for candidate in dict.fromkeys((local, local.upper())):
+            term = self.ontology.get(f"{prefix}:{candidate}")
+            if term is not None:
+                return term.hpo_id
+        return None
+
+    def _is_code(self, query: str) -> bool:
+        """Whether the single search answers this query with one term id."""
+        return looks_like_code(query, self.ontology.dominant_prefix) or (
+            self.typed_code(query) is not None
+        )
 
     def __init__(
         self,
@@ -398,9 +436,7 @@ class OntologyService:
         """
         if request.route in ("id", "browse"):
             return []
-        if request.route == "auto" and looks_like_code(
-            request.query, self.ontology.dominant_prefix
-        ):
+        if request.route == "auto" and self._is_code(request.query):
             return []
         if request.route == "exact":
             return ["en"]
@@ -538,13 +574,16 @@ class OntologyService:
             return [], False, None
 
         allowed = self._allowed(request)
-        if looks_like_code(query, self.ontology.dominant_prefix):
+        numeric = looks_like_code(query, self.ontology.dominant_prefix)
+        typed = None if numeric else self.typed_code(query)
+        if numeric or typed is not None:
             # A typed id is a statement, not a question: that term or nothing.
+            # A code with letters or dots is searched by the id it names.
             hits: list[dict[str, Any]] = [
                 hit
-                for hit in self.engine.search(query=query, path="id", k=request.k)[
-                    "hits"
-                ]
+                for hit in self.engine.search(
+                    query=typed or query, path="id", k=request.k
+                )["hits"]
                 if allowed is None or hit["hpo_id"] in allowed
             ]
             for hit in hits:

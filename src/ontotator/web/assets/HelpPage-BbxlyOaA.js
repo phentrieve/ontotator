@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-BBxlgjyl.js";import{n as a,t as o}from"./lib-EdOLmQqJ.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-DGsPToJS.js";import{n as a,t as o}from"./lib-B53dckZC.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -520,7 +520,7 @@ What for: record a term that the text mentions.
 1. Select the words in the text with the mouse. With the keyboard: click before the first word (or press Tab until the text has focus), hold Shift and move with the arrow keys.
 2. The panel **New finding** shows the marked text. To adjust it, drag the edge handles at its start and end, or focus a handle and press \`←\` or \`→\`.
    - On a phone, the text stays where it is and a **New finding** bar appears at the bottom of the screen. Tap **Choose term** to go on to the term search, or **Discard**. On a phone held sideways there is no bar: the panel **New finding** with the term search stands beside the text.
-3. **Search term** is already filled with the marked words, and the hits are listed under **Terms**. Change the words, or type a code such as \`HP:0001250\`, if the right term is not among them.
+3. **Search term** is already filled with the marked words, and the hits are listed under **Terms**. Change the words, or type a code such as \`HP:0001250\`, if the right term is not among them. A code with letters or dots, such as \`E11.621\` or \`ICD10CM:E11.621\`, also goes straight to its term when your project's ontology has it.
 4. Press Enter to add the top hit, or click a hit. Enter adds nothing when the top hit is a **Weak match**: click a hit, or choose it with \`↓\` and press Enter.
 5. The finding is created with the project's prefilled values. [Confirm or change them](#set-values-and-confirm-defaults).
 
