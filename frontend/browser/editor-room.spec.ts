@@ -80,6 +80,49 @@ test.describe("one bar for the app header and the case (issue 539)", () => {
     await expect(page.locator(".shell-user-menu")).toBeFocused();
   });
 
+  // #627: with the working time and the text stepper the case's controls need more room than a 1280 px window leaves
+  // next to the header's own controls. A stand-in a little wider than the working time (about 130 px) takes that room here.
+  for (const width of [1100, 1150, 1200, 1250, 1280, 1320, 1366, 1440]) {
+    test(`${width} px, wide case controls: nothing in the bar is drawn over anything else`, async ({ page }) => {
+      await open(page, `room-bar-wide-${width}`, { width, height: 800 });
+      await page.locator(".case-toolbar--merged .app-actions").evaluate((actions) => {
+        const standIn = document.createElement("span");
+        standIn.className = "test-stand-in";
+        standIn.textContent = "00:00 Pause timer";
+        standIn.style.display = "inline-block";
+        standIn.style.width = "200px";
+        standIn.style.flex = "none";
+        actions.prepend(standIn);
+      });
+      const boxes = await header(page).evaluate((bar) => {
+        const hidden = (el: Element) => {
+          for (let node: Element | null = el; node && node !== bar; node = node.parentElement) {
+            const style = getComputedStyle(node);
+            if (style.display === "none" || style.visibility === "hidden" || style.clipPath.startsWith("inset(50%")) return true;
+          }
+          return false;
+        };
+        const title = bar.querySelector(".case-toolbar--merged .case-title")!;
+        const parts = [title, ...bar.querySelectorAll(".case-toolbar--merged .case-mode, .case-toolbar--merged .app-actions > *, .shell-heading, .shell-actions")];
+        return parts.filter((el) => !hidden(el)).map((el) => {
+          const r = el.getBoundingClientRect();
+          return { name: el.className, left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width };
+        }).filter((r) => r.width > 0);
+      });
+      for (let i = 0; i < boxes.length; i++) {
+        for (let j = i + 1; j < boxes.length; j++) {
+          const a = boxes[i], b = boxes[j];
+          const overlap = a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+          expect(overlap, `${a.name} and ${b.name} overlap`).toBeFalsy();
+        }
+      }
+      // Every control stays inside the window; the case name keeps at least its opening characters.
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
+      expect((await box(caseBar(page).getByRole("heading", { level: 1 }))).width).toBeGreaterThanOrEqual(60);
+      await expect(caseBar(page).getByRole("button", { name: /^Finish & submit/ })).toBeInViewport();
+    });
+  }
+
   test("390 px: the phone keeps its own header, the case toolbar scrolls with the page as before", async ({ page }) => {
     await open(page, "room-bar-phone", { width: 390, height: 844 });
     await expect(header(page).locator(".case-toolbar")).toHaveCount(0);

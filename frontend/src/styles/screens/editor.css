@@ -3435,8 +3435,12 @@ details.case-version-controls > .btn { vertical-align: bottom; }
   }
   .shell-header:has(> .shell-case-bar > .case-toolbar) .shell-user-initials { display: inline; }
   .shell-header:has(> .shell-case-bar > .case-toolbar) .shell-user-menu { padding: 3px 8px; }
+  /* Never narrower than what the case's controls need at their smallest (the name at its opening characters, the mode
+     at a few letters): a window that cannot give that much wraps the case controls onto a second line instead of
+     drawing them over each other (#627, e.g. a 1280 px window with the working time and the text stepper). */
   .shell-header > .shell-case-bar:has(> .case-toolbar) {
     flex: 1 1 640px;
+    min-width: min-content;
     padding-left: var(--space-4);
     border-left: 1px solid var(--border);
   }
@@ -3448,11 +3452,19 @@ details.case-version-controls > .btn { vertical-align: bottom; }
     gap: var(--space-3);
   }
   /* The bar shares its line with the header's controls (the bell among them, issue 557). The mode says what the task
-     asks ("Check after text change"), so it keeps its words: the case name gives way first (its far larger shrink
-     factor), to an ellipsis (full name in its title) but not below its opening characters; only then does the mode
-     shorten. A one-case stepper ("1 of 1") has nowhere to go and leaves the bar, as on a phone. */
-  .case-toolbar--merged .case-title { font-size: var(--size-reading); line-height: var(--leading-base); flex-shrink: 1000; min-width: 7em; }
-  .case-toolbar--merged .case-mode { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+     asks ("Check after text change"), so it keeps its words: the case name gives way first, to an ellipsis (full
+     name in its title) but not below its opening characters; only then does the mode shorten. Both start from their
+     smallest width and grow up to their full text, the mode first (its far larger grow factor), so the bar's minimum
+     (#627) counts them at their smallest. A one-case stepper ("1 of 1") has nowhere to go and leaves the bar, as on a
+     phone. */
+  .case-toolbar--merged .case-title {
+    font-size: var(--size-reading); line-height: var(--leading-base);
+    flex: 1 1 7em; width: 7em; min-width: 7em; max-width: max-content;
+  }
+  .case-toolbar--merged .case-mode {
+    flex: 1000 1 4em; width: 4em; min-width: 0; max-width: max-content;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
   .case-toolbar--merged .app-title--single-case .case-navigation { display: none; }
 }
 /* A low window (below 800 px): the bar is tighter still, so the tree and the text keep every pixel the bar can spare. */
