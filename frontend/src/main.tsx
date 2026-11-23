@@ -14,7 +14,13 @@ import { applyTheme, readTheme } from "./ui/theme";
 applyTheme(readTheme());
 
 const rootEl = document.getElementById("root");
-if (rootEl) {
+// Mockups for sign-off (dev builds only; the branch is dropped from a production build).
+const mockup = import.meta.env.DEV ? new URLSearchParams(window.location.search).get("mockup") : null;
+if (rootEl && mockup) {
+  void import("./mockups/MockupRoot").then(({ MockupRoot }) => {
+    ReactDOM.createRoot(rootEl).render(<React.StrictMode><MockupRoot name={mockup} /></React.StrictMode>);
+  });
+} else if (rootEl) {
   ReactDOM.createRoot(rootEl).render(
     <React.StrictMode>
       {/* The last resort: a crash in the shell itself (inside it, App catches each screen). */}
