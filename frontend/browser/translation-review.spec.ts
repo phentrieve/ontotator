@@ -650,7 +650,7 @@ test('axe has no violations in the column head with coupling on', async ({ page 
   expect(results.violations.flatMap(v => v.nodes.map(n => `${v.id} ${n.target.join(' ')}: ${n.failureSummary ?? ''}`))).toEqual([]);
 });
 
-test('Mark checked sentences: click, Shift+click and drag per side, kept on reload, task stays open', async ({ page }) => {
+test('Mark checked sentences: click and Shift+click per side, text stays selectable, kept on reload, task stays open', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 }); const s = await scenario(page, 'target'); await openReview(page, s);
   const toggle = page.getByRole('checkbox', { name: 'Mark checked sentences', exact: true });
   await expect(toggle).not.toBeChecked();
@@ -665,17 +665,29 @@ test('Mark checked sentences: click, Shift+click and drag per side, kept on relo
   await expect(sentence(source, 0)).toHaveAttribute('aria-pressed', 'false');
   await sentence(translation, 2).click({ modifiers: ['Shift'] });
   for (const index of [0, 1, 2]) await expect(sentence(translation, index)).toHaveAttribute('aria-pressed', 'true');
-  // A drag from an unchecked sentence marks all sentences passed.
+  // The text stays selectable (#533): a drag over sentences selects their text and marks nothing.
   // The middle of a sentence's first line box: a wrapped sentence's bounding box may centre on a gap.
   const point = (index: number) => sentence(source, index).evaluate(el => { const r = el.getClientRects()[0]; return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
   const [first, third] = [await point(0), await point(2)];
   await page.mouse.move(first.x, first.y); await page.mouse.down();
   await page.mouse.move(third.x, third.y, { steps: 8 });
-  await expect(sentence(source, 1)).toHaveClass(/is-range-mark/);
-  const done = saved();
   await page.mouse.up();
+  const selected = await page.evaluate(() => getSelection()!.toString());
+  expect(selected.length).toBeGreaterThan(10);
+  expect(s.texts.source).toContain(selected);
+  for (const index of [0, 1, 2]) await expect(sentence(source, index)).toHaveAttribute('aria-pressed', 'false');
+  // A double-click selects a word and leaves the mark as it was.
+  const word = await sentence(translation, 1).evaluate(el => { const r = el.getClientRects()[0]; return { x: r.x + 8, y: r.y + r.height / 2 }; });
+  await page.mouse.dblclick(word.x, word.y);
+  expect((await page.evaluate(() => getSelection()!.toString())).trim()).toMatch(/^\S+$/);
+  for (const index of [0, 1, 2]) await expect(sentence(translation, index)).toHaveAttribute('aria-pressed', 'true');
+  await sentence(source, 0).click();
+  const done = saved();
+  await sentence(source, 2).click({ modifiers: ['Shift'] });
   for (const index of [0, 1, 2]) await expect(sentence(source, index)).toHaveAttribute('aria-pressed', 'true');
   expect((await done).ok()).toBe(true);
+  // Show changes works while marking.
+  await expect(page.getByRole('checkbox', { name: 'Show changes', exact: true })).toBeEnabled();
   await expect(page.locator('.sentence-count')).toHaveText([/3 of \d+ checked/, /3 of \d+ checked/]);
   await page.getByRole('button', { name: 'Next unchecked', exact: true }).click();
   await expect(sentence(translation, 3)).toBeFocused();

@@ -193,3 +193,8 @@ export function withRange(states: readonly MarkState[], from: number, to: number
   const low = Math.min(from, to), high = Math.max(from, to);
   return states.map((state, i) => i < low || i > high ? state : checked ? { kind: "checked" } : null);
 }
+
+/** Puts one sentence back into an earlier state, for example after the double-click that selected a word in it. */
+export function restored(states: readonly MarkState[], index: number, state: MarkState): MarkState[] {
+  return states.map((current, i) => i === index ? state : current);
+}

@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "../src/api/client";
 import type { RouteLeaveGuard } from "../src/app/router";
 import { TranslationReviewScreen } from "../src/translation/TranslationReviewScreen";
+import { SentenceView } from "../src/translation/SentenceMarks";
+import { diffText } from "../src/translation/textDiff";
 import { rebaseMarks, resolveMarks, sentenceHash, splitSentences, storedMarks, toggled, type StoredMark } from "../src/translation/sentences";
 import { reviewWorkspace } from "./translationFixtures";
 
@@ -43,14 +45,10 @@ const region = (name: string) => screen.getByRole("region", { name });
 const sentences = (name: string) => [...region(name).querySelectorAll<HTMLElement>("[data-sentence]")];
 const pressed = (name: string) => sentences(name).map(element => element.getAttribute("aria-pressed") === "true");
 const counter = () => [...document.querySelectorAll(".sentence-count")].map(element => element.textContent).join(" / ");
-function click(element: HTMLElement, init: PointerEventInit = {}) {
-  fireEvent.pointerDown(element, { button: 0, pointerId: 1, ...init });
-  fireEvent.pointerUp(element, { button: 0, pointerId: 1, ...init });
-}
-function drag(from: HTMLElement, over: HTMLElement[]) {
-  fireEvent.pointerDown(from, { button: 0, pointerId: 2 });
-  for (const element of over) fireEvent.pointerMove(element, { pointerId: 2 });
-  fireEvent.pointerUp(over.at(-1) ?? from, { pointerId: 2 });
+function click(element: HTMLElement, init: PointerEventInit = {}, detail = 1) {
+  fireEvent.pointerDown(element, { button: 0, pointerId: 1, detail, ...init });
+  fireEvent.pointerUp(element, { button: 0, pointerId: 1, detail, ...init });
+  fireEvent.click(element, { button: 0, detail, ...init });
 }
 
 describe("sentence splitting", () => {
@@ -157,6 +155,31 @@ describe("marks follow an edit of the text", () => {
   });
 });
 
+describe("SentenceView with changes", () => {
+  it("puts every change into the sentence or gap it stands in, each once, and keeps the characters of the text", () => {
+    const before = "Alt Dosis 5 mg. Puls 80.\nEnde weg.";
+    const after = "Dosis 10 mg täglich.  Neu da. Puls 80.\nEnde.";
+    const parts = diffText(before, after);
+    const list = splitSentences(after, "de");
+    render(<SentenceView text={after} sentences={list} states={list.map(() => null)} label="View" changes={parts} onToggle={vi.fn()} onRange={vi.fn()} onRestore={vi.fn()} />);
+    const view = screen.getByRole("region", { name: "View" });
+    // Deleted words are generated content: the text content is exactly the proposed text.
+    expect(view.textContent).toBe(after);
+    const rendered = [...view.querySelectorAll<HTMLElement>("ins, del")].map(node => `${node.tagName.toLowerCase()}:${node.textContent || node.querySelector<HTMLElement>("[data-text]")?.dataset.text}`);
+    const expected = parts.filter(part => part.op !== "equal").map(part => `${part.op === "insert" ? "ins" : "del"}:${part.text}`);
+    // An insertion that runs from the white space into a sentence is split there; joined, the changes are the same.
+    const joined = (pieces: string[]) => pieces.reduce<string[]>((all, piece) => {
+      const op = piece.slice(0, 4), last = all.at(-1);
+      if (last?.startsWith(op)) all[all.length - 1] = last + piece.slice(4); else all.push(piece);
+      return all;
+    }, []);
+    expect(joined(rendered)).toEqual(joined(expected));
+    expect(rendered).toContain("ins:  ");
+    expect(view.querySelector('[data-sentence="0"] del')).not.toBeNull();
+    for (const [index, sentence] of list.entries()) expect(view.querySelector(`[data-sentence="${index}"]`)?.textContent).toBe(sentence.text);
+  });
+});
+
 describe("Mark checked sentences", () => {
   it("is off by default: texts behave as today and the choice is remembered", async () => {
     const { saveMarks } = setup({}, false);
@@ -170,7 +193,8 @@ describe("Mark checked sentences", () => {
     expect(screen.queryByRole("textbox", { name: "Translation (de)" })).toBeNull();
     expect(sentences("Source (en)")).toHaveLength(3);
     expect(sentences("Translation (de)")).toHaveLength(4);
-    expect((screen.getByRole("checkbox", { name: "Show changes" }) as HTMLInputElement).disabled).toBe(true);
+    // Show changes works together with marking (issue 533).
+    expect((screen.getByRole("checkbox", { name: "Show changes" }) as HTMLInputElement).disabled).toBe(false);
     fireEvent.click(toggle);
     expect(window.localStorage.getItem(KEY)).toBe("0");
     expect(screen.getByRole("textbox", { name: "Translation (de)" })).toBeDefined();
@@ -213,23 +237,60 @@ describe("Mark checked sentences", () => {
     expect(pressed("Source (en)")).toEqual([true, false, true]);
   });
 
-  it("drag from an unchecked sentence marks the range and from a checked one unmarks it", async () => {
+  it("keeps the text selectable: a drag that selects text and a double-click on a word leave the marks as they were", async () => {
     setup();
     await screen.findByRole("button", { name: "Next unchecked" });
     const items = () => sentences("Translation (de)");
-    fireEvent.pointerDown(items()[0], { button: 0, pointerId: 3 });
-    fireEvent.pointerMove(items()[2], { pointerId: 3 });
-    // The live range shows what the release will do.
-    expect(items().slice(0, 3).every(element => element.className.includes("is-range-mark"))).toBe(true);
-    expect(items()[3].className).not.toContain("is-range");
-    fireEvent.pointerUp(items()[2], { pointerId: 3 });
+    expect(getComputedStyle(region("Translation (de)")).userSelect).not.toBe("none");
+    // A drag over two sentences selects their text; its click marks nothing.
+    const selection = window.getSelection()!;
+    fireEvent.pointerDown(items()[0], { button: 0, pointerId: 2, detail: 1 });
+    selection.setBaseAndExtent(items()[0].firstChild!, 2, items()[1].firstChild!, 4);
+    fireEvent.pointerUp(items()[1], { button: 0, pointerId: 2, detail: 1 });
+    fireEvent.click(region("Translation (de)"), { button: 0, detail: 1 });
+    fireEvent.click(items()[1], { button: 0, detail: 1 });
+    expect(pressed("Translation (de)")).toEqual([false, false, false, false]);
+    expect(selection.toString()).toBe("ster Satz. Zwei");
+    selection.removeAllRanges();
+    // A double-click selects a word: the first click toggles, the second puts the mark back as it was.
+    click(items()[2]);
+    expect(pressed("Translation (de)")).toEqual([false, false, true, false]);
+    click(items()[3]);
+    click(items()[3], {}, 2);
+    expect(pressed("Translation (de)")).toEqual([false, false, true, false]);
+    click(items()[2]);
+    click(items()[2], {}, 2);
+    expect(pressed("Translation (de)")).toEqual([false, false, true, false]);
+    // Shift+click still marks a range from the last clicked sentence.
+    click(items()[0], { shiftKey: true });
     expect(pressed("Translation (de)")).toEqual([true, true, true, false]);
-    drag(items()[3], [items()[2], items()[1]]);
-    // Started on an unchecked sentence: everything passed is checked.
-    expect(pressed("Translation (de)")).toEqual([true, true, true, true]);
-    drag(items()[2], [items()[1]]);
-    expect(pressed("Translation (de)")).toEqual([true, false, false, true]);
-    expect(pressed("Source (en)")).toEqual([false, false, false]);
+  });
+
+  it("Show changes while marking shows the changed words inside the sentences; find and copy see the text only", async () => {
+    const translation = splitSentences(TRANSLATION, "de");
+    const edited = "Erster Satz. Zweiter Satz geändert. Dritter Satz. Vierter Satz.";
+    setup({
+      draft: { text: edited, form: {}, revision: 6 },
+      checked_sentences: { source: [], translation: [0, 1].map(index => ({ index, hash: translation[index].hash })) },
+    });
+    await screen.findByRole("button", { name: "Next unchecked" });
+    expect(region("Translation (de)").querySelector("ins")).toBeNull();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Show changes" }));
+    const view = region("Translation (de)");
+    expect(view.classList).toContain("translation-sentences");
+    const items = sentences("Translation (de)");
+    expect(items[1].className).toContain("is-stale");
+    expect(items[1].querySelector("ins")?.textContent).toContain("geändert");
+    expect(items[0].querySelector("ins, del")).toBeNull();
+    // The rendered characters are the proposed text; marking still works.
+    expect(items.map(item => item.textContent?.replace(" (changed since checked)", ""))).toEqual(splitSentences(edited, "de").map(sentence => sentence.text));
+    click(items[1]);
+    expect(pressed("Translation (de)")).toEqual([true, true, false, false]);
+    expect(screen.getByText("Click a sentence to mark it as checked. Turn off Mark checked sentences and Show changes to edit.")).toBeDefined();
+    // Off again: the diff view without marks.
+    fireEvent.click(screen.getByRole("checkbox", { name: "Mark checked sentences" }));
+    expect(region("Text changes").querySelector("ins")?.textContent).toContain("geändert");
+    expect(region("Text changes").querySelector("[data-sentence]")).toBeNull();
   });
 
   it("shows stored marks, an edited checked sentence as changed since checked, and Next unchecked", async () => {

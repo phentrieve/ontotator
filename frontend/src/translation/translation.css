@@ -279,16 +279,15 @@
 .sentence-count strong { color: var(--text); font-weight: var(--weight-strong); }
 .sentence-next { margin-left: auto; }
 .sentence-save-error { display: flex; align-items: center; gap: var(--space-2); flex-basis: 100%; margin: 0; color: var(--text); }
-.translation-sentences { user-select: none; -webkit-user-select: none; }
-/* Touch drags mark sentences instead of scrolling the text; the gaps and the scroll bar still scroll. */
-.review-sentence { border-radius: 2px; cursor: pointer; touch-action: none; text-decoration: underline 2px transparent; text-underline-offset: 4px; }
+/* The text stays selectable while marking (issue 533): a drag selects, a click marks. */
+.review-sentence { border-radius: 2px; cursor: pointer; text-decoration: underline 2px transparent; text-underline-offset: 4px; }
 .review-sentence:hover { background: var(--surface-sunken); }
 .review-sentence:focus-visible { outline: var(--focus-width) solid var(--focus-ring); outline-offset: 1px; }
 .review-sentence.is-checked { background: var(--success-light); text-decoration-color: var(--success); }
 .review-sentence.is-stale { background: var(--warning-light); text-decoration-color: var(--warning); text-decoration-style: dashed; }
-/* The live drag range: what the sentences become when the pointer is released. */
-.review-sentence.is-range-mark { background: var(--success-light); text-decoration-color: var(--success); text-decoration-style: dotted; }
-.review-sentence.is-range-unmark { background: transparent; text-decoration-color: var(--border-strong); text-decoration-style: dotted; }
+/* Show changes while marking: the changed words inside the sentence tints, drawn as in the diff view. */
+.translation-sentences ins { color: var(--success); background: var(--success-light); text-decoration: underline; text-underline-offset: 3px; }
+.translation-sentences del { color: var(--danger); background: var(--danger-light); text-decoration: line-through; }
 .review-sentence[aria-disabled="true"] { cursor: default; }
 
 /* Show invisible characters (issue 454). Each mark is generated content drawn over its character: it is never
