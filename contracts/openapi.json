@@ -29719,6 +29719,26 @@
             "type": "array",
             "title": "Diff"
           },
+          "suggestions": {
+            "items": {
+              "items": {
+                "$ref": "#/components/schemas/TextWindowView"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Suggestions"
+          },
+          "changed_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TextWindowView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "old_segments": {
             "items": {
               "$ref": "#/components/schemas/TextWindowView"

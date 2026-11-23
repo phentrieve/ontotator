@@ -4,6 +4,7 @@ No result here is a target annotation/evidence snapshot. The durable job must
 assign target identities and recompute every content-addressed version.
 """
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from difflib import SequenceMatcher
@@ -279,6 +280,25 @@ def _needs_review(
     new_left, new_right = _whole_word_window(new, new_left, new_right)
     old_window = TextWindow(left, right, old[left:right])
     new_window = TextWindow(new_left, new_right, new[new_left:new_right])
+    return NeedsReview(
+        AnnotationRef(
+            annotation_id=source.annotation.annotation_id, version=source.version
+        ),
+        source.annotation.term_id,
+        source.annotation.layer_id,
+        reason,
+        mentions,
+        old_window,
+        new_window,
+        window_diff(old_window, new_window),
+        old_modifiers,
+    )
+
+
+def window_diff(
+    old_window: TextWindow, new_window: TextWindow
+) -> tuple[WindowOpcode, ...]:
+    """Character opcodes between two absolute windows, in absolute positions."""
     matcher = SequenceMatcher(None, old_window.text, new_window.text, autojunk=False)
     diff = []
     for op, a, a_end, b, b_end in matcher.get_opcodes():
@@ -294,26 +314,179 @@ def _needs_review(
         diff.append(
             WindowOpcode(
                 kind,
-                left + a,
-                left + a_end,
-                new_left + b,
-                new_left + b_end,
+                old_window.start + a,
+                old_window.start + a_end,
+                new_window.start + b,
+                new_window.start + b_end,
                 old_window.text[a:a_end],
                 new_window.text[b:b_end],
             )
         )
-    return NeedsReview(
-        AnnotationRef(
-            annotation_id=source.annotation.annotation_id, version=source.version
-        ),
-        source.annotation.term_id,
-        source.annotation.layer_id,
-        reason,
-        mentions,
-        old_window,
-        new_window,
-        tuple(diff),
-        old_modifiers,
+    return tuple(diff)
+
+
+# How far around the mapped window the old words are looked for (codepoints).
+_NEAR = 200
+_MAX_SUGGESTIONS = 5
+_CONTEXT = 40
+
+
+@dataclass(frozen=True)
+class Relocation:
+    """Where a needs-review item's words are, or were, in the new text (#633).
+
+    ``suggestions`` are the places where the old words of the item's single
+    mention occur unchanged near the mapped window, nearest first; each is the
+    mention's segments moved there. ``changed_at`` is, without a suggestion,
+    the new wording that replaced the old words, when unchanged words frame it
+    on both sides. ``new_context`` and ``diff`` are anchored at the first
+    suggestion, else at ``changed_at``; without either there is no reliable
+    location and both are empty.
+    """
+
+    suggestions: tuple[tuple[TextSpan, ...], ...]
+    changed_at: TextSpan | None
+    new_context: TextWindow | None
+    diff: tuple[WindowOpcode, ...]
+
+
+def _bounded(text: str, start: int, end: int) -> bool:
+    """A match does not cut a word: no letter or digit runs on at either edge."""
+    return (
+        start == 0 or not (text[start - 1].isalnum() and text[start].isalnum())
+    ) and (end == len(text) or not (text[end - 1].isalnum() and text[end].isalnum()))
+
+
+def _phrase(
+    segments: Sequence[TextSpan], old_context: TextWindow
+) -> tuple[int, str] | None:
+    """The old stretch from the first to the last segment, read from the window."""
+    if not segments:
+        return None
+    start = min(s.start for s in segments)
+    end = max(s.end for s in segments)
+    if start < old_context.start or end > old_context.end:
+        return None
+    for s in segments:
+        a = s.start - old_context.start
+        if s.end <= s.start or old_context.text[a : a + s.end - s.start] != s.text:
+            return None
+    text = old_context.text[start - old_context.start : end - old_context.start]
+    return (start, text) if text.strip() else None
+
+
+def _tokens(text: str, offset: int) -> list[tuple[int, int, str]]:
+    return [
+        (offset + t.start(), offset + t.end(), t.group()) for t in _TOKEN.finditer(text)
+    ]
+
+
+_TOKEN = re.compile(r"\w+|[^\w\s]")
+
+
+def _changed_at(
+    start: int, end: int, old_context: TextWindow, new_context: TextWindow, new: str
+) -> TextSpan | None:
+    """The new words in place of the old ones, framed by equal words on both sides."""
+    old_tokens = _tokens(old_context.text, old_context.start)
+    new_tokens = _tokens(new_context.text, new_context.start)
+    matcher = SequenceMatcher(
+        None, [t[2] for t in old_tokens], [t[2] for t in new_tokens], autojunk=False
+    )
+    ops = matcher.get_opcodes()
+    hit = [
+        index
+        for index, (_, i, i_end, _, _) in enumerate(ops)
+        if any(a < end and start < b for a, b, _ in old_tokens[i:i_end])
+    ]
+    if not hit or all(ops[index][0] == "equal" for index in hit):
+        return None
+    first, last = hit[0], hit[-1]
+    # Framed on both sides by equal words: an old word that stayed, or the
+    # words just before and after the changed ones.
+    framed_left = ops[first][0] == "equal" or (
+        first > 0 and ops[first - 1][0] == "equal"
+    )
+    framed_right = ops[last][0] == "equal" or (
+        last < len(ops) - 1 and ops[last + 1][0] == "equal"
+    )
+    if not (framed_left and framed_right):
+        return None
+    covered = [
+        index for index, (a, b, _) in enumerate(old_tokens) if a < end and start < b
+    ]
+    # An equal op at an edge counts only with the old words in it.
+    _, i, _, j, _ = ops[first]
+    if ops[first][0] == "equal":
+        j += covered[0] - i
+    _, _, i_end, _, j_end = ops[last]
+    if ops[last][0] == "equal":
+        j_end -= i_end - 1 - covered[-1]
+    if j_end <= j:
+        return None
+    a, b = new_tokens[j][0], new_tokens[j_end - 1][1]
+    return TextSpan(a, b, new[a:b])
+
+
+def relocate(
+    segments: Sequence[TextSpan],
+    old_context: TextWindow,
+    new_context: TextWindow,
+    new: str,
+) -> Relocation:
+    """Suggest where a needs-review mention can be re-created in ``new``.
+
+    The character map keeps the order of the text, so words that moved inside a
+    reordered sentence count as deleted and inserted and do not map. Here the
+    old words (from the first to the last segment of the mention) are looked
+    for as they are, as whole words, within ``_NEAR`` codepoints of the mapped
+    window. A phrase that is gone yields no suggestion.
+    """
+    found = _phrase(segments, old_context)
+    suggestions: list[tuple[TextSpan, ...]] = []
+    if found is not None:
+        start, phrase = found
+        lo = max(0, new_context.start - _NEAR)
+        hi = min(len(new), new_context.end + _NEAR)
+        middle = (new_context.start + new_context.end) / 2
+        places = []
+        at = new.find(phrase, lo, hi)
+        while at != -1:
+            if _bounded(new, at, at + len(phrase)):
+                places.append(at)
+            at = new.find(phrase, at + 1, hi)
+        places.sort(key=lambda p: (abs(p + len(phrase) / 2 - middle), p))
+        for place in places[:_MAX_SUGGESTIONS]:
+            shift = place - start
+            suggestions.append(
+                tuple(
+                    TextSpan(s.start + shift, s.end + shift, s.text) for s in segments
+                )
+            )
+    changed = None
+    if not suggestions and segments:
+        changed = _changed_at(
+            min(s.start for s in segments),
+            max(s.end for s in segments),
+            old_context,
+            new_context,
+            new,
+        )
+    anchor = (
+        (suggestions[0][0].start, suggestions[0][-1].end)
+        if suggestions
+        else (changed.start, changed.end)
+        if changed
+        else None
+    )
+    if anchor is None:
+        return Relocation((), None, None, ())
+    left, right = _whole_word_window(
+        new, max(0, anchor[0] - _CONTEXT), min(len(new), anchor[1] + _CONTEXT)
+    )
+    window = TextWindow(left, right, new[left:right])
+    return Relocation(
+        tuple(suggestions), changed, window, window_diff(old_context, window)
     )
 
 

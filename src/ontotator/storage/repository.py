@@ -52,7 +52,11 @@ from ontotator.domain.errors import (
 from ontotator.domain.guidelines import guideline_ref
 from ontotator.domain.profiles import OntologyDefinition, TaskProfile, profile_hash
 from ontotator.domain.project_rules import ProjectRules
-from ontotator.domain.reanchor_resolution import PendingReanchorRef, ReanchorItem
+from ontotator.domain.reanchor_resolution import (
+    PendingReanchorRef,
+    ReanchorItem,
+    with_relocation,
+)
 from ontotator.domain.results import latest_submissions
 from ontotator.domain.review import ReviewDecision, ReviewTargetSet
 from ontotator.domain.scopes import TaskScope, build_scope, is_review_like
@@ -2788,6 +2792,7 @@ class Repository:
         }
         if not refs or not is_review_like(draft.key.mode):
             return []
+        document = self.get_document(draft.key.project_key, draft.key.document_id)
         items = []
         for raw in self.get_reanchor_items(
             draft.key.project_key, draft.key.document_id
@@ -2805,19 +2810,22 @@ class Repository:
                     proposal_set_id=raw["proposal_set_id"], source_ref=raw["source_ref"]
                 ),
             )
+            item = ReanchorItem.model_validate(
+                {
+                    **raw,
+                    "type_id": source.annotation.type_id if content_valid else None,
+                    "axes_values": source.annotation.axes_values
+                    if content_valid
+                    else None,
+                    "axes_defaulted": source.annotation.axes_defaulted
+                    if content_valid
+                    else None,
+                }
+            )
             items.append(
-                ReanchorItem.model_validate(
-                    {
-                        **raw,
-                        "type_id": source.annotation.type_id if content_valid else None,
-                        "axes_values": source.annotation.axes_values
-                        if content_valid
-                        else None,
-                        "axes_defaulted": source.annotation.axes_defaulted
-                        if content_valid
-                        else None,
-                    }
-                )
+                with_relocation(item, document.text)
+                if content_valid and document is not None
+                else item
             )
         return items
 

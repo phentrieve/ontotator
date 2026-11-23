@@ -1218,7 +1218,9 @@ def register_reanchor_scenario_route(app: FastAPI) -> None:
     """Fresh real import/reanchor results; never registered in the shipped app."""
 
     @app.post("/__test_reanchor__")
-    def reanchor_scenario(assisted: bool = False) -> dict[str, object]:
+    def reanchor_scenario(
+        assisted: bool = False, reordered: bool = False
+    ) -> dict[str, object]:
         from t1_builders import bundle as variant_bundle
         from t1_builders import correction_unit, native_unit
         from t1_fixtures import PIN, annotation, hpo_profile
@@ -1289,6 +1291,52 @@ def register_reanchor_scenario_route(app: FastAPI) -> None:
         corrected = correction_unit(
             source, old_text.replace("Seizure 😀old", "Ataxia 😀new")
         )
+        if reordered:
+            # The example of #633: one finding reworded, one sentence reordered,
+            # two proposals on the same unchanged word. The fixture ontology has
+            # few terms, so the terms stand in for Ptosis, Ataxia and Gait
+            # disturbance; only the words matter here.
+            old_text = (
+                "History: two febrile seizures in infancy. Examination showed"
+                " hypotonia and mild ptosis.\n\nPhysiotherapy was started after"
+                " ataxia was noted. Ataxia improved within weeks.\nFamily history"
+                " is unremarkable."
+            )
+            new_text = old_text.replace(
+                "mild ptosis", "a slightly drooping eyelid"
+            ).replace(
+                "Physiotherapy was started after ataxia was noted.",
+                "After ataxia was noted, physiotherapy was started.",
+            )
+
+            def on(word: str) -> tuple[int, int]:
+                at = old_text.index(word)
+                return at, at + len(word)
+
+            source = native_unit(
+                external,
+                "en",
+                old_text,
+                case_id="Pending case /1 %é",
+                annotations=[
+                    annotation(
+                        "hypotonia",
+                        on("hypotonia"),
+                        text=old_text,
+                        term_id="HP:0001252",
+                    ),
+                    annotation(
+                        "ptosis", on("ptosis"), text=old_text, term_id="HP:0000365"
+                    ),
+                    annotation(
+                        "ataxia", on("ataxia"), text=old_text, term_id="HP:0001284"
+                    ),
+                    annotation(
+                        "gait", on("ataxia"), text=old_text, term_id="HP:0001250"
+                    ),
+                ],
+            )
+            corrected = correction_unit(source, new_text)
         with tempfile.TemporaryDirectory() as folder:
             imported = run_fixture_import(
                 app, variant_bundle(Path(folder), [source, corrected]), key

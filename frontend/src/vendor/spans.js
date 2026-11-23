@@ -609,6 +609,8 @@ export class SpanEditor {
         for (const m of runMentions) {
           if (m.kind) node.classList.add(`run--${m.kind}`);
         }
+        // Only marks of items that need review after a text change: a dashed frame, no fill (#633).
+        if (runMentions.every((m) => m.kind === "pending")) node.classList.add("run--ghost");
         const titles = runMentions.map((m) => m.label).filter(Boolean);
         if (titles.length) node.title = titles.join("; ");
         if (runMentions.some((m) => m.negated)) node.classList.add("run--negated");
