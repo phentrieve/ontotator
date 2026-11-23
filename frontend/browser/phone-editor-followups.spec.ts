@@ -387,3 +387,37 @@ test("issue 472: the selection bar and a toast leave most of Documents in view (
   expect(await noSidewaysScroll(page)).toBe(true);
   expect(errors).toEqual([]);
 });
+
+// ---- Issue 612 ------------------------------------------------------------------------------------------------
+
+test.describe("issue 612 on a touch screen", () => {
+  test.use({ hasTouch: true, viewport: PHONE });
+
+  test("the term search says tap, not keys; a swipe that starts on a hit does not make it active (390 px)", async ({ page }) => {
+    const errors = consoleErrors(page);
+    const s = await openLoop(page, PHONE);
+    const text = s.texts["loop-en"]; // "The patient has a seizure and hypotonia."
+    const start = text.indexOf("seizure");
+    await selectText(page, start, start + "seizure".length);
+    await page.getByRole("group", { name: "New finding", exact: true }).getByRole("button", { name: "Choose term", exact: true }).tap();
+    await search(page).fill("seiz");
+    const hint = page.locator(".search-hint");
+    await expect(hint).toHaveText(/^\d+ terms, tap a term to add it$/);
+    await expect(hint.locator("kbd")).toHaveCount(0);
+    const options = page.getByRole("listbox", { name: "Terms" }).getByRole("option");
+    expect(await options.count()).toBeGreaterThan(1);
+    await expect(options.first()).toHaveAttribute("aria-selected", "true");
+    // A finger landing on a later hit (the start of a swipe; React reads enter from pointerover) leaves the active hit where it was; the Enter key is not shown.
+    const last = options.nth(1);
+    await last.dispatchEvent("pointerenter", { pointerType: "touch", isPrimary: true });
+    await last.dispatchEvent("pointerover", { pointerType: "touch", isPrimary: true });
+    await expect(options.first()).toHaveAttribute("aria-selected", "true");
+    await expect(last).toHaveAttribute("aria-selected", "false");
+    await expect(page.locator(".candidate-enter:visible")).toHaveCount(0);
+    // A mouse still points a hit active, as before.
+    await last.dispatchEvent("pointerenter", { pointerType: "mouse", isPrimary: true });
+    await last.dispatchEvent("pointerover", { pointerType: "mouse", isPrimary: true });
+    await expect(last).toHaveAttribute("aria-selected", "true");
+    expect(errors).toEqual([]);
+  });
+});

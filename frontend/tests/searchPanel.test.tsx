@@ -61,6 +61,23 @@ describe("SearchPanel", () => {
     expect(options()[1].getAttribute("aria-disabled")).toBe("false");
   });
 
+  it("on a touch screen the hint says tap, without keys (#612)", async () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes("pointer: coarse"), media: query, addEventListener: vi.fn(), removeEventListener: vi.fn(),
+    })) as unknown as typeof window.matchMedia;
+    vi.useFakeTimers();
+    try {
+      renderPanel(vi.fn().mockResolvedValue(threeHits), { initialQuery: "seizure", autoFocus: true, debounceMs: 250 });
+      await act(async () => { await Promise.resolve(); });
+      expect(document.querySelector(".search-hint")!.textContent).toBe("3 terms, tap a term to add it");
+      expect(document.querySelector(".search-hint kbd")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+      window.matchMedia = original;
+    }
+  });
+
   it("runs a prefilled query at once, shows it selected and makes the first usable hit active", async () => {
     vi.useFakeTimers();
     try {

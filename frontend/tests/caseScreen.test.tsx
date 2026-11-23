@@ -2817,7 +2817,7 @@ describe("CaseScreen: finding modifiers (attach mode, Modifiers section, marks)"
     fireEvent.click(await screen.findByRole("button", { name: "Actions, Recurrent" }));
     fireEvent.click(await screen.findByRole("menuitem", { name: "Link a text span…" }));
     const banner = container.querySelector<HTMLElement>(".attach-mention-banner")!;
-    expect(banner.textContent).toContain("Select the text for Recurrent, then press Enter. Esc cancels.");
+    expect(banner.textContent).toContain("Select the text for Recurrent. Esc cancels.");
     fireEvent.keyDown(document.body, { key: "Escape" });
     await waitFor(() => expect(container.querySelector(".attach-mention-banner")).toBeNull());
     expect(document.activeElement?.closest('[data-modifier-chip="HP:0031796"]')).not.toBeNull();
@@ -2838,7 +2838,7 @@ describe("CaseScreen: finding modifiers (attach mode, Modifiers section, marks)"
     await waitFor(() => expect(handles()).toEqual(["ev-seizure:start", "ev-seizure:end"]));
     fireEvent.click(await screen.findByRole("button", { name: "Actions, Severe" }));
     fireEvent.click(await screen.findByRole("menuitem", { name: "Change text span…" }));
-    expect(container.querySelector(".attach-mention-banner")!.textContent).toContain("Select the text for Severe, then press Enter. Esc cancels.");
+    expect(container.querySelector(".attach-mention-banner")!.textContent).toContain("Select the text for Severe. Esc cancels.");
     await waitFor(() => expect(handles()).toEqual([]));
     // Esc ends the mode: the finding's handles come back.
     fireEvent.keyDown(document.body, { key: "Escape" });
@@ -3812,7 +3812,7 @@ describe("CaseScreen: finding modifiers (attach mode, Modifiers section, marks)"
         const { apply, decide } = draftSpy(view);
         await openProposal(container);
         fireEvent.click(within(proposalPanel()).getByRole("button", { name: "Link a text span" }));
-        expect(container.querySelector(".attach-mention-banner")!.textContent).toContain("Select the text for Recurrent, then press Enter. Esc cancels.");
+        expect(container.querySelector(".attach-mention-banner")!.textContent).toContain("Select the text for Recurrent. Esc cancels.");
         // Nothing is written before the text is chosen.
         expect(payloads(apply)).toEqual([]);
         mark(container, "wiederholt");
