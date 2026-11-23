@@ -15,6 +15,7 @@ import { createDraftSaver, type DraftSaver } from "./draftSaver";
 import { mapOffset, mergeServerText, takeWording, type TakenWording } from "./wordingMerge";
 import { WordingNotices, type MergeTrouble, type WordingNotice } from "./WordingNotices";
 import { DiffView, TextView } from "./DiffView";
+import { diffText } from "./textDiff";
 import { TranslationEditor } from "./TranslationEditor";
 import { SourceObligationReview } from './SourceObligationReview';
 import { notifyFinalSelectionChanged } from '../variants/finalSelectionState';
@@ -32,7 +33,7 @@ import { checkReview, type ClinicalCategory, type ReviewDecisionCode, type Revie
 import { LanguageTag } from "../ui/LanguageTag";
 import { SentenceCount, SentenceView } from "./SentenceMarks";
 import { InvisiblesKey } from "./invisibles";
-import { isChecked, rebaseMarks, resolveMarks, splitSentences, storedMarks, toggled, withRange, type MarkState, type Sentence, type Side, type StoredMarks } from "./sentences";
+import { isChecked, rebaseMarks, resolveMarks, restored, splitSentences, storedMarks, toggled, withRange, type MarkState, type Sentence, type Side, type StoredMarks } from "./sentences";
 import { formatTime } from "../app/submissionLabels";
 
 export interface TranslationReviewScreenProps {
@@ -341,6 +342,8 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   const targetSentences = useMemo(() => marking ? splitSentences(text, workspace.variant.language) : [], [marking, text, workspace]);
   const sourceStates = useMemo(() => resolveMarks(sourceSentences, marks.source), [sourceSentences, marks.source]);
   const targetStates = useMemo(() => resolveMarks(targetSentences, marks.translation), [targetSentences, marks.translation]);
+  /** Show changes while marking: the changes stand inside the translation's sentences (issue 533). */
+  const markedChanges = useMemo(() => marking && showChanges ? diffText(workspace.text, text) : undefined, [marking, showChanges, workspace.text, text]);
   const applyMarks = (side: Side, change: (states: readonly MarkState[]) => MarkState[]) => {
     if (busy) return;
     const [sentences, states] = side === "source" ? [sourceSentences, sourceStates] : [targetSentences, targetStates];
@@ -983,7 +986,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
         <div className="translation-tools" role="group" aria-label="Text view">
           {!readOnly && !touchOnly && <Checkbox id="review-mark-checked" label="Mark checked sentences" checked={marking} onChange={event => chooseMarking(event.target.checked)} />}
           {!readOnly && !touchOnly && <span className="translation-tools-divider" aria-hidden="true" />}
-          <Checkbox id="review-show-changes" label="Show changes" checked={showChanges && !marking} disabled={marking} onChange={event => setShowChanges(event.target.checked)} />
+          <Checkbox id="review-show-changes" label="Show changes" checked={showChanges} onChange={event => setShowChanges(event.target.checked)} />
           {pairing.available && <Checkbox id="review-couple" label="Couple scrolling" checked={coupled} onChange={event => setRequestedCoupling(event.target.checked ? couplingIdentity : null)} />}
           <Checkbox id="review-show-invisibles" label="Show invisible characters" checked={showInvisibles} onChange={event => chooseInvisibles(event.target.checked)} />
           <div className="translation-tools-end">
@@ -1005,7 +1008,8 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
             {marking
               ? <SentenceView ref={setSourceElement} text={workspace.source.text} sentences={sourceSentences} states={sourceStates} label={`Source (${sourceLanguage})`} lang={sourceLanguage}
                   disabled={busy} showInvisibles={showInvisibles} onToggle={index => applyMarks("source", states => toggled(states, index))}
-                  onRange={(from, to, checked) => applyMarks("source", states => withRange(states, from, to, checked))} />
+                  onRange={(from, to, checked) => applyMarks("source", states => withRange(states, from, to, checked))}
+                  onRestore={(index, state) => applyMarks("source", states => restored(states, index, state))} />
               : <TextView ref={setSourceElement} text={workspace.source.text} label={`Source (${sourceLanguage})`} lang={sourceLanguage} showInvisibles={showInvisibles} />}
           </div>
           <div className="translation-column">
@@ -1019,8 +1023,9 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
             </div>
             {marking
               ? <SentenceView ref={setTargetElement} text={text} sentences={targetSentences} states={targetStates} label={`Translation (${targetLanguage})`} lang={targetLanguage}
-                  disabled={busy} showInvisibles={showInvisibles} onToggle={index => applyMarks("translation", states => toggled(states, index))}
-                  onRange={(from, to, checked) => applyMarks("translation", states => withRange(states, from, to, checked))} />
+                  disabled={busy} showInvisibles={showInvisibles} changes={markedChanges} onToggle={index => applyMarks("translation", states => toggled(states, index))}
+                  onRange={(from, to, checked) => applyMarks("translation", states => withRange(states, from, to, checked))}
+                  onRestore={(index, state) => applyMarks("translation", states => restored(states, index, state))} />
               : showChanges
               ? <DiffView ref={setTargetElement} before={workspace.text} after={text} lang={targetLanguage} showInvisibles={showInvisibles} />
               : <TranslationEditor ref={setTargetElement} id="review-translation" labelledBy="review-translation-label" describedBy="review-translation-note"
@@ -1030,7 +1035,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
                   onCompositionStart={() => { composing.current = true; window.clearTimeout(startsTimer.current); }}
                   onCompositionEnd={() => { composing.current = false; scheduleStarts(); }} />}
             <p id="review-translation-note" className="translation-column-note">{marking
-              ? "Click a sentence to mark it as checked. Turn off Mark checked sentences to edit."
+              ? showChanges ? "Click a sentence to mark it as checked. Turn off Mark checked sentences and Show changes to edit." : "Click a sentence to mark it as checked. Turn off Mark checked sentences to edit."
               : translationNote(workspace.variant, showChanges ? "changes" : changed ? "edited" : "same", previousVersion?.variant.version)}</p>
           </div>
           {comparison && <div className="translation-column">

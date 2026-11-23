@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-DJgQ_r2v.js";import{n as a,t as o}from"./lib-G6HNTnIf.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-CoDMi_K1.js";import{n as a,t as o}from"./lib-D41jidNw.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -952,13 +952,16 @@ If the source text was updated after the translation was made, **Source updates 
 
 What for: keep track of the sentences you have already checked in a long text.
 
-1. Tick **Mark checked sentences** above the texts. Both texts are now split into sentences. To edit the translation again, untick it. **Show changes** is off while you mark. Your choice is remembered in this browser.
+1. Tick **Mark checked sentences** above the texts. Both texts are now split into sentences. To edit the translation again, untick it. Your choice is remembered in this browser.
 2. Click a sentence to mark it as checked. Click it again to remove the mark. Source and translation are marked separately.
 3. Shift+click a sentence to mark all sentences from the last one you clicked up to this one.
-4. Or press on a sentence and drag across others. Starting on an unmarked sentence marks all of them. Starting on a marked sentence removes the marks.
-5. The head of each text shows how many of its sentences are checked. **Next unchecked** jumps to the first unchecked sentence of the translation.
+4. The head of each text shows how many of its sentences are checked. **Next unchecked** jumps to the first unchecked sentence of the translation.
 
 Checked sentences are green. If you edit a checked sentence later, it turns amber, and the head of the text counts it as *changed*. Read it again, then click it to mark it as checked.
+
+To see what you changed while you mark, also tick **Show changes**. The translation keeps its sentences and marks, and your changes stand in them as in **Show changes** alone: added words underlined in green, removed words struck through in red. To edit again, untick both.
+
+The text stays selectable while you mark. Drag over it to select words, for example to copy them; a drag marks nothing. A double-click selects a word and leaves its sentence's mark as it was. The browser's find (\`Ctrl+F\` or \`Cmd+F\`) finds and highlights words in both texts and steps through all of them; with **Show changes** on, it finds the changed text, not the removed words.
 
 A mark belongs to its sentence, not to its wording. When a text repeats a sentence, for example *Unauffällig.*, and you edit the one you had checked, that sentence turns amber where it stands; the same sentence elsewhere in the text stays as it was, unchecked if you had not checked it. When you add or remove text before checked sentences, their marks move with them. A checked sentence you delete loses its mark; if you take an edit back, the sentence is green again.
 

@@ -23,6 +23,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Dependencies: ontospan is pinned to the release tag `v1.2.2` instead of commit `311f93e0`. The only change since that commit: a ZIP bundle counts its directory entries towards the 10,000-entry limit too.
 
+### Fixed
+
+- Translation review: **Mark checked sentences** works together with **Show changes**, the text stays selectable while marking, and the browser's find steps through its hits there (#533). With both boxes ticked, the translation keeps its sentences and marks and shows the changes inside them as the diff view does (deleted words are drawn, not found or copied); before, **Show changes** was off while marking. The texts were `user-select: none` while marking: a drag over sentences marked a range and selected nothing, and the browser's find (`Ctrl+F`/`Cmd+F`) could not select or step through a hit. Now a drag selects text and marks nothing, a double-click selects a word and leaves the mark as it was, and find selects every hit in the source and the translation. A range is marked with Shift+click or Shift+Enter, as before; the drag-to-mark gesture is gone. Editing still needs both boxes off. The editor and **Show changes** were already fixed for find in 0.14.0 (#598). No API change, no migration.
+
 ## [0.14.1] - 2026-11-23
 
 ### Fixed
