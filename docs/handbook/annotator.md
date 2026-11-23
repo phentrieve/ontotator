@@ -32,7 +32,7 @@ To make the findings list wider or narrower, drag the divider between the findin
 
 The right column works the same way on a wide screen (three columns): drag its left edge (**Resize details panel**), or focus it and press `←` or `→`; `Home` and `End` go to the least and the most, a double click or `Enter` restores the usual width. The round button on that edge, **Collapse details panel**, folds the column, with the ontology tree, to a narrow strip, so the text gets the room. Click the strip (**Expand details panel**) to bring it back. When you mark text, the column opens again by itself, for the term search. Width and folding are kept in this browser, for you.
 
-The small actions of a finding sit next to it as icons: **Show in tree** next to the term's name, **Copy text**, **Add segment** and **Move to a new finding** at each mention. Point at an icon to see its name.
+The small actions of a finding sit next to it as icons: **Show in tree** next to the term's name, **Copy text**, **Add segment** and **Move to a new finding** (a small card that leaves a larger one) at each mention. Point at an icon to see its name.
 
 Some hints have a small close icon (**Hide this hint**). A hidden hint stays hidden in this browser; **More** › **Show hints again** brings all of them back.
 

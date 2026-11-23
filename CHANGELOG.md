@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Editor: **Move to a new finding** has a new icon (#596, needs sign-off): a mention leaves its finding's card and becomes a card of its own. The earlier arrow out of a box read as "open in a new window".
+
 - Ontologies: a term id may have dots inside its local part, as ICD-10 or ATC codes do (`ICD10CM:T36.0X1A`). Annotations, modifiers, the search filter `within` and the OBO Graph import accept such ids; an OBO IRI ending in `ICD10CM_T36.0X1A` becomes `ICD10CM:T36.0X1A`. A dot at the start or end of the local part, or two dots in a row, is still no id. An IRI's local part may now also hold a hyphen (`XMPL_A00-A09`), as the CURIE form already allowed. The term search takes such a code as an id: `E11.621`, `e11.621` or `ICD10CM:E11.621` in **Search term** goes straight to that term when the ontology has it, as `HP:0001250` or `1250` already did; a code the ontology lacks (`HP:00012A`) is still searched as words.
 
 - Dependencies: ontospan is pinned to the release tag `v1.2.2` instead of commit `311f93e0`. The only change since that commit: a ZIP bundle counts its directory entries towards the 10,000-entry limit too.

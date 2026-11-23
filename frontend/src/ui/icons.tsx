@@ -207,11 +207,16 @@ export const IconTree = (p: IconProps) => (
   </Icon>
 );
 
-/** "Move to a new finding": out of the box, up and to the right. */
+/**
+ * "Move to a new finding" (issue 596): a mention leaves its finding's card and becomes a card of its own. The earlier
+ * arrow out of a box read as "open in a new window".
+ */
 export const IconMoveOut = (p: IconProps) => (
   <Icon {...p}>
-    <path d="M7 3.25H3.75a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9" />
-    <path d="M9.5 2.75h3.75V6.5M13.25 2.75 7.5 8.5" />
+    <rect x="1.75" y="1.75" width="6" height="7.5" rx="1" />
+    <path d="M3.75 4.5h2" />
+    <path d="M4.75 9.25v2.5a1 1 0 0 0 1 1h2.5M7 11.25l1.5 1.5L7 14.25" />
+    <rect x="9.75" y="9.75" width="4.5" height="4.5" rx="1" />
   </Icon>
 );
 
