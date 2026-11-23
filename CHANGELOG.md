@@ -17,6 +17,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Dependencies: ontospan is pinned to the release tag `v1.2.2` instead of commit `311f93e0`. The only change since that commit: a ZIP bundle counts its directory entries towards the 10,000-entry limit too.
 
+### Fixed
+
+- Editor: the case controls in the header bar are no longer drawn over each other (#627). In a window of about 1200 to 1300 px (a 1280 px window, or a laptop screen with enlarged display), with the working time and the text stepper in the bar, the case name ran into **Working time** and **Pause timer**. The bar now keeps the room its controls need at their smallest (the name at its opening characters, the mode at a few letters); where a window has less, the case controls wrap onto a second line, as they already did below about 1100 px.
+
 ## [0.14.0] - 2026-11-23
 
 ### Added
