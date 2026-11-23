@@ -1,7 +1,7 @@
 /** Issue 556: the (?) help button and the greyed button that says its reason (ui/Help.tsx). */
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { HelpButton, HelpText, ReasonButton, Textarea, useHelp } from "../../src/ui";
+import { HelpButton, HelpText, ReasonButton, reasonTipPlacement, Textarea, useHelp } from "../../src/ui";
 
 afterEach(cleanup);
 
@@ -63,4 +63,42 @@ it("a greyed button says its reason: as its description, and visibly when focuse
   expect(button.getAttribute("aria-disabled")).toBeNull();
   expect(button.getAttribute("aria-describedby")).toBeNull();
   expect(button.getAttribute("title")).toBeNull();
+});
+
+it("issue 618: the reason floats above the button, but goes under it inside a box that clips its overflow", () => {
+  const styles = new Map<Element, Partial<Record<"overflowX" | "overflowY" | "position", string>>>();
+  const styleOf = (element: Element) => ({ overflowX: "visible", overflowY: "visible", position: "static", ...styles.get(element) });
+  const page = document.body.appendChild(document.createElement("main"));
+  const overlay = page.appendChild(document.createElement("div"));
+  const body = overlay.appendChild(document.createElement("div"));
+  const anchor = body.appendChild(document.createElement("span"));
+  const footer = overlay.appendChild(document.createElement("div"));
+  const footerAnchor = footer.appendChild(document.createElement("span"));
+  try {
+    expect(reasonTipPlacement(anchor, styleOf)).toBe("above");
+    // A dialog's scrolling body clips; so does a box that scrolls one way only or hides its overflow.
+    for (const style of [{ overflowY: "auto" }, { overflowX: "scroll" }, { overflowY: "hidden" }, { overflowX: "clip" }]) {
+      styles.set(body, style);
+      expect(reasonTipPlacement(anchor, styleOf)).toBe("below");
+    }
+    // A footer button is outside the body; the fixed overlay stops the walk before the scrolling page.
+    styles.set(overlay, { position: "fixed" });
+    styles.set(page, { overflowY: "auto" });
+    expect(reasonTipPlacement(footerAnchor, styleOf)).toBe("above");
+    styles.delete(overlay);
+    expect(reasonTipPlacement(footerAnchor, styleOf)).toBe("below");
+  } finally {
+    page.remove();
+  }
+});
+
+it("issue 618: the button marks where its reason shows, only while it has one", () => {
+  const { rerender } = render(<div style={{ overflowY: "auto" }}><ReasonButton reason="Already planned.">Annotation only</ReasonButton></div>);
+  const anchor = screen.getByRole("button", { name: "Annotation only" }).parentElement!;
+  expect(anchor.dataset.tip).toBe("below");
+  rerender(<div style={{ overflowY: "auto" }}><ReasonButton reason={null}>Annotation only</ReasonButton></div>);
+  expect(anchor.dataset.tip).toBeUndefined();
+  cleanup();
+  render(<ReasonButton reason="Change the text first.">Save</ReasonButton>);
+  expect(screen.getByRole("button", { name: "Save" }).parentElement!.dataset.tip).toBe("above");
 });

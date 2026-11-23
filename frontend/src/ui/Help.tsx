@@ -3,7 +3,7 @@
  * field or action that shows a short explanation in place, and the reason of a greyed action that shows when the
  * action is pointed at, focused or pressed. Both work by touch and keyboard; neither is a tooltip only.
  */
-import { forwardRef, useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
+import { forwardRef, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { Button, type ButtonProps } from "./Button";
 
 export interface HelpState {
@@ -52,6 +52,24 @@ export function HelpText({ help, children }: { help: HelpState; children: ReactN
   return <div id={help.id} className="ui-help-text" hidden={!help.open} onKeyDown={closeOnEscape(help)}>{children}</div>;
 }
 
+const CLIPS = /auto|scroll|hidden|clip/;
+type PlacementStyle = Pick<CSSStyleDeclaration, "overflowX" | "overflowY" | "position">;
+
+/**
+ * Where a greyed button's reason shows (issue 618). "above" floats over what is above the button, as in a dialog's
+ * footer. Inside a box that clips its overflow (a dialog's scrolling body) a floating tip is cut at the box's edge
+ * and covers the controls above it, so there it is "below": in the flow under the button, moving what follows down.
+ * The walk stops at a fixed element (a dialog's overlay), which no box outside it clips.
+ */
+export function reasonTipPlacement(element: Element, styleOf: (element: Element) => PlacementStyle = getComputedStyle): "above" | "below" {
+  for (let node = element.parentElement; node && node !== document.body && node !== document.documentElement; node = node.parentElement) {
+    const style = styleOf(node);
+    if (CLIPS.test(style.overflowX) || CLIPS.test(style.overflowY)) return "below";
+    if (style.position === "fixed") return "above";
+  }
+  return "above";
+}
+
 export interface ReasonButtonProps extends ButtonProps {
   /** Why the action cannot be taken now; null when it can. The button is greyed (`aria-disabled`) and stays focusable. */
   reason: string | null;
@@ -60,7 +78,8 @@ export interface ReasonButtonProps extends ButtonProps {
 /**
  * A button that can be greyed with a reason (rule 4). The reason is its accessible description and its `title`
  * (the tooltip a greyed control has everywhere, as in `InlineConfirm`); it also shows next to the button while the
- * button is pointed at or focused, and after a press, so a touch or keyboard user sees it too.
+ * button is pointed at or focused, and after a press, so a touch or keyboard user sees it too: above the button, or
+ * under it inside a scrolling box (`reasonTipPlacement`).
  * A press still calls `onClick`, so the dialog can show what is missing in place.
  */
 export const ReasonButton = forwardRef<HTMLButtonElement, ReasonButtonProps>(function ReasonButton(
@@ -69,14 +88,22 @@ export const ReasonButton = forwardRef<HTMLButtonElement, ReasonButtonProps>(fun
   const id = useId();
   const [focused, setFocused] = useState(false);
   const [pressed, setPressed] = useState(false);
+  const [placement, setPlacement] = useState<"above" | "below">("above");
+  const anchor = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => { if (reason && anchor.current) setPlacement(reasonTipPlacement(anchor.current)); }, [reason]);
   // A new reason (or none) is not the one that was pressed.
   useEffect(() => { setPressed(false); }, [reason]);
+  // Under the button, the reason may start below the scrolling box's edge: scroll it into view as it shows.
+  const shown = Boolean(reason) && (focused || pressed);
+  useEffect(() => {
+    if (shown && placement === "below") anchor.current?.querySelector(".ui-reason-tip")?.scrollIntoView?.({ block: "nearest" });
+  }, [shown, placement]);
   const describedBy = [props["aria-describedby"], reason ? `${id}-reason` : null].filter(Boolean).join(" ") || undefined;
-  return <span className="ui-reason-anchor">
+  return <span ref={anchor} className="ui-reason-anchor" data-tip={reason ? placement : undefined}>
     <Button {...props} ref={ref} aria-disabled={reason ? true : props["aria-disabled"]} aria-describedby={describedBy}
       title={reason ?? props.title}
       onFocus={event => { setFocused(true); onFocus?.(event); }} onBlur={event => { setFocused(false); setPressed(false); onBlur?.(event); }}
       onClick={event => { if (reason) setPressed(true); onClick?.(event); }} />
-    {reason && <span id={`${id}-reason`} className="ui-reason-tip" data-shown={focused || pressed ? "true" : undefined}>{reason}</span>}
+    {reason && <span id={`${id}-reason`} className="ui-reason-tip" data-shown={shown ? "true" : undefined}>{reason}</span>}
   </span>;
 });
