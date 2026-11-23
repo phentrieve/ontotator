@@ -960,7 +960,7 @@ ul.task-counts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space
 .form-group > .ui-help-text { margin-bottom: var(--space-1); }
 .ui-help-text > p { margin: 0; max-width: none; }
 .ui-help-text > p + p { margin-top: var(--space-1); }
-/* A greyed action's reason (rule 4): shown above the button while it is pointed at, focused or pressed. */
+/* A greyed action's reason (rule 4): shown above the button while it is pointed at, focused or pressed (under it in a scrolling box). */
 .ui-reason-anchor { position: relative; display: inline-flex; max-width: 100%; }
 .ui-reason-tip {
   position: absolute; z-index: 5; inset-inline-end: 0; bottom: calc(100% + var(--space-2)); width: max-content; max-width: min(22rem, 80vw);
@@ -969,6 +969,14 @@ ul.task-counts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space
 }
 .ui-reason-anchor:hover > .ui-reason-tip,
 .ui-reason-tip[data-shown] { visibility: visible; }
+/* Inside a scrolling box (a dialog's body; issue 618): under the button, in the flow and as wide as the button, so the
+   box cannot cut it and it covers no other control; what follows moves down while it shows. */
+.ui-reason-anchor[data-tip="below"] { flex-direction: column; align-items: stretch; align-self: flex-start; }
+.ui-reason-anchor[data-tip="below"] > .ui-reason-tip {
+  position: static; display: none; width: auto; max-width: none; margin-top: var(--space-1); contain: inline-size; visibility: visible;
+}
+.ui-reason-anchor[data-tip="below"]:hover > .ui-reason-tip,
+.ui-reason-anchor[data-tip="below"] > .ui-reason-tip[data-shown] { display: block; }
 @media (forced-colors: active) {
   .ui-reason-tip, .ui-help-text { border: 1px solid CanvasText; }
 }
