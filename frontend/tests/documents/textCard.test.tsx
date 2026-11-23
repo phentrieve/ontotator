@@ -980,6 +980,19 @@ describe("one layout for the parts (issues 329, 331, 332)", () => {
     expect(within(card()).getByRole("group", { name: "Next step: Carry to v2" })).toBeTruthy();
   });
 
+  it("issue 628: the next-step line names the carry's target version, like its button", () => {
+    const versions = [
+      version({ document_id: "case-200-de", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v2", version: 2, origin: "correction", derived_from: "case-200-de", chain_id: "case-200-de", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v3", version: 3, origin: "correction", derived_from: "case-200-de-v2", chain_id: "case-200-de" }),
+    ];
+    const carry = stepOf("carry_text_change", { stage: "annotation", assignment_id: 1, document_id: "case-200-de-v3" });
+    const row = assignRow({ versions, steps: [carry], stages: { review: cell("accepted", "done"), annotation: cell("submitted", "done", { submitted: 1, total: 1 }), final: cell("choose", "todo", { submitted: 1 }) } });
+    renderCard({ row, steps: [{ step: carry, button: <button type="button">Carry to v3…</button> }] });
+    expect(within(card()).getByRole("group", { name: "Next step: Carry to v3" })).toBeTruthy();
+    expect(within(card()).queryByText(/Carry to v2/)).toBeNull();
+  });
+
   it("Open result and the stage's Change final… share one action row; a stage without actions adds no block", () => {
     const chosen = final({ case_id: "case-200", language: "de", document_id: "case-200-de", submission_id: "s-final" });
     const row = assignRow({ final: chosen, stages: { review: cell("accepted", "done"), annotation: cell("submitted", "done", { submitted: 2, total: 2 }), final: cell("final", "done") } });

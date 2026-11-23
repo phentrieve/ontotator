@@ -4,6 +4,7 @@
  * - The bell entry "Question from …" loads the list again: the new question is listed, marked and focused, and the Open
  *   tab counts what the sidebar's "Questions (n)" counts.
  * - The sidebar link Questions, used while the page is open, loads the list and the count again.
+ * Issue 629: without opening the bell, the page follows the bell's count (its minute refresh, fast-forwarded here).
  * With QUESTIONS_SHOTS=<dir> the test also saves screenshots there at 1440 × 900 and 390 × 844 (never baselines).
  */
 import { mkdirSync } from "node:fs";
@@ -84,6 +85,33 @@ test("on Questions, the bell entry and the sidebar link show a question asked me
     await expect(lead.getByText("Third question about this text?")).toBeVisible();
     await counts(lead, 4);
     await shot(lead, "2-sidebar-link-on-questions");
+  } finally {
+    await context.close();
+  }
+});
+
+test("on Questions, a question asked meanwhile shows once the bell's count goes up", async ({ page, browser }, info) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const s = await leadScenario(page, "QUESTION_FOR_LEAD");
+  const context = await browser.newContext({ baseURL: info.project.use.baseURL, viewport: { width: 1440, height: 900 } });
+  try {
+    const lead = await context.newPage();
+    await loginThroughForm(page, s.users.ana, s.display_names.ana);
+    await page.goto(`/#/tasks/${s.tasks!.ask}`);
+    await expect(page.getByRole("region", { name: "Translation review" })).toBeVisible();
+    // The bell's minute refresh runs on a clock the test can move forward (installed before the app loads).
+    await lead.clock.install();
+    await loginThroughForm(lead, s.users.lead, s.display_names.lead, { lastProject: s.project });
+    await lead.goto(`/#/projects/${encodeURIComponent(s.project)}/questions`);
+    await counts(lead, 1);
+    const before = await bell(lead).getAttribute("aria-label");
+
+    await ask(page, "A question while the lead is on Questions?");
+    await lead.clock.fastForward("01:05");
+    await expect(bell(lead)).not.toHaveAttribute("aria-label", before ?? "");
+    await expect(lead.getByText("A question while the lead is on Questions?")).toBeVisible();
+    await counts(lead, 2);
+    await shot(lead, "3-bell-count-on-questions");
   } finally {
     await context.close();
   }

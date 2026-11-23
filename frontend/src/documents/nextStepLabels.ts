@@ -52,6 +52,18 @@ export const stepLabel = (code: StepCode): string => STEP_LABELS[code] ?? code;
 export const actionLabel = (action: RowAction): string => ACTION_LABELS[action] ?? action;
 
 /**
+ * The name of a step on its row: "Carry to v3" names the step's target version, like its button
+ * (`rowActionLabel`, issue 628); every other step reads its `STEP_LABELS` name.
+ */
+export function rowStepLabel(step: NextStepView, row: Partial<Pick<DocumentRowView, "versions">>): string {
+  if (step.code === "carry_text_change") {
+    const target = row.versions?.find(version => version.document_id === step.document_id);
+    if (target) return `Carry to v${target.version}`;
+  }
+  return stepLabel(step.code);
+}
+
+/**
  * The action name of a step on its row: "Choose final" follows the server's `stages.final.detail.label_rule` (the
  * final-result panel's rule, VD16): "accept" reads "Accept result…", "compare" "Compare results…"; without the field
  * one submission reads "Accept result…". A "compare" row in full agreement (`all_match`, also on notes and modifier

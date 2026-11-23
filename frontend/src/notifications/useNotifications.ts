@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, onSessionRestored, type NotificationView } from "../api/client";
 import { TASKS_CHANGED } from "../tasks/tasksEvents";
+import { notifyNotificationsChanged } from "./notificationsEvents";
 
 /** Background refresh of the bell's count, as the navigation counters do (no push channel). */
 export const NOTIFICATIONS_REFRESH_MS = 60_000;
@@ -20,7 +21,7 @@ export interface NotificationsState {
 /**
  * The header bell (issue 557): the unread count is loaded once, on window focus, on a restored session, every 60 s
  * and on `tasks-changed`; the list only when the bell opens. Marking read updates the list at once and takes the
- * server's count back.
+ * server's count back. A change of a known count fires `notifications-changed` (issue 629).
  */
 export function useNotifications(username: string): NotificationsState {
   const [unread, setUnread] = useState<number | null>(null);
@@ -29,6 +30,14 @@ export function useNotifications(username: string): NotificationsState {
   const alive = useRef(true);
   const itemsRef = useRef(items);
   itemsRef.current = items;
+  // The last known count of this user; null after a user change, so the first count fires nothing.
+  const shown = useRef<number | null>(null);
+  useEffect(() => {
+    if (unread === null) { shown.current = null; return; }
+    const before = shown.current;
+    shown.current = unread;
+    if (before !== null && before !== unread) notifyNotificationsChanged();
+  }, [unread]);
   useEffect(() => {
     alive.current = true;
     setUnread(null);
