@@ -13,7 +13,12 @@
 .task-question-term { font-weight: 600; }
 .task-question-answer { border-top: 1px solid var(--border); padding-top: var(--space-1); margin-top: var(--space-1); }
 .ask-lead-form { display: grid; gap: var(--space-3); }
-.ask-lead-consequence { margin: 0; color: var(--text-muted); }
+/* Issue 611: the consequence line takes a row of its own above the buttons, so Cancel never wraps under Send. */
+.ask-lead-consequence { margin: 0; color: var(--text-muted); flex: 1 0 100%; }
+/* Issue 611: on a phone, Ask the lead and Answer are as tall as their form, not full-height sheets with a gap. */
+@media (max-width: 699px) {
+  .ui-dialog--md.ask-lead-dialog { height: auto; max-height: calc(100dvh - 2 * var(--space-4)); }
+}
 .lead-question-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
 /* A quoted passage with its proposed wording: as tall as its text, not a reading pane. */
 .question-passage .translation-diff { height: auto; min-height: 0; max-height: 8rem; padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius); }

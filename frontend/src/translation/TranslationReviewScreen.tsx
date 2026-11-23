@@ -969,7 +969,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
         {!readOnly && props.headerTimer}
         {props.guidelineActions}
         {!leadCorrection && !readOnly && <Button size="sm" className="ask-lead-entry" onMouseDown={event => event.preventDefault()}
-          onClick={() => setAsking({ quote: selectedPassage() })}>{ASK_LABEL}</Button>}
+          onClick={() => setAsking({ quote: selectedPassage() })}>{`${ASK_LABEL}…`}</Button>}
         {!leadCorrection && props.reportActions}
         <span role="status" className="translation-save-status"><StatusBadge tone={statusTone}>{status}</StatusBadge></span>
         <Button size="sm" icon={<IconRetry />} onClick={() => { void reload(); }}
@@ -1082,7 +1082,8 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
             onDismiss={notice => setWordingNotices(notices => notices.filter(other => other !== notice))}
             onKeepMine={keepMine} onLoadSaved={() => { void reload(); }} onRetry={() => { setMergeTrouble(null); void sync(); }} />}
           {!leadCorrection && <TaskQuestionList assignment={workspace.assignment} state={questions} withProposal readOnly={readOnly}
-            selectedText={selectedPassage} onShowInText={question => { void showWording(question); }} dialogOpen={asking} onDialogOpen={setAsking}
+            selectedText={selectedPassage} onShowInText={question => { void showWording(question); }}
+            wordingInText={question => !!question.proposed_text && text.includes(question.proposed_text)} dialogOpen={asking} onDialogOpen={setAsking}
             // Issue 590: a pausing question pauses the task at once, as a problem report does; a resume opens it again.
             onSaveBeforePause={async () => { await flush(); }} onAsked={clearPassage} onPauseChanged={() => onTaskHeld.current?.()} />}
           <SourceObligationReview assignmentId={props.assignmentId} username={props.username} documentId={workspace.variant.document_id}

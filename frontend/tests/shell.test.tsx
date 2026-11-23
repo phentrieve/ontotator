@@ -450,11 +450,11 @@ describe("shell identity and task count", () => {
     expect(identity.querySelector(".cell-secondary")).toBeNull();
   });
 
-  it("names an annotator on a translation review a Translation reviewer", () => {
+  it("names the same role on a translation review and adds the task (issue 611)", () => {
     const route = { name: "task", assignmentId: 42 } as const;
     const { rerender } = render(<Shell {...props({ projects: [project("p", false)], route, taskProject: "p", taskKind: "translation_review" })} />);
     const identity = screen.getByTestId("current-user");
-    expect(identity.querySelector(".cell-secondary")?.textContent).toBe("Translation reviewer");
+    expect(identity.querySelector(".cell-secondary")?.textContent).toBe("Annotator · translation review");
     rerender(<Shell {...props({ projects: [project("p", false)], route, taskProject: "p", taskKind: "annotate" })} />);
     expect(identity.querySelector(".cell-secondary")?.textContent).toBe("Annotator");
   });

@@ -47,6 +47,9 @@ export const RESUMED_NOTICE = "Resumed. Your question stays open.";
 /** The asker reads what the answer did to their text. */
 export const TOOK_PROPOSED = "The lead put your wording into your text.";
 export const SHOW_IN_TEXT = "Show it in my text";
+/** Issue 616: the lead took the wording, but the reviewer had changed the passage, so their text was kept. */
+export const TOOK_PROPOSED_KEPT = "The lead chose your wording. It is not in your text now: you changed that passage.";
+export const SHOW_WORDING = "Show the lead's wording";
 
 /** Issue 610: the reviewer's screen merges a taken wording into the text on screen, without losing an edit. */
 export function wordingApplied(wording: string): string {
@@ -57,6 +60,10 @@ export function wordingKept(quote: string, wording: string): string {
   return `You changed “${quote}” after you asked, so the lead's wording was not put in: “${wording}”.`;
 }
 export const USE_WORDING = "Use the lead's wording";
+/** Issue 616: what "Use the lead's wording" replaces, so a rewrite of several words is seen before it goes. */
+export function wordingReplaces(mine: string): string {
+  return `Replaces “${mine}” in your text.`;
+}
 export const WORDING_KEPT_HINT = "To use it, change the passage in your text.";
 export const UNMERGED_TITLE = "This review was changed elsewhere";
 export const UNMERGED_TEXT = "Your text here is not saved yet. Keep my text saves it over the other change. Load the saved review discards your edits here.";
@@ -74,6 +81,18 @@ export const TAKE_PROPOSED_HINT = "The quoted passage is replaced in the open re
 
 export function answerButton(take: boolean): string {
   return take ? "Answer and take the wording" : "Send answer";
+}
+
+/**
+ * Issue 616: the lead's side cannot know whether the wording stays in the text: a reviewer who changed the passage
+ * meanwhile keeps their text. So both lines say what the answer did, not what the text holds now.
+ */
+export const ANSWERED_TOOK = "Answer sent. The proposed wording was put into the reviewer's saved text. If they had changed that passage meanwhile, their text is kept and they decide.";
+export const TOOK_AT_ANSWER = "The proposed wording was put into the reviewer's saved text with this answer.";
+
+/** Issue 611: the lead's line of a question whose pause the asker ended. */
+export function resumedNote(reason: string | null | undefined): string {
+  return reason?.trim() ? `resumed: ${reason.trim()}` : "resumed";
 }
 
 /** "1 open question", "3 open questions". */

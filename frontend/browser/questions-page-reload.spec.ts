@@ -34,7 +34,7 @@ async function shot(page: Page, name: string): Promise<void> {
 }
 
 async function ask(page: Page, question: string): Promise<void> {
-  await page.getByRole("button", { name: "Ask the lead", exact: true }).click();
+  await page.locator(".ask-lead-entry").click();
   const dialog = page.getByRole("dialog", { name: "Ask the lead" });
   await dialog.getByRole("textbox", { name: /Your question/ }).fill(question);
   await dialog.getByRole("button", { name: "Send question" }).click();

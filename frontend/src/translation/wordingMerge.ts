@@ -68,15 +68,27 @@ export function wordingsBetween(base: string, server: string, taken: readonly Ta
 
 /**
  * Where the passage `[start, end)` of `before` stands in `after`, by a word diff of the two. A replaced passage
- * covers its replacement; text added right before or after the passage stays outside it.
+ * covers its replacement, also when the replacement is several words (issue 616: the word diff matches a space
+ * between the new words as unchanged, so the replacement runs on through such spaces); text added right before or
+ * after the passage stays outside it.
  */
 export function passageAfterEdits(before: string, after: string, start: number, end: number): { start: number; end: number } | null {
   if (start < 0 || end > before.length || start >= end) return null;
-  let b = 0, a = 0, from: number | null = null, to: number | null = null, extend = false;
-  for (const part of diffText(before, after)) {
+  const parts = diffText(before, after);
+  let b = 0, a = 0, from: number | null = null, to: number | null = null, extend = false, bridged = false;
+  for (let index = 0; index < parts.length; index += 1) {
+    const part = parts[index];
     const length = part.text.length;
     if (part.op === "insert") {
       if (extend && to !== null) to += length;
+      a += length;
+      continue;
+    }
+    // A space between two inserted words of the replacement belongs to it.
+    if (extend && to !== null && part.op === "equal" && /^\s+$/.test(part.text) && parts[index + 1]?.op === "insert") {
+      to += length;
+      bridged = true;
+      b += length;
       a += length;
       continue;
     }
@@ -90,6 +102,8 @@ export function passageAfterEdits(before: string, after: string, start: number, 
     b += length;
     if (part.op === "equal") a += length;
   }
+  // The space a bridged replacement ends with stood after the passage.
+  if (bridged && from !== null && to !== null) while (to > from && /\s/.test(after[to - 1])) to -= 1;
   return from !== null && to !== null && from <= to ? { start: from, end: to } : null;
 }
 

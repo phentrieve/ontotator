@@ -41,9 +41,13 @@ describe("merging the saved draft into the reviewer's text", () => {
   });
 
   it("keeps the reviewer's text where they changed the passage, and names their version of it", () => {
-    const local = SAVED.replace("Krampfanfälle", "Krampfanfälle (fokal)").replace("Krampfanfälle", "Anfälle");
+    const local = SAVED.replace("Krampfanfälle", "Anfälle");
     const merged = mergeServerText(SAVED, TAKEN, local, [QUESTION]);
     expect(merged).toEqual({ kind: "merged", text: local, applied: [], kept: [{ wording: QUESTION, mine: "Anfälle" }], replacements: [] });
+    // Issue 616: a word diff cannot tell a rewrite of several words from a rewrite with a word added after it, so the
+    // reviewer's version covers both; the notice names it ("Replaces …") before "Use the lead's wording".
+    const longer = SAVED.replace("Krampfanfälle", "Anfälle (fokal)");
+    expect(mergeServerText(SAVED, TAKEN, longer, [QUESTION])).toMatchObject({ kept: [{ wording: QUESTION, mine: "Anfälle (fokal)" }] });
   });
 
   it("keeps the text when the passage occurs twice on screen", () => {
@@ -83,5 +87,26 @@ describe("positions", () => {
     // Text added right after the passage stays outside it.
     const appended = "one two more three four";
     expect(appended.slice(...Object.values(passageAfterEdits(before, appended, 4, 7)!) as [number, number])).toBe("two");
+  });
+
+  it("covers a passage that the reviewer turned into several words (issue 616)", () => {
+    const mine = (before: string, quote: string, after: string) => {
+      const at = before.indexOf(quote);
+      const passage = passageAfterEdits(before, after, at, at + quote.length);
+      return passage ? after.slice(passage.start, passage.end) : null;
+    };
+    expect(mine("Unterschiedliche Absatzlängen machen", "Absatzlängen", "Unterschiedliche Längen der Absätze machen")).toBe("Längen der Absätze");
+    expect(mine("Seit Krampfanfälle traten", "Krampfanfälle", "Seit Epileptische Anfälle traten")).toBe("Epileptische Anfälle");
+    expect(mine("Ein Werkzeugvorschlag hier", "Werkzeugvorschlag", "Ein kleinen Vorschlag hier")).toBe("kleinen Vorschlag");
+    expect(mine("Ein Absatzlängen", "Absatzlängen", "Ein Längen der Absätze")).toBe("Längen der Absätze");
+    expect(mine("a generalized hypotonia b", "generalized hypotonia", "a generalized mild hypotonia b")).toBe("generalized mild hypotonia");
+  });
+
+  it("puts the lead's wording over the whole multi-word rewrite", () => {
+    const base = "Unterschiedliche Absatzlängen machen den Vergleich schwer.";
+    const question: TakenWording = { report_id: "q3", quote: "Absatzlängen", proposed_text: "Absatz-Längen", answered_at: "2026-11-22T10:00:00Z" };
+    const local = base.replace("Absatzlängen", "Längen der Absätze");
+    const merged = mergeServerText(base, base.replace("Absatzlängen", "Absatz-Längen"), local, [question]);
+    expect(merged).toMatchObject({ kind: "merged", text: local, applied: [], kept: [{ wording: question, mine: "Längen der Absätze" }] });
   });
 });

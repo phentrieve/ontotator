@@ -704,6 +704,8 @@ a.shell-product { color: inherit; text-decoration: none; }
 .audit-history-dialog .audit-details { display: inline-block; min-width: 14rem; overflow-wrap: anywhere; }
 .shell-page .detail-section:first-child { padding-top: 0; }
 .shell-page .detail-section:last-child { border-bottom: 0; }
+/* Issue 611: a refusal or notice page has one section; the toast after it must not leave its rule standing. */
+.shell-page .detail-section--alone { border-bottom: 0; }
 .shell-page :not(td) > .toolbar { margin-block: var(--space-3); }
 .shell-page :is(.form-control, .form-select) { max-width: var(--field-max-width); }
 .shell-page input.form-control[type="number"] { max-width: 8rem; }
@@ -782,6 +784,16 @@ a.shell-product { color: inherit; text-decoration: none; }
 .export-research-table tbody th { background: transparent; text-align: left; }
 :is(.final-export-table, .export-research-table) thead th { text-align: left; background: transparent; color: var(--text-muted); font-size: var(--size-sm); border-bottom-color: var(--border-strong); }
 .final-export-table td[colspan] { text-align: left; }
+/* Issue 611: on a phone each row stacks: the text and its action on one line, the reason in full width below, so a
+   long "Why" (a question to the lead) reads as a sentence instead of a column of single words. */
+@media (max-width: 699px) {
+  .final-export-table, .final-export-table tbody { display: block; }
+  .final-export-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .final-export-table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: var(--space-2); border-bottom: 1px solid var(--border); }
+  .final-export-table tr > * { border-bottom: 0; }
+  .final-export-table tr > :only-child { grid-column: 1 / -1; }
+  .final-export-table td:nth-child(2):not(:last-child) { grid-row: 2; grid-column: 1 / -1; padding-top: 0; }
+}
 .export-row-status { margin: var(--space-1) 0 0; color: var(--text-muted); font-size: var(--size-sm); line-height: var(--leading-sm); }
 .export-row-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: flex-end; }
 /* A disclosure like "Details and limits": the summary reads the same; the open list keeps the table's size. */
@@ -1342,7 +1354,12 @@ button.stage-path-seg--current:focus-visible::after { border-color: var(--on-acc
 /* Issue 232: the paused banner in the editor, one line until it is opened. */
 .paused-notice { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; }
 .paused-notice__text { flex: 1; min-width: 0; display: grid; gap: var(--space-1); }
-.paused-notice__reason { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.paused-notice--open .paused-notice__reason { white-space: pre-wrap; overflow: visible; }
+/* Issue 611: closed, the line wraps at words and shows up to two lines (three on a phone), so a long title such as
+   "Paused until the lead answers your question" is never cut mid-word and the reason starts in sight. */
+.paused-notice__reason { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow-wrap: break-word; }
+.paused-notice--open .paused-notice__reason { display: block; white-space: pre-wrap; overflow: visible; -webkit-line-clamp: none; line-clamp: none; }
+@media (max-width: 699px) {
+  .paused-notice__reason { -webkit-line-clamp: 3; line-clamp: 3; }
+}
 .paused-notice__toggle { flex: none; }
 .notice-content:has(> .paused-notice) { flex: 1; }
