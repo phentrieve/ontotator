@@ -11,11 +11,11 @@ That is the default. With `ONTOTATOR_MCP_READ_CONTENT=1` five more tools read a 
 You need [uv](https://docs.astral.sh/uv/). Install the command from the repository:
 
 ```bash
-uv tool install "git+https://github.com/phentrieve/ontotator@v0.13.0#subdirectory=mcp"
+uv tool install "git+https://github.com/phentrieve/ontotator@v0.14.0#subdirectory=mcp"
 which ontotator-mcp
 ```
 
-The URL names a release tag, so the server changes only when you install another release: to update, run the command again with the newer tag in the URL. Without a tag the URL would follow `main`, and every push would update the server. From a checkout of a release tag, `uv tool install ./mcp` does the same. Without installing, `uvx --from "git+https://github.com/phentrieve/ontotator@v0.13.0#subdirectory=mcp" ontotator-mcp` runs it directly.
+The URL names a release tag, so the server changes only when you install another release: to update, run the command again with the newer tag in the URL. Without a tag the URL would follow `main`, and every push would update the server. From a checkout of a release tag, `uv tool install ./mcp` does the same. Without installing, `uvx --from "git+https://github.com/phentrieve/ontotator@v0.14.0#subdirectory=mcp" ontotator-mcp` runs it directly.
 
 `ontotator-mcp` has the version of the Ontotator release it comes from (`ontotator-mcp --version`). Use the release your server runs. After installing another release, restart the MCP client: a running `ontotator-mcp` process keeps the code it started with. `whoami` shows both versions and warns when they differ.
 
@@ -78,7 +78,7 @@ Add the server to `claude_desktop_config.json` (Settings › Developer › **Edi
 }
 ```
 
-If the client cannot find the command, give its full path (`which ontotator-mcp`), or use `"command": "uvx"` with `"args": ["--from", "git+https://github.com/phentrieve/ontotator@v0.13.0#subdirectory=mcp", "ontotator-mcp"]`.
+If the client cannot find the command, give its full path (`which ontotator-mcp`), or use `"command": "uvx"` with `"args": ["--from", "git+https://github.com/phentrieve/ontotator@v0.14.0#subdirectory=mcp", "ontotator-mcp"]`.
 
 Ask the client to call `whoami` first: it shows the token's kind, scopes, project and expiry (with a warning two weeks before) and who it acts as. For every kind of token, a project token included, it also shows the version of the Ontotator server (`server`) and of this MCP server (`mcp_server`), with a `warning` when they differ, and whether the [content tools](#content-tools-opt-in) are on (`mcp_server.content_tools`).
 
