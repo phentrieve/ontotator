@@ -45,6 +45,36 @@ BOOTSTRAP_ADMIN = ("admin", "development-only-password", "Administrator")
 # Where the app container reads the demo login file (ONTOTATOR_DEMO_LOGINS_FILE).
 DEMO_LOGINS_TARGET = "/run/ontotator-demo-logins.json"
 
+# Optional ICD-10-CM project (seed --with-icd10cm), for the 0.15.0 acceptance.
+# It needs an app with dotted term ids (`ICD10CM:T36.0X1A`, PR #489) and the
+# test excerpt that PR ships (tests/fixtures/icd10cm.md).
+ICD10CM_KEY = "acceptance-icd10cm"
+ICD10CM_DOCUMENT = "discharge-letter"
+ICD10CM_LANGUAGE = "de"  # demo-annotator reads German only
+ICD10CM_ROLES = {
+    "demo-lead": "lead",
+    "demo-annotator": "annotator",
+    "demo-reviewer": "adjudicator",  # "consolidator" in the UI and CLI
+}
+# Synthetic. Meant codes: E11.621, N18.1, T36.0X1A, I10, J45.30; the letter
+# names none of them, so the annotator has to find them.
+ICD10CM_LETTER = """Entlassbrief (synthetisches Beispiel, keine reale Person)
+
+Diagnosen: Diabetes mellitus Typ 2 mit Fußulkus an der linken Ferse. Chronische Nierenkrankheit, Stadium 1. Versehentliche Vergiftung durch Amoxicillin (Penicillin), Erstbehandlung. Essentielle Hypertonie. Leichtes persistierendes Asthma bronchiale.
+
+Verlauf: Die Patientin nahm zu Hause versehentlich die doppelte Tagesdosis Amoxicillin ein und wurde mit Übelkeit und Schwindel aufgenommen. Nach Absetzen und Überwachung bildeten sich die Beschwerden zurück. Das Fußulkus wurde täglich verbunden und heilt. Die Nierenwerte blieben stabil, der Blutdruck war unter der bestehenden Therapie gut eingestellt. Kein Asthmaanfall während des Aufenthalts.
+
+Procedere: Weiter Wundkontrolle beim Hausarzt, Blutzucker- und Blutdruckkontrolle, Inhalation wie bisher.
+"""
+# Exits non-zero in an image whose term ids cannot hold dots (before #489).
+DOTTED_ID_PROBE = (
+    "import sys\n"
+    "from ontotator.domain.annotations import CURIE_PATTERN\n"
+    "from ontotator.vendor.hpo_span_annotator.hpo import curie\n"
+    "code = 'ICD10CM:T36.0X1A'\n"
+    "sys.exit(0 if CURIE_PATTERN.match(code) and curie(code) == code else 3)\n"
+)
+
 
 def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -560,10 +590,12 @@ def load_prepared(directory: Path) -> dict[str, Any]:
     return cfg
 
 
-def assign(api: Api, document: str, username: str, task: str) -> dict[str, Any]:
+def assign(
+    api: Api, document: str, username: str, task: str, project: str = PROJECT_KEY
+) -> dict[str, Any]:
     result = api.request(
         "POST",
-        f"/api/v1/projects/{PROJECT_KEY}/assignments",
+        f"/api/v1/projects/{project}/assignments",
         {
             "rows": [{"document_id": document, "username": username}],
             "task": task,
@@ -606,9 +638,9 @@ def clinical_creation_defaults(
     return result
 
 
-def ensure_creation_defaults(api: Any) -> bool:
+def ensure_creation_defaults(api: Any, project: str = PROJECT_KEY) -> bool:
     """Set the clinical creation defaults through the settings API; skip when equal."""
-    path = f"/api/v1/projects/{PROJECT_KEY}/settings"
+    path = f"/api/v1/projects/{project}/settings"
     settings = api.request("GET", path)
     wanted = clinical_creation_defaults(
         settings["profile"], settings.get("hidden_axis_values") or {}
@@ -621,7 +653,65 @@ def ensure_creation_defaults(api: Any) -> bool:
     return True
 
 
-def seed(directory: Path) -> None:
+def icd10cm_profile(hpo_profile: dict[str, Any], sha256: str) -> dict[str, Any]:
+    """The ICD-10-CM project's task profile: the HPO profile's axes, one ICD layer."""
+    kinds = [
+        kind | {"type_id": "diagnosis", "label": "Diagnosis"}
+        for kind in hpo_profile["layers"][0]["annotation_types"][:1]
+    ]
+    return {
+        "schema_version": hpo_profile["schema_version"],
+        "profile_id": "synthetic-acceptance-icd10cm/v1",
+        "version": "1.0.0",
+        "ontologies": [
+            {
+                "ontology_id": "icd10cm",
+                "label": "ICD-10-CM",
+                "release": "2026-10-01",
+                "sha256": sha256,
+                "format": "obo-graph-json",
+                "resource_path": "ontologies/icd10cm.json",
+            }
+        ],
+        "layers": [
+            {
+                "layer_id": "icd-layer",
+                "label": "Diagnoses",
+                "ontology_id": "icd10cm",
+                "access": "editable",
+                "default_visible": True,
+                "default_type_id": "diagnosis",
+                "annotation_types": kinds,
+            }
+        ],
+        "default_layer_id": "icd-layer",
+    }
+
+
+def require_icd10cm_fixture(root: Path = ROOT) -> Path:
+    """The ICD-10-CM excerpt of this checkout; absent before PR #489."""
+    fixture = root / "tests" / "fixtures" / "icd10cm.json"
+    if not fixture.is_file():
+        raise ValueError(
+            "--with-icd10cm needs tests/fixtures/icd10cm.json (ICD-10-CM support, "
+            "PR #489); this checkout has none"
+        )
+    return fixture
+
+
+def require_dotted_ids(stack: Any) -> None:
+    """Refuse an app image whose term ids cannot hold dots, before any write."""
+    try:
+        stack.compose("exec", "-T", "app", "python", "-c", DOTTED_ID_PROBE)
+    except RuntimeError:
+        raise ValueError(
+            "--with-icd10cm needs an app with dotted term ids (ICD10CM:T36.0X1A, "
+            "PR #489); the running image has none. Seed without the option or "
+            "build the image from a revision that has it"
+        ) from None
+
+
+def seed(directory: Path, *, with_icd10cm: bool = False) -> None:
     cfg = load_prepared(directory)
     directory = Path(cfg["directory"])
     inputs = Path(cfg.get("inputs", INPUTS))
@@ -635,6 +725,7 @@ def seed(directory: Path) -> None:
         )
     ):
         raise ValueError("Seed was already attempted; ordinary restart needs no reseed")
+    icd_fixture = require_icd10cm_fixture() if with_icd10cm else None
     stack = Stack(cfg)
     identity = stack.verify()
     require_fresh(
@@ -642,6 +733,8 @@ def seed(directory: Path) -> None:
         stack.cli("projects", "list"),
         stack.cli("ontologies", "list"),
     )
+    if with_icd10cm:
+        require_dotted_ids(stack)
     # Readiness is checked before any writes, with no authenticated cookies yet.
     try:
         with build_opener(NoRedirect(), ProxyHandler({})).open(
@@ -707,6 +800,44 @@ def seed(directory: Path) -> None:
         "--t1-profile",
         "hp=hpo-phenotype",
     )
+    icd_sha = None
+    if icd_fixture is not None:
+        icd_sha = digest(icd_fixture)
+        hpo_profile = json.loads((inputs / "profile.json").read_text(encoding="utf-8"))
+        for destination, data in (
+            ("/tmp/acceptance-icd10cm.json", icd_fixture.read_bytes()),
+            (
+                "/tmp/acceptance-icd10cm-profile.json",
+                json.dumps(icd10cm_profile(hpo_profile, icd_sha)).encode(),
+            ),
+            (f"/tmp/{ICD10CM_DOCUMENT}.txt", ICD10CM_LETTER.encode("utf-8")),
+        ):
+            stack.compose(
+                "exec",
+                "-T",
+                "app",
+                "python",
+                "-c",
+                "import pathlib,sys; pathlib.Path(sys.argv[1]).write_bytes(sys.stdin.buffer.read())",
+                destination,
+                data=data,
+            )
+        stack.cli("ontologies", "add", "/tmp/acceptance-icd10cm.json")
+        stack.cli(
+            "projects",
+            "create",
+            ICD10CM_KEY,
+            "--name",
+            "Synthetic ICD-10-CM acceptance",
+            "--profile",
+            "/tmp/acceptance-icd10cm-profile.json",
+            "--pin",
+            f"icd10cm={icd_sha}",
+            "--allowed-roots",
+            "icd10cm=",
+            "--t1-profile",
+            "icd10cm=generic",
+        )
     actors = {}
     for username, (display, role, languages, qualification) in ACTORS.items():
         output = stack.cli("users", "create", username, "--display-name", display)
@@ -714,6 +845,16 @@ def seed(directory: Path) -> None:
         if len(codes) != 1:
             raise RuntimeError("Could not consume synthetic account setup code")
         stack.cli("projects", "add-member", PROJECT_KEY, username, "--role", role)
+        if icd_sha is not None:
+            # Before the login below: a role change ends the user's sessions.
+            stack.cli(
+                "projects",
+                "add-member",
+                ICD10CM_KEY,
+                username,
+                "--role",
+                ICD10CM_ROLES[username],
+            )
         api = Api(cfg["host"])
         current = api.request(
             "POST",
@@ -794,6 +935,9 @@ def seed(directory: Path) -> None:
     if record["status_after"] != "accepted" or record["created_variant_id"] is not None:
         raise RuntimeError("Real review did not accept the independent annotation case")
     annotation = assign(lead, accepted["document_id"], "demo-annotator", "annotate")
+    icd_result = None
+    if icd_sha is not None:
+        icd_result = seed_icd10cm(stack, lead, icd_sha)
     tasks = reviewer.request("GET", "/api/v1/me/tasks")
     statuses = {row["assignment_id"]: row["status"] for row in tasks}
     if (
@@ -804,17 +948,24 @@ def seed(directory: Path) -> None:
     ):
         raise RuntimeError("User-facing review tasks are not fresh and open")
     annotation_tasks = actors["demo-annotator"].request("GET", "/api/v1/me/tasks")
-    if (
-        len(annotation_tasks) != 1
-        or annotation_tasks[0]["assignment_id"] != annotation["id"]
-        or annotation_tasks[0]["status"] != "open"
+    expected_tasks = {annotation["id"]}
+    if icd_result is not None:
+        expected_tasks.add(icd_result["annotation_assignment_id"])
+    if {row["assignment_id"] for row in annotation_tasks} != expected_tasks or any(
+        row["status"] != "open" for row in annotation_tasks
     ):
-        raise RuntimeError("The annotator's real accepted-text assignment is not open")
+        raise RuntimeError("The annotator's real annotation assignments are not open")
     members = lead.request("GET", f"/api/v1/projects/{PROJECT_KEY}/members")
     if {row["username"]: row["roles"] for row in members} != {
         name: [data[1]] for name, data in ACTORS.items()
     }:
         raise RuntimeError("Actual demo roles differ from the minimum-role contract")
+    if icd_result is not None:
+        members = lead.request("GET", f"/api/v1/projects/{ICD10CM_KEY}/members")
+        if {row["username"]: row["roles"] for row in members} != {
+            name: [role] for name, role in ICD10CM_ROLES.items()
+        }:
+            raise RuntimeError("ICD-10-CM project roles differ from the seed contract")
     write_private(
         directory / "seed-result.json",
         {
@@ -832,12 +983,43 @@ def seed(directory: Path) -> None:
                 assigned[name]["id"] for name in ("ready", "failed")
             ],
             "correction_pending_journey": "not preseeded; final packaged validation required",
-        },
+        }
+        | ({"icd10cm": icd_result} if icd_result is not None else {}),
     )
     # DEMO ONLY: read by the app user of the container through the read-only
     # mount, so readable by others; these passwords are shown to every browser
     # that opens the login page anyway. Written last, after a complete seed.
     write_private(directory / "demo-logins.json", demo_logins(passwords), mode=0o644)
+
+
+def seed_icd10cm(stack: Any, lead: Any, sha256: str) -> dict[str, Any]:
+    """Import the letter into the ICD-10-CM project and assign its annotation."""
+    lead.request(
+        "PATCH",
+        f"/api/v1/projects/{ICD10CM_KEY}/settings",
+        {"languages": [ICD10CM_LANGUAGE]},
+    )
+    ensure_creation_defaults(lead, ICD10CM_KEY)
+    stack.cli(
+        "import",
+        ICD10CM_KEY,
+        f"/tmp/{ICD10CM_DOCUMENT}.txt",
+        "--language",
+        ICD10CM_LANGUAGE,
+    )
+    documents = lead.request("GET", f"/api/v1/projects/{ICD10CM_KEY}/documents")
+    if [(row["external_id"], row["language"]) for row in documents] != [
+        (ICD10CM_DOCUMENT, ICD10CM_LANGUAGE)
+    ]:
+        raise RuntimeError("ICD-10-CM import did not produce the one discharge letter")
+    document = documents[0]["document_id"]
+    task = assign(lead, document, "demo-annotator", "annotate", ICD10CM_KEY)
+    return {
+        "project_key": ICD10CM_KEY,
+        "ontology_sha256": sha256,
+        "document_id": document,
+        "annotation_assignment_id": task["id"],
+    }
 
 
 def main() -> int:
@@ -864,13 +1046,20 @@ def main() -> int:
         "--snapshot-sha256",
         help="Explicit dirty source identity; requires matching OCI source-snapshot-sha256 image label",
     )
-    for command in (
-        setup,
-        commands.add_parser(
-            "seed", help="Seed one fresh already-running verified stack"
-        ),
-    ):
+    run = commands.add_parser(
+        "seed", help="Seed one fresh already-running verified stack"
+    )
+    for command in (setup, run):
         command.add_argument("--output-dir", required=True, type=Path)
+    run.add_argument(
+        "--with-icd10cm",
+        action="store_true",
+        help=(
+            "Also seed an ICD-10-CM project (tests/fixtures/icd10cm.json, one "
+            "discharge letter, one annotation task); needs an app with dotted "
+            "term ids (PR #489) and refuses before any write without them"
+        ),
+    )
     args = parser.parse_args()
     try:
         if args.operation == "prepare":
@@ -887,7 +1076,7 @@ def main() -> int:
                 args.inputs_dir,
             )
         else:
-            seed(args.output_dir)
+            seed(args.output_dir, with_icd10cm=args.with_icd10cm)
     except (ValueError, RuntimeError) as error:
         print(f"Acceptance operation refused or incomplete: {error}", file=sys.stderr)
         return 1
