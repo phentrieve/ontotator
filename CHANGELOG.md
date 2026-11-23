@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-23
+
 ### Added
 
 - Settings: **Show codes without the ontology prefix** in the new card **Term codes** (tab **Annotation**). In a project with one ontology the editor and the consolidation then show `N18.1` instead of `ICD10CM:N18.1` in the term search, the ontology tree and the findings; pointing at a short code shows the full one. Display only: saved findings, exports, the API and term links keep the full id. Off by default; a project with more than one ontology always shows the prefix. New column `projects.hide_term_id_prefix` (migration 0058); the setting is in `GET`/`PATCH …/settings` and the workspace view.
@@ -584,7 +586,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 First public release.
 
-[Unreleased]: https://github.com/phentrieve/ontotator/compare/v0.14.1...HEAD
+[Unreleased]: https://github.com/phentrieve/ontotator/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/phentrieve/ontotator/compare/v0.14.1...v0.15.0
 [0.14.1]: https://github.com/phentrieve/ontotator/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/phentrieve/ontotator/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/phentrieve/ontotator/compare/v0.12.0...v0.13.0
