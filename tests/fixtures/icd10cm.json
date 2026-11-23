@@ -1,0 +1,1463 @@
+{
+ "graphs": [
+  {
+   "id": "http://purl.obolibrary.org/obo/icd10cm.json",
+   "meta": {
+    "version": "http://purl.obolibrary.org/obo/icd10cm/releases/2026-10-01/icd10cm.json",
+    "basicPropertyValues": [
+     {
+      "pred": "http://purl.org/dc/terms/source",
+      "val": "ICD-10-CM FY2027 tabular list, CDC/NCHS (public domain); excerpt for tests"
+     }
+    ]
+   },
+   "nodes": [
+    {
+     "id": "ICD10CM:E00-E89",
+     "lbl": "Endocrine, nutritional and metabolic diseases",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E08-E13",
+     "lbl": "Diabetes mellitus",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11",
+     "lbl": "Type 2 diabetes mellitus",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.0",
+     "lbl": "Type 2 diabetes mellitus with hyperosmolarity",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.00",
+     "lbl": "Type 2 diabetes mellitus with hyperosmolarity without nonketotic hyperglycemic-hyperosmolar coma (NKHHC)",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.01",
+     "lbl": "Type 2 diabetes mellitus with hyperosmolarity with coma",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.1",
+     "lbl": "Type 2 diabetes mellitus with ketoacidosis",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.10",
+     "lbl": "Type 2 diabetes mellitus with ketoacidosis without coma",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.11",
+     "lbl": "Type 2 diabetes mellitus with ketoacidosis with coma",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.2",
+     "lbl": "Type 2 diabetes mellitus with kidney complications",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.21",
+     "lbl": "Type 2 diabetes mellitus with diabetic nephropathy",
+     "type": "CLASS",
+     "meta": {
+      "synonyms": [
+       {
+        "pred": "hasExactSynonym",
+        "val": "Type 2 diabetes mellitus with intercapillary glomerulosclerosis"
+       },
+       {
+        "pred": "hasExactSynonym",
+        "val": "Type 2 diabetes mellitus with intracapillary glomerulonephrosis"
+       },
+       {
+        "pred": "hasExactSynonym",
+        "val": "Type 2 diabetes mellitus with Kimmelstiel-Wilson disease"
+       }
+      ]
+     }
+    },
+    {
+     "id": "ICD10CM:E11.22",
+     "lbl": "Type 2 diabetes mellitus with diabetic chronic kidney disease",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.29",
+     "lbl": "Type 2 diabetes mellitus with other diabetic kidney complication",
+     "type": "CLASS",
+     "meta": {
+      "synonyms": [
+       {
+        "pred": "hasExactSynonym",
+        "val": "Type 2 diabetes mellitus with renal tubular degeneration"
+       }
+      ]
+     }
+    },
+    {
+     "id": "ICD10CM:E11.3",
+     "lbl": "Type 2 diabetes mellitus with ophthalmic complications",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.31",
+     "lbl": "Type 2 diabetes mellitus with unspecified diabetic retinopathy",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.32",
+     "lbl": "Type 2 diabetes mellitus with mild nonproliferative diabetic retinopathy",
+     "type": "CLASS",
+     "meta": {
+      "synonyms": [
+       {
+        "pred": "hasExactSynonym",
+        "val": "Type 2 diabetes mellitus with nonproliferative diabetic retinopathy NOS"
+       }
+      ]
+     }
+    },
+    {
+     "id": "ICD10CM:E11.33",
+     "lbl": "Type 2 diabetes mellitus with moderate nonproliferative diabetic retinopathy",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.34",
+     "lbl": "Type 2 diabetes mellitus with severe nonproliferative diabetic retinopathy",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.35",
+     "lbl": "Type 2 diabetes mellitus with proliferative diabetic retinopathy",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.36",
+     "lbl": "Type 2 diabetes mellitus with diabetic cataract",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.37",
+     "lbl": "Type 2 diabetes mellitus with diabetic macular edema, resolved following treatment",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.37X1",
+     "lbl": "Type 2 diabetes mellitus with diabetic macular edema, resolved following treatment, right eye",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.37X2",
+     "lbl": "Type 2 diabetes mellitus with diabetic macular edema, resolved following treatment, left eye",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.37X3",
+     "lbl": "Type 2 diabetes mellitus with diabetic macular edema, resolved following treatment, bilateral",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.37X9",
+     "lbl": "Type 2 diabetes mellitus with diabetic macular edema, resolved following treatment, unspecified eye",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.39",
+     "lbl": "Type 2 diabetes mellitus with other diabetic ophthalmic complication",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.4",
+     "lbl": "Type 2 diabetes mellitus with neurological complications",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.40",
+     "lbl": "Type 2 diabetes mellitus with diabetic neuropathy, unspecified",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.41",
+     "lbl": "Type 2 diabetes mellitus with diabetic mononeuropathy",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.42",
+     "lbl": "Type 2 diabetes mellitus with diabetic polyneuropathy",
+     "type": "CLASS",
+     "meta": {
+      "synonyms": [
+       {
+        "pred": "hasExactSynonym",
+        "val": "Type 2 diabetes mellitus with diabetic neuralgia"
+       }
+      ]
+     }
+    },
+    {
+     "id": "ICD10CM:E11.43",
+     "lbl": "Type 2 diabetes mellitus with diabetic autonomic (poly)neuropathy",
+     "type": "CLASS",
+     "meta": {
+      "synonyms": [
+       {
+        "pred": "hasExactSynonym",
+        "val": "Type 2 diabetes mellitus with diabetic gastroparesis"
+       }
+      ]
+     }
+    },
+    {
+     "id": "ICD10CM:E11.44",
+     "lbl": "Type 2 diabetes mellitus with diabetic amyotrophy",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.49",
+     "lbl": "Type 2 diabetes mellitus with other diabetic neurological complication",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.5",
+     "lbl": "Type 2 diabetes mellitus with circulatory complications",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.51",
+     "lbl": "Type 2 diabetes mellitus with diabetic peripheral angiopathy without gangrene",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.52",
+     "lbl": "Type 2 diabetes mellitus with diabetic peripheral angiopathy with gangrene",
+     "type": "CLASS",
+     "meta": {
+      "synonyms": [
+       {
+        "pred": "hasExactSynonym",
+        "val": "Type 2 diabetes mellitus with diabetic gangrene"
+       }
+      ]
+     }
+    },
+    {
+     "id": "ICD10CM:E11.59",
+     "lbl": "Type 2 diabetes mellitus with other circulatory complications",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.6",
+     "lbl": "Type 2 diabetes mellitus with other specified complications",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.61",
+     "lbl": "Type 2 diabetes mellitus with diabetic arthropathy",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.610",
+     "lbl": "Type 2 diabetes mellitus with diabetic neuropathic arthropathy",
+     "type": "CLASS",
+     "meta": {
+      "synonyms": [
+       {
+        "pred": "hasExactSynonym",
+        "val": "Type 2 diabetes mellitus with Charcôt's joints"
+       }
+      ]
+     }
+    },
+    {
+     "id": "ICD10CM:E11.618",
+     "lbl": "Type 2 diabetes mellitus with other diabetic arthropathy",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.62",
+     "lbl": "Type 2 diabetes mellitus with skin complications",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.620",
+     "lbl": "Type 2 diabetes mellitus with diabetic dermatitis",
+     "type": "CLASS",
+     "meta": {
+      "synonyms": [
+       {
+        "pred": "hasExactSynonym",
+        "val": "Type 2 diabetes mellitus with diabetic necrobiosis lipoidica"
+       }
+      ]
+     }
+    },
+    {
+     "id": "ICD10CM:E11.621",
+     "lbl": "Type 2 diabetes mellitus with foot ulcer",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.622",
+     "lbl": "Type 2 diabetes mellitus with other skin ulcer",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.628",
+     "lbl": "Type 2 diabetes mellitus with other skin complications",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.63",
+     "lbl": "Type 2 diabetes mellitus with oral complications",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.630",
+     "lbl": "Type 2 diabetes mellitus with periodontal disease",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.638",
+     "lbl": "Type 2 diabetes mellitus with other oral complications",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.64",
+     "lbl": "Type 2 diabetes mellitus with hypoglycemia",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.641",
+     "lbl": "Type 2 diabetes mellitus with hypoglycemia with coma",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.649",
+     "lbl": "Type 2 diabetes mellitus with hypoglycemia without coma",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.65",
+     "lbl": "Type 2 diabetes mellitus with hyperglycemia",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.69",
+     "lbl": "Type 2 diabetes mellitus with other specified complication",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.8",
+     "lbl": "Type 2 diabetes mellitus with unspecified complications",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.9",
+     "lbl": "Type 2 diabetes mellitus without complications",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:E11.A",
+     "lbl": "Type 2 diabetes mellitus without complications in remission",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:I00-I99",
+     "lbl": "Diseases of the circulatory system",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:I10-I1A",
+     "lbl": "Hypertensive diseases",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:I10",
+     "lbl": "Essential (primary) hypertension",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:J00-J99",
+     "lbl": "Diseases of the respiratory system",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:J40-J4B",
+     "lbl": "Chronic lower respiratory diseases",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:J45",
+     "lbl": "Asthma",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:J45.2",
+     "lbl": "Mild intermittent asthma",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:J45.20",
+     "lbl": "Mild intermittent asthma, uncomplicated",
+     "type": "CLASS",
+     "meta": {
+      "synonyms": [
+       {
+        "pred": "hasExactSynonym",
+        "val": "Mild intermittent asthma NOS"
+       }
+      ]
+     }
+    },
+    {
+     "id": "ICD10CM:J45.21",
+     "lbl": "Mild intermittent asthma with (acute) exacerbation",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:J45.22",
+     "lbl": "Mild intermittent asthma with status asthmaticus",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:J45.3",
+     "lbl": "Mild persistent asthma",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:J45.30",
+     "lbl": "Mild persistent asthma, uncomplicated",
+     "type": "CLASS",
+     "meta": {
+      "synonyms": [
+       {
+        "pred": "hasExactSynonym",
+        "val": "Mild persistent asthma NOS"
+       }
+      ]
+     }
+    },
+    {
+     "id": "ICD10CM:J45.31",
+     "lbl": "Mild persistent asthma with (acute) exacerbation",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:J45.32",
+     "lbl": "Mild persistent asthma with status asthmaticus",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:J45.4",
+     "lbl": "Moderate persistent asthma",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:J45.40",
+     "lbl": "Moderate persistent asthma, uncomplicated",
+     "type": "CLASS",
+     "meta": {
+      "synonyms": [
+       {
+        "pred": "hasExactSynonym",
+        "val": "Moderate persistent asthma NOS"
+       }
+      ]
+     }
+    },
+    {
+     "id": "ICD10CM:J45.41",
+     "lbl": "Moderate persistent asthma with (acute) exacerbation",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:J45.42",
+     "lbl": "Moderate persistent asthma with status asthmaticus",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:J45.5",
+     "lbl": "Severe persistent asthma",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:J45.50",
+     "lbl": "Severe persistent asthma, uncomplicated",
+     "type": "CLASS",
+     "meta": {
+      "synonyms": [
+       {
+        "pred": "hasExactSynonym",
+        "val": "Severe persistent asthma NOS"
+       }
+      ]
+     }
+    },
+    {
+     "id": "ICD10CM:J45.51",
+     "lbl": "Severe persistent asthma with (acute) exacerbation",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:J45.52",
+     "lbl": "Severe persistent asthma with status asthmaticus",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:J45.9",
+     "lbl": "Other and unspecified asthma",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:J45.90",
+     "lbl": "Unspecified asthma",
+     "type": "CLASS",
+     "meta": {
+      "synonyms": [
+       {
+        "pred": "hasExactSynonym",
+        "val": "Asthmatic bronchitis NOS"
+       },
+       {
+        "pred": "hasExactSynonym",
+        "val": "Childhood asthma NOS"
+       },
+       {
+        "pred": "hasExactSynonym",
+        "val": "Late onset asthma"
+       }
+      ]
+     }
+    },
+    {
+     "id": "ICD10CM:J45.901",
+     "lbl": "Unspecified asthma with (acute) exacerbation",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:J45.902",
+     "lbl": "Unspecified asthma with status asthmaticus",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:J45.909",
+     "lbl": "Unspecified asthma, uncomplicated",
+     "type": "CLASS",
+     "meta": {
+      "synonyms": [
+       {
+        "pred": "hasExactSynonym",
+        "val": "Asthma NOS"
+       }
+      ]
+     }
+    },
+    {
+     "id": "ICD10CM:J45.99",
+     "lbl": "Other asthma",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:J45.990",
+     "lbl": "Exercise induced bronchospasm",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:J45.991",
+     "lbl": "Cough variant asthma",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:J45.998",
+     "lbl": "Other asthma",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:N00-N99",
+     "lbl": "Diseases of the genitourinary system",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:N17-N19",
+     "lbl": "Acute kidney failure and chronic kidney disease",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:N18",
+     "lbl": "Chronic kidney disease (CKD)",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:N18.1",
+     "lbl": "Chronic kidney disease, stage 1",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:N18.2",
+     "lbl": "Chronic kidney disease, stage 2 (mild)",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:N18.3",
+     "lbl": "Chronic kidney disease, stage 3 (moderate)",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:N18.30",
+     "lbl": "Chronic kidney disease, stage 3 unspecified",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:N18.31",
+     "lbl": "Chronic kidney disease, stage 3a",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:N18.32",
+     "lbl": "Chronic kidney disease, stage 3b",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:N18.4",
+     "lbl": "Chronic kidney disease, stage 4 (severe)",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:N18.5",
+     "lbl": "Chronic kidney disease, stage 5",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:N18.6",
+     "lbl": "End stage renal disease",
+     "type": "CLASS",
+     "meta": {
+      "synonyms": [
+       {
+        "pred": "hasExactSynonym",
+        "val": "Chronic kidney disease requiring chronic dialysis"
+       }
+      ]
+     }
+    },
+    {
+     "id": "ICD10CM:N18.9",
+     "lbl": "Chronic kidney disease, unspecified",
+     "type": "CLASS",
+     "meta": {
+      "synonyms": [
+       {
+        "pred": "hasExactSynonym",
+        "val": "Chronic renal disease"
+       },
+       {
+        "pred": "hasExactSynonym",
+        "val": "Chronic renal failure NOS"
+       },
+       {
+        "pred": "hasExactSynonym",
+        "val": "Chronic renal insufficiency"
+       },
+       {
+        "pred": "hasExactSynonym",
+        "val": "Chronic uremia NOS"
+       },
+       {
+        "pred": "hasExactSynonym",
+        "val": "Diffuse sclerosing glomerulonephritis NOS"
+       }
+      ]
+     }
+    },
+    {
+     "id": "ICD10CM:S00-T88",
+     "lbl": "Injury, poisoning and certain other consequences of external causes",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36-T50",
+     "lbl": "Poisoning by, adverse effects of and underdosing of drugs, medicaments and biological substances",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36",
+     "lbl": "Poisoning by, adverse effect of and underdosing of systemic antibiotics",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36.0",
+     "lbl": "Poisoning by, adverse effect of and underdosing of penicillins",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36.0X",
+     "lbl": "Poisoning by, adverse effect of and underdosing of penicillins",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36.0X1",
+     "lbl": "Poisoning by penicillins, accidental (unintentional)",
+     "type": "CLASS",
+     "meta": {
+      "synonyms": [
+       {
+        "pred": "hasExactSynonym",
+        "val": "Poisoning by penicillins NOS"
+       }
+      ]
+     }
+    },
+    {
+     "id": "ICD10CM:T36.0X1A",
+     "lbl": "Poisoning by penicillins, accidental (unintentional), initial encounter",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36.0X1D",
+     "lbl": "Poisoning by penicillins, accidental (unintentional), subsequent encounter",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36.0X1S",
+     "lbl": "Poisoning by penicillins, accidental (unintentional), sequela",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36.0X2",
+     "lbl": "Poisoning by penicillins, intentional self-harm",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36.0X2A",
+     "lbl": "Poisoning by penicillins, intentional self-harm, initial encounter",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36.0X2D",
+     "lbl": "Poisoning by penicillins, intentional self-harm, subsequent encounter",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36.0X2S",
+     "lbl": "Poisoning by penicillins, intentional self-harm, sequela",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36.0X3",
+     "lbl": "Poisoning by penicillins, assault",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36.0X3A",
+     "lbl": "Poisoning by penicillins, assault, initial encounter",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36.0X3D",
+     "lbl": "Poisoning by penicillins, assault, subsequent encounter",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36.0X3S",
+     "lbl": "Poisoning by penicillins, assault, sequela",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36.0X4",
+     "lbl": "Poisoning by penicillins, undetermined",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36.0X4A",
+     "lbl": "Poisoning by penicillins, undetermined, initial encounter",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36.0X4D",
+     "lbl": "Poisoning by penicillins, undetermined, subsequent encounter",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36.0X4S",
+     "lbl": "Poisoning by penicillins, undetermined, sequela",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36.0X5",
+     "lbl": "Adverse effect of penicillins",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36.0X5A",
+     "lbl": "Adverse effect of penicillins, initial encounter",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36.0X5D",
+     "lbl": "Adverse effect of penicillins, subsequent encounter",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36.0X5S",
+     "lbl": "Adverse effect of penicillins, sequela",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36.0X6",
+     "lbl": "Underdosing of penicillins",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36.0X6A",
+     "lbl": "Underdosing of penicillins, initial encounter",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36.0X6D",
+     "lbl": "Underdosing of penicillins, subsequent encounter",
+     "type": "CLASS"
+    },
+    {
+     "id": "ICD10CM:T36.0X6S",
+     "lbl": "Underdosing of penicillins, sequela",
+     "type": "CLASS"
+    }
+   ],
+   "edges": [
+    {
+     "sub": "ICD10CM:E08-E13",
+     "pred": "is_a",
+     "obj": "ICD10CM:E00-E89"
+    },
+    {
+     "sub": "ICD10CM:E11",
+     "pred": "is_a",
+     "obj": "ICD10CM:E08-E13"
+    },
+    {
+     "sub": "ICD10CM:E11.0",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11"
+    },
+    {
+     "sub": "ICD10CM:E11.00",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.0"
+    },
+    {
+     "sub": "ICD10CM:E11.01",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.0"
+    },
+    {
+     "sub": "ICD10CM:E11.1",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11"
+    },
+    {
+     "sub": "ICD10CM:E11.10",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.1"
+    },
+    {
+     "sub": "ICD10CM:E11.11",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.1"
+    },
+    {
+     "sub": "ICD10CM:E11.2",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11"
+    },
+    {
+     "sub": "ICD10CM:E11.21",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.2"
+    },
+    {
+     "sub": "ICD10CM:E11.22",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.2"
+    },
+    {
+     "sub": "ICD10CM:E11.29",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.2"
+    },
+    {
+     "sub": "ICD10CM:E11.3",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11"
+    },
+    {
+     "sub": "ICD10CM:E11.31",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.3"
+    },
+    {
+     "sub": "ICD10CM:E11.32",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.3"
+    },
+    {
+     "sub": "ICD10CM:E11.33",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.3"
+    },
+    {
+     "sub": "ICD10CM:E11.34",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.3"
+    },
+    {
+     "sub": "ICD10CM:E11.35",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.3"
+    },
+    {
+     "sub": "ICD10CM:E11.36",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.3"
+    },
+    {
+     "sub": "ICD10CM:E11.37",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.3"
+    },
+    {
+     "sub": "ICD10CM:E11.37X1",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.37"
+    },
+    {
+     "sub": "ICD10CM:E11.37X2",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.37"
+    },
+    {
+     "sub": "ICD10CM:E11.37X3",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.37"
+    },
+    {
+     "sub": "ICD10CM:E11.37X9",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.37"
+    },
+    {
+     "sub": "ICD10CM:E11.39",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.3"
+    },
+    {
+     "sub": "ICD10CM:E11.4",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11"
+    },
+    {
+     "sub": "ICD10CM:E11.40",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.4"
+    },
+    {
+     "sub": "ICD10CM:E11.41",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.4"
+    },
+    {
+     "sub": "ICD10CM:E11.42",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.4"
+    },
+    {
+     "sub": "ICD10CM:E11.43",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.4"
+    },
+    {
+     "sub": "ICD10CM:E11.44",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.4"
+    },
+    {
+     "sub": "ICD10CM:E11.49",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.4"
+    },
+    {
+     "sub": "ICD10CM:E11.5",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11"
+    },
+    {
+     "sub": "ICD10CM:E11.51",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.5"
+    },
+    {
+     "sub": "ICD10CM:E11.52",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.5"
+    },
+    {
+     "sub": "ICD10CM:E11.59",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.5"
+    },
+    {
+     "sub": "ICD10CM:E11.6",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11"
+    },
+    {
+     "sub": "ICD10CM:E11.61",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.6"
+    },
+    {
+     "sub": "ICD10CM:E11.610",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.61"
+    },
+    {
+     "sub": "ICD10CM:E11.618",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.61"
+    },
+    {
+     "sub": "ICD10CM:E11.62",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.6"
+    },
+    {
+     "sub": "ICD10CM:E11.620",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.62"
+    },
+    {
+     "sub": "ICD10CM:E11.621",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.62"
+    },
+    {
+     "sub": "ICD10CM:E11.622",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.62"
+    },
+    {
+     "sub": "ICD10CM:E11.628",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.62"
+    },
+    {
+     "sub": "ICD10CM:E11.63",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.6"
+    },
+    {
+     "sub": "ICD10CM:E11.630",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.63"
+    },
+    {
+     "sub": "ICD10CM:E11.638",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.63"
+    },
+    {
+     "sub": "ICD10CM:E11.64",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.6"
+    },
+    {
+     "sub": "ICD10CM:E11.641",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.64"
+    },
+    {
+     "sub": "ICD10CM:E11.649",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.64"
+    },
+    {
+     "sub": "ICD10CM:E11.65",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.6"
+    },
+    {
+     "sub": "ICD10CM:E11.69",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11.6"
+    },
+    {
+     "sub": "ICD10CM:E11.8",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11"
+    },
+    {
+     "sub": "ICD10CM:E11.9",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11"
+    },
+    {
+     "sub": "ICD10CM:E11.A",
+     "pred": "is_a",
+     "obj": "ICD10CM:E11"
+    },
+    {
+     "sub": "ICD10CM:I10-I1A",
+     "pred": "is_a",
+     "obj": "ICD10CM:I00-I99"
+    },
+    {
+     "sub": "ICD10CM:I10",
+     "pred": "is_a",
+     "obj": "ICD10CM:I10-I1A"
+    },
+    {
+     "sub": "ICD10CM:J40-J4B",
+     "pred": "is_a",
+     "obj": "ICD10CM:J00-J99"
+    },
+    {
+     "sub": "ICD10CM:J45",
+     "pred": "is_a",
+     "obj": "ICD10CM:J40-J4B"
+    },
+    {
+     "sub": "ICD10CM:J45.2",
+     "pred": "is_a",
+     "obj": "ICD10CM:J45"
+    },
+    {
+     "sub": "ICD10CM:J45.20",
+     "pred": "is_a",
+     "obj": "ICD10CM:J45.2"
+    },
+    {
+     "sub": "ICD10CM:J45.21",
+     "pred": "is_a",
+     "obj": "ICD10CM:J45.2"
+    },
+    {
+     "sub": "ICD10CM:J45.22",
+     "pred": "is_a",
+     "obj": "ICD10CM:J45.2"
+    },
+    {
+     "sub": "ICD10CM:J45.3",
+     "pred": "is_a",
+     "obj": "ICD10CM:J45"
+    },
+    {
+     "sub": "ICD10CM:J45.30",
+     "pred": "is_a",
+     "obj": "ICD10CM:J45.3"
+    },
+    {
+     "sub": "ICD10CM:J45.31",
+     "pred": "is_a",
+     "obj": "ICD10CM:J45.3"
+    },
+    {
+     "sub": "ICD10CM:J45.32",
+     "pred": "is_a",
+     "obj": "ICD10CM:J45.3"
+    },
+    {
+     "sub": "ICD10CM:J45.4",
+     "pred": "is_a",
+     "obj": "ICD10CM:J45"
+    },
+    {
+     "sub": "ICD10CM:J45.40",
+     "pred": "is_a",
+     "obj": "ICD10CM:J45.4"
+    },
+    {
+     "sub": "ICD10CM:J45.41",
+     "pred": "is_a",
+     "obj": "ICD10CM:J45.4"
+    },
+    {
+     "sub": "ICD10CM:J45.42",
+     "pred": "is_a",
+     "obj": "ICD10CM:J45.4"
+    },
+    {
+     "sub": "ICD10CM:J45.5",
+     "pred": "is_a",
+     "obj": "ICD10CM:J45"
+    },
+    {
+     "sub": "ICD10CM:J45.50",
+     "pred": "is_a",
+     "obj": "ICD10CM:J45.5"
+    },
+    {
+     "sub": "ICD10CM:J45.51",
+     "pred": "is_a",
+     "obj": "ICD10CM:J45.5"
+    },
+    {
+     "sub": "ICD10CM:J45.52",
+     "pred": "is_a",
+     "obj": "ICD10CM:J45.5"
+    },
+    {
+     "sub": "ICD10CM:J45.9",
+     "pred": "is_a",
+     "obj": "ICD10CM:J45"
+    },
+    {
+     "sub": "ICD10CM:J45.90",
+     "pred": "is_a",
+     "obj": "ICD10CM:J45.9"
+    },
+    {
+     "sub": "ICD10CM:J45.901",
+     "pred": "is_a",
+     "obj": "ICD10CM:J45.90"
+    },
+    {
+     "sub": "ICD10CM:J45.902",
+     "pred": "is_a",
+     "obj": "ICD10CM:J45.90"
+    },
+    {
+     "sub": "ICD10CM:J45.909",
+     "pred": "is_a",
+     "obj": "ICD10CM:J45.90"
+    },
+    {
+     "sub": "ICD10CM:J45.99",
+     "pred": "is_a",
+     "obj": "ICD10CM:J45.9"
+    },
+    {
+     "sub": "ICD10CM:J45.990",
+     "pred": "is_a",
+     "obj": "ICD10CM:J45.99"
+    },
+    {
+     "sub": "ICD10CM:J45.991",
+     "pred": "is_a",
+     "obj": "ICD10CM:J45.99"
+    },
+    {
+     "sub": "ICD10CM:J45.998",
+     "pred": "is_a",
+     "obj": "ICD10CM:J45.99"
+    },
+    {
+     "sub": "ICD10CM:N17-N19",
+     "pred": "is_a",
+     "obj": "ICD10CM:N00-N99"
+    },
+    {
+     "sub": "ICD10CM:N18",
+     "pred": "is_a",
+     "obj": "ICD10CM:N17-N19"
+    },
+    {
+     "sub": "ICD10CM:N18.1",
+     "pred": "is_a",
+     "obj": "ICD10CM:N18"
+    },
+    {
+     "sub": "ICD10CM:N18.2",
+     "pred": "is_a",
+     "obj": "ICD10CM:N18"
+    },
+    {
+     "sub": "ICD10CM:N18.3",
+     "pred": "is_a",
+     "obj": "ICD10CM:N18"
+    },
+    {
+     "sub": "ICD10CM:N18.30",
+     "pred": "is_a",
+     "obj": "ICD10CM:N18.3"
+    },
+    {
+     "sub": "ICD10CM:N18.31",
+     "pred": "is_a",
+     "obj": "ICD10CM:N18.3"
+    },
+    {
+     "sub": "ICD10CM:N18.32",
+     "pred": "is_a",
+     "obj": "ICD10CM:N18.3"
+    },
+    {
+     "sub": "ICD10CM:N18.4",
+     "pred": "is_a",
+     "obj": "ICD10CM:N18"
+    },
+    {
+     "sub": "ICD10CM:N18.5",
+     "pred": "is_a",
+     "obj": "ICD10CM:N18"
+    },
+    {
+     "sub": "ICD10CM:N18.6",
+     "pred": "is_a",
+     "obj": "ICD10CM:N18"
+    },
+    {
+     "sub": "ICD10CM:N18.9",
+     "pred": "is_a",
+     "obj": "ICD10CM:N18"
+    },
+    {
+     "sub": "ICD10CM:T36-T50",
+     "pred": "is_a",
+     "obj": "ICD10CM:S00-T88"
+    },
+    {
+     "sub": "ICD10CM:T36",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36-T50"
+    },
+    {
+     "sub": "ICD10CM:T36.0",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36"
+    },
+    {
+     "sub": "ICD10CM:T36.0X",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36.0"
+    },
+    {
+     "sub": "ICD10CM:T36.0X1",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36.0X"
+    },
+    {
+     "sub": "ICD10CM:T36.0X1A",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36.0X1"
+    },
+    {
+     "sub": "ICD10CM:T36.0X1D",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36.0X1"
+    },
+    {
+     "sub": "ICD10CM:T36.0X1S",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36.0X1"
+    },
+    {
+     "sub": "ICD10CM:T36.0X2",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36.0X"
+    },
+    {
+     "sub": "ICD10CM:T36.0X2A",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36.0X2"
+    },
+    {
+     "sub": "ICD10CM:T36.0X2D",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36.0X2"
+    },
+    {
+     "sub": "ICD10CM:T36.0X2S",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36.0X2"
+    },
+    {
+     "sub": "ICD10CM:T36.0X3",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36.0X"
+    },
+    {
+     "sub": "ICD10CM:T36.0X3A",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36.0X3"
+    },
+    {
+     "sub": "ICD10CM:T36.0X3D",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36.0X3"
+    },
+    {
+     "sub": "ICD10CM:T36.0X3S",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36.0X3"
+    },
+    {
+     "sub": "ICD10CM:T36.0X4",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36.0X"
+    },
+    {
+     "sub": "ICD10CM:T36.0X4A",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36.0X4"
+    },
+    {
+     "sub": "ICD10CM:T36.0X4D",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36.0X4"
+    },
+    {
+     "sub": "ICD10CM:T36.0X4S",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36.0X4"
+    },
+    {
+     "sub": "ICD10CM:T36.0X5",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36.0X"
+    },
+    {
+     "sub": "ICD10CM:T36.0X5A",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36.0X5"
+    },
+    {
+     "sub": "ICD10CM:T36.0X5D",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36.0X5"
+    },
+    {
+     "sub": "ICD10CM:T36.0X5S",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36.0X5"
+    },
+    {
+     "sub": "ICD10CM:T36.0X6",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36.0X"
+    },
+    {
+     "sub": "ICD10CM:T36.0X6A",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36.0X6"
+    },
+    {
+     "sub": "ICD10CM:T36.0X6D",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36.0X6"
+    },
+    {
+     "sub": "ICD10CM:T36.0X6S",
+     "pred": "is_a",
+     "obj": "ICD10CM:T36.0X6"
+    }
+   ]
+  }
+ ]
+}

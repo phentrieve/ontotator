@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Settings: **Show codes without the ontology prefix** in the new card **Term codes** (tab **Annotation**). In a project with one ontology the editor and the consolidation then show `N18.1` instead of `ICD10CM:N18.1` in the term search, the ontology tree and the findings; pointing at a short code shows the full one. Display only: saved findings, exports, the API and term links keep the full id. Off by default; a project with more than one ontology always shows the prefix. New column `projects.hide_term_id_prefix` (migration 0058); the setting is in `GET`/`PATCH …/settings` and the workspace view.
 
+### Changed
+
+- Ontologies: a term id may have dots inside its local part, as ICD-10 or ATC codes do (`ICD10CM:T36.0X1A`). Annotations, modifiers, the search filter `within` and the OBO Graph import accept such ids; an OBO IRI ending in `ICD10CM_T36.0X1A` becomes `ICD10CM:T36.0X1A`. A dot at the start or end of the local part, or two dots in a row, is still no id. An IRI's local part may now also hold a hyphen (`XMPL_A00-A09`), as the CURIE form already allowed. The term search takes such a code as an id: `E11.621`, `e11.621` or `ICD10CM:E11.621` in **Search term** goes straight to that term when the ontology has it, as `HP:0001250` or `1250` already did; a code the ontology lacks (`HP:00012A`) is still searched as words.
+
 ## [0.14.0] - 2026-11-23
 
 ### Added

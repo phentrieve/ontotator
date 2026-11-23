@@ -72,6 +72,13 @@ from tests.work_plan_support import plan_all  # noqa: E402
 
 ONTOLOGY = ROOT / "tests/fixtures/hp.json"
 MONDO_ONTOLOGY = ROOT / "tests/fixtures/mondo.json"
+# An ICD-10-CM excerpt (tests/fixtures/icd10cm.md): codes with dots and letters.
+ICD10CM_ONTOLOGY = ROOT / "tests/fixtures/icd10cm.json"
+ICD10CM_PROJECT = "browser-fixture-icd10cm"
+ICD10CM_TEXT = (
+    "Type 2 diabetes with a foot ulcer of the left heel. Chronic kidney disease,"
+    " stage 1. Mild persistent asthma. Rash after amoxicillin."
+)
 PORT = int(os.environ.get("HPO_E2E_PORT", "18765"))
 # Idle keep-alive connections stay open this long (uvicorn's default is 5 s).
 BROWSER_KEEP_ALIVE_SECONDS = 600
@@ -374,6 +381,48 @@ def fixture_project(spec: str) -> str:
     return f"browser-fixture-{spec}"
 
 
+def icd10cm_package() -> ValidatedPackage:
+    """A project on the ICD-10-CM excerpt: one text, no proposals (ICD10CM_PROJECT)."""
+    ontology = OntologyDefinition(
+        ontology_id="icd10cm",
+        label="ICD-10-CM",
+        release="2026-10-01",
+        sha256=hashlib.sha256(ICD10CM_ONTOLOGY.read_bytes()).hexdigest(),
+        format="obo-graph-json",
+        resource_path="ontologies/icd10cm.json",
+    )
+    base = fixture_package(project_key=ICD10CM_PROJECT)
+    hp_layer = base.manifest.task_profile.layers[0]
+    layer = hp_layer.model_copy(
+        update={"layer_id": "icd-layer", "label": "Diagnoses", "ontology_id": "icd10cm"}
+    )
+    profile = base.manifest.task_profile.model_copy(
+        update={
+            "profile_id": "icd10cm-browser/v1",
+            "ontologies": [ontology],
+            "layers": [layer],
+            "default_layer_id": "icd-layer",
+        }
+    )
+    doc = base.documents["browser-doc"].model_copy(
+        update={
+            "text": ICD10CM_TEXT,
+            "text_sha256": hashlib.sha256(ICD10CM_TEXT.encode("utf-8")).hexdigest(),
+        }
+    )
+    return ValidatedPackage(
+        manifest=base.manifest.model_copy(
+            update={
+                "task_profile": profile,
+                "task_profile_sha256": profile_hash(profile),
+            }
+        ),
+        documents={doc.document_id: doc},
+        annotations={},
+        evidence={},
+    )
+
+
 def decision_scenario_package() -> ValidatedPackage:
     """decision-semantics.spec.ts's own copy of layers.spec.ts's multi-layer project."""
     pkg = scenario_package("multi_editable")
@@ -437,6 +486,7 @@ def seed_packages() -> list[ValidatedPackage]:
         decision_scenario_package(),
         copy_tree_follow_package(),
         copy_passage_package(),
+        icd10cm_package(),
     ]
 
 
@@ -1397,12 +1447,12 @@ if __name__ == "__main__":
         config = AppConfig(
             workspace_dir=root,
             database_url=database_url_for(root / "editor.db"),
-            ontology_paths=[ONTOLOGY, MONDO_ONTOLOGY],
+            ontology_paths=[ONTOLOGY, MONDO_ONTOLOGY, ICD10CM_ONTOLOGY],
             port=PORT,
             web_dir=ROOT / "frontend/dist",
         )
         app = create_app(config)
-        for ontology_path in (ONTOLOGY, MONDO_ONTOLOGY):
+        for ontology_path in (ONTOLOGY, MONDO_ONTOLOGY, ICD10CM_ONTOLOGY):
             app.state.ontology_store.add(
                 Actor.cli(), ontology_path.name, ontology_path.read_bytes()
             )
@@ -1507,7 +1557,7 @@ if __name__ == "__main__":
                 from test_project_repin import newer_release
 
                 name, data = "hp.json", newer_release()
-            elif name in {"hp.json", "mondo.json"}:
+            elif name in {"hp.json", "mondo.json", "icd10cm.json"}:
                 data = (ROOT / "tests/fixtures" / name).read_bytes()
             else:
                 raise HTTPException(400, "not a fixture ontology")
