@@ -335,12 +335,14 @@ The marks are only shown over the text: the text stays exactly this version, so 
 
 What for: move your findings to the corrected text after the text got a new version, for example from a translation review, a lead's correction or an upload, and your task moved to it. The toolbar reads **Check after text change** while findings are marked **Check needed**. This works the same in a task from proposals: only findings in changed passages need you; your other decisions on the proposals are already carried.
 
-1. The panel **Needs review after the text change** lists the findings to place again.
-2. For each item, click **Re-create here** and mark the supporting text in the corrected version.
-3. Check the term, then click **Save re-created finding**. You can choose a different term below.
-4. Check the text span and the values of the saved finding, then click **Complete text-change review**. A later change to the finding needs this again.
+1. The panel **Needs review after the text change** lists the findings to place again, one row each: the term, the words it was on, and its values when they differ from the defaults. Each item is also marked in the text with a dashed frame: where its words are now, or the new wording that replaced them. Point at a mark to see the term and the old words. Clicking a mark selects its row; clicking the term in a row scrolls the text there.
+2. If the words are still in the corrected text, for example in a sentence that was only reordered, the row offers **Use this location**. One click re-creates the finding there with its term and values and completes its review. If the words occur more than once nearby, **Next place** moves the offer to the next one. Two findings on the same words each get the offer.
+3. Otherwise, or to use other words, click **Mark in text** and mark the supporting text in the corrected version. A row that reads *now “…”* names the new wording in place of the old words; *not found in the corrected text* means there is no reliable place, and the text only scrolls near it. Check the term, then click **Save re-created finding**. You can choose a different term below.
+4. After each item the next one is selected, in the panel and in the text, and its first action has the focus. Press `N` to move to the next item yourself, `Shift + N` to go back.
 
-If the finding no longer fits, click **Dismiss with reason**, fill in **Reason for dismissal** and click **Save dismissal**.
+Saving completes the review of the item. Values the tool defaulted stay marked **Defaults to confirm**, as on any finding. Only where the project requires chosen values does the saved finding open first: confirm or change its values, then click **Complete text-change review**. A later change to a re-created finding needs **Complete text-change review** again.
+
+If the finding no longer fits, click **Dismiss…**, fill in **Reason for dismissal** and click **Save dismissal**. **Show text change** in a row shows the reason, the original and the current context, and the changes between them.
 
 To see which passages the correction changed, tick **Show changes since** v1 above the text ([See what changed since the earlier version](#see-what-changed-since-the-earlier-version)).
 

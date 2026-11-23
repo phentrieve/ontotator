@@ -2698,6 +2698,20 @@ details.case-version-controls > .btn { vertical-align: bottom; }
 .problem-report-detail fieldset { min-width: 0; }
 .report-history dd { margin-inline-start: 0; }
 .reanchor-panel ol { padding-left: var(--space-4); }
+/* An item that needs review after a text change (#633): a dashed frame where its words are now or where they were.
+   Its line form is its own (findings use fills and bottom borders); alone it has no fill, over a finding it keeps it. */
+.run--pending { outline: 1.5px dashed var(--warning); outline-offset: 1px; }
+.run--ghost { background-image: none; }
+.run--pending.run--framed { outline-style: solid; }
+/* Compact rows: term, the old words and the actions; the text change on demand. */
+.reanchor-row { padding-block: var(--space-1); border-radius: var(--radius-sm); }
+.reanchor-row[data-selected] { box-shadow: inset 3px 0 0 var(--warning); padding-left: var(--space-2); }
+.reanchor-row__head, .reanchor-row__values { margin: 0; overflow-wrap: anywhere; }
+.reanchor-row__values { color: var(--text-muted); font-size: var(--size-sm); }
+.reanchor-row__now { color: var(--text-muted); }
+.reanchor-row__term.btn { padding-inline: 0; font-weight: 600; }
+.reanchor-row__actions { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-block: var(--space-1); }
+.reanchor-row__more > summary { cursor: pointer; font-size: var(--size-sm); }
 .reanchor-panel .translation-diff { max-height: 16rem; min-height: 0; }
 
 .reanchor-context mark { background: var(--warning-light); color: inherit; }

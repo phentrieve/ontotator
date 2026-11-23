@@ -10308,6 +10308,9 @@ export interface components {
             new_context: components["schemas"]["TextWindowView"];
             /** Diff */
             diff: components["schemas"]["WindowOpcodeView"][];
+            /** Suggestions */
+            suggestions?: components["schemas"]["TextWindowView"][][];
+            changed_at?: components["schemas"]["TextWindowView"] | null;
             /** Old Segments */
             readonly old_segments: components["schemas"]["TextWindowView"][];
         };
