@@ -8077,6 +8077,8 @@ export interface components {
             available: boolean;
             /** Reason */
             reason: string | null;
+            /** Missing Languages */
+            missing_languages: string[];
             /** Reviewed Again */
             reviewed_again: boolean;
             /** Review On */

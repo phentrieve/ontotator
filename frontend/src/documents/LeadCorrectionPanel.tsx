@@ -136,7 +136,7 @@ export function LeadCorrectionPanel({ row, projectKey, onNavigate, onCancel, hea
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<Exclude<Failure, { kind: "languages" }> | null>(null);
   /** Missing profile languages once the server asked for the confirmation (stays until answered). */
-  const [missing, setMissing] = useState<string[] | null>(null);
+  const [asked, setAsked] = useState<string[] | null>(null);
   const [confirmLanguage, setConfirmLanguage] = useState(false);
   const documentId = chosen ?? correctionDocumentId(row);
   const entry = row.versions.find(item => item.document_id === documentId);
@@ -146,6 +146,9 @@ export function LeadCorrectionPanel({ row, projectKey, onNavigate, onCancel, hea
   const [preview, setPreview] = useState<LeadCorrectionPreview | null>(null);
   const [previewError, setPreviewError] = useState<unknown>();
   const unavailable = preview && !preview.available ? NOT_AVAILABLE[preview.reason ?? ""] ?? null : null;
+  // Issue 629: the preview names the languages start would ask to confirm, so the checkbox is there before the first
+  // attempt; a refusal (LANGUAGE_CONFIRMATION_REQUIRED) still shows it when the preview did not load.
+  const missing = asked ?? (preview?.missing_languages?.length ? preview.missing_languages : null);
   const unconfirmed = missing !== null && !confirmLanguage;
   const blocked = unconfirmed || unavailable !== null;
 
@@ -153,10 +156,11 @@ export function LeadCorrectionPanel({ row, projectKey, onNavigate, onCancel, hea
   const primary = useRef<HTMLButtonElement>(null);
   useEffect(() => { (inDialog ? primary : heading).current?.focus(); }, [inDialog]);
   // Issue 341 b: the consequences for the work on an accepted version (or its rejected correction), before saving.
+  // Issue 629: loaded for every correction, for the missing languages; its failure is shown only where the
+  // consequences depend on it (an accepted version or its correction), else start reports what is wrong.
   useEffect(() => {
-    if (!again) return;
     let live = true;
-    api.getLeadCorrectionPreview(projectKey, documentId).then(value => { if (live) setPreview(value); }, failure => { if (live) setPreviewError(failure); });
+    api.getLeadCorrectionPreview(projectKey, documentId).then(value => { if (live) setPreview(value); }, failure => { if (live && again) setPreviewError(failure); });
     return () => { live = false; };
   }, [again, projectKey, documentId]);
 
@@ -169,13 +173,13 @@ export function LeadCorrectionPanel({ row, projectKey, onNavigate, onCancel, hea
       onNavigate({ name: "task", assignmentId: assignment.id });
     } catch (error: unknown) {
       const next = failureOf(error);
-      if (next.kind === "languages") { setMissing(next.missing); setConfirmLanguage(false); } else setFailure(next);
+      if (next.kind === "languages") { setAsked(next.missing); setConfirmLanguage(false); } else setFailure(next);
     } finally { writing.current = false; setBusy(false); }
   };
 
   const next = preview?.next_version ?? version + 1;
-  const consequences = preview ? correctionConsequences(preview) : [];
-  const annotated = preview ? preview.annotations.submitted + preview.annotations.open > 0 : false;
+  const consequences = preview && again ? correctionConsequences(preview) : [];
+  const annotated = preview && again ? preview.annotations.submitted + preview.annotations.open > 0 : false;
   return <div className="documents-resolve" role="group" aria-labelledby={inDialog ? undefined : `${id}-title`} aria-label={inDialog ? `Correct it myself, ${textLabel(row)} v${version}` : undefined}>
     {/* Rule 2: the step repeats the label of the action that opened it. */}
     {!inDialog && <Heading id={`${id}-title`} ref={heading} tabIndex={-1} className="inline-confirm-title">{`${correctLabel(again).replace(/…$/, "")}, ${textLabel(row)}`}</Heading>}

@@ -2,9 +2,23 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field
+
+
+def _member_role(value: str) -> str:
+    """'consolidator' is the web interface's name of the 'adjudicator' role."""
+    return "adjudicator" if value == "consolidator" else value
+
+
+# A project role; 'consolidator' (the name on the web interface and in
+# `ontotator admin projects add-member`) is taken for 'adjudicator' (#629).
+MemberRole = Annotated[
+    Literal["lead", "annotator", "adjudicator", "consolidator"],
+    AfterValidator(_member_role),
+]
+ROLE_NOTE = "'adjudicator' is the Consolidator role; 'consolidator' is accepted for it."
 
 
 class _Model(BaseModel):
@@ -81,12 +95,9 @@ class NewUser(_Model):
         max_length=200,
         description="Needed for translation reviewers, e.g. 'MD, native speaker'.",
     )
-    roles: list[Literal["lead", "annotator", "adjudicator"]] = Field(
+    roles: list[MemberRole] = Field(
         default_factory=list,
-        description=(
-            "Roles in the tool's project; empty means annotator. 'adjudicator'"
-            " is the consolidator."
-        ),
+        description=f"Roles in the tool's project; empty means annotator. {ROLE_NOTE}",
     )
 
 

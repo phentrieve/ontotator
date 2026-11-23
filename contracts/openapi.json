@@ -23844,6 +23844,13 @@
             ],
             "title": "Reason"
           },
+          "missing_languages": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Languages"
+          },
           "reviewed_again": {
             "type": "boolean",
             "title": "Reviewed Again"
@@ -23876,6 +23883,7 @@
           "translation_status",
           "available",
           "reason",
+          "missing_languages",
           "reviewed_again",
           "review_on",
           "annotate_accepted_only",

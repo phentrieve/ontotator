@@ -395,6 +395,25 @@ describe("account status, projects at creation, history and erasure", () => {
     expect(auditDetails({ ...base, details: { ends_at: "2027-02-03T11:54:22Z" } })).toBe(`Ends at: ${formatTime("2027-02-03T11:54:22Z")}`);
   });
 
+  it("names a typo fix by its reason, the changed passages and the new version, not its raw fields (issue 629)", () => {
+    const base = { at: "", actor: "user:lead", action: "translation.editorial_correction", target_type: "document", target_id: "case-1-de-v3", project_key: "p" };
+    const details = {
+      document_id: "case-1-de-v3", previous_document_id: "case-1-de-v2", case_id: "case-1", language: "de", version: 3, translation_status: "accepted",
+      text_sha256: "a".repeat(64), previous_text_sha256: "b".repeat(64), correction_id: "c-1", reason: "Typo in the diagnosis",
+      inserted_characters: 1, deleted_characters: 0, number_changes: [], tasks_following: 1, tasks_staying: [{ assignment_id: 4, reason: "opened" }], annotations_carried: 2,
+      diff: [{ old_start: 2529, old_end: 2529, new_start: 2529, new_end: 2530, old_text: "", new_text: "a" }, { old_start: 10, old_end: 16, new_start: 10, new_end: 16, old_text: "Ataxie", new_text: "Ataxia" }],
+    };
+    const text = auditDetails({ ...base, details });
+    expect(text).toBe("Reason: Typo in the diagnosis; Changed: added “a”, “Ataxie” → “Ataxia”; New version: v3; 1 task followed the new version; "
+      + "1 task stayed on the old version; 2 annotations moved to v3");
+    expect(text).not.toMatch(/sha256|New end|Diff/);
+    const long = "x".repeat(100);
+    const many = [1, 2, 3, 4, 5].map(n => ({ old_text: `a${n}`, new_text: `b${n}` }));
+    expect(auditDetails({ ...base, details: { reason: " ", version: 2, diff: [{ old_text: long, new_text: "" }], tasks_following: 0, tasks_staying: [], annotations_carried: 0 } }))
+      .toBe(`Changed: removed “${"x".repeat(28)}…${"x".repeat(28)}”; New version: v2`);
+    expect(auditDetails({ ...base, details: { version: 2, diff: many } })).toBe("Changed: “a1” → “b1”, “a2” → “b2”, “a3” → “b3” and 2 more passages; New version: v2");
+  });
+
   it("names a lead's pause and release in plain words, with the way it was made (issue 576, F4)", () => {
     const base = { at: "", actor: "user:lead", target_type: "text", target_id: "L3CASE-002 en", project_key: "p" };
     const pause = { ...base, action: "text.pause", details: { case_id: "L3CASE-002", language: "en", reason: "Clinic is checking", assignment_ids: [10, 11], via: "bulk_pause_texts" } };

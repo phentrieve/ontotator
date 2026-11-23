@@ -785,6 +785,7 @@ def test_preview_lists_the_annotation_work_on_the_accepted_version(accepted):
         "translation_status": "accepted",
         "available": True,
         "reason": None,
+        "missing_languages": ["en"],
         "review_on": flags_of(env, "case", "de").review,
         "annotate_accepted_only": True,
         "annotations": {"submitted": 1, "open": 1},
@@ -797,6 +798,32 @@ def test_preview_lists_the_annotation_work_on_the_accepted_version(accepted):
     )
     assert response.status_code == 200, response.text
     assert response.json()["annotations"] == {"submitted": 1, "open": 1}
+
+
+def test_preview_names_the_languages_start_asks_to_confirm(rejected):
+    """Issue 629: the panel shows the confirmation before the first start."""
+    env = rejected
+    preview = workflow(env).lead_correction_preview(lead(env), "proj", "target")
+    with pytest.raises(DomainError) as caught:
+        start(env, confirm_language=False)
+    details = caught.value.details
+    assert preview["missing_languages"] == sorted(
+        set(details["required_languages"]) - set(details["user_languages"])
+    )
+    assert preview["missing_languages"]
+    with env.db.transaction() as conn:
+        for language in preview["missing_languages"]:
+            conn.execute(
+                insert(UserLanguageRow).values(
+                    user_id=env.accesses["leader"].user_id, language=language
+                )
+            )
+    preview = workflow(env).lead_correction_preview(lead(env), "proj", "target")
+    assert preview["missing_languages"] == []
+    response = logged_in(env.app, "leader").get(
+        f"{BASE}/documents/target/lead-correction"
+    )
+    assert response.json()["missing_languages"] == []
 
 
 def test_preview_names_the_refusal_and_writes_nothing(review_env):

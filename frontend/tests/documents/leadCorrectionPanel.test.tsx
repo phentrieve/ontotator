@@ -49,6 +49,24 @@ it("asks for language confirmation only on LANGUAGE_CONFIRMATION_REQUIRED", asyn
   await waitFor(() => expect(props.onNavigate).toHaveBeenCalledWith({ name: "task", assignmentId: 42 }));
 });
 
+// Issue 629: the profile languages are known in advance, so the first click does not meet a 409.
+it("shows the language confirmation before the first attempt when the preview names missing languages", async () => {
+  vi.spyOn(api, "getLeadCorrectionPreview").mockResolvedValue(preview({ document_id: "case-0101-de", version: 2, next_version: 3, translation_status: "reviewed",
+    reviewed_again: false, annotations: { submitted: 0, open: 0 }, missing_languages: ["es"] }));
+  vi.mocked(api.startLeadCorrection).mockResolvedValue(assignment(44));
+  const props = renderPanel();
+  const checkbox = await within(panel()).findByRole("checkbox", { name: "Correct despite missing es in your profile" });
+  expect(api.getLeadCorrectionPreview).toHaveBeenCalledWith("p", "case-0101-de");
+  expect(open().getAttribute("aria-disabled")).toBe("true");
+  fireEvent.click(open());
+  expect(api.startLeadCorrection).not.toHaveBeenCalled();
+  fireEvent.click(checkbox);
+  fireEvent.click(open());
+  await waitFor(() => expect(api.startLeadCorrection).toHaveBeenCalledWith("p", "case-0101-de", { expected_text_sha256: "sha-v2", confirm_language: true }));
+  expect(api.startLeadCorrection).toHaveBeenCalledTimes(1);
+  await waitFor(() => expect(props.onNavigate).toHaveBeenCalledWith({ name: "task", assignmentId: 44 }));
+});
+
 it("shows the qualification message with a profile link", async () => {
   vi.mocked(api.startLeadCorrection).mockRejectedValueOnce(new ApiError(409, "qualification", "QUALIFICATION_REQUIRED"));
   const props = renderPanel();
@@ -104,7 +122,7 @@ const acceptedRow = () => planRow("case-0101", "de", stepOf("annotation_in_progr
   versions: [version({ document_id: "case-0101-de", version: 1, chain_name: "DeepL", origin: "machine_translation", translation_status: "accepted" })],
 });
 const preview = (overrides: Partial<LeadCorrectionPreview> = {}): LeadCorrectionPreview => ({
-  document_id: "case-0101-de", version: 1, next_version: 2, translation_status: "accepted", available: true, reason: null,
+  document_id: "case-0101-de", version: 1, next_version: 2, translation_status: "accepted", available: true, reason: null, missing_languages: [],
   reviewed_again: true, review_on: false, annotate_accepted_only: false, annotations: { submitted: 2, open: 1 }, open_consolidations: 0, final_result: false, ...overrides,
 });
 

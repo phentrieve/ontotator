@@ -415,13 +415,7 @@ class TranslationWorkflowService:
                 variants.get,
                 allow_accepted_translation_review=True,
             )
-            languages = list(
-                conn.execute(
-                    select(UserLanguageRow.language)
-                    .where(UserLanguageRow.user_id == lead)
-                    .order_by(UserLanguageRow.language)
-                ).scalars()
-            )
+            languages = self._user_languages(conn, lead)
             mismatch = not reads_all(languages, required)
             if mismatch and not confirm_language:
                 raise DomainError(
@@ -489,6 +483,8 @@ class TranslationWorkflowService:
         ``open_consolidations`` and ``final_result`` name consolidation tasks
         and a final result on this version (they stay on it as well);
         ``reviewed_again``: the corrected version starts "ready for review".
+        ``missing_languages``: the required languages missing from the lead's
+        profile, which start asks to confirm (issue 629); empty when none.
         """
         if actor.user_id is None:
             raise AccessDenied("NOT_ALLOWED", "Only a project lead can do this.")
@@ -528,15 +524,43 @@ class TranslationWorkflowService:
             ):
                 # The lead's own ordinary review is open: start refuses too.
                 reason = "review_open"
+            # Issue 629: the languages start would ask to confirm, so the
+            # panel shows the confirmation before the first attempt.
+            missing: list[str] = []
+            try:
+                required = check_variant_assignable(
+                    project,
+                    variant,
+                    "translation_review",
+                    variants.get,
+                    allow_accepted_translation_review=True,
+                )
+            except DomainError:
+                required = frozenset()
+            languages = self._user_languages(conn, actor.user_id)
+            if not reads_all(languages, required):
+                missing = sorted(set(required) - set(languages))
             return {
                 "document_id": document_id,
                 "version": variant.version,
                 "translation_status": variant.translation_status,
                 "available": reason is None,
+                "missing_languages": missing,
                 "reason": reason,
                 "reviewed_again": descends_from_accepted(variant, variants.get),
                 **work_on_version(conn, project, variant, variants),
             }
+
+    @staticmethod
+    def _user_languages(conn: Connection, user_id: int) -> list[str]:
+        """The profile languages of ``user_id``, sorted."""
+        return list(
+            conn.execute(
+                select(UserLanguageRow.language)
+                .where(UserLanguageRow.user_id == user_id)
+                .order_by(UserLanguageRow.language)
+            ).scalars()
+        )
 
     @staticmethod
     def _require_lead_correction_available(

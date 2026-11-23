@@ -12,6 +12,7 @@ import { useDocumentsSummary } from "../documents/useDocumentsSummary";
 import { TASKS_CHANGED } from "../tasks/tasksEvents";
 import { NotificationBell } from "../notifications/NotificationBell";
 import { useNotifications } from "../notifications/useNotifications";
+import { NOTIFICATIONS_CHANGED } from "../notifications/notificationsEvents";
 import { notifyQuestionsChanged, QUESTIONS_CHANGED } from "../questions/questionsEvents";
 import { TechnicalReportHost } from "../reports/TechnicalReportDialog";
 import { TECHNICAL_REPORTS_CHANGED } from "../reports/TechnicalReportsPage";
@@ -120,7 +121,8 @@ function useOpenQuestionCount(projectKey: string | undefined, navigation: unknow
     let active = true;
     setCount(null);
     if (!projectKey) return;
-    // Issue 590: also after an answer on the Questions page and on window focus, so the count equals the Open tab.
+    // Issue 590: also after an answer on the Questions page and on window focus, so the count equals the Open tab;
+  // issue 629: and when the bell's count changes.
     let request = 0;
     const load = () => {
       const mine = ++request;
@@ -128,8 +130,14 @@ function useOpenQuestionCount(projectKey: string | undefined, navigation: unknow
     };
     load();
     window.addEventListener(QUESTIONS_CHANGED, load);
+    window.addEventListener(NOTIFICATIONS_CHANGED, load);
     window.addEventListener("focus", load);
-    return () => { active = false; window.removeEventListener(QUESTIONS_CHANGED, load); window.removeEventListener("focus", load); };
+    return () => {
+      active = false;
+      window.removeEventListener(QUESTIONS_CHANGED, load);
+      window.removeEventListener(NOTIFICATIONS_CHANGED, load);
+      window.removeEventListener("focus", load);
+    };
   }, [projectKey, navigation]);
   return count;
 }

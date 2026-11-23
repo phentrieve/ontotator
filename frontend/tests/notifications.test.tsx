@@ -239,6 +239,30 @@ describe("the question a notification opens (Ask the lead)", () => {
     } finally { window.removeEventListener(QUESTIONS_CHANGED, changed); }
   });
 
+  // Issue 629: the lead is on Questions when an annotator asks; the bell's count goes up and the page follows.
+  it("loads the list again when the bell's unread count changes, not on the first count", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const summary = vi.spyOn(api, "notificationSummary").mockResolvedValue({ unread: 0 });
+    const list = vi.spyOn(api, "listQuestions").mockImplementation(async (_key, filter) =>
+      (summary.mock.calls.length > 1 ? [question("q-1")] : []).filter(q => !filter?.state || q.state === filter.state));
+    const led = { project_key: "led", name: "led", roles: ["lead"], can_manage: true } as unknown as ShellProps["projects"][number];
+    render(<Shell {...props({ projects: [led], route: { name: "projectQuestions", key: "led" } })}><QuestionsPage projectKey="led" onNavigate={vi.fn()} /></Shell>);
+    await waitFor(() => expect(summary).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole("tab", { name: /Open.*0/ })).toBeDefined();
+    const before = list.mock.calls.length;
+    summary.mockResolvedValue({ unread: 0 });
+    await act(async () => { vi.advanceTimersByTime(NOTIFICATIONS_REFRESH_MS); });
+    // The same count again: nothing reloads.
+    expect(list.mock.calls.length).toBe(before);
+    summary.mockResolvedValue({ unread: 1 });
+    await act(async () => { vi.advanceTimersByTime(NOTIFICATIONS_REFRESH_MS); });
+    expect(await screen.findByRole("button", { name: "Notifications, 1 unread" })).toBeDefined();
+    expect(await screen.findByText("Question q-1?")).toBeDefined();
+    expect(screen.getByRole("tab", { name: /Open.*1/ })).toBeDefined();
+    // The page and "Questions (n)" in the sidebar, once each.
+    expect(list.mock.calls.length).toBe(before + 2);
+  });
+
   it("reloads Questions when its sidebar link is used while the page is open", async () => {
     const changed = vi.fn();
     window.addEventListener(QUESTIONS_CHANGED, changed);

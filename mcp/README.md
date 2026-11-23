@@ -311,7 +311,7 @@ This example sets up an HPO annotation project in which annotators check the HPO
 2. **Switch to a project token.** In Settings › People › **Project API tokens**, create a token for `phentrieve-pilot` with `read`, `import`, `export` and `project-admin`, and restart the client with it.
 3. **Settings, guideline and people.**
    *"Set two annotators per text, publish ~/ontotator/pilot/guideline.md as the guideline, and give alice and bob the annotator role and carla the consolidator role."*
-   `update_project_settings` (`{"annotations_per_text": 2}`), `publish_guideline`, `set_member_roles` (consolidator is the role `adjudicator`).
+   `update_project_settings` (`{"annotations_per_text": 2}`), `publish_guideline`, `set_member_roles` (consolidator is the role `adjudicator`; `set_member_roles` and `create_users` take `consolidator` for it).
 4. **Import the proposals.**
    *"Check ~/ontotator/pilot/phentrieve-bundle.zip as an Ontospan bundle and show me the result."* `upload_texts` stages and checks the bundle: cases, texts, proposals, problems and the planned work. *"Import it."* `commit_upload` imports exactly what was checked.
 5. **Work plan and assignments.**

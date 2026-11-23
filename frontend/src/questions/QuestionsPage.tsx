@@ -10,6 +10,7 @@ import { Button, EmptyState, InlineMessage } from "../ui";
 import { tabId, Tabs } from "../ui/Tabs";
 import { AnswerQuestionDialog } from "./AnswerQuestionDialog";
 import { ANSWER_LABEL, openCount, QUESTIONS_PAGE_TITLE, taskNoun } from "./labels";
+import { NOTIFICATIONS_CHANGED } from "../notifications/notificationsEvents";
 import { notifyQuestionsChanged, QUESTIONS_CHANGED } from "./questionsEvents";
 import "./questions.css";
 
@@ -65,7 +66,8 @@ export function QuestionsPage({ projectKey, question: targetId, onNavigate }: {
   const [answering, setAnswering] = useState<ProblemReportView | null>(null), [notice, setNotice] = useState<string | null>(null);
   // Issue 619: loaded again when a notification opens another question here, on `questions-changed` (an own answer,
   // the sidebar link while this page is open) and on window focus, as "Questions (n)" in the sidebar is, so the Open
-  // tab counts what the sidebar counts. The shown list stays until the new one arrives.
+  // tab counts what the sidebar counts. Issue 629: also when the bell's count changes (a question asked meanwhile).
+  // The shown list stays until the new one arrives.
   useEffect(() => {
     let active = true;
     let request = 0;
@@ -76,8 +78,14 @@ export function QuestionsPage({ projectKey, question: targetId, onNavigate }: {
     };
     load();
     window.addEventListener(QUESTIONS_CHANGED, load);
+    window.addEventListener(NOTIFICATIONS_CHANGED, load);
     window.addEventListener("focus", load);
-    return () => { active = false; window.removeEventListener(QUESTIONS_CHANGED, load); window.removeEventListener("focus", load); };
+    return () => {
+      active = false;
+      window.removeEventListener(QUESTIONS_CHANGED, load);
+      window.removeEventListener(NOTIFICATIONS_CHANGED, load);
+      window.removeEventListener("focus", load);
+    };
   }, [projectKey, reload, targetId]);
   // The tab of the question a notification opened, once the list is there (answered since: Answered). Only once per
   // opening, so answering it here does not switch the tab.
