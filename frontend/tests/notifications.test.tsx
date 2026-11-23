@@ -9,6 +9,7 @@ import { QuestionsPage } from "../src/questions/QuestionsPage";
 import { report } from "./problems/fixtures";
 import { NOTIFICATIONS_REFRESH_MS } from "../src/notifications/useNotifications";
 import { notifyTasksChanged } from "../src/tasks/tasksEvents";
+import { notifyQuestionsChanged, QUESTIONS_CHANGED } from "../src/questions/questionsEvents";
 
 const user: CurrentUser = { username: "alex", display_name: "Alex", pseudonym: "a1", is_system_admin: false, csrf_token: "test" };
 const props = (extra: Partial<ShellProps> = {}): ShellProps => ({
@@ -175,5 +176,85 @@ describe("the question a notification opens (Ask the lead)", () => {
     const target = (await screen.findByText("Question q-2?")).closest("li")!;
     expect(target.className).toContain("lead-question--target");
     expect(screen.getByRole("tab", { name: /Answered/ }).getAttribute("aria-selected")).toBe("true");
+  });
+
+  // Issue 619: the lead is on Questions when the entry of a new question is opened.
+  it("loads the list again when a notification opens a new question while the page is open", async () => {
+    const list = vi.spyOn(api, "listQuestions").mockResolvedValueOnce([question("q-1")])
+      .mockResolvedValue([question("q-1"), question("q-2")]);
+    const { rerender } = render(<QuestionsPage projectKey="p" onNavigate={vi.fn()} />);
+    expect(await screen.findByRole("tab", { name: /Open.*1/ })).toBeDefined();
+    expect(screen.queryByText("Question q-2?")).toBeNull();
+    rerender(<QuestionsPage projectKey="p" question="q-2" onNavigate={vi.fn()} />);
+    const target = (await screen.findByText("Question q-2?")).closest("li")!;
+    expect(target.className).toContain("lead-question--target");
+    await waitFor(() => expect(document.activeElement).toBe(target));
+    expect(screen.getByRole("tab", { name: /Open.*2/ }).getAttribute("aria-selected")).toBe("true");
+    expect(list).toHaveBeenCalledTimes(2);
+  });
+
+  it("switches to Answered for a question opened from the Open tab, again after leaving the question", async () => {
+    vi.spyOn(api, "listQuestions").mockResolvedValue([question("q-1"), question("q-2", { state: "resolved", answer: "Yes." })]);
+    const { rerender } = render(<QuestionsPage projectKey="p" question="q-2" onNavigate={vi.fn()} />);
+    await screen.findByText("Question q-2?");
+    await userEvent.setup().click(screen.getByRole("tab", { name: /^Open/ }));
+    rerender(<QuestionsPage projectKey="p" onNavigate={vi.fn()} />);
+    await screen.findByText("Question q-1?");
+    rerender(<QuestionsPage projectKey="p" question="q-2" onNavigate={vi.fn()} />);
+    await waitFor(() => expect(screen.getByRole("tab", { name: /Answered/ }).getAttribute("aria-selected")).toBe("true"));
+  });
+
+  it("loads the list again on questions-changed and on window focus, as the sidebar count does", async () => {
+    const list = vi.spyOn(api, "listQuestions").mockResolvedValueOnce([question("q-1")])
+      .mockResolvedValueOnce([question("q-1"), question("q-2")]).mockResolvedValue([question("q-1"), question("q-2"), question("q-3")]);
+    render(<QuestionsPage projectKey="p" onNavigate={vi.fn()} />);
+    expect(await screen.findByRole("tab", { name: /Open.*1/ })).toBeDefined();
+    act(() => { notifyQuestionsChanged(); });
+    expect(await screen.findByText("Question q-2?")).toBeDefined();
+    act(() => { window.dispatchEvent(new Event("focus")); });
+    expect(await screen.findByText("Question q-3?")).toBeDefined();
+    expect(list).toHaveBeenCalledWith("p");
+  });
+
+  it("opening a question's entry reloads the questions, so Questions (n) counts it too", async () => {
+    const changed = vi.fn();
+    window.addEventListener(QUESTIONS_CHANGED, changed);
+    try {
+      vi.spyOn(api, "notificationSummary").mockResolvedValue({ unread: 2 });
+      vi.spyOn(api, "listNotifications").mockResolvedValue({ unread: 2, items: [
+        entry(2, { kind: "question_received", task: "translation_review", target_id: "q-2" }), entry(1)] });
+      vi.spyOn(api, "markNotificationRead").mockResolvedValue({ unread: 1 });
+      const state = props();
+      render(<Shell {...state} />);
+      const input = userEvent.setup();
+      await input.click(await screen.findByRole("button", { name: "Notifications, 2 unread" }));
+      const links = await within(await screen.findByRole("dialog", { name: "Notifications" })).findAllByRole("link");
+      await input.click(links[0]);
+      expect(state.onNavigate).toHaveBeenCalledWith({ name: "projectQuestions", key: "synthetic-ready", question: "q-2" });
+      expect(changed).toHaveBeenCalledTimes(1);
+      // Other entries leave the questions alone.
+      await input.click(screen.getByRole("button", { name: /^Notifications/ }));
+      await input.click((await within(await screen.findByRole("dialog", { name: "Notifications" })).findAllByRole("link"))[1]);
+      expect(changed).toHaveBeenCalledTimes(1);
+    } finally { window.removeEventListener(QUESTIONS_CHANGED, changed); }
+  });
+
+  it("reloads Questions when its sidebar link is used while the page is open", async () => {
+    const changed = vi.fn();
+    window.addEventListener(QUESTIONS_CHANGED, changed);
+    try {
+      vi.spyOn(api, "listQuestions").mockResolvedValue([]);
+      const led = { project_key: "led", name: "led", roles: ["lead"], can_manage: true } as unknown as ShellProps["projects"][number];
+      const state = props({ projects: [led], route: { name: "projectQuestions", key: "led" } });
+      const { rerender } = render(<Shell {...state} />);
+      const input = userEvent.setup();
+      await input.click(screen.getByRole("link", { name: "Questions" }));
+      expect(state.onNavigate).toHaveBeenCalledWith({ name: "projectQuestions", key: "led" });
+      expect(changed).toHaveBeenCalledTimes(1);
+      // From another page the navigation alone loads the page.
+      rerender(<Shell {...state} route={{ name: "projectDocuments", key: "led" }} />);
+      await input.click(screen.getByRole("link", { name: "Questions" }));
+      expect(changed).toHaveBeenCalledTimes(1);
+    } finally { window.removeEventListener(QUESTIONS_CHANGED, changed); }
   });
 });

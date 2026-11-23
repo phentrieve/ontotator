@@ -12,7 +12,7 @@ import { useDocumentsSummary } from "../documents/useDocumentsSummary";
 import { TASKS_CHANGED } from "../tasks/tasksEvents";
 import { NotificationBell } from "../notifications/NotificationBell";
 import { useNotifications } from "../notifications/useNotifications";
-import { QUESTIONS_CHANGED } from "../questions/questionsEvents";
+import { notifyQuestionsChanged, QUESTIONS_CHANGED } from "../questions/questionsEvents";
 import { TechnicalReportHost } from "../reports/TechnicalReportDialog";
 import { TECHNICAL_REPORTS_CHANGED } from "../reports/TechnicalReportsPage";
 import { openTechnicalReport, REPORT_NAV_LABEL, SHOW_MY_TECHNICAL_REPORTS } from "../reports/technicalReport";
@@ -210,9 +210,15 @@ export function Shell({ user, projects, route, onNavigate, onLogout, breadcrumb,
         <ul className="shell-nav-list">
           {documentsLink(current.project_key)}
           {/* Issue 553 (prototype): the lead's open questions. */}
-          {current.roles.includes("lead") && (openQuestions
-            ? link({ name: "projectQuestions", key: current.project_key }, `Questions (${openQuestions})`, `Questions, ${openQuestions} open`)
-            : link({ name: "projectQuestions", key: current.project_key }, "Questions"))}
+          {current.roles.includes("lead") && <li key="projectQuestions">
+            {/* Issue 619: already on Questions, the link reloads the list and the count (the route stays the same). */}
+            <NavigationLink destination={{ name: "projectQuestions", key: current.project_key }} current={route}
+              onNavigate={destination => {
+                onNavigate(destination);
+                if (route.name === "projectQuestions" && route.key === current.project_key) notifyQuestionsChanged();
+              }}
+              label={openQuestions ? `Questions, ${openQuestions} open` : undefined}>{openQuestions ? `Questions (${openQuestions})` : "Questions"}</NavigationLink>
+          </li>}
           {link({ name: "projectProgress", key: current.project_key }, "Progress")}
           {link({ name: "projectSettings", key: current.project_key }, "Settings")}
           {link({ name: "projectExport", key: current.project_key }, "Export")}

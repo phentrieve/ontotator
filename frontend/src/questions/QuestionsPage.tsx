@@ -10,7 +10,7 @@ import { Button, EmptyState, InlineMessage } from "../ui";
 import { tabId, Tabs } from "../ui/Tabs";
 import { AnswerQuestionDialog } from "./AnswerQuestionDialog";
 import { ANSWER_LABEL, openCount, QUESTIONS_PAGE_TITLE, taskNoun } from "./labels";
-import { notifyQuestionsChanged } from "./questionsEvents";
+import { notifyQuestionsChanged, QUESTIONS_CHANGED } from "./questionsEvents";
 import "./questions.css";
 
 type Segment = "open" | "answered";
@@ -63,17 +63,29 @@ export function QuestionsPage({ projectKey, question: targetId, onNavigate }: {
   const [error, setError] = useState<unknown>(null), [reload, setReload] = useState(0);
   const [segment, setSegment] = useState<Segment>("open");
   const [answering, setAnswering] = useState<ProblemReportView | null>(null), [notice, setNotice] = useState<string | null>(null);
+  // Issue 619: loaded again when a notification opens another question here, on `questions-changed` (an own answer,
+  // the sidebar link while this page is open) and on window focus, as "Questions (n)" in the sidebar is, so the Open
+  // tab counts what the sidebar counts. The shown list stays until the new one arrives.
   useEffect(() => {
     let active = true;
-    api.listQuestions(projectKey).then(list => { if (active) { setQuestions(list); setError(null); } }, failure => { if (active) setError(failure); });
-    return () => { active = false; };
-  }, [projectKey, reload]);
-  // The tab of the question a notification opened, once the list is there (answered since: Answered). Only once, so
-  // answering it here does not switch the tab.
+    let request = 0;
+    const load = () => {
+      const mine = ++request;
+      api.listQuestions(projectKey).then(list => { if (active && mine === request) { setQuestions(list); setError(null); } },
+        failure => { if (active && mine === request) setError(failure); });
+    };
+    load();
+    window.addEventListener(QUESTIONS_CHANGED, load);
+    window.addEventListener("focus", load);
+    return () => { active = false; window.removeEventListener(QUESTIONS_CHANGED, load); window.removeEventListener("focus", load); };
+  }, [projectKey, reload, targetId]);
+  // The tab of the question a notification opened, once the list is there (answered since: Answered). Only once per
+  // opening, so answering it here does not switch the tab.
   const targetState = questions?.find(q => q.report_id === targetId)?.state;
   const shownTarget = useRef<string | null>(null);
   useEffect(() => {
-    if (!targetId || !targetState || shownTarget.current === targetId) return;
+    if (!targetId) { shownTarget.current = null; return; }
+    if (!targetState || shownTarget.current === targetId) return;
     shownTarget.current = targetId;
     setSegment(targetState === "open" ? "open" : "answered");
   }, [targetId, targetState]);
