@@ -69,11 +69,10 @@ for (const viewport of VIEWPORTS) {
       const group = plan.getByRole("group", { name: "Quick choice for the selected translations" });
       const choices = group.locator(".plan-quick-choice-actions").getByRole("button");
       await expect(choices).toHaveCount(2);
-      const greyed = group.locator('.plan-quick-choice-actions button[aria-disabled="true"]');
-      expect(await greyed.count(), "at least one quick choice is already planned").toBeGreaterThan(0);
-
+      // The effects of the quick choices come with the plan preview: wait for the greyed state before counting.
       const annotationOnly = group.getByRole("button", { name: /^Annotation only, no translation review/ });
       await expect(annotationOnly).toHaveAttribute("aria-disabled", "true");
+      const greyed = group.locator('.plan-quick-choice-actions button[aria-disabled="true"]');
       // The a11y contract stays: the reason is the description and the title.
       await expect(annotationOnly).toHaveAccessibleDescription(/^Already planned\. 1 text keeps its translation review: it has started or is done\.$/);
       await expect(annotationOnly).toHaveAttribute("title", /^Already planned\./);
