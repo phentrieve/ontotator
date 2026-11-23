@@ -8,6 +8,7 @@ import { quoteSegments } from "../editor/AnnotationPanel";
 import { Time } from "../app/Time";
 import "./workRounds.css";
 import { actorName } from "../editor/actorName";
+import { useTermIdDisplay } from "../editor/termIds";
 
 const DRAFT_SOURCE = "Draft before the text change";
 
@@ -22,6 +23,7 @@ export function RoundInputEvidenceDialog({ projectKey, input, onClose, labelFor,
   /** "Round 2"; defaults to the input's source round, else "an earlier round". */
   sourceName?: string;
 }): JSX.Element {
+  const showTermId = useTermIdDisplay();
   const [text, setText] = useState<string | null>(null), [error, setError] = useState<unknown>();
   useEffect(() => {
     let active = true; setText(null); setError(undefined);
@@ -46,7 +48,7 @@ export function RoundInputEvidenceDialog({ projectKey, input, onClose, labelFor,
   return <Dialog open title={`Original finding from ${name ?? "an earlier round"}`} onClose={onClose} size="lg" footer={<Button onClick={onClose}>Close original evidence</Button>}>
     <p className="round-evidence__meta">{meta.map((part, index) => <span key={index}>{index > 0 && ", "}{part}</span>)}</p>
     <ul className="round-evidence__facts">
-      <li className="round-evidence__term">{labelFor(annotation.layer_id, annotation.term_id) ?? annotation.term_id}</li>
+      <li className="round-evidence__term">{labelFor(annotation.layer_id, annotation.term_id) ?? showTermId(annotation.term_id)}</li>
       {Object.entries(annotation.axes_values ?? {}).map(([axis, value]) => <li key={axis}>{axisName(axis)}: <AxisValue value={value} /></li>)}
       {annotation.note && <li className="round-evidence__note">{`Note: ${annotation.note}`}</li>}
       {spanless ? <li>{`This finding had no text span in ${name ?? "the earlier round"}.`}</li>

@@ -36,7 +36,7 @@ The editor has three columns: the list of **Findings** on the left, in the order
 
 1. Read the text from the start. When it names a finding, for example "seizures", select the words with the mouse.
 2. The panel **New finding** opens. **Search term** already holds the marked words, and the hits are listed under **Terms**. The copy icon (**Copy text**) right after the marked words, or `Ctrl+C` (`Cmd+C` on a Mac), copies all of them on one line, for example to look them up in a web search; see [Mark text and add a finding](annotator.md#mark-text-and-add-a-finding).
-3. Read the hits before you choose: the search matches words, not meaning, and only a term whose name or synonym equals your words is sure to be on top. If the top hit is the right term, press Enter; a hit tagged **Weak match** is added only after you choose it with `↓`. Otherwise, click another hit, or try another word or a synonym in **Search term**. If you picked the wrong term, click **Change term** in the finding: the search starts with the marked words again.
+3. Read the hits before you choose: the search matches words, not meaning, and only a term whose name or synonym equals your words is sure to be on top. If the top hit is the right term, press Enter; a hit tagged **Weak match** is added only after you choose it with `↓`. Otherwise, click another hit, or try another word or a synonym in **Search term**. If you picked the wrong term, click **Change term** in the finding: the search starts with the marked words again. If the hits show codes without a prefix (`N18.1`), your project's lead chose that; point at a code to see it in full.
 
 ![The New finding panel with the marked text and the term search open](images/annotator-new-finding.png)
 

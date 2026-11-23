@@ -22,6 +22,7 @@ Decide each group by the text and the project guidelines, as if you were annotat
 - Not by majority. Two people can make the same mistake. If two of three said **Present** for "No muscular hypotonia", the right value is still **Absent**.
 - Not by seniority. Whose finding it was does not matter.
 - Read the passage in context. Check negation ("no", "without"), who has the finding (patient or family member), and when (now or in the past).
+- Codes may be shown without the ontology prefix (`N18.1` for `ICD10CM:N18.1`) if the project's lead chose that; the result keeps the full code.
 - Prefer the term the text supports. Usually that is the most specific term the text states; follow the guidelines if they say otherwise.
 - If none of the versions is right, use **More…** › **Other term…** or **Edit values…** ([Edit values or pick another term](#edit-values-or-pick-another-term)).
 - If the guidelines do not settle it, decide as well as you can, write a **Note for the lead** and tick **Guidelines unclear here**. The lead sees both and can improve the guidelines.

@@ -22,6 +22,7 @@ import { quoteOf } from "./modifiers";
 import { prefillQuery } from "./termSearch";
 import { CopyTextButton } from "./CopyTextButton";
 import { DismissibleHint } from "./DismissibleHint";
+import { useTermIdDisplay } from "./termIds";
 
 /** Why a greyed-out control of a read-only finding does nothing (issue 542, U1-05). */
 export const READ_ONLY_REASON = "Read-only: this work cannot be changed here.";
@@ -142,6 +143,7 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
   spanExclusion,
   modifierNotice,
 }) => {
+  const showTermId = useTermIdDisplay();
   const [showSearch, setShowSearch] = useState(false);
   const changeTermButton = useRef<HTMLButtonElement>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -258,7 +260,7 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
           <div>
             <span className="replacement-banner__label">Replacement for proposal: </span>
             <span className="replacement-banner__term">
-              {linkedTarget.termLabel ? `${linkedTarget.termLabel} (${linkedTarget.termId})` : linkedTarget.termId}
+              {linkedTarget.termLabel ? `${linkedTarget.termLabel} (${showTermId(linkedTarget.termId)})` : showTermId(linkedTarget.termId)}
             </span>
           </div>
           {onNavigateTarget && (

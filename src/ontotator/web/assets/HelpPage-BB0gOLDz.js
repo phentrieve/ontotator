@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-C0bVuniV.js";import{n as a,t as o}from"./lib-CwWykDfs.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-BBxlgjyl.js";import{n as a,t as o}from"./lib-EdOLmQqJ.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -539,6 +539,7 @@ What for: find the right ontology term quickly.
 Search options:
 
 - To search only modifier terms (severity, onset, …), switch on **Modifiers only**, or type \`mod:\` before the word.
+- Some projects show codes without the ontology prefix, for example \`N18.1\` instead of \`ICD10CM:N18.1\` (a lead's setting, see [Show codes without the ontology prefix](lead-settings.md#show-codes-without-the-ontology-prefix)). Point at a code to see it in full.
 - The language of the text is searched too. To search names in other languages, click the language button next to the field (it lists the languages searched, for example *EN, DE*) and tick them under **Search languages**. English names are always searched.
 - Hits tagged **Modifier** are modifier terms. Use one as a finding only if it names the finding itself; otherwise add it under **Modifiers**. Obsolete terms cannot be chosen.
 - Hits tagged **Weak match** do not match your words closely: at least one word is not at the start of a word of the name, even allowing for a typo or a plural. They are listed last, and Enter takes one only after you choose it with \`↓\` or \`↑\`. If all hits are weak, the line under the field says "no close match".
@@ -1037,6 +1038,7 @@ Decide each group by the text and the project guidelines, as if you were annotat
 - Not by majority. Two people can make the same mistake. If two of three said **Present** for "No muscular hypotonia", the right value is still **Absent**.
 - Not by seniority. Whose finding it was does not matter.
 - Read the passage in context. Check negation ("no", "without"), who has the finding (patient or family member), and when (now or in the past).
+- Codes may be shown without the ontology prefix (\`N18.1\` for \`ICD10CM:N18.1\`) if the project's lead chose that; the result keeps the full code.
 - Prefer the term the text supports. Usually that is the most specific term the text states; follow the guidelines if they say otherwise.
 - If none of the versions is right, use **More…** › **Other term…** or **Edit values…** ([Edit values or pick another term](#edit-values-or-pick-another-term)).
 - If the guidelines do not settle it, decide as well as you can, write a **Note for the lead** and tick **Guidelines unclear here**. The lead sees both and can improve the guidelines.
@@ -1549,7 +1551,7 @@ The editor has three columns: the list of **Findings** on the left, in the order
 
 1. Read the text from the start. When it names a finding, for example "seizures", select the words with the mouse.
 2. The panel **New finding** opens. **Search term** already holds the marked words, and the hits are listed under **Terms**. The copy icon (**Copy text**) right after the marked words, or \`Ctrl+C\` (\`Cmd+C\` on a Mac), copies all of them on one line, for example to look them up in a web search; see [Mark text and add a finding](annotator.md#mark-text-and-add-a-finding).
-3. Read the hits before you choose: the search matches words, not meaning, and only a term whose name or synonym equals your words is sure to be on top. If the top hit is the right term, press Enter; a hit tagged **Weak match** is added only after you choose it with \`↓\`. Otherwise, click another hit, or try another word or a synonym in **Search term**. If you picked the wrong term, click **Change term** in the finding: the search starts with the marked words again.
+3. Read the hits before you choose: the search matches words, not meaning, and only a term whose name or synonym equals your words is sure to be on top. If the top hit is the right term, press Enter; a hit tagged **Weak match** is added only after you choose it with \`↓\`. Otherwise, click another hit, or try another word or a synonym in **Search term**. If you picked the wrong term, click **Change term** in the finding: the search starts with the marked words again. If the hits show codes without a prefix (\`N18.1\`), your project's lead chose that; point at a code to see it in full.
 
 ![The New finding panel with the marked text and the term search open](images/annotator-new-finding.png)
 
@@ -3226,6 +3228,16 @@ What for: decide what annotators must do before they can submit.
 3. Tick **Annotators must confirm every value before submitting** if prefilled values may not be submitted unconfirmed.
 4. Tick **A finding must be one continuous passage** if a finding may not have several text segments.
 5. Click **Save changes**. The rules apply to every submission from now on.
+
+## Show codes without the ontology prefix
+
+What for: in a project with one ontology, the prefix in front of every code says nothing new. With this setting the editor shows \`N18.1\` instead of \`ICD10CM:N18.1\`.
+
+1. Open **Settings**, tab **Annotation**, card **Term codes**.
+2. Tick **Show codes without the ontology prefix**.
+3. Click **Save changes**. Annotators see the short codes the next time they open a text.
+
+This changes the display only, not the search. Saved findings, exports and the API keep the full code, and links to term pages use it. Pointing at a short code shows the full one. A project with more than one ontology always shows the prefix.
 
 ## Set prefilled values for new findings
 
