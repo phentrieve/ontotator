@@ -1,9 +1,10 @@
-import { useEffect, useId, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useId, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import type { NotificationView } from "../api/client";
 import { routeHref, type Route } from "../app/router";
 import { Time } from "../app/Time";
 import { notifyQuestionsChanged } from "../questions/questionsEvents";
 import { Button } from "../ui/Button";
+import { ReasonButton } from "../ui/Help";
 import { IconBell } from "../ui/icons";
 import { Popover } from "../ui/Popover";
 import { bellLabel, notificationRoute, notificationText } from "./notificationLabels";
@@ -21,6 +22,13 @@ function badge(unread: number | null): string | null {
   return unread > 99 ? "99+" : String(unread);
 }
 
+/** The person's pseudonym (`ann-0003`) is not broken at its hyphen on a narrow screen (issue 620). */
+function keepTogether(text: string, pseudonym: string | undefined): ReactNode {
+  const at = pseudonym ? text.indexOf(pseudonym) : -1;
+  if (!pseudonym || at < 0) return text;
+  return <>{text.slice(0, at)}<span className="notification-nowrap">{pseudonym}</span>{text.slice(at + pseudonym.length)}</>;
+}
+
 function Entry({ item, onOpen, onMarkRead }: { item: NotificationView; onOpen: (item: NotificationView, event: MouseEvent<HTMLAnchorElement>) => void; onMarkRead: (id: number) => void }): JSX.Element {
   const route = notificationRoute(item);
   return <li className={`notification-entry${item.read ? "" : " notification-unread"}`}>
@@ -28,7 +36,7 @@ function Entry({ item, onOpen, onMarkRead }: { item: NotificationView; onOpen: (
       <span className="notification-dot" aria-hidden="true" />
       <span className="notification-body">
         {!item.read && <span className="visually-hidden">Unread: </span>}
-        <span className="notification-text">{notificationText(item)}</span>
+        <span className="notification-text">{keepTogether(notificationText(item), item.actor?.pseudonym)}</span>
         <span className="notification-meta">{item.project_name} · <Time iso={item.created_at} /></span>
       </span>
     </a>
@@ -46,15 +54,22 @@ export function NotificationBell({ state, onNavigate }: NotificationBellProps): 
   const anchor = useRef<HTMLButtonElement>(null);
   const panelId = useId();
   const { unread, items, error, load, markRead, markAllRead } = state;
-  // The list arrives after the popover opened (and took focus): focus moves on to the newest entry.
+  const markAllButton = useRef<HTMLButtonElement>(null);
+  /** Until the first list after opening is shown: only then is "Mark all as read" a focus that was not chosen. */
+  const arriving = useRef(false);
+  // The list arrives after the popover opened and took focus (onto the dialog, or "Mark all as read", the only control
+  // while it loads), or the focused "Mark as read" is gone: focus moves on to the newest entry.
   useEffect(() => {
     if (!open || !items?.length) return;
+    const first = arriving.current;
+    arriving.current = false;
     const panel = document.getElementById(panelId);
     const dialog = panel?.closest('[role="dialog"]');
-    if (panel && (document.activeElement === dialog || document.activeElement === document.body)) panel.querySelector<HTMLElement>("a")?.focus();
+    const active = document.activeElement;
+    if (panel && (active === dialog || active === document.body || (first && active === markAllButton.current))) panel.querySelector<HTMLElement>("a")?.focus();
   }, [open, items, panelId]);
   const toggle = () => {
-    if (!open) load();
+    if (!open) { load(); arriving.current = true; }
     setOpen(!open);
   };
   const close = () => setOpen(false);
@@ -67,20 +82,23 @@ export function NotificationBell({ state, onNavigate }: NotificationBellProps): 
     // Issue 619: a new question; the Questions page (if open) and "Questions (n)" load it.
     if (item.kind === "question_received") notifyQuestionsChanged();
   };
-  // The button turns disabled: focus stays in the list instead of falling back to the page.
+  const anyUnread = !!items?.some(item => !item.read);
+  // After it, focus goes to the list, where the person goes on reading.
   const markAll = () => {
+    if (!anyUnread) return;
     markAllRead();
     document.getElementById(panelId)?.querySelector<HTMLElement>("a")?.focus();
   };
   const count = badge(unread);
-  const anyUnread = !!items?.some(item => !item.read);
+  // Rule 4: the greyed button says why (issue 620).
+  const markAllReason = anyUnread ? null : items !== null ? "Everything is read." : error ? "The notifications could not be loaded." : "Loading…";
   return <>
     <button ref={anchor} type="button" className="btn btn-quiet btn-sm shell-notifications" aria-label={bellLabel(unread)}
       title="Notifications" aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? panelId : undefined} onClick={toggle}>
       <IconBell />{count && <span className="shell-admin-count" aria-hidden="true">{count}</span>}
     </button>
     <Popover open={open} anchorRef={anchor} label="Notifications" onClose={close} width={380}
-      footer={<Button variant="secondary" size="sm" disabled={!anyUnread} onClick={markAll}>Mark all as read</Button>}>
+      footer={<ReasonButton ref={markAllButton} variant="secondary" size="sm" className="notification-mark-all" reason={markAllReason} onClick={markAll}>Mark all as read</ReasonButton>}>
       <div id={panelId} className="notification-panel">
         {error && items === null && <p className="notification-empty" role="alert">The notifications could not be loaded. Try again later.</p>}
         {!error && items === null && <p className="notification-empty" aria-live="polite">Loading…</p>}

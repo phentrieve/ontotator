@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-Bg-QX_RG.js";import{n as a,t as o}from"./lib-CsDsOGbV.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-DgdryF3C.js";import{n as a,t as o}from"./lib-BwgeHtUU.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -1604,7 +1604,7 @@ Details: [Submit the text](annotator.md#submit-the-text).
 - Your task shows **Submitted** in **My tasks**. It is read-only now; click **View** to look at it. A translation review names your decision below, for example *Your decision: Rejected*; one you submitted as a **Query** before it was retired shows *Answer from the lead* there once the lead decided.
 - The next open task opens on its own, or **My tasks** if none is left.
 - The lead sees your submission next to the other annotators' work on the same text, and accepts one result or starts a consolidation. You do not see other people's work.
-- Your task is done. You do not need to do anything else unless the lead reopens it (**Reopened** in **My tasks**, with the lead's reason under the task name) or you notice a mistake. A translation review the lead asks for a second time names the lead's reason under the task, for example *Second review requested by the lead on 17 Nov, 14:30: Check the dose in paragraph 2.* If the lead adds to that reason later, each addition stands below it with its date (*Added by the lead on …*).
+- Your task is done. You do not need to do anything else unless the lead reopens it (**Reopened** in **My tasks**, with the lead's reason under the task name) or you notice a mistake. The bell tells you when the lead reopens or releases a task of yours, and **My tasks** shows it at the same time ([Notifications](getting-started.md#notifications)). A translation review the lead asks for a second time names the lead's reason under the task, for example *Second review requested by the lead on 17 Nov, 14:30: Check the dose in paragraph 2.* If the lead adds to that reason later, each addition stands below it with its date (*Added by the lead on …*).
 
 If you notice a mistake after submitting: open the task, choose **More** › **Work rounds** and click **Continue from this submission** ([Start a new work round](annotator.md#start-a-new-work-round)). Fix the finding, check the carried findings and submit again.
 
@@ -1694,17 +1694,17 @@ What for: learn about new work without looking for it.
 The bell at the top right, next to the user menu, tells you about:
 
 - a new task for you (*New task: annotation of case-0102 de*);
-- a task of yours that the lead reopened (*Task reopened: …*) or released after a pause (*Task released: …*);
+- a task of yours that the lead reopened (*Task reopened: …*) or released after a pause (*Task released: …*). An annotation that still waits for its translation review gets no *Task released*: it opens only once the translation is accepted;
 - the lead's answer to a question you asked with **Ask the lead** (*Answer from the lead: case-0102 de*). If you paused your task until the answer, the answer also opens it again; you get this one notification, not a second *Task released*;
 - for leads: a text problem that someone reported in your project (*Text problem from Ana Weber (ann-0004): case-0042 de*), or a question to the lead (*Question from Ana Weber (ann-0004): case-0102 de*). Every lead of the project gets the question.
 
-A number on the bell counts the unread notifications. It updates every minute and when you come back to the window.
+A number on the bell counts the unread notifications. It updates every minute, when you come back to the window and when you move to another page in Ontotator. **My tasks** loads your tasks again at the same moments, and when a new notification arrives, so the list shows a reopened or released task as the bell does.
 
 1. Click the bell. A short list opens with the newest notifications first. Unread ones have a dot and bold text. Each one names the project and the time.
 2. Click a notification to open its place: the task, or the problem report. It is then marked as read.
    - A question to the lead opens **Questions** at that question: its tab is selected (**Open**, or **Answered** if another lead answered it already) and the question is marked.
    - An answer from the lead opens your task. The answer is under **Questions to the lead** in **Your review**.
-3. To mark one as read without opening it, click **Mark as read** next to it. **Mark all as read** below the list marks all of them.
+3. To mark one as read without opening it, click **Mark as read** next to it. **Mark all as read** below the list marks all of them. Once everything is read, it is greyed and says *Everything is read.*
 
 With the keyboard, Tab to the bell and press Enter; Tab moves through the list and Escape closes it. On a phone the list opens as a full screen sheet.
 
@@ -2385,6 +2385,8 @@ What for: set the work plan for a selection.
 6. Click the save button, for example *Save for 20 cases*.
 7. If work already exists, the dialog lists what happens to it. Tick **I understand** (or **I understand — withdraw the open tasks**) and save again.
 
+The dialog opens with the focus on the save button; while nothing is chosen it is greyed and says *Nothing to change yet.*
+
 ![The Work plan dialog with the quick choice and one row per language](images/lead-work-plan.png)
 
 **Undo** in the message restores the plan and the final results as they were, without asking you to confirm them again. It does not restore withdrawn tasks; withdrawn tasks keep their drafts. If the change withdrew tasks, the message after the Undo offers their texts, for example *Select the 2 texts with withdrawn tasks*. Click it to select them, then [assign the work](#assign-work-to-the-selected-texts) again. This works the same for the plan chips of one row. The offer stays until you close the message.
@@ -2548,6 +2550,8 @@ To release:
 1. Select the texts and choose **More actions** › **Release texts…**. Or click **Release…** in the notice of one text card; the message *Released 1 text.* follows there as well.
 2. Read the preview, for example *Release 3 texts with 4 open tasks · Tom Reis 2, R. Roe 2*. A task that a problem report pauses as well is named in its own group, *1 task stays paused · paused by a problem report as well: decide the report under Problem reports*. Texts that are not paused are skipped.
 3. A reason is optional (**Reason (optional)**). Click the button, for example *Release 4 texts*, tick **I understand** and click again.
+
+Each person whose task opens again gets the notification *Task released: …* under the bell. A task that stays closed does not: one a problem report still pauses, and an annotation that waits for its translation review (it opens once the translation is accepted).
 
 Every listed text is paused or released, or none: if the texts changed since the preview, the dialog says *The texts changed since the preview. Check the new preview.* and shows it. Each text gets its own entry in the audit trail, with the reason. The text card's **History** keeps a line for each pause and each release under the tag **Text**, also after the release: *paused by you, 17 Nov, 17:24: The clinic is checking the source text* and *released by you, 17 Nov, 18:02*, with the reason of the release when you gave one. There is no **Undo** in the message: **Release texts…** is the way back from a pause, **Pause texts…** from a release, and neither changes any work.
 

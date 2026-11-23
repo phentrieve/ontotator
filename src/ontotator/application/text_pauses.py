@@ -68,13 +68,19 @@ def _notify_released(
     from sqlalchemy import select
 
     from ontotator.application.notifications import notify
+    from ontotator.assignments.eligibility import waiting_annotation_tasks
     from ontotator.storage.tables import AssignmentRow
 
-    if not assignment_ids:
+    # Issue 620: an annotation that waits for the translation review does not
+    # open with the release, so its owner is not told it was released.
+    opening = set(assignment_ids) - waiting_annotation_tasks(
+        conn, project_id, assignment_ids
+    )
+    if not opening:
         return
     owners = conn.execute(
         select(AssignmentRow.id, AssignmentRow.user_id)
-        .where(AssignmentRow.id.in_(assignment_ids))
+        .where(AssignmentRow.id.in_(opening))
         .order_by(AssignmentRow.id)
     )
     for aid, owner in owners:
@@ -146,7 +152,8 @@ class TextPauseService:
                     )
                 else:
                     write_release(conn, pid, case_id, language)
-                    # Issue 557: each task that can be worked on again.
+                    # Issue 557: each task that can be worked on again (not one
+                    # a problem report still pauses or that waits, issue 620).
                     _notify_released(
                         conn,
                         pid,

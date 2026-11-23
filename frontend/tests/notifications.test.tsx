@@ -9,6 +9,7 @@ import { QuestionsPage } from "../src/questions/QuestionsPage";
 import { report } from "./problems/fixtures";
 import { NOTIFICATIONS_REFRESH_MS } from "../src/notifications/useNotifications";
 import { notifyTasksChanged } from "../src/tasks/tasksEvents";
+import { NOTIFICATIONS_ARRIVED } from "../src/notifications/notificationsEvents";
 import { notifyQuestionsChanged, QUESTIONS_CHANGED } from "../src/questions/questionsEvents";
 
 const user: CurrentUser = { username: "alex", display_name: "Alex", pseudonym: "a1", is_system_admin: false, csrf_token: "test" };
@@ -118,7 +119,11 @@ describe("the header bell", () => {
     await input.click(within(panel).getByRole("button", { name: "Mark all as read" }));
     expect(markAll).toHaveBeenCalledWith(2);
     expect(within(panel).queryAllByRole("button", { name: /^Mark as read:/ })).toHaveLength(0);
-    expect(within(panel).getByRole("button", { name: "Mark all as read" }).hasAttribute("disabled")).toBe(true);
+    // Issue 620 (rule 4): greyed, still focusable, and it says why.
+    const greyed = within(panel).getByRole("button", { name: "Mark all as read" });
+    expect(greyed.getAttribute("aria-disabled")).toBe("true");
+    expect(greyed.hasAttribute("disabled")).toBe(false);
+    expect(document.getElementById(greyed.getAttribute("aria-describedby")!)?.textContent).toBe("Everything is read.");
     expect(document.activeElement).toBe(within(panel).getAllByRole("link")[0]);
     await screen.findByRole("button", { name: "Notifications" });
   });
@@ -151,6 +156,82 @@ describe("the header bell", () => {
     const bell = await screen.findByRole("button", { name: "Notifications, 120 unread" });
     expect(bell.querySelector(".shell-admin-count")?.textContent).toBe("99+");
     expect(list).not.toHaveBeenCalled();
+  });
+});
+
+describe("bell follow-ups (issue 620)", () => {
+  it("keeps the pseudonym on one line inside the entry", async () => {
+    const ana = { pseudonym: "ann-0003", display_name: "Translation reviewer", is_me: false };
+    vi.spyOn(api, "notificationSummary").mockResolvedValue({ unread: 1 });
+    vi.spyOn(api, "listNotifications").mockResolvedValue({ unread: 1, items: [entry(2, { kind: "text_problem_received", actor: ana, target_id: "r-1" })] });
+    render(<Shell {...props()} />);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Notifications, 1 unread" }));
+    const link = await within(await screen.findByRole("dialog", { name: "Notifications" })).findByRole("link");
+    expect(link.textContent).toContain("Text problem from Translation reviewer (ann-0003): case-012 de");
+    expect(link.querySelector(".notification-nowrap")?.textContent).toBe("ann-0003");
+  });
+
+  it("greys Mark all as read with a reason while nothing is unread", async () => {
+    vi.spyOn(api, "notificationSummary").mockResolvedValue({ unread: 0 });
+    vi.spyOn(api, "listNotifications").mockResolvedValue({ unread: 0, items: [entry(1, { read: true })] });
+    const markAll = vi.spyOn(api, "markAllNotificationsRead").mockResolvedValue({ unread: 0 });
+    render(<Shell {...props()} />);
+    const input = userEvent.setup();
+    await input.click(screen.getByRole("button", { name: "Notifications" }));
+    const panel = await screen.findByRole("dialog", { name: "Notifications" });
+    await within(panel).findByRole("link");
+    const button = within(panel).getByRole("button", { name: "Mark all as read" });
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    expect(button.getAttribute("title")).toBe("Everything is read.");
+    expect(document.getElementById(button.getAttribute("aria-describedby")!)?.textContent).toBe("Everything is read.");
+    await input.click(button);
+    expect(markAll).not.toHaveBeenCalled();
+  });
+
+  it("moves focus from Mark all as read to the newest entry when the list arrives", async () => {
+    let arrive: (value: { unread: number; items: NotificationView[] }) => void = () => undefined;
+    vi.spyOn(api, "notificationSummary").mockResolvedValue({ unread: 1 });
+    vi.spyOn(api, "listNotifications").mockReturnValue(new Promise(resolve => { arrive = resolve; }));
+    render(<Shell {...props()} />);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Notifications, 1 unread" }));
+    const panel = await screen.findByRole("dialog", { name: "Notifications" });
+    // While the list loads, the greyed button is the only control and takes the focus.
+    expect(document.activeElement).toBe(within(panel).getByRole("button", { name: "Mark all as read" }));
+    await act(async () => { arrive({ unread: 1, items: [entry(2)] }); });
+    expect(document.activeElement).toBe(within(panel).getByRole("link"));
+  });
+
+  it("reads the count again on every in-app navigation", async () => {
+    const summary = vi.spyOn(api, "notificationSummary").mockResolvedValue({ unread: 1 });
+    const state = props();
+    const { rerender } = render(<Shell {...state} />);
+    await screen.findByRole("button", { name: "Notifications, 1 unread" });
+    expect(summary).toHaveBeenCalledTimes(1);
+    summary.mockResolvedValue({ unread: 2 });
+    rerender(<Shell {...state} route={{ name: "projects" }} />);
+    await screen.findByRole("button", { name: "Notifications, 2 unread" });
+    expect(summary).toHaveBeenCalledTimes(2);
+    // The same place again is no navigation.
+    rerender(<Shell {...state} route={{ name: "projects" }} />);
+    expect(summary).toHaveBeenCalledTimes(2);
+  });
+
+  it("fires notifications-arrived when the count grows, not when it is first read or falls", async () => {
+    const arrived = vi.fn();
+    window.addEventListener(NOTIFICATIONS_ARRIVED, arrived);
+    try {
+      const summary = vi.spyOn(api, "notificationSummary").mockResolvedValue({ unread: 1 });
+      render(<Shell {...props()} />);
+      await screen.findByRole("button", { name: "Notifications, 1 unread" });
+      expect(arrived).not.toHaveBeenCalled();
+      summary.mockResolvedValue({ unread: 0 });
+      act(() => notifyTasksChanged());
+      await screen.findByRole("button", { name: "Notifications" });
+      summary.mockResolvedValue({ unread: 1 });
+      act(() => { window.dispatchEvent(new Event("focus")); });
+      await screen.findByRole("button", { name: "Notifications, 1 unread" });
+      expect(arrived).toHaveBeenCalledTimes(1);
+    } finally { window.removeEventListener(NOTIFICATIONS_ARRIVED, arrived); }
   });
 });
 

@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, notifySessionRestored, type ProjectSummary, type TaskSummary } from "../src/api/client";
 import { memberHint, MyTasks } from "../src/tasks/MyTasks";
+import { NOTIFICATIONS_ARRIVED } from "../src/notifications/notificationsEvents";
 import { guidelineListing, guidelineSummary, withdrawnGuideline } from "./projectFixtures";
 
 const project = (key: string, name: string, can_manage = false): ProjectSummary => ({
@@ -479,6 +480,21 @@ describe("My tasks component", () => {
     fireEvent(document, new Event("visibilitychange"));
     expect((await screen.findByRole("alert")).textContent).toContain("Server is temporarily unavailable");
     expect(screen.queryByTestId("task-row")).toBeNull();
+  });
+
+  // Issue 620: the list follows the bell, which reloads on window focus and shows new notifications.
+  it("reloads on window focus and on notifications-arrived, keeping the list on screen meanwhile", async () => {
+    render(<MyTasks projects={[]} onNavigate={vi.fn()} />);
+    await screen.findAllByTestId("task-row");
+    let answer: (value: TaskSummary[]) => void = () => undefined;
+    vi.mocked(api.listMyTasks).mockReturnValue(new Promise(resolve => { answer = resolve; }));
+    act(() => { window.dispatchEvent(new Event("focus")); });
+    expect(screen.getAllByTestId("task-row").length).toBeGreaterThan(0);
+    await act(async () => { answer([task(8, "open")]); });
+    expect(await screen.findByText("doc-8 de")).toBeDefined();
+    vi.mocked(api.listMyTasks).mockResolvedValue([task(9, "reopened")]);
+    act(() => { window.dispatchEvent(new Event(NOTIFICATIONS_ARRIVED)); });
+    expect(await screen.findByText("doc-9 de")).toBeDefined();
   });
 
   it("refreshes through the existing session-restored signal", async () => {

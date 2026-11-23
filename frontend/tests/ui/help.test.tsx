@@ -33,6 +33,23 @@ it("the (?) is a disclosure: named by its topic, toggled by click, closed by Esc
   expect(outer).toHaveBeenCalledTimes(1);
 });
 
+it("an opened explanation is scrolled into view, a closed one is not (issue 621)", () => {
+  const scroll = vi.fn();
+  const original = Element.prototype.scrollIntoView;
+  Element.prototype.scrollIntoView = scroll;
+  try {
+    render(<Field />);
+    expect(scroll).not.toHaveBeenCalled();
+    const button = screen.getByRole("button", { name: "Help: Note" });
+    fireEvent.click(button);
+    expect(scroll).toHaveBeenCalledTimes(1);
+    expect(scroll.mock.contexts[0]).toBe(document.getElementById(button.getAttribute("aria-controls")!));
+    expect(scroll).toHaveBeenCalledWith({ block: "nearest" });
+    fireEvent.click(button);
+    expect(scroll).toHaveBeenCalledTimes(1);
+  } finally { Element.prototype.scrollIntoView = original; }
+});
+
 it("a field's help is a (?) after its label, outside the label, so the field keeps its name", () => {
   render(<Textarea id="reason" label="Reason" help={{ topic: "Reason", content: <p>Kept with the change.</p> }} />);
   expect(screen.getByRole("textbox", { name: "Reason" })).toBeTruthy();

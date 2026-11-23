@@ -13,10 +13,12 @@
 .notification-body { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
 .notification-text { font-size: var(--size-md); line-height: var(--leading-md); }
 .notification-unread .notification-text { font-weight: var(--weight-strong); }
+/* A pseudonym (ann-0003) stays on one line. */
+.notification-nowrap { white-space: nowrap; }
 .notification-meta { color: var(--text-muted); font-size: var(--size-sm); line-height: var(--leading-sm); }
 .notification-mark { flex: none; margin-top: var(--space-1); }
 .notification-empty { margin: var(--space-2) 0; color: var(--text-muted); }
 @media (max-width: 699px) {
-  .notification-link, .notification-mark { min-height: var(--touch-target); }
+  .notification-link, .notification-mark, .notification-mark-all { min-height: var(--touch-target); }
   .notification-link { align-items: flex-start; }
 }

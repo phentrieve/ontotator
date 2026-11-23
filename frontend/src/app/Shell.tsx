@@ -179,6 +179,16 @@ export function Shell({ user, projects, route, onNavigate, onLogout, breadcrumb,
   const openTasks = useOpenTaskCount(user.username, navigation);
   const openReports = useOpenReportCount(user.is_system_admin, navigation);
   const notifications = useNotifications(user.username);
+  // Issue 620: a move inside the app is a cheap moment to read the bell's count again (not on the first render,
+  // where the hook loads it anyway).
+  const place = routeHref(route);
+  const firstPlace = useRef(place);
+  const { refresh: refreshNotifications } = notifications;
+  useEffect(() => {
+    if (place === firstPlace.current) return;
+    firstPlace.current = "";
+    refreshNotifications();
+  }, [place, refreshNotifications]);
   // "Documents (n)": rows needing the lead's decision (V3); the summary is lead only.
   const needsDecision = useDocumentsSummary(current?.project_key, !!current?.can_manage && current.roles.includes("lead"));
   const openQuestions = useOpenQuestionCount(current?.can_manage && current.roles.includes("lead") ? current.project_key : undefined, navigation);
