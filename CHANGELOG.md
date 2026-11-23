@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- CLI: `ontotator admin export <project>` (T1) works for a project with work rounds (#635). It failed with `DOCUMENT_NOT_FOUND` as soon as the project had a work round, which every real project has: the operator of the command line has no user row, and its system admin rights were reloaded from the users table and lost on the way. The operator's rights now stay as they are, still without the practice projects (#266); every real account is read fresh from the users table as before. `export-edit-log`, `export-translation-reviews` and `projects export-archive` were not affected. The web app's **Export** page was not affected either. No API change, no migration.
+
 ## [0.15.0] - 2026-11-23
 
 ### Added

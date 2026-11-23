@@ -65,6 +65,10 @@ class Access:
     # Keys of practice projects (issue 266): private to their owner, so the
     # system admin's rights do not reach them; only the roles there count.
     practice: frozenset[str] = frozenset()
+    # The operator of the command line (Q5, issue 635): a system admin without
+    # a user row, so its rights are never reloaded from the users table. Only
+    # ``exchange.jobs.operator_access`` sets it; no request or user row can.
+    system_operator: bool = field(default=False, kw_only=True)
 
     def roles_in(self, project_key: str) -> frozenset[Role]:
         return self.roles.get(project_key, frozenset())
