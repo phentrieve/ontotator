@@ -640,3 +640,42 @@ def test_a_place_that_is_another_old_occurrence_unchanged_comes_last():
     assert [place[0].start for place in found.suggestions] == [moved, other]
     assert found.new_context is not None
     assert found.new_context.start <= moved < found.new_context.end
+
+
+# Issue 652: the correction deletes "und eine leichte Schwerhörigkeit" and
+# reorders the next sentence; "eine" also stands before the reordered clause.
+DELETED_V1 = (
+    "Befund: zeigte eine Hypotonie und eine leichte Schwerhörigkeit.\n\n"
+    "Die Physiotherapie wurde begonnen, nachdem eine Areflexie bemerkt wurde."
+    " Die Areflexie besserte sich innerhalb von Wochen."
+)
+
+
+def _relocated_in(old, new, word):
+    start = old.index(word)
+    review = run(old, new, (((start, start + len(word)),),))
+    assert isinstance(review, NeedsReview)
+    return relocate(
+        review.old_mentions[0].segments, review.old_context, review.new_context, new
+    )
+
+
+def test_a_deleted_phrase_next_to_a_reordered_clause_is_not_found():
+    new = (
+        "Befund: zeigte eine Hypotonie.\n\n"
+        "Als eine Areflexie auffiel, wurde die Physiotherapie begonnen."
+        " Die Areflexie besserte sich innerhalb von Wochen."
+    )
+    found = _relocated_in(DELETED_V1, new, "Schwerhörigkeit")
+    assert found == Relocation((), None, None, ())
+
+
+def test_a_one_word_replacement_next_to_a_reordered_clause_gets_its_new_wording():
+    new = (
+        "Befund: zeigte eine Hypotonie und eine leichte Hörminderung.\n\n"
+        "Als eine Areflexie auffiel, wurde die Physiotherapie begonnen."
+        " Die Areflexie besserte sich innerhalb von Wochen."
+    )
+    found = _relocated_in(DELETED_V1, new, "Schwerhörigkeit")
+    at = new.index("Hörminderung")
+    assert found.changed_at == TextSpan(at, at + len("Hörminderung"), "Hörminderung")

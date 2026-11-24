@@ -395,6 +395,8 @@ def _tokens(text: str, offset: int) -> list[tuple[int, int, str]]:
 
 
 _TOKEN = re.compile(r"\w+|[^\w\s]")
+# Unchanged words that must frame a new wording, on both sides together.
+_MIN_FRAME_WORDS = 2
 
 
 def _changed_at(
@@ -424,6 +426,18 @@ def _changed_at(
         last < len(ops) - 1 and ops[last + 1][0] == "equal"
     )
     if not (framed_left and framed_right):
+        return None
+    # Issue 652: a lone shared word ("eine") is no frame. Deleted words next to
+    # a reordered clause would otherwise read as replaced by that clause.
+    left_op = ops[first] if ops[first][0] == "equal" else ops[first - 1]
+    right_op = ops[last] if ops[last][0] == "equal" else ops[last + 1]
+    frame = sum(
+        1
+        for _, i, i_end, _, _ in {left_op, right_op}
+        for _, _, word in old_tokens[i:i_end]
+        if word[0].isalnum() or word[0] == "_"
+    )
+    if frame < _MIN_FRAME_WORDS:
         return None
     covered = [
         index for index, (a, b, _) in enumerate(old_tokens) if a < end and start < b

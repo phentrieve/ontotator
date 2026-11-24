@@ -2720,6 +2720,27 @@ describe("CaseScreen: finding modifiers (attach mode, Modifiers section, marks)"
     } finally { window.matchMedia = original; }
   });
 
+  it("touch: the attach banner's Cancel names no key (issue 652)", async () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query === "(max-width: 700px)" || query === "(hover: none) and (pointer: coarse)", media: query, onchange: null,
+      addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn(),
+    })) as unknown as typeof window.matchMedia;
+    try {
+      const { container } = await setup(modView(SEIZURE_HYPO));
+      mark(container, "schwere");
+      fireEvent.click(within(container.querySelector<HTMLElement>(".pending-bar")!).getByRole("button", { name: "Choose term" }));
+      const input = screen.getByRole("combobox", { name: "Search term" });
+      await waitFor(() => expect(input.getAttribute("aria-activedescendant")).toBeTruthy());
+      fireEvent.keyDown(input, { key: "Enter" });
+      await waitFor(() => expect(container.querySelector("#findings-column .attach-mention-banner")).not.toBeNull());
+      for (const banner of container.querySelectorAll<HTMLElement>(".attach-mention-banner")) {
+        expect(banner.textContent).not.toContain("Esc");
+        expect(within(banner).getByRole("button", { name: "Cancel" })).toBeDefined();
+      }
+    } finally { window.matchMedia = original; }
+  });
+
   it("a click on another finding's mark attaches to it", async () => {
     const { container, apply } = await setup(modView(SEIZURE_HYPO));
     await startAttach(container);

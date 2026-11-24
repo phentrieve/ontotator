@@ -1278,9 +1278,11 @@
     }
     /* Issue 596: opened from a hit of the term search, the tree gives way so that the panel keeps 320 px, room for
        the term, the mark, the search field and the first hit (they end about 292 px down at 1280 × 720), but never
-       below the tree's 220 px. The panel takes that room only when its content needs it. At 1440 × 900 nothing changes. */
+       below 290 px for the tree: its header, the "Only looking" note, three rows and "Use this term instead…" in full
+       (issue 652: at 220 px, 1280 × 600 showed 2.5 rows and cut the button). The panel takes that room only when its
+       content needs it. At 1440 × 900 nothing changes. */
     .case-screen:not(.case-comparing) .app-layout.tree-open:not(.tree-sized):not(.panel-given-to-tree):has(> .inspector-pane .search-panel .candidate-list) {
-      grid-template-rows: minmax(40%, auto) minmax(min(max(50%, min(400px, 60%)), max(220px, 100% - 320px)), 1fr);
+      grid-template-rows: minmax(40%, auto) minmax(min(max(50%, min(400px, 60%)), max(290px, 100% - 320px)), 1fr);
     }
     .case-screen:not(.case-comparing) .app-layout.tree-open.tree-sized {
       /* The limits of treeHeight.ts once more, so that a height from a higher window can push
@@ -2692,7 +2694,7 @@ details.case-version-controls > .btn { vertical-align: bottom; }
 
 /* Display-only reanchor context preserves the annotation's existing fill and selection. */
 .run--context { outline: 1px dotted var(--focus-ring); outline-offset: 1px; }
-.reanchor-context { white-space: pre-wrap; overflow-wrap: anywhere; }
+.reanchor-context { white-space: pre-wrap; overflow-wrap: break-word; }
 .problem-report-detail { width: min(100%, 72rem); margin-inline: auto; padding: var(--space-4); box-sizing: border-box; }
 .problem-report-detail form, .report-history { margin-block: var(--space-4); }
 .problem-report-detail fieldset { min-width: 0; }
@@ -2712,7 +2714,14 @@ details.case-version-controls > .btn { vertical-align: bottom; }
 .reanchor-row__term.btn { padding-inline: 0; font-weight: 600; }
 .reanchor-row__actions { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-block: var(--space-1); }
 .reanchor-row__more > summary { cursor: pointer; font-size: var(--size-sm); }
-.reanchor-panel .translation-diff { max-height: 16rem; min-height: 0; }
+/* Issue 652: the diff reads like the contexts above it (the row's 14 px, not the reading text's 18 px) and breaks
+   lines between words, also where a deleted word meets the inserted one. */
+.reanchor-panel .translation-diff {
+  height: auto; max-height: 16rem; min-height: 0; padding: var(--space-2);
+  font-family: inherit; font-size: var(--size-md); line-height: var(--leading-md); overflow-wrap: break-word;
+}
+.reanchor-panel .translation-diff del + ins::before, .reanchor-panel .translation-diff ins + del::before { content: "\200B"; }
+.reanchor-row__next.btn { padding-inline: var(--space-1); font-variant-numeric: tabular-nums; }
 
 .reanchor-context mark { background: var(--warning-light); color: inherit; }
 .reanchor-context mark[data-old-kind~="cue"] { text-decoration: underline dotted; }
