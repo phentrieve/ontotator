@@ -2944,6 +2944,11 @@ class Repository:
                             and source.annotation.term_id == pending["term_id"]
                         )
                         return source, content_valid
+                # The set the producer was re-anchored from. It holds the
+                # item too, unless it was stored before #650: such a set
+                # lacks the items it carried on, and a later job carried
+                # them on from what it would hold. The proposal at the end
+                # of the chain is checked against the item all the same.
                 carried_from = next(
                     (
                         row
@@ -2955,12 +2960,6 @@ class Repository:
                             )
                         ).mappings()
                         if producer["annotation_set_id"] == f"{prefix}{row['id']}"
-                        and any(
-                            raw["source_ref"] == pending["source_ref"]
-                            and raw["layer_id"] == pending["layer_id"]
-                            and raw["term_id"] == pending["term_id"]
-                            for raw in row["pending_items"]
-                        )
                     ),
                     None,
                 )

@@ -755,3 +755,48 @@ def test_a_resolved_waiting_proposal_does_not_come_back_for_its_task(tmp_path):
     other = assign(env, v3, "anno2")
     fresh = open_task(env, "anno2", other["id"])
     assert len(fresh["view"]["pending_reanchor_items"]) == 1
+
+
+def test_a_set_stored_before_the_fix_is_no_collision(tmp_path, monkeypatch):
+    """Upgrade: a v2 -> v3 set stored before #650 lacks the item carried on
+    from v2. The v3 -> v4 job re-processes v2 -> v3: that is the same set, it
+    stays as stored, and v4 carries the item on all the same."""
+    from dataclasses import replace
+
+    from t1_fixtures import TEXT
+
+    from ontotator.exchange import reanchor_job
+
+    env = proposal_env(tmp_path)
+    v2_text = TEXT.replace(OLD_WORD, NEW_WORD)
+    v2, v2_unit = _correction(env, env.c1_unit, v2_text, 2)
+    [waiting] = _items(env, v2)
+    # The release before the fix carried no pending item on.
+    sources = reanchor_job.reanchor_sources
+    with monkeypatch.context() as before:
+        before.setattr(
+            reanchor_job,
+            "reanchor_sources",
+            lambda *args: [replace(s, pending_items=()) for s in sources(*args)],
+        )
+        v3_text = v2_text.replace("2 Wochen", "3 Wochen")
+        v3, v3_unit = _correction(env, v2_unit, v3_text, 3)
+    assert _items(env, v3) == []
+
+    v4, _ = _correction(env, v3_unit, "Bef: " + v3_text, 4)
+    with env.db.transaction() as conn:
+        jobs = conn.execute(
+            select(JobRow.status, JobRow.error).where(JobRow.kind == "reanchor")
+        ).all()
+    assert {status for status, _ in jobs} == {"succeeded"}, jobs
+    assert _items(env, v3) == []  # stays as stored
+    [carried] = _items(env, v4)
+    assert carried["source_ref"] == waiting["source_ref"]
+    assert carried["old_context"] == waiting["old_context"]
+    new = carried["new_context"]
+    assert new["text"] == _text(env, v4)[new["start"] : new["end"]]
+    assert NEW_WORD in new["text"]
+    # The item leads back to the proposal across the set stored before.
+    work = assign(env, v4, "anno")
+    [item] = open_task(env, "anno", work["id"])["view"]["pending_reanchor_items"]
+    assert item["type_id"] == "phenotype"

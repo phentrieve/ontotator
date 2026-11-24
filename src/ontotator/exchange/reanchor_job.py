@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
@@ -142,6 +142,11 @@ def carried_pending(raw: Mapping[str, Any], m: TextMap, new: str) -> dict[str, A
         "new_context": asdict(window),
         "diff": [asdict(op) for op in window_diff(old_context, window)],
     }
+
+
+def carried_refs(source: ReanchorSource) -> list[Any]:
+    """The source refs of the source set's own pending items (#650)."""
+    return [raw["source_ref"] for raw in source.pending_items]
 
 
 def original_urn(source: ReanchorSource, annotation_id: str) -> str:
@@ -872,7 +877,14 @@ def _process_pair(
     pair: PairJob,
     variants: Mapping[str, VariantInfo],
     trigger_job_id: int,
+    carried_on: dict[int, tuple[dict[str, Any], ...]] | None = None,
 ) -> dict[str, int]:
+    """Rebuild every source set of the pair's old version on its new one.
+
+    ``carried_on``: per stored set row id, the pending items it holds once
+    the items carried on from its own source are added (#650); filled for a
+    set stored before that fix, read when that set is a source."""
+    carried_on = {} if carried_on is None else carried_on
     repo = Repository(db)
     old = repo.get_document(pair.payload.project, pair.payload.old_document_id)
     target = repo.get_document(pair.payload.project, pair.payload.new_document_id)
@@ -881,7 +893,12 @@ def _process_pair(
         repo.get_task_profile(pair.payload.project),
         repo.project_pins(pair.payload.project),
     )
-    sources = reanchor_sources(conn, project_id, old.document_id)
+    sources = [
+        replace(source, pending_items=carried_on[source.row_id])
+        if source.row_id in carried_on
+        else source
+        for source in reanchor_sources(conn, project_id, old.document_id)
+    ]
     counts = {"sets": 0, "carried": 0, "needs_review": 0}
     for source in sources:
         built, unit = rebuild_source(
@@ -935,9 +952,26 @@ def _process_pair(
                 or known["manifest_sha256"] is not None
                 or known["origin"] != "reanchor"
                 or actual != expected
-                or known["pending_items"] != built.pending_items
             ):
                 raise DomainError("REANCHOR_SET_COLLISION")
+            stored = list(known["pending_items"] or [])
+            if stored != built.pending_items:
+                # Upgrade: a set stored before #650 lacks the items carried
+                # on from its source set's own pending items (the payload,
+                # the proposals, never holds them). It is the same set when
+                # its items are exactly the rest. Proposal sets are append
+                # only, so it stays as stored (that version keeps showing
+                # what it showed); the next pair of this job reads the set
+                # with the carried items (``carried_on``), so the next
+                # version carries them on, as one stored after the fix does.
+                refs = carried_refs(source)
+                if stored != [
+                    item
+                    for item in built.pending_items
+                    if item["source_ref"] not in refs
+                ]:
+                    raise DomainError("REANCHOR_SET_COLLISION")
+                carried_on[int(known["id"])] = tuple(built.pending_items)
             continue
         ontology_views = {
             key: ontospan.ObographOntology.load(db.blobs.path(pin.sha256))
@@ -1052,9 +1086,10 @@ def reanchor(job: Job, ctx: JobContext) -> dict[str, Any]:
         for pair in sorted(pairs, key=lambda p: p.job_id):
             _authority(conn, pair, current["project_id"])
         totals = {"sets": 0, "carried": 0, "needs_review": 0}
+        carried_on: dict[int, tuple[dict[str, Any], ...]] = {}
         for pair in reversed(pairs):
             added = _process_pair(
-                db, conn, current["project_id"], pair, variants, job.id
+                db, conn, current["project_id"], pair, variants, job.id, carried_on
             )
             if isinstance(pair.payload.producer, EditorialProducer):
                 repo = Repository(db)
