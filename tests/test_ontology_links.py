@@ -78,8 +78,14 @@ def test_usable_templates(template: str) -> None:
         ("http://www.icd10data.com/search?s={code}", "Use an https:// address."),
         ("javascript:alert({code})", "Use an https:// address."),
         ("https://{code}", "Put {code} or {id} after the host, not in it."),
-        ("https://{code}.example.org/", "Put {code} or {id} after the host, not in it."),
-        ("https://example.org.{code}/x", "Put {code} or {id} after the host, not in it."),
+        (
+            "https://{code}.example.org/",
+            "Put {code} or {id} after the host, not in it.",
+        ),
+        (
+            "https://example.org.{code}/x",
+            "Put {code} or {id} after the host, not in it.",
+        ),
         ("https:///search?s={code}", "Use an https:// address."),
         ("https://www.icd10data.com/search", "Put {code} or {id} where the code goes."),
         ("https://example.org/{label}", "Use only {code} and {id} in braces."),
