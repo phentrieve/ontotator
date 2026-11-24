@@ -428,6 +428,29 @@ def _changed_at(
     return TextSpan(a, b, new[a:b])
 
 
+def _unchanged_others(
+    start: int, phrase: str, old_context: TextWindow, new: str, lo: int, hi: int
+) -> set[int]:
+    """Where other old occurrences of ``phrase`` in the old window map unchanged.
+
+    The old window is matched against ``new[lo:hi]`` by characters (both are
+    short); an occurrence of the same words that maps exactly is still that
+    occurrence, not the place the mention moved to.
+    """
+    old = old_context.text
+    local = text_map(old, new[lo:hi])
+    taken: set[int] = set()
+    at = old.find(phrase)
+    while at != -1:
+        absolute = old_context.start + at
+        if absolute != start and _bounded(old, at, at + len(phrase)):
+            mapped = map_span(local, at, at + len(phrase))
+            if mapped is not None:
+                taken.add(lo + mapped[0])
+        at = old.find(phrase, at + 1)
+    return taken
+
+
 def relocate(
     segments: Sequence[TextSpan],
     old_context: TextWindow,
@@ -455,7 +478,11 @@ def relocate(
             if _bounded(new, at, at + len(phrase)):
                 places.append(at)
             at = new.find(phrase, at + 1, hi)
-        places.sort(key=lambda p: (abs(p + len(phrase) / 2 - middle), p))
+        # Issue 649: a place that is another old occurrence of the same words,
+        # left where it was, belongs to that occurrence; it comes after the
+        # places the mention may have moved to.
+        others = _unchanged_others(start, phrase, old_context, new, lo, hi)
+        places.sort(key=lambda p: (p in others, abs(p + len(phrase) / 2 - middle), p))
         for place in places[:_MAX_SUGGESTIONS]:
             shift = place - start
             suggestions.append(

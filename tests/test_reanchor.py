@@ -615,3 +615,28 @@ def test_the_new_wording_keeps_the_unchanged_words_of_a_partly_changed_mention()
     at = new.index("Ataxia")
     assert found.suggestions == ()
     assert found.changed_at == TextSpan(at, at + len("Ataxia 😀new"), "Ataxia 😀new")
+
+
+def test_a_place_that_is_another_old_occurrence_unchanged_comes_last():
+    # Issue 649: the reordered sentence moves the first "Areflexie"; the second
+    # stays where it was. Place 1 is the moved one, not the other occurrence.
+    old = (
+        "Befund: zeigte eine Hypotonie.\n\n"
+        "Die Physiotherapie wurde begonnen, nachdem eine Areflexie bemerkt wurde."
+        " Die Areflexie besserte sich innerhalb von Wochen."
+    )
+    new = (
+        "Befund: zeigte eine Hypotonie.\n\n"
+        "Als eine Areflexie auffiel, wurde die Physiotherapie begonnen."
+        " Die Areflexie besserte sich innerhalb von Wochen."
+    )
+    start = old.index("Areflexie")
+    review = run(old, new, (((start, start + len("Areflexie")),),))
+    assert isinstance(review, NeedsReview)
+    found = relocate(
+        review.old_mentions[0].segments, review.old_context, review.new_context, new
+    )
+    moved, other = new.index("Areflexie"), new.rindex("Areflexie")
+    assert [place[0].start for place in found.suggestions] == [moved, other]
+    assert found.new_context is not None
+    assert found.new_context.start <= moved < found.new_context.end
