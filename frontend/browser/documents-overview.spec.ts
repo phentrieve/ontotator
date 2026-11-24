@@ -24,6 +24,8 @@ const SOURCE: CellText = { state: "source text", who: "" };
 const ACCEPTED: CellText = { state: "accepted", who: "" };
 const NOT_PLANNED: CellText = { state: "not planned", who: "" };
 const AFTER_REVIEW: CellText = { state: "after translation review", who: "" };
+// Issue 613: a rejected or queried translation blocks annotation, and the cell says why (as the phone card does).
+const BLOCKED = (why: string): CellText => ({ state: `blocked, ${why}`, who: "" });
 /** "{n} of {m} submitted" without who (submitted annotation; the count follows the per-text setting). */
 const SUBMITTED: CellText = { state: /\d+ of \d+ submitted/, who: "" };
 const ACCEPTED_ON = /accepted( \d{1,2} [A-Z][a-z]{2})?/;
@@ -60,8 +62,8 @@ const SCENARIOS: Record<Exclude<OverviewScenarioName, "WALKTHROUGH">, (RowExpect
     { case_id: "case-103", language: "de", translation: { state: `assigned, not started (${ANA})`, who: "" }, annotation: AFTER_REVIEW, finalization: WAITING, waiting: [ANA], action: "Assign annotation…", edge: false },
   ],
   S4: [
-    { case_id: "case-104", language: "de", translation: { state: "Rejected", who: "" }, annotation: AFTER_REVIEW, finalization: WAITING, waiting: "You", action: "Resolve…", edge: true },
-    { case_id: "case-104", language: "fr", translation: { state: "Query", who: "" }, annotation: AFTER_REVIEW, finalization: WAITING, waiting: "You", action: "Resolve…", edge: true },
+    { case_id: "case-104", language: "de", translation: { state: "Rejected", who: "" }, annotation: BLOCKED("translation rejected"), finalization: WAITING, waiting: "You", action: "Resolve…", edge: true },
+    { case_id: "case-104", language: "fr", translation: { state: "Query", who: "" }, annotation: BLOCKED("queried"), finalization: WAITING, waiting: "You", action: "Resolve…", edge: true },
   ],
   S5: [
     { case_id: "case-105", language: "de", translation: ACCEPTED, annotation: { state: "Unassigned", who: "" }, finalization: WAITING, waiting: "You", action: "Assign annotation…", edge: false },

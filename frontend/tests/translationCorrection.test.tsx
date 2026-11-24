@@ -1,7 +1,7 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { api, ApiError } from '../src/api/client';
-import { TranslationCorrectionAction } from '../src/variants/TranslationCorrectionAction';
+import { AskReviewerDialog, TranslationCorrectionAction } from '../src/variants/TranslationCorrectionAction';
 import { variant } from './variantFixtures';
 import { assignment } from './assignmentFixtures';
 
@@ -19,7 +19,11 @@ it('requests a repeat review of the exact accepted corrected text only after rev
   expect(api.listMembers).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Ask a reviewer to correct…' }));
   await screen.findByLabelText('Translation reviewer');
-  expect(screen.getByRole('button', { name: 'Ask the reviewer' })).toHaveProperty('disabled', true);
+  // Issue 613: focusable, aria-disabled, with what is missing.
+  expect(screen.getByRole('button', { name: 'Ask the reviewer' }).getAttribute('aria-disabled')).toBe('true');
+  expect(screen.getByText('Choose a reviewer and enter a reason.')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Ask the reviewer' }));
+  expect(api.assignTranslationCorrection).not.toHaveBeenCalled();
   fireEvent.change(screen.getByLabelText('Translation reviewer'), { target: { value: 'reviewer' } });
   fireEvent.change(screen.getByLabelText('Reason for another review'), { target: { value: 'Check the source wording again' } });
   fireEvent.click(screen.getByRole('button', { name: 'Ask the reviewer' }));
@@ -50,7 +54,8 @@ it('requires explicit missing-language confirmation and does not offer native te
   await screen.findByLabelText('Translation reviewer');
   fireEvent.change(screen.getByLabelText('Translation reviewer'), { target: { value: 'reviewer' } });
   fireEvent.change(screen.getByLabelText('Reason for another review'), { target: { value: 'Check source wording' } });
-  expect(screen.getByRole('button', { name: 'Ask the reviewer' })).toHaveProperty('disabled', true);
+  expect(screen.getByRole('button', { name: 'Ask the reviewer' }).getAttribute('aria-disabled')).toBe('true');
+  expect(screen.getByText('Tick the box to assign despite missing en.')).toBeTruthy();
   fireEvent.click(screen.getByRole('checkbox', { name: /missing en/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Ask the reviewer' }));
   await screen.findByText(/was asked to correct the translation/);
@@ -77,4 +82,28 @@ it('explains the refusal while a lead correction of the version is open', async 
   fireEvent.click(screen.getByRole('button', { name: 'Ask the reviewer' }));
   expect(await screen.findByText(/^A lead is correcting this version\. Ask a reviewer after that correction is submitted/)).toBeTruthy();
   expect(screen.queryByText(/This task already exists/)).toBeNull();
+});
+
+// Issue 613: the dialog from Documents.
+it('opens at the reviewer, keeps Ask the reviewer as the primary in the footer and moves focus to Close afterwards', async () => {
+  vi.mocked(api.listMembers).mockResolvedValue([
+    { username: 'de-only', display_name: 'Annotator', pseudonym: 'ann-0004', roles: ['annotator'], languages: ['de'] },
+    { username: 'reviewer', display_name: 'Bilingual reviewer', pseudonym: 'R', roles: ['annotator'], languages: ['en', 'de'] },
+  ]);
+  render(<AskReviewerDialog {...props} title="Ask a reviewer to correct, case de" onClose={vi.fn()} />);
+  const select = await screen.findByLabelText('Translation reviewer');
+  await waitFor(() => expect(window.document.activeElement).toBe(select));
+  // Readers of both languages first; the other one says what is missing.
+  expect([...select.querySelectorAll('option')].map(option => option.textContent)).toEqual(['Choose a reviewer', 'Bilingual reviewer (R)', 'Annotator (ann-0004), does not read en']);
+  const footer = window.document.querySelector('.modal-actions') as HTMLElement;
+  const ask = within(footer).getByRole('button', { name: 'Ask the reviewer' });
+  expect(ask.className).toContain('btn-primary');
+  expect(ask.getAttribute('aria-disabled')).toBe('true');
+  expect(window.document.getElementById(ask.getAttribute('aria-describedby')!)?.textContent).toBe('Choose a reviewer and enter a reason.');
+  fireEvent.change(select, { target: { value: 'reviewer' } });
+  fireEvent.change(screen.getByLabelText('Reason for another review'), { target: { value: 'Check it' } });
+  expect(ask.getAttribute('aria-disabled')).toBeNull();
+  fireEvent.click(ask);
+  await screen.findByText(/was asked to correct the translation/);
+  await waitFor(() => expect(window.document.activeElement).toBe(within(footer).getByRole('button', { name: 'Close' })));
 });

@@ -188,6 +188,9 @@ it("names a submitted review by what happens to it (issue 547, U2-06)", () => {
   expect(reviewNote(null, 3)).toBeNull();
   expect(reviewNote("accepted", 3)).toBe("A submitted translation review stays with the version it reviewed.");
   expect(reviewNote("query", 3)).toBe("A submitted translation review stays with the version it reviewed. To have v3 reviewed, use Resolve… › Other ways… › Assign a new review… on this row after saving.");
+  // Issue 613: a decided query or rejection has no Resolve… on its row, so the note does not point there.
+  expect(reviewNote("query", 3, true)).toBe("A submitted translation review stays with the version it reviewed.");
+  expect(reviewNote("rejected", 3, true)).toBe("A submitted translation review stays with the version it reviewed.");
 });
 
 it("says in words why a version cannot be corrected, without the editor", async () => {
