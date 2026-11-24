@@ -24,6 +24,14 @@ def test_texts_without_proposals_are_always_from_scratch():
     )
 
 
+def test_proposals_waiting_for_a_check_count_as_proposals():
+    """Issue 650: a version whose re-anchored set holds only needs-review
+    items is not a text without proposals."""
+    assert mode(proposal_count=0, review_items=True) == TextMode(
+        "proposals", "project", False
+    )
+
+
 def test_plan_override_wins_over_project_setting():
     assert mode(plan_override="scratch") == TextMode("scratch", "plan", False)
     assert mode(project_mode="scratch", plan_override="proposals") == TextMode(

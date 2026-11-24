@@ -295,6 +295,19 @@ def _needs_review(
     )
 
 
+def carry_window(window: TextWindow, m: TextMap, new: str) -> TextWindow:
+    """``window`` of the old text of ``m`` as the window of ``new`` it maps to.
+
+    The edges map as those of a needs-review item's new context do and are
+    widened to whole words. A pending item carried on to a further version
+    (#650) gets its new context this way.
+    """
+    left = _boundary(m, window.start, end=False, new_length=len(new))
+    right = max(left, _boundary(m, window.end, end=True, new_length=len(new)))
+    left, right = _whole_word_window(new, left, right)
+    return TextWindow(left, right, new[left:right])
+
+
 def window_diff(
     old_window: TextWindow, new_window: TextWindow
 ) -> tuple[WindowOpcode, ...]:

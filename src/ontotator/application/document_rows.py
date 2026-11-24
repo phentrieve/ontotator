@@ -67,7 +67,10 @@ from ontotator.storage.plan_tables import (
     TranslationVersionUploadRow,
     WorkPlanFlagsRow,
 )
-from ontotator.storage.proposal_queries import newest_proposal_counts
+from ontotator.storage.proposal_queries import (
+    newest_proposal_counts,
+    review_item_documents,
+)
 from ontotator.storage.repository import Repository, _key_str
 from ontotator.storage.tables import (
     AnnotationSnapshotRow,
@@ -379,6 +382,11 @@ class RowFacts:
     # The same on the editable layers: the targets a carry of work from
     # proposals needs (``work_rounds.target_proposals``, #414).
     carry_proposal_counts: dict[str, int] = field(default_factory=dict)
+    # Issue 650: documents whose re-anchored proposals wait for a check
+    # (needs-review items), on any layer and on the editable layers. Work
+    # from proposals goes there as it goes to proposals; counts leave them out.
+    review_items: frozenset[str] = frozenset()
+    carry_review_items: frozenset[str] = frozenset()
     project_mode: AnnotationMode = "proposals"
     mode_overrides: dict[RowKey, AnnotationMode] = field(default_factory=dict)
     annotation_submissions: dict[str, list[tuple[datetime, AnnotationMode]]] = field(
@@ -1442,6 +1450,9 @@ def load_facts(
     people_fields = {uid: ref.model_dump() for uid, ref in people.items()}
     # Read once: the final state and the source obligations share them.
     causes = repo.workflow_causes_in(conn, key, pid)
+    editable = build_scope(
+        TaskProfile.model_validate(project.task_profile), "proposal_check"
+    ).editable_layer_ids
     return RowFacts(
         project_key=key,
         viewer_user_id=viewer_user_id,
@@ -1507,13 +1518,9 @@ def load_facts(
         source_obligations=_source_obligations(causes),
         consolidation_flags={} if lean else load_consolidation_flags(conn, pid),
         proposal_counts=newest_proposal_counts(conn, pid),
-        carry_proposal_counts=newest_proposal_counts(
-            conn,
-            pid,
-            build_scope(
-                TaskProfile.model_validate(project.task_profile), "proposal_check"
-            ).editable_layer_ids,
-        ),
+        carry_proposal_counts=newest_proposal_counts(conn, pid, editable),
+        review_items=review_item_documents(conn, pid),
+        carry_review_items=review_item_documents(conn, pid, editable),
         project_mode=project.tool_proposal_mode,
         mode_overrides=_mode_overrides(conn, pid),
         annotation_submissions=_annotation_submissions(conn, pid),

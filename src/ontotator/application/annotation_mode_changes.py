@@ -61,8 +61,10 @@ from ontotator.storage.mode_change_tables import (
     DiscardedSubmissionRow,
 )
 from ontotator.storage.proposal_queries import (
+    has_review_items,
     newest_proposal_counts,
     newest_proposal_refs,
+    review_item_documents,
 )
 from ontotator.storage.tables import AssignmentRow, DocumentRow, SubmissionRow
 
@@ -347,6 +349,10 @@ class AnnotationModeChangeService:
         locked = locked_text_modes(conn, pid, documents) if documents else {}
         targets = text_target_documents(conn, pid, found)
         proposals = newest_proposal_counts(conn, pid) if mode == "proposals" else {}
+        # Proposals waiting for a check count as proposals here (#650).
+        review_items = (
+            review_item_documents(conn, pid) if mode == "proposals" else frozenset()
+        )
         finals = (
             {
                 RowKey(case_id, language)
@@ -372,7 +378,11 @@ class AnnotationModeChangeService:
                 why = "not_locked"
             elif current == mode:
                 why = "unchanged"
-            elif mode == "proposals" and not proposals.get(targets[row]):
+            elif (
+                mode == "proposals"
+                and not proposals.get(targets[row])
+                and targets[row] not in review_items
+            ):
                 why = "no_proposals"
             elif row in finals:
                 why = "final_result"
@@ -585,7 +595,11 @@ class AnnotationModeChangeService:
             raise DomainError("ANNOTATION_MODE_NOT_LOCKED", {"mode": current.mode})
         if current.mode == mode:
             raise DomainError("ANNOTATION_MODE_UNCHANGED", {"mode": mode})
-        if mode == "proposals" and not newest_proposal_refs(conn, pid, target):
+        if (
+            mode == "proposals"
+            and not newest_proposal_refs(conn, pid, target)
+            and not has_review_items(conn, pid, target)
+        ):
             raise DomainError("NO_TOOL_PROPOSALS")
         final = conn.execute(
             select(FinalSelectionRow.id).where(

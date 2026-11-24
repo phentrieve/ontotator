@@ -32,7 +32,15 @@ from ontotator.domain.documents import (
 )
 from ontotator.domain.errors import DomainError
 from ontotator.domain.profiles import TaskProfile
-from ontotator.domain.reanchor import NeedsReview, reanchor_annotation, text_map
+from ontotator.domain.reanchor import (
+    NeedsReview,
+    TextMap,
+    TextWindow,
+    carry_window,
+    reanchor_annotation,
+    text_map,
+    window_diff,
+)
 from ontotator.domain.serialization import decode_snapshot
 from ontotator.domain.variants import VariantInfo
 from ontotator.exchange.t1 import (
@@ -72,6 +80,9 @@ class ReanchorSource:
     # actors, or for a legacy re-anchored source the tool of its own source.
     actors: tuple[dict[str, Any], ...] | None = None
     actor_alias: Mapping[str, str] = field(default_factory=dict)
+    # The source set's own needs-review items (#650): a re-anchored set's
+    # proposals that still wait for a check, carried on to the next version.
+    pending_items: tuple[dict[str, Any], ...] = ()
 
     def credited_actors(self) -> list[ontospan.Actor]:
         stored = (
@@ -116,6 +127,23 @@ def pending_payload(item: NeedsReview) -> dict[str, Any]:
     return payload
 
 
+def carried_pending(raw: Mapping[str, Any], m: TextMap, new: str) -> dict[str, Any]:
+    """A needs-review item of the source set, for the next version (#650).
+
+    The proposal and its old words (``old_mentions``, ``old_context``) stay
+    those of the version the proposal was made on, so the item still shows
+    what the proposal "was"; only the new context, mapped from the source
+    version's text onto ``new``, and its diff are recomputed.
+    """
+    old_context = TextWindow(**raw["old_context"])
+    window = carry_window(TextWindow(**raw["new_context"]), m, new)
+    return {
+        **raw,
+        "new_context": asdict(window),
+        "diff": [asdict(op) for op in window_diff(old_context, window)],
+    }
+
+
 def original_urn(source: ReanchorSource, annotation_id: str) -> str:
     try:
         ontospan.parse_annotation_ref(annotation_id)
@@ -138,8 +166,13 @@ def rebuild_source(
     variant: VariantInfo | None = None,
     source_variant_hashes: Mapping[str, str] | None = None,
 ) -> tuple[ImportedSet | None, ontospan.AnnotatedDocument | None]:
-    """Construct real target snapshots and their complete T1 set, never relabel hashes."""
-    if not source.annotations:
+    """Construct real target snapshots and their complete T1 set, never relabel hashes.
+
+    The source set's own needs-review items are carried on unchanged but for
+    their new context (``carried_pending``), also when the set holds no
+    proposal (#650): a proposal waiting for a check is never lost.
+    """
+    if not source.annotations and not source.pending_items:
         return None, None
     set_id = f"{project}:reanchor:{target.document_id}:{source.row_id}"
     # The copy keeps the producer of the source set (#417): the re-anchoring
@@ -156,7 +189,9 @@ def rebuild_source(
     annotations: list[AnnotationSnapshot] = []
     evidence: list[EvidenceSnapshot] = []
     notes: dict[str, list[str]] = {}
-    pending: list[dict[str, Any]] = []
+    pending = [
+        carried_pending(raw, mapped, target.text) for raw in source.pending_items
+    ]
     delivered: list[ontospan.Annotation] = []
     defaulted_axes = 0
     for index, original in enumerate(source.annotations, 1):
@@ -759,6 +794,7 @@ def reanchor_sources(
                 # A legacy re-anchored source is read as its credited tool.
                 tuple(credit.actors) if credit.alias else None,
                 dict(credit.alias),
+                tuple(row["pending_items"] or ()),
             )
         )
     return result
