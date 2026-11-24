@@ -450,7 +450,7 @@ export const TextPane: React.FC<TextPaneProps> = ({
             {attachMessage ?? intentMessage ?? <><strong>Adding a mention:</strong> select text to attach it to the selected finding.</>}
           </span>
           {onCancelAttach && (
-            // Issue 652: on a touch screen the button names no key, as the banner does (#644).
+            // Issue 652: on a touch screen the button names no key, as the banner does (issue 644).
             <Button size="sm" onClick={onCancelAttach}>
               {touchOnly ? "Cancel" : "Cancel (Esc)"}
             </Button>
