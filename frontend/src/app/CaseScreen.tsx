@@ -1198,14 +1198,29 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
     }
     if (!focusRow) return;
     setMobilePane("list");
-    requestAnimationFrame(() => {
-      const row = [...(sidebarScrollRef.current?.querySelectorAll<HTMLElement>('[data-reanchor-item]') ?? [])]
-        .find(element => element.dataset.reanchorItem === key);
-      for (let disclosure = row?.parentElement?.closest("details"); disclosure; disclosure = disclosure.parentElement?.closest("details")) disclosure.open = true;
-      row?.scrollIntoView?.({ block: "nearest" });
-      (row?.querySelector<HTMLElement>('[data-reanchor-primary]:not([aria-disabled="true"])') ?? row?.querySelector<HTMLElement>('button'))?.focus({ preventScroll: true });
-    });
+    requestAnimationFrame(() => { if (!focusReanchorRow(key)) reanchorFocusAfterSave.current = key; });
   };
+  /**
+   * Focuses the row's first action and keeps it in view; false while its buttons are still disabled (the queue
+   * saves the step that resolved the previous item), so the focus follows once the save is done.
+   */
+  const focusReanchorRow = (key: string): boolean => {
+    const row = [...(sidebarScrollRef.current?.querySelectorAll<HTMLElement>('[data-reanchor-item]') ?? [])]
+      .find(element => element.dataset.reanchorItem === key);
+    for (let disclosure = row?.parentElement?.closest("details"); disclosure; disclosure = disclosure.parentElement?.closest("details")) disclosure.open = true;
+    row?.scrollIntoView?.({ block: "nearest" });
+    const target = row?.querySelector<HTMLElement>('[data-reanchor-primary]:not([aria-disabled="true"])') ?? row?.querySelector<HTMLElement>('button');
+    target?.focus({ preventScroll: true });
+    return !target || document.activeElement === target;
+  };
+  const reanchorFocusAfterSave = useRef<string | null>(null);
+  // The render that enables the buttons again (the save is done) hands the waiting focus on; a selection changed meanwhile drops it.
+  useEffect(() => {
+    const key = reanchorFocusAfterSave.current;
+    if (!key || queueState === "saving") return;
+    reanchorFocusAfterSave.current = null;
+    if (selectedReanchorKey === key) focusReanchorRow(key);
+  });
   /** After an item is resolved: the next pending one is selected, in the panel and in the text; else the panel's count gets the focus. */
   const afterReanchorResolved = (item: ReanchorItem) => {
     const next = nextPendingReanchor(reanchorKey(item));
