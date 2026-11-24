@@ -21,10 +21,9 @@ from ontotator.application.work_plans import _chains
 from ontotator.application.work_plans import _target as _row_target
 from ontotator.application.work_rounds import (
     WorkRoundService,
-    no_target_proposals,
+    carry_targets,
     proposal_carry_plan,
     require_independent,
-    target_proposals,
 )
 from ontotator.application.workflow_guards import require_task_writable
 from ontotator.assignments.eligibility import (
@@ -583,12 +582,12 @@ class TextChangeService:
         self, conn: Connection, key: str, pid: int, target: VariantInfo
     ) -> None:
         """Work from proposals is carried onto the target's own proposals
-        (``no_target_proposals`` while it has none: import them first)."""
+        (``no_target_proposals`` while it has none, nor any waiting for a
+        check: import them first)."""
         scope = build_scope(self.repo.get_task_profile(key), "proposal_check")
-        if not target_proposals(
+        carry_targets(
             self.repo, conn, key, pid, target.document_id, scope.editable_layer_ids
-        ):
-            raise no_target_proposals()
+        )
 
     # --- operations ------------------------------------------------------------- #
 

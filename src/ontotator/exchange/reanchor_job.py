@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
@@ -32,7 +32,15 @@ from ontotator.domain.documents import (
 )
 from ontotator.domain.errors import DomainError
 from ontotator.domain.profiles import TaskProfile
-from ontotator.domain.reanchor import NeedsReview, reanchor_annotation, text_map
+from ontotator.domain.reanchor import (
+    NeedsReview,
+    TextMap,
+    TextWindow,
+    carry_window,
+    reanchor_annotation,
+    text_map,
+    window_diff,
+)
 from ontotator.domain.serialization import decode_snapshot
 from ontotator.domain.variants import VariantInfo
 from ontotator.exchange.t1 import (
@@ -72,6 +80,9 @@ class ReanchorSource:
     # actors, or for a legacy re-anchored source the tool of its own source.
     actors: tuple[dict[str, Any], ...] | None = None
     actor_alias: Mapping[str, str] = field(default_factory=dict)
+    # The source set's own needs-review items (#650): a re-anchored set's
+    # proposals that still wait for a check, carried on to the next version.
+    pending_items: tuple[dict[str, Any], ...] = ()
 
     def credited_actors(self) -> list[ontospan.Actor]:
         stored = (
@@ -116,6 +127,28 @@ def pending_payload(item: NeedsReview) -> dict[str, Any]:
     return payload
 
 
+def carried_pending(raw: Mapping[str, Any], m: TextMap, new: str) -> dict[str, Any]:
+    """A needs-review item of the source set, for the next version (#650).
+
+    The proposal and its old words (``old_mentions``, ``old_context``) stay
+    those of the version the proposal was made on, so the item still shows
+    what the proposal "was"; only the new context, mapped from the source
+    version's text onto ``new``, and its diff are recomputed.
+    """
+    old_context = TextWindow(**raw["old_context"])
+    window = carry_window(TextWindow(**raw["new_context"]), m, new)
+    return {
+        **raw,
+        "new_context": asdict(window),
+        "diff": [asdict(op) for op in window_diff(old_context, window)],
+    }
+
+
+def carried_refs(source: ReanchorSource) -> list[Any]:
+    """The source refs of the source set's own pending items (#650)."""
+    return [raw["source_ref"] for raw in source.pending_items]
+
+
 def original_urn(source: ReanchorSource, annotation_id: str) -> str:
     try:
         ontospan.parse_annotation_ref(annotation_id)
@@ -138,8 +171,13 @@ def rebuild_source(
     variant: VariantInfo | None = None,
     source_variant_hashes: Mapping[str, str] | None = None,
 ) -> tuple[ImportedSet | None, ontospan.AnnotatedDocument | None]:
-    """Construct real target snapshots and their complete T1 set, never relabel hashes."""
-    if not source.annotations:
+    """Construct real target snapshots and their complete T1 set, never relabel hashes.
+
+    The source set's own needs-review items are carried on unchanged but for
+    their new context (``carried_pending``), also when the set holds no
+    proposal (#650): a proposal waiting for a check is never lost.
+    """
+    if not source.annotations and not source.pending_items:
         return None, None
     set_id = f"{project}:reanchor:{target.document_id}:{source.row_id}"
     # The copy keeps the producer of the source set (#417): the re-anchoring
@@ -156,7 +194,9 @@ def rebuild_source(
     annotations: list[AnnotationSnapshot] = []
     evidence: list[EvidenceSnapshot] = []
     notes: dict[str, list[str]] = {}
-    pending: list[dict[str, Any]] = []
+    pending = [
+        carried_pending(raw, mapped, target.text) for raw in source.pending_items
+    ]
     delivered: list[ontospan.Annotation] = []
     defaulted_axes = 0
     for index, original in enumerate(source.annotations, 1):
@@ -759,6 +799,7 @@ def reanchor_sources(
                 # A legacy re-anchored source is read as its credited tool.
                 tuple(credit.actors) if credit.alias else None,
                 dict(credit.alias),
+                tuple(row["pending_items"] or ()),
             )
         )
     return result
@@ -836,7 +877,14 @@ def _process_pair(
     pair: PairJob,
     variants: Mapping[str, VariantInfo],
     trigger_job_id: int,
+    carried_on: dict[int, tuple[dict[str, Any], ...]] | None = None,
 ) -> dict[str, int]:
+    """Rebuild every source set of the pair's old version on its new one.
+
+    ``carried_on``: per stored set row id, the pending items it holds once
+    the items carried on from its own source are added (#650); filled for a
+    set stored before that fix, read when that set is a source."""
+    carried_on = {} if carried_on is None else carried_on
     repo = Repository(db)
     old = repo.get_document(pair.payload.project, pair.payload.old_document_id)
     target = repo.get_document(pair.payload.project, pair.payload.new_document_id)
@@ -845,7 +893,12 @@ def _process_pair(
         repo.get_task_profile(pair.payload.project),
         repo.project_pins(pair.payload.project),
     )
-    sources = reanchor_sources(conn, project_id, old.document_id)
+    sources = [
+        replace(source, pending_items=carried_on[source.row_id])
+        if source.row_id in carried_on
+        else source
+        for source in reanchor_sources(conn, project_id, old.document_id)
+    ]
     counts = {"sets": 0, "carried": 0, "needs_review": 0}
     for source in sources:
         built, unit = rebuild_source(
@@ -899,9 +952,26 @@ def _process_pair(
                 or known["manifest_sha256"] is not None
                 or known["origin"] != "reanchor"
                 or actual != expected
-                or known["pending_items"] != built.pending_items
             ):
                 raise DomainError("REANCHOR_SET_COLLISION")
+            stored = list(known["pending_items"] or [])
+            if stored != built.pending_items:
+                # Upgrade: a set stored before #650 lacks the items carried
+                # on from its source set's own pending items (the payload,
+                # the proposals, never holds them). It is the same set when
+                # its items are exactly the rest. Proposal sets are append
+                # only, so it stays as stored (that version keeps showing
+                # what it showed); the next pair of this job reads the set
+                # with the carried items (``carried_on``), so the next
+                # version carries them on, as one stored after the fix does.
+                refs = carried_refs(source)
+                if stored != [
+                    item
+                    for item in built.pending_items
+                    if item["source_ref"] not in refs
+                ]:
+                    raise DomainError("REANCHOR_SET_COLLISION")
+                carried_on[int(known["id"])] = tuple(built.pending_items)
             continue
         ontology_views = {
             key: ontospan.ObographOntology.load(db.blobs.path(pin.sha256))
@@ -1016,9 +1086,10 @@ def reanchor(job: Job, ctx: JobContext) -> dict[str, Any]:
         for pair in sorted(pairs, key=lambda p: p.job_id):
             _authority(conn, pair, current["project_id"])
         totals = {"sets": 0, "carried": 0, "needs_review": 0}
+        carried_on: dict[int, tuple[dict[str, Any], ...]] = {}
         for pair in reversed(pairs):
             added = _process_pair(
-                db, conn, current["project_id"], pair, variants, job.id
+                db, conn, current["project_id"], pair, variants, job.id, carried_on
             )
             if isinstance(pair.payload.producer, EditorialProducer):
                 repo = Repository(db)

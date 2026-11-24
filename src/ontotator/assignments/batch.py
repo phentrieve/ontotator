@@ -272,6 +272,7 @@ class _Rows:
                 remaining > 0
                 and self.locked.get((version.case_id, version.language)) == "proposals"
                 and not self.proposals.get(version.document_id)
+                and version.document_id not in self.facts.review_items
             ):
                 remaining, no_proposals = 0, True
         else:
