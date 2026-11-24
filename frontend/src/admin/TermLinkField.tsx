@@ -17,7 +17,10 @@ export function linkTemplateProblem(template: string): string | null {
   const authority = template.slice("https://".length).split(/[/?#]/, 1)[0] ?? "";
   let host = "";
   try { host = new URL(template).hostname; } catch { /* no address */ }
-  if (!template.startsWith("https://") || /[{}]/.test(authority) || !host) return "Use an https:// address.";
+  if (!template.startsWith("https://")) return "Use an https:// address.";
+  // Issue 634: an https address with a placeholder in the host names that rule, not the https one.
+  if (/[{}]/.test(authority)) return "Put {code} or {id} after the host, not in it.";
+  if (!host) return "Use an https:// address.";
   if ((template.match(/\{[^{}]*\}|[{}]/g) ?? []).some(brace => !PLACEHOLDERS.includes(brace))) return "Use only {code} and {id} in braces.";
   if (!PLACEHOLDERS.some(placeholder => template.includes(placeholder))) return "Put {code} or {id} where the code goes.";
   return null;

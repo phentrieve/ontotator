@@ -420,7 +420,7 @@ export const TreeBrowser: React.FC<TreeBrowserProps> = ({
                   event.stopPropagation();
                   cancelConfirm();
                 }}>
-                <p id="tree-take-effect" className="tree-detail__effect">{takeEffect(takeMode, detail.label, detail.term_id)}</p>
+                <p id="tree-take-effect" className="tree-detail__effect">{takeEffect(takeMode, detail.label, showTermId(detail.term_id))}</p>
                 <Button ref={confirmButton} type="button" variant="primary" disabled={saving} onClick={() => { void assignTerm(); }}>
                   Confirm
                 </Button>

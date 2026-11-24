@@ -422,7 +422,8 @@ describe("project settings sections", () => {
     const field = await screen.findByLabelText("Code link for HPO");
     for (const [template, problem] of [
       ["http://www.icd10data.com/search?s={code}", "Use an https:// address."],
-      ["https://{code}.example.org/", "Use an https:// address."],
+      ["https://{code}.example.org/", "Put {code} or {id} after the host, not in it."],
+      ["https://example.org.{code}/x", "Put {code} or {id} after the host, not in it."],
       ["https://www.icd10data.com/search", "Put {code} or {id} where the code goes."],
       ["https://example.org/{label}", "Use only {code} and {id} in braces."],
     ] as const) {
