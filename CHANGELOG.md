@@ -10,6 +10,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Re-anchoring after a text correction loses no tool proposals (#650). A typo fix that changed the words of every proposal of a text annotated from proposals left the new version with a carried set of 0 proposals and only proposals waiting for a check: **Handle text change** said *v2 has no proposals yet* and **Retry** never helped, a new assignment was refused or offered *From scratch (no tool proposals)*, and nobody saw the waiting proposals. Such a version now counts as having proposals: the open task moves there, a new task is from proposals, batch assignment and mode changes take it, and the task lists the proposals under **Needs review after the text change**. Proposal counts still say 0 proposals. A proposal still waiting for a check is also carried on by a further correction (v2 → v3) with its context in the new text, so **Use this location** and *now “…”* work on v3; the words it was proposed on stay as they were. A task that decided it keeps its decision; a new task on v3 checks it for itself. A carried set stored by an earlier release stays as it is, and the next correction of that text carries the waiting proposals on from it without a conflict. No API change, no migration.
 - Translation review, **Ask the lead** (#651): a reviewer who stays in the task gets the lead's answer without leaving the window. Once the bell shows the answer (within about a minute), the questions and the task load again: a task paused by the question opens again, the answer shows under **Questions to the lead**, and the notice *Question sent. …* goes. Before, only switching to another window and back, or a full reload, showed it, and the bell entry for the task you are in changed nothing. No API change, no migration.
+
+## [0.15.1] - 2026-11-24
+
+### Fixed
+
 - Editor, **Needs review after the text change** (#649): when the old words occur twice, **Use this location** first offers the place the finding moved to, not the other occurrence that stayed where it was. After *Die Physiotherapie wurde begonnen, nachdem eine Areflexie bemerkt wurde. Die Areflexie besserte sich…* became *Als eine Areflexie auffiel, wurde die Physiotherapie begonnen. …*, place 1 of 2 was the second *Areflexie*, and one click re-created the finding there. The current context now opens at the moved words too. No API change, no migration.
 - Editor, **Needs review after the text change** (#633): after **Use this location** the next pending item's **Use this location** gets the focus also when the save takes longer than one frame. The focus was set while the row's buttons were still disabled by the running save and was lost; it now follows once the save is done, unless another item was selected meanwhile. No API change, no migration.
 - Project settings › Annotation › **Term codes** (#634): a code link with `{code}` or `{id}` in the host, such as `https://{code}.example.org/`, now says *Put {code} or {id} after the host, not in it.* instead of *Use an https:// address.*, which it already was. The rule is unchanged; the server's error says the same.
@@ -615,7 +620,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 First public release.
 
-[Unreleased]: https://github.com/phentrieve/ontotator/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/phentrieve/ontotator/compare/v0.15.1...HEAD
+[0.15.1]: https://github.com/phentrieve/ontotator/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/phentrieve/ontotator/compare/v0.14.1...v0.15.0
 [0.14.1]: https://github.com/phentrieve/ontotator/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/phentrieve/ontotator/compare/v0.13.0...v0.14.0
