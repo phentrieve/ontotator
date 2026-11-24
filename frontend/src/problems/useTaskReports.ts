@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type AssignmentView, type ProblemReportView } from "../api/client";
+import { NOTIFICATIONS_CHANGED } from "../notifications/notificationsEvents";
 
 const newestFirst = (a: ProblemReportView, b: ProblemReportView): number => Date.parse(b.created_at ?? "") - Date.parse(a.created_at ?? "");
 
@@ -24,7 +25,8 @@ export interface TaskReports {
 }
 
 /**
- * The reporter's reports on one task. Loads on mount and on window focus; the caller reloads when the dialog
+ * The reporter's reports on one task. Loads on mount, on window focus and when the bell's unread count changes
+ * (issue 651: an answer that resumes a paused task reaches a person who stays in it); the caller reloads when the dialog
  * opens and after each own action. One request counter covers the report list and the task metadata: a
  * response pair older than the newest request is discarded as a whole. A changed task is handed to
  * `onRefresh` (never when nothing changed, so no refresh loop).
@@ -64,7 +66,8 @@ export function useTaskReports(assignment: AssignmentView, onRefresh: (assignmen
     void reload(false);
     const onFocus = () => { void reload(true); };
     window.addEventListener("focus", onFocus);
-    return () => { mounted.current = false; window.removeEventListener("focus", onFocus); };
+    window.addEventListener(NOTIFICATIONS_CHANGED, onFocus);
+    return () => { mounted.current = false; window.removeEventListener("focus", onFocus); window.removeEventListener(NOTIFICATIONS_CHANGED, onFocus); };
   }, [reload, assignment.id]);
 
   return { reports, error, reload, put };
